@@ -380,8 +380,8 @@ Why it matters: the shared definitions must hold every event the engine writes.
 Found: 2026-11-01, in the focused review of unit 3.
 State: deferred by the lead's fix-round-1 rulings.
 
-- `PromptSent` repeats the prompt text from `DeliveryQueued`; unit 4a decides whether both copies are needed.
-- `SessionOpened.process` overlaps the transactional process side rows; unit 4a decides how these records relate.
+- `PromptSent` repeats the prompt text from `DeliveryQueued`. Decided in unit 4a (2026-11-01): the log keeps both copies and changes no contract. The two events happen at different times, a queued prompt can wait a long time, and a thread reader needs `PromptSent` to stand alone. The cost is one extra copy of each prompt in the log. Each copy passes through the redactor on its own.
+- `SessionOpened.process` overlaps the transactional process side rows. Decided in unit 4a (2026-11-01): the event keeps the historical snapshot, and the `processes` row, written in the same transaction by `EventLog.append`, is the operational record that the restart sweep reads. Neither is derived from the other.
 - `CommandRefused.reason` is free text; unit 5 must keep request content, including secret values, out of it.
 - `adapterPath` accepts `/../x`; unit 6 resolves the absolute path before spawning the adapter.
 - The review's remaining minor mutations, M9 and M12, are not covered by tests in this round.
@@ -499,3 +499,50 @@ when it needs them. Unit 8a does not add unused exports.
 Harness-path overrides introduced through settings must also be absolute paths.
 The owner must read the first generated `claude.ndjson` before committing it.
 The lead tells the manager this when requesting the owner-run recording.
+
+## 31. The event log's agent column covers only events with a top-level agent id
+
+Found: 2026-11-01, in unit 4a.
+State: open.
+
+What happened: `EventLog.append` fills `events.agent_id` and the envelope's
+`agentId` from the event's own `agentId` field. Events that name an agent
+elsewhere, such as `DeliveryQueued` (its `delivery.target`), or that name no
+agent, such as account and device events, get a null `agent_id`.
+What should happen: unit 4b, when it filters a thread by agent, either reads
+the payload for those events or the contracts name one agent field for every
+event that belongs to a thread.
+Why it matters: a subscriber that filters on the column alone would miss a
+queued delivery in the target's thread.
+
+## 32. A failed COMMIT left the copied SQLite client's transaction open
+
+Found: 2026-11-01, in the unit 4a review.
+State: fixed in `third_party/t3code/node-sqlite/src/nodeSqliteClient.ts`.
+
+What happened: the copied client (from T3 Code,
+`packages/shared/src/nodeSqliteClient.ts`) passed no `onCommitFailure` to
+`Client.make`. SQLite can keep a transaction open after a COMMIT fails, for
+example on a deferred foreign-key violation, so the rows of the failed batch
+stayed on the writer connection and the next transaction on it was unsafe.
+What should happen: a failed COMMIT is rolled back on the same connection. If
+that rollback fails too, the connection is not reused.
+The fix: `onCommitFailure` runs `ROLLBACK` and counts SQLite's "no transaction
+is active" error as clean. A failed rollback poisons the connection, and each
+later hand-out retries the rollback first, as Effect's `makeSqliteAcquirers`
+does. The client's acquirers and reader routing are unchanged.
+Why it matters: the event log promises that a batch is written whole or not at
+all, and the next append must not run inside a leftover transaction.
+
+## 33. The unit 4a review left two rules for later units
+
+Found: 2026-11-01, in the unit 4a review.
+State: open.
+
+- Unit 4b must publish a newly committed batch itself and must not treat a
+  receipt replay as a new batch, because `EventLog.append` returns the stored
+  envelopes for a repeated request id and a subscriber would see them twice.
+  The unit 4a review found this as F1.
+- The device writes and token revocation that unit 5a adds must follow the same
+  rule as decision row 32: each is written in one transaction, through
+  `EventLog.append`, together with the event that records it.
