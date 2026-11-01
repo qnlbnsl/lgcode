@@ -98,7 +98,30 @@ export interface ExitedEvent {
   readonly stderr: string;
 }
 
-export type FakeRunnerEvent = RunnerEvent | PermissionRequestedEvent | TurnEndedEvent | ExitedEvent;
+// Unit 5d: notices name the delivery sent by the runner. Replay and
+// available-commands notices never accept. Only pause errors requeue.
+export interface DeliveryUpdateEvent {
+  readonly _tag: "deliveryUpdate";
+  readonly agentId: AgentId;
+  readonly incarnation: string;
+  readonly deliveryId: string;
+  readonly kind: "message" | "plan" | "tool-call" | "file-change" | "available_commands_update";
+  readonly replay: boolean;
+  readonly text: string;
+}
+
+export interface PromptReplyEvent {
+  readonly _tag: "promptReply";
+  readonly agentId: AgentId;
+  readonly incarnation: string;
+  readonly deliveryId: string;
+  readonly outcome:
+    | { readonly _tag: "success" }
+    | { readonly _tag: "pause"; readonly reason: "out-of-usage" | "signed-out"; readonly error: string }
+    | { readonly _tag: "error"; readonly error: string };
+}
+
+export type FakeRunnerEvent = RunnerEvent | PermissionRequestedEvent | TurnEndedEvent | ExitedEvent | DeliveryUpdateEvent | PromptReplyEvent;
 
 // What `emit` takes: an `exited` event may leave out its incarnation, and
 // then gets the agent's current one (see `currentIncarnation`).
