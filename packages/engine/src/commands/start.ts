@@ -3,6 +3,7 @@ import { AgentId, DeliveryId, PermissionLevel, type Event } from "@shepherd/cont
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
+import { pickAccount } from "../accounts/pick.ts";
 import { canUseMode, checkFolder, folderForSpawn } from "../identity/ceiling.ts";
 import { mintAgentToken } from "../identity/tokens.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
@@ -24,10 +25,7 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
     const effort = payload.effort ?? harness.defaultEffort;
     if ((model !== undefined && harness.models.length > 0 && !harness.models.includes(model))
       || (effort !== undefined && harness.efforts.length > 0 && !harness.efforts.includes(effort))) return yield* refused();
-    const selection = payload.account;
-    const account = Object.values(snapshot.accounts).find((row) => row.harness === payload.harness
-      && row.enabled !== false && row.status === "available"
-      && (selection._tag === "any" || row.id === selection.accountId));
+    const account = pickAccount(snapshot, payload.harness, payload.account);
     if (account === undefined) return yield* refused("no usable account");
     const grant = yield* checkFolder({ ...runtime, caller: actor, parentFolder: parent?.folder ?? payload.folder, folder: payload.folder }).pipe(
       Effect.mapError(() => refused()),

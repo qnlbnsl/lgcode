@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { RunMode, type AgentId, type Delivery, type Event, type EventEnvelope } from "@shepherd/contracts";
+import { AccountId, RunMode, type AgentId, type Delivery, type Event, type EventEnvelope } from "@shepherd/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as PubSub from "effect/PubSub";
@@ -18,12 +18,13 @@ import { project, withWaitChecks } from "./waits.ts";
 type Row = Snapshot["deliveries"][string];
 const owner = { _tag: "owner" } as const;
 const decodeRunMode = Schema.decodeUnknownSync(RunMode);
+const decodeAccountId = Schema.decodeUnknownSync(AccountId);
 const pending = (row: Row) => row.status === "queued" || row.status === "sent";
 
 const asDelivery = ({ status: _status, method: _method, reason: _reason, ...delivery }: Row): Delivery => delivery;
 
-// Rows 29 and 51: a requeued delivery goes first, then the queue in the
-// order it was written.
+// Rows 29, 51 and 53: a requeued delivery and a carry-on go first, then the
+// queue in the order it was written.
 const nextQueued = (snapshot: Snapshot, agentId: string): Row | undefined => {
   const order = new Map<string, number>();
   for (const row of snapshot.threads[agentId] ?? []) {
@@ -32,7 +33,7 @@ const nextQueued = (snapshot: Snapshot, agentId: string): Row | undefined => {
       order.set(row.event.firstPromptDelivery.id, row.sequence);
     }
   }
-  const rank = (row: Row) => [row.reason === undefined ? 1 : 0, order.get(row.id) ?? Number.MAX_SAFE_INTEGER] as const;
+  const rank = (row: Row) => [row.reason === undefined && row.content._tag !== "carry-on" ? 1 : 0, order.get(row.id) ?? Number.MAX_SAFE_INTEGER] as const;
   return Object.values(snapshot.deliveries).filter((row) => row.target === agentId && row.status === "queued")
     .sort((a, b) => rank(a)[0] - rank(b)[0] || rank(a)[1] - rank(b)[1])[0];
 };
@@ -130,10 +131,35 @@ const failed = (snapshot: Snapshot, agentId: AgentId, deliveryId: string, reason
   return [...returnTo(snapshot, row, reason), { _tag: "StateChanged", agentId, state: { _tag: "idle" } }];
 };
 
-// Rows 51 and 68. A classified pause pauses the agent, which then holds
-// nothing (holders.ts). A delivery the agent had not yet accepted goes back
-// to the head of its queue. An accepted one stays accepted, and the agent is
-// paused mid-turn; carrying on is unit 6b's.
+// What pausing one agent on a paused account writes: a delivery it had sent
+// but not yet accepted goes back to the head of its queue (row 29); an
+// accepted one stays accepted, and the agent is paused mid-turn so that it
+// gets a carry-on on return (row 53). An idle agent is paused with nothing
+// to carry on. The pause keeps its reason and, for a usage limit, the reset
+// time the provider gave.
+const pauseAgent = (
+  snapshot: Snapshot, agentId: AgentId, reason: "limit" | "signed-out", resetAt: number | undefined,
+): ReadonlyArray<Event> => {
+  const state = snapshot.agents[agentId]?.state;
+  if (state === undefined) return [];
+  const turn = state._tag === "working" ? snapshot.deliveries[currentTurn(snapshot, agentId) ?? ""] : undefined;
+  const unaccepted = turn?.status === "sent";
+  const midTurn = state._tag === "paused" ? state.midTurn : state._tag === "working" && !unaccepted;
+  const requeue: ReadonlyArray<Event> = unaccepted
+    ? [{ _tag: "DeliveryRequeued", agentId, deliveryId: turn.id, reason: "agent paused" }] : [];
+  return [...requeue, { _tag: "StateChanged", agentId, state: {
+    _tag: "paused", reason, midTurn,
+    ...(reason === "limit" && resetAt !== undefined ? { resetAt } : {}),
+  } }];
+};
+
+// Rows 28, 51, 53 and 68. A classified pause is about the account, not about
+// one agent. The account is marked unusable, and every agent on it pauses
+// (an agent already paused for a limit is moved to a sign-out, which only
+// the owner clears). The reporting agent's own delivery decides whether it is
+// mid-turn. A sign-out, and a usage limit with no known reset time, tell the
+// owner, since no timer will bring the account back. The provider's own
+// error text is never written (decision row 40).
 export const promptReply = (
   snapshot: Snapshot, event: Extract<RunnerEvent, { _tag: "promptReply" }>, redactText: (text: string) => Effect.Effect<string>,
 ): Effect.Effect<ReadonlyArray<Event>> => Effect.gen(function* () {
@@ -144,12 +170,28 @@ export const promptReply = (
     case "pause": {
       const row = turnDelivery(snapshot, agentId, deliveryId);
       if (row === undefined) return [];
-      const midTurn = row.status === "accepted";
+      const accountId = decodeAccountId(snapshot.agents[agentId]!.account);
+      const account = snapshot.accounts[accountId];
+      // A sign-out outranks a usage limit: once signed out, only the owner
+      // brings the account back.
+      const reason = outcome.reason === "signed-out" || account?.status === "needs-sign-in" ? "signed-out" : "limit";
+      const resetAt = outcome.resetAt;
+      const marked: ReadonlyArray<Event> = account === undefined ? []
+        : reason === "signed-out" ? [{ _tag: "AccountNeedsSignIn", accountId, reason: "account needs sign-in" }]
+        : [{ _tag: "AccountOutOfUsage", accountId, ...(resetAt === undefined ? {} : { resetAt }) }];
+      // Only a sign-out is account-wide. A usage limit pauses the agent that
+      // met it; its siblings meet the limit on their own turns.
+      const onAccount = reason !== "signed-out" ? [] : Object.values(snapshot.agents).filter((agent) => agent.account === accountId && agent.agentId !== agentId
+        && (agent.state._tag === "working" || agent.state._tag === "idle"
+          || (agent.state._tag === "paused" && agent.state.reason === "limit")));
       const paused: ReadonlyArray<Event> = [
-        ...(midTurn ? [] : [{ _tag: "DeliveryRequeued" as const, agentId, deliveryId, reason: "agent paused" }]),
-        { _tag: "StateChanged", agentId, state: {
-          _tag: "paused", reason: outcome.reason === "out-of-usage" ? "limit" : "signed-out", midTurn,
-        } },
+        ...marked,
+        ...pauseAgent(snapshot, agentId, reason, resetAt),
+        ...onAccount.flatMap((agent) => pauseAgent(snapshot, agent.agentId, reason, resetAt)),
+        ...(reason === "signed-out" || resetAt === undefined ? [{
+          _tag: "OwnerNeeded" as const, agentId,
+          reason: reason === "signed-out" ? "account needs sign-in" : "account is out of usage, no reset time known",
+        }] : []),
       ];
       return [...paused, ...moveHeld(project(snapshot, paused))];
     }
@@ -200,7 +242,8 @@ export const dispatchQueued = (agentId: AgentId) => Effect.gen(function* () {
 
 // The events after which an agent may have something to send: a new queue
 // entry, an opened session, a turn end, or a returned or requeued delivery.
-// A state change is not one: whoever writes it (a reload, unit 6b) drains.
+// A state change to idle is one too: an account that came back (unit 6b)
+// leaves its agents idle with their requeued deliveries waiting.
 const readyAfter = (envelope: EventEnvelope): ReadonlyArray<AgentId> => {
   const event = envelope.event;
   switch (event._tag) {
@@ -209,6 +252,7 @@ const readyAfter = (envelope: EventEnvelope): ReadonlyArray<AgentId> => {
     case "TurnEnded":
     case "DeliveryReturned":
     case "DeliveryRequeued": return [event.agentId];
+    case "StateChanged": return event.state._tag === "idle" ? [event.agentId] : [];
     default: return [];
   }
 };
