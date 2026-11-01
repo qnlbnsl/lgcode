@@ -864,7 +864,8 @@ folder, or for the service to hold memory, beyond what the ceiling promises.
 - **What happens:** decision row 67 says a crash suspends an agent's waits and `resume` re-opens them. `WaitRow` has only the statuses open, satisfied and cancelled, and no event marks a wait as suspended.
 - **Why it matters:** the 5.4 `resume` case cannot assert that suspended waits come back. It asserts only that `resume` does not cancel them, which a build with no suspend at all also passes.
 - **What should change:** the owner or the lead decides whether a wait gets a suspended status, or whether a wait simply stays open across a crash. Unit 5d.1 owns the answer.
-- **State:** open.
+- **Unit 5d test contract:** Suspension is derived from an open non-blocking wait and its waiter being crashed. The durable `AgentCrashed` event is the suspension marker. A suspended wait stays open, emits no wake, and is re-checked by a successful reloadable `resume`. Only `stop` writes `WaitCancelled`. This uses the existing event contracts, so no separate suspended status is required. The tests also withdraw a wake already queued when its waiter crashes or stops.
+- **State:** the test contract is written; implementation remains open for unit 5d.
 
 ## 53. The event log gives a command handler no way to check and write in one writer turn
 
