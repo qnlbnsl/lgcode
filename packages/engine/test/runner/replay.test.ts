@@ -1,8 +1,8 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
-import { afterEach, beforeEach, expect, vi } from "vitest";
+import { afterEach, beforeEach, expect, it as plainIt, vi } from "vitest";
 
 import { parseReplay, ReplayParseError } from "../../../testing/src/replay.ts";
 import type { RunnerEvent } from "../../src/runner/Runner.ts";
@@ -47,42 +47,57 @@ const ofDelivery = (events: ReadonlyArray<RunnerEvent>, deliveryId: string) =>
 const messages = (events: ReadonlyArray<RunnerEvent>) =>
   events.flatMap((event) => event._tag === "deliveryUpdate" && event.kind === "message" ? [event.text] : []);
 
-// The agent text each recording holds (issue 38: the third harness's
-// recording is an out-of-usage reply that ends normally).
-const expected = {
-  claude: { protocolVersion: 2, sessionId: "5a051567-eff6-47dd-96cf-b043a7b0635a", text: "ok" },
-  codex: { protocolVersion: 2, sessionId: "01a196cd-177a-7062-a56c-7a0fb3765163", text: "ok" },
-  cursor: { protocolVersion: 1, sessionId: "ecc95bd5-7b12-40f4-b2e9-5a84cecae71b", text: "\n\nUpgrade your plan to continue" },
-} as const;
+// The recordings and what each replays as (issue 38). The third harness has two:
+// `cursor-out-of-usage.ndjson` is the recording made while the owner's account had no usage
+// left, an out-of-usage reply that ends normally, and `cursor.ndjson` is the normal greeting
+// the owner records after the account resets. `cursor.ndjson` is replayed only when it exists.
+const normal = { _tag: "success" } as const;
+const outOfUsage = { _tag: "pause", reason: "out-of-usage" } as const;
+const recorded = [
+  { name: "claude", file: "claude.ndjson", harness: "claude", protocolVersion: 2, sessionId: "5a051567-eff6-47dd-96cf-b043a7b0635a", text: "ok", outcome: normal },
+  { name: "codex", file: "codex.ndjson", harness: "codex", protocolVersion: 2, sessionId: "01a196cd-177a-7062-a56c-7a0fb3765163", text: "ok", outcome: normal },
+  { name: "cursor out of usage", file: "cursor-out-of-usage.ndjson", harness: "cursor", protocolVersion: 1, sessionId: "ecc95bd5-7b12-40f4-b2e9-5a84cecae71b", text: "\n\nUpgrade your plan to continue", outcome: outOfUsage },
+] as const;
+// The recording is not here yet, so the case below reads only its shape, not a session id or text.
+const normalCursor = "cursor.ndjson";
+const normalCursorMissing = "6.2 replay cursor (normal reply): skipped, awaiting the owner's normal Cursor recording (issue 38)";
 
-for (const [fixture, want] of Object.entries(expected)) {
-  live(`6.2 replay ${fixture}: the recorded session opens with its session id and version, its agent text becomes exactly one message update, then promptReply success, then turnEnded (breaks if the runner misreads this adapter's protocol generation, reports the user's own echoed prompt or usage notices as agent text, or ends the turn before the reply)`, () =>
+const replayCase = (c: { readonly name: string; readonly file: string; readonly harness: string; readonly protocolVersion: unknown; readonly sessionId: unknown; readonly text: unknown; readonly outcome: { readonly _tag: string } }) =>
+  live(`6.2 replay ${c.name}: the recorded session opens with its session id and version, its agent text becomes exactly one message update, then promptReply ${c.outcome._tag === "success" ? "success" : "pause"}, then turnEnded (breaks if the runner misreads this adapter's protocol generation, reports the user's own echoed prompt or usage notices as agent text, or ends the turn before the reply)`, () =>
     withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
-      const adapter = writeReplayAdapter(rig, `${fixture}.ndjson`, rig.work);
-      const spawn = yield* spawnFor(rig, harnessFor(fixture, adapter), accountFor(fixture, { turns: [] }, echoFile(rig)));
+      const adapter = writeReplayAdapter(rig, c.file, rig.work);
+      const spawn = yield* spawnFor(rig, harnessFor(c.harness, adapter), accountFor(c.harness, { turns: [] }, echoFile(rig)));
       const opened = yield* context.runner.start(spawn.input);
-      expect(opened.session).toEqual({ _tag: "acp", sessionId: want.sessionId });
-      expect(opened.protocolVersion).toBe(want.protocolVersion);
+      expect(opened.session).toEqual({ _tag: "acp", sessionId: c.sessionId });
+      expect(opened.protocolVersion).toEqual(c.protocolVersion);
       const delivery = deliveryFor(spawn.agentId, "Reply with the word ok. Do not run tools or create or change any file.");
       const before = context.events.length;
       yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
       yield* context.waitFor((event) => event._tag === "turnEnded" && event.deliveryId === delivery.id, before);
       const own = ofDelivery(context.eventsAfter(before), delivery.id);
-      expect(messages(own)).toEqual([want.text]);
+      expect(messages(own)).toEqual([c.text]);
       const tags = own.filter((event) => event._tag !== "deliveryUpdate").map((event) => event._tag);
       expect(tags).toEqual(["promptReply", "turnEnded"]);
-      expect(own.find((event) => event._tag === "promptReply")).toMatchObject({ outcome: fixture === "cursor"
-        ? { _tag: "pause", reason: "out-of-usage" } : { _tag: "success" } });
+      expect(own.find((event) => event._tag === "promptReply")).toMatchObject({ outcome: c.outcome });
       for (const event of own) expect(event).toMatchObject({ agentId: spawn.agentId, incarnation: spawn.incarnation });
       expect(own.every((event) => event._tag !== "deliveryUpdate" || event.replay === false)).toBe(true);
     })));
+
+for (const c of recorded) replayCase(c);
+
+// A normal Cursor greeting: a successful reply with text and no pause, like claude and codex.
+if (existsSync(fixturePath(normalCursor))) {
+  replayCase({ name: "cursor (normal reply)", file: normalCursor, harness: "cursor", protocolVersion: expect.any(Number), sessionId: expect.stringMatching(/\S/), text: expect.stringMatching(/\S/), outcome: normal });
+} else {
+  plainIt.skip(normalCursorMissing, () => {});
 }
 
 it.effect("6.2 fixtures: every recorded fixture parses, and a broken one fails with the exported ReplayParseError naming its line (breaks if a fixture is corrupted or the parse error is no longer exported)", () =>
   Effect.gen(function* () {
-    for (const fixture of Object.keys(expected)) {
-      const transcript = yield* parseReplay(readFileSync(fixturePath(`${fixture}.ndjson`), "utf8"));
-      expect(transcript.provider).toBe(fixture);
+    const files = [...recorded.map((c) => [c.file, c.harness] as const), ...(existsSync(fixturePath(normalCursor)) ? [[normalCursor, "cursor"] as const] : [])];
+    for (const [file, harness] of files) {
+      const transcript = yield* parseReplay(readFileSync(fixturePath(file), "utf8"));
+      expect(transcript.provider).toBe(harness);
     }
     const broken = yield* parseReplay(`${readFileSync(fixturePath("codex.ndjson"), "utf8")}{broken\n`).pipe(Effect.flip);
     expect(broken).toBeInstanceOf(ReplayParseError);
