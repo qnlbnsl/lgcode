@@ -207,6 +207,12 @@ const family = (fakes: Fakes) => Effect.gen(function* () {
   return { grand, lead, worker, ...request };
 });
 
+// Issue 124: the engine delivers the request to its holder in a fiber of its own (unit 5d), and that
+// `DeliverySent` can commit after a test has read its log watermark. A test that takes a watermark and
+// then holds the writer permit waits for the delivery first, so nothing earlier can land in between.
+const afterHolderDelivery = (row: { readonly deliveryId: string }) =>
+  eventually(deliveryRow(row.deliveryId), (found) => found?.status === "sent");
+
 it.live("5.5 holder answers: catches an answer by the holder that is refused, records the wrong answerer, leaves the holder's delivery queued, or never reaches the runner", () =>
   withRig((fakes) => Effect.gen(function* () {
     const { lead, id, row } = yield* family(fakes);
@@ -293,7 +299,8 @@ it.live("5.5 first answer wins: catches a second answer that overwrites the firs
 for (const pair of ["the holder and the owner", "the owner twice"] as const) {
   it.live(`5.5 two answers racing, ${pair}: catches the open and holder checks run outside the writer, so two answers queued behind it both take effect`, () =>
     withRig((fakes) => Effect.gen(function* () {
-      const { lead, id } = yield* family(fakes);
+      const { lead, id, row } = yield* family(fakes);
+      yield* afterHolderDelivery(row);
       const first = pair === "the owner twice" ? ownerCredential : agentCredential(lead.token);
       const raced = yield* behindWriter([
         call(first, "answer", answer(id, "once")),
@@ -318,7 +325,8 @@ for (const pair of ["the holder and the owner", "the owner twice"] as const) {
 
 it.live("5.5 answer racing pass-up: catches a holder's answer and its own pass-up both taking effect, so a moved request is answered by its former holder or an answered one moves", () =>
   withRig((fakes) => Effect.gen(function* () {
-    const { lead, id } = yield* family(fakes);
+    const { lead, id, row } = yield* family(fakes);
+    yield* afterHolderDelivery(row);
     const raced = yield* behindWriter([
       call(agentCredential(lead.token), "pass-up", passUp(id)),
       call(agentCredential(lead.token), "answer", answer(id, "once")),
@@ -333,7 +341,8 @@ it.live("5.5 answer racing pass-up: catches a holder's answer and its own pass-u
 
 it.live("5.5 token race on answer: catches an answer whose token check runs before the writer, so a holder revoked while its answer waited still answers", () =>
   withRig((fakes) => Effect.gen(function* () {
-    const { lead, id } = yield* family(fakes);
+    const { lead, id, row } = yield* family(fakes);
+    yield* afterHolderDelivery(row);
     const sql = yield* SqlClient.SqlClient;
     const raced = yield* behindWriter(
       [call(agentCredential(lead.token), "answer", answer(id, "once"))],

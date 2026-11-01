@@ -18,6 +18,9 @@ type DiagnosticStep =
   | { type: "ext_notification"; method: string; params: Schema.Json }
   | { type: "stderr_flood"; bytes: number }
   | { type: "spawn_grandchild" }
+  // Unit 6c fix round 1 (F-1): starts a helper in its own session, outside the adapter's process group,
+  // that inherits the adapter's stderr, and records its pid in the echo file as `helperPids`.
+  | { type: "spawn_detached_helper" }
 type StepDiagnostic = DiagnosticStep extends infer D ? D extends { type: infer T } ? Omit<D, "type"> & { step: T } : never : never
 type Step = DiagnosticStep | StepDiagnostic
   | { step: "text"; text: string }
@@ -66,7 +69,11 @@ const environment = process.env
 // what it was started with (pid, arguments, working folder, environment) and every frame it
 // received. Nothing is written without the variable.
 const echoPath = environment.FAKE_AGENT_ECHO
-const echo = { pid: process.pid, argv: [...process.argv], cwd: process.cwd(), env: { ...environment }, inbound: [] as Array<unknown> }
+const echo = {
+  pid: process.pid, argv: [...process.argv], cwd: process.cwd(), env: { ...environment }, inbound: [] as Array<unknown>,
+  // Unit 6c fix round 1: the pids of the children the diagnostic steps start, so a test can check them from outside.
+  grandchildPids: [] as Array<number>, helperPids: [] as Array<number>,
+}
 const writeEcho = () => { if (echoPath !== undefined) writeFileSync(echoPath, JSON.stringify(echo), { mode: 0o600 }) }
 writeEcho()
 
@@ -102,8 +109,16 @@ const spawnGrandchild = () => Effect.callback<number, AcpRequestError>((resume) 
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 60000)"], { env: environment, stdio: "ignore" })
   const closed = new Promise<void>((resolve) => child.once("close", () => { grandchildren.delete(child); resolve() }))
   grandchildren.set(child, closed)
-  child.once("spawn", () => resume(Effect.succeed(child.pid!)))
+  child.once("spawn", () => { echo.grandchildPids.push(child.pid!); writeEcho(); resume(Effect.succeed(child.pid!)) })
   child.once("error", () => resume(Effect.fail(AcpRequestError.internalError("Unable to start diagnostic child"))))
+})
+// A helper that leaves the adapter's process group and session and keeps the adapter's stderr open. It ends
+// by itself after a minute, so a test that fails to stop it leaves nothing running for long.
+const spawnDetachedHelper = () => Effect.callback<number, AcpRequestError>((resume) => {
+  const child = spawn(process.execPath, ["-e", "setTimeout(() => process.exit(0), 60000)"], { env: environment, stdio: ["ignore", "ignore", "inherit"], detached: true })
+  child.unref()
+  child.once("spawn", () => { echo.helperPids.push(child.pid!); writeEcho(); resume(Effect.succeed(child.pid!)) })
+  child.once("error", () => resume(Effect.fail(AcpRequestError.internalError("Unable to start diagnostic helper"))))
 })
 const floodStderr = (bytes: number) => Effect.callback<void, AcpRequestError>((resume) => {
   if (!Number.isSafeInteger(bytes) || bytes < 0) { resume(Effect.fail(AcpRequestError.invalidParams("Invalid stderr byte count"))); return }
@@ -245,6 +260,7 @@ const program = Effect.gen(function*() {
           case "ext_notification": yield* agent.client.extNotification(diagnostic.method, diagnostic.params); continue
           case "stderr_flood": yield* floodStderr(diagnostic.bytes); continue
           case "spawn_grandchild": yield* text(`grandchild pid: ${yield* spawnGrandchild()}`); continue
+          case "spawn_detached_helper": yield* text(`helper pid: ${yield* spawnDetachedHelper()}`); continue
         }
         if ("type" in step) continue
         switch (step.step) {
