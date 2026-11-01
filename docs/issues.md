@@ -1916,3 +1916,36 @@ State: open question for the owner.
 What happens: rows 28 and 53 make only a sign-out account-wide. When one agent reports a usage limit, the account is marked out of usage and that agent pauses, but its idle siblings keep receiving work, and each may hit the limit once before it pauses itself.
 What should happen: the owner decides whether idle siblings should pause (and their queued work wait) as soon as the account is known to be out of usage.
 Why it matters: each sibling's first turn after the limit is wasted, and a turn that fails with the limit costs a delivery requeue.
+
+## 144. Replay updates lose the speaker before recovery can scan delivery identifiers
+
+Found: 2026-11-01, while writing the unit 6d restart tests at `287c4df`.
+State: open for unit 6d.
+
+What happens: `packages/engine/src/runner/translate.ts` translates both user
+and agent message chunks to the same message shape during a reload.
+`packages/engine/src/runner/AcpRunner.ts` then publishes a replay update
+without its speaker. The recovery scanner cannot tell whether a delivery
+identifier occurred in a user message or in an agent's answer.
+What should happen: preserve the speaker through translation, redaction and
+publication. Decision row 66 permits matching only joined user-message
+content. The unit 6d tests use an optional `role: "user" | "agent"` on message
+updates, and require the real runner to preserve it too.
+Why it matters: scanning an agent answer as an acknowledgement can lose an
+unaccepted delivery. Ignoring user replay chunks can repeat an accepted one.
+
+## 145. Account-return carry-ons do not include their delivery identifier on the wire
+
+Found: 2026-11-01, while writing the unit 6d real-runner tests at `287c4df`.
+State: open for unit 6d.
+
+What happens: `packages/engine/src/accounts/available.ts` queues a carry-on
+with plain text. `packages/engine/src/runner/AcpRunner.ts` sends that text
+unchanged. The carry-on's delivery identifier is absent from the prompt.
+What should happen: a recovery or account-return carry-on includes its
+identifier in the prompt envelope, as ordinary prompts do. Decision rows 29
+and 51 use that identifier to distinguish a retry from work already accepted
+before a service interruption.
+Why it matters: after another interruption, a replay scanner cannot find an
+accepted carry-on whose identifier never reached the adapter. The real-runner
+restart test checks the identifier in the actual prompt frame.

@@ -54,6 +54,8 @@ type Step = DiagnosticStep | StepDiagnostic
   | { step: "text_after_turn"; text: string; ms: number; plan?: AcpSchema.PlanEntry[] }
 interface Script {
   protocolVersion?: 1 | 2
+  // Unit 6d: advertise a peer that cannot reload, without starting a real adapter.
+  reloadable?: boolean
   reportVersion?: boolean
   agentInfo?: { name: string; version: string }
   configOptions?: AcpSchema.SessionConfigOption[]
@@ -168,7 +170,7 @@ const scriptedStdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
     if (update?.sessionUpdate === "state_update" && update.state === "idle") stops.set(frame.params.sessionId, update.stopReason)
     if (frame.result && methods.get(frame.id) === "initialize") {
       if (script.reportVersion === false) delete frame.result.info.version
-      if (script.protocolVersion === 1) frame.result = { protocolVersion: 1, agentInfo: frame.result.info, agentCapabilities: { loadSession: true }, authMethods: [] }
+      if (script.protocolVersion === 1) frame.result = { protocolVersion: 1, agentInfo: frame.result.info, agentCapabilities: { loadSession: script.reloadable !== false }, authMethods: [] }
     }
     if (script.protocolVersion === 1 && frame.result && methods.get(frame.id) === "session/load") {
       frame.result.configOptions = (frame.result.configOptions ?? []).map(({ configId, ...option }: { configId: string }) => ({ ...option, id: configId }))
@@ -208,7 +210,7 @@ const program = Effect.gen(function*() {
   const agent = yield* AcpAgent.AcpAgent
   const sessions = new Map<string, { turn: number; options: AcpSchema.SessionConfigOption[]; cancel?: Deferred.Deferred<void> }>()
   let nextSession = 0
-  yield* agent.handleInitialize(() => Effect.succeed({ protocolVersion: 2, info: script.agentInfo ?? { name: "fake-agent", version: "0.0.0" }, capabilities: { session: {} } }))
+  yield* agent.handleInitialize(() => Effect.succeed({ protocolVersion: 2, info: script.agentInfo ?? { name: "fake-agent", version: "0.0.0" }, capabilities: script.reloadable === false ? {} : { session: {} } }))
   yield* agent.handleCreateSession(() => Effect.sync(() => {
     const sessionId = `fake-session-${++nextSession}`
     const options = structuredClone(script.configOptions ?? [])
