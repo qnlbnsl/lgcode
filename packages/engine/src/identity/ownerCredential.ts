@@ -26,15 +26,15 @@ const errorCode = (error: unknown): string | undefined =>
     : undefined;
 
 // Decision row 37: the state folder is 0700 and owned by the service's user,
-// checked at every start. A folder with wider modes is refused, never
-// repaired, so the owner learns that it was open.
+// checked at every start. Any other permission bits are refused, never
+// repaired, so the owner learns that it was open (fix round 1, ruling 6).
 const checkStateFolder = (folder: string): string => {
   mkdirSync(folder, { recursive: true, mode: 0o700 });
   const real = realpathSync(folder);
   const stats = statSync(real);
   if (!stats.isDirectory()) throw refuse("state folder is not a directory");
   if (stats.uid !== process.getuid?.()) throw refuse("state folder is owned by another user");
-  if ((stats.mode & 0o077) !== 0) throw refuse("state folder is open to other users");
+  if ((stats.mode & 0o7777) !== 0o700) throw refuse("state folder mode is not 0700");
   return real;
 };
 
@@ -54,7 +54,7 @@ const readExisting = (path: string): Buffer | undefined => {
     const stats = fstatSync(fd);
     if (!stats.isFile()) throw refuse("owner credential is not a regular file");
     if (stats.uid !== process.getuid?.()) throw refuse("owner credential is owned by another user");
-    if ((stats.mode & 0o077) !== 0) throw refuse("owner credential is open to other users");
+    if ((stats.mode & 0o7777) !== 0o600) throw refuse("owner credential mode is not 0600");
     if (stats.size !== credentialBytes) throw refuse("owner credential is damaged");
     const bytes = Buffer.alloc(credentialBytes);
     let read = 0;

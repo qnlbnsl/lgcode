@@ -1,7 +1,7 @@
 import {
-  closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync, statSync,
+  closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, readlinkSync, readSync, realpathSync, statSync,
 } from "node:fs";
-import { basename, dirname, isAbsolute, join, parse, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, parse, resolve, sep } from "node:path";
 
 import {
   acpPermissionOptionKinds, comparePermission, permissionForOptionKind,
@@ -30,6 +30,11 @@ interface FolderRequest {
   readonly pluginRoot: string;
 }
 
+// `readMountInfo` replaces the read of `/proc/self/mountinfo`, for tests.
+interface Dependencies {
+  readonly readMountInfo?: (() => string) | undefined;
+}
+
 interface Identity {
   readonly dev: bigint;
   readonly ino: bigint;
@@ -38,13 +43,16 @@ interface Identity {
 class FolderGrant {
   readonly realPath: string;
   readonly #request: FolderRequest;
+  readonly #dependencies: Dependencies;
   readonly #identity: Identity;
-  constructor(realPath: string, request: FolderRequest, identity: Identity) {
+  constructor(realPath: string, request: FolderRequest, dependencies: Dependencies, identity: Identity) {
     this.realPath = realPath;
     this.#request = request;
+    this.#dependencies = dependencies;
     this.#identity = identity;
   }
   static request(grant: FolderGrant): FolderRequest { return grant.#request; }
+  static dependencies(grant: FolderGrant): Dependencies { return grant.#dependencies; }
   static identity(grant: FolderGrant): Identity { return grant.#identity; }
 }
 
@@ -84,7 +92,8 @@ const ancestry = (real: string): ReadonlyArray<Identity> => {
 };
 
 // Opens without following a symbolic link and without blocking on a FIFO, so
-// an agent-written `.git` cannot redirect or stall the check.
+// an agent-written file cannot redirect or stall the check. Anything but a
+// readable regular file of at most 4 KiB reads as absent.
 const readSmallFile = (path: string): string | undefined => {
   let fd: number;
   try {
@@ -103,6 +112,8 @@ const readSmallFile = (path: string): string | undefined => {
       read += count;
     }
     return buffer.subarray(0, read).toString("utf8");
+  } catch {
+    return undefined;
   } finally {
     closeSync(fd);
   }
@@ -119,14 +130,14 @@ const resolvedDirectory = (base: string, path: string): string | undefined => {
   }
 };
 
-// The git common directory of a folder, read from `.git` and `commondir`
-// directly; `git` is never run (decision row 56). A `.git` directory (a main
-// checkout) is its own common directory. A `.git` file must name a linked
-// worktree's private folder, which git always keeps at
-// `<common directory>/worktrees/<name>` with a `commondir` file; when that
-// folder also holds git's `gitdir` back-link, it must point at this folder's
-// `.git`. A `.git` file that simply names another repository's common
-// directory is not accepted.
+// The git common directory of a folder that holds `.git`, read from `.git`,
+// `commondir` and `gitdir` directly; `git` is never run (decision row 56).
+// A `.git` directory (a main checkout) is its own common directory. A `.git`
+// file must be a registered linked worktree, checked both ways (fix round 1,
+// ruling 8): its `gitdir:` names `<common directory>/worktrees/<name>`, that
+// folder's `commondir` names the common directory, and that folder's
+// `gitdir` back-link, a readable regular file, names this folder's `.git`
+// by device and inode. A missing or unreadable back-link refuses.
 const commonDirectory = (folder: string): Identity | undefined => {
   const dotGit = join(folder, ".git");
   let stats;
@@ -149,45 +160,111 @@ const commonDirectory = (folder: string): Identity | undefined => {
   const worktrees = resolvedDirectory(common, "worktrees");
   if (worktrees === undefined || !sameIdentity(identityOf(dirname(gitdir)), identityOf(worktrees))) return undefined;
   const backLink = readSmallFile(join(gitdir, "gitdir"));
-  if (backLink !== undefined) {
-    try {
-      if (!sameIdentity(identityOf(resolve(gitdir, firstLine(backLink))), identityOf(dotGit))) return undefined;
-    } catch {
-      return undefined;
-    }
+  if (backLink === undefined) return undefined;
+  try {
+    if (!sameIdentity(identityOf(resolve(gitdir, firstLine(backLink))), identityOf(dotGit))) return undefined;
+  } catch {
+    return undefined;
   }
   return identityOf(common);
 };
 
-const check = (request: FolderRequest): FolderGrant => {
+// The repository a parent works in: the first folder, from the parent's
+// own folder up to the root, that holds `.git` (fix round 1, ruling 9).
+const parentCommonDirectory = (parentReal: string): Identity | undefined => {
+  for (let path = parentReal; ; path = dirname(path)) {
+    let present = true;
+    try {
+      lstatSync(join(path, ".git"));
+    } catch {
+      present = false;
+    }
+    if (present) return commonDirectory(path);
+    if (path === parse(path).root) return undefined;
+  }
+};
+
+// The mount points listed in a `/proc/<pid>/mountinfo` text: the fifth
+// field, with the kernel's octal escapes for space, tab, newline and
+// backslash undone.
+const mountPoints = (table: string): ReadonlyArray<string> =>
+  table.split("\n").flatMap((line) => {
+    const field = line.split(" ")[4];
+    return field === undefined || field === ""
+      ? []
+      : [field.replace(/\\([0-7]{3})/g, (_, octal: string) => String.fromCharCode(Number.parseInt(octal, 8)))];
+  });
+
+const readMountTable = (dependencies: Dependencies): string | undefined => {
+  if (dependencies.readMountInfo !== undefined) return dependencies.readMountInfo();
+  if (process.platform !== "linux") return undefined;
+  return readFileSync("/proc/self/mountinfo", "utf8");
+};
+
+// A protected folder, or an ancestor of one, mounted at or beneath the
+// requested folder (decision row 65, "or contains"; fix round 1, ruling 10).
+// The ancestor walk cannot see a mount below the folder, so every mount point
+// there is compared by device and inode. On Linux an unreadable mount table
+// refuses; other platforms have no table, as issue 49 records.
+const containsMountedProtected = (
+  dependencies: Dependencies, real: string, protectedIdentities: ReadonlyArray<Identity>,
+): boolean => {
+  let table: string | undefined;
+  try {
+    table = readMountTable(dependencies);
+  } catch {
+    throw new Refusal("the mount table cannot be read");
+  }
+  if (table === undefined) return false;
+  const below = real === parse(real).root ? real : real + sep;
+  for (const mountPoint of mountPoints(table)) {
+    if (mountPoint !== real && !mountPoint.startsWith(below)) continue;
+    let identity: Identity;
+    try {
+      identity = identityOf(mountPoint);
+    } catch {
+      throw new Refusal("a mount point inside the folder cannot be checked");
+    }
+    if (protectedIdentities.some((protectedIdentity) => sameIdentity(protectedIdentity, identity))) return true;
+  }
+  return false;
+};
+
+const check = (request: FolderRequest, dependencies: Dependencies): FolderGrant => {
   const real = realDirectory(request.folder, "folder is not an existing directory");
   const identity = identityOf(real);
-  if (request.caller._tag === "owner") return new FolderGrant(real, request, identity);
+  if (request.caller._tag === "owner") return new FolderGrant(real, request, dependencies, identity);
 
   // Refused folders (decision rows 56 and 65): the folder may not be, be
   // inside, or contain the owner's home folder, the state folder or the
   // plugin root, compared by device and inode. A protected folder that
   // cannot be resolved refuses every agent-started child.
   const own = ancestry(real);
+  const protectedLines: Array<Identity> = [];
   for (const protectedPath of [request.home, request.stateFolder, request.pluginRoot]) {
     const protectedReal = realDirectory(protectedPath, "a protected folder cannot be resolved");
     const protectedIdentity = identityOf(protectedReal);
     if (own.some((ancestor) => sameIdentity(ancestor, protectedIdentity))) {
       throw new Refusal("folder is, or is inside, a protected folder");
     }
-    if (ancestry(protectedReal).some((ancestor) => sameIdentity(ancestor, identity))) {
+    const line = ancestry(protectedReal);
+    if (line.some((ancestor) => sameIdentity(ancestor, identity))) {
       throw new Refusal("folder contains a protected folder");
     }
+    protectedLines.push(...line);
+  }
+  if (containsMountedProtected(dependencies, real, protectedLines)) {
+    throw new Refusal("folder contains a mounted protected folder");
   }
 
   // Containment (decision row 35a), by identity rather than by spelling.
   const parentReal = realDirectory(request.parentFolder, "parent folder is not an existing directory");
   const parentIdentity = identityOf(parentReal);
-  if (own.some((ancestor) => sameIdentity(ancestor, parentIdentity))) return new FolderGrant(real, request, identity);
+  if (own.some((ancestor) => sameIdentity(ancestor, parentIdentity))) return new FolderGrant(real, request, dependencies, identity);
   const childCommon = commonDirectory(real);
-  const parentCommon = commonDirectory(parentReal);
+  const parentCommon = parentCommonDirectory(parentReal);
   if (childCommon !== undefined && parentCommon !== undefined && sameIdentity(childCommon, parentCommon)) {
-    return new FolderGrant(real, request, identity);
+    return new FolderGrant(real, request, dependencies, identity);
   }
   throw new Refusal("folder is outside the parent's folder and its repository");
 };
@@ -203,18 +280,21 @@ const run = <A>(body: () => A): Effect.Effect<A, FolderRefused> =>
 // The ceiling's folder rule (criterion 5.12, task 5a.2). The grant keeps the
 // folder's resolved real path and its device and inode, and the original
 // request, so every later spawn can check it all again.
-export const checkFolder = (request: FolderRequest): Effect.Effect<FolderGrant, FolderRefused> =>
-  run(() => check(request));
+export const checkFolder = (
+  request: FolderRequest, dependencies: Dependencies = {},
+): Effect.Effect<FolderGrant, FolderRefused> =>
+  run(() => check(request, dependencies));
 
 // Called immediately before every spawn, `resume` and reload (decision rows
 // 56 and 65). The original request is checked again from the start, the
 // requested spelling must still resolve to the stored real path, and that
 // path must still be the same directory. The runner spawns in, and passes to
-// `session/new`, only the path this returns.
+// `session/new`, only the path this returns. Issue 49 records the gap left
+// between this check and the spawn.
 export const folderForSpawn = (grant: FolderGrant, operation: Operation): Effect.Effect<string, FolderRefused> =>
   run(() => {
     if (!(grant instanceof FolderGrant)) throw new Refusal("folder grant is not valid");
-    const again = check(FolderGrant.request(grant));
+    const again = check(FolderGrant.request(grant), FolderGrant.dependencies(grant));
     const stored = grant.realPath;
     if (again.realPath !== stored || realpathSync(stored) !== stored) {
       throw new Refusal(`folder moved before ${operation}`);
@@ -244,25 +324,62 @@ const isHarnessSettings = (path: string): boolean => {
 const isInside = (path: string, folder: string): boolean =>
   path === folder || path.startsWith(folder.endsWith(sep) ? folder : folder + sep);
 
-// The spellings of a path to check: as written, and with its longest existing
-// ancestor resolved, so a symbolic link to a settings file is caught.
-const spellings = (path: string): ReadonlyArray<string> => {
-  const written = resolve(path);
-  const rest: Array<string> = [];
-  for (let current = written; ; current = dirname(current)) {
-    try {
-      return [written, join(realpathSync(current), ...rest)];
-    } catch {
-      if (current === parse(current).root) return [written];
-      rest.unshift(basename(current));
+// The kernel's symbolic-link limit on Linux.
+const maximumLinks = 40;
+
+const errorCode = (error: unknown): string | undefined =>
+  typeof error === "object" && error !== null && "code" in error && typeof error.code === "string"
+    ? error.code
+    : undefined;
+
+// Resolves a path the way the kernel would open it (fix round 1, ruling 7):
+// one component at a time, following each existing symbolic link before the
+// next `..` is applied. Only components missing past the last existing one
+// are kept as written, and `..` among them is not resolved. Returns
+// undefined for anything the kernel would refuse or that cannot be read,
+// such as a link loop, a denied component or a file used as a folder.
+const resolveLikeKernel = (path: string): string | undefined => {
+  if (!isAbsolute(path)) return undefined;
+  const pending = path.split(sep).filter((part) => part !== "" && part !== ".");
+  let current = parse(path).root;
+  let links = 0;
+  while (pending.length > 0) {
+    const part = pending.shift()!;
+    if (part === "..") {
+      current = dirname(current);
+      continue;
     }
+    const next = join(current, part);
+    let stats;
+    try {
+      stats = lstatSync(next);
+    } catch (error) {
+      if (errorCode(error) !== "ENOENT" || pending.includes("..")) return undefined;
+      return join(next, ...pending);
+    }
+    if (stats.isSymbolicLink()) {
+      if (++links > maximumLinks) return undefined;
+      let target: string;
+      try {
+        target = readlinkSync(next);
+      } catch {
+        return undefined;
+      }
+      pending.unshift(...target.split(sep).filter((piece) => piece !== "" && piece !== "."));
+      if (isAbsolute(target)) current = parse(target).root;
+      continue;
+    }
+    if (pending.length > 0 && !stats.isDirectory()) return undefined;
+    current = next;
   }
+  return current;
 };
 
 // Who may choose a permission option (decision rows 35b, 56 and 65). The
 // owner may choose any. For an agent: an unknown kind, an option that
 // persists beyond the session (by its flag or its kind) and a write to a
-// harness settings path go to the owner whatever the agent's mode; an option
+// harness settings path go to the owner whatever the agent's mode; a
+// settings path that cannot be resolved goes to the owner too. An option
 // above the agent's mode is refused; anything else is allowed.
 export const canAnswerOption = (request: {
   readonly caller: Actor;
@@ -277,10 +394,12 @@ export const canAnswerOption = (request: {
   const implied = permissionForOptionKind(kind);
   if (persistent || implied.persistent) return "owner";
   if (request.settingsPath !== undefined) {
-    const paths = spellings(request.settingsPath);
+    const resolved = resolveLikeKernel(request.settingsPath);
+    if (resolved === undefined) return "owner";
+    const paths = [resolve(request.settingsPath), resolved];
     if (paths.some(isHarnessSettings)) return "owner";
     if (request.configDir !== undefined) {
-      const folders = spellings(request.configDir);
+      const folders = [resolve(request.configDir), resolveLikeKernel(request.configDir) ?? resolve(request.configDir)];
       if (paths.some((path) => folders.some((folder) => isInside(path, folder)))) return "owner";
     }
   }
