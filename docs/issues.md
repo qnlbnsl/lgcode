@@ -906,3 +906,66 @@ State: open for unit 6b's persistent store.
 What happens: the handler stores a wrapped secret before it commits the account's new reference. A failed event-log write can leave an unreferenced value in the secret store. The interface has no rollback or removal operation.
 Why it matters: storing after the event commit would instead risk committing a reference whose value was lost, including after a crash. The earlier store keeps committed references resolvable, but can retain an unused secret.
 What should happen: the persistent store defines how to collect unreferenced values or coordinate reference publication. Unit 5b uses only a scoped in-memory store and keeps every stored value wrapped as `Redacted`.
+
+## 58. A refusal by the state table or by rights is stored as the request's receipt
+
+Found: 2026-11-01, in the focused review of unit 5b.
+State: open; the current behaviour is kept until the plan's owner of row 30 rules on it.
+
+What happens: when the state table or the rights check refuses a command, the handler stores the refusal as the receipt for that caller and request id (`packages/engine/src/commands/CommandHandler.ts`, the refusal branch of `execute`). A retry with the same request id after the agent's state has changed returns the old "command refused".
+Why it matters: row 30 names only "no usable account" and "database busy" as temporary refusals that write no receipt. A state refusal also depends on state, so a client that retries with the same request id never sees the new outcome.
+What should happen: either the plan's decision log confirms that a state or rights refusal is final for its request id, and clients must send a new request id, or these refusals stop writing a receipt. Engine-lead's reading for now: it is final, as row 30 reads.
+
+## 59. A read failure inside a writer turn latches the whole writer
+
+Found: 2026-11-01, in the focused review of unit 5b.
+State: open.
+
+What happens: any `LogWriteFailed` raised inside an `EventLog.transact` callback latches the writer (`packages/engine/src/log/EventLog.ts`, the failure branch of `transact`). That includes read-type failures such as "database read failed" and "stored receipt is unreadable".
+Why it matters: one corrupt receipt row then blocks every later command until the engine restarts, and the restart's first retry latches it again.
+What should happen: latch only on failures of the write itself (the append, the commit or the side rows), and turn a read-type failure into a refusal of that one command.
+
+## 60. Envelope-only receipts rebuild list replies from the current snapshot
+
+Found: 2026-11-01, in the focused review of unit 5b.
+State: open, low impact.
+
+What happens: a receipt in the older envelope-only format has no stored reply. For `accounts` and `harnesses` list commands the handler rebuilds the reply from the current snapshot (`CommandHandler.ts`). That reply is not the first reply, and it does not pass `redactReceipt`.
+Why it matters: today only direct callers of `append` write the older format, so no command reaches this path. If one did, a retry could return data that differs from the first reply.
+What should happen: either remove the envelope-only path once no caller writes it, or refuse a list retry whose receipt holds no reply.
+
+## 61. A runner exit event carries no incarnation, so a late exit could hit a new run
+
+Found: 2026-11-01, in the focused review of unit 5b.
+State: open for unit 6a, which adds the first real producer of runner events.
+
+What happens: `RunnerEvent.exited` carries only the agent id (`packages/engine/src/runner/Runner.ts`). The crash consumer in `CommandHandler.ts` checks only the agent's current state.
+Why it matters: after `stop` and an immediate `resume`, a late exit from the old process would write `AgentCrashed` for the new run and revoke its new token.
+What should happen: the event carries an incarnation id (or the token hash of the run it belongs to), and the consumer ignores an exit whose incarnation is not the current one. Unit 6a should also add a test that reads the token table directly after `stop`, since only one 5b test covers that revocation today.
+
+## 62. A failed follow-up append after a rejected runner call leaves the agent starting
+
+Found: 2026-11-01, in the focused review of unit 5b.
+State: open for unit 6a's restart recovery.
+
+What happens: the command's receipt is stored with the first append. If the runner then rejects the start and the follow-up append (`AgentStartFailed` or `AgentReloadFailed`, with the token revocation) itself fails, a retry returns the stored success without calling the runner again.
+Why it matters: the agent stays in "starting" with a live token until the engine restarts.
+What should happen: restart recovery, or a sweep in unit 6a, moves an agent that has sat in "starting" with no runner session to "start failed" and revokes its token.
+
+## 63. The account choice "any" takes the first match, not row 28's picker
+
+Found: 2026-11-01, in the focused review of unit 5b.
+State: open for unit 6b.
+
+What happens: `start` with the account choice "any" takes the first matching account in insertion order (`packages/engine/src/commands/start.ts`).
+Why it matters: row 28 asks for the account with the fewest agents, then the lowest id. The stand-in spreads no load.
+What should happen: unit 6b replaces it with row 28's picker and tests the tie-break.
+
+## 64. The session a runner returns is discarded, and a failed resume records the wrong previous state
+
+Found: 2026-11-01, in the focused review of unit 5b.
+State: open for unit 6a.
+
+What happens: `start.ts` and `resume.ts` discard the `SessionInfo` that `runner.start` and `runner.load` return. No session reference and no `reloadable` flag are ever recorded, so a `resume` without `--fresh` always finds "cannot reload" for an agent started by the engine. Also, a failed reload writes its transition with `previous: "idle"` (`resume.ts`), even when the agent was crashed or stopped.
+Why it matters: reload cannot work end to end until the session is recorded, and the wrong previous state misleads anyone reading the event.
+What should happen: unit 6a writes `SessionOpened` with the session reference and the reloadable flag after a successful start or load, and the failure transition uses the agent's real previous state.
