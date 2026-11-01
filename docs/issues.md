@@ -555,7 +555,8 @@ State: accepted by the manager for now, because the repository is private;
 the owner decides whether to keep it.
 
 What happened: `packages/testing/fixtures/claude.ndjson` (lines 5 and 13-15,
-about 50 KB each) and `codex.ndjson` (line 5) hold the adapters'
+about 50 KB each) and `codex.ndjson` (line 5), and the third harness's `cursor.ndjson` (line 10,
+about 29 KB, recorded at e93bb00), hold the adapters'
 `available_commands_update` notifications. These list every skill and command
 installed on the owner's machine, with their descriptions. The manager found
 no email address, organization, account id, home path or key in either file.
@@ -624,3 +625,22 @@ of names that can hold secrets, and leaves well-known values that are not
 secret, such as the package name, version and script name.
 Why it matters: over-scrubbing is the safe direction, but it corrupts the
 fixtures' text and can hide real differences between recordings.
+
+## 38. The third harness's greeting fixture records an out-of-usage reply
+
+Found: 2026-11-01, by the lead, reading the `cursor.ndjson` recorded at e93bb00.
+State: open. The fixture is committed as recorded.
+
+What happened: `packages/testing/fixtures/cursor.ndjson` is the
+`read-only-greeting` scenario, but the owner's account for the third harness
+had no usage left. The prompt turn's only agent text is "Upgrade your plan to
+continue", and the turn still ends with `stopReason: "end_turn"`. The header
+also records `versionSource: "cli"`, because the adapter reports no version.
+What should happen: a test that replays this fixture treats it as an
+out-of-usage turn that ends normally, not as a greeting. When the account has
+usage again, the owner re-records it so a real greeting exists. Unit 6a's
+mapping of this harness's out-of-usage reply should use this transcript
+together with `errors/cursor-out-of-usage.json`.
+Why it matters: the adapter reports running out of usage as ordinary agent
+text with a normal stop reason, so Shepherd cannot tell it from a reply by the
+stop reason alone.
