@@ -410,3 +410,92 @@ Account environment names also recognize PASSWD and CREDENTIAL variants and
 the AUTH segment, and displayed states have a literal schema.
 Why it matters: every later engine unit consumes these contracts, so missing
 security and recovery rules would otherwise propagate into the implementation.
+
+## 26. The unit 8a tests cannot reach every secret-handling path in issue 13
+
+Found: 2026-11-01, while writing the unit 8a tests.
+State: open.
+
+What happened: issue 13 asks for planted secrets to be tested through the core,
+notification, extension-defect and encoding-failure logging paths. The fake agent
+tests drive a real session, so they reach the core and notification paths only
+when a step makes the client log them, and the session test asserts that nothing
+is logged with wire options off. The extension-defect and encoding-failure paths
+need a peer that sends a malformed frame or a failing extension handler, which no
+step in criterion 8.1 produces. The redacting service logger of units 5a and 7a
+does not exist yet, so the tests install a logger that records every message and
+cause, and they check that no planted secret appears in it or in the adapter's
+standard error.
+What should happen: units 6a, 6d and 7a add a malformed-frame step to the fake
+agent, or their own tests, and run the planted-secret check through the real
+redacting logger.
+Why it matters: without them, a secret in a defect or encoding failure could pass
+every unit 8a test and still reach a log.
+
+A related trap: the callback that `it.layer(...)("name", (it) => ...)` passes in
+`@effect/vitest` offers `it.effect` but not `it.live`, so a test that needs the
+real clock must call the top-level `it.live` and provide its layer itself, as the
+unit 8a tests do.
+
+## 27. Two fake-agent assertions used wire identifiers after client normalization
+
+Found: 2026-11-01, while implementing unit 8a.
+State: fixed by the test writer in 02ec6e6, merged with the lead's approval.
+
+What happened: the copied client converts version 2 configuration option
+`configId` fields into compatibility `id` fields. Two frozen tests expected the
+wire field after that conversion, so a conforming agent could not pass them.
+What should happen: assertions after the client use its compatibility shape.
+The fake agent and recorded frames keep the actual wire representation.
+Why it matters: the fake must exercise the protocol rather than compensate for
+an assertion by changing a real protocol frame.
+
+## 28. The pinned adapter and the fake agent report different protocol versions
+
+Found: 2026-11-01, in the installed first adapter's
+`claude-agent-acp` 0.99.1 `dist/acp-agent.js`, initialize response at line 1416.
+State: handled in the unit 8a recorder; the live check remains owner-run.
+
+What happened: the pinned adapter's source reports protocol version 1, while the
+fake agent tests require version 2. A recorder that demands version 2 rejects
+that pinned adapter before it can record anything. The external harness source
+can also expose modes without a mode configuration option.
+What should happen: the recorder offers version 2 and records the actual
+negotiated version. It distinguishes response shapes, uses the configuration
+option command in both versions, and refuses a harness without that option.
+It does not fall back to the older mode command or to a default permission.
+Why it matters: the frozen tests prove the fake's journey, but they cannot prove
+that every owner-installed harness supports the required recording interface.
+The owner-run command must surface that incompatibility instead of producing a
+fixture from an unconfirmed permission mode.
+
+## 29. Recording needed account identity removal and nonfatal sign-out probes
+
+Found: 2026-11-01, in the focused review of unit 8a at 99b70b8.
+State: fixed in the unit 8a follow-up.
+
+What happened: inbound extension frames could carry an account's email,
+organization and identifier into a fixture. Text scrubbing missed email,
+universally unique identifiers and several credential shapes. An empty-home
+probe without an authentication error also failed an otherwise valid recording.
+What should happen: the recorder discards every inbound extension frame before
+retention and reports only a count. Text scrubbing removes account identity,
+additional token shapes, long hexadecimal values and complete private key
+blocks. Protocol session identifiers retain their reference identity.
+A missing sign-out observation is reported without replacing an unverified
+sample or failing the command. Diagnostic fake steps exercise stderr draining
+and subprocess cleanup, and a version 1 wire mode exercises the pinned adapter's
+initialize shape.
+Why it matters: committed fixtures must not expose account identity or secrets,
+and an optional observation must not prevent an ordinary recording.
+
+## 30. Later engine units and the live recording have three review seams
+
+Found: 2026-11-01, in the focused review of unit 8a.
+State: open for the named later work.
+
+Unit 6a adds the named `ReplayParseError` and harness permission mapping exports
+when it needs them. Unit 8a does not add unused exports.
+Harness-path overrides introduced through settings must also be absolute paths.
+The owner must read the first generated `claude.ndjson` before committing it.
+The lead tells the manager this when requesting the owner-run recording.
