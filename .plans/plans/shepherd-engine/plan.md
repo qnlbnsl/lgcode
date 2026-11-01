@@ -328,7 +328,7 @@ Shepherd.
 | 1.3 | Node.js 26's SQLite module opens a database under Effect 4.0.5 | Test id: `packages/engine/test/smoke/node-sqlite.test.ts` |
 | 1.4 | Herdr accepts the manifest and lists its action | On-device step (owner, end of unit 1): `herdr plugin link /home/qnlbnsl/projects/personal/herdr-synapse/sheprd`, then `herdr plugin action list --plugin shepherd` lists `serve` (commands from https://herdr.dev/tui/docs/plugins/, read 2026-11-01) |
 | 1.5 | The launcher finds Node.js 26 without `node` on the path | Command: `env -i HOME=$HOME NVM_DIR=$HOME/.nvm ./bin/shepherd serve --detach` runs the stub entry, prints `not built yet` and exits 0; with `NVM_DIR` pointing at an empty folder it exits 1 with an install hint |
-| 1.6 | Install scripts of dependencies do not run unless listed | Command: `grep -n onlyBuiltDependencies pnpm-workspace.yaml` shows the list; `pnpm install` output names no unlisted build script |
+| 1.6 | Install scripts of dependencies do not run unless listed (row 77) | Command: `grep -n 'allowBuilds\|strictDepBuilds' pnpm-workspace.yaml` shows the list and `strictDepBuilds: true`, which makes pnpm fail on an unlisted build script; `pnpm install` output names no unlisted build script |
 | 1.7 | Every dependency later units need is declared, and the adapters are pinned exactly | Command: `grep -n '"@agentclientprotocol/claude-agent-acp": "0.99.1"' packages/engine/package.json` and the same for `"@agentclientprotocol/codex-acp": "2.5.0"`, plus `grep` for `ws`, `effect` `4.0.5` and every dependency named in task 1d; `pnpm run` lists `check`, `record-fixtures`, `live-check`; re-run at the end of unit 2 (row 71) |
 
 **Tasks:**

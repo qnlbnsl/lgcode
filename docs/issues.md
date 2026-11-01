@@ -142,10 +142,11 @@ fallback, and the fix costs nothing.
 ## 9. The `onlyBuiltDependencies` list is not enforced on pnpm 12
 
 Found: 2026-11-01, in the unit 1 review (adds to issue 3).
-State: partly fixed in unit 2: `pnpm-workspace.yaml` now says at the old key
-that the list is not enforced and that `allowBuilds` is the policy (commit:
-87e2d4c). Still open: the owner decides whether criterion 1.6 and its frozen
-test should name `allowBuilds` instead.
+State: fixed by decisions row 77 (owner, 2026-11-01: "yes, rename it to
+allowBuilds"), in this commit. Criterion 1.6 and its test name `allowBuilds`
+with `strictDepBuilds: true`, and the unenforced `onlyBuiltDependencies` list
+is deleted from `pnpm-workspace.yaml`. An earlier note at the old key was
+added in unit 2 (commit: 87e2d4c).
 
 What happens: a probe on pnpm 12.16.1 showed that `onlyBuiltDependencies`
 neither allows nor blocks a build script. `allowBuilds` and
