@@ -86,3 +86,37 @@ it.effect("4.5 refusal latch: catches accepting later appends after a write fail
     expect(yield* sql`SELECT COUNT(*) AS n FROM receipts`).toEqual([{ n: 0 }]);
   })),
 );
+
+it.effect("D3 safe failure reason: catches exposing a trigger's data value in the initial or latched refusal", () =>
+  withLog(Effect.gen(function* () {
+    const log = yield* EventLog.EventLog;
+    const sql = yield* SqlClient.SqlClient;
+    const marker = "MARKER-private-side-row-value-719e";
+    yield* sql`CREATE TRIGGER fail_private_side_row AFTER INSERT ON agent_tokens
+      BEGIN SELECT RAISE(ABORT, 'MARKER-private-side-row-value-719e'); END`;
+    const failed = yield* log.append(owner, request("private-side-row"), "5".repeat(64), [event], {
+      agentTokens: [{ agentId, tokenHash: "d".repeat(64), revokedAt: null }],
+    }).pipe(Effect.result);
+
+    expect(failed._tag).toBe("Failure");
+    if (failed._tag !== "Failure") throw new Error("The side-row trigger unexpectedly allowed the append");
+    expect(failed.failure).toBeInstanceOf(EventLog.LogWriteFailed);
+    expect.soft(failed.failure.reason).toMatch(/^database write failed/);
+    expect.soft(failed.failure.reason).not.toContain(marker);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM events`).toEqual([{ n: 0 }]);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM agent_tokens`).toEqual([{ n: 0 }]);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM receipts`).toEqual([{ n: 0 }]);
+
+    yield* sql`DROP TRIGGER fail_private_side_row`;
+    const later = yield* log.append(owner, request("after-private-side-row"), "6".repeat(64), [event], {})
+      .pipe(Effect.result);
+    expect(later._tag).toBe("Failure");
+    if (later._tag !== "Failure") throw new Error("The failed writer accepted another append");
+    expect(later.failure).toBeInstanceOf(EventLog.LogWriteFailed);
+    expect.soft(later.failure.reason).toMatch(/^database write failed/);
+    expect.soft(later.failure.reason).not.toContain(marker);
+    expect(later.failure.reason).toBe(failed.failure.reason);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM events`).toEqual([{ n: 0 }]);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM receipts`).toEqual([{ n: 0 }]);
+  })),
+);
