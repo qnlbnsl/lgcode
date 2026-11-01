@@ -526,6 +526,68 @@ live("a print environment step writes no environment value to any file in the ch
     }
   }))
 
+live("an ext_notification step sends one extension notification with the scripted method and params, and the turn still ends (breaks if the step is dropped, the method name is rewritten, or the params are changed; fix round 1 item 1)", () =>
+  withClient(
+    {
+      turns: [[
+        { step: "ext_notification", method: "_auth/status_update", params: { email: "someone@example.test", nested: { n: [1, 2] } } },
+        { step: "text", text: "after" }
+      ]]
+    },
+    {},
+    (context) =>
+      Effect.gen(function*() {
+        const received: Array<{ method: string; params: unknown }> = []
+        yield* context.acp.handleUnknownExtNotification((method, params) =>
+          Effect.sync(() => void received.push({ method, params }))
+        )
+        yield* context.acp.agent.initialize({ protocolVersion: 2 })
+        const session = yield* context.acp.agent.createSession({ cwd: context.home, mcpServers: [] })
+        yield* context.acp.agent.prompt({ sessionId: session.sessionId, prompt: [{ type: "text", text: "go" }] })
+        yield* context.waitFor(isIdle)
+        assert.deepEqual(received, [
+          { method: "_auth/status_update", params: { email: "someone@example.test", nested: { n: [1, 2] } } }
+        ])
+        assert.deepEqual(textOf(context.updates), ["after"])
+      }))
+)
+
+live("a stderr_flood step writes the scripted number of bytes to stderr and the turn still ends while the client drains it (breaks if the flood is skipped, shortened, or blocks the agent so the turn never ends; fix round 1 item 5a)", () =>
+  Effect.gen(function*() {
+    const bytes = 1024 * 1024
+    const run = yield* converse({ turns: [[{ step: "stderr_flood", bytes }, { step: "text", text: "after the flood" }]] })
+    assert.deepEqual(textOf(run.updates), ["after the flood"])
+    assert.equal(run.result.stopReason, "end_turn")
+    // The client drains stderr in the background; wait for the last bytes to arrive.
+    let seen = 0
+    for (let attempt = 0; attempt < 100 && seen < bytes; attempt++) {
+      seen = Buffer.byteLength(run.stderr())
+      if (seen < bytes) yield* Effect.sleep("100 millis")
+    }
+    assert.isAtLeast(seen, bytes)
+  }))
+
+live("a spawn_grandchild step starts a sleeping child of the agent and puts its pid in the agent's text (breaks if no process is started, the pid is not reported, or the grandchild exits at once; fix round 1 item 5b)", () =>
+  Effect.gen(function*() {
+    const run = yield* converse({ turns: [[{ step: "spawn_grandchild" }]] })
+    const text = textOf(run.updates).join(" ")
+    const pids = [...text.matchAll(/\b\d{2,}\b/g)].map((match) => Number(match[0]))
+    assert.equal(pids.length, 1)
+    const pid = pids[0]!
+    try {
+      // Signal 0 only tests that the process exists; it throws ESRCH when it does not.
+      assert.doesNotThrow(() => process.kill(pid, 0))
+      yield* Effect.sleep("300 millis")
+      assert.doesNotThrow(() => process.kill(pid, 0))
+    } finally {
+      try {
+        process.kill(pid, "SIGKILL")
+      } catch {
+        // already gone
+      }
+    }
+  }))
+
 live("replay history on load sends the scripted history, in order, as user and agent message chunks (breaks if load answers without replaying, or replays out of order or with the wrong roles)", () =>
   withClient(
     {
