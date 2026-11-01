@@ -996,3 +996,21 @@ State: open for unit 5d, which builds returns to the sender.
 What happens: the engine queues a delivery to a request's or question's holder, but `Delivery.sender` is an `Actor` (the owner or an agent), and the contracts have no engine sender. Criterion 5.9 returns a failed delivery to its sender. If the sender is recorded as the asking agent, a failed request delivery would be returned to the agent that asked.
 What should happen: unit 5d decides how a delivery with a `source` (permission, question or wait) is handled on failure: moved by the holder rule, requeued, or returned. The unit 5c tests do not assert the sender of a routing delivery.
 Why it matters: a returned request delivery could tell the asker that its own request failed, while the holder never sees it.
+
+## 68. A committed permission answer can fail to reach its runner
+
+Found: 2026-11-01, while building unit 5c.
+State: open for unit 6a.
+
+What happens: the handler commits a permission answer and its receipt before
+calling `Runner.answerPermission`. If that call fails, the answer stays
+recorded. The handler writes one fixed warning through the service logger,
+with no request content or runner error. A retry with the same request
+identifier returns the stored receipt and does not call the runner again.
+What should happen: unit 6a reconciles a committed answer with a runner that
+did not receive it, including after a service interruption between the commit
+and the call. Its recovery must preserve first-answer-wins and avoid replaying
+an answer into a different incarnation.
+Why it matters: an adapter can still be waiting for a permission whose answer
+the client already sees as recorded. The unit 5c boundary test covers the
+committed state, receipt replay, single call and content-free warning.

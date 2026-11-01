@@ -1,4 +1,4 @@
-import type { Account, AgentId, Delivery, HarnessSettings, PermissionLevel, SessionReference } from "@shepherd/contracts";
+import type { Account, AgentId, Delivery, HarnessSettings, PermissionLevel, PermissionOption, SessionReference } from "@shepherd/contracts";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import type * as Effect from "effect/Effect";
@@ -27,6 +27,19 @@ export type RunnerEvent = {
   readonly exitCode: number | null;
   readonly signal: string | null;
   readonly stderr: string;
+} | {
+  readonly _tag: "permissionRequested";
+  readonly agentId: AgentId;
+  readonly incarnation: string;
+  readonly permissionRequestId: string;
+  readonly toolCallId: string;
+  readonly description: string;
+  readonly options: ReadonlyArray<PermissionOption>;
+  readonly settingsWrite: boolean;
+} | {
+  readonly _tag: "turnEnded";
+  readonly agentId: AgentId;
+  readonly incarnation: string;
 };
 
 interface Spawn {
