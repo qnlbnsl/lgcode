@@ -62,6 +62,9 @@ export const RunnerEvent = Schema.Union([
     deliveryId: DeliveryId,
     kind: Schema.Literals(["message", "plan", "tool-call", "file-change", "available_commands_update"]),
     replay: Schema.Boolean,
+    // Issue 144: who spoke a message, so a reload's replay scan reads only
+    // the user's content (row 66).
+    role: Schema.optionalKey(Schema.Literals(["user", "agent"])),
     text: Schema.String,
     content: Schema.optionalKey(Event.pipe(Schema.toTaggedUnion("_tag")).cases.ThreadItem.fields.content),
   }),

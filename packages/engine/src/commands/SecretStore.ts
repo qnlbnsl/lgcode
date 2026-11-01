@@ -10,12 +10,16 @@ import type { LogWriteFailed } from "../log/EventLog.ts";
 export class SecretStore extends Context.Service<SecretStore, {
   readonly put: (reference: string, value: Redacted.Redacted<string>) => Effect.Effect<void, LogWriteFailed>;
   readonly resolve: (reference: string) => Effect.Effect<Redacted.Redacted<string> | undefined>;
+  // Issue 119: removes every stored value whose reference is not in `keep`.
+  // Restart recovery calls it, before any command can store a new value.
+  readonly retainOnly?: (keep: ReadonlySet<string>) => Effect.Effect<void, LogWriteFailed>;
 }>()("shepherd/engine/commands/SecretStore") {
   static readonly layer: Layer.Layer<SecretStore> = Layer.effect(SecretStore, Effect.sync(() => {
     const values = new Map<string, Redacted.Redacted<string>>();
     return SecretStore.of({
       put: (reference, value) => Effect.sync(() => { values.set(reference, value); }),
       resolve: (reference) => Effect.sync(() => values.get(reference)),
+      retainOnly: (keep) => Effect.sync(() => { for (const reference of [...values.keys()]) if (!keep.has(reference)) values.delete(reference); }),
     });
   }));
 }

@@ -7,6 +7,7 @@ import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
@@ -18,6 +19,8 @@ import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
 import { EventLog, LogWriteFailed, type SideRows } from "../log/EventLog.ts";
 import { crashEvents } from "../recovery/crash.ts";
+import { observeReplay } from "../recovery/replay.ts";
+import { Restart } from "../recovery/service.ts";
 import { Runner, RunnerEvent } from "../runner/Runner.ts";
 import { dispatchCommitted, deliveryUpdate, promptReply, turnEnded } from "../routing/deliveries.ts";
 import { holderAbove, passUp } from "../routing/holders.ts";
@@ -121,6 +124,9 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
     const runner = yield* Runner;
     const secrets = yield* SecretStore;
     const runtime: Runtime = { ...configuration, sql, log, runner, secrets, views };
+    // Issue 88 and row 52: while restart recovery is present and has not
+    // finished step 9, no command runs.
+    const recovery = yield* Effect.serviceOption(Restart);
 
     const handleRunnerEvent = (rawEvent: unknown) => Effect.gen(function* () {
       // A bad adapter event cannot reach the views or the writer, and its
@@ -128,6 +134,8 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
       const decoded = yield* Schema.decodeUnknownEffect(RunnerEvent)(rawEvent).pipe(Effect.result);
       if (decoded._tag === "Failure") return yield* Effect.logWarning("runner event dropped: malformed");
       const event = decoded.success;
+      // Rows 51 and 66: a reload scans its replayed history (recovery/replay.ts).
+      if (event._tag === "deliveryUpdate" && event.replay) yield* observeReplay(log, event);
       const consume = Effect.gen(function* () {
         let resetMode = false;
         yield* log.transact((append) => Effect.gen(function* () {
@@ -191,6 +199,7 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
 
     return CommandHandler.of({
       execute: (credential, name, rawPayload) => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
+        if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
         const step = isBlockingWait(name, rawPayload) ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : restore;
         const outcome = yield* step(log.transact((append) => Effect.gen(function* () {
           // Invalid credentials never write an event or retrieve a receipt.

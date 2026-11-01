@@ -12,6 +12,7 @@ import {
   type Fakes, type Rig, type SeedState,
 } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
+import { deliveryRow, eventually } from "../support/routingRig.ts";
 import * as Views from "../../src/views/Views.ts";
 
 // Criterion 5.4 (decision rows 62, 66, 70, 71): one case per row of the
@@ -243,10 +244,11 @@ it.effect("5.4 resume --fresh (row 66): catches a fresh resume that re-queues de
     // Unit 6a: the runner's session result is written as one SessionOpened after the StateChanged.
     expectSessionOpenedAfterStarting(written, "agent-a");
 
-    expect(yield* stateOf("agent-a")).toBe("idle");
+    // Unit 6d (row 66): resume runs step 10 for this agent, so the first re-queued delivery is sent.
+    expect(yield* eventually(stateOf("agent-a"), (state) => state === "working")).toBe("working");
+    expect((yield* eventually(deliveryRow("delivery-new-1"), (row) => row?.status === "sent"))?.status).toBe("sent");
     const views = yield* Views.Views;
     const deliveries = (yield* views.snapshot).deliveries;
-    expect(deliveries["delivery-new-1"]?.status).toBe("queued");
     expect(deliveries["delivery-new-2"]?.status).toBe("queued");
     expect(deliveries["delivery-old"]?.status).toBe("accepted");
     expect(fakes.runner.callsOf("load")).toHaveLength(0);

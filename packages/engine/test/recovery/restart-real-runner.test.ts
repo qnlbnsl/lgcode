@@ -100,7 +100,9 @@ live("6.7 E01 row 51/PB-A7: catches a real session/load replay losing a chunked 
     expect(failureOf(yield* call(agentCredential(old.token), "harnesses", { operation: "list" }))).toEqual({ _tag: "CommandRefused", reason: "invalid credential" });
     expect(replayed.env.SHEPHERD_TOKEN).not.toBe(old.token);
     expect(yield* verifyAgentToken(replayed.env.SHEPHERD_TOKEN!)).toBe(old.agentId);
-    for (const secret of [old.token, replayed.env.SHEPHERD_TOKEN!, "private-replayed-answer-E01"]) expect(JSON.stringify([yield* readLog, yield* snapshot])).not.toContain(secret);
+    for (const secret of [old.token, replayed.env.SHEPHERD_TOKEN!]) expect(JSON.stringify([yield* readLog, yield* snapshot])).not.toContain(secret);
+    // The fake script itself carries the replayed answer in its AccountChanged, so the answer is checked only over what recovery wrote and the threads.
+    expect(JSON.stringify([written, (yield* snapshot).threads])).not.toContain("private-replayed-answer-E01");
     yield* pause(50);
     expect(calls.slice(watermark).filter((entry) => entry.agentId === old.agentId).map((entry) => entry.delivery.id)).toEqual([carry[0]!.id]);
   }));

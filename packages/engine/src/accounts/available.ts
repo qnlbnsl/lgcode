@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { Event, EventEnvelope } from "@shepherd/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
 
 import { freshRequest, type Snapshot } from "../commands/internal.ts";
 import { EventLog } from "../log/EventLog.ts";
+import { Restart } from "../recovery/service.ts";
 import { freshDelivery } from "../routing/holders.ts";
 import { withWaitChecks } from "../routing/waits.ts";
 import { Views } from "../views/Views.ts";
@@ -14,6 +16,11 @@ type Cause = Extract<Event, { _tag: "AccountAvailable" }>["cause"];
 const owner = { _tag: "owner" } as const;
 
 const CARRY_ON = "The pause has ended. Carry on with what you were doing.";
+
+// Issue 145 and row 51: a carry-on names its own delivery id in the text the
+// adapter receives, so a later replay scan can find it. The text and the id
+// are the engine's own.
+export const carryOnText = (deliveryId: string, text: string): string => `${text} (delivery ${deliveryId})`;
 
 // Rows 28, 29 and 53. What "account available" does to the agents paused on
 // the account. The usage timer's cause ("usage reset") clears only usage
@@ -28,17 +35,21 @@ const CARRY_ON = "The pause has ended. Carry on with what you were doing.";
 // owner and the timer meeting, finds nothing to do. An account that has since
 // become unusable again returns nothing either: a late event must not clear a
 // newer sign-out.
-export const returnAgents = (snapshot: Snapshot, accountId: string, cause: Cause): ReadonlyArray<Event> => {
+//
+// Row 66: `skip` names agents with no live process, such as every paused
+// agent after a restart. Restart recovery reloads those before they return.
+export const returnAgents = (snapshot: Snapshot, accountId: string, cause: Cause, skip: ReadonlySet<string> = new Set()): ReadonlyArray<Event> => {
   if (snapshot.accounts[accountId]?.status !== "available") return [];
   return Object.values(snapshot.agents).flatMap((agent): ReadonlyArray<Event> => {
     const state = agent.state;
-    if (agent.account !== accountId || state._tag !== "paused" || agent.session === undefined || (cause === "usage reset" && state.reason !== "limit")) return [];
+    if (agent.account !== accountId || state._tag !== "paused" || agent.session === undefined || skip.has(agent.agentId)
+      || (cause === "usage reset" && state.reason !== "limit")) return [];
     const { agentId } = agent;
     const id = freshDelivery();
     return [
       { _tag: "StateChanged", agentId, state: { _tag: "idle" } },
       ...(state.midTurn ? [{ _tag: "DeliveryQueued" as const, delivery: {
-        id, target: agentId, sender: owner, content: { _tag: "carry-on" as const, text: CARRY_ON },
+        id, target: agentId, sender: owner, content: { _tag: "carry-on" as const, text: carryOnText(id, CARRY_ON) },
       } }] : []),
     ];
   });
@@ -58,14 +69,21 @@ export const returnOne = (accountId: string, cause: Cause) => Effect.gen(functio
 // Follows the log for the life of the service's scope. It subscribes before
 // it forks, so no "account available" committed after the call is missed.
 // One failed return is logged without content and does not stop it.
+//
+// Issue 88 and row 66: while restart recovery is present, nothing is
+// returned until its step 9 has finished, and a return goes through it, so
+// an agent left without a process is reloaded first.
 export const followAvailability = Effect.gen(function* () {
   const log = yield* EventLog;
+  const recovery = yield* Effect.serviceOption(Restart);
   const committed = yield* log.subscribeCommitted;
   const availability = (envelope: EventEnvelope) =>
     envelope.event._tag === "AccountAvailable" ? [envelope.event] : [];
   return yield* Effect.forever(Effect.gen(function* () {
-    for (const event of (yield* PubSub.takeAll(committed)).flatMap(availability)) {
-      yield* returnOne(event.accountId, event.cause).pipe(Effect.catchCause((cause) => Cause.hasInterrupts(cause)
+    const batch = yield* PubSub.takeAll(committed);
+    if (Option.isSome(recovery)) yield* recovery.value.whenReady;
+    for (const event of batch.flatMap(availability)) {
+      yield* (Option.isSome(recovery) ? recovery.value.returnAccount(event.accountId, event.cause) : returnOne(event.accountId, event.cause)).pipe(Effect.catchCause((cause) => Cause.hasInterrupts(cause)
         ? Effect.failCause(cause)
         : Effect.logWarning("account return failed")));
     }

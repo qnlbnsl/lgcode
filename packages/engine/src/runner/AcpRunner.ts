@@ -82,6 +82,7 @@ interface Process {
   commands: ReadonlyArray<{ name: string }>;
   message?: {
     readonly id: string;
+    readonly role: "user" | "agent" | undefined;
     readonly pending: Array<{ readonly length: number; readonly event: Extract<RunnerEvent, { _tag: "deliveryUpdate" }> }>;
     released: string;
   };
@@ -181,11 +182,20 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     entry.holds.clear();
     entry.secrets.length = 0;
   });
-  const spawn = (input: Spawn, session?: SessionReference): Effect.Effect<SessionInfo, RunnerRejected> => Effect.gen(function* () {
+  // Issue 103: the duplicate-process check and the reservation are one
+  // synchronous step, and the reservation lasts until the process is
+  // registered or the spawn has failed, so two setups for one agent can never
+  // both reach the spawn, even from a caller that bypasses the send lanes.
+  const reserved = new Set<string>();
+  const spawn = (input: Spawn, session?: SessionReference): Effect.Effect<SessionInfo, RunnerRejected> => Effect.suspend(() => {
+    if (processes.has(input.agentId) || reserved.has(input.agentId)) return Effect.fail(rejected("agent already has a process"));
+    reserved.add(input.agentId);
+    return spawnReserved(input, session).pipe(Effect.ensuring(Effect.sync(() => { reserved.delete(input.agentId); })));
+  });
+  const spawnReserved = (input: Spawn, session?: SessionReference): Effect.Effect<SessionInfo, RunnerRejected> => Effect.gen(function* () {
     if (session !== undefined && session._tag !== "acp") return yield* rejected("session is not an ACP session");
     const harness = input.harness;
     if (harness.runMode !== "acp" || !isAbsolute(harness.adapterPath) || resolve(harness.adapterPath) !== harness.adapterPath) return yield* rejected("adapter path is not resolved");
-    if (processes.has(input.agentId)) return yield* rejected("agent already has a process");
     if ((input.model !== undefined && harness.models.length > 0 && !harness.models.includes(input.model))
       || (input.effort !== undefined && harness.efforts.length > 0 && !harness.efforts.includes(input.effort))) return yield* rejected("configuration is not recorded");
     const startingMode = harness.permissionMapping[input.permission];
@@ -334,9 +344,13 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         for (const translated of translatedUpdates) {
           const deliveryId = current.turn?.deliveryId ?? Schema.decodeUnknownSync(DeliveryId)(`replay-${randomUUID()}`);
           if (translated.kind === "message") {
-            current.message ??= { id: randomUUID(), pending: [], released: "" };
+            // Issue 144: one speaker per buffer, so redacted text released
+            // across chunk boundaries never moves from one speaker to another.
+            if (current.message !== undefined && current.message.role !== translated.role) yield* drainMessages(current, true);
+            current.message ??= { id: randomUUID(), role: translated.role, pending: [], released: "" };
             current.message.pending.push({ length: translated.text.length, event: {
-              _tag: "deliveryUpdate", ...identity(current), deliveryId, kind: "message", replay: current.loading, text: "",
+              _tag: "deliveryUpdate", ...identity(current), deliveryId, kind: "message", replay: current.loading,
+              ...(translated.role === undefined ? {} : { role: translated.role }), text: "",
             } });
             current.message.released += yield* redactChunk(current.message.id, translated.text, false);
             yield* drainMessages(current, false);
@@ -380,8 +394,14 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       if (initialized.agentCapabilities !== undefined) processEntry.capabilities = initialized.agentCapabilities;
       const mcpServers = [{ type: "stdio" as const, name: "shepherd", command: process.execPath, args: [fileURLToPath(new URL("../../../cli/src/bin.ts", import.meta.url)), "mcp"],
         env: [{ name: "SHEPHERD_SOCKET", value: configuration.socketPath }, { name: "SHEPHERD_TOKEN", value: Redacted.value(input.token) }] }];
+      // Row 66 and issue 93: reload only through a method this peer
+      // advertised at initialize, `session/load` first, else `session/resume`.
+      const loads = processEntry.capabilities?.loadSession === true;
+      const resumes = processEntry.capabilities?.sessionCapabilities?.resume !== undefined && processEntry.capabilities?.sessionCapabilities?.resume !== null;
+      if (session !== undefined && !loads && !resumes) return yield* rejected("adapter cannot reload");
       const opened = yield* (session === undefined ? client.agent.createSession({ cwd: folder, mcpServers })
-        : client.agent.loadSession({ sessionId: session.sessionId, cwd: folder, mcpServers })).pipe(Effect.mapError(() => rejected("adapter session failed")));
+        : loads ? client.agent.loadSession({ sessionId: session.sessionId, cwd: folder, mcpServers })
+        : client.agent.resumeSession({ sessionId: session.sessionId, cwd: folder, mcpServers })).pipe(Effect.mapError(() => rejected("adapter session failed")));
       if ("sessionId" in opened && typeof opened.sessionId === "string") processEntry.sessionId = opened.sessionId;
       if (processEntry.sessionId === "" || (yield* redactText(processEntry.sessionId)) !== processEntry.sessionId) return yield* rejected("adapter session identifier refused");
       yield* checkChildFolder;
@@ -418,7 +438,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         }
       })), Effect.forkIn(scope));
       return { session: { _tag: "acp" as const, sessionId: processEntry.sessionId }, protocolVersion: initialized.protocolVersion,
-        reloadable: processEntry.capabilities?.loadSession === true };
+        reloadable: loads || resumes };
     }).pipe(Effect.onExit((exit) => Exit.isFailure(exit) ? entry === undefined ? Scope.close(scope, Exit.void) : close(entry) : Effect.void));
   });
   const send = (input: Send, compact: boolean) => Effect.gen(function* () {
