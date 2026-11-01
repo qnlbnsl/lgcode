@@ -1,9 +1,10 @@
-import type { AgentId, PermissionOption, SessionReference } from "@shepherd/contracts";
+import type { AgentId, DeliveryId, PermissionOption, SessionReference } from "@shepherd/contracts";
 import type * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as PubSub from "effect/PubSub";
+import * as Redacted from "effect/Redacted";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as Stream from "effect/Stream";
 
@@ -23,7 +24,8 @@ import { sha256Hex } from "../../src/identity/credential.ts";
 type RunnerShape = Context.Service.Shape<typeof Runner>;
 type Methods = Omit<RunnerShape, "capabilities" | "events">;
 export type RunnerMethod = keyof Methods;
-type Input<M extends RunnerMethod> = Parameters<Methods[M]>[0];
+type Input<M extends RunnerMethod> = Parameters<Methods[M]>[0] &
+  (M extends "prompt" | "compact" ? { readonly incarnation: string } : unknown);
 
 export interface RunnerCall<M extends RunnerMethod = RunnerMethod> {
   readonly method: M;
@@ -35,6 +37,14 @@ export interface RunnerCall<M extends RunnerMethod = RunnerMethod> {
 // the agent.
 type Script = {
   readonly [M in RunnerMethod]: (input: Input<M>) => ReturnType<Methods[M]>;
+};
+
+// Historical-log fixtures represent an already-running process. Register
+// that process in the fake's table without calling a real start or changing
+// the Runner interface. Each fake has its own table, keyed by its service.
+const seededProcesses = new WeakMap<RunnerShape, (agentId: AgentId, token: string, live: boolean) => void>();
+export const seedFakeProcess = (runner: RunnerShape, agentId: AgentId, token: string, live: boolean): void => {
+  seededProcesses.get(runner)?.(agentId, token, live);
 };
 
 export const sessionFor = (agentId: AgentId, reloadable = true): SessionInfo => ({
@@ -76,13 +86,14 @@ export interface PermissionRequestedEvent {
   readonly settingsWrite: boolean;
 }
 
-// `turnEnded`: the agent's current turn finished (the `session/prompt` reply
-// arrived). The engine writes "turn ended" and, in the same transaction,
-// passes up what the agent still holds (row 67).
+// `turnEnded`: the named delivery's `session/prompt` reply ended its turn.
+// The engine correlates it with the current turn before writing "turn ended"
+// and passing up what the agent still holds (row 67).
 export interface TurnEndedEvent {
   readonly _tag: "turnEnded";
   readonly agentId: AgentId;
   readonly incarnation: string;
+  readonly deliveryId: DeliveryId;
 }
 
 // `exited`: the agent's process ended (row 32). Fix round 1 of unit 5c,
@@ -123,9 +134,10 @@ export interface PromptReplyEvent {
 
 export type FakeRunnerEvent = RunnerEvent | PermissionRequestedEvent | TurnEndedEvent | ExitedEvent | DeliveryUpdateEvent | PromptReplyEvent;
 
-// What `emit` takes: an `exited` event may leave out its incarnation, and
-// then gets the agent's current one (see `currentIncarnation`).
-export type EmittedEvent = FakeRunnerEvent | Omit<ExitedEvent, "incarnation">;
+// `emit` defaults an exit's incarnation to the current spawn and a turn end's
+// deliveryId to the last delivery sent to that agent. Historical fixtures
+// fall back to the latest DeliverySent in the real event log (lead #914).
+export type EmittedEvent = FakeRunnerEvent | Omit<ExitedEvent, "incarnation"> | Omit<TurnEndedEvent, "deliveryId">;
 
 // The incarnation of the agent's current spawn: its newest live token hash,
 // or, when every token is revoked, its newest token hash. An agent with no
@@ -143,8 +155,9 @@ export const incarnationOf = (token: string): string => sha256Hex(token);
 
 export interface FakeRunner {
   readonly layer: Layer.Layer<Runner>;
-  // Every call so far, oldest first. The array is live: read it after the
-  // command under test has returned.
+  // Every call to reach the simulated transport, oldest first, including
+  // rejected calls. A held send is recorded when released; its script runs
+  // only if the incarnation check succeeds. The array is live.
   readonly calls: ReadonlyArray<RunnerCall>;
   readonly callsOf: <M extends RunnerMethod>(method: M) => ReadonlyArray<RunnerCall<M>>;
   // Replace one method's reply. The replacement stays until `reset`.
@@ -152,6 +165,12 @@ export interface FakeRunner {
   // Make the next `times` calls of a method fail with `RunnerRejected`. The
   // reason is a fixed text the test chooses; the call is still recorded.
   readonly rejectNext: (method: "start" | "load" | "prompt" | "setMode" | "compact", reason: string, times?: number) => void;
+  // Suspends the next send before it reaches the process. `entered` proves
+  // the engine has reserved it; release is idempotent and also safe in cleanup.
+  readonly holdNext: (method: "prompt" | "compact") => {
+    readonly entered: Effect.Effect<void>;
+    readonly release: Effect.Effect<void>;
+  };
   // Push an event into the stream the engine consumes. An `exited` event
   // without an incarnation gets the agent's current one, read at this call.
   readonly emit: (event: EmittedEvent) => Effect.Effect<void, never, SqlClient.SqlClient>;
@@ -181,13 +200,35 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
     } as Script;
     let script: Script = { ...defaults };
     const rejections = new Map<RunnerMethod, Array<string>>();
+    const holds = new Map<RunnerMethod, Array<{ entered: Deferred.Deferred<void>; release: Deferred.Deferred<void> }>>();
+    const lastDelivery = new Map<AgentId, DeliveryId>();
+    const incarnations = new Map<AgentId, string>();
 
-    const call = <M extends RunnerMethod>(method: M) => (input: Input<M>): ReturnType<Methods[M]> => {
+    const call = <M extends RunnerMethod>(method: M) => (input: Input<M>): ReturnType<Methods[M]> => Effect.gen(function* () {
+      if (method === "prompt" || method === "compact") {
+        const hold = holds.get(method)?.shift();
+        if (hold !== undefined) {
+          yield* Deferred.succeed(hold.entered, undefined);
+          yield* Deferred.await(hold.release);
+        }
+      }
       calls.push({ method, input } as RunnerCall);
+      if (method === "prompt" || method === "compact") {
+        const send = input as Input<"prompt">;
+        if (send.incarnation === undefined || send.incarnation !== incarnations.get(send.agentId)) {
+          return yield* Effect.fail(new RunnerRejected({ reason: "stale incarnation" }));
+        }
+        lastDelivery.set(send.agentId, send.delivery.id);
+      }
       const reason = rejections.get(method)?.shift();
-      if (reason !== undefined) return Effect.fail(new RunnerRejected({ reason })) as ReturnType<Methods[M]>;
-      return (script[method] as (input: Input<M>) => ReturnType<Methods[M]>)(input);
-    };
+      if (reason !== undefined) return yield* Effect.fail(new RunnerRejected({ reason }));
+      const result = yield* (script[method] as (input: Input<M>) => ReturnType<Methods[M]>)(input);
+      if (method === "start" || method === "load") {
+        const spawn = input as Input<"start">;
+        incarnations.set(spawn.agentId, incarnationOf(Redacted.value(spawn.token)));
+      } else if (method === "stop") incarnations.delete((input as Input<"stop">).agentId);
+      return result;
+    }) as ReturnType<Methods[M]>;
 
     const service: RunnerShape = {
       start: call("start"),
@@ -206,6 +247,10 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
         return Stream.fromSubscription(subscription) as Stream.Stream<RunnerEvent>;
       })),
     } as RunnerShape;
+    seededProcesses.set(service, (agentId, token, live) => {
+      if (live) incarnations.set(agentId, incarnationOf(token));
+      else incarnations.delete(agentId);
+    });
 
     return {
       layer: Layer.succeed(Runner, service),
@@ -216,14 +261,32 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
       rejectNext: (method, reason, times = 1) => {
         rejections.set(method, [...(rejections.get(method) ?? []), ...Array.from({ length: times }, () => reason)]);
       },
+      holdNext: (method) => {
+        const entered = Deferred.makeUnsafe<void>();
+        const release = Deferred.makeUnsafe<void>();
+        holds.set(method, [...(holds.get(method) ?? []), { entered, release }]);
+        return { entered: Deferred.await(entered), release: Deferred.succeed(release, undefined).pipe(Effect.asVoid) };
+      },
       emit: (event) => Effect.gen(function* () {
+        let lastSent: DeliveryId | undefined;
+        if (event._tag === "turnEnded" && !("deliveryId" in event) && !lastDelivery.has(event.agentId)) {
+          const sql = yield* SqlClient.SqlClient;
+          const rows = yield* sql<{ payload_json: string }>`
+            SELECT payload_json FROM events WHERE event_type = 'DeliverySent'
+            AND json_extract(payload_json, '$.agentId') = ${event.agentId}
+            ORDER BY sequence DESC LIMIT 1`;
+          lastSent = rows[0] === undefined ? undefined : (JSON.parse(rows[0].payload_json) as { deliveryId: DeliveryId }).deliveryId;
+        }
         const complete: FakeRunnerEvent = event._tag === "exited" && !("incarnation" in event)
           ? { ...event, incarnation: yield* currentIncarnation(event.agentId) }
-          : event as FakeRunnerEvent;
+          : event._tag === "turnEnded" && !("deliveryId" in event)
+            ? { ...event, deliveryId: lastDelivery.get(event.agentId) ?? lastSent ?? "no-delivery" as DeliveryId }
+            : event as FakeRunnerEvent;
+        if (complete._tag === "exited" && complete.incarnation === incarnations.get(complete.agentId)) incarnations.delete(complete.agentId);
         yield* PubSub.publish(pubsub, complete);
-      }),
+      }).pipe(Effect.orDie),
       emitRaw: (event) => PubSub.publish(pubsub, event as FakeRunnerEvent).pipe(Effect.asVoid),
       subscribed: Deferred.await(subscribedSignal),
-      reset: () => { calls.length = 0; script = { ...defaults }; rejections.clear(); },
+      reset: () => { calls.length = 0; script = { ...defaults }; rejections.clear(); holds.clear(); },
     } satisfies FakeRunner;
   });
