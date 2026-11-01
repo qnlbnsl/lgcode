@@ -38,7 +38,33 @@ if [ -z "$node_bin" ]; then
 fi
 [ -x "$node_bin" ] || install_hint
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
+# Follow links to the real file with readlink, the only external command used
+# before Node.js starts. Parameter expansion replaces dirname.
+self=$0
+link_count=0
+while [ -L "$self" ]; do
+  link_count=$((link_count + 1))
+  if [ "$link_count" -gt 40 ]; then
+    echo "Shepherd could not find its folder: too many symbolic links from $0." >&2
+    exit 1
+  fi
+  link_target=$(readlink "$self") || exit 1
+  case $link_target in
+    /*) self=$link_target ;;
+    *)
+      case $self in
+        */*) self=${self%/*}/$link_target ;;
+        *) self=$link_target ;;
+      esac
+      ;;
+  esac
+done
+case $self in
+  */*) launcher_directory=${self%/*} ;;
+  *) launcher_directory=. ;;
+esac
+[ -n "$launcher_directory" ] || launcher_directory=/
+root=$(CDPATH= cd -- "$launcher_directory/.." && pwd -P)
 entry=$root/packages/cli/src/bin.ts
 if [ ! -f "$entry" ]; then
   entry=$root/bin/stub-entry.ts

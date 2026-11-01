@@ -109,9 +109,10 @@ Node.js built-in modules to type-check.
 ## 7. A symbolic link to the launcher runs from the wrong folder
 
 Found: 2026-11-01, in the unit 1 review.
-State: open; assigned to unit 2, which may still edit `bin/**`.
+State: fixed in unit 2: `bin/shepherd` follows links with a `readlink` loop,
+and `launcher-links.test.ts` covers it. Commit: UNIT2.
 
-What happens: `bin/shepherd` finds its checkout with `dirname "$0"` and does
+What happened: `bin/shepherd` found its checkout with `dirname "$0"` and does
 not follow a symbolic link to the file itself. A link such as
 `~/.local/bin/shepherd -> <repo>/bin/shepherd` makes it look for
 `bin/stub-entry.ts` next to the link, and Node.js exits 1 with
@@ -124,9 +125,10 @@ Why it matters: a link on the path is a likely way for the owner to run
 ## 8. The launcher looks up `dirname` on the path
 
 Found: 2026-11-01, in the unit 1 review.
-State: open; assigned to unit 2.
+State: fixed in unit 2: the launcher uses `${self%/*}`, and only `readlink`
+runs before the chosen Node.js. Commit: UNIT2.
 
-What happens: `bin/shepherd` runs `dirname` from `PATH`. Decision 22 allows
+What happened: `bin/shepherd` ran `dirname` from `PATH`. Decision 22 allows
 a path lookup only for `node`.
 What should happen: the launcher uses shell parameter expansion, so
 `node` is the only program found through `PATH`.
@@ -137,8 +139,10 @@ fallback, and the fix costs nothing.
 ## 9. The `onlyBuiltDependencies` list is not enforced on pnpm 12
 
 Found: 2026-11-01, in the unit 1 review (adds to issue 3).
-State: open; the owner decides whether criterion 1.6 and its frozen test
-should name `allowBuilds` instead.
+State: partly fixed in unit 2: `pnpm-workspace.yaml` now says at the old key
+that the list is not enforced and that `allowBuilds` is the policy (commit:
+UNIT2). Still open: the owner decides whether criterion 1.6 and its frozen
+test should name `allowBuilds` instead.
 
 What happens: a probe on pnpm 12.16.1 showed that `onlyBuiltDependencies`
 neither allows nor blocks a build script. `allowBuilds` and
@@ -152,12 +156,14 @@ Why it matters: a reader who edits only the old list changes nothing.
 ## 10. The compiler alias and two copied cache settings are unexplained
 
 Found: 2026-11-01, in the unit 1 review.
-State: open; assigned to unit 2.
+State: fixed in unit 2: a comment in `pnpm-workspace.yaml` names T3 Code as
+the reason for the alias, and the two cache variables are removed from
+`vitest.config.ts` because no test reads them. Commit: UNIT2.
 
-What happens: `pnpm-workspace.yaml` aliases `typescript` to the pre-release
+What happened: `pnpm-workspace.yaml` aliased `typescript` to the pre-release
 `@tsc-rs/typescript` 0.8.0 with no comment. It matches the T3 Code
 reference, which plan check PB-A6 requires, but nothing in this repository
-says so. `vitest.config.ts` also sets `VP_REMOTE_CACHE` and
+said so. `vitest.config.ts` also set `VP_REMOTE_CACHE` and
 `VP_REMOTE_CACHE_URL`, which only the vite-plus tool reads; Shepherd runs
 plain Vitest.
 What should happen: one comment names T3 Code as the reason for the alias,
@@ -178,3 +184,86 @@ the field, so the test passed.
 What should happen: each `[[actions]]` entry has `id`, `title`, `contexts`
 and `command`.
 Why it matters: Herdr cannot load Shepherd at all until the manifest parses.
+
+## 12. The copied SQLite client needed changes for Node.js 26 types
+
+Found: 2026-11-01, in unit 2.
+State: fixed in the copy; recorded in `third_party/t3code/README.md`.
+
+What happened: T3 Code builds against `@types/node` 24, where the `error` event
+of a worker thread carries an `Error`. The workspace catalog pins
+`@types/node` 26, where it carries `unknown`, so the copied
+`nodeSqliteClient.ts` failed to type-check at two `worker.on("error")` handlers.
+The copy now turns the value into text with an `instanceof Error` check.
+What should happen: when T3 Code's file is copied again, the same two edits are
+applied again.
+Why it matters: an unrecorded edit would be lost on the next copy.
+
+## 13. Some copied ACP logging calls are on even when protocol logging is off
+
+Found: 2026-11-01, in the unit 2 security read.
+State: open; belongs to the unit that builds the service logger.
+
+What happens: decision 57 says the copied ACP protocol debug logging stays off
+outside tests. That is true of `logProtocol` in `effect-acp/src/protocol.ts`
+(lines 263-272), which the `logIncoming` and `logOutgoing` options gate. Three
+other calls are not gated: `protocol.ts` lines 503 and 599, and
+`_internal/shared.ts` lines 37 and 53. They log the cause of a handler defect or
+an encoding failure, which can include a value the handler held. Line 547 logs
+only structural diagnostics.
+What should happen: the service's logger passes through the redactor before
+Shepherd registers any extension handler, and a test greps its output for
+planted secrets, as decision 57 requires. Shepherd never sets `logIncoming`,
+`logOutgoing` or `logger` outside tests.
+Why it matters: until then, a handler defect could write a secret to the log.
+No Shepherd code registers a handler yet, so nothing leaks today.
+
+## 14. Copied environment helpers default to the whole process environment
+
+Found: 2026-11-01, in the unit 2 security read.
+State: open; belongs to the unit that starts harness processes.
+
+What happens: `mergeProviderInstanceEnvironment` (`instanceEnvironment.ts`) and
+`makeClaudeEnvironment` (`ClaudeHome.ts`) use `process.env` when the caller
+passes no base environment.
+What should happen: Shepherd always passes an explicit base environment, so an
+agent gets exactly `SHEPHERD_SOCKET` and `SHEPHERD_TOKEN` and what the harness
+needs, as decision 57 says.
+Why it matters: a call without the argument would hand every variable of the
+service to a harness process.
+
+## 15. The copied fake-program helper writes environment values to disk
+
+Found: 2026-11-01, in the unit 2 security read.
+State: open; a rule for test authors, not a code change.
+
+What happens: `writeFakeCli` in `provider-testing/src/fakeCli.ts` writes the
+environment it is given to a JSON file next to the stub, with the default file
+mode.
+What should happen: tests pass only made-up values to it.
+Why it matters: a real token passed to it would sit in a temporary folder.
+
+## 16. The ACP schema generator cannot finish in Shepherd
+
+Found: 2026-11-01, in the unit 2 security read.
+State: open; low priority.
+
+What happens: `effect-acp/scripts/generate.ts` downloads schema files from
+GitHub and ends by running `pnpm exec vp fmt`. The `vp` program belongs to the
+vite-plus tool, which Shepherd does not install, so the last step fails after
+the files are written.
+What should happen: if Shepherd regenerates the schemas, the formatting step is
+replaced by a Shepherd tool, and the change is recorded in the README table.
+Why it matters: someone running `generate` gets a confusing failure.
+
+## 17. T3 Code has no unit test for the replay helpers
+
+Found: 2026-11-01, in unit 2.
+State: fixed; recorded in `third_party/t3code/README.md`.
+
+What happened: criterion 2.4 needs a test named `replayTranscript.test.ts`, but
+T3 Code has none for `provider-testing`. A test was written for Shepherd, with
+a fixture, and the README table marks both as written for Shepherd.
+What should happen: nothing further.
+Why it matters: the copied helpers would otherwise have no test at all.
+
