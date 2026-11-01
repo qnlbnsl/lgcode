@@ -214,3 +214,25 @@ live("6.3 issue 68: when the asking child dies before the answer, the engine rec
       }
     }));
   }));
+
+// Review of fe4adcd, F-5: after `session/cancel` the Agent Client Protocol
+// requires the client to answer every pending `session/request_permission`
+// of that session with the `cancelled` outcome. No engine command cancels a
+// turn yet, so the owner's cancel is the runner's own `cancel`.
+live("6.3 cancel (review F-5): cancelling a turn that holds a permission answers the agent's request with the cancelled outcome, and a later answer for that request is refused (breaks if cancel leaves the request unanswered, answers it with an option, or keeps the hold open)", () =>
+  withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
+    const agent = yield* startPrompted(context, [permissionStep("tool-cancel"), { step: "text", text: "after the answer" }]);
+    const request = (yield* context.waitFor((event) => event._tag === "permissionRequested" && event.agentId === agent.agentId)) as Extract<RunnerEvent, { _tag: "permissionRequested" }>;
+    expect(repliesIn(peekEcho(agent.echo))).toEqual([]);
+
+    yield* context.runner.cancel({ agentId: agent.agentId });
+
+    const replies = repliesIn(yield* readEcho(agent.echo, (echo) => repliesIn(echo).length > 0));
+    expect(replies).toHaveLength(1);
+    expect(replies[0]!.result).toEqual({ outcome: { outcome: "cancelled" } });
+    const late = yield* context.runner.answerPermission({ agentId: agent.agentId, requestId: request.permissionRequestId, optionId: "allow-once" }).pipe(Effect.result);
+    expect(late._tag).toBe("Failure");
+    if (late._tag === "Failure") expect(late.failure._tag).toBe("RunnerRejected");
+    yield* pause(300);
+    expect(repliesIn(peekEcho(agent.echo))).toHaveLength(1);
+  })));

@@ -1,16 +1,23 @@
 import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import type * as Exit from "effect/Exit";
+import * as Layer from "effect/Layer";
+import * as Stream from "effect/Stream";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 import {
   accountFor, deliveryFor, echoFile, harnessFor, makeRunnerRig, modeOption, removeRunnerRig,
-  spawnFor, startPayloadFor, withAcpRunner, withEngine, writeFakeAdapter, type RunnerRig,
+  serviceEnvironment, spawnFor, startPayloadFor, withAcpRunner, withEngine, writeFakeAdapter, type RunnerRig,
 } from "../support/acpRunnerRig.ts";
-import { call, ownerCredential, readLog, success } from "../support/handlerRig.ts";
+import { call, makeFakeSecrets, ownerCredential, readLog, success } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { eventually, pause, tagged } from "../support/routingRig.ts";
 import { makeRedactor } from "../../src/identity/redactor.ts";
+import * as AcpRunner from "../../src/runner/AcpRunner.ts";
+import { Runner, type RunnerRejected, type SessionInfo } from "../../src/runner/Runner.ts";
 
 let rig: RunnerRig;
 beforeEach(() => {
@@ -82,17 +89,35 @@ live("6.2 hardening: resolved spawn secrets remain protected across chunks when 
   })).pipe(Effect.provide(unrelatedRegistry.layer));
 });
 
-live("6.1 hardening: a naturally exited process releases its identity before the agent starts again", () =>
-  withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
+// Review of fe4adcd, F-3: the exit watcher releases the identity itself, before
+// the close it forks runs. The test is the runner's only event consumer and
+// starts the agent again in the same fiber run that receives the exited
+// event, so the forked close has not run yet. The rig's own consumer would
+// see the event a poll later, after the close had released the identity.
+live("6.1 hardening: a naturally exited process releases its identity before the agent starts again (breaks if the exit watcher leaves the identity to the close it forks, review F-3)", () => {
+  const secrets = makeFakeSecrets();
+  const runnerLayer = AcpRunner.layer({ socketPath: rig.socket, stateFolder: rig.stateFolder, environment: serviceEnvironment(rig) })
+    .pipe(Layer.provide(Layer.mergeAll(NodeServices.layer, secrets.layer)));
+  return Effect.gen(function* () {
+    const runner = yield* Runner;
     const harness = harnessFor("first", writeFakeAdapter(rig));
     const first = yield* spawnFor(rig, harness, accountFor("first", { turns: [[{ step: "crash", exitCode: 3 }]] }, echoFile(rig)));
-    yield* context.runner.start(first.input);
-    yield* context.runner.prompt({ agentId: first.agentId, incarnation: first.incarnation, delivery: deliveryFor(first.agentId, "go") });
-    yield* context.waitFor((event) => event._tag === "exited" && event.agentId === first.agentId);
     const second = yield* spawnFor(rig, harness, accountFor("first", { turns: [] }, echoFile(rig)), { agentId: first.agentId });
-    expect((yield* context.runner.start(second.input)).session._tag).toBe("acp");
-    expect((yield* context.runner.prompt({ agentId: first.agentId, incarnation: first.incarnation, delivery: deliveryFor(first.agentId, "stale") }).pipe(Effect.result))._tag).toBe("Failure");
-  })));
+    const restarted = yield* Deferred.make<Exit.Exit<SessionInfo, RunnerRejected>>();
+    yield* runner.events.pipe(
+      Stream.runForEach((event) => event._tag === "exited" && event.agentId === first.agentId
+        ? runner.start(second.input).pipe(Effect.exit, Effect.flatMap((exit) => Deferred.succeed(restarted, exit)))
+        : Effect.void),
+      Effect.forkScoped,
+    );
+    yield* runner.start(first.input);
+    yield* runner.prompt({ agentId: first.agentId, incarnation: first.incarnation, delivery: deliveryFor(first.agentId, "go") });
+    const exit = yield* Deferred.await(restarted).pipe(Effect.timeout("10 seconds"));
+    expect(exit._tag).toBe("Success");
+    if (exit._tag === "Success") expect(exit.value.session._tag).toBe("acp");
+    expect((yield* runner.prompt({ agentId: first.agentId, incarnation: first.incarnation, delivery: deliveryFor(first.agentId, "stale") }).pipe(Effect.result))._tag).toBe("Failure");
+  }).pipe(Effect.provide(runnerLayer), Effect.scoped);
+});
 
 live("6.3 hardening: a permission path through a symlink into harness settings is owner-routed", () =>
   withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
