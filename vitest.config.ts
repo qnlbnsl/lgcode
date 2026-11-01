@@ -10,7 +10,6 @@ export default defineConfig({
     testTimeout: 60_000,
     allowOnly: !process.env["CI"],
     retry: 0,
-    env: { VP_REMOTE_CACHE: "off", VP_REMOTE_CACHE_URL: "" },
     setupFiles: [fileURLToPath(new URL("./scripts/test-environment.ts", import.meta.url))],
     fakeTimers: {
       toFake: [

@@ -38,7 +38,22 @@ if [ -z "$node_bin" ]; then
 fi
 [ -x "$node_bin" ] || install_hint
 
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
+# Follow links to the real file with the chosen Node.js, so that no command
+# other than Node.js and shell builtins runs. Parameter expansion replaces
+# dirname. A launcher that is not a link needs no extra process.
+self=$0
+if [ -L "$self" ]; then
+  self=$("$node_bin" -e 'process.stdout.write(process.getBuiltinModule("node:fs").realpathSync(process.argv[1]))' "$0") || {
+    echo "Shepherd could not find its folder: $0 is not a usable link." >&2
+    exit 1
+  }
+fi
+case $self in
+  */*) launcher_directory=${self%/*} ;;
+  *) launcher_directory=. ;;
+esac
+[ -n "$launcher_directory" ] || launcher_directory=/
+root=$(CDPATH= cd -- "$launcher_directory/.." && pwd -P)
 entry=$root/packages/cli/src/bin.ts
 if [ ! -f "$entry" ]; then
   entry=$root/bin/stub-entry.ts

@@ -17,6 +17,8 @@
     "@effect/platform-node": "catalog:",
     "@shepherd/client": "workspace:*",
     "@shepherd/contracts": "workspace:*",
+    "@shepherd/t3-effect-acp": "workspace:*",
+    "@shepherd/t3-provider-testing": "workspace:*",
     "effect": "catalog:",
     "ws": "catalog:"
   },
