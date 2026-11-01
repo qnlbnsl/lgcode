@@ -11,6 +11,8 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 
 import * as EventLog from "../../src/log/EventLog.ts";
+import * as Views from "../../src/views/Views.ts";
+import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { migrate } from "../../src/log/migrations.ts";
 import * as Redactor from "../../src/log/Redactor.ts";
 
@@ -32,8 +34,11 @@ const event: Event = { _tag: "TurnStarted", agentId };
 const withLog = <A, E>(program: Effect.Effect<A, E, EventLog.EventLog | SqlClient.SqlClient>) =>
   Effect.gen(function* () {
     yield* migrate;
-    return yield* program.pipe(
-      Effect.provide(EventLog.layer.pipe(Layer.provide(Redactor.layer))),
+    return yield* Effect.scoped(Effect.gen(function* () {
+      yield* registerRebuildCheck();
+      return yield* program;
+    })).pipe(
+      Effect.provide(EventLog.layer.pipe(Layer.provideMerge(Views.layer), Layer.provide(Redactor.layer))),
     );
   }).pipe(
     Effect.provide(SqliteClient.layer({ filename: join(home, "events.sqlite") })),

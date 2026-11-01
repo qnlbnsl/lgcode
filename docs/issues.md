@@ -719,7 +719,86 @@ with the reason `database read failed`. Decode failures retain the fixed
 reason `stored event is unreadable` on the same exported error class.
 Why it matters: a refused subscription must not disclose database contents.
 
-## 44. The folder ceiling and the stream redactor leave four duties to later units
+## 44. The low-level log fixtures contain partial agent histories
+
+Found: 2026-11-01, while writing the unit 4c rebuild checks at `4a5ad12`.
+State: open for the unit 4c builder.
+
+What happened: `test/log/append.test.ts` appends turn and session events without
+an earlier `AgentStarted`. The receipt tests append grouping events without
+creating an agent. These fixtures exercise the storage boundary in isolation.
+Adding the required live-view rebuild hook brings those histories through the
+projection layer as well.
+What should happen: the projection remains total over those stored envelopes,
+and the hook compares the real live views with a rebuild before the fixture
+closes. The builder must not add lifecycle validation to the raw log writer or
+change the frozen storage assertions to manufacture missing history.
+Why it matters: a rebuild hook that crashes on these fixtures cannot check the
+existing storage scenarios, even when their database behavior is correct.
+
+## 45. The first view rebuild must not open a reader before WAL is enabled
+
+Found: 2026-11-01, while composing the unit 4c test layers at `4a5ad12`.
+State: handled by the new test fixture; production startup needs the same order.
+
+What happened: `EventLog.layer` currently enables SQLite's write-ahead log
+(WAL). The new live-view layer must load its initial state before the writer
+that consumes it is constructed. The copied SQLite client's reader pool
+permanently falls back to the writer when its first reader opens a database
+that is not in WAL mode.
+What should happen: enable WAL before constructing the live views or starting
+their initial rebuild. The new `test/support/withViews.ts` fixture does this
+after migrations. Unit 4c and the later service startup must preserve that order.
+Why it matters: enabling WAL only after the first rebuild leaves that client's
+reader pool disabled, so comparison can block behind an occupied writer even
+though the database eventually reports WAL mode.
+
+## 46. A failure while applying a committed batch would leave the live views behind
+
+Found: 2026-11-01, while building unit 4c at `3fb1a96`.
+State: open.
+
+What happened: the live views are updated in memory after the database commit,
+inside the writer permit. The update has no error channel, so it can only fail
+by a defect. A defect there would leave the committed log ahead of the live
+views, and nothing detects that until the next comparison with a rebuild.
+What should happen: the service startup should treat such a defect as fatal
+and rebuild the views from the log before serving again, or the comparison
+should run on a schedule outside tests.
+Why it matters: a client could read views that miss a committed event.
+Round 1 of the unit 4c review also found a reachable defect of this kind: an
+agent named `constructor`, `toString` or `__proto__` is a valid identity, and
+the views, built as ordinary objects, threw after the append committed. Fixed
+in round 1: every keyed view has no prototype and is read by own property only.
+
+## 47. Live threads copy their event list on every append and keep full envelopes
+
+Found: 2026-11-01, while building unit 4c at `3fb1a96`.
+State: open.
+
+What happened: `apply` stores each thread as an immutable array and builds a
+new array for every event, so appending to a long thread is linear in its
+length. The thread also holds the whole envelope of every event for the life
+of the process.
+What should happen: before long-running threads matter, store a bounded window
+or event sequences with a read-through to the log, and use a persistent list.
+Why it matters: memory and write time grow without bound for a busy agent.
+
+## 48. The views module and the event log import each other
+
+Found: 2026-11-01, while building unit 4c at `3fb1a96`.
+State: open, harmless today.
+
+What happened: `EventLog.ts` uses the `Views` service, and `Views.ts` reaches
+`log/subscribe.ts`, which imports `EventLog.ts`, through `rebuild.ts`. The
+module cycle works because every use sits inside a function body. Unit 4c also
+exported `EventRow`, `decodeRow` and `PAGE_SIZE` from `subscribe.ts` so the
+rebuild reuses the same decoding.
+What should happen: move the row type, the decoder and the page size into a
+small module that neither side imports back.
+Why it matters: a later top-level use on either side would fail at load time.
+
+## 49. The folder ceiling and the stream redactor leave four duties to later units
 
 Found: 2026-11-01, while building unit 5a.
 State: open; each item names the unit that owns it.

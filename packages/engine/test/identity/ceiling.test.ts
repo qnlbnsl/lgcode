@@ -16,6 +16,9 @@ import { afterEach, beforeEach, expect, vi } from "vitest";
 import {
   checkFolder, folderForSpawn, canUseMode, canAnswerOption,
 } from "../../src/identity/ceiling.ts";
+import { registerRebuildCheck } from "../support/rebuildCheck.ts";
+
+registerRebuildCheck({ noLog: true });
 
 let root: string;
 let parent: string;

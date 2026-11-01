@@ -20,6 +20,8 @@ import { loadOwnerCredential } from "../../src/identity/ownerCredential.ts";
 import { mintDeviceCredential, verifyDeviceCredential } from "../../src/identity/devices.ts";
 import * as EventLog from "../../src/log/EventLog.ts";
 import { migrate } from "../../src/log/migrations.ts";
+import * as Views from "../../src/views/Views.ts";
+import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import * as Redactor from "../../src/log/Redactor.ts";
 
 let home: string;
@@ -45,7 +47,10 @@ const withLog = <A, E>(program: Effect.Effect<A, E, EventLog.EventLog | SqlClien
   mkdirSync(state, { mode: 0o700 });
   return Effect.gen(function* () {
     yield* migrate;
-    return yield* program.pipe(Effect.provide(EventLog.layer.pipe(Layer.provide(Redactor.layer))));
+    return yield* Effect.scoped(Effect.gen(function* () {
+      yield* registerRebuildCheck();
+      return yield* program;
+    })).pipe(Effect.provide(EventLog.layer.pipe(Layer.provideMerge(Views.layer), Layer.provide(Redactor.layer))));
   }).pipe(
     Effect.provide(SqliteClient.layer({ filename: join(state, "events.sqlite") })), Effect.scoped,
   );

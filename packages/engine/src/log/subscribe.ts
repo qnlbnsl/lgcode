@@ -22,7 +22,7 @@ export class LogReadFailed extends Data.TaggedError("LogReadFailed")<{
   readonly reason: "stored event is unreadable" | "database read failed";
 }> {}
 
-interface EventRow {
+export interface EventRow {
   readonly sequence: number;
   readonly event_id: string;
   readonly caller: string;
@@ -33,7 +33,7 @@ interface EventRow {
 }
 
 const decodeEnvelope = Schema.decodeUnknownSync(EventEnvelope);
-const decodeRow = (row: EventRow) => Effect.try({
+export const decodeRow = (row: EventRow) => Effect.try({
   try: () => {
     if (row.caller !== "owner" && !row.caller.startsWith("agent:")) throw new Error("invalid caller");
     return decodeEnvelope({
@@ -50,7 +50,7 @@ const decodeRow = (row: EventRow) => Effect.try({
   catch: () => new LogReadFailed({ reason: "stored event is unreadable" }),
 });
 
-const PAGE_SIZE = 512;
+export const PAGE_SIZE = 512;
 
 // Pattern: T3 Code apps/server/src/persistence/OrchestrationEventStore.ts,
 // streamProjectedApplicationEvents (MIT licence). Only the ordering idea is

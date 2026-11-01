@@ -25,6 +25,8 @@ import { mintAgentToken } from "../../src/identity/tokens.ts";
 import { mintDeviceCredential } from "../../src/identity/devices.ts";
 import * as EventLog from "../../src/log/EventLog.ts";
 import { migrate } from "../../src/log/migrations.ts";
+import * as Views from "../../src/views/Views.ts";
+import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { Redactor } from "../../src/log/Redactor.ts";
 
 let home: string;
@@ -194,13 +196,14 @@ it.effect.each(["agent", "device"] as const)(
     const tokenHashes = new Set<string>();
     const instance = makeRedactor({ secrets: () => [], tokenHashes: () => tokenHashes });
     yield* Effect.gen(function* () {
+      yield* registerRebuildCheck();
       const log = yield* EventLog.EventLog;
       yield* log.append({ _tag: "owner" }, Schema.decodeUnknownSync(RequestId)(randomUUID()), "a".repeat(64), [
         kind === "agent" ? { _tag: "TurnStarted", agentId } : { _tag: "DeviceAdded", deviceId: Schema.decodeUnknownSync(DeviceId)("phone"), name: "Phone" },
       ], kind === "agent"
         ? { agentTokens: [{ agentId, tokenHash: minted.tokenHash, revokedAt: null }] }
         : { devices: [{ deviceId: Schema.decodeUnknownSync(DeviceId)("phone"), name: "Phone", tokenHash: minted.tokenHash, createdAt: 1, revokedAt: null }] });
-    }).pipe(Effect.provide(EventLog.layer.pipe(Layer.provide(instance.layer))));
+    }).pipe(Effect.scoped, Effect.provide(EventLog.layer.pipe(Layer.provideMerge(Views.layer), Layer.provide(instance.layer))));
     const rows = kind === "agent"
       ? yield* sql<{ token_hash: string }>`SELECT token_hash FROM agent_tokens`
       : yield* sql<{ token_hash: string }>`SELECT token_hash FROM devices`;
@@ -267,6 +270,7 @@ it.live("5.11 fake agent: catches a printed token or account key reaching event,
     expect(diagnostics.join("\n")).not.toContain(secret);
     yield* migrate;
     yield* Effect.gen(function* () {
+      yield* registerRebuildCheck();
       const log = yield* EventLog.EventLog;
       const sql = yield* SqlClient.SqlClient;
       const result = yield* log.append({ _tag: "owner" }, Schema.decodeUnknownSync(RequestId)(randomUUID()), "b".repeat(64), [textEvent(chunks.join(""))], {
@@ -286,7 +290,7 @@ it.live("5.11 fake agent: catches a printed token or account key reaching event,
         expect(bytes.includes(Buffer.from(raw))).toBe(false);
         expect(bytes.includes(Buffer.from(secret))).toBe(false);
       }
-    }).pipe(Effect.provide(EventLog.layer.pipe(Layer.provide(instance.layer))));
+    }).pipe(Effect.scoped, Effect.provide(EventLog.layer.pipe(Layer.provideMerge(Views.layer), Layer.provide(instance.layer))));
   }).pipe(
     Effect.provide(SqliteClient.layer({ filename: join(home, "events.sqlite") })),
     Effect.provide(NodeServices.layer), Effect.scoped,

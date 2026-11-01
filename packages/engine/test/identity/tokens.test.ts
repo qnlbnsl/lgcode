@@ -16,6 +16,8 @@ import { afterEach, beforeEach, expect, vi } from "vitest";
 import { mintAgentToken, verifyAgentToken } from "../../src/identity/tokens.ts";
 import * as EventLog from "../../src/log/EventLog.ts";
 import { migrate } from "../../src/log/migrations.ts";
+import * as Views from "../../src/views/Views.ts";
+import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import * as Redactor from "../../src/log/Redactor.ts";
 
 let home: string;
@@ -38,7 +40,10 @@ const opened: Event = {
 const withLog = <A, E>(program: Effect.Effect<A, E, EventLog.EventLog | SqlClient.SqlClient>) =>
   Effect.gen(function* () {
     yield* migrate;
-    return yield* program.pipe(Effect.provide(EventLog.layer.pipe(Layer.provide(Redactor.layer))));
+    return yield* Effect.scoped(Effect.gen(function* () {
+      yield* registerRebuildCheck();
+      return yield* program;
+    })).pipe(Effect.provide(EventLog.layer.pipe(Layer.provideMerge(Views.layer), Layer.provide(Redactor.layer))));
   }).pipe(
     Effect.provide(SqliteClient.layer({ filename: join(home, "events.sqlite") })),
     Effect.scoped,
