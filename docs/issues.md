@@ -164,3 +164,17 @@ What should happen: one comment names T3 Code as the reason for the alias,
 and the two cache variables are removed or credited to T3 Code.
 Why it matters: a later reader sees an unusual compiler and settings that
 do nothing, with no stated cause.
+
+## 11. Herdr refused the plugin manifest: an action needs `title`
+
+Found: 2026-11-01, by the owner's step for criterion 1.4 on Herdr 0.9.3.
+State: fixed in `herdr-plugin.toml`; the owner re-runs the link.
+
+What happened: `herdr plugin link` stopped with "TOML parse error at line 10,
+[[actions]]: missing field `title`". The `serve` action had `name = "Start
+Shepherd"`, but Herdr names an action's label `title`, as the Synapse
+manifest does. Neither the plan's task 1f nor the unit 1 manifest test named
+the field, so the test passed.
+What should happen: each `[[actions]]` entry has `id`, `title`, `contexts`
+and `command`.
+Why it matters: Herdr cannot load Shepherd at all until the manifest parses.
