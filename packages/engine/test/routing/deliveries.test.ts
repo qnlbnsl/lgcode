@@ -145,7 +145,9 @@ it.live("D09 catches queue drain sending during a turn, changing order, or sendi
   yield* finish(runner, target, second);
   expect((yield* eventually(deliveryRow(third), (row) => row?.status === "sent"))?.status).toBe("sent");
   yield* finish(runner, target, third);
-  yield* endTurn(runner, target);
+  yield* runner.emit({ _tag: "turnEnded", agentId: target.agentId, incarnation: incarnationOf(target.token), deliveryId: third });
+  yield* pause(40);
+  expect(tagged(yield* readLog, "TurnEnded").filter((event) => event.agentId === target.agentId)).toHaveLength(3);
   const { dispatchQueued } = yield* loadDeliveries();
   yield* dispatchQueued(target.agentId);
   yield* dispatchQueued(target.agentId);
