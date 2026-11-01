@@ -39,6 +39,7 @@ import { setConfig, type ConfigOption } from "./config.ts";
 import { denyArguments } from "./denyRead.ts";
 import { reportedLevel } from "./modes.ts";
 import { makePermissionHold, mapPermissionOption, settingsWrite } from "./permissions.ts";
+import { resetTimeFromError } from "./resetTime.ts";
 import { Runner, RunnerRejected, type RunnerEvent, type SessionInfo } from "./Runner.ts";
 import { translate } from "./translate.ts";
 
@@ -58,6 +59,7 @@ interface Turn {
   ended: boolean;
   text: string;
   error?: string;
+  resetAt?: number;
 }
 interface Process {
   readonly input: Spawn;
@@ -148,7 +150,8 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       ? (configuration.classifyError ?? classifyError)({ harness, text: clean }) : undefined;
     const classification = turn.error !== undefined || candidate === "out-of-usage" ? candidate : undefined;
     yield* emit({ _tag: "promptReply", ...identity(entry), deliveryId: turn.deliveryId,
-      outcome: classification !== undefined ? { _tag: "pause", reason: classification, error: clean }
+      outcome: classification !== undefined ? { _tag: "pause", reason: classification, error: clean,
+        ...(classification === "out-of-usage" && turn.error !== undefined && turn.resetAt !== undefined ? { resetAt: turn.resetAt } : {}) }
         : turn.error !== undefined ? { _tag: "error", error: clean } : { _tag: "success" } });
     if (entry.turn === turn) delete entry.turn;
     yield* emit({ _tag: "turnEnded", ...identity(entry), deliveryId: turn.deliveryId });
@@ -426,6 +429,8 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         if (reply._tag === "Failure") yield* Deferred.fail(sent, rejected("prompt send failed"));
         if (entry.stopped || entry.dead) return;
         const response = reply._tag === "Success" ? reply.success as { error?: unknown } : undefined;
+        const resetAt = resetTimeFromError(reply._tag === "Failure" ? reply.failure : response?.error);
+        if (resetAt !== undefined) turn.resetAt = resetAt;
         const error = reply._tag === "Failure" ? JSON.stringify(reply.failure) : response?.error === undefined ? turn.error : JSON.stringify(response.error);
         if (error !== undefined) turn.error = error;
         turn.replied = true;

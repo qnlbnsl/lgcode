@@ -1781,9 +1781,9 @@ process because its group number matches an old row.
 
 Found: 2026-11-01, in unit 6c's focused review, finding F-4, and the unit 6b
 review's ruling A3, relayed by engine-lead in board post 980.
-State: error-source classification is fixed in unit 6c fix round 1. Reset
-times remain open for the merge of units 6b and 6c, with engine-lead deciding
-the wiring.
+State: error-source classification is fixed in unit 6c fix round 1. The
+reset-time producer is fixed in fix round 2 after merging unit 6b. Recorded
+adapter evidence for a reset time remains open.
 
 What happened: the runner classified a successful turn's text, so ordinary
 agent prose containing "authentication required" could produce a signed-out
@@ -1793,14 +1793,16 @@ in `turn.error`. Successful text can produce only an out-of-usage pause,
 and only for cursor, whose recorded transcript uses that text form
 (issue 38). All other harnesses classify only their error replies. The
 same restrictions apply to an injected classifier.
-What remains: the real classifier returns only the pause class. The runner
-still omits `resetAt` even when an error reply supplies `data.resetsAt`.
-Unit 6b adds `resetAt` to the runner's pause outcome, and the fake agent's
-`out_of_usage` step already supplies `data.resetsAt`. No recorded fixture
-holds a reset time yet, as recorded in the fix-round brief.
-What should happen: the merge carries the error reply's reset time into
-the pause outcome, and recorded fixtures eventually verify the real
-adapter's reset-time form. The classifier signature stays unchanged here.
+The runner now reads `data.resetsAt` only from the error reply to its
+`session/prompt` request. An out-of-usage pause carries a parsed date string
+or a finite, non-negative integer in epoch milliseconds, within 366 days
+of the current time in either direction. Invalid values are ignored, so
+unit 6b keeps its "owner needed" path when no deadline is known. Successful
+turn text and signed-out pauses never carry this field. The classifier's
+signature is unchanged.
+What remains: recorded fixtures must verify the real adapter's reset-time
+form. The fake agent's `out_of_usage` step already supplies `data.resetsAt`,
+but no recorded fixture holds a reset time yet, as recorded in the brief.
 Why it matters: account recovery cannot schedule a usage reset from a
 classified pause that lost its reset time.
 
