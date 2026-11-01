@@ -546,3 +546,39 @@ State: open.
 - The device writes and token revocation that unit 5a adds must follow the same
   rule as decision row 32: each is written in one transaction, through
   `EventLog.append`, together with the event that records it.
+
+## 34. The recorded fixtures carry the owner's installed skill and command lists
+
+Found: 2026-11-01, when the manager read the first recorded fixtures.
+State: accepted by the manager for now, because the repository is private;
+the owner decides whether to keep it.
+
+What happened: `packages/testing/fixtures/claude.ndjson` (lines 5 and 13-15,
+about 50 KB each) and `codex.ndjson` (line 5) hold the adapters'
+`available_commands_update` notifications. These list every skill and command
+installed on the owner's machine, with their descriptions. The manager found
+no email address, organization, account id, home path or key in either file.
+What should happen: the owner decides whether these lists may stay in the
+repository. If not, the recorder drops or trims `available_commands_update`
+before it keeps a frame.
+Why it matters: the lists describe the owner's private setup, and they would
+become public if the repository ever did.
+
+## 35. The fixture recorder stops every harness when one adapter reports no version
+
+Found: 2026-11-01, in the owner-run `pnpm record-fixtures` at 4a5ad12.
+State: open; a recorder fix is queued for the unit 8a builder.
+
+What happened: Cursor's `agent acp` (version 2026.10.14-941492e, from
+`agent --version`) reports no version in its initialize reply.
+`packages/engine/scripts/recorder.ts` line 235 then throws "Adapter did not
+report its version", which aborted the run after the Claude and Codex
+fixtures were written. The signed-out probes and the `errors/` samples were not
+written. In the same run, the pinned Claude adapter negotiated protocol
+version 2, not the version 1 that issue 28 read from its source.
+What should happen: the recorder takes the version from the harness's own
+`--version` output when the adapter reports none, or records it as unknown. A
+failure in one harness is reported for that harness and the run goes on to the
+others.
+Why it matters: one harness's gap must not block the recordings and samples of
+the others.
