@@ -4,6 +4,7 @@
 //
 // - `FAKE_AGENT_ECHO=<file>`: the agent writes its pid, arguments, working folder, environment
 //   and every raw inbound frame there, after every frame it receives.
+// - Step `stderr_part` (unit 6c tests): stderr text with no line end added.
 // - Steps `stderr`, `rpc_error`, `raw_frame` and `client_request`, whose text expands
 //   `${env:NAME}`, `${env-u:NAME}` (the value as JSON \u escapes) and `${session}`.
 // - The permission step's optional `locations`.
@@ -61,7 +62,7 @@ const run = (turns: ReadonlyArray<ReadonlyArray<Record<string, unknown>>>, permi
     const echo = JSON.parse(yield* Effect.promise(() => readFile(echoFile, "utf8"))) as {
       pid: number; argv: Array<string>; cwd: string; env: Record<string, string>; inbound: Array<{ method?: string; params?: unknown }>
     }
-    return { ...outcome, home, echo, updates, texts, permissions, stderr: () => stderr.join("") }
+    return { ...outcome, home, echo, updates, texts, permissions, stderr: () => stderr.join(""), stderrChunks: () => [...stderr] }
   })
 
 const live = (name: string, test: () => Effect.Effect<unknown, unknown, any>) =>
@@ -83,6 +84,20 @@ live("a stderr step writes the expanded text to stderr (breaks if ${env:NAME} is
   Effect.gen(function*() {
     const result = yield* run([[{ step: "stderr", text: "boom ${env:PLANTED_VALUE} end" }]])
     assert.include(result.stderr(), `boom ${planted} end`)
+    assert.equal(result.reply._tag, "Success")
+  }))
+
+live("stderr_part steps write their text with no line end added, so a slow step between two of them splits one line across two chunks (breaks if a newline is appended to each part, the parts are joined into one write, or ${env:NAME} is not expanded)", () =>
+  Effect.gen(function*() {
+    const result = yield* run([[
+      { step: "stderr_part", text: "boom first-half-" },
+      { step: "slow", ms: 150 },
+      { step: "stderr_part", text: "${env:PLANTED_VALUE} second-half\n" }
+    ]])
+    const chunks = result.stderrChunks()
+    assert.isAtLeast(chunks.length, 2)
+    assert.isFalse(chunks[0]!.includes("\n"))
+    assert.equal(chunks.join(""), `boom first-half-${planted} second-half\n`)
     assert.equal(result.reply._tag, "Success")
   }))
 

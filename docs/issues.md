@@ -1527,3 +1527,84 @@ default settings, or a recorded finding that its adapter has none.
 Why it matters: without the rule, only the folder rule, the permission ceiling
 and the approval routing guard the state folder and the settings files (rows
 61, 65 and 72). `SECURITY.md` lists these harnesses.
+
+## 110. The replay test for the cursor transcript expects success, which unit 6c changes
+
+Found: 2026-11-01, by the unit 6c test writer, while writing criterion 6.9.
+State: open for unit 6c.
+
+What happens: `packages/engine/test/runner/replay.test.ts`, the test named
+"6.2 replay cursor", replays the recorded cursor transcript with no
+classifier and expects a successful turn. The transcript ends in the reply
+"Upgrade your plan to continue". Criterion 6.9 and issue 38 require that reply
+to give an out-of-usage pause once the real classifier is the runner's
+default.
+What should happen: the builder of unit 6c updates that one test to expect the
+pause. The new test in `classify-errors.test.ts` already holds the new
+expectation, so the old one would otherwise fail for a correct change.
+Why it matters: a builder who sees a red test in a file they did not write
+might weaken the classifier to make it green again.
+
+## 111. The runner discards a child's stderr, so a crash records none of it
+
+Found: 2026-11-01, by the unit 6c test writer.
+State: open for unit 6c.
+
+What happens: the runner drains a child's stderr and throws the text away
+(`AcpRunner.ts`, the stderr reader), and its exit event carries an empty
+`stderr`. The command handler writes `stderr: ""` into the crash event, so
+the owner sees an exit code and nothing about why the adapter died.
+What should happen: the runner keeps the last lines through the redactor's
+chunk carry (issue 102), flushes the carry before it reports the exit, and
+the handler stores that text in the crash event.
+Why it matters: a crash with no error text cannot be diagnosed, and a
+tail that is cut per chunk could store a secret that was split across two
+chunks.
+
+## 112. A crash cancels no permission request and tells no parent
+
+Found: 2026-11-01, by the unit 6c test writer, as the follow-up to issue 74.
+State: open for unit 6c.
+
+What happens: the exit handler marks the agent crashed, withdraws its pending
+deliveries and revokes its token, but it does not cancel the agent's open
+permission requests, does not queue a notice to the agent that can act for
+it, and never writes "owner needed" for an agent the owner started. A
+parent without a wait on the crashed agent learns of the crash only by
+looking at the roster.
+What should happen: the crash append also holds the cancellations, exactly
+one notice to the nearest available ancestor (merged with the wait's own
+notice when that ancestor waits, issue 89), or one "owner needed" when no
+agent can act.
+Why it matters: an open request of a dead agent stays in the owner's inbox
+forever, and a team lead can wait on a worker that will never answer.
+
+## 113. Nothing closes the open questions of a crashed agent
+
+Found: 2026-11-01, by the unit 6c test writer.
+State: open, needs an owner decision.
+
+What happens: issue 74 says question closure must use an agreed contract and
+not invent an answer. No event closes a question without an answer, so the
+questions a crashed agent asked stay open after its crash. The unit 6c tests
+only assert that a crash writes no invented answer.
+What should happen: the owner decides whether a question needs a "withdrawn"
+event, or whether an open question of a crashed agent stays open on purpose
+until its asker is replaced.
+Why it matters: the owner's inbox lists questions that nobody can receive an
+answer for.
+
+## 114. A blocking wait on a crashed agent has no stated parent notice
+
+Found: 2026-11-01, by the unit 6c test writer, while reading issue 89.
+State: open, a reading is recorded and untested.
+
+What happens: row 67 merges the crash notice with the parent notice "when the
+waiter is also the parent" and a non-blocking wait stays open. A blocking wait
+creates no delivery, so the rows do not say whether the parent, who is
+blocked inside the wait call, should also get a notice.
+What should happen: the builder follows the reading in the unit 6c result
+(the wait reply is the notice, and no extra delivery is written), or the
+owner states otherwise. The unit 6c tests do not cover this case.
+Why it matters: a second notice to a blocked parent would be delivered after
+its wait call returns and repeat what the call already told it.
