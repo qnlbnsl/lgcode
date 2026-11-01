@@ -1,1 +1,1 @@
-{"harness":"codex","kind":"signed-out","text":"Authentication required","source":"codex-acp 2.5.0 dist/index.js:CodexEventHandler.getTurnFailure; read 2026-11-01; not a live capture","verified":false}
+{"harness":"codex","kind":"signed-out","text":"{\"code\":-32000,\"message\":\"Authentication required\"}","source":"Recorded from the installed adapter with an empty temporary home and no account variables","verified":true}

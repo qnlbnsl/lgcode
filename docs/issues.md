@@ -587,3 +587,40 @@ failure in one harness is reported for that harness and the run goes on to the
 others.
 Why it matters: one harness's gap must not block the recordings and samples of
 the others.
+
+## 36. The fixture scrubber misses identifiers joined by an underscore
+
+Found: 2026-11-01, by the lead, reading the re-recorded `cursor.ndjson` at 0318c78.
+State: open; a fix round is queued for the unit 8a recorder. The new
+`cursor.ndjson` is held out of the repository until the fix lands.
+
+What happens: the third harness lists the owner's synced skills by names of
+the form `synced-<id>_<id>-<skill>`. The two ids look like account or
+organization identifiers. `scrubText` in `packages/engine/scripts/recorder.ts`
+(line 41) replaces identifiers only between word boundaries, and the
+underscore is a word character, so neither id matches and both stay in the
+fixture. The rule for hex of 32 or more characters (line 39) has the same flaw
+next to a letter, a digit or an underscore.
+What should happen: an identifier or a long hex value is replaced wherever it
+appears, whatever character is next to it, except the protocol session ids the
+recorder maps.
+Why it matters: an account or organization identifier would reach a committed
+fixture. The fixtures committed at 6be2478 do not contain these names; each
+holds only its protocol session id.
+
+## 37. The fixture scrubber redacts every environment value of eight or more characters
+
+Found: 2026-11-01, by the manager, in the owner-run re-record at 0318c78.
+State: open.
+
+What happens: `scrubText` replaces every value of the parent environment that
+is eight or more characters long. Under pnpm, `npm_package_name` is
+`shepherd`, so ordinary text such as a source note naming
+`shepherd-engine` becomes `<redacted>-engine`. The re-recorded
+`errors/cursor-out-of-usage.json` was over-scrubbed this way, so the earlier
+committed copy was kept.
+What should happen: the scrubber redacts the values of account variables and
+of names that can hold secrets, and leaves well-known values that are not
+secret, such as the package name, version and script name.
+Why it matters: over-scrubbing is the safe direction, but it corrupts the
+fixtures' text and can hide real differences between recordings.

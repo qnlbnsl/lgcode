@@ -1,1 +1,1 @@
-{"harness":"claude","kind":"signed-out","text":"Not logged in · Please run /login","source":"claude-agent-acp 0.99.1 dist/acp-agent.js:isLoginRequiredText documentation; read 2026-11-01; not a live capture","verified":false}
+{"harness":"claude","kind":"signed-out","text":"{\"code\":-32000,\"message\":\"Authentication required\"}","source":"Recorded from the installed adapter with an empty temporary home and no account variables","verified":true}
