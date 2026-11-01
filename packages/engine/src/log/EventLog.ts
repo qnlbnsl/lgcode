@@ -15,8 +15,9 @@ import type { SqlError } from "effect/sql/SqlError";
 
 import * as Redactor from "./Redactor.ts";
 
-// The reason names the failure and never carries data: it is built from the
-// SQLite error text only, which names tables and columns but not values.
+// The reason names the failure and never carries data. It is built from a
+// fixed category and nothing else, because SQLite's own message can quote a
+// stored value.
 export class LogWriteFailed extends Data.TaggedError("LogWriteFailed")<{
   readonly reason: string;
 }> {}
@@ -61,11 +62,27 @@ export class EventLog extends Context.Service<
 const Envelopes = Schema.Array(EventEnvelope);
 const decodeEnvelopes = Schema.decodeUnknownSync(Envelopes);
 
+// SQLite's primary result code for a full disk.
+const SQLITE_FULL = 13;
+
 const failureReason = (error: SqlError): string => {
-  const cause: unknown = error.reason.cause;
-  const detail = cause instanceof Error ? cause.message.slice(0, 200) : "";
-  return detail === "" ? `database write failed (${error.reason._tag})` : `database write failed (${error.reason._tag}): ${detail}`;
+  const reason = error.reason;
+  const errno: unknown = typeof reason.cause === "object" && reason.cause !== null && "errno" in reason.cause
+    ? reason.cause.errno
+    : undefined;
+  if (typeof errno === "number" && (errno & 0xff) === SQLITE_FULL) return "database write failed: disk full";
+  switch (reason._tag) {
+    case "UniqueViolation":
+    case "ConstraintError": return "database write failed: constraint";
+    case "LockTimeoutError": return "database write failed: busy";
+    default: return "database write failed";
+  }
 };
+
+// The caller as stored in `events.caller` and `receipts.caller`. It is built
+// field by field so the text does not depend on property order or on extra
+// runtime properties.
+const callerKey = (actor: Actor): string => actor._tag === "owner" ? "owner" : `agent:${actor.agentId}`;
 
 // Pattern: T3 Code apps/server/src/orchestration-v2/EventSink.ts
 // (`sql.withTransaction`, lines 716 and 781; MIT licence). The shape was
@@ -132,7 +149,7 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
       if (latched !== undefined) return yield* Effect.fail(latched);
       const redacted = yield* Effect.forEach(events, (event) => redactor.redact(event));
       const occurredAt = yield* Clock.currentTimeMillis;
-      return yield* commit(JSON.stringify(actor), requestId, bodyHash, redacted, sideRows, actor, occurredAt).pipe(
+      return yield* commit(callerKey(actor), requestId, bodyHash, redacted, sideRows, actor, occurredAt).pipe(
         Effect.mapError((error) => error._tag === "SqlError"
           ? new LogWriteFailed({ reason: failureReason(error) })
           : error),
