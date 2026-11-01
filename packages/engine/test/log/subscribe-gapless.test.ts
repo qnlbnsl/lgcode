@@ -23,6 +23,8 @@ import { migrate } from "../../src/log/migrations.ts";
 import * as Redactor from "../../src/log/Redactor.ts";
 import * as Subscribe from "../../src/log/subscribe.ts";
 import { LogReadFailed, SubscribeInvalidCursor } from "../../src/log/subscribe.ts";
+import * as Views from "../../src/views/Views.ts";
+import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 let home: string;
 beforeEach(() => {
@@ -56,9 +58,12 @@ const withLog = <A, E>(
   program: Effect.Effect<A, E, EventLog.EventLog | SqlClient.SqlClient | Scope.Scope>,
 ) => Effect.gen(function* () {
   yield* migrate;
-  return yield* program.pipe(
+  return yield* Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    return yield* program;
+  }).pipe(
     Effect.scoped,
-    Effect.provide(EventLog.layer.pipe(Layer.provide(Redactor.layer))),
+    Effect.provide(EventLog.layer.pipe(Layer.provideMerge(Views.layer), Layer.provide(Redactor.layer))),
   );
 }).pipe(
   Effect.provide(SqliteClient.layer({ filename: join(home, "events.sqlite"), readerWorker: true })),

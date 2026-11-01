@@ -752,3 +752,44 @@ after migrations. Unit 4c and the later service startup must preserve that order
 Why it matters: enabling WAL only after the first rebuild leaves that client's
 reader pool disabled, so comparison can block behind an occupied writer even
 though the database eventually reports WAL mode.
+
+## 46. A failure while applying a committed batch would leave the live views behind
+
+Found: 2026-11-01, while building unit 4c at `3fb1a96`.
+State: open.
+
+What happened: the live views are updated in memory after the database commit,
+inside the writer permit. The update has no error channel, so it can only fail
+by a defect. A defect there would leave the committed log ahead of the live
+views, and nothing detects that until the next comparison with a rebuild.
+What should happen: the service startup should treat such a defect as fatal
+and rebuild the views from the log before serving again, or the comparison
+should run on a schedule outside tests.
+Why it matters: a client could read views that miss a committed event.
+
+## 47. Live threads copy their event list on every append and keep full envelopes
+
+Found: 2026-11-01, while building unit 4c at `3fb1a96`.
+State: open.
+
+What happened: `apply` stores each thread as an immutable array and builds a
+new array for every event, so appending to a long thread is linear in its
+length. The thread also holds the whole envelope of every event for the life
+of the process.
+What should happen: before long-running threads matter, store a bounded window
+or event sequences with a read-through to the log, and use a persistent list.
+Why it matters: memory and write time grow without bound for a busy agent.
+
+## 48. The views module and the event log import each other
+
+Found: 2026-11-01, while building unit 4c at `3fb1a96`.
+State: open, harmless today.
+
+What happened: `EventLog.ts` uses the `Views` service, and `Views.ts` reaches
+`log/subscribe.ts`, which imports `EventLog.ts`, through `rebuild.ts`. The
+module cycle works because every use sits inside a function body. Unit 4c also
+exported `EventRow`, `decodeRow` and `PAGE_SIZE` from `subscribe.ts` so the
+rebuild reuses the same decoding.
+What should happen: move the row type, the decoder and the page size into a
+small module that neither side imports back.
+Why it matters: a later top-level use on either side would fail at load time.

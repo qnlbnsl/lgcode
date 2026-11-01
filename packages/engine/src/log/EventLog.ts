@@ -15,6 +15,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as SqlClient from "effect/sql/SqlClient";
 import type { SqlError } from "effect/sql/SqlError";
 
+import * as Views from "../views/Views.ts";
 import * as Redactor from "./Redactor.ts";
 
 // The reason names the failure and never carries data. It is built from a
@@ -59,6 +60,9 @@ export class EventLog extends Context.Service<
       sideRows: SideRows,
     ) => Effect.Effect<ReadonlyArray<EventEnvelope>, LogWriteFailed | RequestIdReused>;
     readonly subscribeCommitted: Effect.Effect<PubSub.Subscription<EventEnvelope>, never, Scope.Scope>;
+    // Runs an effect while holding the writer's permit, so no batch commits
+    // or updates the live views meanwhile. For `compareViews` only.
+    readonly withWriterPermit: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
   }
 >()("shepherd/engine/log/EventLog") {}
 
@@ -93,6 +97,7 @@ const callerKey = (actor: Actor): string => actor._tag === "owner" ? "owner" : `
 export const layer = Layer.effect(EventLog, Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   const redactor = yield* Redactor.Redactor;
+  const views = yield* Views.Views;
   // WAL lets readers run beside this single writer. The mode is stored in the
   // file; setting it again on an already-WAL file changes nothing.
   yield* sql`PRAGMA journal_mode = WAL`;
@@ -102,9 +107,13 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
     PubSub.shutdown,
   );
   // Called only after COMMIT, while the writer permit still orders batches.
-  // Unit 4c can apply the live views beside this publication step.
+  // The live views are updated first, so a subscriber that sees an event and
+  // then reads the views finds the event applied. Neither step can fail.
   const publishCommitted = (envelopes: ReadonlyArray<EventEnvelope>) =>
-    PubSub.publishAll(committedEvents, envelopes).pipe(Effect.asVoid);
+    views.applyCommitted(envelopes).pipe(
+      Effect.andThen(PubSub.publishAll(committedEvents, envelopes)),
+      Effect.asVoid,
+    );
   // The first write failure, kept for the life of this service. It is read and
   // set only while the writer permit is held.
   let latched: LogWriteFailed | undefined;
@@ -182,5 +191,9 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
       );
     }));
 
-  return EventLog.of({ append, subscribeCommitted: PubSub.subscribe(committedEvents) });
+  return EventLog.of({
+    append,
+    subscribeCommitted: PubSub.subscribe(committedEvents),
+    withWriterPermit: writer.withPermits(1),
+  });
 }));
