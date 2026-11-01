@@ -13,11 +13,10 @@ They were copied on 2026-10-30 from commit
 | File here | File in T3 Code | Changed? |
 |---|---|---|
 | `mergeMessage.ts` | `packages/source-control-core/src/server/mergeMessage.ts` | No, copied exactly. |
-| `mergeMessage.test.ts` | `packages/source-control-core/src/server/mergeMessage.test.ts` | No, copied exactly. |
+| `mergeMessage.test.ts` | `packages/source-control-core/src/server/mergeMessage.test.ts` | The test runner import changed from `vite-plus/test` to `vitest`. |
 
-The test file imports its test runner from `vite-plus/test`, which is T3
-Code's runner. When Shepherd picks its own test runner, change only that
-import line and record the change in the table above.
+The test file uses Shepherd's Vitest runner. Only its test runner import
+changed; its assertions are unchanged.
 
 ## What the code does
 

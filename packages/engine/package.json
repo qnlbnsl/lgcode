@@ -1,0 +1,34 @@
+{
+  "name": "@shepherd/engine",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.13 <27"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentclientprotocol/claude-agent-acp": "0.99.1",
+    "@agentclientprotocol/codex-acp": "2.5.0",
+    "@effect/platform-node": "catalog:",
+    "@shepherd/contracts": "workspace:*",
+    "effect": "catalog:",
+    "ws": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@shepherd/client": "workspace:*",
+    "@shepherd/testing": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/ws": "catalog:",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
