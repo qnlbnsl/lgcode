@@ -71,7 +71,8 @@ for (const [fixture, want] of Object.entries(expected)) {
       expect(messages(own)).toEqual([want.text]);
       const tags = own.filter((event) => event._tag !== "deliveryUpdate").map((event) => event._tag);
       expect(tags).toEqual(["promptReply", "turnEnded"]);
-      expect(own.find((event) => event._tag === "promptReply")).toMatchObject({ outcome: { _tag: "success" } });
+      expect(own.find((event) => event._tag === "promptReply")).toMatchObject({ outcome: fixture === "cursor"
+        ? { _tag: "pause", reason: "out-of-usage" } : { _tag: "success" } });
       for (const event of own) expect(event).toMatchObject({ agentId: spawn.agentId, incarnation: spawn.incarnation });
       expect(own.every((event) => event._tag !== "deliveryUpdate" || event.replay === false)).toBe(true);
     })));

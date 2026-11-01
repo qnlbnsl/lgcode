@@ -18,6 +18,9 @@ type DiagnosticStep =
   | { type: "ext_notification"; method: string; params: Schema.Json }
   | { type: "stderr_flood"; bytes: number }
   | { type: "spawn_grandchild" }
+  // Unit 6c fix round 1 (F-1): starts a helper in its own session, outside the adapter's process group,
+  // that inherits the adapter's stderr, and records its pid in the echo file as `helperPids`.
+  | { type: "spawn_detached_helper" }
 type StepDiagnostic = DiagnosticStep extends infer D ? D extends { type: infer T } ? Omit<D, "type"> & { step: T } : never : never
 type Step = DiagnosticStep | StepDiagnostic
   | { step: "text"; text: string }
@@ -31,6 +34,8 @@ type Step = DiagnosticStep | StepDiagnostic
   | { step: "shepherd_command"; command: string; input: unknown }
   | { step: "end_turn"; stopReason: string }
   | { step: "crash"; exitCode: number }
+  // Unit 6c tests: the agent sends itself the signal, so the runner sees a death by signal with no exit code.
+  | { step: "kill_self"; signal: "SIGKILL" | "SIGTERM" | "SIGSEGV" | "SIGABRT" }
   | { step: "out_of_usage"; message: string; resetsAt: string }
   | { step: "signed_out"; message: string; via?: "idle" | "rpc" }
   | { step: "slow"; ms: number }
@@ -38,6 +43,9 @@ type Step = DiagnosticStep | StepDiagnostic
   // Unit 6a. Text in these steps expands ${env:NAME} to the child's own variable, ${env-u:NAME}
   // to the same value written as JSON \u escapes (raw frames only) and ${session} to the session id.
   | { step: "stderr"; text: string }
+  // Unit 6c tests: writes the expanded text to stderr as given, with no line end added, so a script can
+  // split one line (and a secret in it) across two chunks by putting a `slow` step between two of these.
+  | { step: "stderr_part"; text: string }
   | { step: "rpc_error"; message: string; code?: number }
   | { step: "raw_frame"; frame: string }
   | { step: "client_request"; method: string; params: Schema.Json }
@@ -61,7 +69,11 @@ const environment = process.env
 // what it was started with (pid, arguments, working folder, environment) and every frame it
 // received. Nothing is written without the variable.
 const echoPath = environment.FAKE_AGENT_ECHO
-const echo = { pid: process.pid, argv: [...process.argv], cwd: process.cwd(), env: { ...environment }, inbound: [] as Array<unknown> }
+const echo = {
+  pid: process.pid, argv: [...process.argv], cwd: process.cwd(), env: { ...environment }, inbound: [] as Array<unknown>,
+  // Unit 6c fix round 1: the pids of the children the diagnostic steps start, so a test can check them from outside.
+  grandchildPids: [] as Array<number>, helperPids: [] as Array<number>,
+}
 const writeEcho = () => { if (echoPath !== undefined) writeFileSync(echoPath, JSON.stringify(echo), { mode: 0o600 }) }
 writeEcho()
 
@@ -97,8 +109,16 @@ const spawnGrandchild = () => Effect.callback<number, AcpRequestError>((resume) 
   const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 60000)"], { env: environment, stdio: "ignore" })
   const closed = new Promise<void>((resolve) => child.once("close", () => { grandchildren.delete(child); resolve() }))
   grandchildren.set(child, closed)
-  child.once("spawn", () => resume(Effect.succeed(child.pid!)))
+  child.once("spawn", () => { echo.grandchildPids.push(child.pid!); writeEcho(); resume(Effect.succeed(child.pid!)) })
   child.once("error", () => resume(Effect.fail(AcpRequestError.internalError("Unable to start diagnostic child"))))
+})
+// A helper that leaves the adapter's process group and session and keeps the adapter's stderr open. It ends
+// by itself after a minute, so a test that fails to stop it leaves nothing running for long.
+const spawnDetachedHelper = () => Effect.callback<number, AcpRequestError>((resume) => {
+  const child = spawn(process.execPath, ["-e", "setTimeout(() => process.exit(0), 60000)"], { env: environment, stdio: ["ignore", "ignore", "inherit"], detached: true })
+  child.unref()
+  child.once("spawn", () => { echo.helperPids.push(child.pid!); writeEcho(); resume(Effect.succeed(child.pid!)) })
+  child.once("error", () => resume(Effect.fail(AcpRequestError.internalError("Unable to start diagnostic helper"))))
 })
 const floodStderr = (bytes: number) => Effect.callback<void, AcpRequestError>((resume) => {
   if (!Number.isSafeInteger(bytes) || bytes < 0) { resume(Effect.fail(AcpRequestError.invalidParams("Invalid stderr byte count"))); return }
@@ -240,6 +260,7 @@ const program = Effect.gen(function*() {
           case "ext_notification": yield* agent.client.extNotification(diagnostic.method, diagnostic.params); continue
           case "stderr_flood": yield* floodStderr(diagnostic.bytes); continue
           case "spawn_grandchild": yield* text(`grandchild pid: ${yield* spawnGrandchild()}`); continue
+          case "spawn_detached_helper": yield* text(`helper pid: ${yield* spawnDetachedHelper()}`); continue
         }
         if ("type" in step) continue
         switch (step.step) {
@@ -269,6 +290,11 @@ const program = Effect.gen(function*() {
             yield* Effect.callback<void>((resume) => { process.stderr.write(line, () => resume(Effect.void)) })
             break
           }
+          case "stderr_part": {
+            const part = expand(step.text, request.sessionId)
+            yield* Effect.callback<void>((resume) => { process.stderr.write(part, () => resume(Effect.void)) })
+            break
+          }
           case "rpc_error": return yield* Effect.fail(new AcpRequestError({ code: step.code ?? -32603, errorMessage: expand(step.message, request.sessionId) }))
           case "raw_frame": {
             const line = expand(step.frame, request.sessionId) + "\n"
@@ -290,6 +316,13 @@ const program = Effect.gen(function*() {
             yield* Effect.sleep(10)
             yield* Effect.callback<void>((resume) => { process.stdout.write("", () => resume(Effect.void)) })
             process.exit(step.exitCode)
+          case "kill_self":
+            // Flush queued transport writes first, as the crash step does, then die by the signal.
+            yield* Effect.sleep(10)
+            yield* Effect.callback<void>((resume) => { process.stderr.write("", () => resume(Effect.void)) })
+            process.kill(process.pid, step.signal)
+            yield* Effect.sleep(5_000)
+            continue
           case "end_turn": return { stopReason: step.stopReason }
           case "out_of_usage": return { stopReason: "error", error: { code: -32001, message: step.message, data: { resetsAt: step.resetsAt } } }
           case "signed_out":

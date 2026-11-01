@@ -1144,7 +1144,7 @@ settings paths are also owner-routed.
 ## 74. Requests asked by a crashed or stopped agent remain open
 
 Found: 2026-11-01, in the review of unit 5c.
-State: open for units 6a and 6d.
+State: crash permission cancellation is fixed in unit 6c. Stop and recovery closure remain open, and question closure needs an owner decision (issue 113).
 
 What happens: no current writer emits `PermissionCancelled` or closes the
 questions asked by an agent that crashes or stops. Moving the subjects it
@@ -1160,6 +1160,12 @@ with the cancelled outcome when a turn is cancelled, and removes its local
 hold so a later answer is refused. That protocol response does not close the
 engine's durable permission record. The request cancellation and question
 closure contracts above remain work for units 6c and 6d.
+
+Unit 6c now writes `PermissionCancelled` for every open permission request
+asked by the crashed agent, in the crash append, with the fixed reason
+"agent crashed". It withdraws each queued request delivery before moving
+subjects held by the dead agent. Questions stay open, without an invented
+answer.
 
 ## 75. The wait contract has no owner waiter
 
@@ -1292,11 +1298,18 @@ What should happen: unit 6d decides when the follower becomes active during reco
 ## 89. The parent's crash notice and the wait's crash notice are separate
 
 Found: 2026-11-01, while building unit 5d, and named in the lead's ruling on its focused review.
-State: open for unit 6.6.
+State: fixed in unit 6c.
 
 What happens: when a child crashes, unit 5d writes a crash notice to each agent whose non-blocking wait names the child and stays open. Unit 6.6 will also tell the child's parent about the crash.
 Why it matters: when the waiter is the parent, it would receive two notices for one crash (row 67).
 What should happen: unit 6.6 merges the two notices into one when the waiter is the parent.
+
+What changed: the crash handler adds a fixed notice to the nearest available
+ancestor only when that ancestor has no open wait naming the dead agent.
+The same append computes the wait notices after queuing any ancestor notice.
+A blocking
+wait's reply serves as its notice. Without an available ancestor, the same
+append writes "owner needed" with the fixed reason "agent crashed".
 
 ## 90. The first harness's adapter labels mode-raising options as ordinary "allow always"
 
@@ -1486,7 +1499,7 @@ or accept another delivery. Session replay remains separately tagged.
 ## 102. A future crash stderr tail must redact across chunk boundaries
 
 Found: 2026-11-01, in unit 6a's focused review, finding F-6.
-State: open for unit 6c, which implements the crash stderr tail.
+State: fixed in unit 6c.
 
 What happens: the runner currently drains stderr, calls `redactText` and
 discards it. That is safe while no bytes are retained or published. It does
@@ -1497,6 +1510,12 @@ persisting or logging the tail. It must not store independently redacted raw
 chunks as the crash tail.
 Why it matters: joining those chunks could reconstruct a secret that neither
 individual `redactText` call could match.
+
+What changed: every child has its own stderr carry and bounded tail. The
+runner drains stderr and flushes the carries before emitting its exit
+event. Stop and scope cleanup also flush the carries before releasing
+credentials. The handler stores the resulting tail through the event
+log's redaction boundary.
 
 ## 103. Adapter setup has no timeout, and spawn registration is not atomic
 
@@ -1528,6 +1547,267 @@ default settings, or a recorded finding that its adapter has none.
 Why it matters: without the rule, only the folder rule, the permission ceiling
 and the approval routing guard the state folder and the settings files (rows
 61, 65 and 72). `SECURITY.md` lists these harnesses.
+
+## 110. The replay test for the cursor transcript expects success, which unit 6c changes
+
+Found: 2026-11-01, by the unit 6c test writer, while writing criterion 6.9.
+State: fixed in unit 6c, with the lead's approval in the builder task.
+
+What happens: `packages/engine/test/runner/replay.test.ts`, the test named
+"6.2 replay cursor", replays the recorded cursor transcript with no
+classifier and expects a successful turn. The transcript ends in the reply
+"Upgrade your plan to continue". Criterion 6.9 and issue 38 require that reply
+to give an out-of-usage pause once the real classifier is the runner's
+default.
+What should happen: the builder of unit 6c updates that one test to expect the
+pause. The new test in `classify-errors.test.ts` already holds the new
+expectation, so the old one would otherwise fail for a correct change.
+Why it matters: a builder who sees a red test in a file they did not write
+might weaken the classifier to make it green again.
+
+What changed: only the cursor replay's expected outcome changes from
+success to an out-of-usage pause. The other recorded greetings still expect
+success, and the runner uses the real classifier by default.
+
+## 111. The runner discards a child's stderr, so a crash records none of it
+
+Found: 2026-11-01, by the unit 6c test writer.
+State: fixed in unit 6c.
+
+What happens: the runner drains a child's stderr and throws the text away
+(`AcpRunner.ts`, the stderr reader), and its exit event carries an empty
+`stderr`. The command handler writes `stderr: ""` into the crash event, so
+the owner sees an exit code and nothing about why the adapter died.
+What should happen: the runner keeps the last lines through the redactor's
+chunk carry (issue 102), flushes the carry before it reports the exit, and
+the handler stores that text in the crash event.
+Why it matters: a crash with no error text cannot be diagnosed, and a
+tail that is cut per chunk could store a secret that was split across two
+chunks.
+
+What changed: the runner retains the last 30 redacted stderr lines, bounds
+each retained line to 16,384 characters, and drains the pipe before reporting
+the exit. The handler persists the tail with the exit code or signal.
+
+## 112. A crash cancels no permission request and tells no parent
+
+Found: 2026-11-01, by the unit 6c test writer, as the follow-up to issue 74.
+State: fixed in unit 6c.
+
+What happens: the exit handler marks the agent crashed, withdraws its pending
+deliveries and revokes its token, but it does not cancel the agent's open
+permission requests, does not queue a notice to the agent that can act for
+it, and never writes "owner needed" for an agent the owner started. A
+parent without a wait on the crashed agent learns of the crash only by
+looking at the roster.
+What should happen: the crash append also holds the cancellations, exactly
+one notice to the nearest available ancestor (merged with the wait's own
+notice when that ancestor waits, issue 89), or one "owner needed" when no
+agent can act.
+Why it matters: an open request of a dead agent stays in the owner's inbox
+forever, and a team lead can wait on a worker that will never answer.
+
+What changed: the crash append cancels the dead agent's open permission
+requests, withdraws their queued deliveries, revokes its token, and tells
+the nearest available ancestor once, or records that the owner is needed.
+The notification contains no stderr, exit code or signal.
+
+## 113. Nothing closes the open questions of a crashed agent
+
+Found: 2026-11-01, by the unit 6c test writer.
+State: open, needs an owner decision.
+
+What happens: issue 74 says question closure must use an agreed contract and
+not invent an answer. No event closes a question without an answer, so the
+questions a crashed agent asked stay open after its crash. The unit 6c tests
+only assert that a crash writes no invented answer.
+What should happen: the owner decides whether a question needs a "withdrawn"
+event, or whether an open question of a crashed agent stays open on purpose
+until its asker is replaced.
+Why it matters: the owner's inbox lists questions that nobody can receive an
+answer for.
+
+## 114. A blocking wait on a crashed agent has no stated parent notice
+
+Found: 2026-11-01, by the unit 6c test writer, while reading issue 89.
+State: open, a reading is recorded and untested.
+
+What happens: row 67 merges the crash notice with the parent notice "when the
+waiter is also the parent" and a non-blocking wait stays open. A blocking wait
+creates no delivery, so the rows do not say whether the parent, who is
+blocked inside the wait call, should also get a notice.
+What should happen: the builder follows the reading in the unit 6c result
+(the wait reply is the notice, and no extra delivery is written), or the
+owner states otherwise. The unit 6c tests do not cover this case.
+Why it matters: a second notice to a blocked parent would be delivered after
+its wait call returns and repeat what the call already told it.
+
+## 120. The leftover-process reader does not support macOS yet
+
+Found: 2026-11-01, while building unit 6c.
+State: open for unit 6d to handle unsupported recovery, a macOS implementation and host verification.
+
+What happens: `recovery/orphans.ts` provides the Linux reader and an explicit
+unsupported macOS reader. The macOS reader throws before the sweep can send
+a signal.
+What should happen: a macOS implementation reads the boot identity, process
+group, start time, user and executable, and passes criterion 6.8 on a macOS
+host before recovery uses it.
+Why it matters: a sweep must refuse unsupported process identity checks
+rather than signal a group based only on its number. The lead authorized
+this stub for unit 6c.
+
+## 121. The frozen classifier-test helper inferred an unknown Effect requirement
+
+Found: 2026-11-01, while running the engine typecheck for unit 6c.
+State: fixed in unit 6c, with the lead's approval in board post 968.
+
+What happened: `test/runner/classify-errors.test.ts` gave `turnReply` an
+untyped runner and waiter. Yielding those values inferred an unknown
+Effect requirement, causing four type errors at `withAcpRunner` call sites.
+What changed: the helper now explicitly returns
+`Effect.Effect<unknown, unknown, never>`, with a matching cast on its
+generator. No assertion or test case changed.
+Why it matters: the runtime checks passed, but the frozen helper prevented
+the required engine typecheck from passing.
+
+## 122. The request-routing crash test excluded the new owner crash alert
+
+Found: 2026-11-01, while running the full engine and testing suite for unit 6c.
+State: fixed in unit 6c, with the lead's approval in board post 970.
+
+What happened: `test/routing/moving-requests.test.ts` expected exactly two
+"owner needed" events when a dead holder's permission request and question
+moved to the owner. Unit 6c also requires a separate crash alert when the
+dead agent has no available ancestor, so the old assertion rejected a
+correct third event with no subject.
+What changed: the shared assertion still requires exactly the two subject
+alerts. The crash case separately requires exactly one subjectless alert
+for the dead lead, with the fixed reason "agent crashed", in the same append.
+Why it matters: preserving the old expectation would suppress a required
+notification about a dead agent.
+
+## 123. Crash notices must be queued before checking ancestors for settlement
+
+Found: 2026-11-01, during the unit 6c implementation review.
+State: fixed in unit 6c before hand-off.
+
+What happened: an intermediate implementation evaluated waits before adding
+the ancestor's crash notice. Cancelling a dead child's last permission
+request could temporarily make its idle holder look settled, satisfying a
+higher ancestor's wait before the queued crash notice made the holder busy
+again.
+What changed: the crash helper uses existing open waits to choose whether
+the ancestor needs a separate notice. The command handler evaluates waits
+only after the complete crash batch, including that notice, is assembled.
+Why it matters: a crash notice is pending work, so its target must not look
+settled to a higher ancestor in the same append.
+
+## 124. A permission-race test intermittently observes an earlier log event
+
+Found: 2026-11-01, during unit 6c's full engine and testing suite.
+State: the four permission races are fixed by the unit 6c fix-round test
+writer's commit `cf3419e`. Its follow-up `39302d8` corrects the related
+request-routing assertion.
+
+What happened: `routing/permissions.test.ts`, "5.5 answer racing pass-up",
+failed its `whileHeld` assertion because it contained an earlier event.
+The focused reviewer reproduced the failure on the base as well, in three
+of eighteen runs under load. The event is `DeliverySent`, with
+the owner as caller, for the family fixture's delivery to `lead`.
+The same timing gap affects "5.5 token race on answer".
+Why it happens: `support/routingRig.ts`, `behindWriter`, reads the initial
+log sequence before forking the writer-permit holder. The fixture returns
+before its pending dispatch is committed. That dispatch can commit between
+the watermark read and acquisition of the writer permit, even though both
+raced commands correctly wait. Engine-lead confirmed this finding in the
+unit 6c fix-round brief on 2026-11-01.
+What changed: the permissions tests wait for the fixture's pending
+`DeliverySent` before a race takes the watermark. The change covers the two
+answer-pair races, the answer/pass-up race, and the token/answer race. The
+test writer reported ten of ten passing runs with the fix under load,
+compared with one failure in ten runs without it, at `f07a721` with only
+the respective test edits present. No production serialization code changed.
+Why it matters: the assertion can reject correct command serialization.
+The unit 6c production changes did not cause the race.
+
+Related observation: the first full run with `cf3419e` merged, at
+`bb839e2` with only this issue update uncommitted, failed the "5.6 no
+timeout" case in `routing/moving-requests.test.ts`. Its prohibited subject
+events were absent, but the runner-call count increased from zero to one
+because a `prompt` call arrived after the fixture's watermark. The fixture
+likewise returns before its idle holder's delivery has been dispatched.
+The test writer's follow-up permits a late `prompt` only for a delivery
+queued before the watermark. It still rejects other runner calls and keeps
+the subject-event and open-request assertions. No builder edit to the test
+was made.
+
+## 126. A detached helper could prevent the adapter's crash from being recorded
+
+Found: 2026-11-01, in unit 6c's focused review, finding F-1.
+State: fixed in unit 6c fix round 1.
+
+What happened: an adapter could start a helper in a separate session with
+inherited stderr. Killing the adapter's process group did not close the
+helper's pipe. The exit watcher waited indefinitely for the stderr reader,
+so it never emitted `exited` and the handler could not revoke the token.
+What changed: the watcher waits up to two seconds for stderr to drain. On
+timeout it interrupts the reader, flushes the redacted tail it already has,
+and emits the exit event. It never signals the unrecorded detached helper.
+Why it matters: an open inherited pipe must not keep a dead agent's
+credential valid or hide its crash.
+
+## 127. Recovery needs a policy for groups that cannot be proven or stopped
+
+Found: 2026-11-01, in unit 6c's focused review, finding F-3.
+State: the unbounded wait is fixed in unit 6c fix round 1. The absent-leader
+case and the recovery response remain open for unit 6d.
+
+What happened: the sweep waited indefinitely when a group still appeared
+alive after SIGKILL. It also verifies identity only through the recorded
+group leader. When that leader is gone, live group members cannot be
+proven to belong to the recorded adapter, so the reader reports no process
+and the sweep leaves them alone.
+What changed: the post-SIGKILL wait defaults to five seconds and can be
+set with `killWaitMillis`. If matching process facts remain at the deadline,
+the sweep returns `left-alone` with the fixed reason `group did not exit`.
+What should happen: unit 6d handles these outcomes and the throwing macOS
+reader in issue 120 explicitly. It must not signal members whose recorded
+identity cannot be verified. The leader-only identity rule remains intact.
+Why it matters: recovery must neither hang forever nor signal an unrelated
+process because its group number matches an old row.
+
+## 128. Classified pauses need trustworthy error sources and reset times
+
+Found: 2026-11-01, in unit 6c's focused review, finding F-4, and the unit 6b
+review's ruling A3, relayed by engine-lead in board post 980.
+State: error-source classification is fixed in unit 6c fix round 1. The
+reset-time producer is fixed in fix round 2 after merging unit 6b. Recorded
+adapter evidence for a reset time remains open.
+
+What happened: the runner classified a successful turn's text, so ordinary
+agent prose containing "authentication required" could produce a signed-out
+pause. Unit 6b would then apply that pause to the entire account.
+What changed: a signed-out classification requires an actual error reply
+in `turn.error`. Successful text can produce only an out-of-usage pause,
+and only for cursor, whose recorded transcript uses that text form
+(issue 38). All other harnesses classify only their error replies. The
+same restrictions apply to an injected classifier.
+The runner now reads `data.resetsAt` only from the error for its active
+`session/prompt` request. This includes the terminal idle error in Agent
+Client Protocol version 2, where the raw request reply is an acknowledgement.
+Reading only the raw reply dropped valid deadlines in the frozen tests.
+An out-of-usage pause carries a parsed date string
+or a finite, non-negative integer in epoch milliseconds, within 366 days
+of the current time in either direction. Invalid values are ignored, so
+unit 6b keeps its "owner needed" path when no deadline is known. Successful
+turn text and signed-out pauses never carry this field. The classifier's
+signature is unchanged.
+What remains: recorded fixtures must verify the real adapter's reset-time
+form. The fake agent's `out_of_usage` step already supplies `data.resetsAt`,
+but no recorded fixture holds a reset time yet, as recorded in the brief.
+Why it matters: account recovery cannot schedule a usage reset from a
+classified pause that lost its reset time.
 
 ## 105. The runner's classified pause reply cannot carry a usage reset time
 

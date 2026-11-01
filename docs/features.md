@@ -34,7 +34,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   - **ACP mode** (built first; partly built in the engine: unit 6a starts
     the agent, opens its session, sends prompts and turns its updates and
     permission requests into events; unit 6b pauses and returns agents for
-    their accounts; crash notices and recovery are units 6c and 6d). Shepherd starts the agent as a child process
+    their accounts; unit 6c records crashes, sweeps leftover process groups
+    and tells a signed-out account from one out of usage; restart recovery
+    is unit 6d). Shepherd starts the agent as a child process
     and drives it through the Agent Client Protocol (ACP): it opens a
     session, sends prompts, and receives structured events (text, plan, tool
     calls, permission requests). Adding a harness means adding its ACP

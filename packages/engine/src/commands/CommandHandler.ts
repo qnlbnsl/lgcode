@@ -17,13 +17,14 @@ import { sha256Hex } from "../identity/credential.ts";
 import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
 import { EventLog, LogWriteFailed, type SideRows } from "../log/EventLog.ts";
+import { crashEvents } from "../recovery/crash.ts";
 import { Runner, RunnerEvent } from "../runner/Runner.ts";
-import { dispatchCommitted, deliveryUpdate, promptReply, targetGone, turnEnded } from "../routing/deliveries.ts";
-import { holderAbove, moveHeld, passUp } from "../routing/holders.ts";
+import { dispatchCommitted, deliveryUpdate, promptReply, turnEnded } from "../routing/deliveries.ts";
+import { holderAbove, passUp } from "../routing/holders.ts";
 import { withLane } from "../routing/lanes.ts";
 import { answer, permissionRequested } from "../routing/permissions.ts";
 import { ask } from "../routing/questions.ts";
-import { project, wait, waitReply, withWaitChecks } from "../routing/waits.ts";
+import { wait, waitReply, withWaitChecks } from "../routing/waits.ts";
 import { Views } from "../views/Views.ts";
 import { apply } from "../views/apply.ts";
 import { SecretStore } from "./SecretStore.ts";
@@ -121,8 +122,6 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
     const secrets = yield* SecretStore;
     const runtime: Runtime = { ...configuration, sql, log, runner, secrets, views };
 
-    // stderr is deliberately omitted. Even a failed adapter can echo a raw
-    // credential there; the contract's required text field receives no data.
     const handleRunnerEvent = (rawEvent: unknown) => Effect.gen(function* () {
       // A bad adapter event cannot reach the views or the writer, and its
       // validation error must not expose any of the input it describes.
@@ -154,10 +153,7 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
             }
             case "promptReply": return yield* write(yield* promptReply(snapshot, event, log.redactText));
             case "exited": {
-              const crashed: ReadonlyArray<Event> = [{
-                _tag: "AgentCrashed", agentId: event.agentId, exitCode: event.exitCode, signal: event.signal, stderr: "",
-              }, ...moveHeld(snapshot, [event.agentId])];
-              return yield* write([...crashed, ...targetGone(project(snapshot, crashed), event.agentId, "crashed")],
+              return yield* write(crashEvents(snapshot, event),
                 { revokeAgentTokens: [event.agentId] });
             }
           }
