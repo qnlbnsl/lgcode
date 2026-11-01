@@ -14,7 +14,7 @@ import {
   seedAccount, seedAgent, seedHarness, stateOf, success, type Fakes, type Logged, type Rig,
 } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
-import { eventually, option, requestPermission, requestRow, snapshot, standardOptions, tagged } from "../support/routingRig.ts";
+import { eventually, option, pause, requestPermission, requestRow, snapshot, standardOptions, tagged } from "../support/routingRig.ts";
 
 // Unit 5c fix round 1, rulings 1, 3 and 4: the engine's consumer of runner
 // events.
@@ -140,29 +140,58 @@ for (const [name, change] of malformed) {
   });
 }
 
-it.live("5c fix-1 ruling 1, append refused: catches one runner event whose append fails ending the consumer, so the next valid event is never written", () =>
-  withRig((fakes) => Effect.gen(function* () {
+// One captured line, parsed: the redacting logger writes one JSON object
+// per line, with a `cause` only when one was logged.
+const parsed = (line: string): { readonly message: unknown; readonly cause?: unknown } => JSON.parse(line);
+const hasDefect = (cause: unknown): boolean =>
+  Array.isArray(cause) && cause.some((reason) => (reason as { readonly _tag?: unknown })._tag === "Die");
+
+// Criterion 4.5 (fix-1 lead ruling after the round 2 commit): after a write
+// failure the event log refuses every later append until restart, so no
+// later event can be written here. The consumer shows it is still reading
+// by logging its fixed failure line once for each later event.
+it.live("5c fix-1 ruling 1, append refused: catches one runner event whose append fails ending the consumer, logging event content, or letting a defect escape", () => {
+  const lines: Array<string> = [];
+  return withRig((fakes) => Effect.gen(function* () {
     yield* seedAgent({ id: "lead" });
-    const worker = yield* seedAgent({ id: "worker", parent: "lead", state: "working" });
-    const other = yield* seedAgent({ id: "other", state: "working" });
+    const asker = yield* seedAgent({ id: "asker-5c41", parent: "lead", state: "working" });
+    const bystander = yield* seedAgent({ id: "bystander-5c41", state: "working" });
     const sql = yield* SqlClient.SqlClient;
-    // The log refuses exactly one kind of event, as a full disk or a broken
-    // file would refuse a write.
+    // The log refuses one kind of event, as a full disk or a broken file
+    // would refuse a write; the refusal then latches (criterion 4.5).
     yield* sql.unsafe(`CREATE TRIGGER planted_failure BEFORE INSERT ON events WHEN NEW.event_type = 'PermissionRequested'
       BEGIN SELECT RAISE(ABORT, 'planted insert failure'); END`);
     const before = yield* headSequence;
-    yield* fakes.runner.emitRaw(validRequest(worker, "perm-refused"));
-    yield* turnEnded(fakes, other);
-    const first = yield* turnEndsAfter(before, ["other"]);
-    expect(first.ended).toEqual(["other"]);
-    // The log works again; the consumer must still be reading.
-    yield* sql.unsafe("DROP TRIGGER planted_failure");
-    yield* turnEnded(fakes, worker);
-    const { rows, ended } = yield* turnEndsAfter(before, ["other", "worker"]);
-    expect(ended).toEqual(["other", "worker"]);
-    expect(tagged(rows, "PermissionRequested")).toEqual([]);
+    const mark = lines.length;
+
+    // The refused event, then two later valid events, each read only if the
+    // consumer survived the one before it.
+    yield* fakes.runner.emitRaw(validRequest(asker, "perm-refused"));
+    yield* turnEnded(fakes, bystander);
+    yield* turnEnded(fakes, asker);
+    yield* eventually(Effect.sync(() => lines.length - mark), (count) => count >= 3);
+    yield* pause(200);
+    const logged = lines.slice(mark);
+
+    // One fixed line per event: three lines, the same message each time.
+    expect(logged).toHaveLength(3);
+    const messages = logged.map((line) => parsed(line).message);
+    expect(typeof messages[0]).toBe("string");
+    expect(messages[0]).not.toContain("malformed");
+    expect(new Set(messages.map((message) => JSON.stringify(message))).size).toBe(1);
+    // No event content and no escaped defect in any line.
+    for (const line of logged) {
+      for (const content of ["planted-description-5d0b", "tool-planted-7c1e", "perm-refused", "asker-5c41", "bystander-5c41", "planted insert failure"]) {
+        expect(line).not.toContain(content);
+      }
+      expect(hasDefect(parsed(line).cause)).toBe(false);
+    }
+    // Nothing was written, and the refused request has no row.
+    expect(yield* logAfter(before)).toEqual([]);
     expect(yield* requestRow("perm-refused")).toBeUndefined();
-  })).pipe(Effect.orDie));
+    expect(Object.values((yield* snapshot).requests)).toEqual([]);
+  })).pipe(Effect.provide(capturing(lines)), Effect.orDie);
+});
 
 // ---------------------------------------------------------------------------
 // Ruling 3: `exited` is bound to its spawn
