@@ -89,6 +89,12 @@ interface Process {
   sent?: Deferred.Deferred<void, RunnerRejected>;
 }
 const rejected = (reason: string) => new RunnerRejected({ reason });
+const recordTurnError = (turn: Turn, error: unknown) => {
+  turn.error = JSON.stringify(error);
+  const resetAt = resetTimeFromError(error);
+  if (resetAt === undefined) delete turn.resetAt;
+  else turn.resetAt = resetAt;
+};
 
 export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner;
@@ -313,7 +319,9 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           yield* drainMessages(current, true);
           if (current.turn !== undefined) {
             current.turn.idle = true;
-            if (update.error !== undefined) current.turn.error = JSON.stringify(update.error);
+            // ACP v2 puts the prompt's terminal error in its idle update;
+            // the raw request reply is only an acknowledgement.
+            if (update.error !== undefined) recordTurnError(current.turn, update.error);
             yield* finish(current, current.turn);
           }
           return;
@@ -429,10 +437,8 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         if (reply._tag === "Failure") yield* Deferred.fail(sent, rejected("prompt send failed"));
         if (entry.stopped || entry.dead) return;
         const response = reply._tag === "Success" ? reply.success as { error?: unknown } : undefined;
-        const resetAt = resetTimeFromError(reply._tag === "Failure" ? reply.failure : response?.error);
-        if (resetAt !== undefined) turn.resetAt = resetAt;
-        const error = reply._tag === "Failure" ? JSON.stringify(reply.failure) : response?.error === undefined ? turn.error : JSON.stringify(response.error);
-        if (error !== undefined) turn.error = error;
+        const error = reply._tag === "Failure" ? reply.failure : response?.error;
+        if (error !== undefined) recordTurnError(turn, error);
         turn.replied = true;
         if (entry.version === 1 || reply._tag === "Failure") turn.idle = true;
         yield* finish(entry, turn);

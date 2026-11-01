@@ -1793,8 +1793,11 @@ in `turn.error`. Successful text can produce only an out-of-usage pause,
 and only for cursor, whose recorded transcript uses that text form
 (issue 38). All other harnesses classify only their error replies. The
 same restrictions apply to an injected classifier.
-The runner now reads `data.resetsAt` only from the error reply to its
-`session/prompt` request. An out-of-usage pause carries a parsed date string
+The runner now reads `data.resetsAt` only from the error for its active
+`session/prompt` request. This includes the terminal idle error in Agent
+Client Protocol version 2, where the raw request reply is an acknowledgement.
+Reading only the raw reply dropped valid deadlines in the frozen tests.
+An out-of-usage pause carries a parsed date string
 or a finite, non-negative integer in epoch milliseconds, within 366 days
 of the current time in either direction. Invalid values are ignored, so
 unit 6b keeps its "owner needed" path when no deadline is known. Successful
