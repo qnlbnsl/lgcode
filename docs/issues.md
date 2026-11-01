@@ -110,7 +110,7 @@ Node.js built-in modules to type-check.
 
 Found: 2026-11-01, in the unit 1 review.
 State: fixed in unit 2: `bin/shepherd` follows links with a `readlink` loop,
-and `launcher-links.test.ts` covers it. Commit: UNIT2.
+and `launcher-links.test.ts` covers it. Commit: 87e2d4c.
 
 What happened: `bin/shepherd` found its checkout with `dirname "$0"` and does
 not follow a symbolic link to the file itself. A link such as
@@ -126,7 +126,7 @@ Why it matters: a link on the path is a likely way for the owner to run
 
 Found: 2026-11-01, in the unit 1 review.
 State: fixed in unit 2: the launcher uses `${self%/*}`, and only `readlink`
-runs before the chosen Node.js. Commit: UNIT2.
+runs before the chosen Node.js. Commit: 87e2d4c.
 
 What happened: `bin/shepherd` ran `dirname` from `PATH`. Decision 22 allows
 a path lookup only for `node`.
@@ -141,7 +141,7 @@ fallback, and the fix costs nothing.
 Found: 2026-11-01, in the unit 1 review (adds to issue 3).
 State: partly fixed in unit 2: `pnpm-workspace.yaml` now says at the old key
 that the list is not enforced and that `allowBuilds` is the policy (commit:
-UNIT2). Still open: the owner decides whether criterion 1.6 and its frozen
+87e2d4c). Still open: the owner decides whether criterion 1.6 and its frozen
 test should name `allowBuilds` instead.
 
 What happens: a probe on pnpm 12.16.1 showed that `onlyBuiltDependencies`
@@ -158,7 +158,7 @@ Why it matters: a reader who edits only the old list changes nothing.
 Found: 2026-11-01, in the unit 1 review.
 State: fixed in unit 2: a comment in `pnpm-workspace.yaml` names T3 Code as
 the reason for the alias, and the two cache variables are removed from
-`vitest.config.ts` because no test reads them. Commit: UNIT2.
+`vitest.config.ts` because no test reads them. Commit: 87e2d4c.
 
 What happened: `pnpm-workspace.yaml` aliased `typescript` to the pre-release
 `@tsc-rs/typescript` 0.8.0 with no comment. It matches the T3 Code
