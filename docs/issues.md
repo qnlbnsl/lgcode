@@ -1705,7 +1705,8 @@ settled to a higher ancestor in the same append.
 ## 124. A permission-race test intermittently observes an earlier log event
 
 Found: 2026-11-01, during unit 6c's full engine and testing suite.
-State: confirmed on the base in unit 6c's focused review; the fix-round test writer owns the test correction.
+State: the four permission races are fixed by the unit 6c fix-round test
+writer's commit `cf3419e`. A related request-routing fixture gap remains open.
 
 What happened: `routing/permissions.test.ts`, "5.5 answer racing pass-up",
 failed its `whileHeld` assertion because it contained an earlier event.
@@ -1719,12 +1720,23 @@ before its pending dispatch is committed. That dispatch can commit between
 the watermark read and acquisition of the writer permit, even though both
 raced commands correctly wait. Engine-lead confirmed this finding in the
 unit 6c fix-round brief on 2026-11-01.
-What should happen: the permissions fixture waits for its pending
-`DeliverySent` before a race takes the watermark, or records the watermark
-only after the permit is held. The test writer changes only the test's
-synchronization and runs the permissions file ten times.
+What changed: the permissions tests wait for the fixture's pending
+`DeliverySent` before a race takes the watermark. The change covers the two
+answer-pair races, the answer/pass-up race, and the token/answer race. The
+test writer reported ten of ten passing runs with the fix under load,
+compared with one failure in ten runs without it, at `f07a721` with only
+the respective test edits present. No production serialization code changed.
 Why it matters: the assertion can reject correct command serialization.
 The unit 6c production changes did not cause the race.
+
+Related observation: the first full run with `cf3419e` merged, at
+`bb839e2` with only this issue update uncommitted, failed the "5.6 no
+timeout" case in `routing/moving-requests.test.ts`. Its prohibited subject
+events were absent, but the runner-call count increased from zero to one
+because a `prompt` call arrived after the fixture's watermark. The fixture
+likewise returns before its idle holder's delivery has been dispatched.
+This test's call-count assertion still needs synchronization with pending
+fixture delivery. No builder edit to the test was made.
 
 ## 126. A detached helper could prevent the adapter's crash from being recorded
 
