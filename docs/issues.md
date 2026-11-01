@@ -142,10 +142,11 @@ fallback, and the fix costs nothing.
 ## 9. The `onlyBuiltDependencies` list is not enforced on pnpm 12
 
 Found: 2026-11-01, in the unit 1 review (adds to issue 3).
-State: partly fixed in unit 2: `pnpm-workspace.yaml` now says at the old key
-that the list is not enforced and that `allowBuilds` is the policy (commit:
-87e2d4c). Still open: the owner decides whether criterion 1.6 and its frozen
-test should name `allowBuilds` instead.
+State: fixed by decisions row 77 (owner, 2026-11-01: "yes, rename it to
+allowBuilds"), in this commit. Criterion 1.6 and its test name `allowBuilds`
+with `strictDepBuilds: true`, and the unenforced `onlyBuiltDependencies` list
+is deleted from `pnpm-workspace.yaml`. An earlier note at the old key was
+added in unit 2 (commit: 87e2d4c).
 
 What happens: a probe on pnpm 12.16.1 showed that `onlyBuiltDependencies`
 neither allows nor blocks a build script. `allowBuilds` and
@@ -338,7 +339,12 @@ Why it matters: a review that claims more than was done hides the gap.
 ## 22. Rule 2 and the commit-message hook disagree about vendor-named files
 
 Found: 2026-11-01, in the focused review of unit 2.
-State: open; the owner decides.
+State: fixed. Owner, 2026-11-01: "update the commit hook to how t3 works. i
+only do not want the co authored by line. our commit guard is too aggressive."
+The global commit hook now rejects only a Co-Authored-By trailer. Copied T3
+Code files are named in full in commit messages from now on (rule 2). Pushed
+commit 87e2d4c is not rewritten: `third_party/t3code/README.md` stays its
+record.
 
 What happens: rule 2 says to name each copied source file in the commit message.
 The commit-message hook rejects vendor words, and four T3 Code files carry one
@@ -551,8 +557,8 @@ State: open.
 ## 34. The recorded fixtures carry the owner's installed skill and command lists
 
 Found: 2026-11-01, when the manager read the first recorded fixtures.
-State: accepted by the manager for now, because the repository is private;
-the owner decides whether to keep it.
+State: fixed by owner ruling, 2026-11-01: "keep them". The recorded fixtures
+keep the full skill and command lists; no trimming and no new scrubber rule.
 
 What happened: `packages/testing/fixtures/claude.ndjson` (lines 5 and 13-15,
 about 50 KB each) and `codex.ndjson` (line 5), and the third harness's `cursor.ndjson` (line 10,
@@ -1916,3 +1922,12 @@ State: open question for the owner.
 What happens: rows 28 and 53 make only a sign-out account-wide. When one agent reports a usage limit, the account is marked out of usage and that agent pauses, but its idle siblings keep receiving work, and each may hit the limit once before it pauses itself.
 What should happen: the owner decides whether idle siblings should pause (and their queued work wait) as soon as the account is known to be out of usage.
 Why it matters: each sibling's first turn after the limit is wasted, and a turn that fails with the limit costs a delivery requeue.
+
+## 158. A no-timeout routing test can count a prompt sent after its snapshot
+
+Found: 2026-11-01, by the lead, in the team test runner's check of `worker/engine-i9b` at e263a12 (run 69).
+State: open. The test is unchanged; a later test-only task fixes it.
+
+What happens: `packages/engine/test/routing/moving-requests.test.ts`, "5.6 no timeout" (line 307), seeds an idle `lead` through `family()`, whose permission and question deliveries are sent on a forked dispatch lane. The test records `fakes.runner.calls.length` straight away. Under machine load (7.7 in run 69) one of those `prompt` calls lands after the snapshot, and `expect(fakes.runner.calls).toHaveLength(callsBefore)` fails with one extra call. The branch under test changed no engine source, and five local re-runs and the re-run (run 73) passed.
+What should happen: the test waits until the seeded deliveries are sent (or reads their delivery rows as `sent`) before it records `callsBefore`, as other routing tests do with `eventually`.
+Why it matters: a check that fails at random hides real failures and costs a re-run each time.
