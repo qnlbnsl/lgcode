@@ -546,3 +546,34 @@ State: open.
 - The device writes and token revocation that unit 5a adds must follow the same
   rule as decision row 32: each is written in one transaction, through
   `EventLog.append`, together with the event that records it.
+
+## 34. The read-only connection exists only when the SQLite layer turns on its reader workers
+
+Found: 2026-11-01, while writing the unit 4b tests.
+State: open.
+
+What happens: `SqliteClient.readOnly` in the copied client
+(`third_party/t3code/node-sqlite/src/nodeSqliteClient.ts`, `route`, line 1105)
+sends a read to the writer connection whenever the layer was built without
+`readerWorker: true`, or for an in-memory database. It does this silently.
+What should happen: the service's SQLite layer, which units 6d and 7a build,
+sets `readerWorker: true` on the file database, so the catch-up read that
+plan note PB-A5 asks for really runs on a read-only connection.
+Why it matters: without the reader workers, a `subscribe` catch-up waits
+behind every open write transaction, and a long catch-up holds up the writer.
+The unit 4b test `packages/engine/test/log/subscribe-gapless.test.ts` turns the
+reader workers on itself, so it cannot see this setting in the service.
+
+## 35. The `events.caller` column comment does not match what the log stores
+
+Found: 2026-11-01, while writing the unit 4b tests.
+State: open.
+
+What happens: the migration's comment in
+`packages/engine/src/log/migrations.ts` (line 14) says `caller` holds the JSON
+of an Actor. `EventLog.ts` (`callerKey`, line 85) stores `owner` or
+`agent:<agent id>` instead.
+What should happen: the comment names the stored form, and the `subscribe`
+catch-up read turns that form back into the Actor that `append` returned.
+Why it matters: a catch-up reader written from the comment would fail to
+decode every stored caller, and its envelopes would differ from the live ones.
