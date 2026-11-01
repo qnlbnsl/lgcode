@@ -543,6 +543,8 @@ State: open.
   receipt replay as a new batch, because `EventLog.append` returns the stored
   envelopes for a repeated request id and a subscriber would see them twice.
   The unit 4a review found this as F1.
+  This part is fixed in unit 4b: the writer marks receipt replays and only
+  publishes newly committed batches, after COMMIT and inside its permit.
 - The device writes and token revocation that unit 5a adds must follow the same
   rule as decision row 32: each is written in one transaction, through
   `EventLog.append`, together with the event that records it.
@@ -567,7 +569,7 @@ reader workers on itself, so it cannot see this setting in the service.
 ## 35. The `events.caller` column comment does not match what the log stores
 
 Found: 2026-11-01, while writing the unit 4b tests.
-State: open.
+State: fixed in unit 4b.
 
 What happens: the migration's comment in
 `packages/engine/src/log/migrations.ts` (line 14) says `caller` holds the JSON
@@ -577,3 +579,5 @@ What should happen: the comment names the stored form, and the `subscribe`
 catch-up read turns that form back into the Actor that `append` returned.
 Why it matters: a catch-up reader written from the comment would fail to
 decode every stored caller, and its envelopes would differ from the live ones.
+The fix: the migration comment names the stored keys, and `subscribe` decodes
+`owner` and `agent:<agent id>` back to their corresponding Actors.

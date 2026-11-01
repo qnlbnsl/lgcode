@@ -12,7 +12,7 @@ const migrations: ReadonlyArray<{ readonly id: number; readonly statements: Read
   {
     id: 1,
     statements: [
-      // `caller` holds the JSON of an Actor, so the key is exact for any agent id.
+      // `caller` holds `owner` or `agent:<agent id>`, as built by callerKey.
       `CREATE TABLE events (
         sequence INTEGER PRIMARY KEY AUTOINCREMENT,
         event_id TEXT NOT NULL UNIQUE,

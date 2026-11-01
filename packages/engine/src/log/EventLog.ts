@@ -8,7 +8,9 @@ import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as PubSub from "effect/PubSub";
 import * as Schema from "effect/Schema";
+import type * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 import * as SqlClient from "effect/sql/SqlClient";
 import type { SqlError } from "effect/sql/SqlError";
@@ -56,6 +58,7 @@ export class EventLog extends Context.Service<
       events: ReadonlyArray<Event>,
       sideRows: SideRows,
     ) => Effect.Effect<ReadonlyArray<EventEnvelope>, LogWriteFailed | RequestIdReused>;
+    readonly subscribeCommitted: Effect.Effect<PubSub.Subscription<EventEnvelope>, never, Scope.Scope>;
   }
 >()("shepherd/engine/log/EventLog") {}
 
@@ -94,6 +97,14 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
   // file; setting it again on an already-WAL file changes nothing.
   yield* sql`PRAGMA journal_mode = WAL`;
   const writer = yield* Semaphore.make(1);
+  const committedEvents = yield* Effect.acquireRelease(
+    PubSub.unbounded<EventEnvelope>(),
+    PubSub.shutdown,
+  );
+  // Called only after COMMIT, while the writer permit still orders batches.
+  // Unit 4c can apply the live views beside this publication step.
+  const publishCommitted = (envelopes: ReadonlyArray<EventEnvelope>) =>
+    PubSub.publishAll(committedEvents, envelopes).pipe(Effect.asVoid);
   // The first write failure, kept for the life of this service. It is read and
   // set only while the writer permit is held.
   let latched: LogWriteFailed | undefined;
@@ -101,7 +112,10 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
   const commit = (
     caller: string, requestId: RequestId, bodyHash: string, events: ReadonlyArray<Event>,
     sideRows: SideRows, actor: Actor, occurredAt: number,
-  ): Effect.Effect<ReadonlyArray<EventEnvelope>, RequestIdReused | LogWriteFailed | SqlError> =>
+  ): Effect.Effect<{
+    readonly envelopes: ReadonlyArray<EventEnvelope>;
+    readonly isNew: boolean;
+  }, RequestIdReused | LogWriteFailed | SqlError> =>
     sql.withTransaction(Effect.gen(function* () {
       const existing = yield* sql<{ body_hash: string; result_json: string }>`
         SELECT body_hash, result_json FROM receipts WHERE caller = ${caller} AND request_id = ${requestId}`;
@@ -110,10 +124,11 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
         if (receipt.body_hash !== bodyHash) {
           return yield* Effect.fail(new RequestIdReused({ reason: "request id reused" }));
         }
-        return yield* Effect.try({
+        const envelopes = yield* Effect.try({
           try: () => decodeEnvelopes(JSON.parse(receipt.result_json)),
           catch: () => new LogWriteFailed({ reason: "stored receipt is unreadable" }),
         });
+        return { envelopes, isNew: false };
       }
 
       const envelopes: Array<EventEnvelope> = [];
@@ -141,7 +156,7 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
       }
       yield* sql`INSERT INTO receipts (caller, request_id, body_hash, result_json, first_sequence)
         VALUES (${caller}, ${requestId}, ${bodyHash}, ${JSON.stringify(envelopes)}, ${envelopes[0]?.sequence ?? null})`;
-      return envelopes;
+      return { envelopes, isNew: true };
     }));
 
   const append: Context.Service.Shape<typeof EventLog>["append"] = (actor, requestId, bodyHash, events, sideRows) =>
@@ -149,7 +164,14 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
       if (latched !== undefined) return yield* Effect.fail(latched);
       const redacted = yield* Effect.forEach(events, (event) => redactor.redact(event));
       const occurredAt = yield* Clock.currentTimeMillis;
-      return yield* commit(callerKey(actor), requestId, bodyHash, redacted, sideRows, actor, occurredAt).pipe(
+      return yield* Effect.gen(function* () {
+        const batch = yield* commit(callerKey(actor), requestId, bodyHash, redacted, sideRows, actor, occurredAt);
+        if (batch.isNew) yield* publishCommitted(batch.envelopes);
+        return batch.envelopes;
+      }).pipe(
+        // A caller's cancellation must not split a successful COMMIT from its
+        // publication. Waiting for the writer permit remains interruptible.
+        Effect.uninterruptible,
         Effect.mapError((error) => error._tag === "SqlError"
           ? new LogWriteFailed({ reason: failureReason(error) })
           : error),
@@ -160,5 +182,5 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
       );
     }));
 
-  return EventLog.of({ append });
+  return EventLog.of({ append, subscribeCommitted: PubSub.subscribe(committedEvents) });
 }));
