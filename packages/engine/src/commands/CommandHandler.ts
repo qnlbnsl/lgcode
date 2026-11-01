@@ -12,6 +12,7 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/sql/SqlClient";
 
+import { followAvailability } from "../accounts/available.ts";
 import { sha256Hex } from "../identity/credential.ts";
 import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
@@ -170,6 +171,7 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
       : Effect.logWarning("runner event dropped: processing failed")));
     yield* runner.events.pipe(Stream.runForEach(handleRunnerEvent), Effect.forkScoped);
     yield* dispatchCommitted;
+    yield* followAvailability;
 
     // Fix round 1, F3: a command that changes a target's process holds the
     // target's send lane from before its writer transaction through its

@@ -908,11 +908,12 @@ What should happen: run this child-process integration check in an environment t
 ## 57. A failed account event can leave an unreferenced secret in the store
 
 Found: 2026-11-01, while building unit 5b's secret-store seam.
-State: open for unit 6b's persistent store.
+State: open, kept after unit 6b; the cleanup moves to unit 6d (issue 119).
 
 What happens: the handler stores a wrapped secret before it commits the account's new reference. A failed event-log write can leave an unreferenced value in the secret store. The interface has no rollback or removal operation.
 Why it matters: storing after the event commit would instead risk committing a reference whose value was lost, including after a crash. The earlier store keeps committed references resolvable, but can retain an unused secret.
 What should happen: the persistent store defines how to collect unreferenced values or coordinate reference publication. Unit 5b uses only a scoped in-memory store and keeps every stored value wrapped as `Redacted`.
+Unit 6b: `accounts/SecretStore.ts` keeps the store-before-commit order, so a committed reference always resolves. A leftover value is mode 0600, is never read without a reference, and is never logged. Collecting it needs the log's list of live references, which belongs with the startup recovery of unit 6d, so it is not fixed here (issue 119).
 
 ## 58. A refusal by the state table or by rights is stored as the request's receipt
 
@@ -969,7 +970,7 @@ What should happen: restart recovery, or a sweep in unit 6a, moves an agent that
 ## 63. The account choice "any" takes the first match, not row 28's picker
 
 Found: 2026-11-01, in the focused review of unit 5b.
-State: open for unit 6b.
+State: fixed in unit 6b (`accounts/pick.ts`, used by `commands/start.ts` for "any" and for a named account).
 
 What happens: `start` with the account choice "any" takes the first matching account in insertion order (`packages/engine/src/commands/start.ts`).
 Why it matters: row 28 asks for the account with the fewest agents, then the lowest id. The stand-in spreads no load.
@@ -1802,3 +1803,111 @@ the pause outcome, and recorded fixtures eventually verify the real
 adapter's reset-time form. The classifier signature stays unchanged here.
 Why it matters: account recovery cannot schedule a usage reset from a
 classified pause that lost its reset time.
+
+## 105. The runner's classified pause reply cannot carry a usage reset time
+
+Found: 2026-11-01, while writing unit 6b's account tests.
+State: fixed in unit 6b (`resetAt` is optional on the pause outcome and is written to `AccountOutOfUsage` and the paused state); the classification producer stays with unit 6c.
+
+What happens: the `promptReply` pause outcome in
+`packages/engine/src/runner/Runner.ts` carries only `reason` and `error`.
+The account and lifecycle event contracts already carry `resetAt`, but no
+reset time can reach their writer through this runner event.
+What should happen: add optional `resetAt` in epoch milliseconds to the
+pause outcome, preserve it through validation, and record it in
+`AccountOutOfUsage` and the paused state. The account timer must use the
+logged deadline after restart. The fake runner's test-only outcome now
+accepts that field so the tests can specify the missing seam.
+Why it matters: decisions 28, 52 and 53 require the account to return at its
+reported wall-clock reset time, including when that time passed during
+downtime. Classification itself remains unit 6c's work.
+
+## 115. A pause before the session opens is not handled
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: open for unit 6d.
+
+What happens: row 53 says a pause before the session opens keeps no session, and when it clears the engine opens the session and then sends the first prompt. The start path (`commands/start.ts`) writes the agent, spawns, and records the session in one flow. A provider limit reported before `SessionOpened` has no pause path, and no frozen test covers it.
+What should happen: a start that is paused before its session opens keeps no session reference, and the account return opens the session first and then sends the first prompt.
+Why it matters: without it, such an agent stays stopped instead of waiting for its account. The change needs the start path restructured, which is larger than unit 6b's scope.
+
+## 116. A crash between an "account available" commit and the return write leaves agents paused
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: open for unit 6d.
+
+What happens: the agents on an account return to idle in a second transaction, written by `accounts/available.ts` after it sees the committed `AccountAvailable`. If the service stops between the two commits, the account is available and its agents stay paused. Nothing re-runs the return at startup.
+What should happen: startup recovery runs the return once for every available account that still has paused agents. The return is idempotent, so a second run writes nothing.
+Why it matters: those agents would never resume without an owner `accounts mark-available` call, which the owner cannot know to make.
+
+## 117. The timer and the persistent secret store are not wired into a running service
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: open for the unit that assembles the service.
+
+What happens: `packages/engine/src/index.ts` exports nothing, so `startAccountTimers` (`accounts/timers.ts`) and the persistent secret store layer (`accounts/SecretStore.ts`) are called only from tests. The `AcpRunner` layer also now needs `FileSystem` and `Path` services for the Codex shadow home.
+What should happen: the assembly starts `startAccountTimers` inside the service scope, provides the persistent `SecretStore` layer over the state folder, and provides the Node file system and path services.
+Why it matters: without the timer an out-of-usage account returns only by owner action, against rows 28 and 53.
+
+## 118. A classified pause drops the provider's error text
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: open; no change planned until the owner asks.
+
+What happens: the `promptReply` pause outcome carries an `error` string, but the pause path writes only the fixed reasons ("account needs sign-in", "account is out of usage, no reset time known") so that no provider text reaches the log, a view or a reply.
+What should happen: if a diagnostic is wanted, unit 6c classifies and redacts it before it is stored, and the owner decides where it is shown.
+Why it matters: an owner sees that an account is paused but not what the provider said, which makes odd limit messages harder to diagnose.
+
+## 119. Unreferenced secrets are never collected
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: open for unit 6d; the follow-up of issue 57.
+
+What happens: `accounts/SecretStore.ts` stores a value before the account event that references it commits. A failed commit, or a replaced secret, leaves a value in `secrets.json` that no account event refers to.
+What should happen: startup recovery lists the secret references still used in the account views and removes the others from `secrets.json`.
+Why it matters: an unused credential stays on disk (mode 0600) longer than the owner expects.
+
+## 125. Fix-round test F1 assumed a sign-out pauses only the agent that reports it
+
+Found: 2026-11-01, by engine-u6bb, running the full suite for unit 6b.
+State: fixed in unit 6b by engine-lead's ruling.
+
+What happens: `routing/fix-round-one.test.ts` F1 "inherited grandchild" paused a child with the reason `signed-out` and then expected its idle caller, on the same account, to still run `wait`. Rows 28 and 53, and the frozen 6b test T1, make a sign-out pause every agent on the account, so the caller was paused and its `wait` was refused.
+What should happen: the test pauses the child with `out-of-usage` and no reset time, which pauses only that child and keeps the intent of the test (a wait on a paused member).
+Why it matters: two frozen tests disagreed, and the suite could not pass until one changed.
+
+## 131. A carry-on delivery was returned as failed instead of reaching the agent
+
+Found: 2026-11-01, in the focused review of unit 6b (finding A1).
+State: fixed in unit 6b fix round 1.
+
+What happens: `accounts/available.ts` queues a mid-turn agent's carry-on with content tagged `carry-on`. `routing/deliveries.ts` passed it to `runner.prompt` unchanged, and the real runner accepts only content tagged `prompt`, so the delivery came back as "delivery failed" and the agent never saw it.
+What should happen: `AcpRunner.send` accepts carry-on content and sends its text as the prompt (a two-line change; the frozen tests T5 and T7 expect the runner input to keep the `carry-on` tag). The logged delivery keeps its tag too.
+Why it matters: an agent paused mid-turn came back idle without being told to carry on, which row 53 requires.
+
+## 132. A starting agent could get work after its account signed out
+
+Found: 2026-11-01, in the focused review of unit 6b (finding A2).
+State: fixed in unit 6b fix round 1.
+
+What happens: a sign-out paused only working and idle agents on the account. A sibling still starting opened its session afterwards and was sent its first prompt on a signed-out account.
+What should happen: (a) a sign-out also pauses the account's starting agents, with `signed-out` and `midTurn` false; (b) when `start` records `SessionOpened` and the account is then `needs-sign-in`, the same append pauses the agent; (c) dispatch never sends to an agent whose account is `needs-sign-in`. All three are done. The lifecycle table makes `SessionOpened` invalid from `paused`, so the reducer records the session and keeps the paused state; `start` accepts a starting or paused agent, and returns a paused-while-starting agent to idle when its session opens after the account came back. `accounts mark-available` skips an agent that has no session yet, since `start` returns it.
+Why it matters: work reached an account the owner had to sign in again.
+
+## 133. A symbolic link in the state folder could move the shadow home outside it
+
+Found: 2026-11-01, in the focused review of unit 6b (finding A4).
+State: fixed in unit 6b fix round 1.
+
+What happens: the shadow home path is built under the state folder, but a symbolic link on the way (for example `providers/codex/<account>`) made the copied code create directories and links outside it.
+What should happen: `accounts/shadowHome.ts` resolves the real path of the deepest existing part, and refuses with the fixed reason `account home cannot be prepared` unless the result lies inside the real state folder. It checks before anything is made and again afterwards. The copied source is unchanged.
+Why it matters: a link planted in the state folder could redirect private authentication files out of it.
+
+## 134. An out-of-usage account still sends work to its idle siblings
+
+Found: 2026-11-01, in the focused review of unit 6b (finding C3).
+State: open question for the owner.
+
+What happens: rows 28 and 53 make only a sign-out account-wide. When one agent reports a usage limit, the account is marked out of usage and that agent pauses, but its idle siblings keep receiving work, and each may hit the limit once before it pauses itself.
+What should happen: the owner decides whether idle siblings should pause (and their queued work wait) as soon as the account is known to be out of usage.
+Why it matters: each sibling's first turn after the limit is wasted, and a turn that fails with the limit costs a delivery requeue.

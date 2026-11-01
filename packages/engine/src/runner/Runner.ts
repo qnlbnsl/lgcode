@@ -1,5 +1,5 @@
 import {
-  AgentId, DeliveryId, Event, PermissionOption, PermissionRequestId,
+  AgentId, DeliveryId, EpochMilliseconds, Event, PermissionOption, PermissionRequestId,
   type Account, type Delivery, type HarnessSettings, type PermissionLevel, type SessionReference,
 } from "@shepherd/contracts";
 import * as Context from "effect/Context";
@@ -76,7 +76,11 @@ export const RunnerEvent = Schema.Union([
     deliveryId: DeliveryId,
     outcome: Schema.Union([
       Schema.TaggedStruct("success", {}),
-      Schema.TaggedStruct("pause", { reason: Schema.Literals(["out-of-usage", "signed-out"]), error: Schema.String }),
+      // Issue 105: `resetAt` is the provider's reported reset time, when it gave one.
+      Schema.TaggedStruct("pause", {
+        reason: Schema.Literals(["out-of-usage", "signed-out"]), error: Schema.String,
+        resetAt: Schema.optionalKey(EpochMilliseconds),
+      }),
       Schema.TaggedStruct("error", { error: Schema.String }),
     ]),
   }),

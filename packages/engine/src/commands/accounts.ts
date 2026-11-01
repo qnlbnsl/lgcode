@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Account } from "@shepherd/contracts";
 import * as Effect from "effect/Effect";
+import type { LogWriteFailed } from "../log/EventLog.ts";
 import { refused, type Input, type Payload, type Plan } from "./internal.ts";
 
 // A view's availability fields are derived, never part of AccountChanged.
@@ -34,7 +35,7 @@ export const accounts = ({ snapshot }: Input, payload: Payload<"accounts">): Eff
     }
   });
 
-export const setSecret = ({ runtime, snapshot }: Input, payload: Payload<"accounts set-secret">): Effect.Effect<Plan, ReturnType<typeof refused>> =>
+export const setSecret = ({ runtime, snapshot }: Input, payload: Payload<"accounts set-secret">): Effect.Effect<Plan, ReturnType<typeof refused> | LogWriteFailed> =>
   Effect.gen(function* () {
     const account = snapshot.accounts[payload.accountId];
     if (account === undefined) return yield* refused();
