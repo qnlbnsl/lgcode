@@ -51,7 +51,7 @@ for (const relationship of ["direct child", "inherited grandchild"] as const) {
     const member = relationship === "direct child" ? child : yield* spawn(rig, runner, child);
     if (relationship === "inherited grandchild") {
       const turn = yield* send(runner, child, "Pause before acceptance.");
-      yield* notice(runner, child, { _tag: "promptReply", deliveryId: turn, outcome: { _tag: "pause", reason: "signed-out", error: "Signed out." } });
+      yield* notice(runner, child, { _tag: "promptReply", deliveryId: turn, outcome: { _tag: "pause", reason: "out-of-usage", error: "Usage limit." } });
       expect((yield* eventually(agentRow(child.agentId), (row) => row?.state._tag === "paused"))?.state._tag).toBe("paused");
     }
     const before = yield* headSequence;

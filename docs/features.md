@@ -33,8 +33,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   setting, which the client API exposes, so it can be changed from a phone.
   - **ACP mode** (built first; partly built in the engine: unit 6a starts
     the agent, opens its session, sends prompts and turns its updates and
-    permission requests into events; reload, crash notices and recovery are
-    units 6b to 6d). Shepherd starts the agent as a child process
+    permission requests into events; unit 6b pauses and returns agents for
+    their accounts; crash notices and recovery are units 6c and 6d). Shepherd starts the agent as a child process
     and drives it through the Agent Client Protocol (ACP): it opens a
     session, sends prompts, and receives structured events (text, plan, tool
     calls, permission requests). Adding a harness means adding its ACP
@@ -50,7 +50,11 @@ Synapse fork. It is at `docs/message-board/features.md` in the
     a post is delivered differs: an ACP agent receives it as a prompt, and an
     interactive agent receives it through its hooks or a typed nudge when it
     is idle. See [research/acp.md](research/acp.md).
-- **Several accounts for every harness** (agreed, 2026-11-01). The owner can
+- **Several accounts for every harness** (agreed, 2026-11-01; partly built
+  in the engine: unit 6b picks an account, reads its secrets, gives a second
+  Codex account its own shadow home, pauses agents whose account signs out or
+  runs out of usage, and returns them when the account is available again;
+  adding accounts from the API is unit 7a). The owner can
   set up more than one account for a harness, such as two ChatGPT accounts
   for Codex or three Cursor accounts, and Shepherd spreads agents across
   them. Each account is its own sign-in, kept apart by its own home

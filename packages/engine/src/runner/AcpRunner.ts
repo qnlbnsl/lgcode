@@ -12,8 +12,10 @@ import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
+import * as Path from "effect/Path";
 import * as Queue from "effect/Queue";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
@@ -22,6 +24,7 @@ import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner, makeHandle, type ChildProcessHandle } from "effect/process/ChildProcessSpawner";
+import { withCodexHome } from "../accounts/shadowHome.ts";
 import { SecretStore } from "../commands/SecretStore.ts";
 import { folderForSpawn } from "../identity/ceiling.ts";
 import { sha256Hex } from "../identity/credential.ts";
@@ -85,6 +88,8 @@ const rejected = (reason: string) => new RunnerRejected({ reason });
 export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, Effect.gen(function* () {
   const spawner = yield* ChildProcessSpawner;
   const secrets = yield* SecretStore;
+  const fileSystem = yield* FileSystem.FileSystem;
+  const pathService = yield* Path.Path;
   const lifetime = yield* Effect.scope;
   const suppliedRedactor = yield* Effect.serviceOption(Redactor);
   const processes = new Map<string, Process>();
@@ -178,6 +183,13 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         resolvedSecrets.push(secret);
         variables[name] = Redacted.value(secret);
       } else variables[name] = value;
+    }
+    if (harness.id === "codex") {
+      const homed = yield* withCodexHome({ stateFolder: configuration.stateFolder, home: configuration.environment.HOME ?? input.folder, accountId: input.account.id, variables }).pipe(
+        Effect.provideService(FileSystem.FileSystem, fileSystem), Effect.provideService(Path.Path, pathService),
+        Effect.mapError(() => rejected("account home cannot be prepared")),
+      );
+      Object.assign(variables, homed);
     }
     const base = buildBaseEnvironment({ parent: configuration.environment, accountVariables: variables,
       shepherdSocket: configuration.socketPath, shepherdToken: Redacted.value(input.token) });
@@ -370,9 +382,9 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   });
   const send = (input: Send, compact: boolean) => Effect.gen(function* () {
     const entry = yield* live(input.agentId, input.incarnation);
-    if (input.delivery.target !== input.agentId || (!compact && input.delivery.content._tag !== "prompt")) return yield* rejected("delivery does not match send");
+    if (input.delivery.target !== input.agentId || (!compact && input.delivery.content._tag !== "prompt" && input.delivery.content._tag !== "carry-on")) return yield* rejected("delivery does not match send");
     if (entry.turn !== undefined && !entry.turn.ended) return yield* rejected("agent already has a turn");
-    const text = compact ? yield* compactPrompt(entry.commands) : input.delivery.content._tag === "prompt" ? input.delivery.content.text : "";
+    const text = compact ? yield* compactPrompt(entry.commands) : input.delivery.content._tag === "prompt" || input.delivery.content._tag === "carry-on" ? input.delivery.content.text : "";
     const turn: Turn = { deliveryId: input.delivery.id, replied: false, idle: false, ended: false, text: "" };
     entry.turn = turn;
     const sent = yield* Deferred.make<void, RunnerRejected>();

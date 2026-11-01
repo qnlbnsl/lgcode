@@ -107,7 +107,10 @@ for (const reason of ["out-of-usage", "signed-out"] as const) {
     expect(tagged(yield* readLog, "DeliveryReturned")).toEqual([]);
     // Account return/reload is unit 6b's entry point; 5d's explicit drain is
     // called only after that owner has committed the successful reload.
-    yield* appendSetup([eventOf({ _tag: "StateChanged", agentId: target.agentId, state: { _tag: "idle" } })]);
+    yield* appendSetup([
+      eventOf({ _tag: "AccountAvailable", accountId: "primary", cause: "owner cleared" }),
+      eventOf({ _tag: "StateChanged", agentId: target.agentId, state: { _tag: "idle" } }),
+    ]);
     const { dispatchQueued } = yield* loadDeliveries();
     yield* dispatchQueued(target.agentId);
     expect(promptsTo(runner, target).map((call) => call.input.delivery.id)).toEqual([first, first]);
