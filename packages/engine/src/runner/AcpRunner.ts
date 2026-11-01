@@ -59,6 +59,7 @@ interface Process {
   readonly scope: Scope.Closeable;
   readonly child: ChildProcessHandle;
   readonly client: AcpClient["Service"];
+  readonly secrets: Array<Redacted.Redacted<string>>;
   readonly holds: Map<string, Hold>;
   readonly responses: Map<string, Deferred.Deferred<void, RunnerRejected>>;
   sessionId: string;
@@ -86,8 +87,8 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   const secrets = yield* SecretStore;
   const lifetime = yield* Effect.scope;
   const suppliedRedactor = yield* Effect.serviceOption(Redactor);
-  const knownSecrets: Redacted.Redacted<string>[] = [];
-  const fallback = makeRedactor({ secrets: () => knownSecrets, tokenHashes: () => new Set() });
+  const processes = new Map<string, Process>();
+  const fallback = makeRedactor({ secrets: () => [...processes.values()].flatMap((entry) => entry.secrets), tokenHashes: () => new Set() });
   const redactText = (text: string) => Option.isSome(suppliedRedactor)
     ? suppliedRedactor.value.redactText(fallback.redactText(text)) : Effect.sync(() => fallback.redactText(text));
   const events = yield* Queue.unbounded<RunnerEvent>();
@@ -100,7 +101,6 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     }
     return yield* redactText(clean);
   });
-  const processes = new Map<string, Process>();
   const threadContent = Event.pipe(Schema.toTaggedUnion("_tag")).cases.ThreadItem.fields.content;
   const emit = (event: RunnerEvent) => Queue.offer(events, event).pipe(Effect.asVoid);
   // Keep the redactor's raw carry bounded, retaining only event metadata
@@ -137,6 +137,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     yield* emit({ _tag: "promptReply", ...identity(entry), deliveryId: turn.deliveryId,
       outcome: classification !== undefined ? { _tag: "pause", reason: classification, error: clean }
         : turn.error !== undefined ? { _tag: "error", error: clean } : { _tag: "success" } });
+    if (entry.turn === turn) delete entry.turn;
     yield* emit({ _tag: "turnEnded", ...identity(entry), deliveryId: turn.deliveryId });
   });
   const setMode = (entry: Process, permission: PermissionLevel) => Effect.gen(function* () {
@@ -156,6 +157,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     yield* Effect.sync(() => { try { process.kill(-Number(entry.child.pid), "SIGKILL"); } catch { /* already gone */ } });
     yield* Scope.close(entry.scope, Exit.void);
     entry.holds.clear();
+    entry.secrets.length = 0;
   });
   const spawn = (input: Spawn, session?: SessionReference): Effect.Effect<SessionInfo, RunnerRejected> => Effect.gen(function* () {
     if (session !== undefined && session._tag !== "acp") return yield* rejected("session is not an ACP session");
@@ -166,17 +168,17 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       || (input.effort !== undefined && harness.efforts.length > 0 && !harness.efforts.includes(input.effort))) return yield* rejected("configuration is not recorded");
     const startingMode = harness.permissionMapping[input.permission];
     if (harness.reportedModes.length > 0 && !harness.reportedModes.some((mode) => mode.id === startingMode)) return yield* rejected("mode is not recorded");
+    const resolvedSecrets = [input.token];
     const variables: Record<string, string> = {};
     for (const [name, value] of Object.entries(input.account.environment ?? {})) {
       if (name.startsWith("HERDR_") || name.startsWith("SHEPHERD_")) continue;
       if (value.startsWith("secret:")) {
         const secret = yield* secrets.resolve(value);
         if (secret === undefined) return yield* rejected("account secret is unavailable");
-        knownSecrets.push(secret);
+        resolvedSecrets.push(secret);
         variables[name] = Redacted.value(secret);
       } else variables[name] = value;
     }
-    knownSecrets.push(input.token);
     const base = buildBaseEnvironment({ parent: configuration.environment, accountVariables: variables,
       shepherdSocket: configuration.socketPath, shepherdToken: Redacted.value(input.token) });
     const environment = yield* mergeProviderInstanceEnvironment(Object.entries(variables).map(([name, value]) => ({ name, value, sensitive: input.account.environment?.[name]?.startsWith("secret:") ?? false })), base).pipe(
@@ -243,12 +245,15 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         }),
       })).pipe(Scope.provide(scope));
       const client = Context.get(context, AcpClient);
-      const processEntry: Process = { input, incarnation: sha256Hex(Redacted.value(input.token)), scope, child, client,
+      const processEntry: Process = { input, incarnation: sha256Hex(Redacted.value(input.token)), scope, child, client, secrets: resolvedSecrets,
         holds: new Map(), responses: new Map(), sessionId: session?._tag === "acp" ? session.sessionId : "", version: 0,
         loading: session !== undefined, ready: false, stopped: false, dead: false, mode: startingMode, options: [], commands: [] };
       entry = processEntry;
       processes.set(input.agentId, processEntry);
-      yield* Scope.addFinalizer(scope, drainMessages(processEntry, true));
+      yield* Scope.addFinalizer(scope, drainMessages(processEntry, true).pipe(Effect.ensuring(Effect.sync(() => {
+        processEntry.secrets.length = 0;
+        if (processes.get(input.agentId) === processEntry) processes.delete(input.agentId);
+      }))));
       yield* client.handleSessionUpdate((notification) => Effect.gen(function* () {
         const current = processEntry;
         if (current.dead || current.stopped || (current.sessionId !== "" && notification.sessionId !== current.sessionId)) return;
@@ -279,8 +284,12 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           }
           return;
         }
-        if (current.turn === undefined && !current.loading) return;
-        for (const translated of translate(update, current.loading)) {
+        const translatedUpdates = translate(update, current.loading);
+        if (current.turn === undefined && !current.loading) {
+          if (translatedUpdates.length > 0) yield* Effect.logWarning("adapter content dropped: no active turn");
+          return;
+        }
+        for (const translated of translatedUpdates) {
           const deliveryId = current.turn?.deliveryId ?? Schema.decodeUnknownSync(DeliveryId)(`replay-${randomUUID()}`);
           if (translated.kind === "message") {
             current.message ??= { id: randomUUID(), pending: [], released: "" };
@@ -322,8 +331,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         }));
         yield* emit({ _tag: "permissionRequested", ...identity(processEntry), permissionRequestId: hold.id,
           toolCallId: tool.toolCallId, description, options: mapped, settingsWrite: settingsWrite((tool.locations ?? []).map((location) => location.path), folder, environment.CLAUDE_CONFIG_DIR) });
-        const optionId = yield* Deferred.await(hold.answer);
-        return { outcome: { outcome: "selected" as const, optionId } };
+        return { outcome: yield* Deferred.await(hold.answer) };
       }));
       const initialized = yield* client.agent.initialize({ protocolVersion: 2, clientInfo: { name: "shepherd", version: "0.0.1" }, clientCapabilities: {} }).pipe(Effect.mapError(() => rejected("adapter initialization failed")));
       processEntry.version = initialized.protocolVersion;
@@ -388,13 +396,20 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   return Runner.of({
     start: (input) => spawn(input), load: (input) => spawn(input, input.session),
     prompt: (input) => send(input, false), compact: (input) => send(input, true),
-    cancel: ({ agentId }) => Effect.gen(function* () { const entry = yield* live(agentId); yield* entry.client.agent.cancel({ sessionId: entry.sessionId }).pipe(Effect.mapError(() => rejected("cancel failed"))); }),
+    cancel: ({ agentId }) => Effect.gen(function* () {
+      const entry = yield* live(agentId);
+      yield* entry.client.agent.cancel({ sessionId: entry.sessionId }).pipe(Effect.mapError(() => rejected("cancel failed")));
+      const holds = [...entry.holds.values()];
+      entry.holds.clear();
+      for (const hold of holds) yield* Deferred.succeed(hold.answer, { outcome: "cancelled" });
+      for (const hold of holds) yield* Deferred.await(hold.delivered);
+    }),
     answerPermission: ({ agentId, requestId, optionId }) => Effect.gen(function* () {
       const entry = yield* live(agentId);
       const hold = entry.holds.get(requestId);
       if (hold === undefined || !hold.options.has(optionId)) return yield* rejected("permission answer is not offered");
       entry.holds.delete(requestId);
-      yield* Deferred.succeed(hold.answer, optionId);
+      yield* Deferred.succeed(hold.answer, { outcome: "selected", optionId });
       yield* Deferred.await(hold.delivered);
     }),
     setMode: ({ agentId, permission }) => Effect.gen(function* () {

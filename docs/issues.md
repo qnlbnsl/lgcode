@@ -1154,6 +1154,12 @@ Question closure must use an agreed contract rather than inventing an answer.
 Why it matters: dead sessions leave open subjects and owner alerts that
 nobody can use.
 
+Unit 6a fix round 2 now answers every pending protocol permission request
+with the cancelled outcome when a turn is cancelled, and removes its local
+hold so a later answer is refused. That protocol response does not close the
+engine's durable permission record. The request cancellation and question
+closure contracts above remain work for units 6c and 6d.
+
 ## 75. The wait contract has no owner waiter
 
 Found: 2026-11-01, while building unit 5d.
@@ -1362,7 +1368,7 @@ before it can check the runner's reload behavior.
 ## 95. Seven earlier lifecycle assertions conflict with recording the opened session
 
 Found: 2026-11-01, while building unit 6a and running the command and routing tests.
-State: open for the lead. The frozen tests are unchanged.
+State: fixed by the lead-authorized unit 6a fix round 1 test commit `68fe9b4`.
 
 What happens: `packages/engine/test/commands/lifecycle.test.ts` has one start
 assertion that forbids `SessionOpened`, three reload cases that expect the
@@ -1375,6 +1381,12 @@ required by issue 64 and the accepted unit 6a interface. The builder has not
 weakened or changed them.
 Why it matters: the scoped integration command now exercises the required
 behavior and fails those seven historical expectations. Its other cases pass.
+
+What changed in fix round 1: the test writer preserved the start fields,
+starting transition, requeue set, wait and token checks, and updated only the
+session-result expectations. The builder merged that signed commit, then
+ran the scoped integration command before source changes. All 930 tests
+passed, including the seven previously failing assertions.
 
 ## 96. Text redaction must retain secrets across protocol chunk boundaries
 
@@ -1424,3 +1436,79 @@ Why it matters: the deterministic check holds the real writer just after
 commit, stops the visible agent through the command handler, then releases
 the start. It observes zero runner starts and no session event, with the
 agent still stopped. No frozen test changed.
+
+## 99. Resolved runner credentials accumulated after their processes closed
+
+Found: 2026-11-01, in unit 6a's focused review, finding F-4.
+State: fixed in unit 6a fix round 2.
+
+What happened: the runner appended each resolved account secret and process
+token to a layer-wide redaction list and never removed it. Repeated starts
+therefore retained credentials for processes that no longer existed.
+What changed: each process entry owns its resolved secrets and token. The
+fallback redactor reads only registered process entries, and also applies
+the service's supplied redactor. Close flushes text before removing the entry
+and clearing its secret array. Scope finalization also flushes and releases
+the entry, including a failed setup or engine shutdown.
+Why it matters: stopped processes must not make the runner retain an
+unbounded history of credentials solely for redaction.
+
+## 100. Cancelling a turn left protocol permission requests waiting
+
+Found: 2026-11-01, in unit 6a's focused review, finding F-5.
+State: fixed in unit 6a fix round 2. Durable request closure remains issue 74.
+
+What happened: `Runner.cancel` sent only `session/cancel`. A pending
+`session/request_permission` remained held by its deferred answer, although
+the protocol requires a cancelled response after turn cancellation.
+What changed: a hold accepts the protocol's selected or cancelled outcome.
+Cancel sends the notification, clears that agent's open holds, resolves each
+with the cancelled outcome and awaits its response-write acknowledgement.
+A later answer to a cleared hold returns `RunnerRejected`.
+Why it matters: the child receives a terminal permission response, while the
+engine preserves its existing first-answer-wins and request-closing rules.
+
+## 101. Content arriving after a turn end was attributed to the ended delivery
+
+Found: 2026-11-01, in unit 6a's focused review, finding F-9.
+State: fixed in unit 6a fix round 2.
+
+What happened: completion marked the turn ended but retained it in the
+process entry. A later content notification could therefore emit another
+delivery update and append a thread item for that ended turn.
+What changed: completion clears the matching current turn before emitting
+its end event. Content with no active turn, outside session replay, is
+ignored with a fixed warning that includes no child text.
+Why it matters: content after a completed turn must not extend its history
+or accept another delivery. Session replay remains separately tagged.
+
+## 102. A future crash stderr tail must redact across chunk boundaries
+
+Found: 2026-11-01, in unit 6a's focused review, finding F-6.
+State: open for unit 6c, which implements the crash stderr tail.
+
+What happens: the runner currently drains stderr, calls `redactText` and
+discards it. That is safe while no bytes are retained or published. It does
+not make each chunk safe to retain if a secret spans two chunks.
+What should happen: unit 6c's bounded stderr tail uses `redactChunk` with a
+carry for each process, and flushes it on exit, stop and scope closure before
+persisting or logging the tail. It must not store independently redacted raw
+chunks as the crash tail.
+Why it matters: joining those chunks could reconstruct a secret that neither
+individual `redactText` call could match.
+
+## 103. Adapter setup has no timeout, and spawn registration is not atomic
+
+Found: 2026-11-01, in unit 6a's focused review, finding F-8.
+State: open for unit 6d.
+
+What happens: initialization, session creation, session load and initial
+configuration have no deadline. An adapter that never responds can keep a
+start or reload pending. The duplicate-process check also precedes secret
+resolution and spawning, so it is not atomic with process-table registration.
+What should happen: unit 6d sets the recovery setup timeout and cleanup
+policy, and preserves per-agent serialization or adds an atomic reservation
+for callers that bypass command lanes. Today's command and delivery paths
+hold the per-agent lane across runner setup, which serializes normal calls.
+Why it matters: a stalled setup must not hold recovery forever, and a future
+direct concurrent caller must not create two processes for one agent.

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
 import { AgentId, PermissionRequestId, permissionForOptionKind, type PermissionOption } from "@shepherd/contracts";
+import type { RequestPermissionOutcome } from "@shepherd/t3-effect-acp/schema-v1";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -15,7 +16,7 @@ export function mapPermissionOption(harness: string, option: { optionId: string;
 }
 
 export const makePermissionHold = (options: ReadonlyArray<{ optionId: string }>) => Effect.gen(function* () {
-  const answer = yield* Deferred.make<string>();
+  const answer = yield* Deferred.make<RequestPermissionOutcome>();
   const delivered = yield* Deferred.make<void, RunnerRejected>();
   return { id: Schema.decodeUnknownSync(PermissionRequestId)(randomUUID()),
     options: new Set(options.map((option) => option.optionId)), answer, delivered };
