@@ -100,6 +100,7 @@ const worktrees = () => {
     writeFileSync(join(gitdir, "commondir"), "../..\n");
     writeFileSync(join(gitdir, "HEAD"), "ref: refs/heads/main\n");
     writeFileSync(join(folder, ".git"), `gitdir: ${relative(folder, gitdir)}\n`);
+    writeFileSync(join(gitdir, "gitdir"), `${join(folder, ".git")}\n`);
   }
   writeFileSync(join(common, "HEAD"), "ref: refs/heads/main\n");
   return { child, common };
@@ -146,6 +147,7 @@ it.effect("5.12 main checkout: catches supporting .git files while rejecting a p
     writeFileSync(join(child, ".git"), `gitdir: ${relative(child, gitdir)}\n`);
     writeFileSync(join(gitdir, "commondir"), "../..\n");
     writeFileSync(join(gitdir, "HEAD"), "ref: refs/heads/child\n");
+    writeFileSync(join(gitdir, "gitdir"), `${join(child, ".git")}\n`);
     expect((yield* checkFolder(options(child))).realPath).toBe(child);
   }),
 );
