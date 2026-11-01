@@ -410,3 +410,29 @@ Account environment names also recognize PASSWD and CREDENTIAL variants and
 the AUTH segment, and displayed states have a literal schema.
 Why it matters: every later engine unit consumes these contracts, so missing
 security and recovery rules would otherwise propagate into the implementation.
+
+## 26. The unit 8a tests cannot reach every secret-handling path in issue 13
+
+Found: 2026-11-01, while writing the unit 8a tests.
+State: open.
+
+What happened: issue 13 asks for planted secrets to be tested through the core,
+notification, extension-defect and encoding-failure logging paths. The fake agent
+tests drive a real session, so they reach the core and notification paths only
+when a step makes the client log them, and the session test asserts that nothing
+is logged with wire options off. The extension-defect and encoding-failure paths
+need a peer that sends a malformed frame or a failing extension handler, which no
+step in criterion 8.1 produces. The redacting service logger of units 5a and 7a
+does not exist yet, so the tests install a logger that records every message and
+cause, and they check that no planted secret appears in it or in the adapter's
+standard error.
+What should happen: units 6a, 6d and 7a add a malformed-frame step to the fake
+agent, or their own tests, and run the planted-secret check through the real
+redacting logger.
+Why it matters: without them, a secret in a defect or encoding failure could pass
+every unit 8a test and still reach a log.
+
+A related trap: the callback that `it.layer(...)("name", (it) => ...)` passes in
+`@effect/vitest` offers `it.effect` but not `it.live`, so a test that needs the
+real clock must call the top-level `it.live` and provide its layer itself, as the
+unit 8a tests do.
