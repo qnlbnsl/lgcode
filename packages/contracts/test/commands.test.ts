@@ -5,7 +5,15 @@ import * as SchemaAST from "effect/SchemaAST"
 import * as RpcSchema from "effect/rpc/RpcSchema"
 import { describe, expect, it } from "vitest"
 
-import { commandAccess, commandNames, CommandsRpcGroup, ownerOnlyCommands } from "../src/commands.ts"
+import {
+  commandAccess,
+  commandNames,
+  CommandsRpcGroup,
+  DebugRpcGroup,
+  ownerOnlyCommands,
+  ServiceRpcGroup
+} from "../src/commands.ts"
+import { EventEnvelope } from "../src/events.ts"
 
 // The lists as written in plan criterion 3.1 and decisions row 55. They are copied here on purpose:
 // the test must not read the lists it checks from the code under test.
@@ -140,5 +148,42 @@ describe("command RPC group", () => {
     for (const name of expectedCommands) {
       expect(RpcSchema.isStreamSchema(rpcFor(name).successSchema), name).toBe(name === "subscribe")
     }
+  })
+})
+
+describe("the groups the service serves (fix round 1, item 4)", () => {
+  const debugCommand = "debug.compare-views"
+  const withoutDebug = expectedCommands.filter((name) => name !== debugCommand)
+
+  // Catches: the production group being only a comment: `ServiceRpcGroup` missing, or still holding the
+  // debug command (row 74: it is served only behind the test flag), or missing another command.
+  it("ServiceRpcGroup has the 15 commands and not debug.compare-views", () => {
+    expect(ServiceRpcGroup, "ServiceRpcGroup export").toBeDefined()
+    expect(ServiceRpcGroup.requests.size).toBe(15)
+    expect(ServiceRpcGroup.requests.has(debugCommand)).toBe(false)
+    expect(sorted([...ServiceRpcGroup.requests.keys()])).toEqual(sorted(withoutDebug))
+  })
+
+  // Catches: the full inventory (the CLI and clients) losing the debug command when the service group was cut.
+  it("CommandsRpcGroup keeps all 16 commands", () => {
+    expect(CommandsRpcGroup.requests.size).toBe(16)
+    expect(CommandsRpcGroup.requests.has(debugCommand)).toBe(true)
+  })
+
+  // Catches: the debug group holding anything but the one debug command (it would be served behind the
+  // flag with other commands).
+  it("DebugRpcGroup has only debug.compare-views", () => {
+    expect([...DebugRpcGroup.requests.keys()]).toEqual([debugCommand])
+  })
+})
+
+describe("subscribe items (fix round 1, item 5)", () => {
+  // Catches: `subscribe` streaming bare events, so a client gets no sequence number to resume from and no
+  // time or caller. Its stream items are the shared `EventEnvelope`.
+  it("streams EventEnvelope items", () => {
+    const success = rpcFor("subscribe").successSchema
+    expect(RpcSchema.isStreamSchema(success)).toBe(true)
+    if (!RpcSchema.isStreamSchema(success)) return
+    expect(success.success.ast).toBe(EventEnvelope.ast)
   })
 })

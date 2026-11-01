@@ -1,6 +1,9 @@
 // Unit 3, criterion 3.4: no schema can carry a raw secret value.
 // Rests on decisions rows 19 (secrets are references, `secret:<id>`) and 55 ("command refused"
 // records only the command name and the reason).
+import { inspect } from "node:util"
+
+import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
 import * as SchemaAST from "effect/SchemaAST"
 import * as RpcSchema from "effect/rpc/RpcSchema"
@@ -11,9 +14,13 @@ import { CommandsRpcGroup } from "../src/commands.ts"
 import { Event } from "../src/events.ts"
 import { HarnessSettings } from "../src/harnesses.ts"
 
-// A name is secret-looking when it contains TOKEN, KEY, SECRET or PASSWORD in any case (the globs
-// `*TOKEN*`, `*KEY*`, `*SECRET*` and `*PASSWORD*` of criterion 3.4).
-const secretLooking = /token|key|secret|password/i
+// A name is secret-looking when it contains TOKEN, KEY, SECRET, PASSWORD, PASSWD or CREDENTIAL in any case
+// (the globs of criterion 3.4, widened by fix round 1, item 6), or has AUTH as a whole word segment: at the
+// start or end of the name, or bounded by `_`, `-` or `.`. So `AUTH`, `GH_AUTH` and `x-auth` are secret-looking
+// and `AUTHOR_NAME` is not. Matching too much is the safe direction.
+const secretName = /token|key|secret|password|passwd|credential/i
+const authSegment = /(^|[_.-])auth($|[_.-])/i
+const secretLooking = { test: (name: string): boolean => secretName.test(name) || authSegment.test(name) }
 
 // Values that are not references. Any of them accepted under a secret-looking name is a leak.
 const rawProbes = ["abc", "hunter2", "sk-ant-api03-AAAAAAAAAAAAAAAA", "secret", "secret:", "SECRET:x y"]
@@ -56,7 +63,7 @@ const walk = (root: SchemaAST.AST, label: string): { findings: Array<Finding>; p
       if (ast.propertySignatures.length === 0) {
         for (const index of ast.indexSignatures) {
           const accepts = Schema.is(Schema.make(ast))
-          for (const key of ["API_KEY", "github_token", "Db_Password", "AWS_SECRET_ACCESS"]) {
+          for (const key of ["API_KEY", "github_token", "Db_Password", "AWS_SECRET_ACCESS", "DB_PASSWD", "GOOGLE_CREDENTIALS", "GH_AUTH", "x-auth"]) {
             for (const probe of rawProbes) {
               if (accepts({ [key]: probe })) {
                 findings.push({ path: `${path}{${key}}`, kind: "record-key", accepted: probe })
@@ -104,6 +111,9 @@ describe("schema walk", () => {
   it("reports a string field named like a token and a record that takes a raw value under a key name", () => {
     const bad = Schema.Struct({
       apiToken: Schema.String,
+      db_passwd: Schema.String,
+      gh_auth: Schema.String,
+      author_name: Schema.String,
       extra: Schema.Record(Schema.String, Schema.String),
       fine: Schema.String
     })
@@ -112,6 +122,10 @@ describe("schema walk", () => {
     // `extra` is a field of a struct with named properties: its own record node has no named properties.
     expect(findings.some((f) => f.path.startsWith("bad.extra{") && f.kind === "record-key")).toBe(true)
     expect(findings.some((f) => f.path === "bad.fine")).toBe(false)
+    // Fix round 1, item 6: the widened names are walked, and a word that only contains "auth" is not.
+    expect(findings.some((f) => f.path === "bad.db_passwd")).toBe(true)
+    expect(findings.some((f) => f.path === "bad.gh_auth")).toBe(true)
+    expect(findings.some((f) => f.path === "bad.author_name")).toBe(false)
   })
 
   // Catches: a walker that stops at the top level of the event union or at a nested struct,
@@ -159,16 +173,24 @@ describe("account environment", () => {
     "AWS_SECRET_ACCESS",
     "MONKEY",
     "tokenizer",
-    "MY_pAsSwOrD_FILE"
+    "MY_pAsSwOrD_FILE",
+    // Fix round 1, item 6: names the first rule missed.
+    "DB_PASSWD",
+    "GOOGLE_CREDENTIALS",
+    "AUTH",
+    "x-auth",
+    "GH_AUTH_TOKEN",
+    "GH_AUTH",
+    "auth.user"
   ])("refuses a raw value under the secret-looking name %s", (name) => {
     expect(() => decode(account({ [name]: "hunter2" }))).toThrow()
     expect(decode(account({ [name]: "secret:ref-1" })).environment).toEqual({ [name]: "secret:ref-1" })
   })
 
   // Catches: an over-eager check that refuses every environment variable, so no account could set
-  // a log level or a region.
+  // a log level or a region, or one that treats "auth" inside a word (`AUTHOR_NAME`) as a secret name.
   it("accepts plain values under names that do not look secret", () => {
-    const environment = { LOG_LEVEL: "debug", AWS_REGION: "eu-west-1", HOME: "/home/someone" }
+    const environment = { LOG_LEVEL: "debug", AWS_REGION: "eu-west-1", HOME: "/home/someone", AUTHOR_NAME: "x" }
     expect(decode(account(environment)).environment).toEqual(environment)
   })
 
@@ -222,5 +244,65 @@ describe("command refused event", () => {
   it("decodes a refusal that carries only the command name and the reason", () => {
     const refusal = { _tag: "CommandRefused", command: "prompt", reason: "the agent is stopped" }
     expect(decode(refusal)).toEqual(refusal)
+  })
+})
+
+describe("accounts set-secret request value (fix round 1, item 1)", () => {
+  const rpc = CommandsRpcGroup.requests.get("accounts set-secret")
+  const request = (value: unknown) => ({
+    requestId: "req-1",
+    accountId: "work",
+    name: "CURSOR_API_KEY",
+    nonce: "nonce-1",
+    value
+  })
+  const decode = (value: unknown) => Schema.decodeUnknownSync(rpc!.payloadSchema as Schema.Codec<{ value: unknown }>)(request(value))
+  const plain = "hunter2hunter2hunter2"
+
+  // Catches: the raw credential decoded to a plain string, which any log line, error message or
+  // `JSON.stringify` of the request would then print. After decoding, the value must be an Effect `Redacted`.
+  it("decodes the value to a Redacted that prints as redacted in every common way", () => {
+    expect(rpc, "accounts set-secret Rpc").toBeDefined()
+    const decoded = decode(plain)
+    expect(Redacted.isRedacted(decoded.value)).toBe(true)
+    expect(String(decoded.value)).not.toContain(plain)
+    expect(JSON.stringify(decoded)).not.toContain(plain)
+    expect(inspect(decoded, { depth: 10 })).not.toContain(plain)
+    expect(inspect(decoded.value)).not.toContain(plain)
+    expect(`${String(decoded.value)}`).not.toContain(plain)
+  })
+
+  // Catches: the redaction wrapper hiding the value from the one place that must read it (the secret
+  // writer): `Redacted.value` must return the exact input.
+  it("returns the input through Redacted.value", () => {
+    const decoded = decode(plain)
+    expect(Redacted.value(decoded.value as Redacted.Redacted<string>)).toBe(plain)
+  })
+
+  // Catches (row 73, mutation M2): the minimum length dropped or moved. `accounts set-secret` refuses
+  // secrets shorter than 16 characters and accepts 16.
+  it("refuses a 15-character value and accepts a 16-character one", () => {
+    expect(() => decode("a".repeat(15))).toThrow()
+    expect(Redacted.value(decode("a".repeat(16)).value as Redacted.Redacted<string>)).toBe("a".repeat(16))
+    expect(() => decode("")).toThrow()
+  })
+
+  // Catches: a value that is not text (a number or an object) being wrapped and accepted.
+  it("refuses a value that is not a string", () => {
+    expect(() => decode(1234567890123456)).toThrow()
+    expect(() => decode({ secret: plain })).toThrow()
+  })
+
+  // Catches: the failure message of a refused value repeating the secret (a short secret is still a secret).
+  it("does not repeat a refused value in the error", () => {
+    const short = "short-secret-1"
+    let message = ""
+    try {
+      decode(short)
+    } catch (error) {
+      message = String(error)
+    }
+    expect(message.length, "decoding must have failed with a message").toBeGreaterThan(0)
+    expect(message).not.toContain(short)
   })
 })
