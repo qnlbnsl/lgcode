@@ -1,0 +1,1 @@
+{"harness":"claude","kind":"out-of-usage","text":"You've hit your","source":"claude-agent-acp 0.99.1 dist/session-failure-extension.js:isSyntheticUsageLimitMessage uses claude-agent-sdk 0.3.312 USAGE_LIMIT_ERROR_PREFIXES; this is a source prefix, not a complete observed message; read 2026-11-01","verified":false}

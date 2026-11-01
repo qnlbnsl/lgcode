@@ -3,6 +3,7 @@ import * as NodeUtil from "node:util";
 import * as NodeWorkerThreads from "node:worker_threads";
 
 import * as Cache from "effect/Cache";
+import type * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -24,7 +25,7 @@ import * as Tracer from "effect/Tracer";
 import * as Reactivity from "effect/reactivity/Reactivity";
 import * as Client from "effect/sql/SqlClient";
 import type { Borrower, Connection } from "effect/sql/SqlConnection";
-import { SqlError, classifySqliteError } from "effect/sql/SqlError";
+import { ConnectionError, SqlError, classifySqliteError } from "effect/sql/SqlError";
 import * as Statement from "effect/sql/Statement";
 
 const ATTR_DB_SYSTEM_NAME = "db.system.name";
@@ -1132,6 +1133,45 @@ const make = Effect.fn("makeWithDatabase")(function* (
     lockWaitMs: Number((clock.monotonicTimeNanosUnsafe() - start) / 1000n) / 1000,
   });
 
+  // A COMMIT that fails can leave its transaction open (SQLite keeps it open
+  // after a deferred constraint failure, for example). `onCommitFailure` rolls
+  // it back; if that fails too, the connection is poisoned and every later
+  // hand-out retries the rollback first. This follows `makeSqliteAcquirers`
+  // in effect/sql/SqlClient, without replacing the acquirers or the routing.
+  const poisoned = new Map<Connection, SqlError>();
+  const rollback = (conn: Connection): Effect.Effect<void, SqlError> =>
+    conn.executeUnprepared("ROLLBACK", [], undefined).pipe(
+      Effect.asVoid,
+      Effect.catchIf(isNoTransactionError, () => Effect.void),
+    );
+  const poison = (conn: Connection, cause: Cause.Cause<SqlError>) =>
+    poisoned.set(
+      conn,
+      new SqlError({
+        reason: new ConnectionError({
+          message: "SQLite connection cannot be reused after failed COMMIT cleanup",
+          operation: "rollback",
+          cause,
+        }),
+      }),
+    );
+  const usable = (conn: Connection): Effect.Effect<Connection, SqlError> =>
+    Effect.suspend(() => {
+      if (!poisoned.has(conn)) return Effect.succeed(conn);
+      return Effect.matchCauseEffect(rollback(conn), {
+        onFailure: (cause) => {
+          poison(conn, cause);
+          return Effect.fail(poisoned.get(conn)!);
+        },
+        onSuccess: () => {
+          poisoned.delete(conn);
+          return Effect.succeed(conn);
+        },
+      });
+    });
+  const onCommitFailure = (conn: Connection): Effect.Effect<void, SqlError> =>
+    Effect.tapCause(rollback(conn), (cause) => Effect.sync(() => poison(conn, cause)));
+
   const writerBorrowBatchSize = 16;
   let writerBorrowsSinceYield = 0;
   const borrower: Borrower = (use) =>
@@ -1152,7 +1192,7 @@ const make = Effect.fn("makeWithDatabase")(function* (
       readonly connection: Connection;
     },
     use: (connection: Connection) => Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E, R> =>
+  ): Effect.Effect<A, E | SqlError, R> =>
     Effect.withFiber((fiber) => {
       const clock = fiber.getRef(Clock.Clock);
       const start = clock.monotonicTimeNanosUnsafe();
@@ -1166,7 +1206,7 @@ const make = Effect.fn("makeWithDatabase")(function* (
         ) {
           annotateAcquired(fiber, acquired(target, clock, start), ownerAtWaitStart);
         }
-        return use(target.connection);
+        return Effect.flatMap(usable(target.connection), use);
       });
       const useOwnedConnection =
         target.name === "writer"
@@ -1232,10 +1272,10 @@ const make = Effect.fn("makeWithDatabase")(function* (
             }).pipe(Effect.andThen(target.lock.release(1))),
           );
         });
-        return Effect.as(
+        return Effect.andThen(
           // A scheduler yield after taking the permit must not precede its release finalizer.
           Effect.provideService(acquire, Scheduler.PreventSchedulerYield, true),
-          target.connection,
+          usable(target.connection),
         );
       }),
     ),
@@ -1246,6 +1286,7 @@ const make = Effect.fn("makeWithDatabase")(function* (
     borrower,
     compiler,
     transactionAcquirer,
+    onCommitFailure,
     // BEGIN IMMEDIATE avoids read-then-write SQLITE_BUSY_SNAPSHOT, which busy_timeout cannot resolve.
     beginTransaction: options.readonly === true ? "BEGIN" : "BEGIN IMMEDIATE",
     spanAttributes: [
@@ -1277,6 +1318,18 @@ const make = Effect.fn("makeWithDatabase")(function* (
       }),
   });
 });
+
+// Copied from isNoTransactionError in effect/sql/SqlClient (it is not exported).
+const isNoTransactionError = (error: SqlError): boolean => {
+  const cause: unknown = error.reason.cause;
+  const message =
+    typeof cause === "string"
+      ? cause
+      : Predicate.hasProperty(cause, "message") && typeof cause.message === "string"
+        ? cause.message
+        : "";
+  return /no transaction is active/i.test(message);
+};
 
 export const layer = (config: SqliteClientConfig): Layer.Layer<Client.SqlClient, SqlError> =>
   Layer.effect(Client.SqlClient, make(config)).pipe(Layer.provide(Reactivity.layer));

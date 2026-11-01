@@ -1,0 +1,1 @@
+{"harness":"cursor","kind":"signed-out","text":"{\"code\":-32000,\"message\":\"Authentication required\",\"data\":{\"message\":\"Authentication required. Please run 'agent login' first, then call authenticate() with methodId 'cursor_login'.\"}}","source":"Recorded from the installed adapter with an empty temporary home and no account variables","verified":true}
