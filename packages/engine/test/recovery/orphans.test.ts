@@ -84,6 +84,28 @@ describe.skipIf(!onLinux)(`6.8 the sweep stops a leftover group only when every 
     expect(results[0]?.outcome).toBe("stopped");
   });
 
+  // Unit 6c fix round 1, F-3: the wait after SIGKILL has a bound (5 seconds by default). The fake host
+  // never removes the group, as a process stuck in uninterruptible sleep would behave.
+  it("F-3 a group that survives SIGKILL is left alone with the fixed reason 'group did not exit' once the wait after SIGKILL is over, within 8 seconds, and the next row is still swept (breaks if the sweep waits for the group after SIGKILL with no bound)", async () => {
+    const fake = fakeHost([[4242, matching], [5252, matching]]);
+    fake.onSignal = (groupId, signal) => { if (groupId === 5252 && signal === "SIGTERM") fake.groups.delete(groupId); };
+    const started = Date.now();
+    const swept = await run(sweepOrphans({
+      rows: [rowFor(), rowFor({ agentId: "agent-two", groupId: 5252 })], reader: fake.reader, kill: fake.kill, graceMillis: 30,
+    }).pipe(Effect.timeoutOption("8 seconds")));
+    const elapsed = Date.now() - started;
+    expect(swept._tag, "the sweep must return; it waited for the group after SIGKILL with no bound").toBe("Some");
+    if (swept._tag !== "Some") return;
+    expect(elapsed).toBeLessThan(8000);
+    expect(fake.calls).toEqual([
+      { groupId: 4242, signal: "SIGTERM" }, { groupId: 4242, signal: "SIGKILL" }, { groupId: 5252, signal: "SIGTERM" },
+    ]);
+    expect(swept.value).toEqual([
+      { agentId: "agent-one", groupId: 4242, outcome: "left-alone", reason: "group did not exit" },
+      { agentId: "agent-two", groupId: 5252, outcome: "stopped", reason: "group stopped" },
+    ]);
+  });
+
   // One case per guard. Every other fact matches, so only the named guard can
   // be the reason the group is left alone.
   const guards: ReadonlyArray<{
