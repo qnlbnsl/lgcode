@@ -9,6 +9,7 @@ import { Event } from "../src/events.ts"
 import {
   canTransition,
   commandOutcome,
+  DisplayedState,
   displayedState,
   eventEffect,
   LifecycleState,
@@ -53,17 +54,7 @@ describe("lifecycle states", () => {
 })
 
 describe("displayed state derivation (first match wins)", () => {
-  type Shown =
-    | "Stopped"
-    | "Crashed"
-    | "Interrupted"
-    | "Signed out"
-    | "Paused for a limit"
-    | "Starting"
-    | "Waiting on a permission"
-    | "Waiting on an answer"
-    | "Working"
-    | "Idle"
+  type Shown = typeof DisplayedState.Type
 
   const variants = {
     starting: { _tag: "starting" },
@@ -76,12 +67,43 @@ describe("displayed state derivation (first match wins)", () => {
     stopped: { _tag: "stopped" }
   } as const
 
-  const show = (state: (typeof variants)[keyof typeof variants], permissions: number, questions: number) =>
+  // The return type is annotated on purpose: `tsc` fails here if `displayedState` returns a plain string
+  // union instead of `DisplayedState` (fix round 1, item 8).
+  const show = (state: (typeof variants)[keyof typeof variants], permissions: number, questions: number): Shown =>
     displayedState({
       state: state as never,
       openPermissionRequests: permissions,
       openQuestionsAsked: questions
-    }) as Shown
+    })
+
+  // The ten display strings in the plan's table order (criterion 3.5, the derivation table).
+  // Catches: a string reworded, dropped, added or reordered in the exported `DisplayedState` schema,
+  // so a client that switches on it would miss a case.
+  it("exports DisplayedState with the ten strings of the table, in the table's order", () => {
+    expect([...DisplayedState.literals]).toEqual([
+      "Stopped",
+      "Crashed",
+      "Interrupted",
+      "Signed out",
+      "Paused for a limit",
+      "Starting",
+      "Waiting on a permission",
+      "Waiting on an answer",
+      "Working",
+      "Idle"
+    ])
+  })
+
+  // Catches: `displayedState` returning a string that `DisplayedState` does not accept (the type and the
+  // function drifting apart). Every state with every count combination must give a member.
+  it("returns only members of DisplayedState", () => {
+    const isDisplayed = Schema.is(DisplayedState)
+    for (const state of Object.values(variants)) {
+      for (const [permissions, questions] of [[0, 0], [1, 0], [0, 1], [2, 2]] as const) {
+        expect(isDisplayed(show(state, permissions, questions)), `${JSON.stringify(state)} ${permissions} ${questions}`).toBe(true)
+      }
+    }
+  })
 
   // Rows of the plan's table, one per row, with no counts open.
   // Catches: a row missing or wrongly worded in the derivation.
@@ -230,14 +252,19 @@ describe("transition table: which state change is legal", () => {
   //  - starting -> idle (session opened) and idle -> working (message sent); working -> idle (turn ended);
   //  - paused -> starting (cleared before the session opened), idle or working (cleared; a mid-turn agent
   //    gets a carry-on), crashed, stopped, and paused again (the reason changed, row 53);
-  //  - crashed, interrupted and stopped only restart (`resume`, to starting) or, if not stopped, get stopped;
+  //  - crashed and stopped only restart (`resume`, to starting) or, if not stopped, get stopped;
+  //  - interrupted: restarted (to starting), or stopped, or, after a successful reload, the transaction written
+  //    at the end of recovery sets the agent's state: working if it was mid-turn or has an unaccepted delivery,
+  //    idle otherwise (row 66, row 52 step 6). So interrupted -> idle and interrupted -> working are legal;
+  //    starting -> working stays illegal, because an agent caught starting is started again
+  //    (interrupted -> starting) and then opens its session;
   //  - no state changes to itself except paused (reason change).
   const legal: Record<StateName, ReadonlyArray<StateName>> = {
     starting: ["idle", "paused", "interrupted", "crashed", "stopped"],
     working: ["idle", "paused", "interrupted", "crashed", "stopped"],
     idle: ["working", "paused", "interrupted", "crashed", "stopped"],
     paused: ["starting", "idle", "working", "crashed", "stopped", "paused"],
-    interrupted: ["starting", "stopped"],
+    interrupted: ["starting", "idle", "working", "stopped"],
     crashed: ["starting", "stopped"],
     stopped: ["starting"]
   }
@@ -245,7 +272,8 @@ describe("transition table: which state change is legal", () => {
   const cells = states.flatMap((from) => states.map((to) => [from, to, legal[from].includes(to)] as const))
 
   // Catches: any of the 49 state changes answered wrongly: a stopped agent going straight to working,
-  // a crashed agent going idle without a restart, an agent "changing" to its own state.
+  // a crashed agent going idle without a restart, an agent "changing" to its own state, and (row 66) an
+  // interrupted agent that recovered being unable to go to idle or working.
   it.each(cells)("%s -> %s is %s", (from, to, expected) => {
     expect(canTransition(from, to)).toBe(expected)
   })
@@ -282,6 +310,8 @@ describe("event table: (lifecycle state, event) cells", () => {
     // Row 70: if the adapter rejects a value, "agent start failed" is written and the agent becomes stopped.
     // Only an agent that is starting can fail to start.
     AgentStartFailed: { ...allStates("invalid"), starting: "stopped" },
+    // Fix round 1, item 3: an account event, so it is valid and changes nothing in every state.
+    AccountOutOfUsage: allStates("keep"),
     SessionOpened: { ...allStates("invalid"), starting: "idle" },
     TurnStarted: { ...allStates("invalid"), working: "keep" },
     TurnEnded: { ...allStates("invalid"), working: "idle" },
@@ -299,7 +329,7 @@ describe("event table: (lifecycle state, event) cells", () => {
   const cells = tags.flatMap((tag) => states.map((state) => [tag, state, expectedFor(tag, state)] as const))
 
   // Catches: the table missing a cell, or an event added to the union that the table does not know
-  // (every event must have an answer in every state, 40 events by 7 states).
+  // (every event must have an answer in every state, 41 events by 7 states).
   it("has a defined answer for every event in every state", () => {
     expect(cells.length).toBe(tags.length * states.length)
     for (const [tag, state] of cells) {
