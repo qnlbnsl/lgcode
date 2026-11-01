@@ -8,7 +8,7 @@ import { moveHeld } from "../../src/routing/holders.ts";
 import { incarnationOf, makeFakeRunner } from "../support/fakeRunner.ts";
 import {
   agentCredential, agentIdOf, appendSetup, call, eventOf, headSequence, logAfter, makeFakeSecrets, makeRig,
-  ownerCredential, provideRig, removeRig, rotateToken, seedAccount, seedAgent, seedHarness, stateOf, success,
+  ownerCredential, provideRig, readLog, removeRig, rotateToken, seedAccount, seedAgent, seedHarness, stateOf, success,
   type Fakes, type Logged, type Rig, type SeedState,
 } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
@@ -299,6 +299,9 @@ it.effect("5.6 no timeout: catches a request or question that is answered, cance
     const ownerHeld = yield* requestPermission(fakes.runner, solo);
     const before = yield* headSequence;
     const callsBefore = fakes.runner.calls.length;
+    // Issue 124: a setup delivery can still be dispatched after the watermark, so the runner may
+    // receive a prompt for a delivery that was queued before it. Nothing else may reach the runner.
+    const queuedBefore = new Set(tagged((yield* readLog).filter((row) => row.sequence <= before), "DeliveryQueued").map((event) => event.delivery.id as string));
     for (const step of ["1 hour", "1 day", "400 days"] as const) {
       yield* TestClock.adjust(step);
       // Real time for any fiber the clock woke.
@@ -308,7 +311,9 @@ it.effect("5.6 no timeout: catches a request or question that is answered, cance
     for (const tag of ["PermissionAnswered", "PermissionCancelled", "PermissionMoved", "QuestionAnswered", "QuestionMoved"] as const) {
       expect(tagged(written, tag)).toEqual([]);
     }
-    expect(fakes.runner.calls).toHaveLength(callsBefore);
+    const unexpectedCalls = fakes.runner.calls.slice(callsBefore).filter((entry) =>
+      entry.method !== "prompt" || !queuedBefore.has((entry.input as { readonly delivery: { readonly id: string } }).delivery.id));
+    expect(unexpectedCalls).toEqual([]);
     expect(yield* requestRow(world.request.id)).toMatchObject({ status: "open", holder: agent("lead") });
     expect(yield* questionRow(world.question.id)).toMatchObject({ status: "open", holder: agent("lead") });
     expect(yield* requestRow(ownerHeld.id)).toMatchObject({ status: "open", holder: owner });
