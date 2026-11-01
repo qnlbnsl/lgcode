@@ -718,3 +718,39 @@ The fix: both read paths map `SqlError` to the exported `LogReadFailed` error
 with the reason `database read failed`. Decode failures retain the fixed
 reason `stored event is unreadable` on the same exported error class.
 Why it matters: a refused subscription must not disclose database contents.
+
+## 44. The folder ceiling and the stream redactor leave four duties to later units
+
+Found: 2026-11-01, while building unit 5a.
+State: open; each item names the unit that owns it.
+
+What happens: unit 5a's ceiling and redactor meet criteria 5.11 and 5.12, but
+four limits remain.
+
+- A protected folder bind-mounted somewhere inside a requested folder is not
+  found. Decision row 65 compares device and inode along the real path's
+  ancestors, which catches a folder that is, is inside, or is an ancestor of a
+  protected folder, including a bind mount of the protected folder itself.
+  Finding a mount below the requested folder would need a walk of the whole
+  tree or a read of the mount table.
+- The worktree check cannot prove that git created the worktree. It accepts a
+  `.git` file only when it names `<common directory>/worktrees/<name>` with a
+  `commondir` file, and it checks git's `gitdir` back-link when that file
+  exists. The frozen fixtures have no back-link, so its absence is accepted.
+  An agent that can write inside the parent repository's common directory can
+  still make a new `worktrees/<name>` entry that passes.
+- A folder grant lives in memory. Unit 6d's recovery reload (decision row 52,
+  step 7) must rebuild it by calling `checkFolder` with the stored request and
+  then compare the result with the stored real path before it calls
+  `folderForSpawn`. A short race also remains between `folderForSpawn` and the
+  spawn itself; unit 6a should call it immediately before spawning.
+- `redactChunk` keeps a carry for each item until that item's final chunk.
+  Unit 6a must send a final chunk for every item, including items cut off by a
+  crash or an interruption, or the carries stay in memory.
+
+What should happen: units 6a and 6d meet the grant, race and final-chunk
+duties above. The owner decides whether the first two limits need a mount
+table read or a required back-link, and SECURITY.md states the remaining
+limit.
+Why it matters: each limit is a way for an agent-started child to reach a
+folder, or for the service to hold memory, beyond what the ceiling promises.

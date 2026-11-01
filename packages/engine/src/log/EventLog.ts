@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  EventEnvelope, type Actor, type AgentId, type BootId, type Event, type RequestId,
+  EventEnvelope, type Actor, type AgentId, type BootId, type DeviceId, type Event, type RequestId,
 } from "@shepherd/contracts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -43,8 +43,25 @@ export interface ProcessRow {
   readonly executable: string;
 }
 
+// A device row holds the credential's hash, never the credential.
+export interface DeviceRow {
+  readonly deviceId: DeviceId;
+  readonly name: string;
+  readonly tokenHash: string;
+  readonly createdAt: number;
+  readonly revokedAt: number | null;
+}
+
+// Rows written in the same transaction as the batch's events (decision row
+// 32, issue 33). Revocations are applied before inserts, so a rotation
+// revokes an agent's earlier tokens and then adds its new one. `"all"`
+// revokes every agent token, for start-up recovery (decision row 52, step 4).
+// A revoked row's `revoked_at` is the batch's `occurredAt`.
 export interface SideRows {
+  readonly revokeAgentTokens?: ReadonlyArray<AgentId> | "all";
   readonly agentTokens?: ReadonlyArray<AgentTokenRow>;
+  readonly revokeDevices?: ReadonlyArray<DeviceId>;
+  readonly devices?: ReadonlyArray<DeviceRow>;
   readonly processes?: ReadonlyArray<ProcessRow>;
 }
 
@@ -146,9 +163,24 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
           ...(agentId === undefined ? {} : { agentId }), event,
         }));
       }
+      if (sideRows.revokeAgentTokens === "all") {
+        yield* sql`UPDATE agent_tokens SET revoked_at = ${occurredAt} WHERE revoked_at IS NULL`;
+      } else {
+        for (const agentId of sideRows.revokeAgentTokens ?? []) {
+          yield* sql`UPDATE agent_tokens SET revoked_at = ${occurredAt}
+            WHERE agent_id = ${agentId} AND revoked_at IS NULL`;
+        }
+      }
       for (const token of sideRows.agentTokens ?? []) {
         yield* sql`INSERT INTO agent_tokens (token_hash, agent_id, revoked_at)
           VALUES (${token.tokenHash}, ${token.agentId}, ${token.revokedAt})`;
+      }
+      for (const deviceId of sideRows.revokeDevices ?? []) {
+        yield* sql`UPDATE devices SET revoked_at = ${occurredAt} WHERE device_id = ${deviceId} AND revoked_at IS NULL`;
+      }
+      for (const device of sideRows.devices ?? []) {
+        yield* sql`INSERT INTO devices (device_id, name, token_hash, created_at, revoked_at)
+          VALUES (${device.deviceId}, ${device.name}, ${device.tokenHash}, ${device.createdAt}, ${device.revokedAt})`;
       }
       for (const row of sideRows.processes ?? []) {
         yield* sql`INSERT INTO processes (agent_id, group_id, boot_id, start_time, user_id, executable)
