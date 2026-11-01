@@ -98,8 +98,17 @@ interface State {
 
 const zero = Schema.decodeUnknownSync(EventSequenceSchema)(0);
 
+// Identities are any nonempty string, so `constructor`, `toString` and
+// `__proto__` are valid keys. Every keyed view is therefore a record without
+// a prototype: a key is present only when this reducer wrote it, and writing
+// `__proto__` makes an ordinary own property instead of changing a prototype.
+type Keyed<T> = Readonly<Record<string, T>>;
+
+const keyed = <T>(): Keyed<T> => Object.create(null) as Keyed<T>;
+
 export const emptyViews = (): State => ({
-  sequence: zero, agents: {}, threads: {}, requests: {}, questions: {}, waits: {}, deliveries: {}, accounts: {}, devices: {},
+  sequence: zero, agents: keyed(), threads: keyed(), requests: keyed(), questions: keyed(), waits: keyed(),
+  deliveries: keyed(), accounts: keyed(), devices: keyed(),
 });
 
 // The agent whose thread an event belongs to. `DeliveryQueued` names its
@@ -108,21 +117,26 @@ export const emptyViews = (): State => ({
 const threadAgent = (event: Event): AgentId | undefined =>
   event._tag === "DeliveryQueued" ? event.delivery.target : "agentId" in event ? event.agentId : undefined;
 
-const put = <T>(record: Readonly<Record<string, T>>, key: string, value: T): Readonly<Record<string, T>> =>
-  ({ ...record, [key]: value });
+const lookup = <T>(record: Keyed<T>, key: string): T | undefined =>
+  Object.hasOwn(record, key) ? record[key] : undefined;
 
-const omit = <T>(record: Readonly<Record<string, T>>, key: string): Readonly<Record<string, T>> => {
-  const { [key]: _removed, ...rest } = record;
-  return rest;
+const put = <T>(record: Keyed<T>, key: string, value: T): Keyed<T> => {
+  const next = Object.assign(Object.create(null) as Record<string, T>, record);
+  next[key] = value;
+  return next;
+};
+
+const omit = <T>(record: Keyed<T>, key: string): Keyed<T> => {
+  const next = Object.assign(Object.create(null) as Record<string, T>, record);
+  delete next[key];
+  return next;
 };
 
 // Update a record that exists. A stored history may name a record whose
 // opening event is missing (issue 44); the projection stays total and
 // leaves such an event out of that view, the same way live and on rebuild.
-const change = <T>(
-  record: Readonly<Record<string, T>>, key: string, update: (row: T) => T,
-): Readonly<Record<string, T>> => {
-  const row = record[key];
+const change = <T>(record: Keyed<T>, key: string, update: (row: T) => T): Keyed<T> => {
+  const row = lookup(record, key);
   return row === undefined ? record : put(record, key, update(row));
 };
 
@@ -276,7 +290,7 @@ const accountsAfter = (state: State, event: Event): State["accounts"] => {
   switch (event._tag) {
     case "AccountChanged": {
       if (event.account === undefined) return omit(state.accounts, event.accountId);
-      const existing = state.accounts[event.accountId];
+      const existing = lookup(state.accounts, event.accountId);
       // An edit keeps what the log said about the account's usability.
       return put(state.accounts, event.accountId, {
         ...event.account,
@@ -318,7 +332,7 @@ export const apply = (state: State, envelope: EventEnvelope): State => {
     agents: agentsAfter(state, event),
     threads: owner === undefined
       ? state.threads
-      : put(state.threads, owner, [...(state.threads[owner] ?? []), envelope]),
+      : put(state.threads, owner, [...(lookup(state.threads, owner) ?? []), envelope]),
     requests: requestsAfter(state, event),
     questions: questionsAfter(state, event),
     waits: waitsAfter(state, event),

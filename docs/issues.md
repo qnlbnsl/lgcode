@@ -766,6 +766,10 @@ What should happen: the service startup should treat such a defect as fatal
 and rebuild the views from the log before serving again, or the comparison
 should run on a schedule outside tests.
 Why it matters: a client could read views that miss a committed event.
+Round 1 of the unit 4c review also found a reachable defect of this kind: an
+agent named `constructor`, `toString` or `__proto__` is a valid identity, and
+the views, built as ordinary objects, threw after the append committed. Fixed
+in round 1: every keyed view has no prototype and is read by own property only.
 
 ## 47. Live threads copy their event list on every append and keep full envelopes
 
