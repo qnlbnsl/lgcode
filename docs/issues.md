@@ -339,7 +339,12 @@ Why it matters: a review that claims more than was done hides the gap.
 ## 22. Rule 2 and the commit-message hook disagree about vendor-named files
 
 Found: 2026-11-01, in the focused review of unit 2.
-State: open; the owner decides.
+State: fixed. Owner, 2026-11-01: "update the commit hook to how t3 works. i
+only do not want the co authored by line. our commit guard is too aggressive."
+The global commit hook now rejects only a Co-Authored-By trailer. Copied T3
+Code files are named in full in commit messages from now on (rule 2). Pushed
+commit 87e2d4c is not rewritten: `third_party/t3code/README.md` stays its
+record.
 
 What happens: rule 2 says to name each copied source file in the commit message.
 The commit-message hook rejects vendor words, and four T3 Code files carry one
