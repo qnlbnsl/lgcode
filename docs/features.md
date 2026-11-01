@@ -1,10 +1,18 @@
 # Shepherd: the feature list
 
-Status: **draft, not approved.** Nothing on this list is built.
+Status: **draft, not approved.** Some features are built inside the engine,
+but none is reachable from a client yet.
 
 Each feature has a short name, one paragraph saying what it does, and a state:
 **idea** (written down, not agreed), **agreed** (the owner wants it), or
 **built** (merged and working).
+
+While the engine is being built, a feature can also be **built in the
+engine** (unit numbers follow). That means its engine part is merged into
+`area/engine` and passes its tests, but nobody can use it yet, because the
+agent runner (unit 6a) and the server (unit 7a) are not merged. A feature
+is **partly built in the engine** when only some of what its paragraph
+describes is merged; the note after it says which part.
 
 An earlier, much longer list of message-board features was written for the
 Synapse fork. It is at `docs/message-board/features.md` in the
@@ -51,7 +59,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   two Codex accounts continue the same threads. See T3 Code's
   `docs/user/providers-codex.md`, `providers-claude.md` and `cursor.md`, and
   `packages/contracts/src/providerInstance.ts`, at commit `6fc9144`.
-- **A token for every agent** (idea). When Shepherd starts an agent, it mints a
+- **A token for every agent** (built in the engine: units 5a and 5b). When Shepherd starts an agent, it mints a
   private token for it and passes it in an environment variable. The agent
   proves who it is with that token, not with the pane's environment or the
   process tree, so Codex's sandbox and a backgrounded Claude stop breaking
@@ -61,7 +69,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   work, ask the owner) are offered to agents through a Model Context Protocol
   (MCP) server on a loopback address, as well as through the command line.
   Every tool declares which roles may call it. See research item 1.
-- **A permission ceiling** (idea). An agent that a lead starts, swaps or
+- **A permission ceiling** (built in the engine: units 5a and 5b; the
+  set-back of a mode change made inside the agent is unit 6a's). An agent that a lead starts, swaps or
   messages never runs with a broader permission mode than the lead. See
   research item 6.
 - **Hand-offs built from records** (idea). A replacement worker starts from a
@@ -78,7 +87,10 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   full agent turn.
 - **System events in a log** (idea). Joins, exits, and status changes go to
   an event log, not onto the boards that agents read.
-- **A mailbox per agent, with receipts** (idea). Every post is stored before
+- **A mailbox per agent, with receipts** (partly built in the engine:
+  units 4a and 5d deliver to ACP agents, with queued, sent and accepted
+  steps and request receipts; the hook and typed-nudge paths for
+  interactive agents are not built). Every post is stored before
   it is delivered, and something is always responsible for delivering it. A
   post to an idle agent wakes it, a post to a busy Claude is steered into its
   running turn through a hook, and anything else waits for the turn to end.
@@ -89,7 +101,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   a post needs it. Claude Code starts the turn by itself, and nothing is typed
   into the pane. Other agents keep a typed nudge that only fires when the
   agent is idle. See research item 2.
-- **Wait results that say why** (idea). A wait or a collection ends early,
+- **Wait results that say why** (partly built in the engine: unit 5d's
+  waits end with a reason per member; the command line's exit codes are
+  unit 7b's). A wait or a collection ends early,
   with a reason, when the agent it waits on is stuck on a question or an
   approval. The command line exits with 0 for done, 1 for failed, and 2 for
   waiting on an answer. See research item 7.
@@ -119,7 +133,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   code, as described in [SECURITY.md](../SECURITY.md).
 - **Live updates** (idea). Clients receive board posts, thread events, and
   agent states as a stream, not by polling.
-- **Updates that survive a sleeping phone** (idea). A client gets a snapshot
+- **Updates that survive a sleeping phone** (partly built in the engine:
+  units 4a to 4c give request receipts, gapless subscriptions and
+  snapshots; the client API that carries them is unit 7a's). A client gets a snapshot
   and then only newer events, picks up where it left off after a reconnect,
   and every action carries a request id so a double tap acts once. See
   research item 9.
