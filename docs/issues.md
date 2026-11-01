@@ -357,7 +357,8 @@ Found: 2026-11-01, while writing the unit 3 tests.
 State: answered by the lead on 2026-11-01: row 70 (closed, later than the list in task 3d) wins, so
 "agent start failed" is a fortieth event, carrying a reason. The unit 3 tests now include it
 (from starting the agent becomes stopped; invalid in every other state). The builder adds it to
-`events.ts`; the plan's task 3d list should be amended.
+`events.ts`; the plan's task 3d list should be amended. Unit 3 now defines
+`AgentStartFailed` with the agent id and reason, and its starting-to-stopped cell.
 
 What happened: the lifecycle command table in the plan (line 532, row 70) says
 `start` writes "agent start failed" when the adapter rejects a value, and

@@ -1,0 +1,134 @@
+import * as Schema from "effect/Schema"
+import * as Rpc from "effect/rpc/Rpc"
+import * as RpcGroup from "effect/rpc/RpcGroup"
+import { Account } from "./accounts.ts"
+import { Event, WaitMember } from "./events.ts"
+import { HarnessSettings, RunMode } from "./harnesses.ts"
+import { AccountId, AgentId, DeliveryId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
+import { PermissionLevel } from "./permission.ts"
+
+export const commandNames = [
+  "start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group",
+  "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "subscribe", "debug.compare-views"
+] as const
+type CommandName = typeof commandNames[number]
+
+export const ownerOnlyCommands = [
+  "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views"
+] as const satisfies ReadonlyArray<CommandName>
+const owners: ReadonlySet<CommandName> = new Set(ownerOnlyCommands)
+export const commandAccess = Object.fromEntries(commandNames.map((name) => [
+  name, owners.has(name) ? "owner-only" : "agent-callable"
+])) as Record<CommandName, "agent-callable" | "owner-only">
+
+const request = { requestId: RequestId }
+const target = { ...request, agentId: AgentId }
+const Ack = Schema.Struct(request)
+const Refused = Schema.TaggedStruct("CommandError", { ...request, reason: Schema.String })
+const Subject = Schema.Union([
+  Schema.TaggedStruct("permission", { id: PermissionRequestId }),
+  Schema.TaggedStruct("question", { id: QuestionId })
+])
+
+// The service installs this group only under row 74's test flag and temporary
+// state-folder checks. CommandsRpcGroup is the complete client/CLI inventory;
+// the production service omits this tag before registering its normal group.
+export const DebugRpcGroup = RpcGroup.make(Rpc.make("debug.compare-views", {
+  payload: request,
+  success: Schema.Struct({
+    ...request, sequence: EventSequence, equal: Schema.Boolean, differences: Schema.Array(Schema.String)
+  }),
+  error: Refused
+}))
+
+export const CommandsRpcGroup = RpcGroup.make(
+  Rpc.make("start", {
+    payload: {
+      ...request,
+      name: Schema.NonEmptyString,
+      role: Schema.String,
+      harness: HarnessId,
+      // A named account may itself be called "any"; selection is unambiguous.
+      account: Schema.Union([
+        Schema.TaggedStruct("named", { accountId: AccountId }),
+        Schema.TaggedStruct("any", {})
+      ]),
+      model: Schema.optionalKey(Schema.NonEmptyString),
+      effort: Schema.optionalKey(Schema.NonEmptyString),
+      permission: PermissionLevel,
+      folder: Schema.String.check(Schema.isPattern(/^\/.*$/)),
+      runMode: Schema.optionalKey(RunMode),
+      groups: Schema.optionalKey(Schema.Array(Schema.String)),
+      prompt: Schema.optionalKey(Schema.String)
+    },
+    success: Schema.Struct({ ...request, agentId: AgentId }), error: Refused
+  }),
+  Rpc.make("prompt", {
+    payload: { ...target, text: Schema.String },
+    success: Schema.Struct({ ...request, deliveryId: DeliveryId }), error: Refused
+  }),
+  Rpc.make("answer", {
+    payload: Schema.Union([
+      Schema.Struct({ ...request, kind: Schema.Literal("permission"), id: PermissionRequestId, optionId: Schema.NonEmptyString }),
+      Schema.Struct({ ...request, kind: Schema.Literal("question"), id: QuestionId, text: Schema.String })
+    ]),
+    success: Ack, error: Refused
+  }),
+  Rpc.make("pass-up", { payload: { ...request, subject: Subject }, success: Ack, error: Refused }),
+  Rpc.make("ask", {
+    payload: { ...request, text: Schema.String },
+    success: Schema.Struct({ ...request, questionId: QuestionId }), error: Refused
+  }),
+  Rpc.make("wait", {
+    payload: {
+      ...request, members: Schema.Array(AgentId).check(Schema.isMinLength(1)),
+      mode: Schema.Literals(["any", "all"]), block: Schema.Boolean
+    },
+    success: Schema.Struct({
+      ...request, waitId: WaitId, members: Schema.Array(WaitMember),
+      outcome: Schema.Literals(["opened", "satisfied", "request-held", "cancelled"])
+    }), error: Refused
+  }),
+  Rpc.make("stop", { payload: target, success: Ack, error: Refused }),
+  Rpc.make("resume", {
+    payload: { ...target, fresh: Schema.optionalKey(Schema.Boolean) }, success: Ack, error: Refused
+  }),
+  Rpc.make("compact", {
+    payload: target, success: Schema.Struct({ ...request, deliveryId: DeliveryId }), error: Refused
+  }),
+  Rpc.make("group", {
+    payload: { ...target, add: Schema.Array(Schema.String), remove: Schema.Array(Schema.String) },
+    success: Ack, error: Refused
+  }),
+  Rpc.make("accounts", {
+    payload: Schema.Union([
+      Schema.Struct({ ...request, operation: Schema.Literal("list") }),
+      Schema.Struct({ ...request, operation: Schema.Literals(["add", "set"]), account: Account }),
+      Schema.Struct({ ...request, operation: Schema.Literals(["disable", "remove"]), accountId: AccountId })
+    ]),
+    success: Schema.Struct({ ...request, accounts: Schema.Array(Account) }), error: Refused
+  }),
+  Rpc.make("accounts set-secret", {
+    // This owner-only ingress is the sole raw credential field. It must never
+    // be copied into an event, a reply, a receipt hash or a transcript (row 55).
+    payload: {
+      ...request, accountId: AccountId, name: Schema.NonEmptyString,
+      nonce: Schema.NonEmptyString, value: Schema.String.check(Schema.isMinLength(16))
+    },
+    success: Ack, error: Refused
+  }),
+  Rpc.make("accounts mark-available", {
+    payload: { ...request, accountId: AccountId }, success: Ack, error: Refused
+  }),
+  Rpc.make("harnesses", {
+    payload: Schema.Union([
+      Schema.Struct({ ...request, operation: Schema.Literal("list") }),
+      Schema.Struct({ ...request, operation: Schema.Literal("set"), harness: HarnessSettings })
+    ]),
+    success: Schema.Struct({ ...request, harnesses: Schema.Array(HarnessSettings) }), error: Refused
+  }),
+  Rpc.make("subscribe", {
+    payload: { ...request, after: EventSequence },
+    success: Schema.Struct({ sequence: EventSequence, event: Event }), error: Refused, stream: true
+  })
+).merge(DebugRpcGroup)
