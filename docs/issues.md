@@ -350,3 +350,21 @@ them in neutral words, as the lead instructed. The table in
 What should happen: the owner decides whether the hook should allow file paths.
 Until then, commit messages name `third_party/t3code/README.md` as the file list.
 Why it matters: the rule and the hook cannot both be followed to the letter.
+
+## 23. Task 3d has no event for "agent start failed"
+
+Found: 2026-11-01, while writing the unit 3 tests.
+State: open; the lead decides.
+
+What happens: the lifecycle command table in the plan (line 532, row 70) says
+`start` writes "agent start failed" when the adapter rejects a value, and
+criterion 6.11 refers to it. The list of events in task 3d (39 events) has no
+such event, so the event union cannot record the failure. The unit 3 test
+`events-roundtrip.test.ts` asserts task 3d's 39 tags exactly, as the task
+instructs.
+What should happen: the lead rules whether "agent start failed" becomes a
+fortieth event (and what the state machine does with it: an agent that failed
+to start is probably crashed or never created), or whether the plan's wording
+means "command refused". Until then the tests allow neither.
+Why it matters: without it, unit 5 and unit 6 have no event to write for a
+rejected starting value, and would invent one outside the shared definitions.
