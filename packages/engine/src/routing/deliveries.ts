@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto";
-import { RunMode, type AgentId, type Delivery, type Event, type EventEnvelope } from "@shepherd/contracts";
+import { AccountId, RunMode, type AgentId, type Delivery, type Event, type EventEnvelope } from "@shepherd/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import { freshRequest, type Snapshot } from "../commands/internal.ts";
 import { EventLog, LogWriteFailed } from "../log/EventLog.ts";
+import { Restart } from "../recovery/service.ts";
 import { Runner, type RunnerEvent } from "../runner/Runner.ts";
 import { Views } from "../views/Views.ts";
 import { envelope } from "./envelope.ts";
@@ -18,12 +20,13 @@ import { project, withWaitChecks } from "./waits.ts";
 type Row = Snapshot["deliveries"][string];
 const owner = { _tag: "owner" } as const;
 const decodeRunMode = Schema.decodeUnknownSync(RunMode);
+const decodeAccountId = Schema.decodeUnknownSync(AccountId);
 const pending = (row: Row) => row.status === "queued" || row.status === "sent";
 
 const asDelivery = ({ status: _status, method: _method, reason: _reason, ...delivery }: Row): Delivery => delivery;
 
-// Rows 29 and 51: a requeued delivery goes first, then the queue in the
-// order it was written.
+// Rows 29, 51 and 53: a requeued delivery and a carry-on go first, then the
+// queue in the order it was written.
 const nextQueued = (snapshot: Snapshot, agentId: string): Row | undefined => {
   const order = new Map<string, number>();
   for (const row of snapshot.threads[agentId] ?? []) {
@@ -32,7 +35,7 @@ const nextQueued = (snapshot: Snapshot, agentId: string): Row | undefined => {
       order.set(row.event.firstPromptDelivery.id, row.sequence);
     }
   }
-  const rank = (row: Row) => [row.reason === undefined ? 1 : 0, order.get(row.id) ?? Number.MAX_SAFE_INTEGER] as const;
+  const rank = (row: Row) => [row.reason === undefined && row.content._tag !== "carry-on" ? 1 : 0, order.get(row.id) ?? Number.MAX_SAFE_INTEGER] as const;
   return Object.values(snapshot.deliveries).filter((row) => row.target === agentId && row.status === "queued")
     .sort((a, b) => rank(a)[0] - rank(b)[0] || rank(a)[1] - rank(b)[1])[0];
 };
@@ -106,7 +109,11 @@ const accepted = (snapshot: Snapshot, agentId: AgentId, deliveryId: string): Rea
 // Row 51: only a content update after the send accepts. The command
 // catalogue and replayed history never do; replay writes nothing here.
 export const deliveryUpdate = (snapshot: Snapshot, event: Extract<RunnerEvent, { _tag: "deliveryUpdate" }>): ReadonlyArray<Event> =>
-  event.replay || event.kind === "available_commands_update" ? [] : accepted(snapshot, event.agentId, event.deliveryId);
+  event.replay || event.kind === "available_commands_update" ? [] : [
+    ...accepted(snapshot, event.agentId, event.deliveryId),
+    ...(event.content === undefined ? [] : [{ _tag: "ThreadItem" as const, agentId: event.agentId, itemId: randomUUID(),
+      content: event.content, replay: false }]),
+  ];
 
 // Fix round 1, F2: a failure or a pause applies to the delivery that started
 // the current turn, sent or already accepted by a content update. A second
@@ -126,10 +133,35 @@ const failed = (snapshot: Snapshot, agentId: AgentId, deliveryId: string, reason
   return [...returnTo(snapshot, row, reason), { _tag: "StateChanged", agentId, state: { _tag: "idle" } }];
 };
 
-// Rows 51 and 68. A classified pause pauses the agent, which then holds
-// nothing (holders.ts). A delivery the agent had not yet accepted goes back
-// to the head of its queue. An accepted one stays accepted, and the agent is
-// paused mid-turn; carrying on is unit 6b's.
+// What pausing one agent on a paused account writes: a delivery it had sent
+// but not yet accepted goes back to the head of its queue (row 29); an
+// accepted one stays accepted, and the agent is paused mid-turn so that it
+// gets a carry-on on return (row 53). An idle agent is paused with nothing
+// to carry on. The pause keeps its reason and, for a usage limit, the reset
+// time the provider gave.
+const pauseAgent = (
+  snapshot: Snapshot, agentId: AgentId, reason: "limit" | "signed-out", resetAt: number | undefined,
+): ReadonlyArray<Event> => {
+  const state = snapshot.agents[agentId]?.state;
+  if (state === undefined) return [];
+  const turn = state._tag === "working" ? snapshot.deliveries[currentTurn(snapshot, agentId) ?? ""] : undefined;
+  const unaccepted = turn?.status === "sent";
+  const midTurn = state._tag === "paused" ? state.midTurn : state._tag === "working" && !unaccepted;
+  const requeue: ReadonlyArray<Event> = unaccepted
+    ? [{ _tag: "DeliveryRequeued", agentId, deliveryId: turn.id, reason: "agent paused" }] : [];
+  return [...requeue, { _tag: "StateChanged", agentId, state: {
+    _tag: "paused", reason, midTurn,
+    ...(reason === "limit" && resetAt !== undefined ? { resetAt } : {}),
+  } }];
+};
+
+// Rows 28, 51, 53 and 68. A classified pause is about the account, not about
+// one agent. The account is marked unusable, and every agent on it pauses
+// (an agent already paused for a limit is moved to a sign-out, which only
+// the owner clears). The reporting agent's own delivery decides whether it is
+// mid-turn. A sign-out, and a usage limit with no known reset time, tell the
+// owner, since no timer will bring the account back. The provider's own
+// error text is never written (decision row 40).
 export const promptReply = (
   snapshot: Snapshot, event: Extract<RunnerEvent, { _tag: "promptReply" }>, redactText: (text: string) => Effect.Effect<string>,
 ): Effect.Effect<ReadonlyArray<Event>> => Effect.gen(function* () {
@@ -140,12 +172,28 @@ export const promptReply = (
     case "pause": {
       const row = turnDelivery(snapshot, agentId, deliveryId);
       if (row === undefined) return [];
-      const midTurn = row.status === "accepted";
+      const accountId = decodeAccountId(snapshot.agents[agentId]!.account);
+      const account = snapshot.accounts[accountId];
+      // A sign-out outranks a usage limit: once signed out, only the owner
+      // brings the account back.
+      const reason = outcome.reason === "signed-out" || account?.status === "needs-sign-in" ? "signed-out" : "limit";
+      const resetAt = outcome.resetAt;
+      const marked: ReadonlyArray<Event> = account === undefined ? []
+        : reason === "signed-out" ? [{ _tag: "AccountNeedsSignIn", accountId, reason: "account needs sign-in" }]
+        : [{ _tag: "AccountOutOfUsage", accountId, ...(resetAt === undefined ? {} : { resetAt }) }];
+      // Only a sign-out is account-wide. A usage limit pauses the agent that
+      // met it; its siblings meet the limit on their own turns.
+      const onAccount = reason !== "signed-out" ? [] : Object.values(snapshot.agents).filter((agent) => agent.account === accountId && agent.agentId !== agentId
+        && (agent.state._tag === "working" || agent.state._tag === "idle" || agent.state._tag === "starting"
+          || (agent.state._tag === "paused" && agent.state.reason === "limit")));
       const paused: ReadonlyArray<Event> = [
-        ...(midTurn ? [] : [{ _tag: "DeliveryRequeued" as const, agentId, deliveryId, reason: "agent paused" }]),
-        { _tag: "StateChanged", agentId, state: {
-          _tag: "paused", reason: outcome.reason === "out-of-usage" ? "limit" : "signed-out", midTurn,
-        } },
+        ...marked,
+        ...pauseAgent(snapshot, agentId, reason, resetAt),
+        ...onAccount.flatMap((agent) => pauseAgent(snapshot, agent.agentId, reason, resetAt)),
+        ...(reason === "signed-out" || resetAt === undefined ? [{
+          _tag: "OwnerNeeded" as const, agentId,
+          reason: reason === "signed-out" ? "account needs sign-in" : "account is out of usage, no reset time known",
+        }] : []),
       ];
       return [...paused, ...moveHeld(project(snapshot, paused))];
     }
@@ -160,14 +208,34 @@ export const promptReply = (
 // Fix round 1, F3: the agent's lane is held from the reservation through the
 // runner call (lanes.ts), and the send names the incarnation it was reserved
 // for, the hash of the agent's live token, read in the same transaction.
-export const dispatchQueued = (agentId: AgentId) => Effect.gen(function* () {
+//
+// Recovery step 10 and row 66 (`recovered`): an agent that a reload left
+// working, with a re-sent delivery or a carry-on at the head of its queue,
+// sends that head once. It counts as sent once any delivery was sent after
+// the reload's "working". `laneHeld` is for a caller that already holds the
+// agent's lane, such as `resume`.
+export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?: boolean; readonly laneHeld?: boolean } = {}) => Effect.gen(function* () {
   const log = yield* EventLog;
   const views = yield* Views;
   const runner = yield* Runner;
   const sql = yield* SqlClient.SqlClient;
-  const ready = (snapshot: Snapshot) => snapshot.agents[agentId]?.state._tag === "idle" ? nextQueued(snapshot, agentId) : undefined;
+  const reloaded = (snapshot: Snapshot) => {
+    const thread = snapshot.threads[agentId] ?? [];
+    const since = thread.findLastIndex((row) => row.event._tag === "StateChanged" && row.event.state._tag === "working");
+    return since >= 0 && !thread.slice(since + 1).some((row) => row.event._tag === "DeliverySent")
+      && !Object.values(snapshot.deliveries).some((row) => row.target === agentId && row.status === "sent");
+  };
+  // Fix round 1, A2: an agent on a signed-out account gets nothing; its
+  // queue waits for the owner's "account available".
+  const ready = (snapshot: Snapshot) => {
+    const agent = snapshot.agents[agentId];
+    const state = agent?.state._tag;
+    return agent !== undefined && snapshot.accounts[agent.account]?.status !== "needs-sign-in"
+      && (state === "idle" || (options.recovered === true && state === "working" && reloaded(snapshot)))
+      ? nextQueued(snapshot, agentId) : undefined;
+  };
   if (ready(yield* views.snapshot) === undefined) return;
-  yield* withLane(log, agentId)(Effect.gen(function* () {
+  yield* (options.laneHeld === true ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : withLane(log, agentId))(Effect.gen(function* () {
     const reserved = yield* log.transact((append) => Effect.gen(function* () {
       const snapshot = yield* views.snapshot;
       const row = ready(snapshot);
@@ -196,7 +264,8 @@ export const dispatchQueued = (agentId: AgentId) => Effect.gen(function* () {
 
 // The events after which an agent may have something to send: a new queue
 // entry, an opened session, a turn end, or a returned or requeued delivery.
-// A state change is not one: whoever writes it (a reload, unit 6b) drains.
+// A state change to idle is one too: an account that came back (unit 6b)
+// leaves its agents idle with their requeued deliveries waiting.
 const readyAfter = (envelope: EventEnvelope): ReadonlyArray<AgentId> => {
   const event = envelope.event;
   switch (event._tag) {
@@ -205,6 +274,7 @@ const readyAfter = (envelope: EventEnvelope): ReadonlyArray<AgentId> => {
     case "TurnEnded":
     case "DeliveryReturned":
     case "DeliveryRequeued": return [event.agentId];
+    case "StateChanged": return event.state._tag === "idle" ? [event.agentId] : [];
     default: return [];
   }
 };
@@ -217,8 +287,13 @@ const readyAfter = (envelope: EventEnvelope): ReadonlyArray<AgentId> => {
 // commit that arrives meanwhile makes it go round once more. The fibers are
 // children of the follower and end with it. One failed send is logged
 // without content and does not stop it.
+//
+// Issue 88: while restart recovery runs (its layer is present), the follower
+// collects commits but sends nothing until recovery's step 9 has finished;
+// step 10 then sends what was queued before.
 export const dispatchCommitted = Effect.gen(function* () {
   const log = yield* EventLog;
+  const recovery = yield* Effect.serviceOption(Restart);
   const committed = yield* log.subscribeCommitted;
   const running = new Map<string, { again: boolean }>();
   // The check and the removal happen in one step, so a request that arrives
@@ -239,6 +314,7 @@ export const dispatchCommitted = Effect.gen(function* () {
   })));
   return yield* Effect.forever(Effect.gen(function* () {
     const batch = yield* PubSub.takeAll(committed);
+    if (Option.isSome(recovery)) yield* recovery.value.whenReady;
     for (const agentId of new Set(batch.flatMap(readyAfter))) {
       const entry = running.get(agentId);
       if (entry !== undefined) {

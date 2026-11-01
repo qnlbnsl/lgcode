@@ -142,10 +142,11 @@ fallback, and the fix costs nothing.
 ## 9. The `onlyBuiltDependencies` list is not enforced on pnpm 12
 
 Found: 2026-11-01, in the unit 1 review (adds to issue 3).
-State: partly fixed in unit 2: `pnpm-workspace.yaml` now says at the old key
-that the list is not enforced and that `allowBuilds` is the policy (commit:
-87e2d4c). Still open: the owner decides whether criterion 1.6 and its frozen
-test should name `allowBuilds` instead.
+State: fixed by decisions row 77 (owner, 2026-11-01: "yes, rename it to
+allowBuilds"), in this commit. Criterion 1.6 and its test name `allowBuilds`
+with `strictDepBuilds: true`, and the unenforced `onlyBuiltDependencies` list
+is deleted from `pnpm-workspace.yaml`. An earlier note at the old key was
+added in unit 2 (commit: 87e2d4c).
 
 What happens: a probe on pnpm 12.16.1 showed that `onlyBuiltDependencies`
 neither allows nor blocks a build script. `allowBuilds` and
@@ -338,7 +339,12 @@ Why it matters: a review that claims more than was done hides the gap.
 ## 22. Rule 2 and the commit-message hook disagree about vendor-named files
 
 Found: 2026-11-01, in the focused review of unit 2.
-State: open; the owner decides.
+State: fixed. Owner, 2026-11-01: "update the commit hook to how t3 works. i
+only do not want the co authored by line. our commit guard is too aggressive."
+The global commit hook now rejects only a Co-Authored-By trailer. Copied T3
+Code files are named in full in commit messages from now on (rule 2). Pushed
+commit 87e2d4c is not rewritten: `third_party/t3code/README.md` stays its
+record.
 
 What happens: rule 2 says to name each copied source file in the commit message.
 The commit-message hook rejects vendor words, and four T3 Code files carry one
@@ -551,11 +557,11 @@ State: open.
 ## 34. The recorded fixtures carry the owner's installed skill and command lists
 
 Found: 2026-11-01, when the manager read the first recorded fixtures.
-State: accepted by the manager for now, because the repository is private;
-the owner decides whether to keep it.
+State: fixed by owner ruling, 2026-11-01: "keep them". The recorded fixtures
+keep the full skill and command lists; no trimming and no new scrubber rule.
 
 What happened: `packages/testing/fixtures/claude.ndjson` (lines 5 and 13-15,
-about 50 KB each) and `codex.ndjson` (line 5), and the third harness's `cursor.ndjson` (line 10,
+about 50 KB each) and `codex.ndjson` (line 5), and the third harness's `cursor-out-of-usage.ndjson` (line 10,
 about 29 KB, recorded at e93bb00), hold the adapters'
 `available_commands_update` notifications. These list every skill and command
 installed on the owner's machine, with their descriptions. The manager found
@@ -629,9 +635,21 @@ fixtures' text and can hide real differences between recordings.
 ## 38. The third harness's greeting fixture records an out-of-usage reply
 
 Found: 2026-11-01, by the lead, reading the `cursor.ndjson` recorded at e93bb00.
-State: open. The fixture is committed as recorded.
+State: open. The fixture is committed as recorded, and the owner ruled on it.
+Owner, 2026-11-01: "yes" (keep the out-of-usage sample as
+`cursor-out-of-usage.ndjson`; a normal Cursor recording is added after the
+account resets, by the owner). The file was renamed with
+`git mv packages/testing/fixtures/cursor.ndjson packages/testing/fixtures/cursor-out-of-usage.ndjson`,
+without changing a byte, in the commit "test(engine): name the Cursor fixture
+for what it is (issue 38)" on branch `worker/engine-c38`. Tests replay it as
+the out-of-usage case. `replay.test.ts` also has a case for a normal
+`packages/testing/fixtures/cursor.ndjson`, where the recorder writes the new
+recording; it is skipped, with the reason "awaiting the owner's normal Cursor
+recording (issue 38)", until that file exists. The issue stays open until the
+owner adds that recording.
 
-What happened: `packages/testing/fixtures/cursor.ndjson` is the
+What happened: `packages/testing/fixtures/cursor.ndjson` (now
+`cursor-out-of-usage.ndjson`) is the
 `read-only-greeting` scenario, but the owner's account for the third harness
 had no usage left. The prompt turn's only agent text is "Upgrade your plan to
 continue", and the turn still ends with `stopReason: "end_turn"`. The header
@@ -836,6 +854,12 @@ these limits remain.
   final chunk for every item, including items cut off by a crash or an
   interruption, or the carries of abandoned items stay in memory.
 
+Unit 6a now rechecks the grant at spawn, compares the Linux child working
+folder by path, device and inode before initialization and after session
+setup, and closes every text carry on completion, stop, crash and scope
+closure. Recovery must still reconstruct grants, and the stated platform
+and worktree limits remain.
+
 What should happen: units 6a and 6d meet the grant, spawn-time and
 final-chunk duties above, and SECURITY.md states the remaining platform and
 worktree limits.
@@ -902,11 +926,12 @@ What should happen: run this child-process integration check in an environment t
 ## 57. A failed account event can leave an unreferenced secret in the store
 
 Found: 2026-11-01, while building unit 5b's secret-store seam.
-State: open for unit 6b's persistent store.
+State: open, kept after unit 6b; the cleanup moves to unit 6d (issue 119).
 
 What happens: the handler stores a wrapped secret before it commits the account's new reference. A failed event-log write can leave an unreferenced value in the secret store. The interface has no rollback or removal operation.
 Why it matters: storing after the event commit would instead risk committing a reference whose value was lost, including after a crash. The earlier store keeps committed references resolvable, but can retain an unused secret.
 What should happen: the persistent store defines how to collect unreferenced values or coordinate reference publication. Unit 5b uses only a scoped in-memory store and keeps every stored value wrapped as `Redacted`.
+Unit 6b: `accounts/SecretStore.ts` keeps the store-before-commit order, so a committed reference always resolves. A leftover value is mode 0600, is never read without a reference, and is never logged. Collecting it needs the log's list of live references, which belongs with the startup recovery of unit 6d, so it is not fixed here (issue 119).
 
 ## 58. A refusal by the state table or by rights is stored as the request's receipt
 
@@ -938,8 +963,7 @@ What should happen: either remove the envelope-only path once no caller writes i
 ## 61. A runner exit event carries no incarnation, so a late exit could hit a new run
 
 Found: 2026-11-01, in the focused review of unit 5b.
-State: fixed in the engine by unit 5c fix round 1. The producer remains open
-for unit 6a.
+State: fixed in the engine by unit 5c fix round 1 and in the producer by unit 6a.
 
 What happened: `RunnerEvent.exited` carried only the agent identifier. The
 crash consumer checked only the agent's current state.
@@ -947,24 +971,30 @@ Why it matters: after `stop` and an immediate `resume`, a late exit from the old
 What changed: the runner event schema requires an incarnation on every tag,
 including `exited`. The consumer checks both the agent identifier and its
 unrevoked token hash inside the writer transaction before applying an event.
-What remains: unit 6a must take the agent identifier and incarnation from its
-own process table, never from a child's data. Its real process tests must
-check token revocation after a current exit and reject exits from old or
-different agents' incarnations.
+Unit 6a takes every event identity from its process table. Its fake-process
+tests check current exits, revoked tokens and forged identities. A natural
+exit releases the process entry, and a later spawn refuses sends carrying
+the old token hash.
 
 ## 62. A failed follow-up append after a rejected runner call leaves the agent starting
 
 Found: 2026-11-01, in the focused review of unit 5b.
-State: open for unit 6a's restart recovery.
+State: fixed in unit 6d (`recovery/restart.ts`).
 
 What happens: the command's receipt is stored with the first append. If the runner then rejects the start and the follow-up append (`AgentStartFailed` or `AgentReloadFailed`, with the token revocation) itself fails, a retry returns the stored success without calling the runner again.
 Why it matters: the agent stays in "starting" with a live token until the engine restarts.
 What should happen: restart recovery, or a sweep in unit 6a, moves an agent that has sat in "starting" with no runner session to "start failed" and revokes its token.
 
+What changed in unit 6d: restart step 4 revokes every agent token. Step 6
+marks an agent caught in "starting" as interrupted from "starting", and step 7
+starts it again with a new token. If that start fails, recovery writes
+`AgentReloadFailed` with the fixed reason "agent start failed" and revokes
+the agent's tokens.
+
 ## 63. The account choice "any" takes the first match, not row 28's picker
 
 Found: 2026-11-01, in the focused review of unit 5b.
-State: open for unit 6b.
+State: fixed in unit 6b (`accounts/pick.ts`, used by `commands/start.ts` for "any" and for a named account).
 
 What happens: `start` with the account choice "any" takes the first matching account in insertion order (`packages/engine/src/commands/start.ts`).
 Why it matters: row 28 asks for the account with the fewest agents, then the lowest id. The stand-in spreads no load.
@@ -973,11 +1003,19 @@ What should happen: unit 6b replaces it with row 28's picker and tests the tie-b
 ## 64. The session a runner returns is discarded, and a failed resume records the wrong previous state
 
 Found: 2026-11-01, in the focused review of unit 5b.
-State: open for unit 6a.
+State: fixed in unit 6a.
 
 What happens: `start.ts` and `resume.ts` discard the `SessionInfo` that `runner.start` and `runner.load` return. No session reference and no `reloadable` flag are ever recorded, so a `resume` without `--fresh` always finds "cannot reload" for an agent started by the engine. Also, a failed reload writes its transition with `previous: "idle"` (`resume.ts`), even when the agent was crashed or stopped.
 Why it matters: reload cannot work end to end until the session is recorded, and the wrong previous state misleads anyone reading the event.
 What should happen: unit 6a writes `SessionOpened` with the session reference and the reloadable flag after a successful start or load, and the failure transition uses the agent's real previous state.
+
+What changed: both command paths append `SessionOpened` from the runner
+result in a fresh writer transaction after the process call. The append
+requires the agent still to be starting, so a concurrent crash cannot be
+undone by a late session result. A failed reload records the previous state
+as `starting`, the state committed immediately before the reload call. The
+contracts allow starting, working or idle in that field, rather than the
+crashed or stopped state from which the resume command was requested.
 
 ## 65. No event withdraws an owner alert, so a closed request's alert is visible only through its status
 
@@ -1010,7 +1048,7 @@ State: decided by the lead for unit 5d and implemented. The sender of a routed p
 ## 68. A committed permission answer can fail to reach its runner
 
 Found: 2026-11-01, while building unit 5c.
-State: open for unit 6a.
+State: the live process path is fixed in unit 6a. Restart reconciliation is fixed in unit 6d (`recovery/restart.ts`, step 6).
 
 What happens: the handler commits a permission answer and its receipt before
 calling `Runner.answerPermission`. If that call fails, the answer stays
@@ -1024,6 +1062,22 @@ an answer into a different incarnation.
 Why it matters: an adapter can still be waiting for a permission whose answer
 the client already sees as recorded. The unit 5c boundary test covers the
 committed state, receipt replay, single call and content-free warning.
+
+What changed in unit 6a: permission answers resolve the held protocol call,
+and `answerPermission` waits for the transport response-write acknowledgement.
+An unknown, stale or cross-agent request is refused. A failed response write
+fails that acknowledgement, logs a fixed warning and kills the detached
+process group, so a committed answer cannot leave a live child holding the
+request. Death and stop fail outstanding acknowledgements and discard their
+holds. A service interruption between the answer commit and its runner call
+still needs unit 6d recovery, with first-answer-wins preserved.
+
+What changed in unit 6d: after a service interruption, the process that
+asked the permission is gone. Restart step 6 therefore cancels every open
+permission request with the fixed reason "agent interrupted" and withdraws
+the work queued behind it. A committed answer stays recorded and is never
+sent to the new incarnation, so first-answer-wins holds and no answer
+reaches a different process.
 
 ## 69. One malformed runner event could stop the consumer for every agent
 
@@ -1080,7 +1134,7 @@ Why it matters: a completed delivery remains accepted in the log and views.
 ## 72. Permission request identifiers must be unique across agents
 
 Found: 2026-11-01, in the focused review and attack pass for unit 5c.
-State: open for unit 6a's runner.
+State: fixed in unit 6a.
 
 What happens: the engine preserves the first request when a runner reports
 an identifier it already holds. Fix round 1 adds a fixed warning when that
@@ -1092,11 +1146,15 @@ The runner retains the mapping needed to answer the original protocol call.
 Why it matters: a collision must not overwrite the first request, and dropping
 the second otherwise leaves another adapter waiting without a routed request.
 
+What changed: each permission hold receives an engine-generated random
+identifier. The process entry maps that hold to the client protocol request
+and validates the agent, hold and offered option before writing a response.
+
 ## 73. Permission option safety depends on the runner's option mapping
 
 Found: 2026-11-01, in the unit 5c attack pass. The reported engine ceiling
 bypass was disproved by the verifier; the producer duty remains.
-State: open for unit 6a.
+State: fixed for the recorded option mappings in unit 6a. New adapters still need fixture review.
 
 What happens: the engine cannot know what an adapter's option identifier does.
 It trusts the mapped option kind. The ceiling already uses the stricter of
@@ -1109,10 +1167,15 @@ persistent options must remain owner-only.
 Why it matters: an incorrect mapping could give a one-time approval effects
 that persist beyond the session.
 
+What changed: generic kinds use the contracts mapping, including owner-only
+persistence and unknown kinds. Recorded first-harness exit-plan bypass and
+auto identifiers are raised to full and persistent. Symlink-resolved harness
+settings paths are also owner-routed.
+
 ## 74. Requests asked by a crashed or stopped agent remain open
 
 Found: 2026-11-01, in the review of unit 5c.
-State: open for units 6a and 6d.
+State: crash permission cancellation is fixed in unit 6c. Stop and recovery closure remain open, and question closure needs an owner decision (issue 113).
 
 What happens: no current writer emits `PermissionCancelled` or closes the
 questions asked by an agent that crashes or stops. Moving the subjects it
@@ -1122,6 +1185,18 @@ with their actual sessions and close requests that no longer have a waiter.
 Question closure must use an agreed contract rather than inventing an answer.
 Why it matters: dead sessions leave open subjects and owner alerts that
 nobody can use.
+
+Unit 6a fix round 2 now answers every pending protocol permission request
+with the cancelled outcome when a turn is cancelled, and removes its local
+hold so a later answer is refused. That protocol response does not close the
+engine's durable permission record. The request cancellation and question
+closure contracts above remain work for units 6c and 6d.
+
+Unit 6c now writes `PermissionCancelled` for every open permission request
+asked by the crashed agent, in the crash append, with the fixed reason
+"agent crashed". It withdraws each queued request delivery before moving
+subjects held by the dead agent. Questions stay open, without an invented
+answer.
 
 ## 75. The wait contract has no owner waiter
 
@@ -1190,20 +1265,25 @@ What changed: `promptReply` handles an error or a pause for the delivery that st
 ## 82. A send reserved before a stop could reach the runner after it
 
 Found: 2026-11-01, in the focused review of unit 5d (finding F3).
-State: fixed in unit 5d's fix round 1. Unit 6a must build the runner's half.
+State: fixed in unit 5d fix round 1 and unit 6a.
 
 What happened: `dispatchQueued` committed `DeliverySent` and then called the runner with no lock against `stop` or `resume`. A stop could commit between the two, so the prompt reached a process the engine had stopped, or a later run of the same agent.
 What changed: `routing/lanes.ts` gives each agent one send lane. `dispatchQueued` holds it from the reservation through the runner call. `stop` and `resume` hold the target's lane from before their writer transaction through their runner call, and `start` holds the new agent's lane through its runner call. The lane always comes before the writer's permit, so the two cannot deadlock. `Runner.prompt` and `Runner.compact` also take the incarnation the send was reserved for, the hash of the agent's live token, read in the reservation transaction.
-What unit 6a must do: refuse a send with `RunnerRejected` when its incarnation is not the live process's incarnation.
+What unit 6a changed: prompt and compact compare their reserved incarnation
+with the live process entry before any protocol write. A mismatch returns
+`RunnerRejected` and sends no frame.
 
 ## 83. A repeated turn end could end the next turn
 
 Found: 2026-11-01, in the focused review of unit 5d (finding F4).
-State: fixed in unit 5d's fix round 1. Unit 6a must build the runner's half.
+State: fixed in unit 5d fix round 1 and unit 6a.
 
 What happened: the `turnEnded` runner event named only the agent. A repeated or late turn end for an earlier delivery ended whatever turn was running, and the next queued delivery was sent while the agent was still busy.
 What changed: `turnEnded` carries the identifier of the delivery whose turn ended. The engine writes `TurnEnded` only when the agent is working and that identifier is the delivery that started its current turn, the last one sent since the previous turn end.
-What unit 6a must do: name the delivery whose `session/prompt` reply ended, from the runner's own process table (issue 61).
+What unit 6a changed: each process retains the current delivery and emits
+one `promptReply` followed by one `turnEnded` for it. Version 2 waits for
+both the protocol reply and idle state, in either order. A later idle error
+is therefore retained even when the prompt acknowledgement arrived early.
 
 ## 84. A queued answer to a stopped or crashed agent was lost
 
@@ -1240,17 +1320,836 @@ What changed: the engine's agent view row in `views/apply.ts` has `compacting: b
 ## 88. The dispatch follower is active from the moment the handler starts
 
 Found: 2026-11-01, in the lead's ruling on unit 5d's focused review.
-State: open for unit 6d.
+State: fixed in unit 6d (`recovery/service.ts`, `recovery/restart.ts`).
 
 What happens: the committed-event follower starts with the command handler and sends on `SessionOpened`, `DeliveryQueued`, `TurnEnded`, `DeliveryReturned` and `DeliveryRequeued`. It does not send what was queued before it started.
 Why it matters: during recovery, events that recovery itself commits could start sends before recovery has re-checked waits or reconciled sessions.
 What should happen: unit 6d decides when the follower becomes active during recovery, and how the queues that existed before it started are drained, such as by step 10 calling `dispatchQueued` for each agent.
 
+What changed in unit 6d: the `Restart` service holds a readiness gate that
+opens after restart step 9. Until then the command handler refuses every
+command with "recovering". The dispatch follower and the account follower
+wait for the gate before they act. Step 10 calls `dispatchQueued` for every
+agent, so queues that existed before the restart are sent once.
+
 ## 89. The parent's crash notice and the wait's crash notice are separate
 
 Found: 2026-11-01, while building unit 5d, and named in the lead's ruling on its focused review.
-State: open for unit 6.6.
+State: fixed in unit 6c.
 
 What happens: when a child crashes, unit 5d writes a crash notice to each agent whose non-blocking wait names the child and stays open. Unit 6.6 will also tell the child's parent about the crash.
 Why it matters: when the waiter is the parent, it would receive two notices for one crash (row 67).
 What should happen: unit 6.6 merges the two notices into one when the waiter is the parent.
+
+What changed: the crash handler adds a fixed notice to the nearest available
+ancestor only when that ancestor has no open wait naming the dead agent.
+The same append computes the wait notices after queuing any ancestor notice.
+A blocking
+wait's reply serves as its notice. Without an available ancestor, the same
+append writes "owner needed" with the fixed reason "agent crashed".
+
+## 90. The first harness's adapter labels mode-raising options as ordinary "allow always"
+
+Found: 2026-11-01, while writing the unit 6a tests, reading `@agentclientprotocol/claude-agent-acp` 0.99.1 (`dist/permissions/options/tools.js` and `shared.js`).
+State: fixed in unit 6a. The test `6.3 option table, first harness` in `packages/engine/test/runner/permission-hold.test.ts` states the expected mapping.
+
+What happens: when the agent leaves plan mode, the adapter offers `exit-plan-bypass` ("Yes, and bypass permissions") and `exit-plan-auto` ("Yes, and use auto mode") with the kind `allow_always`. The contracts' `permissionForOptionKind` maps `allow_always` to the level `edit`. Choosing either option actually moves the session to bypass or auto mode, which is the level `full`.
+Why it matters: a mapping by kind alone rates a full-access option as `edit` (issue 73). The option is persistent, so the engine already routes it to the owner, but the recorded level is wrong, and any later rule that trusts the level would be too lenient.
+What changed: `runner/permissions.ts` maps the recorded exit-plan bypass
+and auto identifiers, including the clear-context forms, to full access and
+persistence. Other options retain the contracts mapping by kind.
+
+## 91. The deny-rule contract cannot express the first harness's only deny mechanism
+
+Found: 2026-11-01, while writing the unit 6a tests, reading `@agentclientprotocol/claude-agent-acp` 0.99.1 (`dist/acp-agent.js`, the session options near lines 400-440 and 9030-9095).
+State: open for the contracts scope and the lead.
+
+What happens: the adapter takes deny rules (`disallowedTools`, `settings`) only through the `_meta.claudeCode.options` field of `session/new`, not through launch arguments. The contracts' `DenyMechanism` (`packages/contracts/src/harnesses.ts`) has only `none` and `launch-arguments`.
+Why it matters: rows 61 and 65 ask for a launch-time deny-read and deny-write rule where a harness supports one. With today's contract the first harness must be recorded as `none`, although its adapter has a mechanism.
+What should happen: the contracts gain a session-option form of the mechanism, or the lead records the first harness as having no launch-time mechanism in SECURITY.md (row 72). The unit 6a tests cover only the `launch-arguments` and `none` forms.
+
+## 92. The runner's spawn input carries no folder grant
+
+Found: 2026-11-01, while writing the unit 6a tests.
+State: fixed in unit 6a.
+
+What happens: `Runner.start` and `Runner.load` (`packages/engine/src/runner/Runner.ts`) take only the folder's path. Issue 49 asks the runner to call `folderForSpawn` immediately before each spawn, and that needs the `FolderGrant` from `checkFolder`.
+Why it matters: without the grant the runner can only trust the path string, so a folder replaced between the command's check and the spawn is not caught.
+What should happen: the spawn input gains `grant: FolderGrant`, and `commands/start.ts` and `commands/resume.ts` pass the grant they already hold. The unit 6a tests pass a grant and expect a replaced folder to be refused.
+
+What changed: the spawn input now carries the grant already held by the
+command. The runner checks it immediately before spawning and checks the
+Linux child working folder against the granted identity twice (issue 49).
+
+## 93. Protocol version 2 advertises no session reload capability
+
+Found: 2026-11-01, while writing the unit 6a tests, reading `third_party/t3code/effect-acp/src/_generated/schema.gen.ts` (`SessionCapabilities`, line 4094) and the recorded fixtures.
+State: the version 2 rule is implemented in unit 6a. Real-adapter confirmation remains open for post-build check PB-A12.
+
+What happens: in version 2, `SessionCapabilities` has no `load` or `resume` field, and neither recorded version 2 adapter advertises one. Version 1 has `agentCapabilities.loadSession`, which the third harness's adapter sets.
+Why it matters: the `reloadable` flag in "session opened" (issue 64) decides whether `resume` can reload an agent. For a version 2 adapter it cannot come from an advertised capability.
+What should happen: the builder chooses the version 2 rule (for example, that `session/load` is part of the version 2 baseline) and records it with its source; post-build check PB-A12 confirms it on the real adapters. The unit 6a tests assert the flag only for a version 1 adapter that advertises `loadSession`.
+
+Chosen rule: use the copied client's normalized `agentCapabilities.loadSession`
+for both generations. `normalizeInitializeResponse` in
+`third_party/t3code/effect-acp/src/client.ts` sets that flag for version 2
+when `capabilities.session` exists, and exposes baseline resume support.
+The runner records the normalized capabilities and negotiated version in its
+process entry, and stores the derived reloadability with `SessionOpened`.
+This uses the existing client compatibility rule rather than requiring a
+version 2 capability field that does not exist. The frozen version 1 load
+test and recorded replays pass locally. No real adapter was started.
+
+## 94. The scripted version 1 fake agent advertised reload but rejected its wire method
+
+Found: 2026-11-01, while building unit 6a and running its frozen reload test.
+State: fixed in unit 6a, with the lead's approval in board post 939.
+
+What happened: `scriptedStdio` changed the fake agent's initialization reply
+into version 1 and advertised `loadSession`. Its underlying server remained
+version 2 and handled only `session/resume`, so a valid `session/load` from
+the copied client failed before the reload assertions could run.
+What changed: only the version 1 load compatibility path translates
+`session/load` into `session/resume`, supplies the missing stdio discriminator,
+and normalizes the returned configuration identifiers for the client. The
+response retains the original request identifier. No frozen test changed.
+Why it matters: a fixture that advertises a method must implement that method
+before it can check the runner's reload behavior.
+
+## 95. Seven earlier lifecycle assertions conflict with recording the opened session
+
+Found: 2026-11-01, while building unit 6a and running the command and routing tests.
+State: fixed by the lead-authorized unit 6a fix round 1 test commit `68fe9b4`.
+
+What happens: `packages/engine/test/commands/lifecycle.test.ts` has one start
+assertion that forbids `SessionOpened`, three reload cases that expect the
+agent to remain starting, and two fresh-resume cases with the same expectation.
+`packages/engine/test/routing/runner-events.test.ts` has one old-incarnation
+case that also expects a successful resume to leave the agent starting.
+What should happen: the lead updates those seven assertions to expect the
+session event and idle state after the fake runner returns its session, as
+required by issue 64 and the accepted unit 6a interface. The builder has not
+weakened or changed them.
+Why it matters: the scoped integration command now exercises the required
+behavior and fails those seven historical expectations. Its other cases pass.
+
+What changed in fix round 1: the test writer preserved the start fields,
+starting transition, requeue set, wait and token checks, and updated only the
+session-result expectations. The builder merged that signed commit, then
+ran the scoped integration command before source changes. All 930 tests
+passed, including the seven previously failing assertions.
+
+## 96. Text redaction must retain secrets across protocol chunk boundaries
+
+Found: 2026-11-01, during unit 6a implementation review.
+State: fixed in unit 6a.
+
+What happened: redacting each message chunk separately would release a secret
+that an adapter split across chunks. Relying solely on the service registry
+would also miss a newly resolved spawn secret before the registry saw it.
+What changed: the runner streams text through the existing bounded carry
+redactor for its resolved secrets and token, followed by the supplied service
+redactor when present. It retains event metadata while text is pending and
+flushes the carries at item boundaries, session load completion, turn idle,
+stop, crash and scope closure. The service exposes its existing chunk method.
+Why it matters: the runner's own event stream must contain safe text before
+the event log applies its second redaction boundary. Two fake-process checks
+cover split secrets and a service registry that has not yet seen the secret.
+
+## 97. A failed mode reset must not leave an elevated child running
+
+Found: 2026-11-01, during unit 6a implementation review.
+State: fixed in unit 6a.
+
+What happens: an adapter can report an unknown or elevated mode and then
+reject the engine's configuration call that restores the permission ceiling.
+A refusal event alone would leave the process in the reported mode.
+What changed: mode reports are checked against recorded mappings and the
+spawn ceiling. The consumer records the refusal and calls the reset after
+the transaction under the agent's send lane. If the adapter rejects it, the
+runner kills the process; exit cleanup kills its detached process group.
+Why it matters: the fake-process check observes both the mode refusal and
+crash, rather than treating a failed reset as a safe running session.
+
+## 98. A stopped start reservation could spawn a child after its token was revoked
+
+Found: 2026-11-01, in unit 6a's final concurrency review.
+State: fixed in unit 6a.
+
+What happened: a new agent's identifier becomes visible when `AgentStarted`
+commits, before the start command acquires that agent's send lane. Another
+client can stop it in that interval. The original start would then acquire
+the lane and spawn a child for the stopped agent with its revoked token.
+What changed: the start checks that its committed agent is still starting
+inside the lane, immediately before calling the runner. A stop that already
+won the lane makes the remaining start effect a no-op.
+Why it matters: the deterministic check holds the real writer just after
+commit, stops the visible agent through the command handler, then releases
+the start. It observes zero runner starts and no session event, with the
+agent still stopped. No frozen test changed.
+
+## 99. Resolved runner credentials accumulated after their processes closed
+
+Found: 2026-11-01, in unit 6a's focused review, finding F-4.
+State: fixed in unit 6a fix round 2.
+
+What happened: the runner appended each resolved account secret and process
+token to a layer-wide redaction list and never removed it. Repeated starts
+therefore retained credentials for processes that no longer existed.
+What changed: each process entry owns its resolved secrets and token. The
+fallback redactor reads only registered process entries, and also applies
+the service's supplied redactor. Close flushes text before removing the entry
+and clearing its secret array. Scope finalization also flushes and releases
+the entry, including a failed setup or engine shutdown.
+Why it matters: stopped processes must not make the runner retain an
+unbounded history of credentials solely for redaction.
+
+## 100. Cancelling a turn left protocol permission requests waiting
+
+Found: 2026-11-01, in unit 6a's focused review, finding F-5.
+State: fixed in unit 6a fix round 2. Durable request closure remains issue 74.
+
+What happened: `Runner.cancel` sent only `session/cancel`. A pending
+`session/request_permission` remained held by its deferred answer, although
+the protocol requires a cancelled response after turn cancellation.
+What changed: a hold accepts the protocol's selected or cancelled outcome.
+Cancel sends the notification, clears that agent's open holds, resolves each
+with the cancelled outcome and awaits its response-write acknowledgement.
+A later answer to a cleared hold returns `RunnerRejected`.
+Why it matters: the child receives a terminal permission response, while the
+engine preserves its existing first-answer-wins and request-closing rules.
+
+## 101. Content arriving after a turn end was attributed to the ended delivery
+
+Found: 2026-11-01, in unit 6a's focused review, finding F-9.
+State: fixed in unit 6a fix round 2.
+
+What happened: completion marked the turn ended but retained it in the
+process entry. A later content notification could therefore emit another
+delivery update and append a thread item for that ended turn.
+What changed: completion clears the matching current turn before emitting
+its end event. Content with no active turn, outside session replay, is
+ignored with a fixed warning that includes no child text.
+Why it matters: content after a completed turn must not extend its history
+or accept another delivery. Session replay remains separately tagged.
+
+## 102. A future crash stderr tail must redact across chunk boundaries
+
+Found: 2026-11-01, in unit 6a's focused review, finding F-6.
+State: fixed in unit 6c.
+
+What happens: the runner currently drains stderr, calls `redactText` and
+discards it. That is safe while no bytes are retained or published. It does
+not make each chunk safe to retain if a secret spans two chunks.
+What should happen: unit 6c's bounded stderr tail uses `redactChunk` with a
+carry for each process, and flushes it on exit, stop and scope closure before
+persisting or logging the tail. It must not store independently redacted raw
+chunks as the crash tail.
+Why it matters: joining those chunks could reconstruct a secret that neither
+individual `redactText` call could match.
+
+What changed: every child has its own stderr carry and bounded tail. The
+runner drains stderr and flushes the carries before emitting its exit
+event. Stop and scope cleanup also flush the carries before releasing
+credentials. The handler stores the resulting tail through the event
+log's redaction boundary.
+
+## 103. Adapter setup has no timeout, and spawn registration is not atomic
+
+Found: 2026-11-01, in unit 6a's focused review, finding F-8.
+State: fixed in unit 6d (`recovery/reload.ts`, `runner/AcpRunner.ts`).
+
+What happens: initialization, session creation, session load and initial
+configuration have no deadline. An adapter that never responds can keep a
+start or reload pending. The duplicate-process check also precedes secret
+resolution and spawning, so it is not atomic with process-table registration.
+What should happen: unit 6d sets the recovery setup timeout and cleanup
+policy, and preserves per-agent serialization or adds an atomic reservation
+for callers that bypass command lanes. Today's command and delivery paths
+hold the per-agent lane across runner setup, which serializes normal calls.
+Why it matters: a stalled setup must not hold recovery forever, and a future
+direct concurrent caller must not create two processes for one agent.
+
+What changed in unit 6d: every recovery reload, account-return reload and
+`resume` is bounded by `SETUP_TIMEOUT_MILLIS` (two minutes, set through
+`setupTimeoutMillis`). At the deadline the engine calls `Runner.stop` and
+records the fixed reason "adapter setup timed out". `AcpRunner.spawn`
+reserves the agent before any await, in the same step as the duplicate
+check, so two direct callers cannot create two processes. A reload uses only
+the method the peer advertised at initialize: `session/load` when it
+advertised `loadSession`, otherwise `session/resume` when it advertised
+resume, and otherwise it is refused with "adapter cannot reload". The plain
+`start` command is not bounded yet.
+
+## 104. Three harnesses have no verified deny-read or deny-write rule
+
+Found: 2026-11-01, by the lead, merging unit 6a for plan task L4.
+State: open, for the live check.
+
+What happens: `packages/engine/src/runner/denyRead.ts` gives every harness the
+`none` deny mechanism by default. For `codex`, `gemini` and `cursor`, no
+launch-argument rule that forbids reading the state folder or writing the
+harness settings has been verified against the installed adapter.
+What should happen: each of these harnesses gets a verified launch rule in its
+default settings, or a recorded finding that its adapter has none.
+Why it matters: without the rule, only the folder rule, the permission ceiling
+and the approval routing guard the state folder and the settings files (rows
+61, 65 and 72). `SECURITY.md` lists these harnesses.
+
+## 110. The replay test for the cursor transcript expects success, which unit 6c changes
+
+Found: 2026-11-01, by the unit 6c test writer, while writing criterion 6.9.
+State: fixed in unit 6c, with the lead's approval in the builder task.
+
+What happens: `packages/engine/test/runner/replay.test.ts`, the test named
+"6.2 replay cursor", replays the recorded cursor transcript with no
+classifier and expects a successful turn. The transcript ends in the reply
+"Upgrade your plan to continue". Criterion 6.9 and issue 38 require that reply
+to give an out-of-usage pause once the real classifier is the runner's
+default.
+What should happen: the builder of unit 6c updates that one test to expect the
+pause. The new test in `classify-errors.test.ts` already holds the new
+expectation, so the old one would otherwise fail for a correct change.
+Why it matters: a builder who sees a red test in a file they did not write
+might weaken the classifier to make it green again.
+
+What changed: only the cursor replay's expected outcome changes from
+success to an out-of-usage pause. The other recorded greetings still expect
+success, and the runner uses the real classifier by default.
+
+## 111. The runner discards a child's stderr, so a crash records none of it
+
+Found: 2026-11-01, by the unit 6c test writer.
+State: fixed in unit 6c.
+
+What happens: the runner drains a child's stderr and throws the text away
+(`AcpRunner.ts`, the stderr reader), and its exit event carries an empty
+`stderr`. The command handler writes `stderr: ""` into the crash event, so
+the owner sees an exit code and nothing about why the adapter died.
+What should happen: the runner keeps the last lines through the redactor's
+chunk carry (issue 102), flushes the carry before it reports the exit, and
+the handler stores that text in the crash event.
+Why it matters: a crash with no error text cannot be diagnosed, and a
+tail that is cut per chunk could store a secret that was split across two
+chunks.
+
+What changed: the runner retains the last 30 redacted stderr lines, bounds
+each retained line to 16,384 characters, and drains the pipe before reporting
+the exit. The handler persists the tail with the exit code or signal.
+
+## 112. A crash cancels no permission request and tells no parent
+
+Found: 2026-11-01, by the unit 6c test writer, as the follow-up to issue 74.
+State: fixed in unit 6c.
+
+What happens: the exit handler marks the agent crashed, withdraws its pending
+deliveries and revokes its token, but it does not cancel the agent's open
+permission requests, does not queue a notice to the agent that can act for
+it, and never writes "owner needed" for an agent the owner started. A
+parent without a wait on the crashed agent learns of the crash only by
+looking at the roster.
+What should happen: the crash append also holds the cancellations, exactly
+one notice to the nearest available ancestor (merged with the wait's own
+notice when that ancestor waits, issue 89), or one "owner needed" when no
+agent can act.
+Why it matters: an open request of a dead agent stays in the owner's inbox
+forever, and a team lead can wait on a worker that will never answer.
+
+What changed: the crash append cancels the dead agent's open permission
+requests, withdraws their queued deliveries, revokes its token, and tells
+the nearest available ancestor once, or records that the owner is needed.
+The notification contains no stderr, exit code or signal.
+
+## 113. Nothing closes the open questions of a crashed agent
+
+Found: 2026-11-01, by the unit 6c test writer.
+State: open, needs an owner decision.
+
+What happens: issue 74 says question closure must use an agreed contract and
+not invent an answer. No event closes a question without an answer, so the
+questions a crashed agent asked stay open after its crash. The unit 6c tests
+only assert that a crash writes no invented answer.
+What should happen: the owner decides whether a question needs a "withdrawn"
+event, or whether an open question of a crashed agent stays open on purpose
+until its asker is replaced.
+Why it matters: the owner's inbox lists questions that nobody can receive an
+answer for.
+
+## 114. A blocking wait on a crashed agent has no stated parent notice
+
+Found: 2026-11-01, by the unit 6c test writer, while reading issue 89.
+State: open, a reading is recorded and untested.
+
+What happens: row 67 merges the crash notice with the parent notice "when the
+waiter is also the parent" and a non-blocking wait stays open. A blocking wait
+creates no delivery, so the rows do not say whether the parent, who is
+blocked inside the wait call, should also get a notice.
+What should happen: the builder follows the reading in the unit 6c result
+(the wait reply is the notice, and no extra delivery is written), or the
+owner states otherwise. The unit 6c tests do not cover this case.
+Why it matters: a second notice to a blocked parent would be delivered after
+its wait call returns and repeat what the call already told it.
+
+## 120. The leftover-process reader does not support macOS yet
+
+Found: 2026-11-01, while building unit 6c.
+State: unsupported recovery is handled in unit 6d. A macOS implementation and host verification remain open.
+
+What happens: `recovery/orphans.ts` provides the Linux reader and an explicit
+unsupported macOS reader. The macOS reader throws before the sweep can send
+a signal.
+What should happen: a macOS implementation reads the boot identity, process
+group, start time, user and executable, and passes criterion 6.8 on a macOS
+host before recovery uses it.
+Why it matters: a sweep must refuse unsupported process identity checks
+rather than signal a group based only on its number. The lead authorized
+this stub for unit 6c.
+
+What changed in unit 6d: restart step 5 runs the sweep with the host's
+reader. A reader that throws for a row is treated as "process identity
+unavailable", so that group is left alone and never signalled. Recovery goes
+on. If the sweep itself fails, recovery logs the fixed warning "leftover
+process sweep failed" and goes on.
+
+## 121. The frozen classifier-test helper inferred an unknown Effect requirement
+
+Found: 2026-11-01, while running the engine typecheck for unit 6c.
+State: fixed in unit 6c, with the lead's approval in board post 968.
+
+What happened: `test/runner/classify-errors.test.ts` gave `turnReply` an
+untyped runner and waiter. Yielding those values inferred an unknown
+Effect requirement, causing four type errors at `withAcpRunner` call sites.
+What changed: the helper now explicitly returns
+`Effect.Effect<unknown, unknown, never>`, with a matching cast on its
+generator. No assertion or test case changed.
+Why it matters: the runtime checks passed, but the frozen helper prevented
+the required engine typecheck from passing.
+
+## 122. The request-routing crash test excluded the new owner crash alert
+
+Found: 2026-11-01, while running the full engine and testing suite for unit 6c.
+State: fixed in unit 6c, with the lead's approval in board post 970.
+
+What happened: `test/routing/moving-requests.test.ts` expected exactly two
+"owner needed" events when a dead holder's permission request and question
+moved to the owner. Unit 6c also requires a separate crash alert when the
+dead agent has no available ancestor, so the old assertion rejected a
+correct third event with no subject.
+What changed: the shared assertion still requires exactly the two subject
+alerts. The crash case separately requires exactly one subjectless alert
+for the dead lead, with the fixed reason "agent crashed", in the same append.
+Why it matters: preserving the old expectation would suppress a required
+notification about a dead agent.
+
+## 123. Crash notices must be queued before checking ancestors for settlement
+
+Found: 2026-11-01, during the unit 6c implementation review.
+State: fixed in unit 6c before hand-off.
+
+What happened: an intermediate implementation evaluated waits before adding
+the ancestor's crash notice. Cancelling a dead child's last permission
+request could temporarily make its idle holder look settled, satisfying a
+higher ancestor's wait before the queued crash notice made the holder busy
+again.
+What changed: the crash helper uses existing open waits to choose whether
+the ancestor needs a separate notice. The command handler evaluates waits
+only after the complete crash batch, including that notice, is assembled.
+Why it matters: a crash notice is pending work, so its target must not look
+settled to a higher ancestor in the same append.
+
+## 124. A permission-race test intermittently observes an earlier log event
+
+Found: 2026-11-01, during unit 6c's full engine and testing suite.
+State: the four permission races are fixed by the unit 6c fix-round test
+writer's commit `cf3419e`. Its follow-up `39302d8` corrects the related
+request-routing assertion.
+
+What happened: `routing/permissions.test.ts`, "5.5 answer racing pass-up",
+failed its `whileHeld` assertion because it contained an earlier event.
+The focused reviewer reproduced the failure on the base as well, in three
+of eighteen runs under load. The event is `DeliverySent`, with
+the owner as caller, for the family fixture's delivery to `lead`.
+The same timing gap affects "5.5 token race on answer".
+Why it happens: `support/routingRig.ts`, `behindWriter`, reads the initial
+log sequence before forking the writer-permit holder. The fixture returns
+before its pending dispatch is committed. That dispatch can commit between
+the watermark read and acquisition of the writer permit, even though both
+raced commands correctly wait. Engine-lead confirmed this finding in the
+unit 6c fix-round brief on 2026-11-01.
+What changed: the permissions tests wait for the fixture's pending
+`DeliverySent` before a race takes the watermark. The change covers the two
+answer-pair races, the answer/pass-up race, and the token/answer race. The
+test writer reported ten of ten passing runs with the fix under load,
+compared with one failure in ten runs without it, at `f07a721` with only
+the respective test edits present. No production serialization code changed.
+Why it matters: the assertion can reject correct command serialization.
+The unit 6c production changes did not cause the race.
+
+Related observation: the first full run with `cf3419e` merged, at
+`bb839e2` with only this issue update uncommitted, failed the "5.6 no
+timeout" case in `routing/moving-requests.test.ts`. Its prohibited subject
+events were absent, but the runner-call count increased from zero to one
+because a `prompt` call arrived after the fixture's watermark. The fixture
+likewise returns before its idle holder's delivery has been dispatched.
+The test writer's follow-up permits a late `prompt` only for a delivery
+queued before the watermark. It still rejects other runner calls and keeps
+the subject-event and open-request assertions. No builder edit to the test
+was made.
+
+## 126. A detached helper could prevent the adapter's crash from being recorded
+
+Found: 2026-11-01, in unit 6c's focused review, finding F-1.
+State: fixed in unit 6c fix round 1.
+
+What happened: an adapter could start a helper in a separate session with
+inherited stderr. Killing the adapter's process group did not close the
+helper's pipe. The exit watcher waited indefinitely for the stderr reader,
+so it never emitted `exited` and the handler could not revoke the token.
+What changed: the watcher waits up to two seconds for stderr to drain. On
+timeout it interrupts the reader, flushes the redacted tail it already has,
+and emits the exit event. It never signals the unrecorded detached helper.
+Why it matters: an open inherited pipe must not keep a dead agent's
+credential valid or hide its crash.
+
+## 127. Recovery needs a policy for groups that cannot be proven or stopped
+
+Found: 2026-11-01, in unit 6c's focused review, finding F-3.
+State: the unbounded wait is fixed in unit 6c fix round 1. The recovery
+response is fixed in unit 6d. The absent-leader case stays left alone by design.
+
+What happened: the sweep waited indefinitely when a group still appeared
+alive after SIGKILL. It also verifies identity only through the recorded
+group leader. When that leader is gone, live group members cannot be
+proven to belong to the recorded adapter, so the reader reports no process
+and the sweep leaves them alone.
+What changed: the post-SIGKILL wait defaults to five seconds and can be
+set with `killWaitMillis`. If matching process facts remain at the deadline,
+the sweep returns `left-alone` with the fixed reason `group did not exit`.
+What should happen: unit 6d handles these outcomes and the throwing macOS
+reader in issue 120 explicitly. It must not signal members whose recorded
+identity cannot be verified. The leader-only identity rule remains intact.
+Why it matters: recovery must neither hang forever nor signal an unrelated
+process because its group number matches an old row.
+
+What changed in unit 6d: recovery keeps the leader-only identity rule. A
+group whose leader is gone, or whose identity the reader cannot prove, is
+left alone. A group that did not exit after SIGKILL keeps the result
+`group did not exit`, and recovery logs the fixed warning "leftover process
+group did not exit" and goes on. A signal that fails with anything other
+than "no such process" records `left-alone` with the fixed reason "signal
+failed", and the sweep moves on to the next row.
+
+## 128. Classified pauses need trustworthy error sources and reset times
+
+Found: 2026-11-01, in unit 6c's focused review, finding F-4, and the unit 6b
+review's ruling A3, relayed by engine-lead in board post 980.
+State: error-source classification is fixed in unit 6c fix round 1. The
+reset-time producer is fixed in fix round 2 after merging unit 6b. Recorded
+adapter evidence for a reset time remains open.
+
+What happened: the runner classified a successful turn's text, so ordinary
+agent prose containing "authentication required" could produce a signed-out
+pause. Unit 6b would then apply that pause to the entire account.
+What changed: a signed-out classification requires an actual error reply
+in `turn.error`. Successful text can produce only an out-of-usage pause,
+and only for cursor, whose recorded transcript uses that text form
+(issue 38). All other harnesses classify only their error replies. The
+same restrictions apply to an injected classifier.
+The runner now reads `data.resetsAt` only from the error for its active
+`session/prompt` request. This includes the terminal idle error in Agent
+Client Protocol version 2, where the raw request reply is an acknowledgement.
+Reading only the raw reply dropped valid deadlines in the frozen tests.
+An out-of-usage pause carries a parsed date string
+or a finite, non-negative integer in epoch milliseconds, within 366 days
+of the current time in either direction. Invalid values are ignored, so
+unit 6b keeps its "owner needed" path when no deadline is known. Successful
+turn text and signed-out pauses never carry this field. The classifier's
+signature is unchanged.
+What remains: recorded fixtures must verify the real adapter's reset-time
+form. The fake agent's `out_of_usage` step already supplies `data.resetsAt`,
+but no recorded fixture holds a reset time yet, as recorded in the brief.
+Why it matters: account recovery cannot schedule a usage reset from a
+classified pause that lost its reset time.
+
+## 105. The runner's classified pause reply cannot carry a usage reset time
+
+Found: 2026-11-01, while writing unit 6b's account tests.
+State: fixed in unit 6b (`resetAt` is optional on the pause outcome and is written to `AccountOutOfUsage` and the paused state); the classification producer stays with unit 6c.
+
+What happens: the `promptReply` pause outcome in
+`packages/engine/src/runner/Runner.ts` carries only `reason` and `error`.
+The account and lifecycle event contracts already carry `resetAt`, but no
+reset time can reach their writer through this runner event.
+What should happen: add optional `resetAt` in epoch milliseconds to the
+pause outcome, preserve it through validation, and record it in
+`AccountOutOfUsage` and the paused state. The account timer must use the
+logged deadline after restart. The fake runner's test-only outcome now
+accepts that field so the tests can specify the missing seam.
+Why it matters: decisions 28, 52 and 53 require the account to return at its
+reported wall-clock reset time, including when that time passed during
+downtime. Classification itself remains unit 6c's work.
+
+## 115. A pause before the session opens is not handled
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: fixed in unit 6d for the return path (`recovery/restart.ts`).
+
+What happens: row 53 says a pause before the session opens keeps no session, and when it clears the engine opens the session and then sends the first prompt. The start path (`commands/start.ts`) writes the agent, spawns, and records the session in one flow. A provider limit reported before `SessionOpened` has no pause path, and no frozen test covers it.
+What should happen: a start that is paused before its session opens keeps no session reference, and the account return opens the session first and then sends the first prompt.
+Why it matters: without it, such an agent stays stopped instead of waiting for its account. The change needs the start path restructured, which is larger than unit 6b's scope.
+
+What changed in unit 6d: when an account returns, a paused agent that has
+no session is started, not loaded, and its first queued prompt is sent after
+the session opens. Frozen test A06 covers it after a restart. The start
+command's own handling of a sign-out while starting is unchanged.
+
+## 116. A crash between an "account available" commit and the return write leaves agents paused
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: fixed in unit 6d (`recovery/restart.ts`, step 8).
+
+What happens: the agents on an account return to idle in a second transaction, written by `accounts/available.ts` after it sees the committed `AccountAvailable`. If the service stops between the two commits, the account is available and its agents stay paused. Nothing re-runs the return at startup.
+What should happen: startup recovery runs the return once for every available account that still has paused agents. The return is idempotent, so a second run writes nothing.
+Why it matters: those agents would never resume without an owner `accounts mark-available` call, which the owner cannot know to make.
+
+What changed in unit 6d: restart step 8 reads the latest `AccountAvailable`
+cause of each available account and runs the return for every account that
+still has returnable paused agents. A paused agent whose process is gone is
+reloaded, or started if it had no session. A second run writes nothing.
+
+## 117. The timer and the persistent secret store are not wired into a running service
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: the timer half is handled by unit 6d. The persistent secret store and the file system services remain open for the unit that assembles the service.
+
+What happens: `packages/engine/src/index.ts` exports nothing, so `startAccountTimers` (`accounts/timers.ts`) and the persistent secret store layer (`accounts/SecretStore.ts`) are called only from tests. The `AcpRunner` layer also now needs `FileSystem` and `Path` services for the Codex shadow home.
+What should happen: the assembly starts `startAccountTimers` inside the service scope, provides the persistent `SecretStore` layer over the state folder, and provides the Node file system and path services.
+Why it matters: without the timer an out-of-usage account returns only by owner action, against rows 28 and 53.
+
+What changed in unit 6d: `Restart.recover` starts `startAccountTimers` at
+restart step 8, inside the scope `recover` runs in. Unit 7a must not start
+the timers a second time. It must still provide the persistent `SecretStore`
+layer and the Node file system and path services.
+
+## 118. A classified pause drops the provider's error text
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: open; no change planned until the owner asks.
+
+What happens: the `promptReply` pause outcome carries an `error` string, but the pause path writes only the fixed reasons ("account needs sign-in", "account is out of usage, no reset time known") so that no provider text reaches the log, a view or a reply.
+What should happen: if a diagnostic is wanted, unit 6c classifies and redacts it before it is stored, and the owner decides where it is shown.
+Why it matters: an owner sees that an account is paused but not what the provider said, which makes odd limit messages harder to diagnose.
+
+## 119. Unreferenced secrets are never collected
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: fixed in unit 6d (`recovery/restart.ts`, `accounts/SecretStore.ts`).
+
+What happens: `accounts/SecretStore.ts` stores a value before the account event that references it commits. A failed commit, or a replaced secret, leaves a value in `secrets.json` that no account event refers to.
+What should happen: startup recovery lists the secret references still used in the account views and removes the others from `secrets.json`.
+Why it matters: an unused credential stays on disk (mode 0600) longer than the owner expects.
+
+What changed in unit 6d: during restart, recovery collects every account's
+secret reference and every `secret:` environment value, and calls the
+store's `retainOnly`. The persistent store rewrites `secrets.json` only when
+something is removed, under its write lock.
+
+## 125. Fix-round test F1 assumed a sign-out pauses only the agent that reports it
+
+Found: 2026-11-01, by engine-u6bb, running the full suite for unit 6b.
+State: fixed in unit 6b by engine-lead's ruling.
+
+What happens: `routing/fix-round-one.test.ts` F1 "inherited grandchild" paused a child with the reason `signed-out` and then expected its idle caller, on the same account, to still run `wait`. Rows 28 and 53, and the frozen 6b test T1, make a sign-out pause every agent on the account, so the caller was paused and its `wait` was refused.
+What should happen: the test pauses the child with `out-of-usage` and no reset time, which pauses only that child and keeps the intent of the test (a wait on a paused member).
+Why it matters: two frozen tests disagreed, and the suite could not pass until one changed.
+
+## 131. A carry-on delivery was returned as failed instead of reaching the agent
+
+Found: 2026-11-01, in the focused review of unit 6b (finding A1).
+State: fixed in unit 6b fix round 1.
+
+What happens: `accounts/available.ts` queues a mid-turn agent's carry-on with content tagged `carry-on`. `routing/deliveries.ts` passed it to `runner.prompt` unchanged, and the real runner accepts only content tagged `prompt`, so the delivery came back as "delivery failed" and the agent never saw it.
+What should happen: `AcpRunner.send` accepts carry-on content and sends its text as the prompt (a two-line change; the frozen tests T5 and T7 expect the runner input to keep the `carry-on` tag). The logged delivery keeps its tag too.
+Why it matters: an agent paused mid-turn came back idle without being told to carry on, which row 53 requires.
+
+## 132. A starting agent could get work after its account signed out
+
+Found: 2026-11-01, in the focused review of unit 6b (finding A2).
+State: fixed in unit 6b fix round 1.
+
+What happens: a sign-out paused only working and idle agents on the account. A sibling still starting opened its session afterwards and was sent its first prompt on a signed-out account.
+What should happen: (a) a sign-out also pauses the account's starting agents, with `signed-out` and `midTurn` false; (b) when `start` records `SessionOpened` and the account is then `needs-sign-in`, the same append pauses the agent; (c) dispatch never sends to an agent whose account is `needs-sign-in`. All three are done. The lifecycle table makes `SessionOpened` invalid from `paused`, so the reducer records the session and keeps the paused state; `start` accepts a starting or paused agent, and returns a paused-while-starting agent to idle when its session opens after the account came back. `accounts mark-available` skips an agent that has no session yet, since `start` returns it.
+Why it matters: work reached an account the owner had to sign in again.
+
+## 133. A symbolic link in the state folder could move the shadow home outside it
+
+Found: 2026-11-01, in the focused review of unit 6b (finding A4).
+State: fixed in unit 6b fix round 1.
+
+What happens: the shadow home path is built under the state folder, but a symbolic link on the way (for example `providers/codex/<account>`) made the copied code create directories and links outside it.
+What should happen: `accounts/shadowHome.ts` resolves the real path of the deepest existing part, and refuses with the fixed reason `account home cannot be prepared` unless the result lies inside the real state folder. It checks before anything is made and again afterwards. The copied source is unchanged.
+Why it matters: a link planted in the state folder could redirect private authentication files out of it.
+
+## 134. An out-of-usage account still sends work to its idle siblings
+
+Found: 2026-11-01, in the focused review of unit 6b (finding C3).
+State: open question for the owner.
+
+What happens: rows 28 and 53 make only a sign-out account-wide. When one agent reports a usage limit, the account is marked out of usage and that agent pauses, but its idle siblings keep receiving work, and each may hit the limit once before it pauses itself.
+What should happen: the owner decides whether idle siblings should pause (and their queued work wait) as soon as the account is known to be out of usage.
+Why it matters: each sibling's first turn after the limit is wasted, and a turn that fails with the limit costs a delivery requeue.
+
+## 144. Replay updates lose the speaker before recovery can scan delivery identifiers
+
+Found: 2026-11-01, while writing the unit 6d restart tests at `287c4df`.
+State: fixed in unit 6d (`runner/Runner.ts`, `runner/translate.ts`, `runner/AcpRunner.ts`).
+
+What happens: `packages/engine/src/runner/translate.ts` translates both user
+and agent message chunks to the same message shape during a reload.
+`packages/engine/src/runner/AcpRunner.ts` then publishes a replay update
+without its speaker. The recovery scanner cannot tell whether a delivery
+identifier occurred in a user message or in an agent's answer.
+What should happen: preserve the speaker through translation, redaction and
+publication. Decision row 66 permits matching only joined user-message
+content. The unit 6d tests use an optional `role: "user" | "agent"` on message
+updates, and require the real runner to preserve it too.
+Why it matters: scanning an agent answer as an acknowledgement can lose an
+unaccepted delivery. Ignoring user replay chunks can repeat an accepted one.
+
+What changed in unit 6d: a message update carries an optional `role` of
+"user" or "agent". The translator sets it, and the runner flushes its
+message buffer when the speaker changes, so one published update never mixes
+two speakers. The replay scan in `recovery/replay.ts` joins only consecutive
+user chunks.
+
+## 145. Account-return carry-ons do not include their delivery identifier on the wire
+
+Found: 2026-11-01, while writing the unit 6d real-runner tests at `287c4df`.
+State: fixed in unit 6d (`accounts/available.ts`, `recovery/reload.ts`).
+
+What happens: `packages/engine/src/accounts/available.ts` queues a carry-on
+with plain text. `packages/engine/src/runner/AcpRunner.ts` sends that text
+unchanged. The carry-on's delivery identifier is absent from the prompt.
+What should happen: a recovery or account-return carry-on includes its
+identifier in the prompt envelope, as ordinary prompts do. Decision rows 29
+and 51 use that identifier to distinguish a retry from work already accepted
+before a service interruption.
+Why it matters: after another interruption, a replay scanner cannot find an
+accepted carry-on whose identifier never reached the adapter. The real-runner
+restart test checks the identifier in the actual prompt frame.
+
+What changed in unit 6d: every carry-on the engine writes ends with the
+fixed line "(delivery <id>)", built by `carryOnText` in `accounts/available.ts`.
+Examples are "The pause has ended. Carry on with what you were doing.
+(delivery <id>)" and "The engine restarted. Carry on with what you were
+doing. (delivery <id>)". The text holds no secret and no free text. The
+older test A1 in `accounts/carry-on-dispatch.test.ts` was changed to expect
+it, with the lead's approval.
+
+## 150. An owner prompt carries no delivery identifier, so a replay cannot find it
+
+Found: 2026-11-01, while building unit 6d, named in the lead's ruling #1042.
+State: open; the lead decides later, because it changes owner prompt text (rows 38 and 58).
+
+What happens: `routing/envelope.ts` (`agentText`) sends the owner's prompts
+unchanged, with no envelope and no delivery identifier. After a restart, the
+replay scan cannot find an owner prompt that was sent but never accepted.
+What should happen: an owner prompt carries its identifier in a form the
+replay scan can read, or recovery uses another proof that it was received.
+Why it matters: such a prompt is sent again after a restart, so the agent may
+do the same work twice.
+
+## 151. Frozen test E01 checked for a string its own setup writes
+
+Found: 2026-11-01, while building unit 6d.
+State: fixed in unit 6d with the lead's approval (#1045).
+
+What happened: `test/recovery/restart-real-runner.test.ts:103` asserted that
+"private-replayed-answer-E01" is absent from the whole log and snapshot. The
+test's own `AccountChanged` event stores that text in the fake adapter's
+script, so the assertion could never pass.
+What changed: the two tokens are still checked over the whole log and
+snapshot. The replayed answer is checked over the events recovery wrote and
+the snapshot's threads.
+Why it matters: the test still proves that replayed history never reaches a
+thread, without failing on its own setup.
+
+## 152. A paused agent that cannot reload after a restart has no path back except stop
+
+Found: 2026-11-01, while building unit 6d.
+State: open.
+
+What happens: when its account returns, a paused agent with a session whose
+adapter cannot reload gets `AgentReloadFailed` with the fixed reason "agent
+reload failed" and stays paused. `resume` refuses a paused agent, so only
+`stop` and a new start remain.
+What should happen: the owner decides whether `resume --fresh` should accept
+a paused agent, or whether the return should open a fresh session by itself.
+Why it matters: the agent's queued work stays stuck until the owner notices.
+
+## 153. Nothing records process rows, and swept rows are never removed
+
+Found: 2026-11-01, while building unit 6d.
+State: open for the unit that records adapter processes.
+
+What happens: `EventLog` can insert `processes` rows through a side row, but
+no production path passes one, so restart step 5 has nothing to sweep
+outside tests. The sweep also never deletes the rows it handled, so they are
+read again at every restart.
+What should happen: the runner records each adapter's process identity when
+it spawns, and recovery removes or marks the rows it has handled.
+Why it matters: leftover adapters from a crash keep running after a restart,
+and old rows grow without bound.
+
+## 154. The replay scan waits a fixed number of yields for the handler
+
+Found: 2026-11-01, while building unit 6d.
+State: fixed in unit 6d fix round 1 (`runner/Runner.ts`, `runner/AcpRunner.ts`, `recovery/replay.ts`, `recovery/reload.ts`).
+
+What happened: the runner's events have one consumer, the command handler,
+which passed replay updates to `recovery/replay.ts`. After the load
+returned, the scan yielded 64 times so the handler could drain what was
+already published, and then read what it had seen. The trigger is replay
+length, not machine load: the verifier measured a miss between 1,250 and
+1,500 replayed filler frames on an idle machine. A user chunk that came
+after the filler was not read, so a delivery the agent had already received
+was sent to it again.
+What changed: the runner records each replayed update of a load, in order,
+and returns that record with the load result as `SessionInfo.replay`. A
+user-message item carries its redacted text, and every other replayed update
+is one break, with consecutive breaks kept as one. The scan joins only
+consecutive user items, so it reads every replayed update of that load and
+never waits on the event stream. The command handler no longer takes part.
+`SessionOpened` is written from named fields only, so the replayed text never
+reaches the log.
+Why it matters: a long history is the normal case for an agent that has
+worked for a while, so a scan that depends on scheduling misses exactly
+when recovery is most needed.
+
+## 158. A no-timeout routing test can count a prompt sent after its snapshot
+
+Found: 2026-11-01, by the lead, in the team test runner's check of `worker/engine-i9b` at e263a12 (run 69).
+State: open. The test is unchanged; a later test-only task fixes it.
+
+What happens: `packages/engine/test/routing/moving-requests.test.ts`, "5.6 no timeout" (line 307), seeds an idle `lead` through `family()`, whose permission and question deliveries are sent on a forked dispatch lane. The test records `fakes.runner.calls.length` straight away. Under machine load (7.7 in run 69) one of those `prompt` calls lands after the snapshot, and `expect(fakes.runner.calls).toHaveLength(callsBefore)` fails with one extra call. The branch under test changed no engine source, and five local re-runs and the re-run (run 73) passed.
+What should happen: the test waits until the seeded deliveries are sent (or reads their delivery rows as `sent`) before it records `callsBefore`, as other routing tests do with `eventually`.
+Why it matters: a check that fails at random hides real failures and costs a re-run each time.
+
+## 159. A second recovery on one service could repeat the token revocation and the interrupt
+
+Found: 2026-11-01, in unit 6d's focused review (finding 4) and attack pass (B3), confirmed by the verifier as a library defect not reachable at `9b5853c`.
+State: fixed in unit 6d fix round 1 (`recovery/service.ts`, `recovery/restart.ts`).
+
+What happened: `Restart.recover` set its completed flag only after step 10.
+A run that failed or was interrupted before then could be started again on
+the same service, which revoked every token again, swept again and
+interrupted agents that the first run had already started to reload.
+What changed: each service runs recovery at most once. After a run
+completed, `recover` is a no-op. After a run that started and did not
+complete, `recover` fails at once with `RecoveryAttempted` and the fixed
+reason "recovery already attempted; start a new engine", and writes
+nothing. The gate stays shut. `Restart.recover` documents that such a
+failure is fatal to the service, and that unit 7a must start a fresh engine,
+whose new service runs recovery over the same log.
+Why it matters: a repeated step 4 and step 6 would revoke the tokens of
+agents the first run had just reloaded, and interrupt them again.

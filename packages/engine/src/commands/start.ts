@@ -3,6 +3,7 @@ import { AgentId, DeliveryId, PermissionLevel, type Event } from "@shepherd/cont
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
+import { pickAccount } from "../accounts/pick.ts";
 import { canUseMode, checkFolder, folderForSpawn } from "../identity/ceiling.ts";
 import { mintAgentToken } from "../identity/tokens.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
@@ -24,10 +25,7 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
     const effort = payload.effort ?? harness.defaultEffort;
     if ((model !== undefined && harness.models.length > 0 && !harness.models.includes(model))
       || (effort !== undefined && harness.efforts.length > 0 && !harness.efforts.includes(effort))) return yield* refused();
-    const selection = payload.account;
-    const account = Object.values(snapshot.accounts).find((row) => row.harness === payload.harness
-      && row.enabled !== false && row.status === "available"
-      && (selection._tag === "any" || row.id === selection.accountId));
+    const account = pickAccount(snapshot, payload.harness, payload.account);
     if (account === undefined) return yield* refused("no usable account");
     const grant = yield* checkFolder({ ...runtime, caller: actor, parentFolder: parent?.folder ?? payload.folder, folder: payload.folder }).pipe(
       Effect.mapError(() => refused()),
@@ -52,17 +50,41 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
     // Issue 78: the failure carries the wait checks it causes.
     return {
       events: [event], sideRows: { agentTokens: [{ agentId, tokenHash: token.tokenHash, revokedAt: null }] },
-      afterCommit: Effect.suspend(() => runtime.runner.start({ agentId, token: token.token, folder, harness, account,
-        permission: payload.permission, ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }),
-      })).pipe(
-        Effect.asVoid,
-        Effect.catchTag("RunnerRejected", () => runtime.log.transact((append) => Effect.gen(function* () {
-          const snapshot = yield* runtime.views.snapshot;
-          yield* append(actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, [
-            { _tag: "AgentStartFailed", agentId, reason: "agent start failed" },
-          ]), { revokeAgentTokens: [agentId] });
-        })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
-        withLane(runtime.log, agentId),
-      ),
+      afterCommit: Effect.gen(function* () {
+        // The new id becomes visible at commit, before this lane is acquired.
+        // A stop that wins the lane must prevent the later process spawn.
+        // Fix round 1, A2: a sign-out pauses a starting agent too; it still
+        // opens its session, which the pause then keeps.
+        const waiting = (yield* runtime.views.snapshot).agents[agentId]?.state._tag;
+        if (waiting !== "starting" && waiting !== "paused") return;
+        yield* Effect.suspend(() => runtime.runner.start({ agentId, token: token.token, folder, grant, harness, account,
+          permission: payload.permission, ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }),
+        })).pipe(
+          Effect.flatMap((session) => runtime.log.transact((append) => Effect.gen(function* () {
+            // An exit can arrive while the session result is being returned.
+            const before = (yield* runtime.views.snapshot).agents[agentId]?.state._tag;
+            if (before !== "starting" && before !== "paused") return;
+            // Fix round 1, A2: an account that signed out while this session
+            // was opening keeps the agent paused, in the same append, so no
+            // work reaches it; the owner's "account available" brings it back.
+            // An agent paused while starting whose account has since come back
+            // goes idle here, as it has a session now.
+            const snapshot = yield* runtime.views.snapshot;
+            const signedOut = snapshot.accounts[account.id]?.status === "needs-sign-in";
+            const lifecycle: ReadonlyArray<Event> = signedOut
+              ? [{ _tag: "StateChanged", agentId, state: { _tag: "paused", reason: "signed-out", midTurn: false } }]
+              : before === "paused" ? [{ _tag: "StateChanged", agentId, state: { _tag: "idle" } }] : [];
+            const opened: ReadonlyArray<Event> = [{ _tag: "SessionOpened", agentId, session: session.session,
+              protocolVersion: session.protocolVersion, reloadable: session.reloadable }, ...lifecycle];
+            yield* append(actor, freshRequest(), randomUUID(), lifecycle.length > 0 ? withWaitChecks(snapshot, opened) : opened, {});
+          })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
+          Effect.catchTag("RunnerRejected", () => runtime.log.transact((append) => Effect.gen(function* () {
+            const snapshot = yield* runtime.views.snapshot;
+            yield* append(actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, [
+              { _tag: "AgentStartFailed", agentId, reason: "agent start failed" },
+            ]), { revokeAgentTokens: [agentId] });
+          })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
+        );
+      }).pipe(withLane(runtime.log, agentId)),
     };
   });

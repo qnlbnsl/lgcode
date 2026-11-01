@@ -96,6 +96,15 @@ export const moveHeld = (snapshot: Snapshot, leaving: ReadonlyArray<AgentId | st
       ? move(snapshot, subject, leaving) : [];
   });
 
+// Recovery step 9 (rows 52 and 66): only a subject whose holder stayed
+// interrupted moves. A paused or reloaded holder keeps holding.
+export const moveFromInterrupted = (snapshot: Snapshot): ReadonlyArray<Event> =>
+  subjects(snapshot).flatMap((subject) => {
+    const row = rowFor(snapshot, subject)!;
+    return row.holder._tag === "agent" && snapshot.agents[row.holder.agentId]?.state._tag === "interrupted"
+      ? move(snapshot, subject) : [];
+  });
+
 export const passUp = ({ actor, snapshot }: Input, { subject }: Payload<"pass-up">): Effect.Effect<Plan, ReturnType<typeof refused>> => {
   const row = rowFor(snapshot, subject);
   if (row === undefined || row.status !== "open" || row.holder._tag === "owner" || !mayActForHolder(snapshot, actor, row.holder)) {

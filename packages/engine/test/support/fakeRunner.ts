@@ -10,7 +10,7 @@ import * as Stream from "effect/Stream";
 
 import {
   Runner, RunnerRejected,
-  type RunnerCapabilities, type RunnerEvent, type SessionInfo,
+  type ReplayItem, type RunnerCapabilities, type RunnerEvent, type SessionInfo,
 } from "../../src/runner/Runner.ts";
 import { sha256Hex } from "../../src/identity/credential.ts";
 
@@ -128,7 +128,7 @@ export interface PromptReplyEvent {
   readonly deliveryId: string;
   readonly outcome:
     | { readonly _tag: "success" }
-    | { readonly _tag: "pause"; readonly reason: "out-of-usage" | "signed-out"; readonly error: string }
+    | { readonly _tag: "pause"; readonly reason: "out-of-usage" | "signed-out"; readonly error: string; readonly resetAt?: number }
     | { readonly _tag: "error"; readonly error: string };
 }
 
@@ -203,6 +203,18 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
     const holds = new Map<RunnerMethod, Array<{ entered: Deferred.Deferred<void>; release: Deferred.Deferred<void> }>>();
     const lastDelivery = new Map<AgentId, DeliveryId>();
     const incarnations = new Map<AgentId, string>();
+    // Unit 6d fix round 1 (issue 154): the real runner returns a load's replay
+    // with its result. Replay updates a load script emits for its own spawn
+    // are collected here and returned the same way.
+    const loading = new Map<string, { readonly incarnation: string; readonly items: Array<ReplayItem> }>();
+    const noteReplay = (event: unknown) => {
+      if (event === null || typeof event !== "object") return;
+      const update = event as { _tag?: unknown; agentId?: unknown; incarnation?: unknown; kind?: unknown; replay?: unknown; role?: unknown; text?: unknown };
+      if (update._tag !== "deliveryUpdate" || update.replay !== true || update.kind === "available_commands_update" || typeof update.text !== "string") return;
+      const capture = loading.get(String(update.agentId));
+      if (capture === undefined || capture.incarnation !== update.incarnation) return;
+      capture.items.push(update.kind === "message" && update.role === "user" ? { _tag: "user", text: update.text } : { _tag: "break" });
+    };
 
     const call = <M extends RunnerMethod>(method: M) => (input: Input<M>): ReturnType<Methods[M]> => Effect.gen(function* () {
       if (method === "prompt" || method === "compact") {
@@ -222,7 +234,16 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
       }
       const reason = rejections.get(method)?.shift();
       if (reason !== undefined) return yield* Effect.fail(new RunnerRejected({ reason }));
-      const result = yield* (script[method] as (input: Input<M>) => ReturnType<Methods[M]>)(input);
+      const capture = method === "load"
+        ? { incarnation: incarnationOf(Redacted.value((input as Input<"load">).token)), items: [] as Array<ReplayItem> } : undefined;
+      if (capture !== undefined) loading.set((input as Input<"load">).agentId, capture);
+      let result = yield* (script[method] as (input: Input<M>) => ReturnType<Methods[M]>)(input).pipe(
+        Effect.ensuring(Effect.sync(() => {
+          if (capture !== undefined && loading.get((input as Input<"load">).agentId) === capture) loading.delete((input as Input<"load">).agentId);
+        })));
+      if (capture !== undefined && (result as unknown as SessionInfo).replay === undefined) {
+        result = { ...(result as unknown as SessionInfo), replay: capture.items } as unknown as typeof result;
+      }
       if (method === "start" || method === "load") {
         const spawn = input as Input<"start">;
         incarnations.set(spawn.agentId, incarnationOf(Redacted.value(spawn.token)));
@@ -283,9 +304,11 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
             ? { ...event, deliveryId: lastDelivery.get(event.agentId) ?? lastSent ?? "no-delivery" as DeliveryId }
             : event as FakeRunnerEvent;
         if (complete._tag === "exited" && complete.incarnation === incarnations.get(complete.agentId)) incarnations.delete(complete.agentId);
+        noteReplay(complete);
         yield* PubSub.publish(pubsub, complete);
       }).pipe(Effect.orDie),
-      emitRaw: (event) => PubSub.publish(pubsub, event as FakeRunnerEvent).pipe(Effect.asVoid),
+      emitRaw: (event) => Effect.sync(() => noteReplay(event)).pipe(
+        Effect.andThen(PubSub.publish(pubsub, event as FakeRunnerEvent)), Effect.asVoid),
       subscribed: Deferred.await(subscribedSignal),
       reset: () => { calls.length = 0; script = { ...defaults }; rejections.clear(); holds.clear(); },
     } satisfies FakeRunner;

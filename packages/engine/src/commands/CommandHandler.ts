@@ -7,22 +7,26 @@ import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/sql/SqlClient";
 
+import { followAvailability } from "../accounts/available.ts";
 import { sha256Hex } from "../identity/credential.ts";
 import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
 import { EventLog, LogWriteFailed, type SideRows } from "../log/EventLog.ts";
+import { crashEvents } from "../recovery/crash.ts";
+import { Restart } from "../recovery/service.ts";
 import { Runner, RunnerEvent } from "../runner/Runner.ts";
-import { dispatchCommitted, deliveryUpdate, promptReply, targetGone, turnEnded } from "../routing/deliveries.ts";
-import { holderAbove, moveHeld, passUp } from "../routing/holders.ts";
+import { dispatchCommitted, deliveryUpdate, promptReply, turnEnded } from "../routing/deliveries.ts";
+import { holderAbove, passUp } from "../routing/holders.ts";
 import { withLane } from "../routing/lanes.ts";
 import { answer, permissionRequested } from "../routing/permissions.ts";
 import { ask } from "../routing/questions.ts";
-import { project, wait, waitReply, withWaitChecks } from "../routing/waits.ts";
+import { wait, waitReply, withWaitChecks } from "../routing/waits.ts";
 import { Views } from "../views/Views.ts";
 import { apply } from "../views/apply.ts";
 import { SecretStore } from "./SecretStore.ts";
@@ -119,46 +123,60 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
     const runner = yield* Runner;
     const secrets = yield* SecretStore;
     const runtime: Runtime = { ...configuration, sql, log, runner, secrets, views };
+    // Issue 88 and row 52: while restart recovery is present and has not
+    // finished step 9, no command runs.
+    const recovery = yield* Effect.serviceOption(Restart);
 
-    // stderr is deliberately omitted. Even a failed adapter can echo a raw
-    // credential there; the contract's required text field receives no data.
     const handleRunnerEvent = (rawEvent: unknown) => Effect.gen(function* () {
       // A bad adapter event cannot reach the views or the writer, and its
       // validation error must not expose any of the input it describes.
       const decoded = yield* Schema.decodeUnknownEffect(RunnerEvent)(rawEvent).pipe(Effect.result);
       if (decoded._tag === "Failure") return yield* Effect.logWarning("runner event dropped: malformed");
       const event = decoded.success;
-      yield* log.transact((append) => Effect.gen(function* () {
-        const snapshot = yield* views.snapshot;
-        const agent = snapshot.agents[event.agentId];
-        if (agent === undefined || !["starting", "working", "idle", "paused"].includes(agent.state._tag)) return;
-        const tokens = yield* sql<{ agent_id: string }>`
-          SELECT agent_id FROM agent_tokens WHERE token_hash = ${event.incarnation}
-          AND agent_id = ${event.agentId} AND revoked_at IS NULL`;
-        if (tokens.length === 0) return;
-        // Every batch carries the wait checks it causes (rows 25 and 50).
-        const write = (events: ReadonlyArray<Event>, sideRows: SideRows = {}) => events.length === 0 ? Effect.void
-          : append({ _tag: "owner" }, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), sideRows).pipe(Effect.asVoid);
-        switch (event._tag) {
-          case "permissionRequested": return yield* write(yield* permissionRequested(snapshot, event));
-          case "turnEnded": return yield* write(turnEnded(snapshot, event));
-          case "deliveryUpdate": return yield* write(deliveryUpdate(snapshot, event));
-          case "promptReply": return yield* write(yield* promptReply(snapshot, event, log.redactText));
-          case "exited": {
-            const crashed: ReadonlyArray<Event> = [{
-              _tag: "AgentCrashed", agentId: event.agentId, exitCode: event.exitCode, signal: event.signal, stderr: "",
-            }, ...moveHeld(snapshot, [event.agentId])];
-            return yield* write([...crashed, ...targetGone(project(snapshot, crashed), event.agentId, "crashed")],
-              { revokeAgentTokens: [event.agentId] });
+      const consume = Effect.gen(function* () {
+        let resetMode = false;
+        yield* log.transact((append) => Effect.gen(function* () {
+          const snapshot = yield* views.snapshot;
+          const agent = snapshot.agents[event.agentId];
+          if (agent === undefined || !["starting", "working", "idle", "paused"].includes(agent.state._tag)) return;
+          const tokens = yield* sql<{ agent_id: string }>`
+            SELECT agent_id FROM agent_tokens WHERE token_hash = ${event.incarnation}
+            AND agent_id = ${event.agentId} AND revoked_at IS NULL`;
+          if (tokens.length === 0) return;
+          // Every batch carries the wait checks it causes (rows 25 and 50).
+          const write = (events: ReadonlyArray<Event>, sideRows: SideRows = {}) => events.length === 0 ? Effect.void
+            : append({ _tag: "owner" }, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), sideRows).pipe(Effect.asVoid);
+          switch (event._tag) {
+            case "permissionRequested": return yield* write(yield* permissionRequested(snapshot, event));
+            case "turnEnded": return yield* write(turnEnded(snapshot, event));
+            case "deliveryUpdate": return yield* write(deliveryUpdate(snapshot, event));
+            case "modeReported": {
+              resetMode = event.level === undefined;
+              return yield* write([event.level === undefined
+                ? { _tag: "ModeRefused", agentId: event.agentId, mode: event.mode, ceiling: event.ceiling, reason: "mode exceeds permission ceiling" }
+                : { _tag: "ModeChanged", agentId: event.agentId, mode: event.mode, level: event.level }]);
+            }
+            case "promptReply": return yield* write(yield* promptReply(snapshot, event, log.redactText));
+            case "exited": {
+              return yield* write(crashEvents(snapshot, event),
+                { revokeAgentTokens: [event.agentId] });
+            }
           }
+        }));
+        if (event._tag === "modeReported" && resetMode) {
+          yield* runner.setMode({ agentId: event.agentId, permission: event.ceiling }).pipe(
+            Effect.catchTag("RunnerRejected", () => Effect.logWarning("mode set-back failed")),
+          );
         }
-      }));
+      });
+      yield* event._tag === "modeReported" ? withLane(log, event.agentId)(consume) : consume;
     // A failed event is isolated, but scope closure must still stop the stream.
     }).pipe(Effect.catchCause((cause) => Cause.hasInterrupts(cause)
       ? Effect.failCause(cause)
       : Effect.logWarning("runner event dropped: processing failed")));
     yield* runner.events.pipe(Stream.runForEach(handleRunnerEvent), Effect.forkScoped);
     yield* dispatchCommitted;
+    yield* followAvailability;
 
     // Fix round 1, F3: a command that changes a target's process holds the
     // target's send lane from before its writer transaction through its
@@ -178,6 +196,7 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
 
     return CommandHandler.of({
       execute: (credential, name, rawPayload) => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
+        if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
         const step = isBlockingWait(name, rawPayload) ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : restore;
         const outcome = yield* step(log.transact((append) => Effect.gen(function* () {
           // Invalid credentials never write an event or retrieve a receipt.

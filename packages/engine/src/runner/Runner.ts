@@ -1,5 +1,5 @@
 import {
-  AgentId, DeliveryId, PermissionOption, PermissionRequestId,
+  AgentId, DeliveryId, EpochMilliseconds, Event, PermissionOption, PermissionRequestId,
   type Account, type Delivery, type HarnessSettings, type PermissionLevel, type SessionReference,
 } from "@shepherd/contracts";
 import * as Context from "effect/Context";
@@ -8,6 +8,8 @@ import type * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import type * as Stream from "effect/Stream";
+
+import type { folderForSpawn } from "../identity/ceiling.ts";
 
 export class RunnerRejected extends Data.TaggedError("RunnerRejected")<{
   readonly reason: string;
@@ -19,10 +21,19 @@ export interface RunnerCapabilities {
   readonly setModeConfigOption: boolean;
 }
 
+// Rows 51 and 66 and issue 154: what a reload replayed, in order, returned
+// with the load result so the replay scan never waits on the event stream.
+// A user item is redacted user-message text; a break stands for any other
+// replayed update (an agent message, a plan, a tool call, a file change), so
+// user chunks are joined only when nothing else came between them.
+export type ReplayItem = { readonly _tag: "user"; readonly text: string } | { readonly _tag: "break" };
+
 export interface SessionInfo {
   readonly session: SessionReference;
   readonly protocolVersion: number;
   readonly reloadable: boolean;
+  // Present on a load; absent on a start, which replays nothing.
+  readonly replay?: ReadonlyArray<ReplayItem>;
 }
 
 // Every event belongs to the spawn identified by its unrevoked token hash.
@@ -60,7 +71,16 @@ export const RunnerEvent = Schema.Union([
     deliveryId: DeliveryId,
     kind: Schema.Literals(["message", "plan", "tool-call", "file-change", "available_commands_update"]),
     replay: Schema.Boolean,
+    // Issue 144: who spoke a message, so a reload's replay scan reads only
+    // the user's content (row 66).
+    role: Schema.optionalKey(Schema.Literals(["user", "agent"])),
     text: Schema.String,
+    content: Schema.optionalKey(Event.pipe(Schema.toTaggedUnion("_tag")).cases.ThreadItem.fields.content),
+  }),
+  Schema.TaggedStruct("modeReported", {
+    agentId: AgentId, incarnation: Schema.NonEmptyString, mode: Schema.String,
+    level: Schema.optionalKey(Schema.Literals(["read-only", "ask", "edit", "full"])),
+    ceiling: Schema.Literals(["read-only", "ask", "edit", "full"]),
   }),
   Schema.TaggedStruct("promptReply", {
     agentId: AgentId,
@@ -68,7 +88,11 @@ export const RunnerEvent = Schema.Union([
     deliveryId: DeliveryId,
     outcome: Schema.Union([
       Schema.TaggedStruct("success", {}),
-      Schema.TaggedStruct("pause", { reason: Schema.Literals(["out-of-usage", "signed-out"]), error: Schema.String }),
+      // Issue 105: `resetAt` is the provider's reported reset time, when it gave one.
+      Schema.TaggedStruct("pause", {
+        reason: Schema.Literals(["out-of-usage", "signed-out"]), error: Schema.String,
+        resetAt: Schema.optionalKey(EpochMilliseconds),
+      }),
       Schema.TaggedStruct("error", { error: Schema.String }),
     ]),
   }),
@@ -79,6 +103,7 @@ interface Spawn {
   readonly agentId: AgentId;
   readonly token: Redacted.Redacted<string>;
   readonly folder: string;
+  readonly grant: Parameters<typeof folderForSpawn>[0];
   readonly harness: HarnessSettings;
   readonly account: Account;
   readonly permission: PermissionLevel;

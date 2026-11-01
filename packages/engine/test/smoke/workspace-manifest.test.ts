@@ -134,17 +134,23 @@ describe("pnpm-workspace.yaml (tasks 1a, criterion 1.6)", () => {
     expect(catalog["@types/ws"]).toMatch(/^[\^~]?\d+\./);
   });
 
-  it("has an onlyBuiltDependencies key so install scripts of dependencies do not run unless listed (criterion 1.6, decisions row 39)", () => {
-    const block = topLevelBlock(text, "onlyBuiltDependencies");
-    expect(block, "onlyBuiltDependencies must be a top-level key").toBeDefined();
-    // Either an inline list (`[]`, `[esbuild]`) or a block list of names.
-    const inline = block?.inline ?? "";
-    const isInlineList = /^\[.*\]$/.test(inline);
-    const isBlockList = inline === "" && listItems(block ?? { lines: [] }).length > 0;
-    expect(isInlineList || isBlockList).toBe(true);
+  it("allows exactly @tsc-rs/typescript@0.8.0 to run an install script and makes pnpm fail on any other (criterion 1.6, decisions rows 39 and 77; breaks if allowBuilds is missing, lists another package, or strictDepBuilds is not true)", () => {
+    const block = topLevelBlock(text, "allowBuilds");
+    expect(block, "allowBuilds must be a top-level key").toBeDefined();
+    const allowed: Record<string, string> = {};
+    for (const line of block?.lines ?? []) {
+      const match = /^\s+["']?([^"':\s]+(?:\/[^"':\s]+)?(?:@[^"':\s]+)?)["']?\s*:\s*([^\s#]+)\s*(?:#.*)?$/.exec(line);
+      if (match?.[1] !== undefined && match[2] !== undefined) allowed[match[1]] = match[2];
+    }
+    expect(allowed).toEqual({ "@tsc-rs/typescript@0.8.0": "true" });
+    expect(topLevelBlock(text, "strictDepBuilds")?.inline).toBe("true");
   });
 
-  it("does not switch every install script back on (breaks if a catch-all build setting defeats onlyBuiltDependencies)", () => {
+  it("has no onlyBuiltDependencies key, which pnpm 12 does not enforce (criterion 1.6, decisions row 77; breaks if the dead list comes back and can drift from allowBuilds)", () => {
+    expect(topLevelBlock(text, "onlyBuiltDependencies")).toBeUndefined();
+  });
+
+  it("does not switch every install script back on (criterion 1.6, row 77; breaks if a catch-all build setting such as dangerouslyAllowAllBuilds defeats allowBuilds)", () => {
     expect(text).not.toMatch(/^dangerouslyAllowAllBuilds\s*:\s*true/m);
   });
 });

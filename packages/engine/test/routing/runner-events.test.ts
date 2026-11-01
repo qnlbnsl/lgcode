@@ -219,7 +219,7 @@ it.live("5c fix-1 ruling 3(b), earlier spawn: catches a late exit of the spawn b
     expect(loads).toHaveLength(1);
     const newToken = Redacted.value(loads[0]!.input.token);
     const resumed = yield* stateOf("solo");
-    expect(resumed).toBe("starting");
+    expect(resumed).toBe("idle");
     expect(yield* tokenWorks(newToken)).toBe(true);
     const before = yield* headSequence;
 
