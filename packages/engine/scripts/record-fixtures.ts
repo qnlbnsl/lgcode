@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as Effect from "effect/Effect"
 import { resolveHarnessDefaults } from "../src/runner/harnesses.ts"
-import { formatReport, recordFixtures } from "./recorder.ts"
+import { formatReport, hasRecordingFailures, recordFixtures } from "./recorder.ts"
 
 const parentEnvironment = { ...process.env }
 const outputDirectory = fileURLToPath(new URL("../../testing/fixtures", import.meta.url))
@@ -39,6 +39,7 @@ async function main() {
       prompt: "Reply with the word ok. Do not run tools or create or change any file.", errorSamples, captureSignedOut: true
     }))
     process.stdout.write(formatReport(results) + "\n")
+    if (hasRecordingFailures(results) || !results.some((result) => result.status === "recorded")) process.exitCode = 1
   } finally { await rm(temporaryRoot, { recursive: true, force: true }) }
 }
 

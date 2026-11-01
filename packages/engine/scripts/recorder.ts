@@ -75,12 +75,48 @@ interface RecordOptions {
   /** The owner-run entry point also probes authentication with an empty home. */
   readonly captureSignedOut?: boolean
 }
+interface PhaseFailure { readonly status: "failed"; readonly category: FailureReason }
 type RecordResult =
-  | { readonly harness: string; readonly status: "recorded"; readonly file: string; readonly workspace: string; readonly droppedExtensionFrames: number; signedOutNotObserved?: boolean }
+  | { readonly harness: string; readonly status: "recorded"; readonly file: string; readonly workspace: string; readonly droppedExtensionFrames: number; signedOutNotObserved?: boolean; probe?: PhaseFailure; samples?: PhaseFailure }
   | { readonly harness: string; readonly status: "skipped"; readonly reason: string }
+  | { readonly harness: string; readonly status: "failed"; readonly reason: FailureReason }
 type Frame = Record<string, any>
 
-class RecordingError extends Error {}
+type FailureReason = "start" | "initialize" | "read-only mode" | "prompt" | "timeout" | "other"
+class RecordingError extends Error {
+  readonly reason: FailureReason | undefined
+  constructor(message: string, reason?: FailureReason) { super(message); this.reason = reason }
+}
+
+// Use the already resolved program, without adapter arguments, a shell or account credentials.
+async function cliVersion(settings: HarnessSettings, environment: Record<string, string>, workspace: string,
+  scrub: (text: string) => string, signal: AbortSignal): Promise<string | undefined> {
+  const child = spawn(settings.adapterPath, ["--version"], { cwd: workspace, env: environment, detached: true, stdio: ["ignore", "pipe", "pipe"] })
+  let output = ""
+  let failed = false
+  const kill = () => {
+    failed = true
+    if (child.pid !== undefined) { try { process.kill(-child.pid, "SIGKILL") } catch { /* Already exited. */ } }
+  }
+  child.stdout.on("data", (chunk: Buffer) => {
+    if (Buffer.byteLength(output) + chunk.length > 1024 * 1024) kill()
+    else output += chunk.toString("utf8")
+  })
+  child.stderr.resume()
+  child.on("error", () => { failed = true })
+  signal.addEventListener("abort", kill, { once: true })
+  const timer = setTimeout(kill, 10_000)
+  if (signal.aborted) kill()
+  try {
+    const code = await new Promise<number | null>((resolve) => child.once("close", resolve))
+    if (failed || code !== 0) return undefined
+    const line = output.split(/\r?\n/).find((line) => line.trim())
+    return line === undefined ? undefined : scrub(line.trim()).trim().slice(0, 100) || undefined
+  } finally {
+    clearTimeout(timer)
+    signal.removeEventListener("abort", kill)
+  }
+}
 
 const safeName = (name: string) => /^[a-z][a-z0-9-]*$/.test(name)
 
@@ -96,6 +132,7 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
   const entries: unknown[] = []
   const sessionIds = new Set<string>()
   let droppedExtensionFrames = 0
+  let stage: FailureReason = "initialize"
   let total = 0
   const retain = (type: string, frame: Frame) => {
     const safe = scrub(JSON.stringify({ type, frame }), sessionIds)
@@ -117,7 +154,7 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
     pending.clear()
     idleReject?.(failure)
   }
-  child.on("error", () => fail(new RecordingError("Unable to start adapter")))
+  child.on("error", () => fail(new RecordingError("Unable to start adapter", "start")))
   child.stdin.on("error", () => fail(new RecordingError("Adapter input closed")))
   const closed = new Promise<void>((resolve) => child.once("close", () => { fail(new RecordingError("Adapter exited before recording completed")); resolve() }))
   const lines = createInterface({ input: child.stdout, crlfDelay: Infinity })
@@ -170,13 +207,14 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
   const abort = () => { fail(new RecordingError("Recording interrupted")); terminate("SIGTERM") }
   signal.addEventListener("abort", abort, { once: true })
   if (signal.aborted) abort()
-  const timer = setTimeout(() => { fail(new RecordingError("Recording timed out")); terminate("SIGTERM") }, 60_000)
+  const timer = setTimeout(() => { fail(new RecordingError("Recording timed out", "timeout")); terminate("SIGTERM") }, 60_000)
   try {
     const info = { name: "shepherd-recorder", version: "0.0.1" }
     const initialized = await request("initialize", { protocolVersion: 2, info, clientInfo: info, capabilities: {}, clientCapabilities: {} })
     if (![1, 2].includes(initialized.protocolVersion)) throw new RecordingError("Adapter negotiated an unsupported protocol version")
     // Shipped adapters can report a v1-shaped response even with protocolVersion 2.
     const v2 = initialized.info !== undefined
+    stage = "read-only mode"
     const session = await request("session/new", { cwd: workspace, mcpServers: [] })
     const mode = (session.configOptions as Array<Frame> | undefined)?.find((option) => option.category === "mode")
     if (!mode) throw new RecordingError("Adapter has no mode configuration option")
@@ -186,12 +224,16 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
     if (!changed.configOptions?.some((option: Frame) => (option.configId ?? option.id) === configId && option.currentValue === value)) {
       throw new RecordingError("Adapter did not confirm read-only mode")
     }
+    stage = "prompt"
     const idle = v2 ? new Promise<void>((resolve, reject) => { idleResolve = resolve; idleReject = reject }) : Promise.resolve()
     // Attach rejection handling before issuing a prompt: a child exit rejects both waits.
     const prompted = request("session/prompt", { sessionId: session.sessionId, prompt: [{ type: "text", text: prompt }] })
     const [reply] = await Promise.all([prompted, idle])
     if (reply.stopReason === "error") throw new RecordingError("Adapter turn failed")
-    return { version: initialized.info?.version ?? initialized.agentInfo?.version, protocolVersion: initialized.protocolVersion, entries, sessionIds, droppedExtensionFrames }
+    const version = [initialized.info?.version, initialized.agentInfo?.version].find((value) => typeof value === "string" && value.trim())
+    return { version, protocolVersion: initialized.protocolVersion, entries, sessionIds, droppedExtensionFrames }
+  } catch (error) {
+    throw new RecordingError("Harness recording failed", error instanceof RecordingError ? error.reason ?? stage : stage)
   } finally {
     clearTimeout(timer)
     signal.removeEventListener("abort", abort)
@@ -219,6 +261,16 @@ export const recordFixtures = (options: RecordOptions) => Effect.tryPromise({
     const temporaryPath = relative(await realpath(tmpdir()), await realpath(options.temporaryRoot))
     if (temporaryPath.startsWith("..") || isAbsolute(temporaryPath)) throw new RecordingError("Recording workspaces must be inside the system temporary folder")
     const results: RecordResult[] = []
+    const markFailed = (harness: string, error: unknown, phase?: "probe" | "samples") => {
+      const index = results.findIndex((result) => result.harness === harness)
+      const category = error instanceof RecordingError ? error.reason ?? "other" : "other"
+      const result = results[index]
+      // A later probe or sample failure does not erase a successfully written fixture.
+      if (phase && result?.status === "recorded") { result[phase] = { status: "failed", category }; return }
+      const failed: RecordResult = { harness, status: "failed", reason: category }
+      if (index < 0) results.push(failed)
+      else if (results[index]?.status !== "failed") results[index] = failed
+    }
     // Keep every value even when different accounts use the same variable name.
     const allEnvironment: Record<string, string | undefined> = {}
     let secretIndex = 0
@@ -227,52 +279,62 @@ export const recordFixtures = (options: RecordOptions) => Effect.tryPromise({
     }
     for (const harness of options.harnesses) {
       if (!harness.settings) { results.push({ harness: harness.id, status: "skipped", reason: "Harness is not installed" }); continue }
-      const workspace = await mkdtemp(join(options.temporaryRoot, `${harness.id}-`))
-      await chmod(workspace, 0o700)
-      const environment = buildBaseEnvironment({ parent: options.parentEnvironment, ...(harness.accountVariables ? { accountVariables: harness.accountVariables } : {}) })
-      const scrub = (text: string, sessionIds?: ReadonlySet<string>) => scrubText(text, { homeDirectory: options.homeDirectory, workspace, environment: { ...allEnvironment, ...environment }, ...(sessionIds ? { sessionIds } : {}) })
-      const recording = await recordOne(harness.settings, environment, workspace, options.prompt, scrub, signal)
-      if (typeof recording.version !== "string" || !recording.version.trim()) throw new RecordingError("Adapter did not report its version")
-      const header = { type: "transcript_start", provider: harness.id, protocol: "acp", version: recording.version, scenario: "read-only-greeting", metadata: { protocolVersion: recording.protocolVersion } }
-      const text = [header, ...recording.entries, { type: "runtime_exit", status: "success" }].map((entry) => scrub(JSON.stringify(entry), recording.sessionIds)).join("\n") + "\n"
-      const file = join(options.outputDirectory, `${harness.id}.ndjson`)
-      await writeFile(file, text, { mode: 0o600 })
-      // The caller owns outputDirectory. Do not echo its private home path in results.
-      results.push({ harness: harness.id, status: "recorded", file: scrub(file), workspace, droppedExtensionFrames: recording.droppedExtensionFrames })
+      try {
+        const workspace = await mkdtemp(join(options.temporaryRoot, `${harness.id}-`))
+        await chmod(workspace, 0o700)
+        const environment = buildBaseEnvironment({ parent: options.parentEnvironment, ...(harness.accountVariables ? { accountVariables: harness.accountVariables } : {}) })
+        const scrub = (text: string, sessionIds?: ReadonlySet<string>) => scrubText(text, { homeDirectory: options.homeDirectory, workspace, environment: { ...allEnvironment, ...environment }, ...(sessionIds ? { sessionIds } : {}) })
+        const recording = await recordOne(harness.settings, environment, workspace, options.prompt, scrub, signal)
+        const fallback = recording.version ? undefined : await cliVersion(harness.settings,
+          buildBaseEnvironment({ parent: options.parentEnvironment }), workspace, scrub, signal)
+        const version = recording.version ?? fallback ?? "unknown"
+        const versionSource = recording.version ? "adapter" : fallback ? "cli" : "unknown"
+        const header = { type: "transcript_start", provider: harness.id, protocol: "acp", version, scenario: "read-only-greeting", metadata: { protocolVersion: recording.protocolVersion, versionSource } }
+        const text = [header, ...recording.entries, { type: "runtime_exit", status: "success" }].map((entry) => scrub(JSON.stringify(entry), recording.sessionIds)).join("\n") + "\n"
+        const file = join(options.outputDirectory, `${harness.id}.ndjson`)
+        await writeFile(file, text, { mode: 0o600 })
+        // The caller owns outputDirectory. Do not echo its private home path in results.
+        results.push({ harness: harness.id, status: "recorded", file: scrub(file), workspace, droppedExtensionFrames: recording.droppedExtensionFrames })
+      } catch (error) { markFailed(harness.id, error) }
     }
     const samples: ErrorSample[] = [...options.errorSamples ?? []]
     if (options.captureSignedOut) {
       for (const harness of options.harnesses) {
-        if (!harness.settings) continue
-        const homeDirectory = await mkdtemp(join(options.temporaryRoot, `${harness.id}-signed-out-home-`))
-        const workspace = await mkdtemp(join(options.temporaryRoot, `${harness.id}-signed-out-work-`))
-        await chmod(homeDirectory, 0o700)
-        await chmod(workspace, 0o700)
-        const environment = buildBaseEnvironment({ parent: options.parentEnvironment })
-        // No account variables or provider keys are carried into the signed-out probe.
-        Object.assign(environment, { HOME: homeDirectory, TMPDIR: homeDirectory, XDG_CONFIG_HOME: homeDirectory,
-          CLAUDE_CONFIG_DIR: homeDirectory, CODEX_HOME: homeDirectory, GEMINI_CLI_HOME: homeDirectory, CURSOR_CONFIG_DIR: homeDirectory })
-        let captured: string | undefined
+        if (!harness.settings || results.find((result) => result.harness === harness.id)?.status !== "recorded") continue
         try {
-          await recordOne(harness.settings, environment, workspace, options.prompt,
-            (text) => scrubText(text, { homeDirectory: options.homeDirectory, workspace, environment: { ...allEnvironment, ...environment } }), signal,
-            (text) => { captured = text })
-        } catch (error) {
-          if (signal.aborted) throw error
-        }
-        if (!captured) {
-          const result = results.find((result) => result.harness === harness.id)
-          if (result?.status === "recorded") result.signedOutNotObserved = true
-          continue
-        }
-        samples.push({ harness: harness.id, kind: "signed-out", text: captured, source: "Recorded from the installed adapter with an empty temporary home and no account variables", verified: true })
+          const homeDirectory = await mkdtemp(join(options.temporaryRoot, `${harness.id}-signed-out-home-`))
+          const workspace = await mkdtemp(join(options.temporaryRoot, `${harness.id}-signed-out-work-`))
+          await chmod(homeDirectory, 0o700)
+          await chmod(workspace, 0o700)
+          const environment = buildBaseEnvironment({ parent: options.parentEnvironment })
+          // No account variables or provider keys are carried into the signed-out probe.
+          Object.assign(environment, { HOME: homeDirectory, TMPDIR: homeDirectory, XDG_CONFIG_HOME: homeDirectory,
+            CLAUDE_CONFIG_DIR: homeDirectory, CODEX_HOME: homeDirectory, GEMINI_CLI_HOME: homeDirectory, CURSOR_CONFIG_DIR: homeDirectory })
+          let captured: string | undefined
+          try {
+            await recordOne(harness.settings, environment, workspace, options.prompt,
+              (text) => scrubText(text, { homeDirectory: options.homeDirectory, workspace, environment: { ...allEnvironment, ...environment } }), signal,
+              (text) => { captured = text })
+          } catch (error) {
+            // An authentication refusal is the expected outcome of this probe.
+            if (!captured) markFailed(harness.id, error, "probe")
+          }
+          if (!captured) {
+            const result = results.find((result) => result.harness === harness.id)
+            if (result?.status === "recorded") result.signedOutNotObserved = true
+            continue
+          }
+          samples.push({ harness: harness.id, kind: "signed-out", text: captured, source: "Recorded from the installed adapter with an empty temporary home and no account variables", verified: true })
+        } catch (error) { markFailed(harness.id, error, "probe") }
       }
     }
     for (const sample of samples) {
-      const directory = join(options.outputDirectory, "errors")
-      await mkdir(directory, { recursive: true, mode: 0o700 })
-      const text = scrubText(JSON.stringify({ ...sample, verified: sample.verified ?? false }), { homeDirectory: options.homeDirectory, workspace: "", environment: allEnvironment })
-      await writeFile(join(directory, `${sample.harness}-${sample.kind}.json`), text + "\n", { mode: 0o600 })
+      try {
+        const directory = join(options.outputDirectory, "errors")
+        await mkdir(directory, { recursive: true, mode: 0o700 })
+        const text = scrubText(JSON.stringify({ ...sample, verified: sample.verified ?? false }), { homeDirectory: options.homeDirectory, workspace: "", environment: allEnvironment })
+        await writeFile(join(directory, `${sample.harness}-${sample.kind}.json`), text + "\n", { mode: 0o600 })
+      } catch (error) { markFailed(sample.harness, error, "samples") }
     }
     return results
   },
@@ -280,6 +342,16 @@ export const recordFixtures = (options: RecordOptions) => Effect.tryPromise({
   catch: (error) => error instanceof RecordingError ? error : new RecordingError("Fixture recording failed")
 }).pipe(Effect.provide(Logger.layer([Logger.make(() => { process.stderr.write("[redacted recorder diagnostic]\n") })])))
 
-export const formatReport = (results: ReadonlyArray<RecordResult>): string => results.map((result) =>
-  `${result.harness}: ${result.status}${result.status === "skipped" ? ` (${result.reason})` : `; droppedExtensionFrames: ${result.droppedExtensionFrames}${result.signedOutNotObserved ? "; signedOutNotObserved" : ""}`}`
-).join("\n")
+export const hasRecordingFailures = (results: ReadonlyArray<RecordResult>): boolean => results.some((result) =>
+  result.status === "failed" || (result.status === "recorded" && (result.probe !== undefined || result.samples !== undefined)))
+
+export const formatReport = (results: ReadonlyArray<RecordResult>): string => {
+  const lines = results.map((result) =>
+    `${result.harness}: ${result.status}${result.status !== "recorded" ? ` (${result.reason})` : `; droppedExtensionFrames: ${result.droppedExtensionFrames}${result.signedOutNotObserved ? "; signedOutNotObserved" : ""}`}`)
+  const failed = results.flatMap((result) => result.status === "failed" ? [`${result.harness}: ${result.reason}`]
+    : result.status !== "recorded" ? [] : [
+      ...(result.probe ? [`${result.harness} signed-out probe: ${result.probe.category}`] : []),
+      ...(result.samples ? [`${result.harness} error samples: ${result.samples.category}`] : [])
+    ])
+  return [...lines, ...(failed.length ? ["failed:", ...failed] : [])].join("\n")
+}
