@@ -286,6 +286,7 @@ export const makeRedactor = (registry: {
   };
 
   const layer = Layer.succeed(Redactor, {
+    redactChunk: (itemId: string, text: string, final: boolean) => Effect.sync(() => redactChunk(itemId, text, final)),
     redactText: (text: string) => Effect.sync(() => redactText(text)),
     redact: (event: Event) => Effect.sync(() =>
       redactValue(event, redactWith(currentForms(), registry.tokenHashes())) as Event),

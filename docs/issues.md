@@ -836,6 +836,12 @@ these limits remain.
   final chunk for every item, including items cut off by a crash or an
   interruption, or the carries of abandoned items stay in memory.
 
+Unit 6a now rechecks the grant at spawn, compares the Linux child working
+folder by path, device and inode before initialization and after session
+setup, and closes every text carry on completion, stop, crash and scope
+closure. Recovery must still reconstruct grants, and the stated platform
+and worktree limits remain.
+
 What should happen: units 6a and 6d meet the grant, spawn-time and
 final-chunk duties above, and SECURITY.md states the remaining platform and
 worktree limits.
@@ -938,8 +944,7 @@ What should happen: either remove the envelope-only path once no caller writes i
 ## 61. A runner exit event carries no incarnation, so a late exit could hit a new run
 
 Found: 2026-11-01, in the focused review of unit 5b.
-State: fixed in the engine by unit 5c fix round 1. The producer remains open
-for unit 6a.
+State: fixed in the engine by unit 5c fix round 1 and in the producer by unit 6a.
 
 What happened: `RunnerEvent.exited` carried only the agent identifier. The
 crash consumer checked only the agent's current state.
@@ -947,10 +952,10 @@ Why it matters: after `stop` and an immediate `resume`, a late exit from the old
 What changed: the runner event schema requires an incarnation on every tag,
 including `exited`. The consumer checks both the agent identifier and its
 unrevoked token hash inside the writer transaction before applying an event.
-What remains: unit 6a must take the agent identifier and incarnation from its
-own process table, never from a child's data. Its real process tests must
-check token revocation after a current exit and reject exits from old or
-different agents' incarnations.
+Unit 6a takes every event identity from its process table. Its fake-process
+tests check current exits, revoked tokens and forged identities. A natural
+exit releases the process entry, and a later spawn refuses sends carrying
+the old token hash.
 
 ## 62. A failed follow-up append after a rejected runner call leaves the agent starting
 
@@ -973,11 +978,19 @@ What should happen: unit 6b replaces it with row 28's picker and tests the tie-b
 ## 64. The session a runner returns is discarded, and a failed resume records the wrong previous state
 
 Found: 2026-11-01, in the focused review of unit 5b.
-State: open for unit 6a.
+State: fixed in unit 6a.
 
 What happens: `start.ts` and `resume.ts` discard the `SessionInfo` that `runner.start` and `runner.load` return. No session reference and no `reloadable` flag are ever recorded, so a `resume` without `--fresh` always finds "cannot reload" for an agent started by the engine. Also, a failed reload writes its transition with `previous: "idle"` (`resume.ts`), even when the agent was crashed or stopped.
 Why it matters: reload cannot work end to end until the session is recorded, and the wrong previous state misleads anyone reading the event.
 What should happen: unit 6a writes `SessionOpened` with the session reference and the reloadable flag after a successful start or load, and the failure transition uses the agent's real previous state.
+
+What changed: both command paths append `SessionOpened` from the runner
+result in a fresh writer transaction after the process call. The append
+requires the agent still to be starting, so a concurrent crash cannot be
+undone by a late session result. A failed reload records the previous state
+as `starting`, the state committed immediately before the reload call. The
+contracts allow starting, working or idle in that field, rather than the
+crashed or stopped state from which the resume command was requested.
 
 ## 65. No event withdraws an owner alert, so a closed request's alert is visible only through its status
 
@@ -1010,7 +1023,7 @@ State: decided by the lead for unit 5d and implemented. The sender of a routed p
 ## 68. A committed permission answer can fail to reach its runner
 
 Found: 2026-11-01, while building unit 5c.
-State: open for unit 6a.
+State: the live process path is fixed in unit 6a. Restart reconciliation remains open for unit 6d.
 
 What happens: the handler commits a permission answer and its receipt before
 calling `Runner.answerPermission`. If that call fails, the answer stays
@@ -1024,6 +1037,15 @@ an answer into a different incarnation.
 Why it matters: an adapter can still be waiting for a permission whose answer
 the client already sees as recorded. The unit 5c boundary test covers the
 committed state, receipt replay, single call and content-free warning.
+
+What changed in unit 6a: permission answers resolve the held protocol call,
+and `answerPermission` waits for the transport response-write acknowledgement.
+An unknown, stale or cross-agent request is refused. A failed response write
+fails that acknowledgement, logs a fixed warning and kills the detached
+process group, so a committed answer cannot leave a live child holding the
+request. Death and stop fail outstanding acknowledgements and discard their
+holds. A service interruption between the answer commit and its runner call
+still needs unit 6d recovery, with first-answer-wins preserved.
 
 ## 69. One malformed runner event could stop the consumer for every agent
 
@@ -1080,7 +1102,7 @@ Why it matters: a completed delivery remains accepted in the log and views.
 ## 72. Permission request identifiers must be unique across agents
 
 Found: 2026-11-01, in the focused review and attack pass for unit 5c.
-State: open for unit 6a's runner.
+State: fixed in unit 6a.
 
 What happens: the engine preserves the first request when a runner reports
 an identifier it already holds. Fix round 1 adds a fixed warning when that
@@ -1092,11 +1114,15 @@ The runner retains the mapping needed to answer the original protocol call.
 Why it matters: a collision must not overwrite the first request, and dropping
 the second otherwise leaves another adapter waiting without a routed request.
 
+What changed: each permission hold receives an engine-generated random
+identifier. The process entry maps that hold to the client protocol request
+and validates the agent, hold and offered option before writing a response.
+
 ## 73. Permission option safety depends on the runner's option mapping
 
 Found: 2026-11-01, in the unit 5c attack pass. The reported engine ceiling
 bypass was disproved by the verifier; the producer duty remains.
-State: open for unit 6a.
+State: fixed for the recorded option mappings in unit 6a. New adapters still need fixture review.
 
 What happens: the engine cannot know what an adapter's option identifier does.
 It trusts the mapped option kind. The ceiling already uses the stricter of
@@ -1108,6 +1134,11 @@ checks the permission boundary in acceptance case SEC-PB-3. Unknown or
 persistent options must remain owner-only.
 Why it matters: an incorrect mapping could give a one-time approval effects
 that persist beyond the session.
+
+What changed: generic kinds use the contracts mapping, including owner-only
+persistence and unknown kinds. Recorded first-harness exit-plan bypass and
+auto identifiers are raised to full and persistent. Symlink-resolved harness
+settings paths are also owner-routed.
 
 ## 74. Requests asked by a crashed or stopped agent remain open
 
@@ -1190,20 +1221,25 @@ What changed: `promptReply` handles an error or a pause for the delivery that st
 ## 82. A send reserved before a stop could reach the runner after it
 
 Found: 2026-11-01, in the focused review of unit 5d (finding F3).
-State: fixed in unit 5d's fix round 1. Unit 6a must build the runner's half.
+State: fixed in unit 5d fix round 1 and unit 6a.
 
 What happened: `dispatchQueued` committed `DeliverySent` and then called the runner with no lock against `stop` or `resume`. A stop could commit between the two, so the prompt reached a process the engine had stopped, or a later run of the same agent.
 What changed: `routing/lanes.ts` gives each agent one send lane. `dispatchQueued` holds it from the reservation through the runner call. `stop` and `resume` hold the target's lane from before their writer transaction through their runner call, and `start` holds the new agent's lane through its runner call. The lane always comes before the writer's permit, so the two cannot deadlock. `Runner.prompt` and `Runner.compact` also take the incarnation the send was reserved for, the hash of the agent's live token, read in the reservation transaction.
-What unit 6a must do: refuse a send with `RunnerRejected` when its incarnation is not the live process's incarnation.
+What unit 6a changed: prompt and compact compare their reserved incarnation
+with the live process entry before any protocol write. A mismatch returns
+`RunnerRejected` and sends no frame.
 
 ## 83. A repeated turn end could end the next turn
 
 Found: 2026-11-01, in the focused review of unit 5d (finding F4).
-State: fixed in unit 5d's fix round 1. Unit 6a must build the runner's half.
+State: fixed in unit 5d fix round 1 and unit 6a.
 
 What happened: the `turnEnded` runner event named only the agent. A repeated or late turn end for an earlier delivery ended whatever turn was running, and the next queued delivery was sent while the agent was still busy.
 What changed: `turnEnded` carries the identifier of the delivery whose turn ended. The engine writes `TurnEnded` only when the agent is working and that identifier is the delivery that started its current turn, the last one sent since the previous turn end.
-What unit 6a must do: name the delivery whose `session/prompt` reply ended, from the runner's own process table (issue 61).
+What unit 6a changed: each process retains the current delivery and emits
+one `promptReply` followed by one `turnEnded` for it. Version 2 waits for
+both the protocol reply and idle state, in either order. A later idle error
+is therefore retained even when the prompt acknowledgement arrived early.
 
 ## 84. A queued answer to a stopped or crashed agent was lost
 
@@ -1258,11 +1294,13 @@ What should happen: unit 6.6 merges the two notices into one when the waiter is 
 ## 90. The first harness's adapter labels mode-raising options as ordinary "allow always"
 
 Found: 2026-11-01, while writing the unit 6a tests, reading `@agentclientprotocol/claude-agent-acp` 0.99.1 (`dist/permissions/options/tools.js` and `shared.js`).
-State: open for unit 6a's builder. The test `6.3 option table, first harness` in `packages/engine/test/runner/permission-hold.test.ts` states the expected mapping.
+State: fixed in unit 6a. The test `6.3 option table, first harness` in `packages/engine/test/runner/permission-hold.test.ts` states the expected mapping.
 
 What happens: when the agent leaves plan mode, the adapter offers `exit-plan-bypass` ("Yes, and bypass permissions") and `exit-plan-auto` ("Yes, and use auto mode") with the kind `allow_always`. The contracts' `permissionForOptionKind` maps `allow_always` to the level `edit`. Choosing either option actually moves the session to bypass or auto mode, which is the level `full`.
 Why it matters: a mapping by kind alone rates a full-access option as `edit` (issue 73). The option is persistent, so the engine already routes it to the owner, but the recorded level is wrong, and any later rule that trusts the level would be too lenient.
-What should happen: the runner maps options by the harness's recorded option identifiers as well as their kind, and keeps the stricter result.
+What changed: `runner/permissions.ts` maps the recorded exit-plan bypass
+and auto identifiers, including the clear-context forms, to full access and
+persistence. Other options retain the contracts mapping by kind.
 
 ## 91. The deny-rule contract cannot express the first harness's only deny mechanism
 
@@ -1276,17 +1314,96 @@ What should happen: the contracts gain a session-option form of the mechanism, o
 ## 92. The runner's spawn input carries no folder grant
 
 Found: 2026-11-01, while writing the unit 6a tests.
-State: open for unit 6a's builder.
+State: fixed in unit 6a.
 
 What happens: `Runner.start` and `Runner.load` (`packages/engine/src/runner/Runner.ts`) take only the folder's path. Issue 49 asks the runner to call `folderForSpawn` immediately before each spawn, and that needs the `FolderGrant` from `checkFolder`.
 Why it matters: without the grant the runner can only trust the path string, so a folder replaced between the command's check and the spawn is not caught.
 What should happen: the spawn input gains `grant: FolderGrant`, and `commands/start.ts` and `commands/resume.ts` pass the grant they already hold. The unit 6a tests pass a grant and expect a replaced folder to be refused.
 
+What changed: the spawn input now carries the grant already held by the
+command. The runner checks it immediately before spawning and checks the
+Linux child working folder against the granted identity twice (issue 49).
+
 ## 93. Protocol version 2 advertises no session reload capability
 
 Found: 2026-11-01, while writing the unit 6a tests, reading `third_party/t3code/effect-acp/src/_generated/schema.gen.ts` (`SessionCapabilities`, line 4094) and the recorded fixtures.
-State: open for units 6a and 6d.
+State: the version 2 rule is implemented in unit 6a. Real-adapter confirmation remains open for post-build check PB-A12.
 
 What happens: in version 2, `SessionCapabilities` has no `load` or `resume` field, and neither recorded version 2 adapter advertises one. Version 1 has `agentCapabilities.loadSession`, which the third harness's adapter sets.
 Why it matters: the `reloadable` flag in "session opened" (issue 64) decides whether `resume` can reload an agent. For a version 2 adapter it cannot come from an advertised capability.
 What should happen: the builder chooses the version 2 rule (for example, that `session/load` is part of the version 2 baseline) and records it with its source; post-build check PB-A12 confirms it on the real adapters. The unit 6a tests assert the flag only for a version 1 adapter that advertises `loadSession`.
+
+Chosen rule: use the copied client's normalized `agentCapabilities.loadSession`
+for both generations. `normalizeInitializeResponse` in
+`third_party/t3code/effect-acp/src/client.ts` sets that flag for version 2
+when `capabilities.session` exists, and exposes baseline resume support.
+The runner records the normalized capabilities and negotiated version in its
+process entry, and stores the derived reloadability with `SessionOpened`.
+This uses the existing client compatibility rule rather than requiring a
+version 2 capability field that does not exist. The frozen version 1 load
+test and recorded replays pass locally. No real adapter was started.
+
+## 94. The scripted version 1 fake agent advertised reload but rejected its wire method
+
+Found: 2026-11-01, while building unit 6a and running its frozen reload test.
+State: fixed in unit 6a, with the lead's approval in board post 939.
+
+What happened: `scriptedStdio` changed the fake agent's initialization reply
+into version 1 and advertised `loadSession`. Its underlying server remained
+version 2 and handled only `session/resume`, so a valid `session/load` from
+the copied client failed before the reload assertions could run.
+What changed: only the version 1 load compatibility path translates
+`session/load` into `session/resume`, supplies the missing stdio discriminator,
+and normalizes the returned configuration identifiers for the client. The
+response retains the original request identifier. No frozen test changed.
+Why it matters: a fixture that advertises a method must implement that method
+before it can check the runner's reload behavior.
+
+## 95. Seven earlier lifecycle assertions conflict with recording the opened session
+
+Found: 2026-11-01, while building unit 6a and running the command and routing tests.
+State: open for the lead. The frozen tests are unchanged.
+
+What happens: `packages/engine/test/commands/lifecycle.test.ts` has one start
+assertion that forbids `SessionOpened`, three reload cases that expect the
+agent to remain starting, and two fresh-resume cases with the same expectation.
+`packages/engine/test/routing/runner-events.test.ts` has one old-incarnation
+case that also expects a successful resume to leave the agent starting.
+What should happen: the lead updates those seven assertions to expect the
+session event and idle state after the fake runner returns its session, as
+required by issue 64 and the accepted unit 6a interface. The builder has not
+weakened or changed them.
+Why it matters: the scoped integration command now exercises the required
+behavior and fails those seven historical expectations. Its other cases pass.
+
+## 96. Text redaction must retain secrets across protocol chunk boundaries
+
+Found: 2026-11-01, during unit 6a implementation review.
+State: fixed in unit 6a.
+
+What happened: redacting each message chunk separately would release a secret
+that an adapter split across chunks. Relying solely on the service registry
+would also miss a newly resolved spawn secret before the registry saw it.
+What changed: the runner streams text through the existing bounded carry
+redactor for its resolved secrets and token, followed by the supplied service
+redactor when present. It retains event metadata while text is pending and
+flushes the carries at item boundaries, session load completion, turn idle,
+stop, crash and scope closure. The service exposes its existing chunk method.
+Why it matters: the runner's own event stream must contain safe text before
+the event log applies its second redaction boundary. Two fake-process checks
+cover split secrets and a service registry that has not yet seen the secret.
+
+## 97. A failed mode reset must not leave an elevated child running
+
+Found: 2026-11-01, during unit 6a implementation review.
+State: fixed in unit 6a.
+
+What happens: an adapter can report an unknown or elevated mode and then
+reject the engine's configuration call that restores the permission ceiling.
+A refusal event alone would leave the process in the reported mode.
+What changed: mode reports are checked against recorded mappings and the
+spawn ceiling. The consumer records the refusal and calls the reset after
+the transaction under the agent's send lane. If the adapter rejects it, the
+runner kills the process; exit cleanup kills its detached process group.
+Why it matters: the fake-process check observes both the mode refusal and
+crash, rather than treating a failed reset as a safe running session.

@@ -128,31 +128,46 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
       const decoded = yield* Schema.decodeUnknownEffect(RunnerEvent)(rawEvent).pipe(Effect.result);
       if (decoded._tag === "Failure") return yield* Effect.logWarning("runner event dropped: malformed");
       const event = decoded.success;
-      yield* log.transact((append) => Effect.gen(function* () {
-        const snapshot = yield* views.snapshot;
-        const agent = snapshot.agents[event.agentId];
-        if (agent === undefined || !["starting", "working", "idle", "paused"].includes(agent.state._tag)) return;
-        const tokens = yield* sql<{ agent_id: string }>`
-          SELECT agent_id FROM agent_tokens WHERE token_hash = ${event.incarnation}
-          AND agent_id = ${event.agentId} AND revoked_at IS NULL`;
-        if (tokens.length === 0) return;
-        // Every batch carries the wait checks it causes (rows 25 and 50).
-        const write = (events: ReadonlyArray<Event>, sideRows: SideRows = {}) => events.length === 0 ? Effect.void
-          : append({ _tag: "owner" }, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), sideRows).pipe(Effect.asVoid);
-        switch (event._tag) {
-          case "permissionRequested": return yield* write(yield* permissionRequested(snapshot, event));
-          case "turnEnded": return yield* write(turnEnded(snapshot, event));
-          case "deliveryUpdate": return yield* write(deliveryUpdate(snapshot, event));
-          case "promptReply": return yield* write(yield* promptReply(snapshot, event, log.redactText));
-          case "exited": {
-            const crashed: ReadonlyArray<Event> = [{
-              _tag: "AgentCrashed", agentId: event.agentId, exitCode: event.exitCode, signal: event.signal, stderr: "",
-            }, ...moveHeld(snapshot, [event.agentId])];
-            return yield* write([...crashed, ...targetGone(project(snapshot, crashed), event.agentId, "crashed")],
-              { revokeAgentTokens: [event.agentId] });
+      const consume = Effect.gen(function* () {
+        let resetMode = false;
+        yield* log.transact((append) => Effect.gen(function* () {
+          const snapshot = yield* views.snapshot;
+          const agent = snapshot.agents[event.agentId];
+          if (agent === undefined || !["starting", "working", "idle", "paused"].includes(agent.state._tag)) return;
+          const tokens = yield* sql<{ agent_id: string }>`
+            SELECT agent_id FROM agent_tokens WHERE token_hash = ${event.incarnation}
+            AND agent_id = ${event.agentId} AND revoked_at IS NULL`;
+          if (tokens.length === 0) return;
+          // Every batch carries the wait checks it causes (rows 25 and 50).
+          const write = (events: ReadonlyArray<Event>, sideRows: SideRows = {}) => events.length === 0 ? Effect.void
+            : append({ _tag: "owner" }, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), sideRows).pipe(Effect.asVoid);
+          switch (event._tag) {
+            case "permissionRequested": return yield* write(yield* permissionRequested(snapshot, event));
+            case "turnEnded": return yield* write(turnEnded(snapshot, event));
+            case "deliveryUpdate": return yield* write(deliveryUpdate(snapshot, event));
+            case "modeReported": {
+              resetMode = event.level === undefined;
+              return yield* write([event.level === undefined
+                ? { _tag: "ModeRefused", agentId: event.agentId, mode: event.mode, ceiling: event.ceiling, reason: "mode exceeds permission ceiling" }
+                : { _tag: "ModeChanged", agentId: event.agentId, mode: event.mode, level: event.level }]);
+            }
+            case "promptReply": return yield* write(yield* promptReply(snapshot, event, log.redactText));
+            case "exited": {
+              const crashed: ReadonlyArray<Event> = [{
+                _tag: "AgentCrashed", agentId: event.agentId, exitCode: event.exitCode, signal: event.signal, stderr: "",
+              }, ...moveHeld(snapshot, [event.agentId])];
+              return yield* write([...crashed, ...targetGone(project(snapshot, crashed), event.agentId, "crashed")],
+                { revokeAgentTokens: [event.agentId] });
+            }
           }
+        }));
+        if (event._tag === "modeReported" && resetMode) {
+          yield* runner.setMode({ agentId: event.agentId, permission: event.ceiling }).pipe(
+            Effect.catchTag("RunnerRejected", () => Effect.logWarning("mode set-back failed")),
+          );
         }
-      }));
+      });
+      yield* event._tag === "modeReported" ? withLane(log, event.agentId)(consume) : consume;
     // A failed event is isolated, but scope closure must still stop the stream.
     }).pipe(Effect.catchCause((cause) => Cause.hasInterrupts(cause)
       ? Effect.failCause(cause)

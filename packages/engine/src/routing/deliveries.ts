@@ -106,7 +106,11 @@ const accepted = (snapshot: Snapshot, agentId: AgentId, deliveryId: string): Rea
 // Row 51: only a content update after the send accepts. The command
 // catalogue and replayed history never do; replay writes nothing here.
 export const deliveryUpdate = (snapshot: Snapshot, event: Extract<RunnerEvent, { _tag: "deliveryUpdate" }>): ReadonlyArray<Event> =>
-  event.replay || event.kind === "available_commands_update" ? [] : accepted(snapshot, event.agentId, event.deliveryId);
+  event.replay || event.kind === "available_commands_update" ? [] : [
+    ...accepted(snapshot, event.agentId, event.deliveryId),
+    ...(event.content === undefined ? [] : [{ _tag: "ThreadItem" as const, agentId: event.agentId, itemId: randomUUID(),
+      content: event.content, replay: false }]),
+  ];
 
 // Fix round 1, F2: a failure or a pause applies to the delivery that started
 // the current turn, sent or already accepted by a content update. A second

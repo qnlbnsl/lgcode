@@ -34,20 +34,25 @@ export const resume = ({ runtime, snapshot, actor }: Input, agent: Agent, payloa
       }
     }
     const token = mintAgentToken();
-    const spawn = { agentId: agent.agentId, token: token.token, folder, harness, account,
+    const spawn = { agentId: agent.agentId, token: token.token, folder, grant, harness, account,
       permission: Schema.decodeUnknownSync(PermissionLevel)(agent.permission),
       ...(agent.model === undefined ? {} : { model: agent.model }), ...(agent.effort === undefined ? {} : { effort: agent.effort }),
     };
     return {
       events, sideRows: { revokeAgentTokens: [agent.agentId], agentTokens: [{ agentId: agent.agentId, tokenHash: token.tokenHash, revokedAt: null }] },
       afterCommit: Effect.suspend(() => payload.fresh ? runtime.runner.start(spawn) : runtime.runner.load({ ...spawn, session: agent.session! })).pipe(
-        Effect.asVoid,
+        Effect.flatMap((session) => runtime.log.transact((append) => Effect.gen(function* () {
+          if ((yield* runtime.views.snapshot).agents[agent.agentId]?.state._tag !== "starting") return;
+          yield* append(actor, freshRequest(), randomUUID(), [
+            { _tag: "SessionOpened", agentId: agent.agentId, ...session },
+          ], {});
+        })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
         // Issue 78: the failure carries the wait checks it causes. The
         // target's send lane is held by CommandHandler around this command.
         Effect.catchTag("RunnerRejected", () => runtime.log.transact((append) => Effect.gen(function* () {
           const snapshot = yield* runtime.views.snapshot;
           yield* append(actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, [
-            { _tag: "StateChanged", agentId: agent.agentId, state: { _tag: "interrupted", previous: "idle" } },
+            { _tag: "StateChanged", agentId: agent.agentId, state: { _tag: "interrupted", previous: "starting" } },
             { _tag: "AgentReloadFailed", agentId: agent.agentId, reason: "agent reload failed" },
           ]), { revokeAgentTokens: [agent.agentId] });
         })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),

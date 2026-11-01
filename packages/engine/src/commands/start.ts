@@ -52,10 +52,16 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
     // Issue 78: the failure carries the wait checks it causes.
     return {
       events: [event], sideRows: { agentTokens: [{ agentId, tokenHash: token.tokenHash, revokedAt: null }] },
-      afterCommit: Effect.suspend(() => runtime.runner.start({ agentId, token: token.token, folder, harness, account,
+      afterCommit: Effect.suspend(() => runtime.runner.start({ agentId, token: token.token, folder, grant, harness, account,
         permission: payload.permission, ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }),
       })).pipe(
-        Effect.asVoid,
+        Effect.flatMap((session) => runtime.log.transact((append) => Effect.gen(function* () {
+          // An exit can arrive while the session result is being returned.
+          if ((yield* runtime.views.snapshot).agents[agentId]?.state._tag !== "starting") return;
+          yield* append(actor, freshRequest(), randomUUID(), [
+            { _tag: "SessionOpened", agentId, ...session },
+          ], {});
+        })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
         Effect.catchTag("RunnerRejected", () => runtime.log.transact((append) => Effect.gen(function* () {
           const snapshot = yield* runtime.views.snapshot;
           yield* append(actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, [

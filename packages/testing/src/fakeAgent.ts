@@ -132,6 +132,11 @@ const scriptedStdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
     if (frame.id !== undefined && typeof frame.method === "string") methods.set(frame.id, frame.method)
     if (frame.method === "initialize") frame.params = { ...frame.params, info: frame.params.info ?? frame.params.clientInfo, capabilities: frame.params.capabilities ?? frame.params.clientCapabilities ?? {} }
     if (frame.method === "session/set_config_option") frame.params.type ??= "id"
+    // The scripted v1 peer advertises loadSession; its underlying server is v2.
+    if (script.protocolVersion === 1 && frame.method === "session/load") {
+      frame.method = "session/resume"
+      for (const server of frame.params.mcpServers ?? []) server.type ??= "stdio"
+    }
     return JSON.stringify(frame) + "\n"
   }
   const outbound = (chunk: string | Uint8Array) => Buffer.from(chunk).toString().split("\n").filter(Boolean).map((line) => {
@@ -141,6 +146,9 @@ const scriptedStdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
     if (frame.result && methods.get(frame.id) === "initialize") {
       if (script.reportVersion === false) delete frame.result.info.version
       if (script.protocolVersion === 1) frame.result = { protocolVersion: 1, agentInfo: frame.result.info, agentCapabilities: { loadSession: true }, authMethods: [] }
+    }
+    if (script.protocolVersion === 1 && frame.result && methods.get(frame.id) === "session/load") {
+      frame.result.configOptions = (frame.result.configOptions ?? []).map(({ configId, ...option }: { configId: string }) => ({ ...option, id: configId }))
     }
     if (script.protocolVersion === 1 && frame.result && methods.get(frame.id) === "session/prompt") frame.result.stopReason = [...stops.values()].at(-1) ?? "end_turn"
     if (frame.id !== undefined && frame.method === undefined) methods.delete(frame.id)
