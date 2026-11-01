@@ -969,3 +969,30 @@ State: open for unit 6a.
 What happens: `start.ts` and `resume.ts` discard the `SessionInfo` that `runner.start` and `runner.load` return. No session reference and no `reloadable` flag are ever recorded, so a `resume` without `--fresh` always finds "cannot reload" for an agent started by the engine. Also, a failed reload writes its transition with `previous: "idle"` (`resume.ts`), even when the agent was crashed or stopped.
 Why it matters: reload cannot work end to end until the session is recorded, and the wrong previous state misleads anyone reading the event.
 What should happen: unit 6a writes `SessionOpened` with the session reference and the reloadable flag after a successful start or load, and the failure transition uses the agent's real previous state.
+
+## 65. No event withdraws an owner alert, so a closed request's alert is visible only through its status
+
+Found: 2026-11-01, while writing the unit 5c tests.
+State: open; the owner of the client API (piece 2) or the lead decides.
+
+What happens: decision rows 27 and 51 say that closing or moving a request withdraws its owner alert in the same transaction. The alert is the `OwnerNeeded` event, and the contracts (`packages/contracts/src/events.ts`) have no event that withdraws it. A request never moves down from the owner (row 51), so only closing ends an alert, and a client can see that only from the request's or question's status.
+What should happen: either the contracts gain an "owner alert withdrawn" event, or the plan states that an alert ends when its subject closes, and clients derive it.
+Why it matters: a phone alert for an answered request stays visible until the client checks the subject. The unit 5c tests cannot assert a withdrawal, so they assert only the closed status.
+
+## 66. A request held by the owner still carries a delivery id that names no delivery
+
+Found: 2026-11-01, while writing the unit 5c tests.
+State: open.
+
+What happens: `PermissionRequested`, `PermissionMoved`, `QuestionAsked` and `QuestionMoved` require a `deliveryId`. When the holder is the owner, nothing is queued, because a delivery's target must be an agent. The id then refers to no delivery, and a later withdrawal of it changes no row.
+What should happen: either the field becomes optional for an owner holder, or the plan states that the id is a placeholder there. The unit 5c tests assert only that no delivery is queued for an owner-held request.
+Why it matters: a reader or a later unit that looks the id up finds nothing, and could mistake that for a lost delivery.
+
+## 67. A routing delivery has no sender of its own, so returning it to its sender is undefined
+
+Found: 2026-11-01, while writing the unit 5c tests.
+State: open for unit 5d, which builds returns to the sender.
+
+What happens: the engine queues a delivery to a request's or question's holder, but `Delivery.sender` is an `Actor` (the owner or an agent), and the contracts have no engine sender. Criterion 5.9 returns a failed delivery to its sender. If the sender is recorded as the asking agent, a failed request delivery would be returned to the agent that asked.
+What should happen: unit 5d decides how a delivery with a `source` (permission, question or wait) is handled on failure: moved by the holder rule, requeued, or returned. The unit 5c tests do not assert the sender of a routing delivery.
+Why it matters: a returned request delivery could tell the asker that its own request failed, while the holder never sees it.
