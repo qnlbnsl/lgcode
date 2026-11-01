@@ -61,7 +61,8 @@ interface Script {
   configOptions?: AcpSchema.SessionConfigOption[]
   // Unit 6a: refuse set_config_option for an unknown option or a value the option does not list.
   strictConfigOptions?: boolean
-  history?: Array<{ role: "user" | "agent"; text: string }>
+  // Repeat emits separate replay chunks without exceeding the operating system's per-variable limit.
+  history?: Array<{ role: "user" | "agent"; text: string; repeat?: number }>
   turns: Step[][]
 }
 
@@ -221,10 +222,12 @@ const program = Effect.gen(function*() {
     const options = structuredClone(script.configOptions ?? [])
     sessions.set(request.sessionId, { turn: 0, options })
     for (const item of script.history ?? []) {
-      yield* agent.client.sessionUpdate({ sessionId: request.sessionId, update: {
-        sessionUpdate: item.role === "user" ? "user_message_chunk" : "agent_message_chunk",
-        content: { type: "text", text: item.text }
-      } })
+      for (let index = 0; index < (item.repeat ?? 1); index++) {
+        yield* agent.client.sessionUpdate({ sessionId: request.sessionId, update: {
+          sessionUpdate: item.role === "user" ? "user_message_chunk" : "agent_message_chunk",
+          content: { type: "text", text: item.text }
+        } })
+      }
     }
     return { configOptions: options }
   }))
