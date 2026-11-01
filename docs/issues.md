@@ -644,3 +644,77 @@ together with `errors/cursor-out-of-usage.json`.
 Why it matters: the adapter reports running out of usage as ordinary agent
 text with a normal stop reason, so Shepherd cannot tell it from a reply by the
 stop reason alone.
+
+## 39. The read-only connection exists only when the SQLite layer turns on its reader workers
+
+Found: 2026-11-01, while writing the unit 4b tests.
+State: open.
+
+What happens: `SqliteClient.readOnly` in the copied client
+(`third_party/t3code/node-sqlite/src/nodeSqliteClient.ts`, `route`, line 1105)
+sends a read to the writer connection whenever the layer was built without
+`readerWorker: true`, or for an in-memory database. It does this silently.
+What should happen: the service's SQLite layer, which units 6d and 7a build,
+sets `readerWorker: true` on the file database, so the catch-up read that
+plan note PB-A5 asks for really runs on a read-only connection.
+Why it matters: without the reader workers, a `subscribe` catch-up waits
+behind every open write transaction, and a long catch-up holds up the writer.
+The unit 4b test `packages/engine/test/log/subscribe-gapless.test.ts` turns the
+reader workers on itself, so it cannot see this setting in the service.
+
+## 40. The `events.caller` column comment does not match what the log stores
+
+Found: 2026-11-01, while writing the unit 4b tests.
+State: fixed in unit 4b.
+
+What happens: the migration's comment in
+`packages/engine/src/log/migrations.ts` (line 14) says `caller` holds the JSON
+of an Actor. `EventLog.ts` (`callerKey`, line 85) stores `owner` or
+`agent:<agent id>` instead.
+What should happen: the comment names the stored form, and the `subscribe`
+catch-up read turns that form back into the Actor that `append` returned.
+Why it matters: a catch-up reader written from the comment would fail to
+decode every stored caller, and its envelopes would differ from the live ones.
+The fix: the migration comment names the stored keys, and `subscribe` decodes
+`owner` and `agent:<agent id>` back to their corresponding Actors.
+
+## 41. A subscriber that stops reading keeps every later event in memory
+
+Found: 2026-11-01, in the focused review of unit 4b at eb6308b.
+State: open for unit 7a.
+
+What happens: `PubSub.unbounded` in `packages/engine/src/log/EventLog.ts`
+keeps publishing committed events while a subscriber is open. If the consumer
+of `Stream.fromSubscription` in `packages/engine/src/log/subscribe.ts` stops
+reading without closing, its backlog keeps every later event in memory.
+What should happen: unit 7a owns a bound or a disconnect rule for a slow
+client. T3 Code's `apps/server/src/orchestration-v2/LiveStreamBudget.ts`,
+line 333, is a pattern for budgeting the buffered live events during replay.
+Why it matters: one stalled client must not exhaust the engine's memory.
+
+## 42. Invalid subscription cursors could silently skip catch-up
+
+Found: 2026-11-01, in the focused review of unit 4b at eb6308b.
+State: fixed in unit 4b fix round 1.
+
+What happened: `subscribe` accepted cursors that were not nonnegative safe
+integers. In particular, `NaN` skipped catch-up and left the stream open.
+What should happen: invalid cursors fail before subscribing to committed events.
+The fix: `subscribe` rejects negative values and values that are not safe
+integers, including non-finite and fractional values, with
+`SubscribeInvalidCursor { after }`.
+Why it matters: accepting an invalid cursor can hide a gap from the client.
+
+## 43. Subscription reads exposed raw database errors
+
+Found: 2026-11-01, in the focused review of unit 4b at eb6308b.
+State: fixed in unit 4b fix round 1.
+
+What happened: failures of the subscription's head and catch-up queries escaped
+as raw `SqlError` values, whose reasons can contain database text and data.
+What should happen: the application programming interface receives a named
+failure with a fixed reason that carries no stored values or query text.
+The fix: both read paths map `SqlError` to the exported `LogReadFailed` error
+with the reason `database read failed`. Decode failures retain the fixed
+reason `stored event is unreadable` on the same exported error class.
+Why it matters: a refused subscription must not disclose database contents.
