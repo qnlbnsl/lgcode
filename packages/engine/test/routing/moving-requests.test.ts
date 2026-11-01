@@ -137,7 +137,8 @@ it.live("5.6 holder stops: catches a stopped holder that keeps its request and q
 
 it.live("5.6 holder pauses (unit 6b's writer): catches moveHeld that leaves a request with an agent about to pause, or moves it to someone other than the next idle ancestor", () =>
   withRig((fakes) => Effect.gen(function* () {
-    const world = yield* family(fakes);
+    // Working, so the lead's deliveries stay queued until the move (unit 5d).
+    const world = yield* family(fakes, { lead: "working" });
     const moves = moveHeld(yield* snapshot, [agentIdOf("lead")]);
     const before = yield* headSequence;
     yield* appendSetup([
@@ -150,7 +151,8 @@ it.live("5.6 holder pauses (unit 6b's writer): catches moveHeld that leaves a re
 
 it.live("5.6 holder interrupted (row 52 step 9): catches moveHeld that skips a holder left interrupted after recovery", () =>
   withRig((fakes) => Effect.gen(function* () {
-    const world = yield* family(fakes);
+    // Working, so the lead's deliveries stay queued until the move (unit 5d).
+    const world = yield* family(fakes, { lead: "working" });
     // Step 6 interrupts without moving anything; step 9 re-evaluates once.
     yield* appendSetup([eventOf({ _tag: "AgentInterrupted", agentId: "lead", previous: "idle" })]);
     const moves = moveHeld(yield* snapshot);
@@ -183,7 +185,8 @@ it.live("5.6 move to the owner: catches a crash that leaves the request with a p
 
 it.live("5.6 never back down: catches a request that returns to a holder below it once that holder can act again, by re-evaluation, pass-up or a later move", () =>
   withRig((fakes) => Effect.gen(function* () {
-    const world = yield* family(fakes);
+    // Working, so the lead's deliveries stay queued until the move (unit 5d).
+    const world = yield* family(fakes, { lead: "working" });
     yield* appendSetup([
       eventOf({ _tag: "StateChanged", agentId: "lead", state: { _tag: "paused", reason: "limit", midTurn: false } }),
       ...moveHeld(yield* snapshot, [agentIdOf("lead")]),

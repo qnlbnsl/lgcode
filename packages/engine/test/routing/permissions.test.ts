@@ -111,7 +111,9 @@ for (const parentState of ["idle", "working"] as const) {
       const deliveries = queuedFor(batch, "permission", id);
       expect(deliveries).toHaveLength(1);
       expect(deliveries[0]).toMatchObject({ id: requested.deliveryId, target: "lead", content: { _tag: "prompt" } });
-      expect((yield* deliveryRow(requested.deliveryId))?.status).toBe("queued");
+      // Unit 5d sends a delivery to an idle holder at once; a working one keeps it queued.
+      const expected = parentState === "idle" ? "sent" : "queued";
+      expect((yield* eventually(deliveryRow(requested.deliveryId), (found) => found?.status === expected))?.status).toBe(expected);
       expect(tagged(written, "OwnerNeeded")).toEqual([]);
       expect(answers(fakes)).toBe(0);
     })).pipe(Effect.orDie));
@@ -208,6 +210,8 @@ const family = (fakes: Fakes) => Effect.gen(function* () {
 it.live("5.5 holder answers: catches an answer by the holder that is refused, records the wrong answerer, leaves the holder's delivery queued, or never reaches the runner", () =>
   withRig((fakes) => Effect.gen(function* () {
     const { lead, id, row } = yield* family(fakes);
+    // Unit 5d sends the idle holder its delivery before the answer.
+    expect((yield* eventually(deliveryRow(row.deliveryId), (found) => found?.status === "sent"))?.status).toBe("sent");
     const before = yield* headSequence;
     success(yield* call(agentCredential(lead.token), "answer", answer(id, "once")));
     const written = yield* logAfter(before);
@@ -216,9 +220,9 @@ it.live("5.5 holder answers: catches an answer by the holder that is refused, re
       _tag: "PermissionAnswered", agentId: "worker", permissionRequestId: id, answeredBy: agent("lead"),
       answer: { _tag: "selected", optionId: "once" },
     }]);
-    // Closing the request withdraws its queued delivery in the same transaction (row 27).
-    expect(tagged(batch, "DeliveryWithdrawn").map((event) => event.deliveryId)).toEqual([row.deliveryId]);
-    expect((yield* deliveryRow(row.deliveryId))?.status).toBe("withdrawn");
+    // Closing the request withdraws only a queued delivery (row 27); this one was already sent.
+    expect(tagged(batch, "DeliveryWithdrawn").map((event) => event.deliveryId)).toEqual([]);
+    expect((yield* deliveryRow(row.deliveryId))?.status).toBe("sent");
     expect(yield* requestRow(id)).toMatchObject({ status: "answered", answeredBy: agent("lead"), answer: { _tag: "selected", optionId: "once" } });
     expect(fakes.runner.callsOf("answerPermission").map((entry) => entry.input)).toEqual([
       { agentId: "worker", requestId: id, optionId: "once" },
@@ -363,7 +367,8 @@ it.live("5.5 pass-up skips an ancestor that cannot act: catches a pass-up that m
   withRig((fakes) => Effect.gen(function* () {
     yield* seedAgent({ id: "top" });
     yield* seedAgent({ id: "grand", parent: "top", state: "paused" });
-    const lead = yield* seedAgent({ id: "lead", parent: "grand" });
+    // Working, so the lead's delivery stays queued until the move withdraws it (unit 5d).
+    const lead = yield* seedAgent({ id: "lead", parent: "grand", state: "working" });
     const worker = yield* seedAgent({ id: "worker", parent: "lead", state: "working" });
     const { id, row } = yield* requestPermission(fakes.runner, worker);
     expect(row.holder).toEqual(agent("lead"));

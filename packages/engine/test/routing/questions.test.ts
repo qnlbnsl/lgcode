@@ -186,7 +186,8 @@ it.live("5.7 owner-held question: catches a question held by the owner that the 
 for (const pair of ["the holder and the owner", "the owner twice"] as const) {
   it.live(`5.7 two answers racing, ${pair}: catches the open check run outside the writer, so two queued answers both deliver a reply`, () =>
     withRig(() => Effect.gen(function* () {
-      const { lead, worker } = yield* family();
+      // Working, so the lead's delivery stays queued and nothing is sent while the writer is held (unit 5d).
+      const { lead, worker } = yield* family({ lead: "working" });
       const { questionId } = success(yield* ask(worker.token, "Which branch?"));
       const first = pair === "the owner twice" ? ownerCredential : agentCredential(lead.token);
       const raced = yield* behindWriter([

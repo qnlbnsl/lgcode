@@ -158,7 +158,8 @@ it.effect("5.4 stop: catches a stop that writes no AgentStopped, leaves an open 
     const waits = (yield* views.snapshot).waits;
     expect(waits["wait-1"]?.status).toBe("cancelled");
     expect(waits["wait-2"]?.status).toBe("cancelled");
-    expect(waits["wait-kid"]?.status).toBe("open");
+    // Rows 25 and 50 (unit 5d): the stop resolves the kid's wait on agent-a, without cancelling it.
+    expect(waits["wait-kid"]).toMatchObject({ status: "satisfied", resolved: [{ agentId: "agent-a", reason: "stopped" }] });
     expect(fakes.runner.callsOf("stop")).toHaveLength(1);
   })).pipe(Effect.orDie));
 
