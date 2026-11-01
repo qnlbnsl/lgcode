@@ -95,7 +95,7 @@ describe("6.9 issue 38: the third harness's out-of-usage reply", () => {
   });
 
   it("the text in the recorded cursor transcript, the reply the real adapter sends, classifies as out of usage too (breaks if only the placeholder fixture text is matched and not the recorded wording)", () => {
-    const transcript = readFileSync(fixturePath("cursor.ndjson"), "utf8");
+    const transcript = readFileSync(fixturePath("cursor-out-of-usage.ndjson"), "utf8");
     expect(transcript).toContain("Upgrade your plan to continue");
     expect(classifyError({ harness: "cursor", text: "\n\nUpgrade your plan to continue" })).toBe("out-of-usage");
   });
@@ -142,7 +142,7 @@ live("6.9 the real runner, with no classifier passed in, turns each recorded out
 live("6.9 issue 38: the recorded cursor transcript, replayed through the real runner, ends in an out-of-usage pause and the adapter keeps running, not a crash (breaks if the runner reports the turn as success, or the pause is dropped, or the child is stopped)", () =>
   withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
     const echo = echoFile(rig);
-    const adapter = writeReplayAdapter(rig, "cursor.ndjson", rig.work);
+    const adapter = writeReplayAdapter(rig, "cursor-out-of-usage.ndjson", rig.work);
     const spawn = yield* spawnFor(rig, harnessFor("cursor", adapter), accountFor("cursor", {}, echo));
     yield* context.runner.start(spawn.input);
     const reply = yield* turnReply(context, spawn, "go");

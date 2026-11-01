@@ -555,7 +555,7 @@ State: accepted by the manager for now, because the repository is private;
 the owner decides whether to keep it.
 
 What happened: `packages/testing/fixtures/claude.ndjson` (lines 5 and 13-15,
-about 50 KB each) and `codex.ndjson` (line 5), and the third harness's `cursor.ndjson` (line 10,
+about 50 KB each) and `codex.ndjson` (line 5), and the third harness's `cursor-out-of-usage.ndjson` (line 10,
 about 29 KB, recorded at e93bb00), hold the adapters'
 `available_commands_update` notifications. These list every skill and command
 installed on the owner's machine, with their descriptions. The manager found
@@ -629,9 +629,21 @@ fixtures' text and can hide real differences between recordings.
 ## 38. The third harness's greeting fixture records an out-of-usage reply
 
 Found: 2026-11-01, by the lead, reading the `cursor.ndjson` recorded at e93bb00.
-State: open. The fixture is committed as recorded.
+State: open. The fixture is committed as recorded, and the owner ruled on it.
+Owner, 2026-11-01: "yes" (keep the out-of-usage sample as
+`cursor-out-of-usage.ndjson`; a normal Cursor recording is added after the
+account resets, by the owner). The file was renamed with
+`git mv packages/testing/fixtures/cursor.ndjson packages/testing/fixtures/cursor-out-of-usage.ndjson`,
+without changing a byte, in the commit "test(engine): name the Cursor fixture
+for what it is (issue 38)" on branch `worker/engine-c38`. Tests replay it as
+the out-of-usage case. `replay.test.ts` also has a case for a normal
+`packages/testing/fixtures/cursor.ndjson`, where the recorder writes the new
+recording; it is skipped, with the reason "awaiting the owner's normal Cursor
+recording (issue 38)", until that file exists. The issue stays open until the
+owner adds that recording.
 
-What happened: `packages/testing/fixtures/cursor.ndjson` is the
+What happened: `packages/testing/fixtures/cursor.ndjson` (now
+`cursor-out-of-usage.ndjson`) is the
 `read-only-greeting` scenario, but the owner's account for the third harness
 had no usage left. The prompt turn's only agent text is "Upgrade your plan to
 continue", and the turn still ends with `stopReason: "end_turn"`. The header
