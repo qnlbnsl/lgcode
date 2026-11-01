@@ -1,0 +1,1 @@
+{"harness":"codex","kind":"out-of-usage","text":"rateLimitExceeded","source":"codex-acp 2.5.0 dist/index.js:CodexEventHandler maps the upstream codexErrorInfo rateLimitExceeded to rate_limited; source indicator, not a complete observed message; read 2026-11-01","verified":false}

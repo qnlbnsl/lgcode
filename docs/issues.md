@@ -436,3 +436,35 @@ A related trap: the callback that `it.layer(...)("name", (it) => ...)` passes in
 `@effect/vitest` offers `it.effect` but not `it.live`, so a test that needs the
 real clock must call the top-level `it.live` and provide its layer itself, as the
 unit 8a tests do.
+
+## 27. Two fake-agent assertions used wire identifiers after client normalization
+
+Found: 2026-11-01, while implementing unit 8a.
+State: fixed by the test writer in 02ec6e6, merged with the lead's approval.
+
+What happened: the copied client converts version 2 configuration option
+`configId` fields into compatibility `id` fields. Two frozen tests expected the
+wire field after that conversion, so a conforming agent could not pass them.
+What should happen: assertions after the client use its compatibility shape.
+The fake agent and recorded frames keep the actual wire representation.
+Why it matters: the fake must exercise the protocol rather than compensate for
+an assertion by changing a real protocol frame.
+
+## 28. The pinned adapter and the fake agent report different protocol versions
+
+Found: 2026-11-01, in the installed first adapter's
+`claude-agent-acp` 0.99.1 `dist/acp-agent.js`, initialize response at line 1416.
+State: handled in the unit 8a recorder; the live check remains owner-run.
+
+What happened: the pinned adapter's source reports protocol version 1, while the
+fake agent tests require version 2. A recorder that demands version 2 rejects
+that pinned adapter before it can record anything. The external harness source
+can also expose modes without a mode configuration option.
+What should happen: the recorder offers version 2 and records the actual
+negotiated version. It distinguishes response shapes, uses the configuration
+option command in both versions, and refuses a harness without that option.
+It does not fall back to the older mode command or to a default permission.
+Why it matters: the frozen tests prove the fake's journey, but they cannot prove
+that every owner-installed harness supports the required recording interface.
+The owner-run command must surface that incompatibility instead of producing a
+fixture from an unconfirmed permission mode.
