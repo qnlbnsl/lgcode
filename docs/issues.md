@@ -718,3 +718,37 @@ The fix: both read paths map `SqlError` to the exported `LogReadFailed` error
 with the reason `database read failed`. Decode failures retain the fixed
 reason `stored event is unreadable` on the same exported error class.
 Why it matters: a refused subscription must not disclose database contents.
+
+## 44. The low-level log fixtures contain partial agent histories
+
+Found: 2026-11-01, while writing the unit 4c rebuild checks at `4a5ad12`.
+State: open for the unit 4c builder.
+
+What happened: `test/log/append.test.ts` appends turn and session events without
+an earlier `AgentStarted`. The receipt tests append grouping events without
+creating an agent. These fixtures exercise the storage boundary in isolation.
+Adding the required live-view rebuild hook brings those histories through the
+projection layer as well.
+What should happen: the projection remains total over those stored envelopes,
+and the hook compares the real live views with a rebuild before the fixture
+closes. The builder must not add lifecycle validation to the raw log writer or
+change the frozen storage assertions to manufacture missing history.
+Why it matters: a rebuild hook that crashes on these fixtures cannot check the
+existing storage scenarios, even when their database behavior is correct.
+
+## 45. The first view rebuild must not open a reader before WAL is enabled
+
+Found: 2026-11-01, while composing the unit 4c test layers at `4a5ad12`.
+State: handled by the new test fixture; production startup needs the same order.
+
+What happened: `EventLog.layer` currently enables SQLite's write-ahead log
+(WAL). The new live-view layer must load its initial state before the writer
+that consumes it is constructed. The copied SQLite client's reader pool
+permanently falls back to the writer when its first reader opens a database
+that is not in WAL mode.
+What should happen: enable WAL before constructing the live views or starting
+their initial rebuild. The new `test/support/withViews.ts` fixture does this
+after migrations. Unit 4c and the later service startup must preserve that order.
+Why it matters: enabling WAL only after the first rebuild leaves that client's
+reader pool disabled, so comparison can block behind an occupied writer even
+though the database eventually reports WAL mode.
