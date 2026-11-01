@@ -105,3 +105,62 @@ and `process`, even though `@types/node` is installed.
 What should happen: every package selects the shared Node.js type library.
 Why it matters: the frozen smoke tests and later engine units require
 Node.js built-in modules to type-check.
+
+## 7. A symbolic link to the launcher runs from the wrong folder
+
+Found: 2026-11-01, in the unit 1 review.
+State: open; assigned to unit 2, which may still edit `bin/**`.
+
+What happens: `bin/shepherd` finds its checkout with `dirname "$0"` and does
+not follow a symbolic link to the file itself. A link such as
+`~/.local/bin/shepherd -> <repo>/bin/shepherd` makes it look for
+`bin/stub-entry.ts` next to the link, and Node.js exits 1 with
+`Cannot find module`.
+What should happen: the launcher resolves its own path through any links,
+or prints a clear message when the entry file is missing.
+Why it matters: a link on the path is a likely way for the owner to run
+`shepherd` from any terminal.
+
+## 8. The launcher looks up `dirname` on the path
+
+Found: 2026-11-01, in the unit 1 review.
+State: open; assigned to unit 2.
+
+What happens: `bin/shepherd` runs `dirname` from `PATH`. Decision 22 allows
+a path lookup only for `node`.
+What should happen: the launcher uses shell parameter expansion, so
+`node` is the only program found through `PATH`.
+Why it matters: a hostile path could run another program first. The risk
+is low, because such a path already controls the permitted `node`
+fallback, and the fix costs nothing.
+
+## 9. The `onlyBuiltDependencies` list is not enforced on pnpm 12
+
+Found: 2026-11-01, in the unit 1 review (adds to issue 3).
+State: open; the owner decides whether criterion 1.6 and its frozen test
+should name `allowBuilds` instead.
+
+What happens: a probe on pnpm 12.16.1 showed that `onlyBuiltDependencies`
+neither allows nor blocks a build script. `allowBuilds` and
+`strictDepBuilds` are the real policy, so the two lists must be kept equal
+by hand. The allowed compiler install script also runs the native compiler
+once with `--version`, which issue 3 does not say.
+What should happen: the workspace file says at the old key that it is not
+enforced, and the plan's criterion 1.6 names the setting pnpm 12 reads.
+Why it matters: a reader who edits only the old list changes nothing.
+
+## 10. The compiler alias and two copied cache settings are unexplained
+
+Found: 2026-11-01, in the unit 1 review.
+State: open; assigned to unit 2.
+
+What happens: `pnpm-workspace.yaml` aliases `typescript` to the pre-release
+`@tsc-rs/typescript` 0.8.0 with no comment. It matches the T3 Code
+reference, which plan check PB-A6 requires, but nothing in this repository
+says so. `vitest.config.ts` also sets `VP_REMOTE_CACHE` and
+`VP_REMOTE_CACHE_URL`, which only the vite-plus tool reads; Shepherd runs
+plain Vitest.
+What should happen: one comment names T3 Code as the reason for the alias,
+and the two cache variables are removed or credited to T3 Code.
+Why it matters: a later reader sees an unusual compiler and settings that
+do nothing, with no stated cause.
