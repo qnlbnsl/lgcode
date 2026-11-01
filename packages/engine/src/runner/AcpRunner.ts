@@ -12,6 +12,7 @@ import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
@@ -27,7 +28,9 @@ import { folderForSpawn } from "../identity/ceiling.ts";
 import { sha256Hex } from "../identity/credential.ts";
 import { makeRedactor } from "../identity/redactor.ts";
 import { Redactor } from "../log/Redactor.ts";
+import { makeStderrTail, stderrTailLines } from "../recovery/crash.ts";
 import { buildBaseEnvironment } from "./baseEnvironment.ts";
+import { classifyError } from "./classify.ts";
 import { compactPrompt } from "./compact.ts";
 import { setConfig, type ConfigOption } from "./config.ts";
 import { denyArguments } from "./denyRead.ts";
@@ -133,7 +136,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     turn.ended = true;
     yield* drainMessages(entry, true);
     const clean = yield* redactText(turn.error ?? turn.text);
-    const classification = configuration.classifyError?.({ harness: entry.input.harness.id, text: clean });
+    const classification = (configuration.classifyError ?? classifyError)({ harness: entry.input.harness.id, text: clean });
     yield* emit({ _tag: "promptReply", ...identity(entry), deliveryId: turn.deliveryId,
       outcome: classification !== undefined ? { _tag: "pause", reason: classification, error: clean }
         : turn.error !== undefined ? { _tag: "error", error: clean } : { _tag: "success" } });
@@ -207,7 +210,13 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       });
       yield* checkChildFolder;
       // Stderr is consumed continuously and never forwarded to service stdio.
-      yield* child.stderr.pipe(Stream.decodeText, Stream.runForEach((text) => redactText(text).pipe(Effect.asVoid)), Effect.catch(() => Effect.void), Effect.forkIn(scope));
+      // The local carry covers spawn credentials even before registration.
+      const stderrRedactor = makeRedactor({ secrets: () => resolvedSecrets, tokenHashes: () => new Set() });
+      const stderrTail = yield* makeStderrTail({ maxLines: stderrTailLines,
+        redactChunk: (id, text, final) => redactChunk(id, stderrRedactor.redactChunk(id, text, final), final),
+      });
+      yield* Scope.addFinalizer(scope, stderrTail.finish().pipe(Effect.asVoid));
+      const stderrReader = yield* child.stderr.pipe(Stream.decodeText, Stream.runForEach(stderrTail.push), Effect.catch(() => Effect.void), Effect.forkIn(scope));
       // A write acknowledgement is separate from the eventual prompt reply.
       // Keep stdin open between writes; each sink run waits for the actual
       // process pipe, so callers return only after their frame was written.
@@ -250,7 +259,12 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         loading: session !== undefined, ready: false, stopped: false, dead: false, mode: startingMode, options: [], commands: [] };
       entry = processEntry;
       processes.set(input.agentId, processEntry);
-      yield* Scope.addFinalizer(scope, drainMessages(processEntry, true).pipe(Effect.ensuring(Effect.sync(() => {
+      yield* Scope.addFinalizer(scope, Effect.gen(function* () {
+        // Stop the producer before flushing and releasing its credentials.
+        yield* Fiber.interrupt(stderrReader);
+        yield* stderrTail.finish();
+        yield* drainMessages(processEntry, true);
+      }).pipe(Effect.ensuring(Effect.sync(() => {
         processEntry.secrets.length = 0;
         if (processes.get(input.agentId) === processEntry) processes.delete(input.agentId);
       }))));
@@ -352,13 +366,21 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       processEntry.ready = true;
       yield* child.exitCode.pipe(Effect.result, Effect.flatMap((result) => Effect.gen(function* () {
         processEntry.dead = true;
+        // Descendants must not keep stderr open after their adapter exits.
+        yield* Effect.sync(() => { try { process.kill(-Number(child.pid), "SIGKILL"); } catch { /* gone */ } });
+        yield* Fiber.join(stderrReader);
+        const stderr = yield* stderrTail.finish();
         yield* drainMessages(processEntry, true);
         if (processEntry.sent !== undefined) yield* Deferred.fail(processEntry.sent, rejected("agent process exited"));
         for (const delivered of processEntry.responses.values()) yield* Deferred.fail(delivered, rejected("permission answer delivery failed"));
         processEntry.responses.clear();
         processEntry.holds.clear();
         if (!processEntry.stopped) {
-          yield* emit({ _tag: "exited", ...identity(processEntry), exitCode: result._tag === "Success" ? Number(result.success) : null, signal: null, stderr: "" });
+          // Effect's Node spawner reports signal exits as a PlatformError
+          // whose original cause holds this fixed message (4.0.5).
+          const cause = result._tag === "Failure" ? result.failure.cause : undefined;
+          const signal = cause instanceof Error ? /^Process interrupted due to receipt of signal: '(SIG[A-Z0-9]+)'$/.exec(cause.message)?.[1] ?? null : null;
+          yield* emit({ _tag: "exited", ...identity(processEntry), exitCode: result._tag === "Success" ? Number(result.success) : null, signal, stderr });
           if (processes.get(input.agentId) === processEntry) processes.delete(input.agentId);
           // Close from the parent scope so the watcher never interrupts itself.
           yield* close(processEntry).pipe(Effect.forkIn(lifetime));

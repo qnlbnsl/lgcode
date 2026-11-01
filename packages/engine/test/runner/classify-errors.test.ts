@@ -111,13 +111,13 @@ afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig); });
 const live = (name: string, body: () => Effect.Effect<unknown, unknown, any>) =>
   it.live(name, () => body() as Effect.Effect<unknown, unknown, never>, 30_000);
 
-const turnReply = (context: { readonly runner: any; readonly events: ReadonlyArray<any>; readonly waitFor: any }, spawn: { readonly agentId: any; readonly incarnation: string }, text: string) =>
+const turnReply = (context: { readonly runner: any; readonly events: ReadonlyArray<any>; readonly waitFor: any }, spawn: { readonly agentId: any; readonly incarnation: string }, text: string): Effect.Effect<unknown, unknown, never> =>
   Effect.gen(function* () {
     const delivery = deliveryFor(spawn.agentId, text);
     const before = context.events.length;
     yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
     return yield* context.waitFor((event: any) => event._tag === "promptReply" && event.deliveryId === delivery.id, before);
-  });
+  }) as Effect.Effect<unknown, unknown, never>;
 
 live("6.9 the real runner, with no classifier passed in, turns each recorded out-of-usage reply into a pause and each recorded signed-out reply into a signed-out pause, not an error or a crash (breaks if the runner's default classifier is missing or is not the one in runner/classify.ts)", () =>
   // No `classifyError` option is given: the default must be the real one.

@@ -1143,7 +1143,7 @@ settings paths are also owner-routed.
 ## 74. Requests asked by a crashed or stopped agent remain open
 
 Found: 2026-11-01, in the review of unit 5c.
-State: open for units 6a and 6d.
+State: crash permission cancellation is fixed in unit 6c. Stop and recovery closure remain open, and question closure needs an owner decision (issue 113).
 
 What happens: no current writer emits `PermissionCancelled` or closes the
 questions asked by an agent that crashes or stops. Moving the subjects it
@@ -1159,6 +1159,12 @@ with the cancelled outcome when a turn is cancelled, and removes its local
 hold so a later answer is refused. That protocol response does not close the
 engine's durable permission record. The request cancellation and question
 closure contracts above remain work for units 6c and 6d.
+
+Unit 6c now writes `PermissionCancelled` for every open permission request
+asked by the crashed agent, in the crash append, with the fixed reason
+"agent crashed". It withdraws each queued request delivery before moving
+subjects held by the dead agent. Questions stay open, without an invented
+answer.
 
 ## 75. The wait contract has no owner waiter
 
@@ -1291,11 +1297,18 @@ What should happen: unit 6d decides when the follower becomes active during reco
 ## 89. The parent's crash notice and the wait's crash notice are separate
 
 Found: 2026-11-01, while building unit 5d, and named in the lead's ruling on its focused review.
-State: open for unit 6.6.
+State: fixed in unit 6c.
 
 What happens: when a child crashes, unit 5d writes a crash notice to each agent whose non-blocking wait names the child and stays open. Unit 6.6 will also tell the child's parent about the crash.
 Why it matters: when the waiter is the parent, it would receive two notices for one crash (row 67).
 What should happen: unit 6.6 merges the two notices into one when the waiter is the parent.
+
+What changed: the crash handler adds a fixed notice to the nearest available
+ancestor only when that ancestor has no open wait naming the dead agent.
+The same append computes the wait notices after queuing any ancestor notice.
+A blocking
+wait's reply serves as its notice. Without an available ancestor, the same
+append writes "owner needed" with the fixed reason "agent crashed".
 
 ## 90. The first harness's adapter labels mode-raising options as ordinary "allow always"
 
@@ -1485,7 +1498,7 @@ or accept another delivery. Session replay remains separately tagged.
 ## 102. A future crash stderr tail must redact across chunk boundaries
 
 Found: 2026-11-01, in unit 6a's focused review, finding F-6.
-State: open for unit 6c, which implements the crash stderr tail.
+State: fixed in unit 6c.
 
 What happens: the runner currently drains stderr, calls `redactText` and
 discards it. That is safe while no bytes are retained or published. It does
@@ -1496,6 +1509,12 @@ persisting or logging the tail. It must not store independently redacted raw
 chunks as the crash tail.
 Why it matters: joining those chunks could reconstruct a secret that neither
 individual `redactText` call could match.
+
+What changed: every child has its own stderr carry and bounded tail. The
+runner drains stderr and flushes the carries before emitting its exit
+event. Stop and scope cleanup also flush the carries before releasing
+credentials. The handler stores the resulting tail through the event
+log's redaction boundary.
 
 ## 103. Adapter setup has no timeout, and spawn registration is not atomic
 
@@ -1531,7 +1550,7 @@ and the approval routing guard the state folder and the settings files (rows
 ## 110. The replay test for the cursor transcript expects success, which unit 6c changes
 
 Found: 2026-11-01, by the unit 6c test writer, while writing criterion 6.9.
-State: open for unit 6c.
+State: fixed in unit 6c, with the lead's approval in the builder task.
 
 What happens: `packages/engine/test/runner/replay.test.ts`, the test named
 "6.2 replay cursor", replays the recorded cursor transcript with no
@@ -1545,10 +1564,14 @@ expectation, so the old one would otherwise fail for a correct change.
 Why it matters: a builder who sees a red test in a file they did not write
 might weaken the classifier to make it green again.
 
+What changed: only the cursor replay's expected outcome changes from
+success to an out-of-usage pause. The other recorded greetings still expect
+success, and the runner uses the real classifier by default.
+
 ## 111. The runner discards a child's stderr, so a crash records none of it
 
 Found: 2026-11-01, by the unit 6c test writer.
-State: open for unit 6c.
+State: fixed in unit 6c.
 
 What happens: the runner drains a child's stderr and throws the text away
 (`AcpRunner.ts`, the stderr reader), and its exit event carries an empty
@@ -1561,10 +1584,14 @@ Why it matters: a crash with no error text cannot be diagnosed, and a
 tail that is cut per chunk could store a secret that was split across two
 chunks.
 
+What changed: the runner retains the last 30 redacted stderr lines, bounds
+each retained line to 16,384 characters, and drains the pipe before reporting
+the exit. The handler persists the tail with the exit code or signal.
+
 ## 112. A crash cancels no permission request and tells no parent
 
 Found: 2026-11-01, by the unit 6c test writer, as the follow-up to issue 74.
-State: open for unit 6c.
+State: fixed in unit 6c.
 
 What happens: the exit handler marks the agent crashed, withdraws its pending
 deliveries and revokes its token, but it does not cancel the agent's open
@@ -1578,6 +1605,11 @@ notice when that ancestor waits, issue 89), or one "owner needed" when no
 agent can act.
 Why it matters: an open request of a dead agent stays in the owner's inbox
 forever, and a team lead can wait on a worker that will never answer.
+
+What changed: the crash append cancels the dead agent's open permission
+requests, withdraws their queued deliveries, revokes its token, and tells
+the nearest available ancestor once, or records that the owner is needed.
+The notification contains no stderr, exit code or signal.
 
 ## 113. Nothing closes the open questions of a crashed agent
 
@@ -1608,3 +1640,84 @@ What should happen: the builder follows the reading in the unit 6c result
 owner states otherwise. The unit 6c tests do not cover this case.
 Why it matters: a second notice to a blocked parent would be delivered after
 its wait call returns and repeat what the call already told it.
+
+## 120. The leftover-process reader does not support macOS yet
+
+Found: 2026-11-01, while building unit 6c.
+State: open for a macOS implementation and host verification.
+
+What happens: `recovery/orphans.ts` provides the Linux reader and an explicit
+unsupported macOS reader. The macOS reader throws before the sweep can send
+a signal.
+What should happen: a macOS implementation reads the boot identity, process
+group, start time, user and executable, and passes criterion 6.8 on a macOS
+host before recovery uses it.
+Why it matters: a sweep must refuse unsupported process identity checks
+rather than signal a group based only on its number. The lead authorized
+this stub for unit 6c.
+
+## 121. The frozen classifier-test helper inferred an unknown Effect requirement
+
+Found: 2026-11-01, while running the engine typecheck for unit 6c.
+State: fixed in unit 6c, with the lead's approval in board post 968.
+
+What happened: `test/runner/classify-errors.test.ts` gave `turnReply` an
+untyped runner and waiter. Yielding those values inferred an unknown
+Effect requirement, causing four type errors at `withAcpRunner` call sites.
+What changed: the helper now explicitly returns
+`Effect.Effect<unknown, unknown, never>`, with a matching cast on its
+generator. No assertion or test case changed.
+Why it matters: the runtime checks passed, but the frozen helper prevented
+the required engine typecheck from passing.
+
+## 122. The request-routing crash test excluded the new owner crash alert
+
+Found: 2026-11-01, while running the full engine and testing suite for unit 6c.
+State: fixed in unit 6c, with the lead's approval in board post 970.
+
+What happened: `test/routing/moving-requests.test.ts` expected exactly two
+"owner needed" events when a dead holder's permission request and question
+moved to the owner. Unit 6c also requires a separate crash alert when the
+dead agent has no available ancestor, so the old assertion rejected a
+correct third event with no subject.
+What changed: the shared assertion still requires exactly the two subject
+alerts. The crash case separately requires exactly one subjectless alert
+for the dead lead, with the fixed reason "agent crashed", in the same append.
+Why it matters: preserving the old expectation would suppress a required
+notification about a dead agent.
+
+## 123. Crash notices must be queued before checking ancestors for settlement
+
+Found: 2026-11-01, during the unit 6c implementation review.
+State: fixed in unit 6c before hand-off.
+
+What happened: an intermediate implementation evaluated waits before adding
+the ancestor's crash notice. Cancelling a dead child's last permission
+request could temporarily make its idle holder look settled, satisfying a
+higher ancestor's wait before the queued crash notice made the holder busy
+again.
+What changed: the crash helper uses existing open waits to choose whether
+the ancestor needs a separate notice. The command handler evaluates waits
+only after the complete crash batch, including that notice, is assembled.
+Why it matters: a crash notice is pending work, so its target must not look
+settled to a higher ancestor in the same append.
+
+## 124. A permission-race test intermittently observes an earlier log event
+
+Found: 2026-11-01, during unit 6c's full engine and testing suite.
+State: open for the test writer to investigate.
+
+What happened: `routing/permissions.test.ts`, "5.5 answer racing pass-up",
+failed its `whileHeld` assertion once because it contained one event at
+sequence 14. The same case passed in the two preceding full runs. The
+failure output did not expand the event, so its tag is not confirmed.
+What may explain it: `support/routingRig.ts`, `behindWriter`, reads the
+initial log sequence before forking the writer-permit holder, then sleeps
+instead of acknowledging that the permit is held. A previously scheduled
+dispatch could commit between that read and acquisition. This is an
+inference from the helper's ordering, not a confirmed event trace.
+What should happen: investigate that interval and synchronize the helper's
+watermark with confirmed permit acquisition if it admits earlier commits.
+Why it matters: a pre-existing event could fail the assertion even when
+both raced commands correctly wait for the writer. Unit 6c leaves the
+frozen helper and this test unchanged.

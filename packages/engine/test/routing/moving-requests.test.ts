@@ -95,7 +95,7 @@ const expectMovedIn = (batch: ReadonlyArray<Logged>, world: Family, from: Actor,
   } else {
     expect(queuedFor(batch, "permission", world.request.id)).toEqual([]);
     expect(queuedFor(batch, "question", world.question.id)).toEqual([]);
-    expect(tagged(batch, "OwnerNeeded").map((event) => event.subject).sort((a, b) => a!._tag.localeCompare(b!._tag))).toEqual([
+    expect(tagged(batch, "OwnerNeeded").filter((event) => event.subject !== undefined).map((event) => event.subject).sort((a, b) => a!._tag.localeCompare(b!._tag))).toEqual([
       { _tag: "permission", id: world.request.id }, { _tag: "question", id: world.question.id },
     ]);
   }
@@ -175,7 +175,11 @@ it.live("5.6 move to the owner: catches a crash that leaves the request with a p
     const before = yield* headSequence;
     yield* fakes.runner.emit({ _tag: "exited", agentId: agentIdOf("lead"), exitCode: null, signal: "SIGKILL", stderr: "" });
     const written = yield* eventually(logAfter(before), (rows) => rows.some((row) => row.event._tag === "AgentCrashed"));
-    expectMovedIn(appendWith(written, (row) => row.event._tag === "AgentCrashed"), world, agent("lead"), owner);
+    const batch = appendWith(written, (row) => row.event._tag === "AgentCrashed");
+    expectMovedIn(batch, world, agent("lead"), owner);
+    expect(tagged(batch, "OwnerNeeded").filter((event) => event.subject === undefined)).toEqual([
+      { _tag: "OwnerNeeded", agentId: "lead", reason: "agent crashed" },
+    ]);
     yield* expectHeldBy(world, owner);
   })).pipe(Effect.orDie));
 
