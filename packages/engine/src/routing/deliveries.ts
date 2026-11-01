@@ -182,7 +182,7 @@ export const promptReply = (
       // Only a sign-out is account-wide. A usage limit pauses the agent that
       // met it; its siblings meet the limit on their own turns.
       const onAccount = reason !== "signed-out" ? [] : Object.values(snapshot.agents).filter((agent) => agent.account === accountId && agent.agentId !== agentId
-        && (agent.state._tag === "working" || agent.state._tag === "idle"
+        && (agent.state._tag === "working" || agent.state._tag === "idle" || agent.state._tag === "starting"
           || (agent.state._tag === "paused" && agent.state.reason === "limit")));
       const paused: ReadonlyArray<Event> = [
         ...marked,

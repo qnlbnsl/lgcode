@@ -1613,10 +1613,10 @@ Why it matters: an agent paused mid-turn came back idle without being told to ca
 ## 132. A starting agent could get work after its account signed out
 
 Found: 2026-11-01, in the focused review of unit 6b (finding A2).
-State: fixed in unit 6b fix round 1, in two of the three ruled parts.
+State: fixed in unit 6b fix round 1.
 
 What happens: a sign-out paused only working and idle agents on the account. A sibling still starting opened its session afterwards and was sent its first prompt on a signed-out account.
-What should happen: (b) when `start` records `SessionOpened` and the account is then `needs-sign-in`, the same append pauses the agent with `signed-out` and `midTurn` false; (c) dispatch never sends to an agent whose account is `needs-sign-in`. Both are done. Part (a), pausing starting agents at the sign-out, is not done: the lifecycle table makes `SessionOpened` invalid from `paused`, so a starting agent paused early could not record its session. Parts (b) and (c) already close the gap, since the agent is paused the moment its session opens.
+What should happen: (a) a sign-out also pauses the account's starting agents, with `signed-out` and `midTurn` false; (b) when `start` records `SessionOpened` and the account is then `needs-sign-in`, the same append pauses the agent; (c) dispatch never sends to an agent whose account is `needs-sign-in`. All three are done. The lifecycle table makes `SessionOpened` invalid from `paused`, so the reducer records the session and keeps the paused state; `start` accepts a starting or paused agent, and returns a paused-while-starting agent to idle when its session opens after the account came back. `accounts mark-available` skips an agent that has no session yet, since `start` returns it.
 Why it matters: work reached an account the owner had to sign in again.
 
 ## 133. A symbolic link in the state folder could move the shadow home outside it

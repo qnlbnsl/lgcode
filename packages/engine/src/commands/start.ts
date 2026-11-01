@@ -53,23 +53,29 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
       afterCommit: Effect.gen(function* () {
         // The new id becomes visible at commit, before this lane is acquired.
         // A stop that wins the lane must prevent the later process spawn.
-        if ((yield* runtime.views.snapshot).agents[agentId]?.state._tag !== "starting") return;
+        // Fix round 1, A2: a sign-out pauses a starting agent too; it still
+        // opens its session, which the pause then keeps.
+        const waiting = (yield* runtime.views.snapshot).agents[agentId]?.state._tag;
+        if (waiting !== "starting" && waiting !== "paused") return;
         yield* Effect.suspend(() => runtime.runner.start({ agentId, token: token.token, folder, grant, harness, account,
           permission: payload.permission, ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }),
         })).pipe(
           Effect.flatMap((session) => runtime.log.transact((append) => Effect.gen(function* () {
             // An exit can arrive while the session result is being returned.
-            if ((yield* runtime.views.snapshot).agents[agentId]?.state._tag !== "starting") return;
+            const before = (yield* runtime.views.snapshot).agents[agentId]?.state._tag;
+            if (before !== "starting" && before !== "paused") return;
             // Fix round 1, A2: an account that signed out while this session
-            // was opening pauses the agent in the same append, so no work
-            // reaches it; the owner's "account available" brings it back.
+            // was opening keeps the agent paused, in the same append, so no
+            // work reaches it; the owner's "account available" brings it back.
+            // An agent paused while starting whose account has since come back
+            // goes idle here, as it has a session now.
             const snapshot = yield* runtime.views.snapshot;
             const signedOut = snapshot.accounts[account.id]?.status === "needs-sign-in";
-            const opened: ReadonlyArray<Event> = [
-              { _tag: "SessionOpened", agentId, ...session },
-              ...(signedOut ? [{ _tag: "StateChanged" as const, agentId, state: { _tag: "paused" as const, reason: "signed-out" as const, midTurn: false } }] : []),
-            ];
-            yield* append(actor, freshRequest(), randomUUID(), signedOut ? withWaitChecks(snapshot, opened) : opened, {});
+            const lifecycle: ReadonlyArray<Event> = signedOut
+              ? [{ _tag: "StateChanged", agentId, state: { _tag: "paused", reason: "signed-out", midTurn: false } }]
+              : before === "paused" ? [{ _tag: "StateChanged", agentId, state: { _tag: "idle" } }] : [];
+            const opened: ReadonlyArray<Event> = [{ _tag: "SessionOpened", agentId, ...session }, ...lifecycle];
+            yield* append(actor, freshRequest(), randomUUID(), lifecycle.length > 0 ? withWaitChecks(snapshot, opened) : opened, {});
           })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
           Effect.catchTag("RunnerRejected", () => runtime.log.transact((append) => Effect.gen(function* () {
             const snapshot = yield* runtime.views.snapshot;

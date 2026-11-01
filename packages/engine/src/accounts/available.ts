@@ -32,7 +32,7 @@ export const returnAgents = (snapshot: Snapshot, accountId: string, cause: Cause
   if (snapshot.accounts[accountId]?.status !== "available") return [];
   return Object.values(snapshot.agents).flatMap((agent): ReadonlyArray<Event> => {
     const state = agent.state;
-    if (agent.account !== accountId || state._tag !== "paused" || (cause === "usage reset" && state.reason !== "limit")) return [];
+    if (agent.account !== accountId || state._tag !== "paused" || agent.session === undefined || (cause === "usage reset" && state.reason !== "limit")) return [];
     const { agentId } = agent;
     const id = freshDelivery();
     return [
