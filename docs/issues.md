@@ -380,8 +380,8 @@ Why it matters: the shared definitions must hold every event the engine writes.
 Found: 2026-11-01, in the focused review of unit 3.
 State: deferred by the lead's fix-round-1 rulings.
 
-- `PromptSent` repeats the prompt text from `DeliveryQueued`; unit 4a decides whether both copies are needed.
-- `SessionOpened.process` overlaps the transactional process side rows; unit 4a decides how these records relate.
+- `PromptSent` repeats the prompt text from `DeliveryQueued`. Decided in unit 4a (2026-11-01): the log keeps both copies and changes no contract. The two events happen at different times, a queued prompt can wait a long time, and a thread reader needs `PromptSent` to stand alone. The cost is one extra copy of each prompt in the log. Each copy passes through the redactor on its own.
+- `SessionOpened.process` overlaps the transactional process side rows. Decided in unit 4a (2026-11-01): the event keeps the historical snapshot, and the `processes` row, written in the same transaction by `EventLog.append`, is the operational record that the restart sweep reads. Neither is derived from the other.
 - `CommandRefused.reason` is free text; unit 5 must keep request content, including secret values, out of it.
 - `adapterPath` accepts `/../x`; unit 6 resolves the absolute path before spawning the adapter.
 - The review's remaining minor mutations, M9 and M12, are not covered by tests in this round.
@@ -410,3 +410,18 @@ Account environment names also recognize PASSWD and CREDENTIAL variants and
 the AUTH segment, and displayed states have a literal schema.
 Why it matters: every later engine unit consumes these contracts, so missing
 security and recovery rules would otherwise propagate into the implementation.
+
+## 26. The event log's agent column covers only events with a top-level agent id
+
+Found: 2026-11-01, in unit 4a.
+State: open.
+
+What happened: `EventLog.append` fills `events.agent_id` and the envelope's
+`agentId` from the event's own `agentId` field. Events that name an agent
+elsewhere, such as `DeliveryQueued` (its `delivery.target`), or that name no
+agent, such as account and device events, get a null `agent_id`.
+What should happen: unit 4b, when it filters a thread by agent, either reads
+the payload for those events or the contracts name one agent field for every
+event that belongs to a thread.
+Why it matters: a subscriber that filters on the column alone would miss a
+queued delivery in the target's thread.
