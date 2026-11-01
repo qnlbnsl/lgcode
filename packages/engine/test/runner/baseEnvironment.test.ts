@@ -157,3 +157,40 @@ it("a real child started with the built environment sees exactly those names and
   assert.deepEqual(seen, [...Object.keys(allowListed), "ACCOUNT_VAR", "SHEPHERD_SOCKET", "SHEPHERD_TOKEN"].sort())
   assert.notInclude(child.stdout, "planted")
 })
+
+it("passes exactly the allow-listed names from a parent that holds every one of them and many more, and not one name beyond the list (breaks if the allow-list gains a name such as EDITOR, PAGER, NODE_OPTIONS or SSH_AUTH_SOCK; rows 33 and 57)", () => {
+  // The expected names are written out here on purpose: they are the allow-list of row 33, and
+  // they must not be derived from the code under test.
+  const allowedNames = [
+    "PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "LC_CTYPE", "LC_MESSAGES", "LC_TIME",
+    "TERM", "TMPDIR", "TZ"
+  ]
+  const others = {
+    EDITOR: "vim",
+    VISUAL: "vim",
+    PAGER: "less",
+    NODE_OPTIONS: "--require=/tmp/planted.js",
+    SSH_AUTH_SOCK: "/tmp/ssh-planted/agent.1",
+    DISPLAY: ":0",
+    XDG_RUNTIME_DIR: "/run/user/1000",
+    XDG_CONFIG_HOME: "/home/someone/.config",
+    COLORTERM: "truecolor",
+    TERM_PROGRAM: "planted-terminal",
+    NO_COLOR: "1",
+    FORCE_COLOR: "1",
+    LD_PRELOAD: "/tmp/planted.so",
+    PWD: "/home/someone/work",
+    OLDPWD: "/home/someone",
+    SHLVL: "2",
+    _: "/usr/bin/planted",
+    CI: "true",
+    GIT_AUTHOR_NAME: "Planted",
+    HTTP_PROXY: "http://planted:8080"
+  }
+  const parent: Record<string, string> = { ...others }
+  for (const name of allowedNames) parent[name] = `value-of-${name}`
+  const environment = buildBaseEnvironment({ parent })
+  assert.deepEqual(keys(environment), [...allowedNames].sort())
+  for (const name of allowedNames) assert.equal(environment[name], `value-of-${name}`)
+  for (const name of Object.keys(others)) assert.notProperty(environment, name)
+})

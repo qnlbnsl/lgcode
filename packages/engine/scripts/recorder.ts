@@ -12,6 +12,7 @@ interface ScrubContext {
   readonly homeDirectory: string
   readonly workspace: string
   readonly environment: Readonly<Record<string, string | undefined>>
+  readonly sessionIds?: ReadonlySet<string>
 }
 
 export function scrubText(text: string, context: ScrubContext): string {
@@ -26,12 +27,19 @@ export function scrubText(text: string, context: ScrubContext): string {
   if (context.homeDirectory) add(context.homeDirectory, "<home>")
   if (context.workspace) add(context.workspace, "<workspace>")
   const ordered = [...replacements].sort(([a], [b]) => b.length - a.length)
+  const removePem = (value: string) => value.replace(/-----BEGIN ([A-Z0-9][A-Z0-9 -]*)-----[\s\S]*?-----END \1-----/g, "<redacted>")
   const clean = (value: string) => {
+    value = removePem(value)
     for (const [secret, replacement] of ordered) value = value.replaceAll(secret, replacement)
     return value
       .replace(/\b(?:sk-ant-[A-Za-z0-9_-]+|sk-[A-Za-z0-9_-]{16,}|gh[pousr]_[A-Za-z0-9_]+|AKIA[A-Z0-9]{16}|shp_[ad]_[A-Za-z0-9_-]+)\b/g, "<redacted>")
       .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "<redacted>")
       .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, "Bearer <redacted>")
+      .replace(/\b(?:github_pat_[A-Za-z0-9_]+|AIza[A-Za-z0-9_-]+|xox[abpr]-[A-Za-z0-9-]+|key_[A-Za-z0-9_-]{16,})\b/g, "<redacted>")
+      .replace(/\b[0-9a-f]{32,}\b/gi, "<redacted>")
+      .replace(/[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}/g, "<email>")
+      .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+        (id) => context.sessionIds?.has(id) ? id : "<id>")
   }
   const walk = (value: unknown): unknown => {
     if (typeof value === "string") return clean(value)
@@ -44,7 +52,7 @@ export function scrubText(text: string, context: ScrubContext): string {
     if (value !== null && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, item]) => [clean(key), walk(item)]))
     return value
   }
-  return text.split("\n").map((line) => {
+  return removePem(text).split("\n").map((line) => {
     try { return JSON.stringify(walk(JSON.parse(line))) } catch { return clean(line) }
   }).join("\n")
 }
@@ -68,7 +76,7 @@ interface RecordOptions {
   readonly captureSignedOut?: boolean
 }
 type RecordResult =
-  | { readonly harness: string; readonly status: "recorded"; readonly file: string; readonly workspace: string }
+  | { readonly harness: string; readonly status: "recorded"; readonly file: string; readonly workspace: string; readonly droppedExtensionFrames: number; signedOutNotObserved?: boolean }
   | { readonly harness: string; readonly status: "skipped"; readonly reason: string }
 type Frame = Record<string, any>
 
@@ -77,7 +85,7 @@ class RecordingError extends Error {}
 const safeName = (name: string) => /^[a-z][a-z0-9-]*$/.test(name)
 
 async function recordOne(settings: HarnessSettings, environment: Record<string, string>, workspace: string,
-  prompt: string, scrub: (text: string) => string, signal: AbortSignal, signedOut?: (text: string) => void) {
+  prompt: string, scrub: (text: string, sessionIds?: ReadonlySet<string>) => string, signal: AbortSignal, signedOut?: (text: string) => void) {
   // No ACP debug callbacks: these are the actual transport frames, scrubbed before retention.
   const child = spawn(settings.adapterPath, [...settings.adapterArguments], { cwd: workspace, env: environment, detached: true, stdio: ["pipe", "pipe", "pipe"] })
   const terminate = (signal: NodeJS.Signals) => {
@@ -86,9 +94,11 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
     try { process.kill(-child.pid, signal) } catch { /* The group has already exited. */ }
   }
   const entries: unknown[] = []
+  const sessionIds = new Set<string>()
+  let droppedExtensionFrames = 0
   let total = 0
   const retain = (type: string, frame: Frame) => {
-    const safe = scrub(JSON.stringify({ type, frame }))
+    const safe = scrub(JSON.stringify({ type, frame }), sessionIds)
     total += Buffer.byteLength(safe)
     if (total > 16 * 1024 * 1024) throw new RecordingError("Recording exceeded the frame limit")
     entries.push(JSON.parse(safe))
@@ -116,6 +126,12 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
     try {
       for await (const line of lines) {
         const frame = JSON.parse(line) as Frame
+        if (typeof frame.method === "string" && frame.method.startsWith("_")) {
+          droppedExtensionFrames++
+          continue
+        }
+        // Session identifiers are protocol references, rather than account identity.
+        if (typeof frame.result?.sessionId === "string") sessionIds.add(frame.result.sessionId)
         retain("emit_inbound", frame)
         if (typeof frame.method === "string") {
           if (frame.id !== undefined) {
@@ -175,7 +191,7 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
     const prompted = request("session/prompt", { sessionId: session.sessionId, prompt: [{ type: "text", text: prompt }] })
     const [reply] = await Promise.all([prompted, idle])
     if (reply.stopReason === "error") throw new RecordingError("Adapter turn failed")
-    return { version: initialized.info?.version ?? initialized.agentInfo?.version, protocolVersion: initialized.protocolVersion, entries }
+    return { version: initialized.info?.version ?? initialized.agentInfo?.version, protocolVersion: initialized.protocolVersion, entries, sessionIds, droppedExtensionFrames }
   } finally {
     clearTimeout(timer)
     signal.removeEventListener("abort", abort)
@@ -214,15 +230,15 @@ export const recordFixtures = (options: RecordOptions) => Effect.tryPromise({
       const workspace = await mkdtemp(join(options.temporaryRoot, `${harness.id}-`))
       await chmod(workspace, 0o700)
       const environment = buildBaseEnvironment({ parent: options.parentEnvironment, ...(harness.accountVariables ? { accountVariables: harness.accountVariables } : {}) })
-      const scrub = (text: string) => scrubText(text, { homeDirectory: options.homeDirectory, workspace, environment: { ...allEnvironment, ...environment } })
+      const scrub = (text: string, sessionIds?: ReadonlySet<string>) => scrubText(text, { homeDirectory: options.homeDirectory, workspace, environment: { ...allEnvironment, ...environment }, ...(sessionIds ? { sessionIds } : {}) })
       const recording = await recordOne(harness.settings, environment, workspace, options.prompt, scrub, signal)
       if (typeof recording.version !== "string" || !recording.version.trim()) throw new RecordingError("Adapter did not report its version")
       const header = { type: "transcript_start", provider: harness.id, protocol: "acp", version: recording.version, scenario: "read-only-greeting", metadata: { protocolVersion: recording.protocolVersion } }
-      const text = [header, ...recording.entries, { type: "runtime_exit", status: "success" }].map((entry) => scrub(JSON.stringify(entry))).join("\n") + "\n"
+      const text = [header, ...recording.entries, { type: "runtime_exit", status: "success" }].map((entry) => scrub(JSON.stringify(entry), recording.sessionIds)).join("\n") + "\n"
       const file = join(options.outputDirectory, `${harness.id}.ndjson`)
       await writeFile(file, text, { mode: 0o600 })
       // The caller owns outputDirectory. Do not echo its private home path in results.
-      results.push({ harness: harness.id, status: "recorded", file: scrub(file), workspace })
+      results.push({ harness: harness.id, status: "recorded", file: scrub(file), workspace, droppedExtensionFrames: recording.droppedExtensionFrames })
     }
     const samples: ErrorSample[] = [...options.errorSamples ?? []]
     if (options.captureSignedOut) {
@@ -242,9 +258,13 @@ export const recordFixtures = (options: RecordOptions) => Effect.tryPromise({
             (text) => scrubText(text, { homeDirectory: options.homeDirectory, workspace, environment: { ...allEnvironment, ...environment } }), signal,
             (text) => { captured = text })
         } catch (error) {
-          if (!captured) throw error
+          if (signal.aborted) throw error
         }
-        if (!captured) throw new RecordingError("Empty-home probe did not produce an authentication-required error")
+        if (!captured) {
+          const result = results.find((result) => result.harness === harness.id)
+          if (result?.status === "recorded") result.signedOutNotObserved = true
+          continue
+        }
         samples.push({ harness: harness.id, kind: "signed-out", text: captured, source: "Recorded from the installed adapter with an empty temporary home and no account variables", verified: true })
       }
     }
@@ -261,5 +281,5 @@ export const recordFixtures = (options: RecordOptions) => Effect.tryPromise({
 }).pipe(Effect.provide(Logger.layer([Logger.make(() => { process.stderr.write("[redacted recorder diagnostic]\n") })])))
 
 export const formatReport = (results: ReadonlyArray<RecordResult>): string => results.map((result) =>
-  `${result.harness}: ${result.status}${result.status === "skipped" ? ` (${result.reason})` : ""}`
+  `${result.harness}: ${result.status}${result.status === "skipped" ? ` (${result.reason})` : `; droppedExtensionFrames: ${result.droppedExtensionFrames}${result.signedOutNotObserved ? "; signedOutNotObserved" : ""}`}`
 ).join("\n")

@@ -468,3 +468,34 @@ Why it matters: the frozen tests prove the fake's journey, but they cannot prove
 that every owner-installed harness supports the required recording interface.
 The owner-run command must surface that incompatibility instead of producing a
 fixture from an unconfirmed permission mode.
+
+## 29. Recording needed account identity removal and nonfatal sign-out probes
+
+Found: 2026-11-01, in the focused review of unit 8a at 99b70b8.
+State: fixed in the unit 8a follow-up.
+
+What happened: inbound extension frames could carry an account's email,
+organization and identifier into a fixture. Text scrubbing missed email,
+universally unique identifiers and several credential shapes. An empty-home
+probe without an authentication error also failed an otherwise valid recording.
+What should happen: the recorder discards every inbound extension frame before
+retention and reports only a count. Text scrubbing removes account identity,
+additional token shapes, long hexadecimal values and complete private key
+blocks. Protocol session identifiers retain their reference identity.
+A missing sign-out observation is reported without replacing an unverified
+sample or failing the command. Diagnostic fake steps exercise stderr draining
+and subprocess cleanup, and a version 1 wire mode exercises the pinned adapter's
+initialize shape.
+Why it matters: committed fixtures must not expose account identity or secrets,
+and an optional observation must not prevent an ordinary recording.
+
+## 30. Later engine units and the live recording have three review seams
+
+Found: 2026-11-01, in the focused review of unit 8a.
+State: open for the named later work.
+
+Unit 6a adds the named `ReplayParseError` and harness permission mapping exports
+when it needs them. Unit 8a does not add unused exports.
+Harness-path overrides introduced through settings must also be absolute paths.
+The owner must read the first generated `claude.ndjson` before committing it.
+The lead tells the manager this when requesting the owner-run recording.

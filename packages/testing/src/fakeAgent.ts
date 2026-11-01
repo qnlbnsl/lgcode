@@ -6,9 +6,19 @@ import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Logger from "effect/Logger"
+import type * as Schema from "effect/Schema"
+import * as Sink from "effect/Sink"
+import * as Stdio from "effect/Stdio"
+import * as Stream from "effect/Stream"
+import { spawn, type ChildProcess } from "node:child_process"
 import WebSocket from "ws"
 
-type Step =
+type DiagnosticStep =
+  | { type: "ext_notification"; method: string; params: Schema.Json }
+  | { type: "stderr_flood"; bytes: number }
+  | { type: "spawn_grandchild" }
+type StepDiagnostic = DiagnosticStep extends infer D ? D extends { type: infer T } ? Omit<D, "type"> & { step: T } : never : never
+type Step = DiagnosticStep | StepDiagnostic
   | { step: "text"; text: string }
   | { step: "plan"; entries: AcpSchema.PlanEntry[] }
   | { step: "tool_call"; toolCallId: string; title: string; kind: AcpSchema.ToolKind; status: AcpSchema.ToolCallStatus; output: string }
@@ -25,6 +35,7 @@ type Step =
   | { step: "slow"; ms: number }
   | { step: "print_env" }
 interface Script {
+  protocolVersion?: 1 | 2
   agentInfo?: { name: string; version: string }
   configOptions?: AcpSchema.SessionConfigOption[]
   history?: Array<{ role: "user" | "agent"; text: string }>
@@ -36,7 +47,7 @@ let script: Script
 try {
   if (environment.FAKE_AGENT_SCRIPT === undefined) throw new Error()
   script = JSON.parse(environment.FAKE_AGENT_SCRIPT) as Script
-  if (!Array.isArray(script.turns)) throw new Error()
+  if (!Array.isArray(script.turns) || (script.protocolVersion !== undefined && script.protocolVersion !== 1 && script.protocolVersion !== 2)) throw new Error()
 } catch {
   process.stderr.write("FAKE_AGENT_SCRIPT must contain a JSON script with turns\n")
   process.exit(1)
@@ -44,6 +55,61 @@ try {
 
 // Drop every diagnostic field, including annotations and causes. Wire logging is never enabled.
 const safeLogger = Logger.make(() => { process.stderr.write("[redacted agent diagnostic]\n") })
+
+// Reap diagnostic subprocesses before exiting, including when the recorder kills our group.
+const grandchildren = new Map<ChildProcess, Promise<void>>()
+process.on("SIGTERM", () => {
+  for (const child of grandchildren.keys()) child.kill("SIGTERM")
+  void Promise.all(grandchildren.values()).then(() => process.exit(0))
+})
+const spawnGrandchild = () => Effect.callback<number, AcpRequestError>((resume) => {
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 60000)"], { env: environment, stdio: "ignore" })
+  const closed = new Promise<void>((resolve) => child.once("close", () => { grandchildren.delete(child); resolve() }))
+  grandchildren.set(child, closed)
+  child.once("spawn", () => resume(Effect.succeed(child.pid!)))
+  child.once("error", () => resume(Effect.fail(AcpRequestError.internalError("Unable to start diagnostic child"))))
+})
+const floodStderr = (bytes: number) => Effect.callback<void, AcpRequestError>((resume) => {
+  if (!Number.isSafeInteger(bytes) || bytes < 0) { resume(Effect.fail(AcpRequestError.invalidParams("Invalid stderr byte count"))); return }
+  const write = (remaining: number) => {
+    if (remaining === 0) { resume(Effect.void); return }
+    const count = Math.min(remaining, 65536)
+    process.stderr.write(Buffer.alloc(count, 120), (error) => {
+      if (error) resume(Effect.fail(AcpRequestError.internalError("Unable to write diagnostic stderr")))
+      else write(remaining - count)
+    })
+  }
+  write(bytes)
+})
+
+// The server is v2. Adapt only its wire boundary to the pinned adapter's v1 shape.
+const version1Stdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
+  const stdio = yield* Stdio.Stdio
+  const methods = new Map<string | number, string>()
+  const stops = new Map<string, string>()
+  const inbound = (line: string) => {
+    const frame = JSON.parse(line)
+    if (frame.id !== undefined && typeof frame.method === "string") methods.set(frame.id, frame.method)
+    if (frame.method === "initialize") frame.params = { ...frame.params, info: frame.params.info ?? frame.params.clientInfo, capabilities: frame.params.capabilities ?? frame.params.clientCapabilities ?? {} }
+    if (frame.method === "session/set_config_option") frame.params.type ??= "id"
+    return JSON.stringify(frame) + "\n"
+  }
+  const outbound = (chunk: string | Uint8Array) => Buffer.from(chunk).toString().split("\n").filter(Boolean).map((line) => {
+    const frame = JSON.parse(line)
+    const update = frame.params?.update
+    if (update?.sessionUpdate === "state_update" && update.state === "idle") stops.set(frame.params.sessionId, update.stopReason)
+    if (frame.result && methods.get(frame.id) === "initialize") {
+      frame.result = { protocolVersion: 1, agentInfo: frame.result.info, agentCapabilities: { loadSession: true }, authMethods: [] }
+    }
+    if (frame.result && methods.get(frame.id) === "session/prompt") frame.result.stopReason = [...stops.values()].at(-1) ?? "end_turn"
+    if (frame.id !== undefined && frame.method === undefined) methods.delete(frame.id)
+    return JSON.stringify(frame) + "\n"
+  }).join("")
+  return Stdio.make({ ...stdio,
+    stdin: stdio.stdin.pipe(Stream.decodeText(), Stream.splitLines, Stream.filter((line) => line.trim().length > 0), Stream.map(inbound), Stream.encodeText),
+    stdout: (options) => Sink.mapInput(stdio.stdout(options), outbound)
+  })
+}))
 
 const shepherdCommand = (command: string, input: unknown) => Effect.callback<string>((resume) => {
   const socket = environment.SHEPHERD_SOCKET
@@ -110,6 +176,13 @@ const program = Effect.gen(function*() {
     const steps = script.turns[session.turn++] ?? []
     const run = Effect.gen(function*() {
       for (const step of steps) {
+        const diagnostic = "type" in step ? { ...step, step: step.type } as StepDiagnostic : step
+        switch (diagnostic.step) {
+          case "ext_notification": yield* agent.client.extNotification(diagnostic.method, diagnostic.params); continue
+          case "stderr_flood": yield* floodStderr(diagnostic.bytes); continue
+          case "spawn_grandchild": yield* text(`grandchild pid: ${yield* spawnGrandchild()}`); continue
+        }
+        if ("type" in step) continue
         switch (step.step) {
           case "text": yield* text(step.text); break
           case "plan": yield* update({ sessionUpdate: "plan_update", plan: { type: "items", planId: "script-plan", entries: step.entries } }); break
@@ -155,7 +228,7 @@ const program = Effect.gen(function*() {
 })
 
 Effect.runPromise(program.pipe(
-  Effect.provide(AcpAgent.layerStdio().pipe(Layer.provide(NodeServices.layer))),
+  Effect.provide(AcpAgent.layerStdio().pipe(Layer.provide(script.protocolVersion === 1 ? version1Stdio.pipe(Layer.provide(NodeServices.layer)) : NodeServices.layer))),
   Effect.provide(Logger.layer([safeLogger])),
   Effect.scoped
 )).catch(() => { process.stderr.write("Fake agent failed\n"); process.exitCode = 1 })
