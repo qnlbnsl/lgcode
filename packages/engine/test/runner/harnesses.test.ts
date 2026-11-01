@@ -29,6 +29,9 @@ import * as Schema from "effect/Schema"
 import { afterEach, beforeEach, vi } from "vitest"
 
 import { resolveHarnessDefaults } from "../../src/runner/harnesses.ts"
+import { registerRebuildCheck } from "../support/rebuildCheck.ts"
+
+registerRebuildCheck({ noLog: true })
 
 let root: string
 let binDirectory: string

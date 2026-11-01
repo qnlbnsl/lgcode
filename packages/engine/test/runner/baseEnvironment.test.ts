@@ -17,6 +17,9 @@ import { assert, it } from "@effect/vitest"
 import { afterEach, vi } from "vitest"
 
 import { buildBaseEnvironment } from "../../src/runner/baseEnvironment.ts"
+import { registerRebuildCheck } from "../support/rebuildCheck.ts"
+
+registerRebuildCheck({ noLog: true })
 
 afterEach(() => {
   vi.unstubAllEnvs()
