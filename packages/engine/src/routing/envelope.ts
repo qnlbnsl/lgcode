@@ -2,9 +2,10 @@ import { randomBytes } from "node:crypto";
 import type { Actor } from "@shepherd/contracts";
 
 // Decision rows 38 and 58. A prompt an agent sends to another agent must not
-// start with a slash command, after any leading whitespace. The owner's own
-// prompts are never passed through here.
-export const escapeLeadingSlash = (text: string): string => text.replace(/^(\s*)\//, "$1\\/");
+// start with a slash command, after any leading whitespace: every Unicode
+// White_Space character, and the invisible format characters (Cf) such as
+// U+200B and U+FEFF. The owner's own prompts are never passed through here.
+export const escapeLeadingSlash = (text: string): string => text.replace(/^([\p{White_Space}\p{Cf}]*)\//u, "$1\\/");
 
 // Wraps data the engine passes from one agent to another. The marker comes
 // from a cryptographic source and is fresh for every envelope, so a closing

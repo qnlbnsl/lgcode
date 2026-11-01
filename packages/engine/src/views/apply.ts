@@ -26,6 +26,9 @@ interface AgentRow {
   readonly session?: SessionReference;
   readonly protocolVersion?: number;
   readonly reloadable?: boolean;
+  // Fix round 1, F8 and row 67: true from the sending of a compact delivery
+  // until that turn ends or the agent stops working.
+  readonly compacting: boolean;
 }
 
 interface RequestRow {
@@ -177,6 +180,7 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
       ...(event.model === undefined ? {} : { model: event.model }),
       ...(event.effort === undefined ? {} : { effort: event.effort }),
       permission: event.permission, folder: event.folder, runMode: event.runMode, state: { _tag: "starting" },
+      compacting: false,
     });
     case "SessionOpened": return change(state.agents, event.agentId, (row) => ({
       ...row, state: nextState(row.state, event), session: event.session,
@@ -186,17 +190,22 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
     case "ModeChanged": return change(state.agents, event.agentId, (row) => ({
       ...row, mode: event.mode, permission: event.level,
     }));
+    case "DeliverySent": return change(state.agents, event.agentId, (row) => {
+      const next = nextState(row.state, event);
+      const compacting = next._tag === "working" && lookup(state.deliveries, event.deliveryId)?.content._tag === "compact";
+      return next === row.state && compacting === row.compacting ? row : { ...row, state: next, compacting };
+    });
     case "AgentStartFailed":
     case "TurnStarted":
     case "TurnEnded":
     case "StateChanged":
-    case "DeliverySent":
     case "AgentCrashed":
     case "AgentInterrupted":
     case "AgentReloadFailed":
     case "AgentStopped": return change(state.agents, event.agentId, (row) => {
       const next = nextState(row.state, event);
-      return next === row.state ? row : { ...row, state: next };
+      const compacting = row.compacting && event._tag !== "TurnEnded" && next._tag === "working";
+      return next === row.state && compacting === row.compacting ? row : { ...row, state: next, compacting };
     });
     default: return state.agents;
   }

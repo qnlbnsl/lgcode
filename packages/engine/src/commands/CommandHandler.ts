@@ -19,6 +19,7 @@ import { EventLog, LogWriteFailed, type SideRows } from "../log/EventLog.ts";
 import { Runner, RunnerEvent } from "../runner/Runner.ts";
 import { dispatchCommitted, deliveryUpdate, promptReply, targetGone, turnEnded } from "../routing/deliveries.ts";
 import { holderAbove, moveHeld, passUp } from "../routing/holders.ts";
+import { withLane } from "../routing/lanes.ts";
 import { answer, permissionRequested } from "../routing/permissions.ts";
 import { ask } from "../routing/questions.ts";
 import { project, wait, waitReply, withWaitChecks } from "../routing/waits.ts";
@@ -140,7 +141,7 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
           : append({ _tag: "owner" }, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), sideRows).pipe(Effect.asVoid);
         switch (event._tag) {
           case "permissionRequested": return yield* write(yield* permissionRequested(snapshot, event));
-          case "turnEnded": return yield* write(turnEnded(snapshot, event.agentId));
+          case "turnEnded": return yield* write(turnEnded(snapshot, event));
           case "deliveryUpdate": return yield* write(deliveryUpdate(snapshot, event));
           case "promptReply": return yield* write(yield* promptReply(snapshot, event, log.redactText));
           case "exited": {
@@ -159,9 +160,26 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
     yield* runner.events.pipe(Stream.runForEach(handleRunnerEvent), Effect.forkScoped);
     yield* dispatchCommitted;
 
+    // Fix round 1, F3: a command that changes a target's process holds the
+    // target's send lane from before its writer transaction through its
+    // runner call. The lane always comes before the writer (lanes.ts). The
+    // payload is not decoded yet, so only a string id picks a lane; a lane
+    // for a bad id is harmless.
+    const laneFor = (name: string, rawPayload: unknown): string | undefined => {
+      if ((name !== "stop" && name !== "resume") || typeof rawPayload !== "object" || rawPayload === null) return undefined;
+      const agentId = (rawPayload as { readonly agentId?: unknown }).agentId;
+      return typeof agentId === "string" ? agentId : undefined;
+    };
+    // Issue 77: a blocking wait commits its opening and registers its
+    // cancellation in one uninterruptible step (waits.ts, `block`). Every
+    // other command stays interruptible throughout, as before.
+    const isBlockingWait = (name: string, rawPayload: unknown) => name === "wait" && typeof rawPayload === "object"
+      && rawPayload !== null && (rawPayload as { readonly block?: unknown }).block === true;
+
     return CommandHandler.of({
-      execute: (credential, name, rawPayload) => Effect.gen(function* () {
-        const outcome = yield* log.transact((append) => Effect.gen(function* () {
+      execute: (credential, name, rawPayload) => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
+        const step = isBlockingWait(name, rawPayload) ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : restore;
+        const outcome = yield* step(log.transact((append) => Effect.gen(function* () {
           // Invalid credentials never write an event or retrieve a receipt.
           let actor: Actor;
           if (credential._tag === "owner") actor = { _tag: "owner" };
@@ -236,11 +254,15 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
             SELECT result_json FROM receipts WHERE caller = ${caller} AND request_id = ${requestId}`;
           if (written[0] === undefined) return yield* new LogWriteFailed({ reason: "receipt insert returned no result" });
           return { ...(yield* decodeReceipt(written[0].result_json)), afterCommit: plan.afterCommit };
-        }));
+        })));
         if (outcome.failure !== undefined) return yield* outcome.failure;
-        const late = outcome.afterCommit === undefined ? undefined : yield* outcome.afterCommit;
+        const late = outcome.afterCommit === undefined ? undefined : yield* step(outcome.afterCommit);
         return late ?? outcome.reply!;
-      }).pipe(
+      })).pipe(
+        (effect) => {
+          const lane = laneFor(name, rawPayload);
+          return lane === undefined ? effect : withLane(log, lane)(effect);
+        },
         Effect.provideService(SqlClient.SqlClient, sql),
         Effect.catchTag("RequestIdReused", () => Effect.fail(refused("request id reused"))),
         Effect.catchTag("SqlError", () => Effect.fail(new LogWriteFailed({ reason: "database read failed" }))),

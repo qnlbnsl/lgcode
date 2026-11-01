@@ -16,7 +16,7 @@ import { EventLog } from "../log/EventLog.ts";
 import { apply } from "../views/apply.ts";
 import { Views } from "../views/Views.ts";
 import { envelope } from "./envelope.ts";
-import { freshDelivery } from "./holders.ts";
+import { freshDelivery, holderAbove } from "./holders.ts";
 
 type Reason = WaitMember["reason"];
 type Wait = Snapshot["waits"][string];
@@ -155,7 +155,11 @@ export const waitReply = (events: ReadonlyArray<Event>): Record<string, unknown>
 // the views after each commit, so a commit between its opening and its
 // subscription is not missed. The connection closing interrupts it and
 // commits "wait cancelled".
-const block = (runtime: Runtime, requestId: string, waitId: WaitId) => Effect.scoped(Effect.gen(function* () {
+//
+// Issue 77: CommandHandler runs the opening commit and this effect in one
+// uninterruptible region, so the cancellation is registered before any
+// interruption can arrive; only the waiting itself is interruptible.
+const block = (runtime: Runtime, requestId: string, waitId: WaitId) => Effect.interruptible(Effect.scoped(Effect.gen(function* () {
   const committed = yield* runtime.log.subscribeCommitted;
   for (;;) {
     const row = (yield* runtime.views.snapshot).waits[waitId];
@@ -164,7 +168,7 @@ const block = (runtime: Runtime, requestId: string, waitId: WaitId) => Effect.sc
     }
     yield* PubSub.takeAll(committed);
   }
-})).pipe(Effect.onInterrupt(() => runtime.log.transact((append) => Effect.gen(function* () {
+}))).pipe(Effect.onInterrupt(() => runtime.log.transact((append) => Effect.gen(function* () {
   const row = (yield* runtime.views.snapshot).waits[waitId];
   if (row?.status !== "open") return;
   yield* append({ _tag: "agent", agentId: row.agentId }, freshRequest(), randomUUID(), [{
@@ -179,6 +183,13 @@ export const wait = ({ actor, snapshot, runtime }: Input, payload: Payload<"wait
   if (actor._tag !== "agent") return Effect.fail(refused());
   const members = [...new Set(payload.members)];
   if (members.some((member) => member === actor.agentId || snapshot.agents[member] === undefined)) return Effect.fail(refused());
+  // Fix round 1, F1 and row 27: waiting is a parent's right, held by the
+  // nearest ancestor that can act. A list with any other member is refused
+  // whole.
+  if (members.some((member) => {
+    const holder = holderAbove(snapshot, member);
+    return holder._tag !== "agent" || holder.agentId !== actor.agentId;
+  })) return Effect.fail(refused());
   const waitId = decodeWaitId(randomUUID());
   return Effect.succeed({
     events: [{ _tag: "WaitOpened", agentId: actor.agentId, waitId, members, mode: payload.mode, blocking: payload.block }],

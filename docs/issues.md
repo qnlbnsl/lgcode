@@ -1144,20 +1144,22 @@ What should happen: the contracts add an engine sender, or the plan states that 
 ## 77. A blocking wait's retry and its cancellation window
 
 Found: 2026-11-01, while building unit 5d.
-State: open for unit 7a, which owns the transport and its connection handling.
+State: the cancellation window is fixed in unit 5d's fix round 1. The retry part is open for unit 7a, which owns the transport and its connection handling.
 
 What happens: a blocking `wait` stores its receipt when the wait opens, so a retry with the same request identifier returns the stored "opened" reply, not the final outcome. Separately, the handler runs the blocking part after the opening commit. An interruption that lands after the commit and before the blocking part starts would leave the wait open.
 Why it matters: a blocking wait creates no delivery and never counts against its caller's settled state, so a left-open wait wakes nobody. It still shows as open until recovery step 6 cancels blocking waits (row 66).
 What should happen: the transport retries a blocking wait with a new request identifier, and unit 7a either masks interruption across the commit and the start of the blocking part or cancels open blocking waits of closed connections.
+What changed in fix round 1: `CommandHandler.execute` runs inside `Effect.uninterruptibleMask`. For a blocking wait, the opening transaction and the blocking part run in the uninterruptible region, and only the waiting loop inside `block` is interruptible. Its `Effect.onInterrupt` cancellation is therefore registered before any interruption can arrive, and an interruption at any point after the `WaitOpened` commit writes `WaitCancelled` with the reason "connection closed". Every other command runs with interruption restored, as before.
 
 ## 78. Follow-up appends after a rejected start or reload skip the wait checks
 
 Found: 2026-11-01, while building unit 5d.
-State: open for unit 6a.
+State: fixed in unit 5d's fix round 1.
 
 What happens: when the runner rejects a start or a reload, `start.ts` and `resume.ts` append `AgentStartFailed` or `AgentReloadFailed` with `EventLog.append`, outside a transaction that reads the views. Those batches carry no wait checks, so a wait on that agent resolves only at the next check that runs, or at recovery's re-check.
 Why it matters: a parent waiting on a child whose start failed is not woken at once.
 What should happen: unit 6a writes these follow-ups through `EventLog.transact` with the views snapshot and `withWaitChecks`, like the other runner events.
+What changed in fix round 1: `start.ts` and `resume.ts` now write these follow-ups through `EventLog.transact`, with the views snapshot and `withWaitChecks`, so a waiter on that agent is resolved in the same append as the failure.
 
 
 ## 79. Nine earlier tests assumed a delivery to an idle agent stays queued
@@ -1168,3 +1170,87 @@ State: fixed with the lead's approval in board post 909.
 What happened: unit 5d sends a delivery to an idle agent as soon as it is queued, and a stop resolves another agent's wait on the stopped agent. Seven unit 5c tests seeded an idle holder and expected its routed delivery to stay queued or to be withdrawn. The unit 5b stop test expected a wait on the stopped agent to stay open.
 What changed: tests whose point is a withdrawal or a queued move now seed the holder as working, so its delivery stays queued. The two tests whose names need an idle holder keep it idle and assert that the delivery was sent. The stop test asserts that the other agent's wait resolves with the reason "stopped" and is not cancelled. No other assertion changed.
 Why it matters: the old expectations contradicted decision rows 25, 29 and 50.
+
+## 80. A wait could name agents the caller has no rights over
+
+Found: 2026-11-01, in the focused review of unit 5d (finding F1).
+State: fixed in unit 5d's fix round 1.
+
+What happened: `wait` checked only that each member exists and is not the caller. Any agent could wait on an unrelated agent, a sibling or its own parent.
+What changed: decision row 27 lists `wait` among a parent's rights. `routing/waits.ts` now refuses the whole command with "command refused" unless `holderAbove` names the caller for every member, the same rule the other targeted parent commands use. The check runs inside the command's writer transaction, and a refused list writes no `WaitOpened`.
+
+## 81. A failure reply after a content update was ignored
+
+Found: 2026-11-01, in the focused review of unit 5d (finding F2).
+State: fixed in unit 5d's fix round 1.
+
+What happened: a content update can accept a delivery before the reply that ends the turn. An error or pause reply then found the delivery no longer "sent" and wrote nothing, so the agent stayed working with no turn running.
+What changed: `promptReply` handles an error or a pause for the delivery that started the agent's current turn, whether it is sent or already accepted. An error on an accepted delivery returns it to its sender with the redacted reason and makes the agent idle; the delivery is not put back in the queue. A pause on an accepted delivery pauses the agent with `midTurn: true` and does not requeue it; carrying on is unit 6b's. A second terminal reply, or one for an earlier delivery, writes nothing.
+
+## 82. A send reserved before a stop could reach the runner after it
+
+Found: 2026-11-01, in the focused review of unit 5d (finding F3).
+State: fixed in unit 5d's fix round 1. Unit 6a must build the runner's half.
+
+What happened: `dispatchQueued` committed `DeliverySent` and then called the runner with no lock against `stop` or `resume`. A stop could commit between the two, so the prompt reached a process the engine had stopped, or a later run of the same agent.
+What changed: `routing/lanes.ts` gives each agent one send lane. `dispatchQueued` holds it from the reservation through the runner call. `stop` and `resume` hold the target's lane from before their writer transaction through their runner call, and `start` holds the new agent's lane through its runner call. The lane always comes before the writer's permit, so the two cannot deadlock. `Runner.prompt` and `Runner.compact` also take the incarnation the send was reserved for, the hash of the agent's live token, read in the reservation transaction.
+What unit 6a must do: refuse a send with `RunnerRejected` when its incarnation is not the live process's incarnation.
+
+## 83. A repeated turn end could end the next turn
+
+Found: 2026-11-01, in the focused review of unit 5d (finding F4).
+State: fixed in unit 5d's fix round 1. Unit 6a must build the runner's half.
+
+What happened: the `turnEnded` runner event named only the agent. A repeated or late turn end for an earlier delivery ended whatever turn was running, and the next queued delivery was sent while the agent was still busy.
+What changed: `turnEnded` carries the identifier of the delivery whose turn ended. The engine writes `TurnEnded` only when the agent is working and that identifier is the delivery that started its current turn, the last one sent since the previous turn end.
+What unit 6a must do: name the delivery whose `session/prompt` reply ended, from the runner's own process table (issue 61).
+
+## 84. A queued answer to a stopped or crashed agent was lost
+
+Found: 2026-11-01, in the focused review of unit 5d (finding F5).
+State: fixed in unit 5d's fix round 1.
+
+What happened: `targetGone` returned to its sender only a delivery with no source. An answer carries its question as source, cannot move, and was withdrawn silently, so the answerer never learned it was not delivered.
+What changed: `targetGone` classifies by role. A wait's wake is only withdrawn (row 50). A routed permission request or question whose subject is still open has already moved with `moveHeld`, and is only withdrawn. Every other pending delivery, including an answer to a closed question, is withdrawn and returned to its sender as "not delivered" (row 69).
+
+## 85. One slow send held up every other agent's dispatch
+
+Found: 2026-11-01, in the focused review of unit 5d (finding F6).
+State: fixed in unit 5d's fix round 1.
+
+What happened: the committed-event follower awaited each agent's `dispatchQueued`, and so its runner call, before handling the next agent's events.
+What changed: the follower forks each agent's dispatch as a child fiber, with at most one running per agent. A commit that arrives while one runs makes it go round once more. A failed dispatch logs the fixed line "delivery dispatch failed", and interruption still ends the follower and its fibers.
+
+## 86. Unicode whitespace before a slash escaped the slash-command guard
+
+Found: 2026-11-01, in the focused review of unit 5d (finding F7).
+State: fixed in unit 5d's fix round 1.
+
+What happened: `escapeLeadingSlash` treated only the characters of JavaScript's `\s` as leading whitespace. Format characters such as U+200B and U+FEFF are not in `\s`, so an agent could send a prompt that a harness might still read as a slash command.
+What changed: every character in `\p{White_Space}` and in `\p{Cf}` counts as leading whitespace, with the regular expression's `u` flag (rows 38 and 58). The owner's own prompts are still never escaped.
+
+## 87. The agent view did not show a compact turn
+
+Found: 2026-11-01, in the focused review of unit 5d (finding F8).
+State: fixed in unit 5d's fix round 1.
+
+What happened: row 67 needs a client to see that an agent is compacting, but the agent view showed only "working".
+What changed: the engine's agent view row in `views/apply.ts` has `compacting: boolean`. It is false when the agent starts, becomes true when a compact delivery's `DeliverySent` is applied, and is cleared by the agent's next `TurnEnded` or by any change that leaves the working state. The live and rebuilt views fold it the same way. The row is engine-side, so the contracts are unchanged.
+
+## 88. The dispatch follower is active from the moment the handler starts
+
+Found: 2026-11-01, in the lead's ruling on unit 5d's focused review.
+State: open for unit 6d.
+
+What happens: the committed-event follower starts with the command handler and sends on `SessionOpened`, `DeliveryQueued`, `TurnEnded`, `DeliveryReturned` and `DeliveryRequeued`. It does not send what was queued before it started.
+Why it matters: during recovery, events that recovery itself commits could start sends before recovery has re-checked waits or reconciled sessions.
+What should happen: unit 6d decides when the follower becomes active during recovery, and how the queues that existed before it started are drained, such as by step 10 calling `dispatchQueued` for each agent.
+
+## 89. The parent's crash notice and the wait's crash notice are separate
+
+Found: 2026-11-01, while building unit 5d, and named in the lead's ruling on its focused review.
+State: open for unit 6.6.
+
+What happens: when a child crashes, unit 5d writes a crash notice to each agent whose non-blocking wait names the child and stays open. Unit 6.6 will also tell the child's parent about the crash.
+Why it matters: when the waiter is the parent, it would receive two notices for one crash (row 67).
+What should happen: unit 6.6 merges the two notices into one when the waiter is the parent.
