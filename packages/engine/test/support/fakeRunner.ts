@@ -128,7 +128,7 @@ export interface PromptReplyEvent {
   readonly deliveryId: string;
   readonly outcome:
     | { readonly _tag: "success" }
-    | { readonly _tag: "pause"; readonly reason: "out-of-usage" | "signed-out"; readonly error: string }
+    | { readonly _tag: "pause"; readonly reason: "out-of-usage" | "signed-out"; readonly error: string; readonly resetAt?: number }
     | { readonly _tag: "error"; readonly error: string };
 }
 

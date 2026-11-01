@@ -1527,3 +1527,21 @@ default settings, or a recorded finding that its adapter has none.
 Why it matters: without the rule, only the folder rule, the permission ceiling
 and the approval routing guard the state folder and the settings files (rows
 61, 65 and 72). `SECURITY.md` lists these harnesses.
+
+## 105. The runner's classified pause reply cannot carry a usage reset time
+
+Found: 2026-11-01, while writing unit 6b's account tests.
+State: open for unit 6b's builder, with the classification producer in unit 6c.
+
+What happens: the `promptReply` pause outcome in
+`packages/engine/src/runner/Runner.ts` carries only `reason` and `error`.
+The account and lifecycle event contracts already carry `resetAt`, but no
+reset time can reach their writer through this runner event.
+What should happen: add optional `resetAt` in epoch milliseconds to the
+pause outcome, preserve it through validation, and record it in
+`AccountOutOfUsage` and the paused state. The account timer must use the
+logged deadline after restart. The fake runner's test-only outcome now
+accepts that field so the tests can specify the missing seam.
+Why it matters: decisions 28, 52 and 53 require the account to return at its
+reported wall-clock reset time, including when that time passed during
+downtime. Classification itself remains unit 6c's work.

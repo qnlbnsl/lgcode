@@ -21,6 +21,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as Stream from "effect/Stream";
 
 import * as CommandHandler from "../../src/commands/CommandHandler.ts";
+import type * as SecretStore from "../../src/commands/SecretStore.ts";
 import { checkFolder } from "../../src/identity/ceiling.ts";
 import { redactingLoggerLayer } from "../../src/identity/logger.ts";
 import { makeRedactor } from "../../src/identity/redactor.ts";
@@ -301,6 +302,9 @@ const registryFor = (secrets: FakeSecrets, database?: string) => {
 
 export interface RunnerOptions {
   readonly secrets?: Readonly<Record<string, string>>;
+  // Account tests exercise the persistent store through the real handler.
+  // `secrets` remains the planted registry used by the service's redactor.
+  readonly secretStore?: Layer.Layer<SecretStore.SecretStore>;
   readonly classifyError?: AcpRunner.AcpRunnerOptions["classifyError"];
   readonly environment?: Readonly<Record<string, string>>;
 }
@@ -318,17 +322,17 @@ const loggerFor = (redactText: (text: string) => string, lines: Array<string>) =
   Layer.succeed(MinimumLogLevel, "All"),
 );
 
-const fakeSecretsWith = (values: Readonly<Record<string, string>> = {}): FakeSecrets => {
+const fakeSecretsWith = (values: Readonly<Record<string, string>> = {}, persistent?: Layer.Layer<SecretStore.SecretStore>): FakeSecrets => {
   const secrets = makeFakeSecrets();
   for (const [reference, value] of Object.entries(values)) (secrets.stored as Map<string, string>).set(reference, value);
-  return secrets;
+  return persistent === undefined ? secrets : { ...secrets, layer: persistent };
 };
 
 // The ACP runner alone, with its event stream collected from before the
 // first spawn. The redacting logger is installed before the runner layer is
 // built, as the service does (identity/logger.ts).
 export const withAcpRunner = <A, E>(rig: RunnerRig, options: RunnerOptions, body: (context: RunnerContext) => Effect.Effect<A, E, Scope.Scope>) => {
-  const secrets = fakeSecretsWith(options.secrets);
+  const secrets = fakeSecretsWith(options.secrets, options.secretStore);
   const redactor = registryFor(secrets);
   const lines: Array<string> = [];
   const events: Array<RunnerEvent> = [];
@@ -359,7 +363,7 @@ export const withEngine = <A, E>(
   rig: RunnerRig, options: RunnerOptions & { readonly harness: HarnessSettings; readonly accounts: ReadonlyArray<Account> },
   body: (context: EngineContext) => Effect.Effect<A, E, Scope.Scope | CommandHandler.CommandHandler | EventLog.EventLog | Views.Views | SqlClient.SqlClient | Runner>,
 ) => {
-  const secrets = fakeSecretsWith(options.secrets);
+  const secrets = fakeSecretsWith(options.secrets, options.secretStore);
   const redactor = registryFor(secrets, rig.database);
   const lines: Array<string> = [];
   const events: Array<RunnerEvent> = [];
