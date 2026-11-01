@@ -1407,3 +1407,20 @@ the transaction under the agent's send lane. If the adapter rejects it, the
 runner kills the process; exit cleanup kills its detached process group.
 Why it matters: the fake-process check observes both the mode refusal and
 crash, rather than treating a failed reset as a safe running session.
+
+## 98. A stopped start reservation could spawn a child after its token was revoked
+
+Found: 2026-11-01, in unit 6a's final concurrency review.
+State: fixed in unit 6a.
+
+What happened: a new agent's identifier becomes visible when `AgentStarted`
+commits, before the start command acquires that agent's send lane. Another
+client can stop it in that interval. The original start would then acquire
+the lane and spawn a child for the stopped agent with its revoked token.
+What changed: the start checks that its committed agent is still starting
+inside the lane, immediately before calling the runner. A stop that already
+won the lane makes the remaining start effect a no-op.
+Why it matters: the deterministic check holds the real writer just after
+commit, stops the visible agent through the command handler, then releases
+the start. It observes zero runner starts and no session event, with the
+agent still stopped. No frozen test changed.

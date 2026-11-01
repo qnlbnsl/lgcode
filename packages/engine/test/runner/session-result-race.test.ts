@@ -1,5 +1,7 @@
 import { it } from "@effect/vitest";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Redacted from "effect/Redacted";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 import type { Runner } from "../../src/runner/Runner.ts";
@@ -52,3 +54,36 @@ for (const command of ["start", "resume"] as const) {
     }));
   }), 10_000);
 }
+
+it.live("6.1 start reservation: a stop committed before the start lane is acquired prevents the runner call", () => Effect.gen(function* () {
+  const runner = yield* makeFakeRunner();
+  const committed = yield* Deferred.make<string>();
+  const release = yield* Deferred.make<void>();
+  let views: Views["Service"] | undefined;
+  let held = false;
+  return yield* provideRig(rig, {
+    runner, secrets: makeFakeSecrets(),
+    wrapLog: (real) => ({ ...real, transact: (body) => real.transact(body).pipe(Effect.tap(() => Effect.gen(function* () {
+      if (held || views === undefined) return;
+      const starting = Object.values((yield* views.snapshot).agents).find((agent) => agent.state._tag === "starting");
+      if (starting === undefined) return;
+      held = true;
+      yield* Deferred.succeed(committed, starting.agentId);
+      yield* Deferred.await(release);
+    }))) }),
+  }, Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    views = yield* Views;
+    yield* seedAccount();
+    yield* seedHarness();
+    const starting = yield* call(ownerCredential, "start", startPayload(rig)).pipe(Effect.forkScoped);
+    const agentId = yield* Deferred.await(committed);
+    success(yield* call(ownerCredential, "stop", { agentId }));
+    yield* Deferred.succeed(release, undefined);
+    success(yield* Fiber.join(starting));
+    expect(runner.callsOf("start")).toHaveLength(0);
+    expect(runner.callsOf("stop")).toHaveLength(1);
+    expect((yield* views.snapshot).agents[agentId]?.state._tag).toBe("stopped");
+    expect(tagged(yield* readLog, "SessionOpened")).toHaveLength(0);
+  }));
+}), 10_000);
