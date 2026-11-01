@@ -1706,7 +1706,8 @@ settled to a higher ancestor in the same append.
 
 Found: 2026-11-01, during unit 6c's full engine and testing suite.
 State: the four permission races are fixed by the unit 6c fix-round test
-writer's commit `cf3419e`. A related request-routing fixture gap remains open.
+writer's commit `cf3419e`. Its follow-up `39302d8` corrects the related
+request-routing assertion.
 
 What happened: `routing/permissions.test.ts`, "5.5 answer racing pass-up",
 failed its `whileHeld` assertion because it contained an earlier event.
@@ -1735,8 +1736,10 @@ timeout" case in `routing/moving-requests.test.ts`. Its prohibited subject
 events were absent, but the runner-call count increased from zero to one
 because a `prompt` call arrived after the fixture's watermark. The fixture
 likewise returns before its idle holder's delivery has been dispatched.
-This test's call-count assertion still needs synchronization with pending
-fixture delivery. No builder edit to the test was made.
+The test writer's follow-up permits a late `prompt` only for a delivery
+queued before the watermark. It still rejects other runner calls and keeps
+the subject-event and open-request assertions. No builder edit to the test
+was made.
 
 ## 126. A detached helper could prevent the adapter's crash from being recorded
 
