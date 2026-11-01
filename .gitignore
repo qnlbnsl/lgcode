@@ -1,0 +1,10 @@
+node_modules/
+coverage/
+.vitest/
+**/test/.state/
+**/tests/.state/
+**/test/**/shepherd-state/
+**/tests/**/shepherd-state/
+**/test/**/*.sqlite*
+**/tests/**/*.sqlite*
+.foundry/

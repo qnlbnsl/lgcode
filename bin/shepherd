@@ -1,0 +1,46 @@
+#!/bin/sh
+set -eu
+
+# Herdr may start without a shell profile or a PATH containing Node.js.
+install_hint() {
+  echo 'Shepherd needs Node.js 26. Run nvm install 26, or set SHEPHERD_NODE to its executable.' >&2
+  exit 1
+}
+
+node_bin=${SHEPHERD_NODE:-}
+if [ -z "$node_bin" ]; then
+  nvm_directory=${NVM_DIR:-${HOME:-}/.nvm}
+  newest_minor=-1
+  newest_patch=-1
+  for candidate in "$nvm_directory"/versions/node/v26.*/bin/node; do
+    [ -x "$candidate" ] || continue
+    version=${candidate%/bin/node}
+    version=${version##*/v26.}
+    minor=${version%%.*}
+    patch=${version#*.}
+    case "$minor" in ''|*[!0-9]*) continue ;; esac
+    case "$patch" in ''|*[!0-9]*) continue ;; esac
+    if [ "$minor" -gt "$newest_minor" ] ||
+       { [ "$minor" -eq "$newest_minor" ] && [ "$patch" -gt "$newest_patch" ]; }; then
+      node_bin=$candidate
+      newest_minor=$minor
+      newest_patch=$patch
+    fi
+  done
+fi
+
+if [ -z "$node_bin" ]; then
+  node_bin=$(command -v node) || install_hint
+  case "$("$node_bin" --version 2>/dev/null)" in
+    v26.*) ;;
+    *) install_hint ;;
+  esac
+fi
+[ -x "$node_bin" ] || install_hint
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd -P)
+entry=$root/packages/cli/src/bin.ts
+if [ ! -f "$entry" ]; then
+  entry=$root/bin/stub-entry.ts
+fi
+exec "$node_bin" "$entry" "$@"

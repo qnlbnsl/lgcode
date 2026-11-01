@@ -46,3 +46,62 @@ version named in the root `package.json` before unit 1 runs
 `pnpm install`.
 Why it matters: every build step and `pnpm check` need pnpm; without it,
 unit 1 fails at its first command.
+
+## 3. The plan names a build policy removed from pnpm 12
+
+Found: 2026-11-01, while building the unit 1 workspace.
+State: fixed by the unit 1 workspace configuration.
+
+What happens: decision 39 and criterion 1.6 name `onlyBuiltDependencies`,
+which pnpm removed in version 11. An empty `allowBuilds` policy correctly
+blocked the compiler's post-install script on pnpm 12.16.1.
+What should happen: the workspace uses pnpm's current `allowBuilds` policy
+and fails when an unreviewed dependency asks to run a build script.
+The workspace retains the plan's explicit `onlyBuiltDependencies` list for
+its acceptance check. Both lists allow only `@tsc-rs/typescript` 0.8.0,
+whose script was read and only optimizes its local compiler launcher.
+Why it matters: the obsolete setting alone does not enforce the plan's
+security requirement. The current setting must enforce the same minimal
+list. The pnpm 12 documentation confirms the replacement:
+https://github.com/pnpm/pnpm/blob/v12.15.0/pnpm/docs/settings/build.md
+(read 2026-11-01).
+
+## 4. A transitive platform dependency drifts beyond Effect 4.0.5
+
+Found: 2026-11-01, while installing the unit 1 workspace.
+State: fixed by the unit 1 workspace overrides.
+
+What happens: `@effect/platform-node` 4.0.5 accepts
+`@effect/platform-node-shared` 4.1.1, which requires Effect `^4.1.1`.
+`pnpm peers check` reports this mismatch with the required Effect 4.0.5.
+What should happen: the platform packages and Effect resolve to 4.0.5.
+The workspace pins the shared package and overrides these transitive edges.
+Why it matters: a clean install otherwise silently combines incompatible
+library versions before the copied packages or the socket client use them.
+
+## 5. The original package graph omits later approved dependencies
+
+Found: 2026-11-01, while reconciling unit 1 with the decision log.
+State: fixed by the unit 1 package manifests.
+
+What happens: decision 23 says the testing package depends on contracts
+and copied packages only. Decision 71 adds its client dependency. Decision
+59 also adds the command-line package's engine and tool-server dependencies,
+and the engine's development dependencies on client and testing.
+What should happen: the manifests follow decisions 59 and 71, with the
+engine's client and testing dependencies used only for development.
+Why it matters: the original graph cannot support the later fixture
+recorder and acceptance tests. The revised graph remains acyclic.
+
+## 6. The compiler needs Node.js types selected explicitly
+
+Found: 2026-11-01, while type-checking the unit 1 smoke tests.
+State: fixed by `types: ["node"]` in the shared TypeScript configuration.
+
+What happens: the compiler used by the T3 reference checkout does not
+automatically select the workspace's installed Node.js types for the
+engine package. The smoke tests fail to resolve `node:fs`, `node:sqlite`
+and `process`, even though `@types/node` is installed.
+What should happen: every package selects the shared Node.js type library.
+Why it matters: the frozen smoke tests and later engine units require
+Node.js built-in modules to type-check.
