@@ -26,6 +26,9 @@ interface AgentRow {
   readonly session?: SessionReference;
   readonly protocolVersion?: number;
   readonly reloadable?: boolean;
+  // Fix round 1, F8 and row 67: true from the sending of a compact delivery
+  // until that turn ends or the agent stops working.
+  readonly compacting: boolean;
 }
 
 interface RequestRow {
@@ -61,6 +64,8 @@ interface WaitRow {
   readonly members: ReadonlyArray<AgentId>;
   readonly mode: "any" | "all";
   readonly blocking: boolean;
+  // Rows 25 and 50: the sequence of the event that opened the wait.
+  readonly since: EventSequence;
   readonly status: "open" | "satisfied" | "cancelled";
   readonly resolved: ReadonlyArray<WaitMember>;
   readonly reason?: string;
@@ -175,6 +180,7 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
       ...(event.model === undefined ? {} : { model: event.model }),
       ...(event.effort === undefined ? {} : { effort: event.effort }),
       permission: event.permission, folder: event.folder, runMode: event.runMode, state: { _tag: "starting" },
+      compacting: false,
     });
     case "SessionOpened": return change(state.agents, event.agentId, (row) => ({
       ...row, state: nextState(row.state, event), session: event.session,
@@ -184,17 +190,22 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
     case "ModeChanged": return change(state.agents, event.agentId, (row) => ({
       ...row, mode: event.mode, permission: event.level,
     }));
+    case "DeliverySent": return change(state.agents, event.agentId, (row) => {
+      const next = nextState(row.state, event);
+      const compacting = next._tag === "working" && lookup(state.deliveries, event.deliveryId)?.content._tag === "compact";
+      return next === row.state && compacting === row.compacting ? row : { ...row, state: next, compacting };
+    });
     case "AgentStartFailed":
     case "TurnStarted":
     case "TurnEnded":
     case "StateChanged":
-    case "DeliverySent":
     case "AgentCrashed":
     case "AgentInterrupted":
     case "AgentReloadFailed":
     case "AgentStopped": return change(state.agents, event.agentId, (row) => {
       const next = nextState(row.state, event);
-      return next === row.state ? row : { ...row, state: next };
+      const compacting = row.compacting && event._tag !== "TurnEnded" && next._tag === "working";
+      return next === row.state && compacting === row.compacting ? row : { ...row, state: next, compacting };
     });
     default: return state.agents;
   }
@@ -239,11 +250,11 @@ const questionsAfter = (state: State, event: Event): State["questions"] => {
 const wasResolved = (resolved: ReadonlyArray<WaitMember>, member: WaitMember): ReadonlyArray<WaitMember> =>
   [...resolved.filter((row) => row.agentId !== member.agentId), member];
 
-const waitsAfter = (state: State, event: Event): State["waits"] => {
+const waitsAfter = (state: State, { sequence, event }: EventEnvelope): State["waits"] => {
   switch (event._tag) {
     case "WaitOpened": return put(state.waits, event.waitId, {
       waitId: event.waitId, agentId: event.agentId, members: event.members, mode: event.mode,
-      blocking: event.blocking, status: "open", resolved: [],
+      blocking: event.blocking, since: sequence, status: "open", resolved: [],
     });
     case "WaitMemberResolved": return change(state.waits, event.waitId, (row) => ({
       ...row, resolved: wasResolved(row.resolved, event.member),
@@ -335,7 +346,7 @@ export const apply = (state: State, envelope: EventEnvelope): State => {
       : put(state.threads, owner, [...(lookup(state.threads, owner) ?? []), envelope]),
     requests: requestsAfter(state, event),
     questions: questionsAfter(state, event),
-    waits: waitsAfter(state, event),
+    waits: waitsAfter(state, envelope),
     deliveries: deliveriesAfter(state, event),
     accounts: accountsAfter(state, event),
     devices: devicesAfter(state, event),

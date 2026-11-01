@@ -28,6 +28,7 @@ export interface Runtime {
   readonly log: Context.Service.Shape<typeof EventLog>;
   readonly runner: Context.Service.Shape<typeof Runner>;
   readonly secrets: Context.Service.Shape<typeof SecretStore>;
+  readonly views: Context.Service.Shape<typeof Views>;
   readonly home: string;
   readonly stateFolder: string;
   readonly pluginRoot: string;
@@ -40,7 +41,8 @@ export interface Input {
 export interface Plan {
   readonly events: ReadonlyArray<Event>;
   readonly sideRows?: SideRows;
-  readonly afterCommit?: Effect.Effect<void, LogWriteFailed>;
+  // Runs after the commit. A blocking command returns its final reply here.
+  readonly afterCommit?: Effect.Effect<void | Record<string, unknown>, LogWriteFailed>;
 }
 
 export const freshRequest = () => Schema.decodeUnknownSync(RequestId)(randomUUID());

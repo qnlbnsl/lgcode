@@ -5,6 +5,7 @@ import * as Schema from "effect/Schema";
 
 import { checkFolder, folderForSpawn } from "../identity/ceiling.ts";
 import { mintAgentToken } from "../identity/tokens.ts";
+import { withWaitChecks } from "../routing/waits.ts";
 import { freshRequest, readHarnesses, refused, type Agent, type Input, type Payload, type Plan } from "./internal.ts";
 
 export const resume = ({ runtime, snapshot, actor }: Input, agent: Agent, payload: Payload<"resume">) =>
@@ -41,10 +42,15 @@ export const resume = ({ runtime, snapshot, actor }: Input, agent: Agent, payloa
       events, sideRows: { revokeAgentTokens: [agent.agentId], agentTokens: [{ agentId: agent.agentId, tokenHash: token.tokenHash, revokedAt: null }] },
       afterCommit: Effect.suspend(() => payload.fresh ? runtime.runner.start(spawn) : runtime.runner.load({ ...spawn, session: agent.session! })).pipe(
         Effect.asVoid,
-        Effect.catchTag("RunnerRejected", () => runtime.log.append(actor, freshRequest(), randomUUID(), [
-          { _tag: "StateChanged", agentId: agent.agentId, state: { _tag: "interrupted", previous: "idle" } },
-          { _tag: "AgentReloadFailed", agentId: agent.agentId, reason: "agent reload failed" },
-        ], { revokeAgentTokens: [agent.agentId] }).pipe(Effect.asVoid, Effect.catchTag("RequestIdReused", () => Effect.void))),
+        // Issue 78: the failure carries the wait checks it causes. The
+        // target's send lane is held by CommandHandler around this command.
+        Effect.catchTag("RunnerRejected", () => runtime.log.transact((append) => Effect.gen(function* () {
+          const snapshot = yield* runtime.views.snapshot;
+          yield* append(actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, [
+            { _tag: "StateChanged", agentId: agent.agentId, state: { _tag: "interrupted", previous: "idle" } },
+            { _tag: "AgentReloadFailed", agentId: agent.agentId, reason: "agent reload failed" },
+          ]), { revokeAgentTokens: [agent.agentId] });
+        })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
       ),
     } satisfies Plan;
   });
