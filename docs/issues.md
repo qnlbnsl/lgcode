@@ -557,8 +557,8 @@ State: open.
 ## 34. The recorded fixtures carry the owner's installed skill and command lists
 
 Found: 2026-11-01, when the manager read the first recorded fixtures.
-State: accepted by the manager for now, because the repository is private;
-the owner decides whether to keep it.
+State: fixed by owner ruling, 2026-11-01: "keep them". The recorded fixtures
+keep the full skill and command lists; no trimming and no new scrubber rule.
 
 What happened: `packages/testing/fixtures/claude.ndjson` (lines 5 and 13-15,
 about 50 KB each) and `codex.ndjson` (line 5), and the third harness's `cursor.ndjson` (line 10,
