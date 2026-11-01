@@ -440,6 +440,20 @@ live("a crash step exits the process with the scripted code mid-turn and the cli
     }))
 )
 
+live("a kill_self step ends the process by the named signal mid-turn, so the client sees an exit with no exit code (breaks if the step exits with a code instead of dying by the signal, or does not stop the process)", () =>
+  withClient({ turns: [[{ step: "text", text: "last words" }, { step: "kill_self", signal: "SIGKILL" }]] }, {}, (context) =>
+    Effect.gen(function*() {
+      yield* context.acp.agent.initialize({ protocolVersion: 2 })
+      const session = yield* context.acp.agent.createSession({ cwd: context.home, mcpServers: [] })
+      const failure = yield* context.acp.agent
+        .prompt({ sessionId: session.sessionId, prompt: [{ type: "text", text: "go" }] })
+        .pipe(Effect.flip)
+      assert.equal(failure._tag, "AcpProcessExitedError")
+      assert.notEqual(Number((failure as unknown as { code: unknown }).code), 0)
+      assert.deepEqual(textOf(context.updates), ["last words"])
+    }))
+)
+
 live("an out of usage step ends the turn as an error carrying the scripted message and reset time, not as -32000 (breaks if usage limits look like a sign-out, or the reset time is lost)", () =>
   Effect.gen(function*() {
     const run = yield* converse({
