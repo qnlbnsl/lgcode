@@ -797,3 +797,47 @@ rebuild reuses the same decoding.
 What should happen: move the row type, the decoder and the page size into a
 small module that neither side imports back.
 Why it matters: a later top-level use on either side would fail at load time.
+
+## 49. The folder ceiling and the stream redactor leave duties to later units
+
+Found: 2026-11-01, while building unit 5a.
+State: open. Fix round 1 of unit 5a (2026-11-01) closed the mount and
+back-link items on Linux; each remaining item names the unit that owns it.
+
+What happens: unit 5a's ceiling and redactor meet criteria 5.11 and 5.12, but
+these limits remain.
+
+- A protected folder mounted beneath a requested folder. Fixed on Linux in
+  fix round 1: the check reads `/proc/self/mountinfo` and compares every mount
+  point at or beneath the folder, by device and inode, with each protected
+  folder and each of its ancestors, and an unreadable mount table refuses an
+  agent-started child. Other platforms have no such table, so there the check
+  still sees only the folder's own ancestors, and a protected folder mounted
+  below the requested folder is not found.
+- Linked worktrees. Fixed in fix round 1: a `.git` file is accepted only when
+  git's `gitdir` back-link exists, is a readable regular file, and names the
+  folder's `.git` by device and inode. An agent that can write inside the
+  parent repository's common directory can still register a new worktree
+  entry, with its back-link, that passes. This is the limit decision row 35
+  accepts by allowing worktrees at all.
+- A folder grant lives in memory. Unit 6d's recovery reload (decision row 52,
+  step 7) must rebuild it by calling `checkFolder` with the stored request and
+  then compare the result with the stored real path before it calls
+  `folderForSpawn`.
+- The time between the check and its use. `folderForSpawn` returns a path,
+  and Node.js cannot start a child process in a held directory handle, so a
+  process running as the same user can redirect that path after the check.
+  Unit 6a must call `folderForSpawn` immediately before each spawn. On Linux,
+  unit 6a must also compare the child's `/proc/<pid>/cwd` with the granted
+  device and inode right after the spawn and again after `session/new`, and
+  stop the child on a mismatch.
+- `redactChunk` keeps a carry for each item until that item's final chunk.
+  The carry is bounded by the longest matched form, but unit 6a must send a
+  final chunk for every item, including items cut off by a crash or an
+  interruption, or the carries of abandoned items stay in memory.
+
+What should happen: units 6a and 6d meet the grant, spawn-time and
+final-chunk duties above, and SECURITY.md states the remaining platform and
+worktree limits.
+Why it matters: each limit is a way for an agent-started child to reach a
+folder, or for the service to hold memory, beyond what the ceiling promises.

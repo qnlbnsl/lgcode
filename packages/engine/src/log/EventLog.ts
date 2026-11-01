@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  EventEnvelope, type Actor, type AgentId, type BootId, type Event, type RequestId,
+  EventEnvelope, type Actor, type AgentId, type BootId, DeviceId, type Event, type RequestId,
 } from "@shepherd/contracts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -44,8 +44,25 @@ export interface ProcessRow {
   readonly executable: string;
 }
 
+// A device row holds the credential's hash, never the credential.
+export interface DeviceRow {
+  readonly deviceId: DeviceId;
+  readonly name: string;
+  readonly tokenHash: string;
+  readonly createdAt: number;
+  readonly revokedAt: number | null;
+}
+
+// Rows written in the same transaction as the batch's events (decision row
+// 32, issue 33). Revocations are applied before inserts, so a rotation
+// revokes an agent's earlier tokens and then adds its new one. `"all"`
+// revokes every agent token, for start-up recovery (decision row 52, step 4).
+// A revoked row's `revoked_at` is the batch's `occurredAt`.
 export interface SideRows {
+  readonly revokeAgentTokens?: ReadonlyArray<AgentId> | "all";
   readonly agentTokens?: ReadonlyArray<AgentTokenRow>;
+  readonly revokeDevices?: ReadonlyArray<DeviceId>;
+  readonly devices?: ReadonlyArray<DeviceRow>;
   readonly processes?: ReadonlyArray<ProcessRow>;
 }
 
@@ -68,6 +85,9 @@ export class EventLog extends Context.Service<
 
 const Envelopes = Schema.Array(EventEnvelope);
 const decodeEnvelopes = Schema.decodeUnknownSync(Envelopes);
+
+// The placeholder identifier of the carrier event that redacts side-row text.
+const carrierDeviceId = Schema.decodeUnknownSync(DeviceId)("side-row-text");
 
 // SQLite's primary result code for a full disk.
 const SQLITE_FULL = 13;
@@ -155,9 +175,24 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
           ...(agentId === undefined ? {} : { agentId }), event,
         }));
       }
+      if (sideRows.revokeAgentTokens === "all") {
+        yield* sql`UPDATE agent_tokens SET revoked_at = ${occurredAt} WHERE revoked_at IS NULL`;
+      } else {
+        for (const agentId of sideRows.revokeAgentTokens ?? []) {
+          yield* sql`UPDATE agent_tokens SET revoked_at = ${occurredAt}
+            WHERE agent_id = ${agentId} AND revoked_at IS NULL`;
+        }
+      }
       for (const token of sideRows.agentTokens ?? []) {
         yield* sql`INSERT INTO agent_tokens (token_hash, agent_id, revoked_at)
           VALUES (${token.tokenHash}, ${token.agentId}, ${token.revokedAt})`;
+      }
+      for (const deviceId of sideRows.revokeDevices ?? []) {
+        yield* sql`UPDATE devices SET revoked_at = ${occurredAt} WHERE device_id = ${deviceId} AND revoked_at IS NULL`;
+      }
+      for (const device of sideRows.devices ?? []) {
+        yield* sql`INSERT INTO devices (device_id, name, token_hash, created_at, revoked_at)
+          VALUES (${device.deviceId}, ${device.name}, ${device.tokenHash}, ${device.createdAt}, ${device.revokedAt})`;
       }
       for (const row of sideRows.processes ?? []) {
         yield* sql`INSERT INTO processes (agent_id, group_id, boot_id, start_time, user_id, executable)
@@ -168,13 +203,32 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
       return { envelopes, isNew: true };
     }));
 
+  // Free text in a side row passes through the same redactor as the events
+  // (fix round 1, ruling 4). The Redactor service takes only events and its
+  // shape is fixed, so the text rides in the `name` field of a carrier
+  // `DeviceAdded` event; the redactor rewrites every string field alike.
+  // Identifiers and token hashes are not free text and are left alone.
+  const redactText = (text: string) =>
+    redactor.redact({ _tag: "DeviceAdded", deviceId: carrierDeviceId, name: text }).pipe(
+      // A redactor that returned another event would be a defect; fail closed.
+      Effect.map((event) => event._tag === "DeviceAdded" ? event.name : "[REDACTED]"),
+    );
+  const redactSideRows = (sideRows: SideRows): Effect.Effect<SideRows> => Effect.gen(function* () {
+    const devices = yield* Effect.forEach(sideRows.devices ?? [], (device) =>
+      Effect.map(redactText(device.name), (name): DeviceRow => ({ ...device, name })));
+    const processes = yield* Effect.forEach(sideRows.processes ?? [], (row) =>
+      Effect.map(redactText(row.executable), (executable): ProcessRow => ({ ...row, executable })));
+    return { ...sideRows, devices, processes };
+  });
+
   const append: Context.Service.Shape<typeof EventLog>["append"] = (actor, requestId, bodyHash, events, sideRows) =>
     writer.withPermits(1)(Effect.gen(function* () {
       if (latched !== undefined) return yield* Effect.fail(latched);
       const redacted = yield* Effect.forEach(events, (event) => redactor.redact(event));
+      const redactedSideRows = yield* redactSideRows(sideRows);
       const occurredAt = yield* Clock.currentTimeMillis;
       return yield* Effect.gen(function* () {
-        const batch = yield* commit(callerKey(actor), requestId, bodyHash, redacted, sideRows, actor, occurredAt);
+        const batch = yield* commit(callerKey(actor), requestId, bodyHash, redacted, redactedSideRows, actor, occurredAt);
         if (batch.isNew) yield* publishCommitted(batch.envelopes);
         return batch.envelopes;
       }).pipe(
