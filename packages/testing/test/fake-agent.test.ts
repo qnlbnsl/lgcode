@@ -374,7 +374,9 @@ live("a config options step sends the options exactly as scripted (breaks if con
     ]
     const run = yield* converse({ turns: [[{ step: "config_options", configOptions }]] })
     const update = run.updates.find((candidate) => candidate.sessionUpdate === "config_option_update")
-    assert.deepEqual(update?.configOptions, configOptions)
+    // The copied client renames configId to id on the way in; nothing else may change.
+    const expected = configOptions.map(({ configId, ...rest }) => ({ id: configId, ...rest }))
+    assert.deepEqual(update?.configOptions, expected)
   }))
 
 live("session/new returns the scripted options and set_config_option changes the current value, while set_mode is refused (breaks if the mode is set by session/set_mode; row 70)", () =>
@@ -391,7 +393,7 @@ live("session/new returns the scripted options and set_config_option changes the
         value: "read-only"
       } as never)
       const after = changed.configOptions as unknown as Array<Record<string, any>>
-      assert.equal(after.find((option) => option.configId === "mode")?.currentValue, "read-only")
+      assert.equal(after.find((option) => option.id === "mode")?.currentValue, "read-only")
 
       const refused = yield* acp.agent.setSessionMode({ sessionId: session.sessionId, modeId: "plan" }).pipe(Effect.flip)
       assert.equal(refused._tag === "AcpRequestError" ? refused.code : undefined, -32601)
