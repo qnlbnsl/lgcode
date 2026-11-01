@@ -22,6 +22,7 @@ import * as EventLog from "../../src/log/EventLog.ts";
 import { migrate } from "../../src/log/migrations.ts";
 import * as Redactor from "../../src/log/Redactor.ts";
 import * as Subscribe from "../../src/log/subscribe.ts";
+import { LogReadFailed, SubscribeInvalidCursor } from "../../src/log/subscribe.ts";
 
 let home: string;
 beforeEach(() => {
@@ -395,4 +396,97 @@ it.live("PB-A5 read-only catch-up: catches reading the head or catch-up pages on
     expect(caughtUp._tag).toBe("Success");
     expect(sequencesOf(subscriber.received)).toEqual([1, 2, 3, 4, 5]);
   })),
+);
+
+// Ruling m2 (fix round 1): a cursor that is not a whole number at or above 0
+// is refused at once. `NaN` compares false with every sequence and `-1` or
+// `1.5` replay from the wrong place, so accepting them leaves a gap or a
+// stream that never ends, with no error.
+it.live("m2 invalid cursor: catches accepting NaN, an infinity, a fraction or a negative cursor instead of failing with SubscribeInvalidCursor", () =>
+  withLog(Effect.gen(function* () {
+    const log = yield* EventLog.EventLog;
+    yield* log.append(owner, request("three"), bodyHash("three"), [eventFor(0), eventFor(1), eventFor(2)], {});
+    const invalid = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, 1.5, -1];
+    const results = yield* Effect.forEach(invalid, (after) =>
+      Subscribe.subscribe(after).pipe(Stream.runCollect, Effect.timeout("5 seconds"), Effect.result),
+    { concurrency: "unbounded" });
+
+    for (const [index, after] of invalid.entries()) {
+      const result = results[index]!;
+      const label = `after ${after}`;
+      expect(result._tag, label).toBe("Failure");
+      if (result._tag !== "Failure") throw new Error(`The cursor ${after} was accepted`);
+      expect(result.failure, label).toMatchObject({ _tag: "SubscribeInvalidCursor" });
+      expect(result.failure, label).toBeInstanceOf(SubscribeInvalidCursor);
+      // toBe compares with Object.is, so NaN matches NaN and -1 is not 1.
+      expect((result.failure as SubscribeInvalidCursor).after, label).toBe(after);
+    }
+  })),
+  30_000,
+);
+
+// Ruling m3 (fix round 1): a failed read reaches the client API as a refusal,
+// so it must be a `LogReadFailed` with a fixed reason, as `append` gives
+// `LogWriteFailed`, and never the raw `SqlError`, whose message holds SQL text.
+it.live("m3 read failure: catches a raw SqlError, or SQL text or event data in the reason, when the head read or a catch-up page fails", () =>
+  withLog(Effect.gen(function* () {
+    const log = yield* EventLog.EventLog;
+    const sql = yield* SqlClient.SqlClient;
+    const marker = "MARKER-private-event-value-4b31";
+    yield* log.append(owner, request("private"), bodyHash("private"), [
+      { _tag: "AccountNeedsSignIn", accountId, reason: marker },
+      eventFor(1),
+    ], {});
+
+    // SQLite's own message for a failing statement, found in the SqlError's
+    // cause chain, so the test can show that none of it reaches the reason.
+    const messagesOf = (value: unknown, depth = 0): ReadonlyArray<string> => {
+      if (typeof value !== "object" || value === null || depth > 5) return [];
+      const record = value as { readonly message?: unknown; readonly cause?: unknown; readonly reason?: unknown };
+      return [
+        ...(typeof record.message === "string" ? [record.message] : []),
+        ...messagesOf(record.reason, depth + 1),
+        ...messagesOf(record.cause, depth + 1),
+      ];
+    };
+    const rawMessage = (statement: Effect.Effect<unknown, unknown>) =>
+      SqliteClient.readOnly(statement).pipe(
+        Effect.flip,
+        Effect.map((error) => messagesOf(error).find((message) => message.includes("no such")) ?? "none found"),
+      );
+    const expectSafeReadFailure = (after: number, raw: string, label: string) => Effect.gen(function* () {
+      const result = yield* Subscribe.subscribe(after).pipe(
+        Stream.runCollect, Effect.timeout("5 seconds"), Effect.result,
+      );
+      expect(result._tag, label).toBe("Failure");
+      if (result._tag !== "Failure") throw new Error(`The ${label} succeeded`);
+      expect(result.failure, label).toMatchObject({ _tag: "LogReadFailed" });
+      expect(result.failure, label).toBeInstanceOf(LogReadFailed);
+      const reason = (result.failure as LogReadFailed).reason;
+      expect(typeof reason, label).toBe("string");
+      expect(reason.trim().length, label).toBeGreaterThan(0);
+      // Neither the reason nor anything else the error carries may hold the
+      // SQL text, the database's message, or a stored value.
+      const carried = `${reason}\n${JSON.stringify(result.failure)}`;
+      for (const secret of [raw, marker, "SELECT", "payload_", "events_hidden", "no such", "account-a", "agent-a"]) {
+        expect.soft(carried, `${label} holds ${secret}`).not.toContain(secret);
+      }
+    });
+
+    // A catch-up page fails while the head read still succeeds: the head
+    // query reads only `sequence`, a page reads every column.
+    yield* sql`ALTER TABLE events RENAME COLUMN payload_json TO payload_hidden`;
+    expect(yield* SqliteClient.readOnly(sql`SELECT COALESCE(MAX(sequence), 0) AS head FROM events`))
+      .toEqual([{ head: 2 }]);
+    const pageMessage = yield* rawMessage(sql`SELECT payload_json FROM events`);
+    expect(pageMessage).toContain("payload_json");
+    yield* expectSafeReadFailure(0, pageMessage, "catch-up page read");
+
+    // The head read fails.
+    yield* sql`ALTER TABLE events RENAME TO events_hidden`;
+    const headMessage = yield* rawMessage(sql`SELECT COALESCE(MAX(sequence), 0) AS head FROM events`);
+    expect(headMessage).toContain("events");
+    yield* expectSafeReadFailure(0, headMessage, "head read");
+  })),
+  30_000,
 );
