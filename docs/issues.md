@@ -849,3 +849,35 @@ folder, or for the service to hold memory, beyond what the ceiling promises.
 - **Why it matters:** the redaction is correct, but the carrier event is a workaround. A redactor that ever treated `DeviceAdded` specially would silently change how side rows are redacted.
 - **What should change:** the `Redactor` service in `packages/engine/src/log/Redactor.ts` gains a `redactText(text)` member, and `EventLog.append` calls it for side-row text. Unit 5b owns this, because it is the next unit that touches the event log's callers.
 - **State:** open. The current behaviour is covered by the side-row tests in `packages/engine/test/identity/redactor-fix-1.test.ts`.
+
+## 51. No view holds the harness settings, so a `harnesses set` cannot be read back from the views
+
+- **Found:** unit 5b tests, by the test writer.
+- **What happens:** the reducer in `packages/engine/src/views/apply.ts` ignores `HarnessChanged`, and the snapshot has no harness table. The only way to see the settings a `harnesses set` wrote is the reply of `harnesses list`.
+- **Why it matters:** criterion 5.4 says each lifecycle case asserts the event and the view change. For `harnesses set` there is no view change to assert, so the test reads the list reply, and a client that wants the settings has no live view to subscribe to.
+- **What should change:** either unit 5b adds a harness table to the views, or the plan says that the list reply is the harness view.
+- **State:** open. The test `5.4 harnesses set` reads the list reply.
+
+## 52. No suspended-wait marker exists, so "crash suspends waits" has no observable state
+
+- **Found:** unit 5b tests, by the test writer.
+- **What happens:** decision row 67 says a crash suspends an agent's waits and `resume` re-opens them. `WaitRow` has only the statuses open, satisfied and cancelled, and no event marks a wait as suspended.
+- **Why it matters:** the 5.4 `resume` case cannot assert that suspended waits come back. It asserts only that `resume` does not cancel them, which a build with no suspend at all also passes.
+- **What should change:** the owner or the lead decides whether a wait gets a suspended status, or whether a wait simply stays open across a crash. Unit 5d.1 owns the answer.
+- **State:** open.
+
+## 53. The event log gives a command handler no way to check and write in one writer turn
+
+- **Found:** unit 5b tests, by the test writer.
+- **What happens:** `EventLog.append` takes the writer permit itself, and `withWriterPermit` uses the same semaphore without re-entry. A handler that verifies the caller's token and reads the state inside `withWriterPermit` and then calls `append` waits on itself forever. Without a seam the verification would sit outside the permit, and a token revoked while the command waited would still be accepted.
+- **Why it matters:** criterion 5.1 and decision row 32 require the token to be checked in the writer. The test `5.1 token race` fails if it is checked before.
+- **What should change:** unit 5b adds an `append` variant that runs a check inside its permit and transaction, or lets the handler hand `append` a function that builds the events from a state read taken under the permit.
+- **State:** open. The tests do not name the seam.
+
+## 54. The tests read two behaviours the plan leaves open: crash handling and the shape of a failed start
+
+- **Found:** unit 5b tests, by the test writer.
+- **What happens:** the plan gives `Runner.events` to units 6x but says in unit 5b only that a crash writes `AgentCrashed` with a revocation. The test `5b crash token` assumes a `RunnerEvent` of `{ _tag: "exited", agentId, exitCode, signal, stderr }` that the handler layer turns into the crash. The lifecycle test for a rejected start accepts a reply or a failure, and asserts only the `AgentStartFailed` event and the view.
+- **Why it matters:** if the builder gives the exit event another shape, the crash test fails for a reason that is not a missing behaviour.
+- **What should change:** the lead confirms the shape of the exit event before the builder starts, or moves the crash test to unit 6x.
+- **State:** open.
