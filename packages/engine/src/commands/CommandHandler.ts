@@ -1,0 +1,220 @@
+import { randomUUID } from "node:crypto";
+import {
+  CommandsRpcGroup, EventEnvelope, commandOutcome, ownerOnlyCommands,
+  type Actor, type HarnessSettings, type RequestId,
+} from "@shepherd/contracts";
+import * as Context from "effect/Context";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
+import * as Stream from "effect/Stream";
+import * as SqlClient from "effect/sql/SqlClient";
+
+import { sha256Hex } from "../identity/credential.ts";
+import { verifyDeviceCredential } from "../identity/devices.ts";
+import { verifyAgentToken } from "../identity/tokens.ts";
+import { EventLog, LogWriteFailed } from "../log/EventLog.ts";
+import { Runner } from "../runner/Runner.ts";
+import { Views } from "../views/Views.ts";
+import { apply } from "../views/apply.ts";
+import { SecretStore } from "./SecretStore.ts";
+import { accounts, setSecret, markAvailable } from "./accounts.ts";
+import { compact } from "./compact.ts";
+import { group } from "./group.ts";
+import { harnesses } from "./harnesses.ts";
+import { prompt } from "./prompt.ts";
+import { resume } from "./resume.ts";
+import { start } from "./start.ts";
+import { stop } from "./stop.ts";
+import { CommandRefused, freshRequest, readHarnesses, refused, type Input, type Payload, type Plan, type Runtime, type Snapshot } from "./internal.ts";
+
+export { CommandRefused } from "./internal.ts";
+
+type Credential =
+  | { readonly _tag: "owner" }
+  | { readonly _tag: "device"; readonly credential: Redacted.Redacted<string> }
+  | { readonly _tag: "agent"; readonly token: Redacted.Redacted<string> };
+
+export class CommandHandler extends Context.Service<CommandHandler, {
+  readonly execute: (credential: Credential, name: string, payload: unknown) => Effect.Effect<Record<string, unknown>, CommandRefused | LogWriteFailed>;
+}>()("shepherd/engine/commands/CommandHandler") {}
+
+const supported = new Set(["start", "prompt", "stop", "resume", "compact", "group", "accounts", "accounts set-secret", "accounts mark-available", "harnesses"]);
+const targeted = new Set(["prompt", "stop", "resume", "compact", "group"]);
+const owners = new Set<string>(ownerOnlyCommands);
+const canonical = (value: unknown): string => {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    const entries = Object.entries(value).filter(([, item]) => item !== undefined).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0);
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+};
+
+// Rights are evaluated from this writer turn's snapshot. A cycle or a missing
+// ancestor fails closed to the owner, rather than walking forever.
+const rightsHolder = (snapshot: Snapshot, target: string): Actor => {
+  let parent = snapshot.agents[target]?.parent;
+  const seen = new Set<string>([target]);
+  while (parent?._tag === "agent") {
+    if (seen.has(parent.agentId)) return { _tag: "owner" };
+    seen.add(parent.agentId);
+    const row = snapshot.agents[parent.agentId];
+    if (row === undefined) return { _tag: "owner" };
+    if (row.state._tag === "idle" || row.state._tag === "working") return parent;
+    parent = row.parent;
+  }
+  return { _tag: "owner" };
+};
+
+// Payloads have been checked with their contract's decoded-value schema.
+const planCommand = (input: Input, name: string, payload: Record<string, unknown>): Effect.Effect<Plan, CommandRefused | LogWriteFailed> =>
+  Effect.gen(function* () {
+    const { actor, snapshot } = input;
+    if (!supported.has(name) || (owners.has(name) && actor._tag !== "owner")) return yield* refused();
+    const agentId = payload.agentId as string;
+    const agent = snapshot.agents[agentId];
+    if (targeted.has(name)) {
+      if (agent === undefined || commandOutcome(agent.state._tag, name as "prompt" | "stop" | "resume" | "compact" | "group") === "refused") return yield* refused();
+      const holder = rightsHolder(snapshot, agentId);
+      if (actor._tag === "agent" && (holder._tag !== "agent" || holder.agentId !== actor.agentId)) return yield* refused();
+    }
+    switch (name) {
+      case "start": return yield* start(input, payload as Payload<"start">);
+      case "prompt": return prompt(input, payload as Payload<"prompt">);
+      case "compact": return compact(input, payload as Payload<"compact">);
+      case "stop": return stop(input, agent!);
+      case "resume": return yield* resume(input, agent!, payload as Payload<"resume">);
+      case "group": return group(agent!, payload as Payload<"group">);
+      case "accounts": return yield* accounts(input, payload as Payload<"accounts">);
+      case "accounts set-secret": return yield* setSecret(input, payload as Payload<"accounts set-secret">);
+      case "accounts mark-available": return yield* markAvailable(input, payload as Payload<"accounts mark-available">);
+      case "harnesses": return harnesses(payload as Payload<"harnesses">);
+      default: return yield* refused();
+    }
+  });
+
+const replyFor = (snapshot: Snapshot, name: string, requestId: RequestId, envelopes: ReadonlyArray<EventEnvelope>, settings: ReadonlyArray<HarnessSettings>) => {
+  const events = envelopes.map((envelope) => envelope.event);
+  const failure = events.find((event) => event._tag === "CommandRefused");
+  if (failure !== undefined) return { failure: refused(failure.reason) };
+  const reply: Record<string, unknown> = { requestId };
+  const started = events.find((event) => event._tag === "AgentStarted");
+  if (started !== undefined) reply.agentId = started.agentId;
+  const queued = events.find((event) => event._tag === "DeliveryQueued");
+  if (queued !== undefined) reply.deliveryId = queued.delivery.id;
+  if (name === "accounts") reply.accounts = Object.values(envelopes.reduce(apply, snapshot).accounts);
+  if (name === "harnesses") {
+    const harnesses = new Map(settings.map((harness) => [harness.id, harness]));
+    for (const event of events) if (event._tag === "HarnessChanged") harnesses.set(event.harness.id, event.harness);
+    reply.harnesses = [...harnesses.values()];
+  }
+  return { reply };
+};
+
+export const layer = (configuration: { readonly home: string; readonly stateFolder: string; readonly pluginRoot: string }) =>
+  Layer.effect(CommandHandler, Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient;
+    const log = yield* EventLog;
+    const views = yield* Views;
+    const runner = yield* Runner;
+    const secrets = yield* SecretStore;
+    const runtime: Runtime = { ...configuration, sql, log, runner, secrets };
+
+    // stderr is deliberately omitted. Even a failed adapter can echo a raw
+    // credential there; the contract's required text field receives no data.
+    yield* runner.events.pipe(Stream.runForEach((event) => log.transact((append) => Effect.gen(function* () {
+      const snapshot = yield* views.snapshot;
+      const agent = snapshot.agents[event.agentId];
+      if (agent === undefined || !["starting", "working", "idle", "paused"].includes(agent.state._tag)) return;
+      yield* append({ _tag: "owner" }, freshRequest(), randomUUID(), [{
+        _tag: "AgentCrashed", agentId: event.agentId, exitCode: event.exitCode, signal: event.signal, stderr: "",
+      }], { revokeAgentTokens: [event.agentId] });
+    })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))), Effect.forkScoped);
+
+    return CommandHandler.of({
+      execute: (credential, name, rawPayload) => Effect.gen(function* () {
+        const outcome = yield* log.transact((append) => Effect.gen(function* () {
+          // Invalid credentials never write an event or retrieve a receipt.
+          let actor: Actor;
+          if (credential._tag === "owner") actor = { _tag: "owner" };
+          else if (credential._tag === "device") {
+            yield* verifyDeviceCredential(Redacted.value(credential.credential)).pipe(Effect.mapError(() => refused("invalid credential")));
+            actor = { _tag: "owner" };
+          } else {
+            const agentId = yield* verifyAgentToken(Redacted.value(credential.token)).pipe(Effect.mapError(() => refused("invalid credential")));
+            const current = (yield* views.snapshot).agents[agentId];
+            if (current === undefined || current.state._tag === "stopped" || current.state._tag === "crashed") return yield* refused("invalid credential");
+            actor = { _tag: "agent", agentId };
+          }
+          const rpc = CommandsRpcGroup.requests.get(name);
+          if (rpc === undefined || !supported.has(name)) return yield* refused();
+          const payload = yield* Effect.try({
+            try: () => {
+              // The transport supplies decoded values. Normalize the wrapper's
+              // label before validating it; the label is not secret data.
+              let value = rawPayload;
+              if (name === "accounts set-secret" && typeof value === "object" && value !== null
+                && "value" in value && Redacted.isRedacted(value.value)) {
+                value = { ...value, value: Redacted.make(Redacted.value(value.value), { label: "secret value" }) };
+              }
+              return Schema.decodeUnknownSync(Schema.toType(rpc.payloadSchema))(value) as Record<string, unknown>;
+            },
+            catch: () => refused(),
+          });
+          const { requestId: id, ...body } = payload;
+          const requestId = id as RequestId;
+          const bodyHash = sha256Hex(canonical(name === "accounts set-secret"
+            ? { command: name, accountId: payload.accountId, nonce: payload.nonce }
+            : { command: name, payload: body }));
+          const caller = actor._tag === "owner" ? "owner" : `agent:${actor.agentId}`;
+          const receipts = yield* sql<{ body_hash: string; result_json: string }>`
+            SELECT body_hash, result_json FROM receipts WHERE caller = ${caller} AND request_id = ${requestId}`;
+          const snapshot = yield* views.snapshot;
+          const settings = name === "harnesses" ? yield* readHarnesses(runtime) : [];
+          const decodeReceipt = (resultJson: string) => Effect.try({
+            try: () => {
+              const data: unknown = JSON.parse(resultJson);
+              if (Array.isArray(data)) {
+                const envelopes = Schema.decodeUnknownSync(Schema.Array(EventEnvelope))(data);
+                return replyFor(snapshot, name, requestId, envelopes, settings);
+              }
+              const result = Schema.decodeUnknownSync(Schema.Struct({ envelopes: Schema.Array(EventEnvelope), reply: Schema.Unknown }))(data);
+              return { reply: Schema.decodeUnknownSync(Schema.toType(rpc.successSchema))(result.reply) as Record<string, unknown> };
+            },
+            catch: () => new LogWriteFailed({ reason: "stored receipt is unreadable" }),
+            });
+          const receipt = receipts[0];
+          if (receipt !== undefined) {
+            if (receipt.body_hash !== bodyHash) return yield* refused("request id reused");
+            const stored = yield* decodeReceipt(receipt.result_json);
+            return { ...stored, afterCommit: undefined };
+          }
+          const planned = yield* planCommand({ runtime, actor, snapshot }, name, payload).pipe(Effect.result);
+          if (planned._tag === "Failure") {
+            if (planned.failure._tag === "LogWriteFailed") return yield* planned.failure;
+            const failure = planned.failure;
+            yield* append(actor, requestId, bodyHash, [{ _tag: "CommandRefused", command: name, reason: failure.reason }], {},
+              failure.reason === "no usable account" ? false : undefined);
+            return { failure, afterCommit: undefined };
+          }
+          const plan = planned.success;
+          yield* append(actor, requestId, bodyHash, plan.events, plan.sideRows ?? {}, (batch) =>
+            replyFor(snapshot, name, requestId, batch, settings).reply);
+          // Return precisely the redacted result that a later retry reads.
+          const written = yield* sql<{ result_json: string }>`
+            SELECT result_json FROM receipts WHERE caller = ${caller} AND request_id = ${requestId}`;
+          if (written[0] === undefined) return yield* new LogWriteFailed({ reason: "receipt insert returned no result" });
+          return { ...(yield* decodeReceipt(written[0].result_json)), afterCommit: plan.afterCommit };
+        }));
+        if (outcome.failure !== undefined) return yield* outcome.failure;
+        if (outcome.afterCommit !== undefined) yield* outcome.afterCommit;
+        return outcome.reply!;
+      }).pipe(
+        Effect.provideService(SqlClient.SqlClient, sql),
+        Effect.catchTag("RequestIdReused", () => Effect.fail(refused("request id reused"))),
+        Effect.catchTag("SqlError", () => Effect.fail(new LogWriteFailed({ reason: "database read failed" }))),
+      ),
+    });
+  }));

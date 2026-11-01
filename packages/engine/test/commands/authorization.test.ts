@@ -58,6 +58,7 @@ const expectOutcome = (
 ) => Effect.gen(function* () {
   const views = yield* viewsWithoutSequence;
   const before = yield* headSequence;
+  const runnerCallsBefore = fakes.runner.calls.length;
   const outcome = yield* call(credential, name, payload);
   const written = yield* logAfter(before);
   if (expectation === "allowed") {
@@ -65,7 +66,7 @@ const expectOutcome = (
     return written;
   }
   expect(failureOf(outcome)).toBeDefined();
-  expect(fakes.runner.calls).toHaveLength(0);
+  expect(fakes.runner.calls).toHaveLength(runnerCallsBefore);
   expect(yield* viewsWithoutSequence).toEqual(views);
   if (expectation === "refused") {
     expect(failureOf(outcome)?._tag).toBe("CommandRefused");
