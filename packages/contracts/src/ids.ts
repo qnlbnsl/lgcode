@@ -3,6 +3,8 @@ import * as Schema from "effect/Schema"
 // Opaque identities are distinct even when their wire representations coincide.
 export const AgentId = Schema.NonEmptyString.pipe(Schema.brand("AgentId"))
 export type AgentId = typeof AgentId.Type
+export const EventId = Schema.NonEmptyString.pipe(Schema.brand("EventId"))
+export type EventId = typeof EventId.Type
 export const RequestId = Schema.NonEmptyString.pipe(Schema.brand("RequestId"))
 export type RequestId = typeof RequestId.Type
 export const PermissionRequestId = Schema.NonEmptyString.pipe(Schema.brand("PermissionRequestId"))
@@ -31,3 +33,10 @@ export const EventSequence = Schema.Int.check(
   Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER)
 ).pipe(Schema.brand("EventSequence"))
 export type EventSequence = typeof EventSequence.Type
+
+// Wall-clock deadlines and event times share one JSON-safe representation.
+export const EpochMilliseconds = Schema.Int.check(
+  Schema.isGreaterThanOrEqualTo(0),
+  Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER)
+)
+export type EpochMilliseconds = typeof EpochMilliseconds.Type

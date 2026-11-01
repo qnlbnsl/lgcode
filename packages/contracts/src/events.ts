@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema"
 import { Account } from "./accounts.ts"
 import { HarnessSettings, RunMode } from "./harnesses.ts"
-import { AccountId, AgentId, BootId, DeliveryId, DeviceId, HarnessId, PermissionRequestId, QuestionId, WaitId } from "./ids.ts"
+import { AccountId, AgentId, BootId, DeliveryId, DeviceId, EpochMilliseconds, EventId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
 import { PermissionLevel } from "./permission.ts"
 import { LifecycleState } from "./stateMachine.ts"
 
@@ -171,6 +171,7 @@ export const Event = Schema.Union([
   // No account means removal. Values in an account are references, never credentials.
   Schema.TaggedStruct("AccountChanged", { ...account, account: Schema.optionalKey(Account) }),
   Schema.TaggedStruct("AccountNeedsSignIn", { ...account, reason: Schema.String }),
+  Schema.TaggedStruct("AccountOutOfUsage", { ...account, resetAt: Schema.optionalKey(EpochMilliseconds) }),
   Schema.TaggedStruct("AccountAvailable", { ...account, cause: Schema.Literals(["usage reset", "owner cleared"]) }),
   Schema.TaggedStruct("HarnessChanged", { harness: HarnessSettings }),
   Schema.TaggedStruct("DeviceAdded", { deviceId: DeviceId, name: Schema.String }),
@@ -179,3 +180,14 @@ export const Event = Schema.Union([
   Schema.TaggedStruct("CommandRefused", { command: Schema.NonEmptyString, reason: Schema.String })
 ])
 export type Event = typeof Event.Type
+
+export const EventEnvelope = Schema.Struct({
+  sequence: EventSequence,
+  eventId: EventId,
+  occurredAt: EpochMilliseconds,
+  caller: Actor,
+  requestId: Schema.optionalKey(RequestId),
+  agentId: Schema.optionalKey(AgentId),
+  event: Event
+})
+export type EventEnvelope = typeof EventEnvelope.Type

@@ -1,5 +1,6 @@
 import * as Schema from "effect/Schema"
 import type { Event } from "./events.ts"
+import { EpochMilliseconds } from "./ids.ts"
 
 export const lifecycleStateNames = ["starting", "working", "idle", "paused", "interrupted", "crashed", "stopped"] as const
 type StateName = typeof lifecycleStateNames[number]
@@ -11,9 +12,7 @@ export const LifecycleState = Schema.Union([
     reason: Schema.Literals(["limit", "signed-out"]),
     midTurn: Schema.Boolean,
     // Epoch milliseconds, logged so pause timers can be rebuilt after restart.
-    resetAt: Schema.optionalKey(Schema.Int.check(
-      Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER)
-    ))
+    resetAt: Schema.optionalKey(EpochMilliseconds)
   }),
   Schema.TaggedStruct("interrupted", { previous: Schema.Literals(["starting", "working", "idle"]) }),
   Schema.TaggedStruct("crashed", {}),
@@ -21,11 +20,17 @@ export const LifecycleState = Schema.Union([
 ])
 export type LifecycleState = typeof LifecycleState.Type
 
+export const DisplayedState = Schema.Literals([
+  "Stopped", "Crashed", "Interrupted", "Signed out", "Paused for a limit", "Starting",
+  "Waiting on a permission", "Waiting on an answer", "Working", "Idle"
+])
+export type DisplayedState = typeof DisplayedState.Type
+
 export function displayedState(input: {
   readonly state: LifecycleState
   readonly openPermissionRequests: number
   readonly openQuestionsAsked: number
-}) {
+}): DisplayedState {
   switch (input.state._tag) {
     case "stopped": return "Stopped"
     case "crashed": return "Crashed"
@@ -59,7 +64,8 @@ const transitions: Record<StateName, ReadonlyArray<StateName>> = {
   working: ["idle", "paused", "interrupted", "crashed", "stopped"],
   idle: ["working", "paused", "interrupted", "crashed", "stopped"],
   paused: ["starting", "idle", "working", "crashed", "stopped", "paused"],
-  interrupted: ["starting", "stopped"],
+  // Row 66 commits the post-reload state directly after successful recovery.
+  interrupted: ["starting", "idle", "working", "stopped"],
   crashed: ["starting", "stopped"],
   stopped: ["starting"]
 }
@@ -106,6 +112,7 @@ const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
   AgentGrouped: allStates("keep"),
   AccountChanged: allStates("keep"),
   AccountNeedsSignIn: allStates("keep"),
+  AccountOutOfUsage: allStates("keep"),
   AccountAvailable: allStates("keep"),
   HarnessChanged: allStates("keep"),
   DeviceAdded: allStates("keep"),

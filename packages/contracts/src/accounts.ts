@@ -8,7 +8,7 @@ export type SecretReference = typeof SecretReference.Type
 // The diagnostic names the variable, never its value.
 const Environment = Schema.Record(Schema.String, Schema.String).check(Schema.makeFilter((environment) => {
   for (const [name, value] of Object.entries(environment)) {
-    if (/token|key|secret|password/i.test(name) && !Schema.is(SecretReference)(value)) {
+    if (/token|key|secret|password|passwd|credential|(?:^|[_.-])auth(?:$|[_.-])/i.test(name) && !Schema.is(SecretReference)(value)) {
       return { path: [name], issue: "A secret-looking environment name requires a secret reference" }
     }
   }

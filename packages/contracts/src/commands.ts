@@ -2,7 +2,7 @@ import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
 import { Account } from "./accounts.ts"
-import { Event, WaitMember } from "./events.ts"
+import { EventEnvelope, WaitMember } from "./events.ts"
 import { HarnessSettings, RunMode } from "./harnesses.ts"
 import { AccountId, AgentId, DeliveryId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
 import { PermissionLevel } from "./permission.ts"
@@ -30,9 +30,9 @@ const Subject = Schema.Union([
   Schema.TaggedStruct("question", { id: QuestionId })
 ])
 
-// The service installs this group only under row 74's test flag and temporary
-// state-folder checks. CommandsRpcGroup is the complete client/CLI inventory;
-// the production service omits this tag before registering its normal group.
+// The service serves ServiceRpcGroup, plus DebugRpcGroup only after row 74's
+// test flag and temporary state-folder checks. CommandsRpcGroup remains the
+// complete client/CLI inventory.
 export const DebugRpcGroup = RpcGroup.make(Rpc.make("debug.compare-views", {
   payload: request,
   success: Schema.Struct({
@@ -109,11 +109,12 @@ export const CommandsRpcGroup = RpcGroup.make(
     success: Schema.Struct({ ...request, accounts: Schema.Array(Account) }), error: Refused
   }),
   Rpc.make("accounts set-secret", {
-    // This owner-only ingress is the sole raw credential field. It must never
-    // be copied into an event, a reply, a receipt hash or a transcript (row 55).
+    // The wire-only credential ingress decodes to Redacted. Its value must
+    // never reach an event, reply, receipt hash or transcript (row 55).
     payload: {
       ...request, accountId: AccountId, name: Schema.NonEmptyString,
-      nonce: Schema.NonEmptyString, value: Schema.String.check(Schema.isMinLength(16))
+      nonce: Schema.NonEmptyString,
+      value: Schema.RedactedFromValue(Schema.String.check(Schema.isMinLength(16)), { label: "secret value" })
     },
     success: Ack, error: Refused
   }),
@@ -129,6 +130,8 @@ export const CommandsRpcGroup = RpcGroup.make(
   }),
   Rpc.make("subscribe", {
     payload: { ...request, after: EventSequence },
-    success: Schema.Struct({ sequence: EventSequence, event: Event }), error: Refused, stream: true
+    success: EventEnvelope, error: Refused, stream: true
   })
 ).merge(DebugRpcGroup)
+
+export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
