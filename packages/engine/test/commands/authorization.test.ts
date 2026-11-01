@@ -2,6 +2,7 @@ import { mkdirSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { it } from "@effect/vitest";
+import type { PermissionLevel } from "@shepherd/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import { afterEach, beforeEach, expect, vi } from "vitest";
@@ -10,10 +11,11 @@ import { makeFakeRunner } from "../support/fakeRunner.ts";
 import {
   agentCredential, agentIdOf, agentRow, appendSetup, call, crashAgent, deviceCredential, eventOf, failureOf,
   folderIn, harnessSettings, headSequence, logAfter, makeFakeSecrets, makeRig, ownerCredential, provideRig,
-  removeRig, revokeTokens, seedAccount, seedAgent, seedDevice, seedHarness, startPayload, viewsWithoutSequence,
+  removeRig, revokeTokens, seedAccount, seedAgent, seedDevice, seedHarness, startPayload, success, viewsWithoutSequence,
   type Credential, type Fakes, type Rig, type SeedState,
 } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
+import { option, requestPermission, standardOptions } from "../support/routingRig.ts";
 import * as Views from "../../src/views/Views.ts";
 
 // Criterion 5.3, the lifecycle part (decision rows 24, 27, 35, 56, 65): who may
@@ -466,9 +468,223 @@ it.effect("5.3 resume of an owner-started agent: catches the ceiling being appli
   })).pipe(Effect.orDie));
 
 // ---------------------------------------------------------------------------
-// Unit 5c adds its permission-answer rows below. Each is a todo until then.
+// Unit 5c: answer, pass-up and ask (rows 27, 35, 51, 56)
 // ---------------------------------------------------------------------------
 
-it.todo("5.3 permission answers (5c): rights passed up reach the nearest idle or working ancestor, as for a prompt");
-it.todo("5.3 permission answers (5c): a persistent option is refused to an agent answerer");
-it.todo("5.3 permission answers (5c): an option above the answerer's own mode is refused");
+// boss -> holder -> asker (working), with `kid` a second child of the holder
+// and `sibling` a second child of the boss. The asker has asked for a
+// permission and asked a question; the holder holds both. `dead` is stopped
+// and `keeper`'s token has been revoked.
+type RoutingCaller =
+  | "owner" | "device" | "holder" | "ancestor" | "sibling" | "child" | "asker" | "unrelated" | "stopped" | "revoked-token";
+
+const routingWorld = (fakes: Fakes) => Effect.gen(function* () {
+  const boss = yield* seedAgent({ id: "boss" });
+  const holder = yield* seedAgent({ id: "holder", parent: "boss" });
+  const asker = yield* seedAgent({ id: "asker", parent: "holder", state: "working" });
+  const kid = yield* seedAgent({ id: "kid", parent: "holder" });
+  const sibling = yield* seedAgent({ id: "sibling", parent: "boss" });
+  const unrelated = yield* seedAgent({ id: "unrelated" });
+  const dead = yield* seedAgent({ id: "dead", parent: "boss", state: "stopped" });
+  const keeper = yield* seedAgent({ id: "keeper", parent: "boss" });
+  yield* revokeTokens(agentIdOf("keeper"));
+  const device = yield* seedDevice();
+  const permission = yield* requestPermission(fakes.runner, asker);
+  const questionId: string = success(yield* call(agentCredential(asker.token), "ask", { text: "Which branch?" })).questionId;
+  expect(permission.row.holder).toEqual({ _tag: "agent", agentId: "holder" });
+  expect((yield* (yield* Views.Views).snapshot).questions[questionId]?.holder).toEqual({ _tag: "agent", agentId: "holder" });
+  const credentials: Record<RoutingCaller, Credential> = {
+    owner: ownerCredential,
+    device: deviceCredential(device.credential),
+    holder: agentCredential(holder.token),
+    ancestor: agentCredential(boss.token),
+    sibling: agentCredential(sibling.token),
+    child: agentCredential(kid.token),
+    asker: agentCredential(asker.token),
+    unrelated: agentCredential(unrelated.token),
+    stopped: agentCredential(dead.token),
+    "revoked-token": agentCredential(keeper.token),
+  };
+  return { credentials, permissionId: permission.id, questionId };
+});
+
+// Only the holder or the owner may answer or pass up (row 27). Anyone with a
+// live token may ask, for itself; the owner has no one to ask.
+const holderOnly: Readonly<Record<RoutingCaller, Expectation>> = {
+  owner: "allowed", device: "allowed", holder: "allowed",
+  ancestor: "refused", sibling: "refused", child: "refused", asker: "refused", unrelated: "refused",
+  stopped: "rejected", "revoked-token": "rejected",
+};
+const anyLiveAgent: Readonly<Record<RoutingCaller, Expectation>> = {
+  owner: "refused", device: "refused", holder: "allowed",
+  ancestor: "allowed", sibling: "allowed", child: "allowed", asker: "allowed", unrelated: "allowed",
+  stopped: "rejected", "revoked-token": "rejected",
+};
+// Where each caller's own question goes, by the holder rule.
+const askHolder: Partial<Record<RoutingCaller, string | undefined>> = {
+  holder: "boss", ancestor: undefined, sibling: "boss", child: "holder", asker: "holder", unrelated: undefined,
+};
+const callerId: Partial<Record<RoutingCaller, string>> = {
+  holder: "holder", ancestor: "boss", sibling: "sibling", child: "kid", asker: "asker", unrelated: "unrelated",
+};
+const recordedAs = (kind: RoutingCaller) =>
+  kind === "owner" || kind === "device" ? { _tag: "owner" } : { _tag: "agent", agentId: callerId[kind] };
+
+type RoutingWorld = Effect.Success<ReturnType<typeof routingWorld>>;
+const routingCommands: ReadonlyArray<{
+  readonly label: string;
+  readonly name: string;
+  readonly expected: Readonly<Record<RoutingCaller, Expectation>>;
+  readonly payload: (world: RoutingWorld) => Record<string, unknown>;
+  // What an allowed command must have done, checked against the views.
+  readonly check: (world: RoutingWorld, kind: RoutingCaller, reply: Record<string, unknown> | undefined) => Effect.Effect<void, never, Views.Views>;
+}> = [
+  {
+    label: "answer (permission)", name: "answer", expected: holderOnly,
+    payload: (world) => ({ kind: "permission", id: world.permissionId, optionId: "once" }),
+    check: (world, kind) => Effect.gen(function* () {
+      const row = (yield* (yield* Views.Views).snapshot).requests[world.permissionId];
+      expect(row).toMatchObject({ status: "answered", answeredBy: recordedAs(kind) });
+    }),
+  },
+  {
+    label: "answer (question)", name: "answer", expected: holderOnly,
+    payload: (world) => ({ kind: "question", id: world.questionId, text: "Use main." }),
+    check: (world, kind) => Effect.gen(function* () {
+      const row = (yield* (yield* Views.Views).snapshot).questions[world.questionId];
+      expect(row).toMatchObject({ status: "answered", answeredBy: recordedAs(kind) });
+    }),
+  },
+  {
+    label: "pass-up (permission)", name: "pass-up", expected: holderOnly,
+    payload: (world) => ({ subject: { _tag: "permission", id: world.permissionId } }),
+    check: (world) => Effect.gen(function* () {
+      expect((yield* (yield* Views.Views).snapshot).requests[world.permissionId]).toMatchObject({
+        status: "open", holder: { _tag: "agent", agentId: "boss" },
+      });
+    }),
+  },
+  {
+    label: "pass-up (question)", name: "pass-up", expected: holderOnly,
+    payload: (world) => ({ subject: { _tag: "question", id: world.questionId } }),
+    check: (world) => Effect.gen(function* () {
+      expect((yield* (yield* Views.Views).snapshot).questions[world.questionId]).toMatchObject({
+        status: "open", holder: { _tag: "agent", agentId: "boss" },
+      });
+    }),
+  },
+  {
+    label: "ask", name: "ask", expected: anyLiveAgent,
+    payload: () => ({ text: "May I go on?" }),
+    check: (_world, kind, reply) => Effect.gen(function* () {
+      const row = (yield* (yield* Views.Views).snapshot).questions[String(reply?.["questionId"])];
+      const holder = askHolder[kind];
+      expect(row).toMatchObject({
+        status: "open", agentId: callerId[kind],
+        holder: holder === undefined ? { _tag: "owner" } : { _tag: "agent", agentId: holder },
+      });
+    }),
+  },
+];
+
+for (const command of routingCommands) {
+  for (const kind of Object.keys(command.expected) as ReadonlyArray<RoutingCaller>) {
+    const want = command.expected[kind];
+    it.live(`5.3 ${command.label} as ${kind}: catches ${kind} being ${want === "allowed" ? "refused" : "allowed"}`, () =>
+      withRig((fakes) => Effect.gen(function* () {
+        const world = yield* routingWorld(fakes);
+        const before = yield* headSequence;
+        const outcome = yield* call(world.credentials[kind], command.name, command.payload(world));
+        const reply = outcome._tag === "Success" ? outcome.success as Record<string, unknown> : undefined;
+        const written = yield* logAfter(before);
+        if (want === "allowed") {
+          expect(failureOf(outcome)).toBeUndefined();
+          yield* command.check(world, kind, reply);
+          expect(new Set(written.map((row) => JSON.stringify(row.caller)))).toEqual(new Set([JSON.stringify(recordedAs(kind))]));
+          return;
+        }
+        expect(failureOf(outcome)).toBeDefined();
+        if (want === "refused") {
+          expect(failureOf(outcome)?._tag).toBe("CommandRefused");
+          expect(written.map((row) => row.event)).toEqual([
+            expect.objectContaining({ _tag: "CommandRefused", command: command.name, reason: expect.any(String) }),
+          ]);
+        } else {
+          expect(written).toEqual([]);
+        }
+        const views = (yield* (yield* Views.Views).snapshot);
+        expect(views.requests[world.permissionId]).toMatchObject({ status: "open", holder: { _tag: "agent", agentId: "holder" } });
+        expect(views.questions[world.questionId]).toMatchObject({ status: "open", holder: { _tag: "agent", agentId: "holder" } });
+        expect(fakes.runner.callsOf("answerPermission")).toEqual([]);
+      })).pipe(Effect.orDie));
+  }
+}
+
+// Rights pass up (row 27) to the holder's nearest idle or working ancestor
+// while the holder itself cannot act. A holder is left interrupted only during
+// restart recovery (row 52 step 6), before holders are re-evaluated.
+type RightsCase = { readonly grand: SeedState; readonly allowed: "grand" | "great" };
+for (const row of [{ grand: "idle", allowed: "grand" }, { grand: "paused", allowed: "great" }] satisfies ReadonlyArray<RightsCase>) {
+  for (const subject of ["permission", "question"] as const) {
+    for (const who of ["great", "grand"] as const) {
+      const want: Expectation = who === row.allowed ? "allowed" : "refused";
+      it.live(`5.3 rights up for answer (row 27), grand ${row.grand}, ${subject}: catches ${who} being ${want === "allowed" ? "refused" : "allowed"} to answer for an interrupted holder, as for a prompt`, () =>
+        withRig((fakes) => Effect.gen(function* () {
+          const great = yield* seedAgent({ id: "great" });
+          const grand = yield* seedAgent({ id: "grand", parent: "great" });
+          yield* seedAgent({ id: "holder", parent: "grand" });
+          const asker = yield* seedAgent({ id: "asker", parent: "holder", state: "working" });
+          const id = subject === "permission"
+            ? (yield* requestPermission(fakes.runner, asker)).id
+            : String(success(yield* call(agentCredential(asker.token), "ask", { text: "Which branch?" })).questionId);
+          yield* appendSetup([eventOf({ _tag: "AgentInterrupted", agentId: "holder", previous: "idle" })]);
+          if (row.grand !== "idle") yield* appendSetup([eventOf({ _tag: "StateChanged", agentId: "grand", state: { _tag: "paused", reason: "limit", midTurn: false } })]);
+          const token = { great, grand }[who].token;
+          const payload = subject === "permission"
+            ? { kind: "permission", id, optionId: "once" }
+            : { kind: "question", id, text: "Use main." };
+          yield* expectOutcome(want, agentCredential(token), "answer", payload, fakes);
+        })).pipe(Effect.orDie));
+    }
+  }
+}
+
+// The answerer's own ceiling (rows 35b, 56): an agent may choose an option
+// only at or below its own mode, and never one that persists beyond the
+// session or has a kind Shepherd does not know; the owner may choose any.
+const ceilingOptions = [
+  ...standardOptions,
+  option("sticky", "allow_once", "ask", true),
+  option("forever", "allow_forever", "ask"),
+];
+const askWithCeilingOptions = (fakes: Fakes, holderMode: PermissionLevel) => Effect.gen(function* () {
+  const holder = yield* seedAgent({ id: "holder", permission: holderMode });
+  const asker = yield* seedAgent({ id: "asker", parent: "holder", state: "working" });
+  const { id } = yield* requestPermission(fakes.runner, asker, { options: ceilingOptions });
+  return { holder, id };
+});
+
+for (const optionId of ["always", "never", "sticky", "forever"] as const) {
+  it.live(`5.3 persistent or unknown option ${optionId} (row 56): catches an agent answerer with full mode allowed to choose it, or the owner refused`, () =>
+    withRig((fakes) => Effect.gen(function* () {
+      const { holder, id } = yield* askWithCeilingOptions(fakes, "full");
+      yield* expectOutcome("refused", agentCredential(holder.token), "answer", { kind: "permission", id, optionId }, fakes);
+      expect(fakes.runner.callsOf("answerPermission")).toEqual([]);
+      yield* expectOutcome("allowed", ownerCredential, "answer", { kind: "permission", id, optionId }, fakes);
+      expect(fakes.runner.callsOf("answerPermission").map((entry) => entry.input.optionId)).toEqual([optionId]);
+    })).pipe(Effect.orDie));
+}
+
+const optionLevels = [["reject", "read-only"], ["once", "ask"], ["once-edit", "edit"], ["once-full", "full"]] as const;
+for (const holderMode of modes) {
+  for (const [optionId, level] of optionLevels) {
+    const allowed = modes.indexOf(level) <= modes.indexOf(holderMode);
+    it.live(`5.3 option above the answerer's mode (row 35b): catches a holder in mode ${holderMode} being ${allowed ? "refused" : "allowed"} the ${level} option`, () =>
+      withRig((fakes) => Effect.gen(function* () {
+        const { holder, id } = yield* askWithCeilingOptions(fakes, holderMode);
+        yield* expectOutcome(allowed ? "allowed" : "refused", agentCredential(holder.token), "answer", { kind: "permission", id, optionId }, fakes);
+        expect(fakes.runner.callsOf("answerPermission").map((entry) => entry.input.optionId)).toEqual(allowed ? [optionId] : []);
+        if (!allowed) yield* expectOutcome("allowed", ownerCredential, "answer", { kind: "permission", id, optionId }, fakes);
+      })).pipe(Effect.orDie));
+  }
+}

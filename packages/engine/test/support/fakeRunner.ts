@@ -1,5 +1,6 @@
-import type { AgentId, SessionReference } from "@shepherd/contracts";
+import type { AgentId, PermissionOption, SessionReference } from "@shepherd/contracts";
 import type * as Context from "effect/Context";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as PubSub from "effect/PubSub";
@@ -9,6 +10,7 @@ import {
   Runner, RunnerRejected,
   type RunnerCapabilities, type RunnerEvent, type SessionInfo,
 } from "../../src/runner/Runner.ts";
+import { sha256Hex } from "../../src/identity/credential.ts";
 
 // The Runner test double of unit 5b.2 (decision rows 44 and 59), used by units
 // 5b to 5d. It implements the row-44 interface without a child process: it
@@ -46,6 +48,47 @@ const defaultCapabilities: RunnerCapabilities = {
   setModeConfigOption: true,
 };
 
+// Unit 5c's runner events (decision rows 27, 50, 51, 67; issue 61). Unit 6a's
+// real runner must produce exactly these shapes; the builder adds them to
+// `RunnerEvent` in `src/runner/Runner.ts`.
+//
+// `incarnation` names the spawn an event belongs to: the SHA-256 hex of the
+// token that spawn was given, which is the `token_hash` of its row in
+// `agent_tokens`. The engine ignores an event whose incarnation is not an
+// unrevoked token hash of that agent, so a late event from an earlier
+// process cannot act on a later one.
+//
+// `permissionRequested`: the adapter asked to use a tool. `permissionRequestId`
+// is the runner's own id for the held request, unique across agents; the
+// engine records it as the request's `permissionRequestId` and passes it back
+// as `requestId` to `answerPermission`. The options arrive already mapped onto
+// Shepherd's scale (task 6a.3, rows 35b and 56), and `settingsWrite` says the
+// tool would write a harness settings path.
+export interface PermissionRequestedEvent {
+  readonly _tag: "permissionRequested";
+  readonly agentId: AgentId;
+  readonly incarnation: string;
+  readonly permissionRequestId: string;
+  readonly toolCallId: string;
+  readonly description: string;
+  readonly options: ReadonlyArray<PermissionOption>;
+  readonly settingsWrite: boolean;
+}
+
+// `turnEnded`: the agent's current turn finished (the `session/prompt` reply
+// arrived). The engine writes "turn ended" and, in the same transaction,
+// passes up what the agent still holds (row 67).
+export interface TurnEndedEvent {
+  readonly _tag: "turnEnded";
+  readonly agentId: AgentId;
+  readonly incarnation: string;
+}
+
+export type FakeRunnerEvent = RunnerEvent | PermissionRequestedEvent | TurnEndedEvent;
+
+// The incarnation of a spawn that was given `token` (a raw `shp_a_` value).
+export const incarnationOf = (token: string): string => sha256Hex(token);
+
 export interface FakeRunner {
   readonly layer: Layer.Layer<Runner>;
   // Every call so far, oldest first. The array is live: read it after the
@@ -58,14 +101,18 @@ export interface FakeRunner {
   // reason is a fixed text the test chooses; the call is still recorded.
   readonly rejectNext: (method: "start" | "load" | "prompt" | "setMode" | "compact", reason: string, times?: number) => void;
   // Push an event into the stream the engine consumes.
-  readonly emit: (event: RunnerEvent) => Effect.Effect<void>;
+  readonly emit: (event: FakeRunnerEvent) => Effect.Effect<void>;
+  // Succeeds once the engine has subscribed to `events`, so an event emitted
+  // afterwards is not lost.
+  readonly subscribed: Effect.Effect<void>;
   readonly reset: () => void;
 }
 
 export const makeFakeRunner = (options: { readonly capabilities?: Partial<RunnerCapabilities> } = {}): Effect.Effect<FakeRunner> =>
   Effect.gen(function* () {
     const calls: Array<RunnerCall> = [];
-    const pubsub = yield* PubSub.unbounded<RunnerEvent>();
+    const pubsub = yield* PubSub.unbounded<FakeRunnerEvent>();
+    const subscribedSignal = yield* Deferred.make<void>();
     const defaults: Script = {
       start: (input) => Effect.succeed(sessionFor(input.agentId)),
       load: (input) => Effect.succeed({ ...sessionFor(input.agentId), session: input.session }),
@@ -96,7 +143,12 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
       compact: call("compact"),
       stop: call("stop"),
       capabilities: { ...defaultCapabilities, ...options.capabilities },
-      events: Stream.fromPubSub(pubsub),
+      // Subscribe before signalling, so nothing emitted after `subscribed` is lost.
+      events: Stream.unwrap(Effect.gen(function* () {
+        const subscription = yield* PubSub.subscribe(pubsub);
+        yield* Deferred.succeed(subscribedSignal, undefined);
+        return Stream.fromSubscription(subscription) as Stream.Stream<RunnerEvent>;
+      })),
     } as RunnerShape;
 
     return {
@@ -109,6 +161,7 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
         rejections.set(method, [...(rejections.get(method) ?? []), ...Array.from({ length: times }, () => reason)]);
       },
       emit: (event) => PubSub.publish(pubsub, event).pipe(Effect.asVoid),
+      subscribed: Deferred.await(subscribedSignal),
       reset: () => { calls.length = 0; script = { ...defaults }; rejections.clear(); },
     } satisfies FakeRunner;
   });
