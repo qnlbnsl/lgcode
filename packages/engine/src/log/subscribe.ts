@@ -14,8 +14,12 @@ export class SubscribeAheadOfHead extends Data.TaggedError("SubscribeAheadOfHead
   readonly head: number;
 }> {}
 
-class LogReadFailed extends Data.TaggedError("LogReadFailed")<{
-  readonly reason: "stored event is unreadable";
+export class SubscribeInvalidCursor extends Data.TaggedError("SubscribeInvalidCursor")<{
+  readonly after: number;
+}> {}
+
+export class LogReadFailed extends Data.TaggedError("LogReadFailed")<{
+  readonly reason: "stored event is unreadable" | "database read failed";
 }> {}
 
 interface EventRow {
@@ -51,7 +55,14 @@ const PAGE_SIZE = 512;
 // Pattern: T3 Code apps/server/src/persistence/OrchestrationEventStore.ts,
 // streamProjectedApplicationEvents (MIT licence). Only the ordering idea is
 // reused: subscribe first, capture a head, replay, then drop overlap at the join.
-export const subscribe = (after: number) => Stream.unwrap(Effect.gen(function* () {
+export const subscribe = (after: number): Stream.Stream<
+  EventEnvelope,
+  SubscribeAheadOfHead | SubscribeInvalidCursor | LogReadFailed,
+  EventLog.EventLog | SqlClient.SqlClient
+> => Stream.unwrap(Effect.gen(function* () {
+  if (!Number.isSafeInteger(after) || after < 0) {
+    return yield* Effect.fail(new SubscribeInvalidCursor({ after }));
+  }
   const log = yield* EventLog.EventLog;
   const sql = yield* SqlClient.SqlClient;
   // Stream.unwrap owns this subscription's scope, including failure and cancellation.
@@ -59,7 +70,8 @@ export const subscribe = (after: number) => Stream.unwrap(Effect.gen(function* (
 
   // PB-A5: both the head and every catch-up page deliberately use readOnly.
   // The file database's SqliteClient.layer MUST set readerWorker: true, or the
-  // copied client silently routes these reads to the writer (issue 34).
+  // copied client silently routes these reads to the writer (issue 34), as it
+  // also does when the reader pool is unavailable.
   const rows = yield* SqliteClient.readOnly(sql<{ head: number }>`
     SELECT COALESCE(MAX(sequence), 0) AS head FROM events`);
   const head = rows[0]!.head;
@@ -81,4 +93,6 @@ export const subscribe = (after: number) => Stream.unwrap(Effect.gen(function* (
   // by the writer permit, so only this fixed overlap needs to be removed.
   const live = Stream.fromSubscription(subscription).pipe(Stream.filter((event) => event.sequence > head));
   return Stream.concat(catchUp, live);
-}));
+})).pipe(Stream.mapError((error) => error._tag === "SqlError"
+  ? new LogReadFailed({ reason: "database read failed" })
+  : error));

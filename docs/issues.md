@@ -581,3 +581,44 @@ Why it matters: a catch-up reader written from the comment would fail to
 decode every stored caller, and its envelopes would differ from the live ones.
 The fix: the migration comment names the stored keys, and `subscribe` decodes
 `owner` and `agent:<agent id>` back to their corresponding Actors.
+
+## 36. A subscriber that stops reading keeps every later event in memory
+
+Found: 2026-11-01, in the focused review of unit 4b at eb6308b.
+State: open for unit 7a.
+
+What happens: `PubSub.unbounded` in `packages/engine/src/log/EventLog.ts`
+keeps publishing committed events while a subscriber is open. If the consumer
+of `Stream.fromSubscription` in `packages/engine/src/log/subscribe.ts` stops
+reading without closing, its backlog keeps every later event in memory.
+What should happen: unit 7a owns a bound or a disconnect rule for a slow
+client. T3 Code's `apps/server/src/orchestration-v2/LiveStreamBudget.ts`,
+line 333, is a pattern for budgeting the buffered live events during replay.
+Why it matters: one stalled client must not exhaust the engine's memory.
+
+## 37. Invalid subscription cursors could silently skip catch-up
+
+Found: 2026-11-01, in the focused review of unit 4b at eb6308b.
+State: fixed in unit 4b fix round 1.
+
+What happened: `subscribe` accepted cursors that were not nonnegative safe
+integers. In particular, `NaN` skipped catch-up and left the stream open.
+What should happen: invalid cursors fail before subscribing to committed events.
+The fix: `subscribe` rejects negative values and values that are not safe
+integers, including non-finite and fractional values, with
+`SubscribeInvalidCursor { after }`.
+Why it matters: accepting an invalid cursor can hide a gap from the client.
+
+## 38. Subscription reads exposed raw database errors
+
+Found: 2026-11-01, in the focused review of unit 4b at eb6308b.
+State: fixed in unit 4b fix round 1.
+
+What happened: failures of the subscription's head and catch-up queries escaped
+as raw `SqlError` values, whose reasons can contain database text and data.
+What should happen: the application programming interface receives a named
+failure with a fixed reason that carries no stored values or query text.
+The fix: both read paths map `SqlError` to the exported `LogReadFailed` error
+with the reason `database read failed`. Decode failures retain the fixed
+reason `stored event is unreadable` on the same exported error class.
+Why it matters: a refused subscription must not disclose database contents.
