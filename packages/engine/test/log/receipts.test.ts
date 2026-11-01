@@ -113,6 +113,51 @@ it.effect("4.2 caller key: catches deduplicating by request id alone across two 
   })),
 );
 
+it.effect("D1 caller order replay: catches treating reordered actor properties as a new caller and writing a second batch", () =>
+  withLog(Effect.gen(function* () {
+    const log = yield* EventLog.EventLog;
+    const sql = yield* SqlClient.SqlClient;
+    const first = yield* log.append({ _tag: "agent", agentId }, request("reordered"), bodyHash("same body"), [event], {});
+    const repeated = yield* log.append({ agentId, _tag: "agent" }, request("reordered"), bodyHash("same body"), [event], {});
+
+    expect(repeated).toEqual(first);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM events`).toEqual([{ n: 1 }]);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM receipts`).toEqual([{ n: 1 }]);
+  })),
+);
+
+it.effect("D1 caller order mismatch: catches accepting a different body when only actor property order changed", () =>
+  withLog(Effect.gen(function* () {
+    const log = yield* EventLog.EventLog;
+    const sql = yield* SqlClient.SqlClient;
+    yield* log.append({ _tag: "agent", agentId }, request("reordered-mismatch"), bodyHash("first body"), [event], {});
+    const refused = yield* log.append({ agentId, _tag: "agent" }, request("reordered-mismatch"), bodyHash("other body"), [event], {})
+      .pipe(Effect.result);
+
+    expect(refused._tag).toBe("Failure");
+    if (refused._tag !== "Failure") throw new Error("The reordered caller bypassed request-id reuse detection");
+    expect(refused.failure).toBeInstanceOf(EventLog.RequestIdReused);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM events`).toEqual([{ n: 1 }]);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM receipts`).toEqual([{ n: 1 }]);
+    const next = yield* log.append({ _tag: "agent", agentId }, request("after-reordered-mismatch"), bodyHash("fresh body"), [event], {});
+    expect(next.map((row) => row.sequence)).toEqual([2]);
+  })),
+);
+
+it.effect("D1 caller extras: catches including an extra runtime actor property in the receipt key", () =>
+  withLog(Effect.gen(function* () {
+    const log = yield* EventLog.EventLog;
+    const sql = yield* SqlClient.SqlClient;
+    const first = yield* log.append({ _tag: "agent", agentId }, request("extra-property"), bodyHash("same body"), [event], {});
+    const extra = { _tag: "agent", agentId, runtimeOnly: "ignored" } as unknown as Actor;
+    const repeated = yield* log.append(extra, request("extra-property"), bodyHash("same body"), [event], {});
+
+    expect(repeated).toEqual(first);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM events`).toEqual([{ n: 1 }]);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM receipts`).toEqual([{ n: 1 }]);
+  })),
+);
+
 it.effect("4.2 concurrent duplicate: catches checking receipts outside the writer, double writes, or a false disk-failure latch", () =>
   Effect.gen(function* () {
     const entered = yield* Deferred.make<void>();
