@@ -18,7 +18,7 @@
 // `outputDirectory`, with `errors/<harness>-<kind>.json` per error sample. The recorder manages
 // its own child-process scope and needs only the services `NodeServices.layer` provides. It leaves
 // the workspace folder in place for the caller to remove with `temporaryRoot`.
-import { mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises"
+import { chmod, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, sep } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -149,6 +149,13 @@ const record = (harnesses: ReadonlyArray<unknown>, extra: Record<string, unknown
 
 const readFixture = async (name: string) => await readFile(join(outputDirectory, name), "utf8")
 const names = async (directory: string) => (await readdir(directory).catch(() => [])).sort()
+
+// A failed harness is a result entry `{ harness, status: "failed", reason: <category> }`, or a `failed`
+// list on the results; the category is a fixed word, never the raw error text (fix round 2 item 2).
+const failures = (results: unknown): Array<{ harness: string; category: string }> => {
+  const list: any[] = Array.isArray(results) ? results.filter((result: any) => result.status === "failed") : ((results as any)?.failed ?? [])
+  return list.map((entry) => ({ harness: entry.harness as string, category: (entry.reason ?? entry.category) as string }))
+}
 
 const outbound = (entries: ReadonlyArray<any>) => entries.filter((entry) => entry.type === "expect_outbound")
 const inboundText = (entries: ReadonlyArray<any>) =>
@@ -392,11 +399,11 @@ live("the adapter receives only allow-listed environment names plus the account'
     }
   }))
 
-live("a session that cannot be set to read-only is never prompted and leaves no fixture (breaks if the recorder falls back to the adapter's default permission mode when the mode option is missing)", () =>
+live("a session that cannot be set to read-only is never prompted, leaves no fixture, and is reported as failed with the category \"read-only mode\" (breaks if the recorder falls back to the adapter's default permission mode when the mode option is missing, or still rejects the whole run; fix round 2 item 2)", () =>
   Effect.gen(function*() {
-    const exit = yield* record([cleanHarness("claude", [[{ step: "text", text: "hello" }]], [])]).pipe(Effect.exit)
-    assert.isTrue(Exit.isFailure(exit))
+    const results = yield* record([cleanHarness("claude", [[{ step: "text", text: "hello" }]], [])])
     assert.deepEqual(yield* fx(() => names(outputDirectory)), [])
+    assert.deepEqual(failures(results), [{ harness: "claude", category: "read-only mode" }])
   }))
 
 live("an error sample is written under errors/ with its source, scrubbed text and verified flag (breaks if the sample loses its source, keeps a secret, or marks an unverified Cursor message as verified; row 42)", () =>
@@ -597,4 +604,274 @@ live("with captureSignedOut on and an adapter that never signs out, the run succ
     assert.match(report, /signedOutNotObserved/)
     // the harness is named on the same line as the heading, or on the line after it
     assert.match(report, /signedOutNotObserved[^\n]*\bclaude\b|^claude: [^\n]*signedOutNotObserved|signedOutNotObserved[^\n]*\n[^\n]*\bclaude\b/m)
+  }), 60_000)
+
+// ---------------------------------------------------------------------------------------------
+// Fix round 2: an adapter that reports no version, and one harness's failure must not stop the others.
+//
+// The recorder runs the harness's own program (`settings.adapterPath`, no arguments but `--version`)
+// when the initialize reply carries no version. The tests give each harness a launcher: a small
+// executable that answers `--version` the way a command-line program does, and otherwise starts the
+// fake agent. The launcher writes what it was called with to a log, so the tests can see the call.
+// ---------------------------------------------------------------------------------------------
+interface LauncherOptions {
+  /** What `--version` prints, and its exit code. `hang` makes it sleep until killed. */
+  readonly version?: { readonly stdout: string; readonly exitCode?: number; readonly hang?: boolean }
+  /** When the home folder is an empty probe home, the launcher plays this script instead (a signed-out probe). */
+  readonly signedOutProbe?: boolean
+}
+const launcherSeed = { count: 0 }
+const makeLauncher = async (options: LauncherOptions) => {
+  const index = ++launcherSeed.count
+  const file = join(root, `launcher-${index}.cjs`)
+  const log = join(root, `launcher-${index}.log`)
+  const config = JSON.stringify({ fake: fakeAgentPath, log, version: options.version ?? null, signedOutProbe: options.signedOutProbe ?? false })
+  const body = `#!${process.execPath}
+const config = ${config}
+const fs = require("node:fs")
+const args = process.argv.slice(2)
+if (args[0] === "--version") {
+  fs.appendFileSync(config.log, JSON.stringify({ args, env: Object.keys(process.env), pid: process.pid }) + "\\n")
+  if (config.version === null) process.exit(2)
+  if (config.version.hang) setInterval(() => {}, 1000)
+  else {
+    process.stdout.write(config.version.stdout)
+    process.exit(config.version.exitCode ?? 0)
+  }
+} else {
+  if (config.signedOutProbe && /signed-out-home/.test(process.env.HOME ?? "")) {
+    process.env.FAKE_AGENT_SCRIPT = JSON.stringify({ agentInfo: { name: "probe", version: "9.9.9" }, configOptions: [${JSON.stringify(modeOption)}],
+      turns: [[{ step: "signed_out", message: "Please run /login (planted-probe-message)" }]] })
+  }
+  import(require("node:url").pathToFileURL(config.fake).href)
+}
+`
+  await writeFile(file, body, { mode: 0o755 })
+  await chmod(file, 0o755)
+  const calls = async () => (await readFile(log, "utf8").catch(() => "")).split("\n").filter(Boolean).map((line) => JSON.parse(line) as { args: string[]; env: string[]; pid: number })
+  return { file, calls }
+}
+
+const launcherHarness = async (id: string, launcher: { file: string }, script: Record<string, unknown>) => ({
+  id,
+  settings: { ...settingsFor(id), adapterPath: launcher.file, adapterArguments: [] } as HarnessSettings,
+  accountVariables: { FAKE_AGENT_SCRIPT: JSON.stringify({ configOptions: [modeOption], turns: [[{ step: "text", text: `hello from ${id}` }]], ...script }) }
+})
+const header = async (file: string) => {
+  const transcript = await allEntries(file)
+  return transcript as typeof transcript & { metadata: Record<string, unknown> }
+}
+const noVersion = { reportVersion: false, agentInfo: { name: "no-version-fake", version: "0.0.0" } }
+
+live("an adapter that reports no version gets its version from the harness program's --version, and the header says versionSource cli (breaks if the recorder still throws 'Adapter did not report its version', or does not run --version, or does not record where the version came from; fix round 2 item 1)", () =>
+  Effect.gen(function*() {
+    const launcher = yield* fx(() => makeLauncher({ version: { stdout: "\n   \n  2026.10.14-941492e  \nsecond line is ignored\n" } }))
+    const results = yield* record([yield* fx(() => launcherHarness("cursor", launcher, noVersion))])
+    assert.deepEqual((results as any[]).map((result) => [result.harness, result.status]), [["cursor", "recorded"]])
+    const transcript = yield* fx(() => header("cursor.ndjson"))
+    assert.equal(transcript.version, "2026.10.14-941492e")
+    assert.equal(transcript.metadata.versionSource, "cli")
+    assert.equal(transcript.metadata.protocolVersion, 2)
+    const fixture = yield* fx(() => readFixture("cursor.ndjson"))
+    assert.notInclude(fixture, "second line is ignored")
+  }))
+
+live("the --version call runs once, with the single argument --version and the base environment only (breaks if it is run more than once, with the adapter's own arguments, or with the whole parent environment; fix round 2 item 1)", () =>
+  Effect.gen(function*() {
+    const launcher = yield* fx(() => makeLauncher({ version: { stdout: "1.2.3\n" } }))
+    yield* record([yield* fx(() => launcherHarness("cursor", launcher, noVersion))])
+    const calls = yield* fx(() => launcher.calls())
+    assert.equal(calls.length, 1)
+    assert.deepEqual(calls[0]!.args, ["--version"])
+    for (const name of ["PLANTED_API_TOKEN", "PLANTED_PASSWORD", "PLANTED_HEX", "PLANTED_QUOTED", "HERDR_SOCKET_PATH", "ANTHROPIC_API_KEY"]) {
+      assert.notInclude(calls[0]!.env, name)
+    }
+    assert.include(calls[0]!.env, "PATH")
+  }))
+
+live("a --version line longer than 100 characters is cut to 100 (breaks if the whole line is stored as the version; fix round 2 item 1)", () =>
+  Effect.gen(function*() {
+    const launcher = yield* fx(() => makeLauncher({ version: { stdout: `  ${"v".repeat(150)}  \n` } }))
+    yield* record([yield* fx(() => launcherHarness("cursor", launcher, noVersion))])
+    const transcript = yield* fx(() => header("cursor.ndjson"))
+    assert.equal(transcript.version, "v".repeat(100))
+    assert.equal(transcript.metadata.versionSource, "cli")
+  }))
+
+for (const [name, version] of [
+  ["prints nothing", { stdout: "" }],
+  ["prints only blank lines", { stdout: "\n  \n\t\n" }],
+  ["exits nonzero, even after printing a line", { stdout: "looks-like-a-version 9.9.9\n", exitCode: 2 }]
+] as const) {
+  live(`when --version ${name}, the header says version unknown and versionSource unknown, and the recording still succeeds (breaks if the run fails, the version is empty, or the output of a failed program is trusted; fix round 2 item 1)`, () =>
+    Effect.gen(function*() {
+      const launcher = yield* fx(() => makeLauncher({ version }))
+      const results = yield* record([yield* fx(() => launcherHarness("cursor", launcher, noVersion))])
+      assert.deepEqual((results as any[]).map((result) => [result.harness, result.status]), [["cursor", "recorded"]])
+      const transcript = yield* fx(() => header("cursor.ndjson"))
+      assert.equal(transcript.version, "unknown")
+      assert.equal(transcript.metadata.versionSource, "unknown")
+      assert.notInclude(yield* fx(() => readFixture("cursor.ndjson")), "looks-like-a-version")
+    }))
+}
+
+live("a --version call that never ends is stopped after about 10 seconds, the version is unknown, and the program is gone afterwards (breaks if the recorder waits without a timeout or leaves the program running; fix round 2 item 1)", () =>
+  Effect.gen(function*() {
+    const launcher = yield* fx(() => makeLauncher({ version: { stdout: "", hang: true } }))
+    const started = Date.now()
+    yield* record([yield* fx(() => launcherHarness("cursor", launcher, noVersion))])
+    const elapsed = Date.now() - started
+    assert.isBelow(elapsed, 40_000)
+    const transcript = yield* fx(() => header("cursor.ndjson"))
+    assert.equal(transcript.version, "unknown")
+    assert.equal(transcript.metadata.versionSource, "unknown")
+    const calls = yield* fx(() => launcher.calls())
+    assert.equal(calls.length, 1)
+    const pid = calls[0]!.pid
+    try {
+      const ended = yield* poll(() => gone(pid), 30)
+      assert.isTrue(ended === true, `the --version program ${pid} is still running`)
+    } finally {
+      try { process.kill(pid, "SIGKILL") } catch { /* already gone */ }
+    }
+  }), 60_000)
+
+live("a secret in the --version output is scrubbed before it reaches the header (breaks if the cli line skips scrubText; fix round 2 item 1)", () =>
+  Effect.gen(function*() {
+    const planted = [tokens[1]!, accountEmail, home, envSecret]
+    const launcher = yield* fx(() => makeLauncher({ version: { stdout: `tool 1.0 ${planted.join(" ")}\n` } }))
+    yield* record([yield* fx(() => launcherHarness("cursor", launcher, noVersion))])
+    const fixture = yield* fx(() => readFixture("cursor.ndjson"))
+    for (const secret of planted) assert.notInclude(fixture, secret)
+    const transcript = yield* fx(() => header("cursor.ndjson"))
+    assert.match(transcript.version, /^tool 1\.0 /)
+    assert.equal(transcript.metadata.versionSource, "cli")
+  }))
+
+live("a version the adapter reports wins: --version is not run and the header says versionSource adapter (breaks if the program is run anyway, or its output replaces the adapter's own version; fix round 2 item 1)", () =>
+  Effect.gen(function*() {
+    const launcher = yield* fx(() => makeLauncher({ version: { stdout: "from-the-cli 7.7.7\n" } }))
+    yield* record([yield* fx(() => launcherHarness("cursor", launcher, { agentInfo: { name: "fake", version: "3.1.4" } }))])
+    const transcript = yield* fx(() => header("cursor.ndjson"))
+    assert.equal(transcript.version, "3.1.4")
+    assert.equal(transcript.metadata.versionSource, "adapter")
+    assert.deepEqual(yield* fx(() => launcher.calls()), [])
+  }))
+
+live("a version 1 adapter's agentInfo version also counts as reported by the adapter (breaks if versionSource is cli or unknown for a version read from agentInfo; fix round 2 item 1)", () =>
+  Effect.gen(function*() {
+    const launcher = yield* fx(() => makeLauncher({ version: { stdout: "from-the-cli 7.7.7\n" } }))
+    yield* record([yield* fx(() => launcherHarness("claude", launcher, { protocolVersion: 1, agentInfo: { name: "fake", version: "0.99.1" } }))])
+    const transcript = yield* fx(() => header("claude.ndjson"))
+    assert.equal(transcript.version, "0.99.1")
+    assert.equal(transcript.metadata.versionSource, "adapter")
+    assert.equal(transcript.metadata.protocolVersion, 1)
+  }))
+
+const crashedAdapter = (id: string): any => ({
+  id,
+  settings: { ...settingsFor(id), adapterPath: process.execPath,
+    adapterArguments: ["-e", `process.stderr.write("PLANTED-RAW-CRASH-MESSAGE ${home}/secret ${tokens[0]}\\n"); process.exit(3)`] } as HarnessSettings
+})
+
+live("when the middle of three harnesses crashes during initialize, the other two are written, the signed-out probe and error samples run for them, the middle one is reported under failed with category initialize, and recordFixtures resolves (breaks if one failure aborts the run or leaves the others unwritten; fix round 2 item 2)", () =>
+  Effect.gen(function*() {
+    const first = yield* fx(() => makeLauncher({ signedOutProbe: true }))
+    const third = yield* fx(() => makeLauncher({ signedOutProbe: true }))
+    const results = yield* record([
+      yield* fx(() => launcherHarness("claude", first, { agentInfo: { name: "fake", version: "0.99.1" } })),
+      crashedAdapter("codex"),
+      yield* fx(() => launcherHarness("gemini", third, { agentInfo: { name: "fake", version: "0.31.0" } }))
+    ], {
+      captureSignedOut: true,
+      errorSamples: [
+        { harness: "claude", kind: "out-of-usage", text: "limit reached", source: "claude adapter source, not run", verified: false },
+        { harness: "gemini", kind: "out-of-usage", text: "quota exhausted", source: "gemini source, not run", verified: false }
+      ]
+    })
+    assert.deepEqual((results as any[]).filter((result) => result.status === "recorded").map((result) => result.harness), ["claude", "gemini"])
+    assert.deepEqual(failures(results), [{ harness: "codex", category: "initialize" }])
+    assert.deepEqual(yield* fx(() => names(outputDirectory)), ["claude.ndjson", "errors", "gemini.ndjson"])
+    for (const id of ["claude", "gemini"]) {
+      const transcript = yield* fx(() => allEntries(`${id}.ndjson`))
+      assert.equal((transcript as any).provider, id)
+      assert.deepEqual(inboundText(transcript.entries), [`hello from ${id}`])
+    }
+    // The error samples and the signed-out probe ran for the harnesses that recorded.
+    const errors = yield* fx(() => names(join(outputDirectory, "errors")))
+    for (const expected of ["claude-out-of-usage.json", "claude-signed-out.json", "gemini-out-of-usage.json", "gemini-signed-out.json"]) {
+      assert.include(errors, expected)
+    }
+    for (const id of ["claude", "gemini"]) {
+      const probe = JSON.parse(yield* fx(() => readFile(join(outputDirectory, "errors", `${id}-signed-out.json`), "utf8")))
+      assert.equal(probe.verified, true)
+      assert.equal(probe.harness, id)
+    }
+    assert.notInclude(errors, "codex-signed-out.json")
+    const report = formatReport(results)
+    assert.match(report, /^claude: recorded/m)
+    assert.match(report, /^gemini: recorded/m)
+    assert.match(report, /failed/)
+    assert.match(report, /codex/)
+    assert.match(report, /initialize/)
+    assert.notMatch(report, /signedOutNotObserved/)
+  }), 60_000)
+
+live("a failed harness is reported with a fixed category and none of the raw error: not the adapter's stderr, exit code, home path or token (breaks if the report or the results carry the raw error message; fix round 2 item 2)", () =>
+  Effect.gen(function*() {
+    const launcher = yield* fx(() => makeLauncher({}))
+    const results = yield* record([
+      crashedAdapter("codex"),
+      yield* fx(() => launcherHarness("claude", launcher, { agentInfo: { name: "fake", version: "0.99.1" } }))
+    ])
+    const report = formatReport(results)
+    for (const text of [report, JSON.stringify(results)]) {
+      for (const raw of ["PLANTED-RAW-CRASH-MESSAGE", "secret", home, tokens[0]!, "ENOENT", "EPIPE", "code 3", "exit code", "Error:", "    at "]) {
+        assert.notInclude(text, raw)
+      }
+    }
+    assert.deepEqual(failures(results), [{ harness: "codex", category: "initialize" }])
+    // one failed harness first does not stop the one after it
+    assert.deepEqual(yield* fx(() => names(outputDirectory)), ["claude.ndjson"])
+  }))
+
+live("an adapter that cannot be started is reported with category start (breaks if every failure is reported as initialize or other, or the missing program aborts the run; fix round 2 item 2)", () =>
+  Effect.gen(function*() {
+    const missing: any = { id: "gemini", settings: { ...settingsFor("gemini"), adapterPath: join(root, "no-such-program"), adapterArguments: [] } as HarnessSettings }
+    const results = yield* record([missing, fakeHarness("claude", "0.99.1")])
+    assert.deepEqual(failures(results), [{ harness: "gemini", category: "start" }])
+    assert.deepEqual(yield* fx(() => names(outputDirectory)), ["claude.ndjson"])
+    assert.notInclude(formatReport(results) + JSON.stringify(results), "no-such-program")
+  }))
+
+live("an adapter that dies during the prompt is reported with category prompt, and the next harness is still recorded (breaks if a failure after the session started is reported under another category or stops the run; fix round 2 item 2)", () =>
+  Effect.gen(function*() {
+    const results = yield* record([
+      cleanHarness("codex", [[{ step: "text", text: "last words" }, { step: "crash", exitCode: 3 }]]),
+      fakeHarness("claude", "0.99.1")
+    ])
+    assert.deepEqual(failures(results), [{ harness: "codex", category: "prompt" }])
+    assert.deepEqual(yield* fx(() => names(outputDirectory)), ["claude.ndjson"])
+    assert.notInclude(formatReport(results), "last words")
+  }))
+
+live("when every harness fails the run still resolves and reports each one, so the command can exit 1 after writing everything it could (breaks if the last failure is thrown instead of reported; fix round 2 item 2)", () =>
+  Effect.gen(function*() {
+    const results = yield* record([crashedAdapter("claude"), crashedAdapter("codex")])
+    assert.deepEqual(failures(results), [{ harness: "claude", category: "initialize" }, { harness: "codex", category: "initialize" }])
+    assert.deepEqual(yield* fx(() => names(outputDirectory)), [])
+  }))
+
+live("a signed-out probe whose adapter dies at start stops neither the next harness nor the first one's fixture (breaks if a probe error aborts the run after the fixtures were written; fix round 2 item 2)", () =>
+  Effect.gen(function*() {
+    const probeBroken: any = {
+      id: "claude",
+      settings: { ...settingsFor("claude"), adapterPath: process.execPath,
+        // records fine with its own script, then starts as an empty-home probe that crashes on start
+        adapterArguments: ["-e", `if (/signed-out-home/.test(process.env.HOME ?? "")) process.exit(4); import(${JSON.stringify(fakeAgentPath)})`] } as HarnessSettings,
+      accountVariables: { FAKE_AGENT_SCRIPT: JSON.stringify({ agentInfo: { name: "fake", version: "0.99.1" }, configOptions: [modeOption], turns: [[{ step: "text", text: "hello from claude" }]] }) }
+    }
+    const results = yield* record([probeBroken, fakeHarness("codex", "2.5.0")], { captureSignedOut: true })
+    assert.deepEqual((results as any[]).map((result) => [result.harness, result.status]), [["claude", "recorded"], ["codex", "recorded"]])
+    assert.deepEqual(yield* fx(() => names(outputDirectory)), ["claude.ndjson", "codex.ndjson"])
   }), 60_000)
