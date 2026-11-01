@@ -333,6 +333,15 @@ importers:
       '@shepherd/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@shepherd/t3-effect-acp':
+        specifier: workspace:*
+        version: link:../../third_party/t3code/effect-acp
+      '@shepherd/t3-node-sqlite':
+        specifier: workspace:*
+        version: link:../../third_party/t3code/node-sqlite
+      '@shepherd/t3-provider-instance':
+        specifier: workspace:*
+        version: link:../../third_party/t3code/provider-instance
       effect:
         specifier: 4.0.5
         version: 4.0.5
@@ -407,6 +416,12 @@ importers:
       '@shepherd/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@shepherd/t3-effect-acp':
+        specifier: workspace:*
+        version: link:../../third_party/t3code/effect-acp
+      '@shepherd/t3-provider-testing':
+        specifier: workspace:*
+        version: link:../../third_party/t3code/provider-testing
       effect:
         specifier: 4.0.5
         version: 4.0.5

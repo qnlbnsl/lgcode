@@ -12,6 +12,10 @@
 #   - a copyright line quoted in a row is still present in that file;
 #   - every copied file has a row in third_party/t3code/SECURITY-REVIEW.md, and
 #     every row names a file that exists.
+# A path with a control character (a newline or a tab, for example), and any
+# entry that is neither a regular file nor a folder (a symbolic link, for
+# example), is a failure that names the path, with control characters shown
+# as "?". Such entries are never counted as credited.
 # Package metadata files (README.md, LICENSE, SECURITY-REVIEW.md, package.json,
 # tsconfig.json at the top of third_party/t3code and of each package) and
 # node_modules directories are not copied code and need no rows.
@@ -86,10 +90,25 @@ problems=$(
   [ -f "$readme" ] || echo "third_party/t3code/README.md: file is missing"
   [ -f "$review" ] || echo "third_party/t3code/SECURITY-REVIEW.md: file is missing"
 
+  # Entries that cannot be credited by name. Control characters are shown as "?".
+  LC_ALL=C find "$base" -name node_modules -prune -o \
+    \( -path '*[[:cntrl:]]*' -o \( ! -type f ! -type d \) \) -exec sh -c '
+      for path; do
+        shown=$(printf "%s" "$path" | tr "[:cntrl:]" "?")
+        if [ -L "$path" ]; then
+          echo "$shown: symbolic link is not allowed under third_party/t3code"
+        elif [ ! -f "$path" ] && [ ! -d "$path" ]; then
+          echo "$shown: only regular files and folders are allowed under third_party/t3code"
+        else
+          echo "$shown: path contains a control character"
+        fi
+      done
+    ' sh {} +
+
   # Every copied file, relative to third_party/t3code.
   files=$(
     cd "$base" || exit 1
-    find . -type d -name node_modules -prune -o -type f -print |
+    LC_ALL=C find . -name node_modules -prune -o -path '*[[:cntrl:]]*' -prune -o -type f -print |
       sed 's|^\./||' | LC_ALL=C sort |
       while IFS= read -r path; do
         case $path in
@@ -101,16 +120,30 @@ problems=$(
       done
   )
 
-  # NOTICE must name every package directory.
+  # NOTICE must name every package directory. A name counts only when a whole
+  # word after "third_party/t3code/" equals the directory name, compared as
+  # text, never as a pattern. A full stop, comma or bracket after the word is
+  # punctuation, not part of the name.
   if [ -f "$notice" ]; then
+    named=$(awk '
+      {
+        line = $0
+        while ((at = index(line, "third_party/t3code/")) > 0) {
+          line = substr(line, at + 19)
+          word = line
+          sub(/[^A-Za-z0-9_.@-].*$/, "", word)
+          sub(/[.]+$/, "", word)
+          print word
+        }
+      }
+    ' "$notice")
     for dir in "$base"/*/; do
       [ -d "$dir" ] || continue
       name=${dir%/}
       name=${name##*/}
       [ "$name" = node_modules ] && continue
-      if ! grep -Eq "third_party/t3code/$name([^A-Za-z0-9_-]|\$)" "$notice"; then
+      printf '%s\n' "$named" | grep -Fxq -- "$name" ||
         echo "third_party/t3code/$name: package is not named in NOTICE"
-      fi
     done
   fi
 

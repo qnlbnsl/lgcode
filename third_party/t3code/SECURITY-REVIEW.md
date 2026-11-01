@@ -65,21 +65,33 @@ is recorded as an issue in `docs/issues.md`.
 
 ## Table of files
 
-The five metadata files in each package (`package.json` and `tsconfig.json`) are
-Shepherd's own and are not listed. The two generated schema files are made of
-schema declarations only: they import `effect/Schema`, hold no functions, and
-run no code. Their text was checked by searching for calls, process access and
-dynamic code, and by reading their first sections.
+The two metadata files in each package (`package.json` and `tsconfig.json`) are
+Shepherd's own and are not listed.
+
+The three generated files under `effect-acp/src/_generated/` (19,457 lines in
+all) were scanned and were not read line by line. The scan used these commands
+from that folder:
+
+- `grep -hE '^import ' *.ts | sort -u` printed one line, the import of
+  `effect/Schema`, so the files import nothing else.
+- `grep -nE 'process\.|require\(|import\(|eval\(|new Function|child_process|"node:|fetch\(|Effect\.|console\.|globalThis|Deno\.|Bun\.' *.ts`
+  matched three lines, all of them text inside description strings (the words
+  "process" and "processing"), and no code.
+- The files hold schema declarations, plus short arrow functions that only
+  delay a reference to another schema (`Schema.suspend`). A search for
+  top-level functions and classes found none.
+
+Rows for these files say "scanned, not read line by line".
 
 | File | Result |
 |---|---|
 | `effect-acp/scripts/generate.ts` | Finding: downloads from GitHub and runs `pnpm exec vp fmt`; development only, not run by Shepherd. See "Findings that are not logging". |
-| `effect-acp/src/_generated/meta.gen.ts` | read, no findings |
-| `effect-acp/src/_generated/schema-v1.gen.ts` | read, no findings |
-| `effect-acp/src/_generated/schema.gen.ts` | read, no findings |
+| `effect-acp/src/_generated/meta.gen.ts` | scanned, not read line by line; no findings. See the method above. |
+| `effect-acp/src/_generated/schema-v1.gen.ts` | scanned, not read line by line; no findings. See the method above. |
+| `effect-acp/src/_generated/schema.gen.ts` | scanned, not read line by line; no findings. See the method above. |
 | `effect-acp/src/_internal/shared.ts` | Finding: logs handler defects at lines 37 and 53; redacted by the service logger. |
 | `effect-acp/src/_internal/stdio.test.ts` | read, no findings |
-| `effect-acp/src/_internal/stdio.ts` | read, no findings. The child's standard error is discarded, not logged. |
+| `effect-acp/src/_internal/stdio.ts` | Finding: the copied Stdio service discards its own standard error writes, but it does not read or drain the child's `stderr`. Unit 6a must drain the child's standard error and redact it before it is logged or stored. |
 | `effect-acp/src/agent.test.ts` | read, no findings |
 | `effect-acp/src/agent.ts` | read, no findings. It passes the logging options through unchanged and has no logging call of its own. |
 | `effect-acp/src/client.test.ts` | read, no findings |

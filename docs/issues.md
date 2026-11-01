@@ -109,8 +109,9 @@ Node.js built-in modules to type-check.
 ## 7. A symbolic link to the launcher runs from the wrong folder
 
 Found: 2026-11-01, in the unit 1 review.
-State: fixed in unit 2: `bin/shepherd` follows links with a `readlink` loop,
-and `launcher-links.test.ts` covers it. Commit: 87e2d4c.
+State: fixed in unit 2: `bin/shepherd` follows links, and
+`launcher-links.test.ts` covers it. Commit: 87e2d4c. The first fix used
+`readlink` from `PATH`; issue 20 replaced that.
 
 What happened: `bin/shepherd` found its checkout with `dirname "$0"` and does
 not follow a symbolic link to the file itself. A link such as
@@ -125,8 +126,10 @@ Why it matters: a link on the path is a likely way for the owner to run
 ## 8. The launcher looks up `dirname` on the path
 
 Found: 2026-11-01, in the unit 1 review.
-State: fixed in unit 2: the launcher uses `${self%/*}`, and only `readlink`
-runs before the chosen Node.js. Commit: 87e2d4c.
+State: fixed in unit 2: the launcher uses `${self%/*}` instead of `dirname`.
+Commit: 87e2d4c. The first fix still ran `readlink` from `PATH` before the
+chosen Node.js, which the focused review found; issue 20 fixed that, so now
+only shell builtins and the chosen Node.js run.
 
 What happened: `bin/shepherd` ran `dirname` from `PATH`. Decision 22 allows
 a path lookup only for `node`.
@@ -206,7 +209,7 @@ State: open; belongs to the unit that builds the service logger.
 
 What happens: decision 57 says the copied ACP protocol debug logging stays off
 outside tests. That is true of `logProtocol` in `effect-acp/src/protocol.ts`
-(lines 263-272), which the `logIncoming` and `logOutgoing` options gate. Three
+(lines 263-272), which the `logIncoming` and `logOutgoing` options gate. Four
 other calls are not gated: `protocol.ts` lines 503 and 599, and
 `_internal/shared.ts` lines 37 and 53. They log the cause of a handler defect or
 an encoding failure, which can include a value the handler held. Line 547 logs
@@ -215,6 +218,11 @@ What should happen: the service's logger passes through the redactor before
 Shepherd registers any extension handler, and a test greps its output for
 planted secrets, as decision 57 requires. Shepherd never sets `logIncoming`,
 `logOutgoing` or `logger` outside tests.
+Rule for the units that run ACP (6a, 6d and 7a): install the redacting service
+logger before constructing any ACP runner or handler. Keep wire logging off,
+except behind the temporary-home test gate of decision 74. Test planted secrets
+through four paths: the core path, notification handlers, extension-handler
+defects, and encoding failures.
 Why it matters: until then, a handler defect could write a secret to the log.
 No Shepherd code registers a handler yet, so nothing leaks today.
 
@@ -267,3 +275,78 @@ a fixture, and the README table marks both as written for Shepherd.
 What should happen: nothing further.
 Why it matters: the copied helpers would otherwise have no test at all.
 
+## 18. The first-party packages did not depend on the copied packages
+
+Found: 2026-11-01, in the focused review of unit 2.
+State: fixed in the commit "fix(unit-2): link the copies, harden the checker and launcher" (unit 2 fix round 1); `copied-package-edges.test.ts` covers it.
+
+What happened: after a frozen install, `import.meta.resolve` failed with
+`ERR_MODULE_NOT_FOUND` from `packages/engine` and `packages/testing` for the
+copied packages. Decision rows 23 and 71 require these edges before the
+manifests freeze.
+What should happen: `engine` depends on `@shepherd/t3-effect-acp`,
+`@shepherd/t3-node-sqlite` and `@shepherd/t3-provider-instance`. `testing`
+depends on `@shepherd/t3-effect-acp` and `@shepherd/t3-provider-testing`, all as
+`workspace:*`. Nothing depends on `@shepherd/t3-source-control`, which has no
+planned consumer. `testing` does not depend on the provider-instance copy,
+because unit 8a's fake agent only needs the protocol library and the replay
+helpers; unit 8a's harness defaults and environment builder live in `engine`.
+Why it matters: the manifests freeze after unit 2, so a missing edge would
+force an unplanned change to a frozen file.
+
+## 19. The credit checker accepted names it had not credited
+
+Found: 2026-11-01, in the focused review of unit 2.
+State: fixed in the commit "fix(unit-2): link the copies, harden the checker and launcher" (unit 2 fix round 1); `credits-names.test.ts` covers it.
+
+What happened: three inputs made `scripts/check-credits.sh` exit 0. A path with
+a newline whose fragments matched credited files was split into lines. A symbolic
+link under a package was skipped, because the search listed regular files only.
+A package folder named `effect-acp.*`, missing from `NOTICE`, matched because
+the folder name was used as a regular expression.
+What should happen: the checker fails on any path with a control character, on
+any entry that is not a regular file or a folder (a symbolic link is rejected,
+not listed), and compares `NOTICE` package names as text.
+Why it matters: the check is the only guard that every copied file is credited.
+
+## 20. A linked launcher ran `readlink` from `PATH`
+
+Found: 2026-11-01, in the focused review of unit 2.
+State: fixed in the commit "fix(unit-2): link the copies, harden the checker and launcher" (unit 2 fix round 1); `launcher-readlink.test.ts` covers it.
+
+What happened: with `PATH` holding only the link's folder, the launcher exited 1
+with `readlink: not found`, and a substituted `readlink` would have run.
+What should happen: the launcher chooses Node.js first, and when it is started
+through a link, asks the chosen Node.js for its real path. No command other
+than the chosen Node.js and shell builtins runs.
+Why it matters: decision 22 allows a `PATH` lookup for `node` only.
+
+## 21. The security read overstated how the generated schema files were checked
+
+Found: 2026-11-01, in the focused review of unit 2.
+State: fixed in the commit "fix(unit-2): link the copies, harden the checker and launcher" (unit 2 fix round 1).
+
+What happened: `SECURITY-REVIEW.md` said "read, no findings" for the three
+generated schema files, which hold 19,457 lines. They had been scanned, not read.
+It also said the child's standard error is discarded, but the copied Stdio
+service only discards its own writes and does not drain the child's `stderr`.
+What should happen: the review states the scan commands, marks the rows
+"scanned, not read line by line", and tells unit 6a to drain and redact the
+child's standard error.
+Why it matters: a review that claims more than was done hides the gap.
+
+## 22. Rule 2 and the commit-message hook disagree about vendor-named files
+
+Found: 2026-11-01, in the focused review of unit 2.
+State: open; the owner decides.
+
+What happens: rule 2 says to name each copied source file in the commit message.
+The commit-message hook rejects vendor words, and four T3 Code files carry one
+in their names: the first harness's home file (`ClaudeHome.ts`), the second
+harness's home layout (`CodexHomeLayout.ts`) and its test, and the second
+harness's managed home (`CodexManagedHome.ts`). Commit 87e2d4c therefore names
+them in neutral words, as the lead instructed. The table in
+`third_party/t3code/README.md` is the record of every source file.
+What should happen: the owner decides whether the hook should allow file paths.
+Until then, commit messages name `third_party/t3code/README.md` as the file list.
+Why it matters: the rule and the hook cannot both be followed to the letter.

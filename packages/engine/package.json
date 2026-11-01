@@ -18,6 +18,9 @@
     "@agentclientprotocol/codex-acp": "2.5.0",
     "@effect/platform-node": "catalog:",
     "@shepherd/contracts": "workspace:*",
+    "@shepherd/t3-effect-acp": "workspace:*",
+    "@shepherd/t3-node-sqlite": "workspace:*",
+    "@shepherd/t3-provider-instance": "workspace:*",
     "effect": "catalog:",
     "ws": "catalog:"
   },
