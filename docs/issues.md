@@ -1761,13 +1761,24 @@ identity cannot be verified. The leader-only identity rule remains intact.
 Why it matters: recovery must neither hang forever nor signal an unrelated
 process because its group number matches an old row.
 
-## 128. Classified pauses still need reset times from real error replies
+## 128. Classified pauses need trustworthy error sources and reset times
 
-Found: 2026-11-01, in unit 6c's focused review, finding F-4.
-State: open for the merge of units 6b and 6c, with engine-lead deciding the wiring.
+Found: 2026-11-01, in unit 6c's focused review, finding F-4, and the unit 6b
+review's ruling A3, relayed by engine-lead in board post 980.
+State: error-source classification is fixed in unit 6c fix round 1. Reset
+times remain open for the merge of units 6b and 6c, with engine-lead deciding
+the wiring.
 
-What happens: the real classifier returns only the pause class. The runner
-therefore omits `resetAt` even when an error reply supplies `data.resetsAt`.
+What happened: the runner classified a successful turn's text, so ordinary
+agent prose containing "authentication required" could produce a signed-out
+pause. Unit 6b would then apply that pause to the entire account.
+What changed: a signed-out classification requires an actual error reply
+in `turn.error`. Successful text can produce only an out-of-usage pause,
+and only for cursor, whose recorded transcript uses that text form
+(issue 38). All other harnesses classify only their error replies. The
+same restrictions apply to an injected classifier.
+What remains: the real classifier returns only the pause class. The runner
+still omits `resetAt` even when an error reply supplies `data.resetsAt`.
 Unit 6b adds `resetAt` to the runner's pause outcome, and the fake agent's
 `out_of_usage` step already supplies `data.resetsAt`. No recorded fixture
 holds a reset time yet, as recorded in the fix-round brief.

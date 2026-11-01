@@ -136,7 +136,12 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     turn.ended = true;
     yield* drainMessages(entry, true);
     const clean = yield* redactText(turn.error ?? turn.text);
-    const classification = (configuration.classifyError ?? classifyError)({ harness: entry.input.harness.id, text: clean });
+    const harness = entry.input.harness.id;
+    // Only the recorded cursor adapter reports usage exhaustion as a
+    // successful text reply. Agent prose cannot establish a signed-out error.
+    const candidate = turn.error !== undefined || harness === "cursor"
+      ? (configuration.classifyError ?? classifyError)({ harness, text: clean }) : undefined;
+    const classification = turn.error !== undefined || candidate === "out-of-usage" ? candidate : undefined;
     yield* emit({ _tag: "promptReply", ...identity(entry), deliveryId: turn.deliveryId,
       outcome: classification !== undefined ? { _tag: "pause", reason: classification, error: clean }
         : turn.error !== undefined ? { _tag: "error", error: clean } : { _tag: "success" } });
