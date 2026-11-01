@@ -368,7 +368,10 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         processEntry.dead = true;
         // Descendants must not keep stderr open after their adapter exits.
         yield* Effect.sync(() => { try { process.kill(-Number(child.pid), "SIGKILL"); } catch { /* gone */ } });
-        yield* Fiber.join(stderrReader);
+        // A helper in another session can inherit this pipe even after the
+        // adapter's own group is gone. It must not postpone the crash event.
+        const drained = yield* Fiber.join(stderrReader).pipe(Effect.timeoutOption(2_000));
+        if (Option.isNone(drained)) yield* Fiber.interrupt(stderrReader);
         const stderr = yield* stderrTail.finish();
         yield* drainMessages(processEntry, true);
         if (processEntry.sent !== undefined) yield* Deferred.fail(processEntry.sent, rejected("agent process exited"));

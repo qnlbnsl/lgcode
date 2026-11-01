@@ -53,6 +53,7 @@ export const sweepOrphans = (options: {
   readonly reader: ProcessReader;
   readonly kill: (groupId: number, signal: "SIGTERM" | "SIGKILL") => void;
   readonly graceMillis: number;
+  readonly killWaitMillis?: number;
 }) => Effect.gen(function* () {
   const { reader } = options;
   const guard = (row: ProcessRow): string | undefined => {
@@ -86,7 +87,12 @@ export const sweepOrphans = (options: {
     // group number belongs to another process and must never be signalled.
     if (guard(row) === undefined) {
       signal(row, "SIGKILL");
-      while (guard(row) === undefined) yield* Effect.sleep(10);
+      const killDeadline = Date.now() + Math.max(0, options.killWaitMillis ?? 5_000);
+      while (guard(row) === undefined && Date.now() < killDeadline) yield* Effect.sleep(Math.min(10, Math.max(0, killDeadline - Date.now())));
+      if (guard(row) === undefined) {
+        results.push({ agentId: row.agentId, groupId: row.groupId, outcome: "left-alone", reason: "group did not exit" });
+        continue;
+      }
     }
     results.push({ agentId: row.agentId, groupId: row.groupId, outcome: "stopped", reason: "group stopped" });
   }

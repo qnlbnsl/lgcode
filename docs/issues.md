@@ -1644,7 +1644,7 @@ its wait call returns and repeat what the call already told it.
 ## 120. The leftover-process reader does not support macOS yet
 
 Found: 2026-11-01, while building unit 6c.
-State: open for a macOS implementation and host verification.
+State: open for unit 6d to handle unsupported recovery, a macOS implementation and host verification.
 
 What happens: `recovery/orphans.ts` provides the Linux reader and an explicit
 unsupported macOS reader. The macOS reader throws before the sweep can send
@@ -1705,19 +1705,74 @@ settled to a higher ancestor in the same append.
 ## 124. A permission-race test intermittently observes an earlier log event
 
 Found: 2026-11-01, during unit 6c's full engine and testing suite.
-State: open for the test writer to investigate.
+State: confirmed on the base in unit 6c's focused review; the fix-round test writer owns the test correction.
 
 What happened: `routing/permissions.test.ts`, "5.5 answer racing pass-up",
-failed its `whileHeld` assertion once because it contained one event at
-sequence 14. The same case passed in the two preceding full runs. The
-failure output did not expand the event, so its tag is not confirmed.
-What may explain it: `support/routingRig.ts`, `behindWriter`, reads the
-initial log sequence before forking the writer-permit holder, then sleeps
-instead of acknowledging that the permit is held. A previously scheduled
-dispatch could commit between that read and acquisition. This is an
-inference from the helper's ordering, not a confirmed event trace.
-What should happen: investigate that interval and synchronize the helper's
-watermark with confirmed permit acquisition if it admits earlier commits.
-Why it matters: a pre-existing event could fail the assertion even when
-both raced commands correctly wait for the writer. Unit 6c leaves the
-frozen helper and this test unchanged.
+failed its `whileHeld` assertion because it contained an earlier event.
+The focused reviewer reproduced the failure on the base as well, in three
+of eighteen runs under load. The event is `DeliverySent`, with
+the owner as caller, for the family fixture's delivery to `lead`.
+The same timing gap affects "5.5 token race on answer".
+Why it happens: `support/routingRig.ts`, `behindWriter`, reads the initial
+log sequence before forking the writer-permit holder. The fixture returns
+before its pending dispatch is committed. That dispatch can commit between
+the watermark read and acquisition of the writer permit, even though both
+raced commands correctly wait. Engine-lead confirmed this finding in the
+unit 6c fix-round brief on 2026-11-01.
+What should happen: the permissions fixture waits for its pending
+`DeliverySent` before a race takes the watermark, or records the watermark
+only after the permit is held. The test writer changes only the test's
+synchronization and runs the permissions file ten times.
+Why it matters: the assertion can reject correct command serialization.
+The unit 6c production changes did not cause the race.
+
+## 126. A detached helper could prevent the adapter's crash from being recorded
+
+Found: 2026-11-01, in unit 6c's focused review, finding F-1.
+State: fixed in unit 6c fix round 1.
+
+What happened: an adapter could start a helper in a separate session with
+inherited stderr. Killing the adapter's process group did not close the
+helper's pipe. The exit watcher waited indefinitely for the stderr reader,
+so it never emitted `exited` and the handler could not revoke the token.
+What changed: the watcher waits up to two seconds for stderr to drain. On
+timeout it interrupts the reader, flushes the redacted tail it already has,
+and emits the exit event. It never signals the unrecorded detached helper.
+Why it matters: an open inherited pipe must not keep a dead agent's
+credential valid or hide its crash.
+
+## 127. Recovery needs a policy for groups that cannot be proven or stopped
+
+Found: 2026-11-01, in unit 6c's focused review, finding F-3.
+State: the unbounded wait is fixed in unit 6c fix round 1. The absent-leader
+case and the recovery response remain open for unit 6d.
+
+What happened: the sweep waited indefinitely when a group still appeared
+alive after SIGKILL. It also verifies identity only through the recorded
+group leader. When that leader is gone, live group members cannot be
+proven to belong to the recorded adapter, so the reader reports no process
+and the sweep leaves them alone.
+What changed: the post-SIGKILL wait defaults to five seconds and can be
+set with `killWaitMillis`. If matching process facts remain at the deadline,
+the sweep returns `left-alone` with the fixed reason `group did not exit`.
+What should happen: unit 6d handles these outcomes and the throwing macOS
+reader in issue 120 explicitly. It must not signal members whose recorded
+identity cannot be verified. The leader-only identity rule remains intact.
+Why it matters: recovery must neither hang forever nor signal an unrelated
+process because its group number matches an old row.
+
+## 128. Classified pauses still need reset times from real error replies
+
+Found: 2026-11-01, in unit 6c's focused review, finding F-4.
+State: open for the merge of units 6b and 6c, with engine-lead deciding the wiring.
+
+What happens: the real classifier returns only the pause class. The runner
+therefore omits `resetAt` even when an error reply supplies `data.resetsAt`.
+Unit 6b adds `resetAt` to the runner's pause outcome, and the fake agent's
+`out_of_usage` step already supplies `data.resetsAt`. No recorded fixture
+holds a reset time yet, as recorded in the fix-round brief.
+What should happen: the merge carries the error reply's reset time into
+the pause outcome, and recorded fixtures eventually verify the real
+adapter's reset-time form. The classifier signature stays unchanged here.
+Why it matters: account recovery cannot schedule a usage reset from a
+classified pause that lost its reset time.
