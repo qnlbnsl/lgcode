@@ -39,17 +39,27 @@ export const layer = (configuration: { readonly stateFolder: string }): Layer.La
     // The owner-only mode is set when the temporary file is created, so the
     // value is never readable by others, and the rename replaces the whole
     // file at once.
-    const put = async (reference: string, value: string) => {
+    const replace = async (next: Record<string, string>) => {
       await mkdir(configuration.stateFolder, { recursive: true, mode: 0o700 });
-      const next = { ...await read(path), [reference]: value };
       const temporary = `${path}.${randomUUID()}.tmp`;
       await writeFile(temporary, JSON.stringify(next), { mode: 0o600 });
       await chmod(temporary, 0o600);
       await rename(temporary, path);
     };
+    const put = async (reference: string, value: string) => replace({ ...await read(path), [reference]: value });
+    // Issue 119. A store with nothing to remove is left untouched.
+    const retainOnly = async (keep: ReadonlySet<string>) => {
+      const values = await read(path);
+      const kept = Object.fromEntries(Object.entries(values).filter(([reference]) => keep.has(reference)));
+      if (Object.keys(kept).length !== Object.keys(values).length) await replace(kept);
+    };
     return SecretStore.of({
       put: (reference, value) => writes.withPermit(Effect.tryPromise({
         try: () => put(reference, Redacted.value(value)),
+        catch: () => new LogWriteFailed({ reason: "secret store write failed" }),
+      })),
+      retainOnly: (keep) => writes.withPermit(Effect.tryPromise({
+        try: () => retainOnly(keep),
         catch: () => new LogWriteFailed({ reason: "secret store write failed" }),
       })),
       resolve: (reference) => Effect.promise(() => read(path)).pipe(

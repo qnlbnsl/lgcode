@@ -2,12 +2,14 @@ import { randomUUID } from "node:crypto";
 import { AccountId, RunMode, type AgentId, type Delivery, type Event, type EventEnvelope } from "@shepherd/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import { freshRequest, type Snapshot } from "../commands/internal.ts";
 import { EventLog, LogWriteFailed } from "../log/EventLog.ts";
+import { Restart } from "../recovery/service.ts";
 import { Runner, type RunnerEvent } from "../runner/Runner.ts";
 import { Views } from "../views/Views.ts";
 import { envelope } from "./envelope.ts";
@@ -206,19 +208,34 @@ export const promptReply = (
 // Fix round 1, F3: the agent's lane is held from the reservation through the
 // runner call (lanes.ts), and the send names the incarnation it was reserved
 // for, the hash of the agent's live token, read in the same transaction.
-export const dispatchQueued = (agentId: AgentId) => Effect.gen(function* () {
+//
+// Recovery step 10 and row 66 (`recovered`): an agent that a reload left
+// working, with a re-sent delivery or a carry-on at the head of its queue,
+// sends that head once. It counts as sent once any delivery was sent after
+// the reload's "working". `laneHeld` is for a caller that already holds the
+// agent's lane, such as `resume`.
+export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?: boolean; readonly laneHeld?: boolean } = {}) => Effect.gen(function* () {
   const log = yield* EventLog;
   const views = yield* Views;
   const runner = yield* Runner;
   const sql = yield* SqlClient.SqlClient;
+  const reloaded = (snapshot: Snapshot) => {
+    const thread = snapshot.threads[agentId] ?? [];
+    const since = thread.findLastIndex((row) => row.event._tag === "StateChanged" && row.event.state._tag === "working");
+    return since >= 0 && !thread.slice(since + 1).some((row) => row.event._tag === "DeliverySent")
+      && !Object.values(snapshot.deliveries).some((row) => row.target === agentId && row.status === "sent");
+  };
   // Fix round 1, A2: an agent on a signed-out account gets nothing; its
   // queue waits for the owner's "account available".
   const ready = (snapshot: Snapshot) => {
     const agent = snapshot.agents[agentId];
-    return agent?.state._tag === "idle" && snapshot.accounts[agent.account]?.status !== "needs-sign-in" ? nextQueued(snapshot, agentId) : undefined;
+    const state = agent?.state._tag;
+    return agent !== undefined && snapshot.accounts[agent.account]?.status !== "needs-sign-in"
+      && (state === "idle" || (options.recovered === true && state === "working" && reloaded(snapshot)))
+      ? nextQueued(snapshot, agentId) : undefined;
   };
   if (ready(yield* views.snapshot) === undefined) return;
-  yield* withLane(log, agentId)(Effect.gen(function* () {
+  yield* (options.laneHeld === true ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : withLane(log, agentId))(Effect.gen(function* () {
     const reserved = yield* log.transact((append) => Effect.gen(function* () {
       const snapshot = yield* views.snapshot;
       const row = ready(snapshot);
@@ -270,8 +287,13 @@ const readyAfter = (envelope: EventEnvelope): ReadonlyArray<AgentId> => {
 // commit that arrives meanwhile makes it go round once more. The fibers are
 // children of the follower and end with it. One failed send is logged
 // without content and does not stop it.
+//
+// Issue 88: while restart recovery runs (its layer is present), the follower
+// collects commits but sends nothing until recovery's step 9 has finished;
+// step 10 then sends what was queued before.
 export const dispatchCommitted = Effect.gen(function* () {
   const log = yield* EventLog;
+  const recovery = yield* Effect.serviceOption(Restart);
   const committed = yield* log.subscribeCommitted;
   const running = new Map<string, { again: boolean }>();
   // The check and the removal happen in one step, so a request that arrives
@@ -292,6 +314,7 @@ export const dispatchCommitted = Effect.gen(function* () {
   })));
   return yield* Effect.forever(Effect.gen(function* () {
     const batch = yield* PubSub.takeAll(committed);
+    if (Option.isSome(recovery)) yield* recovery.value.whenReady;
     for (const agentId of new Set(batch.flatMap(readyAfter))) {
       const entry = running.get(agentId);
       if (entry !== undefined) {

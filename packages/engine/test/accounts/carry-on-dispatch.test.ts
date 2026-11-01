@@ -48,7 +48,7 @@ it.effect("6b A1: catches dispatch passing carry-on content unchanged to the rea
       .filter((row) => row.target === started.agentId && row.content._tag === "carry-on");
     expect(carries).toHaveLength(1);
     expect.soft(promptTexts(resumed)).toHaveLength(2);
-    expect.soft(promptTexts(resumed)[1]).toBe("The pause has ended. Carry on with what you were doing.");
+    expect.soft(promptTexts(resumed)[1]).toBe(`The pause has ended. Carry on with what you were doing. (delivery ${carries[0]!.id})`);
     expect.soft(carries[0]?.status).not.toBe("returned");
     const accepted = yield* eventually(deliveryRow(carries[0]!.id), (row) => row?.status === "accepted" || row?.status === "returned");
     expect(accepted?.status).toBe("accepted");

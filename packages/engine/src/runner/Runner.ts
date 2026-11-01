@@ -21,10 +21,19 @@ export interface RunnerCapabilities {
   readonly setModeConfigOption: boolean;
 }
 
+// Rows 51 and 66 and issue 154: what a reload replayed, in order, returned
+// with the load result so the replay scan never waits on the event stream.
+// A user item is redacted user-message text; a break stands for any other
+// replayed update (an agent message, a plan, a tool call, a file change), so
+// user chunks are joined only when nothing else came between them.
+export type ReplayItem = { readonly _tag: "user"; readonly text: string } | { readonly _tag: "break" };
+
 export interface SessionInfo {
   readonly session: SessionReference;
   readonly protocolVersion: number;
   readonly reloadable: boolean;
+  // Present on a load; absent on a start, which replays nothing.
+  readonly replay?: ReadonlyArray<ReplayItem>;
 }
 
 // Every event belongs to the spawn identified by its unrevoked token hash.
@@ -62,6 +71,9 @@ export const RunnerEvent = Schema.Union([
     deliveryId: DeliveryId,
     kind: Schema.Literals(["message", "plan", "tool-call", "file-change", "available_commands_update"]),
     replay: Schema.Boolean,
+    // Issue 144: who spoke a message, so a reload's replay scan reads only
+    // the user's content (row 66).
+    role: Schema.optionalKey(Schema.Literals(["user", "agent"])),
     text: Schema.String,
     content: Schema.optionalKey(Event.pipe(Schema.toTaggedUnion("_tag")).cases.ThreadItem.fields.content),
   }),

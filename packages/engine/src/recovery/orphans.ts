@@ -56,7 +56,12 @@ export const sweepOrphans = (options: {
   readonly killWaitMillis?: number;
 }) => Effect.gen(function* () {
   const { reader } = options;
+  // Issues 120 and 127: a reader that throws proves nothing, so the group is
+  // left alone. The thrown value is never kept or reported.
   const guard = (row: ProcessRow): string | undefined => {
+    try { return check(row); } catch { return "process identity unavailable"; }
+  };
+  const check = (row: ProcessRow): string | undefined => {
     if (row.bootId !== reader.bootId()) return "boot id differs";
     if (!Number.isSafeInteger(row.groupId) || row.groupId <= 1) return "group id not above 1";
     if (row.groupId === reader.ownGroupId()) return "group id is the engine's own";
@@ -67,11 +72,11 @@ export const sweepOrphans = (options: {
     if (facts.executable !== row.executable) return "executable differs";
     return undefined;
   };
-  const signal = (row: ProcessRow, value: "SIGTERM" | "SIGKILL") => {
-    try { options.kill(row.groupId, value); }
-    catch (error) {
-      if (!(error !== null && typeof error === "object" && "code" in error && error.code === "ESRCH")) throw error;
-    }
+  // An absent group already exited. Any other signalling failure leaves the
+  // group alone rather than ending the sweep.
+  const signal = (row: ProcessRow, value: "SIGTERM" | "SIGKILL"): boolean => {
+    try { options.kill(row.groupId, value); return true; }
+    catch (error) { return error !== null && typeof error === "object" && "code" in error && error.code === "ESRCH"; }
   };
   const results: Array<{ agentId: ProcessRow["agentId"]; groupId: number; outcome: "stopped" | "left-alone"; reason: string }> = [];
   for (const row of options.rows) {
@@ -80,13 +85,19 @@ export const sweepOrphans = (options: {
       results.push({ agentId: row.agentId, groupId: row.groupId, outcome: "left-alone", reason });
       continue;
     }
-    signal(row, "SIGTERM");
+    if (!signal(row, "SIGTERM")) {
+      results.push({ agentId: row.agentId, groupId: row.groupId, outcome: "left-alone", reason: "signal failed" });
+      continue;
+    }
     const deadline = Date.now() + Math.max(0, options.graceMillis);
     while (guard(row) === undefined && Date.now() < deadline) yield* Effect.sleep(Math.min(10, Math.max(0, deadline - Date.now())));
     // Every guard is checked again immediately before escalation. A reused
     // group number belongs to another process and must never be signalled.
     if (guard(row) === undefined) {
-      signal(row, "SIGKILL");
+      if (!signal(row, "SIGKILL")) {
+        results.push({ agentId: row.agentId, groupId: row.groupId, outcome: "left-alone", reason: "signal failed" });
+        continue;
+      }
       const killDeadline = Date.now() + Math.max(0, options.killWaitMillis ?? 5_000);
       while (guard(row) === undefined && Date.now() < killDeadline) yield* Effect.sleep(Math.min(10, Math.max(0, killDeadline - Date.now())));
       if (guard(row) === undefined) {

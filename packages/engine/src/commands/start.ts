@@ -74,7 +74,8 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
             const lifecycle: ReadonlyArray<Event> = signedOut
               ? [{ _tag: "StateChanged", agentId, state: { _tag: "paused", reason: "signed-out", midTurn: false } }]
               : before === "paused" ? [{ _tag: "StateChanged", agentId, state: { _tag: "idle" } }] : [];
-            const opened: ReadonlyArray<Event> = [{ _tag: "SessionOpened", agentId, ...session }, ...lifecycle];
+            const opened: ReadonlyArray<Event> = [{ _tag: "SessionOpened", agentId, session: session.session,
+              protocolVersion: session.protocolVersion, reloadable: session.reloadable }, ...lifecycle];
             yield* append(actor, freshRequest(), randomUUID(), lifecycle.length > 0 ? withWaitChecks(snapshot, opened) : opened, {});
           })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
           Effect.catchTag("RunnerRejected", () => runtime.log.transact((append) => Effect.gen(function* () {

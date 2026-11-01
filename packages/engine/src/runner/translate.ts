@@ -3,6 +3,8 @@ import type { Event } from "@shepherd/contracts";
 type Content = Extract<Event, { _tag: "ThreadItem" }>["content"];
 export interface Translated {
   readonly kind: "message" | "plan" | "tool-call" | "file-change";
+  // Issue 144: the speaker of a message chunk.
+  readonly role?: "user" | "agent";
   readonly text: string;
   readonly content: Content;
 }
@@ -16,7 +18,7 @@ export const translate = (value: unknown, replay: boolean): ReadonlyArray<Transl
   if (update.sessionUpdate === "agent_message_chunk" || (replay && update.sessionUpdate === "user_message_chunk")) {
     const content = record(update.content);
     return content?.type === "text" && typeof content.text === "string"
-      ? [{ kind: "message", text: content.text, content: { _tag: "text", text: content.text } }] : [];
+      ? [{ kind: "message", role: update.sessionUpdate === "user_message_chunk" ? "user" : "agent", text: content.text, content: { _tag: "text", text: content.text } }] : [];
   }
   const entries = update.sessionUpdate === "plan" ? update.entries
     : update.sessionUpdate === "plan_update" && update.plan?.type === "items" ? update.plan.entries : undefined;
