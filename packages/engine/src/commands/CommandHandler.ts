@@ -19,7 +19,6 @@ import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
 import { EventLog, LogWriteFailed, type SideRows } from "../log/EventLog.ts";
 import { crashEvents } from "../recovery/crash.ts";
-import { observeReplay } from "../recovery/replay.ts";
 import { Restart } from "../recovery/service.ts";
 import { Runner, RunnerEvent } from "../runner/Runner.ts";
 import { dispatchCommitted, deliveryUpdate, promptReply, turnEnded } from "../routing/deliveries.ts";
@@ -134,8 +133,6 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
       const decoded = yield* Schema.decodeUnknownEffect(RunnerEvent)(rawEvent).pipe(Effect.result);
       if (decoded._tag === "Failure") return yield* Effect.logWarning("runner event dropped: malformed");
       const event = decoded.success;
-      // Rows 51 and 66: a reload scans its replayed history (recovery/replay.ts).
-      if (event._tag === "deliveryUpdate" && event.replay) yield* observeReplay(log, event);
       const consume = Effect.gen(function* () {
         let resetMode = false;
         yield* log.transact((append) => Effect.gen(function* () {

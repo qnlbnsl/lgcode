@@ -9,6 +9,7 @@ import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
+import type * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 import * as SqlClient from "effect/sql/SqlClient";
 
@@ -26,9 +27,9 @@ import { Runner } from "../runner/Runner.ts";
 import { Views } from "../views/Views.ts";
 import { linuxProcessReader, macosProcessReader, signalProcessGroup, sweepOrphans, type ProcessReader } from "./orphans.ts";
 import { reload, SETUP_TIMEOUT_MILLIS, spawnInput } from "./reload.ts";
-import { Restart } from "./service.ts";
+import { RecoveryAttempted, Restart } from "./service.ts";
 
-export { Restart } from "./service.ts";
+export { RecoveryAttempted, Restart } from "./service.ts";
 
 type AvailableCause = Extract<Event, { _tag: "AccountAvailable" }>["cause"];
 
@@ -74,6 +75,7 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
   const ready = yield* Deferred.make<void>();
   const running = yield* Semaphore.make(1);
   let completed = false;
+  let attempted = false;
   let timersStarted = false;
 
   const write = (events: ReadonlyArray<Event>) => log.transact((append) => Effect.gen(function* () {
@@ -298,7 +300,14 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
   return Restart.of({
     ready: Deferred.isDone(ready),
     whenReady: Deferred.await(ready),
-    recover: running.withPermits(1)(Effect.suspend(() => completed ? Effect.void : recoverOnce)),
+    // Ruling 3 of fix round 1: one attempt per service (see `Restart.recover`).
+    // A call that waited behind a running attempt sees its outcome.
+    recover: running.withPermits(1)(Effect.suspend((): Effect.Effect<void, LogWriteFailed | RecoveryAttempted, Scope.Scope> => {
+      if (completed) return Effect.void;
+      if (attempted) return Effect.fail(new RecoveryAttempted({ reason: "recovery already attempted; start a new engine" }));
+      attempted = true;
+      return recoverOnce;
+    })),
     returnAccount: (accountId, cause) => Effect.gen(function* () {
       const reloaded = yield* returnPaused(accountId, cause);
       // Row 66: a returned agent's queue is sent once, as at step 10.

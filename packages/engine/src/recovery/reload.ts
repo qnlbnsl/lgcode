@@ -20,7 +20,7 @@ import {
   freshRequest, readHarnesses, refused, type Agent, type CommandRefused, type Runtime, type Snapshot,
 } from "../commands/internal.ts";
 import { carryOnText } from "../accounts/available.ts";
-import { capturingReplay } from "./replay.ts";
+import { replayedDelivery, userRuns } from "./replay.ts";
 
 type Spawn = Parameters<Context.Service.Shape<typeof Runner>["start"]>[0];
 type Token = ReturnType<typeof mintAgentToken>;
@@ -73,12 +73,13 @@ const bounded = (runtime: Runtime, agentId: AgentId, timeoutMillis: number, setu
 // agent is working when it has something to send again or carry on, so it
 // does not count as settled at step 9; otherwise it is idle.
 export const reloadedEvents = (
-  snapshot: Snapshot, agentId: AgentId, session: SessionInfo, runs: ReadonlyArray<string>, midTurn: boolean, carryText: string,
+  snapshot: Snapshot, agentId: AgentId, session: SessionInfo, midTurn: boolean, carryText: string,
 ): ReadonlyArray<Event> => {
+  const runs = userRuns(session.replay ?? []);
   const agent = snapshot.agents[agentId]!;
   const rows = Object.values(snapshot.deliveries).filter((row) => row.target === agentId);
   const sent = rows.filter((row) => row.status === "sent");
-  const found = sent.filter((row) => runs.some((text) => text.includes(row.id)));
+  const found = sent.filter((row) => replayedDelivery(runs, row.id));
   const unaccepted = sent.filter((row) => !found.includes(row));
   const requeued = rows.filter((row) => row.status === "queued" && row.reason !== undefined && row.content._tag !== "carry-on");
   const carried = rows.some((row) => row.status === "queued" && row.content._tag === "carry-on");
@@ -87,7 +88,8 @@ export const reloadedEvents = (
   const id = freshDelivery();
   return [
     ...(agent.state._tag === "starting" ? [] : [{ _tag: "StateChanged" as const, agentId, state: { _tag: "starting" as const } }]),
-    { _tag: "SessionOpened", agentId, ...session },
+    // Named fields only: the replayed text never reaches the log (row 51).
+    { _tag: "SessionOpened", agentId, session: session.session, protocolVersion: session.protocolVersion, reloadable: session.reloadable },
     ...found.map((row): Event => ({ _tag: "DeliveryAccepted", agentId, deliveryId: row.id })),
     ...unaccepted.map((row): Event => ({ _tag: "DeliveryRequeued", agentId, deliveryId: row.id, reason: "agent interrupted" })),
     ...(carry ? [{ _tag: "DeliveryQueued" as const, delivery: {
@@ -124,8 +126,7 @@ export const reload = (input: Reload): Effect.Effect<boolean, LogWriteFailed> =>
   const agentId = agent.agentId;
   const setup = Effect.suspend(() => input.mode === "start" || agent.session === undefined
     ? runtime.runner.start(spawn) : runtime.runner.load({ ...spawn, session: agent.session }));
-  const outcome = yield* capturingReplay(runtime.log, agentId, token.tokenHash,
-    bounded(runtime, agentId, input.timeoutMillis, setup)).pipe(Effect.result);
+  const outcome = yield* bounded(runtime, agentId, input.timeoutMillis, setup).pipe(Effect.result);
   const recorded = yield* runtime.log.transact((append) => Effect.gen(function* () {
     const snapshot = yield* runtime.views.snapshot;
     if (!input.still(snapshot.agents[agentId])) return false;
@@ -133,7 +134,7 @@ export const reload = (input: Reload): Effect.Effect<boolean, LogWriteFailed> =>
       yield* append(input.actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, input.failed(snapshot)), { revokeAgentTokens: [agentId] });
       return false;
     }
-    const events = reloadedEvents(snapshot, agentId, outcome.success.result, outcome.success.runs, input.midTurn, input.carryText ?? RESTART_CARRY_ON);
+    const events = reloadedEvents(snapshot, agentId, outcome.success, input.midTurn, input.carryText ?? RESTART_CARRY_ON);
     yield* append(input.actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), input.storeToken
       ? { revokeAgentTokens: [agentId], agentTokens: [{ agentId, tokenHash: token.tokenHash, revokedAt: null }] } : {});
     return true;

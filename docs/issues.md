@@ -1920,11 +1920,16 @@ reloaded, or started if it had no session. A second run writes nothing.
 ## 117. The timer and the persistent secret store are not wired into a running service
 
 Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: open for the unit that assembles the service.
+State: the timer half is handled by unit 6d. The persistent secret store and the file system services remain open for the unit that assembles the service.
 
 What happens: `packages/engine/src/index.ts` exports nothing, so `startAccountTimers` (`accounts/timers.ts`) and the persistent secret store layer (`accounts/SecretStore.ts`) are called only from tests. The `AcpRunner` layer also now needs `FileSystem` and `Path` services for the Codex shadow home.
 What should happen: the assembly starts `startAccountTimers` inside the service scope, provides the persistent `SecretStore` layer over the state folder, and provides the Node file system and path services.
 Why it matters: without the timer an out-of-usage account returns only by owner action, against rows 28 and 53.
+
+What changed in unit 6d: `Restart.recover` starts `startAccountTimers` at
+restart step 8, inside the scope `recover` runs in. Unit 7a must not start
+the timers a second time. It must still provide the persistent `SecretStore`
+layer and the Node file system and path services.
 
 ## 118. A classified pause drops the provider's error text
 
@@ -2099,17 +2104,27 @@ and old rows grow without bound.
 ## 154. The replay scan waits a fixed number of yields for the handler
 
 Found: 2026-11-01, while building unit 6d.
-State: open.
+State: fixed in unit 6d fix round 1 (`runner/Runner.ts`, `runner/AcpRunner.ts`, `recovery/replay.ts`, `recovery/reload.ts`).
 
-What happens: the runner's events have one consumer, the command handler,
-which passes replay updates to `recovery/replay.ts`. After the load returns,
-the scan yields 64 times so the handler can drain what is already published.
-Nothing proves the handler has read every replay update by then.
-What should happen: the runner marks the end of a replay, or returns the
-replayed updates with the load result, so the scan does not depend on fiber
-scheduling.
-Why it matters: on a very busy engine a late user chunk could be missed, and
-an accepted delivery would be sent again.
+What happened: the runner's events have one consumer, the command handler,
+which passed replay updates to `recovery/replay.ts`. After the load
+returned, the scan yielded 64 times so the handler could drain what was
+already published, and then read what it had seen. The trigger is replay
+length, not machine load: the verifier measured a miss between 1,250 and
+1,500 replayed filler frames on an idle machine. A user chunk that came
+after the filler was not read, so a delivery the agent had already received
+was sent to it again.
+What changed: the runner records each replayed update of a load, in order,
+and returns that record with the load result as `SessionInfo.replay`. A
+user-message item carries its redacted text, and every other replayed update
+is one break, with consecutive breaks kept as one. The scan joins only
+consecutive user items, so it reads every replayed update of that load and
+never waits on the event stream. The command handler no longer takes part.
+`SessionOpened` is written from named fields only, so the replayed text never
+reaches the log.
+Why it matters: a long history is the normal case for an agent that has
+worked for a while, so a scan that depends on scheduling misses exactly
+when recovery is most needed.
 
 ## 158. A no-timeout routing test can count a prompt sent after its snapshot
 
@@ -2119,3 +2134,22 @@ State: open. The test is unchanged; a later test-only task fixes it.
 What happens: `packages/engine/test/routing/moving-requests.test.ts`, "5.6 no timeout" (line 307), seeds an idle `lead` through `family()`, whose permission and question deliveries are sent on a forked dispatch lane. The test records `fakes.runner.calls.length` straight away. Under machine load (7.7 in run 69) one of those `prompt` calls lands after the snapshot, and `expect(fakes.runner.calls).toHaveLength(callsBefore)` fails with one extra call. The branch under test changed no engine source, and five local re-runs and the re-run (run 73) passed.
 What should happen: the test waits until the seeded deliveries are sent (or reads their delivery rows as `sent`) before it records `callsBefore`, as other routing tests do with `eventually`.
 Why it matters: a check that fails at random hides real failures and costs a re-run each time.
+
+## 159. A second recovery on one service could repeat the token revocation and the interrupt
+
+Found: 2026-11-01, in unit 6d's focused review (finding 4) and attack pass (B3), confirmed by the verifier as a library defect not reachable at `9b5853c`.
+State: fixed in unit 6d fix round 1 (`recovery/service.ts`, `recovery/restart.ts`).
+
+What happened: `Restart.recover` set its completed flag only after step 10.
+A run that failed or was interrupted before then could be started again on
+the same service, which revoked every token again, swept again and
+interrupted agents that the first run had already started to reload.
+What changed: each service runs recovery at most once. After a run
+completed, `recover` is a no-op. After a run that started and did not
+complete, `recover` fails at once with `RecoveryAttempted` and the fixed
+reason "recovery already attempted; start a new engine", and writes
+nothing. The gate stays shut. `Restart.recover` documents that such a
+failure is fatal to the service, and that unit 7a must start a fresh engine,
+whose new service runs recovery over the same log.
+Why it matters: a repeated step 4 and step 6 would revoke the tokens of
+agents the first run had just reloaded, and interrupt them again.
