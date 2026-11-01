@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { it } from "@effect/vitest";
 import { Actor } from "@shepherd/contracts";
 import * as Effect from "effect/Effect";
+import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import { afterEach, beforeEach, expect, vi } from "vitest";
@@ -11,7 +12,7 @@ import * as Views from "../../src/views/Views.ts";
 import { emptyViews } from "../../src/views/apply.ts";
 import { rebuild } from "../../src/views/rebuild.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
-import { event, journey, question, queued, ready, sent } from "../support/viewFixtures.ts";
+import { event, journey, question, queued, ready, sent, started } from "../support/viewFixtures.ts";
 import { append, sequence, withViews } from "../support/withViews.ts";
 
 let home: string;
@@ -145,4 +146,70 @@ it.effect("4.4 rollback: catches projecting uncommitted events from a batch that
     expect(yield* rebuild(before.sequence)).toEqual(before);
     expect(yield* sql`SELECT COUNT(*) AS n FROM events`).toEqual([{ n: 3 }]);
   })),
+);
+
+it.effect("4c F1 committed constructor: catches losing live publication or rebuild after a valid inherited agent identity commits", () =>
+  Effect.gen(function* () {
+    const first = yield* withViews(home, Effect.gen(function* () {
+      yield* registerRebuildCheck();
+      const written = yield* append("constructor-launch", [event({ ...started, agentId: "constructor" })]);
+      expect(written).toHaveLength(1);
+      const live = yield* (yield* Views.Views).snapshot;
+      expect(live.sequence).toBe(1);
+      expect(Object.hasOwn(live.agents, "constructor")).toBe(true);
+      expect(live.agents["constructor"]).toMatchObject({ agentId: "constructor", state: { _tag: "starting" } });
+      expect(live.threads["constructor"]).toEqual(written);
+      expect(yield* rebuild(sequence(1))).toEqual(live);
+      return live;
+    }));
+    // The startup rebuild must also accept the already committed identity.
+    yield* withViews(home, Effect.gen(function* () {
+      yield* registerRebuildCheck();
+      expect(yield* (yield* Views.Views).snapshot).toEqual(first);
+    }));
+  }),
+);
+
+it.effect("4c F3 missing table: catches silently skipping the rebuild hook when the durable events table disappears", () =>
+  withViews(home, Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    yield* append("ready", ready);
+    const sql = yield* SqlClient.SqlClient;
+    const closed = yield* Effect.scoped(Effect.gen(function* () {
+      yield* registerRebuildCheck();
+      yield* sql`ALTER TABLE events RENAME TO events_hidden`;
+    })).pipe(
+      Effect.exit,
+      Effect.ensuring(sql`ALTER TABLE events_hidden RENAME TO events`.pipe(Effect.orDie)),
+    );
+    const defect = Exit.findDefect(closed);
+    expect(defect._tag, "closing the hook's scope must fail with a defect").toBe("Success");
+    if (defect._tag !== "Success") throw new Error("The missing events table did not fail the rebuild hook");
+    expect(defect.success).toBeInstanceOf(Error);
+    expect((defect.success as Error).message).toMatch(/events/i);
+    expect((defect.success as Error).message).toMatch(/missing/i);
+  })),
+);
+
+it.effect("4c F3 planted difference: catches a rebuild hook that ignores corrupted views without expectDifference", () =>
+  withViews(home, Effect.gen(function* () {
+    yield* registerRebuildCheck({ expectDifference: true });
+    yield* append("drop-revocation", [...ready,
+      event({ _tag: "DeviceAdded", deviceId: "phone", name: "Phone" }),
+      event({ _tag: "DeviceRevoked", deviceId: "phone" }),
+      event({ _tag: "AgentGrouped", agentId: "agent-a", groups: ["review"] }),
+    ]);
+    const closed = yield* Effect.scoped(registerRebuildCheck()).pipe(Effect.exit);
+    const defect = Exit.findDefect(closed);
+    expect(defect._tag).toBe("Success");
+    if (defect._tag !== "Success") throw new Error("The planted difference did not fail the rebuild hook");
+    expect(defect.success).toBeInstanceOf(Error);
+    expect((defect.success as Error).message).toContain("Live views differ from the rebuild at sequence 6");
+    expect((defect.success as Error).message).toContain('["devices","phone","revoked"]');
+  }), {
+    replace: (real) => ({
+      ...real,
+      applyCommitted: (batch) => real.applyCommitted(batch.filter((row) => row.event._tag !== "DeviceRevoked")),
+    }),
+  }),
 );
