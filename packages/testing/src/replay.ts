@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url"
 import { decodeProviderReplayNdjson } from "@shepherd/t3-provider-testing/replayTranscript"
 import * as Effect from "effect/Effect"
 
-class ReplayParseError extends Error {
+export class ReplayParseError extends Error {
   readonly lineNumber: number
   constructor(lineNumber: number) { super(`Invalid replay at line ${lineNumber}`); this.lineNumber = lineNumber }
 }
@@ -24,15 +24,56 @@ function materialize(value: unknown, workspace: string): unknown {
   return value
 }
 
+type Frame = { id?: unknown; method?: unknown; [key: string]: unknown }
+const writeFrame = (frame: unknown) =>
+  new Promise<void>((resolve, reject) => process.stdout.write(JSON.stringify(frame) + "\n", (error) => error ? reject(error) : resolve()))
+
+// Unit 6a: `--match method` stands in for an adapter that a different client drives, such as
+// Shepherd's runner, whose own frames differ from the recorder's. Each client request or
+// notification is matched with the next recorded outbound frame of the same method, and the
+// recorded inbound frames after that entry are written, with a recorded reply's id changed to
+// the client's id. A request no remaining entry has gets "method not found". Replies to the
+// agent's own requests are not compared. Input ends the player.
+async function playByMethod(entries: ReadonlyArray<{ type: string; frame?: unknown; afterMs?: number }>, workspace: string) {
+  const input = createInterface({ input: process.stdin, crlfDelay: Infinity })
+  let cursor = 0
+  try {
+    for await (const line of input) {
+      let frame: Frame
+      try { frame = JSON.parse(line) as Frame } catch { continue }
+      if (typeof frame.method !== "string") continue
+      const index = entries.findIndex((entry, at) => at >= cursor && entry.type === "expect_outbound" && (entry.frame as Frame).method === frame.method)
+      if (index < 0) {
+        if (frame.id !== undefined) await writeFrame({ jsonrpc: "2.0", id: frame.id, error: { code: -32601, message: "Method not found" } })
+        continue
+      }
+      const recordedId = (entries[index]!.frame as Frame).id
+      cursor = index + 1
+      while (cursor < entries.length && entries[cursor]!.type === "emit_inbound") {
+        const entry = entries[cursor++]!
+        const out = materialize(entry.frame, workspace) as Frame
+        if (out.method === undefined && recordedId !== undefined && out.id === recordedId) out.id = frame.id
+        if (entry.afterMs) await new Promise((resolve) => setTimeout(resolve, entry.afterMs))
+        await writeFrame(out)
+      }
+    }
+  } finally { input.close() }
+}
+
 async function play() {
   const file = process.argv[2]
   const workspaceIndex = process.argv.indexOf("--workspace")
   if (file === undefined || workspaceIndex < 0 || process.argv[workspaceIndex + 1] === undefined) {
-    throw new Error("Usage: replay.ts <fixture> --workspace <folder>")
+    throw new Error("Usage: replay.ts <fixture> --workspace <folder> [--match method]")
   }
   const workspace = process.argv[workspaceIndex + 1]!
   const text = await readFile(file, "utf8")
   const transcript = await Effect.runPromise(parseReplay(text))
+  const matchIndex = process.argv.indexOf("--match")
+  if (matchIndex >= 0) {
+    if (process.argv[matchIndex + 1] !== "method") throw new Error("Usage: replay.ts <fixture> --workspace <folder> [--match method]")
+    return playByMethod(transcript.entries as ReadonlyArray<{ type: string; frame?: unknown; afterMs?: number }>, workspace)
+  }
   const lineNumbers = text.split(/\r?\n/).flatMap((line, index) => line.trim() ? [index + 1] : []).slice(1)
   const input = createInterface({ input: process.stdin, crlfDelay: Infinity })
   const frames = input[Symbol.asyncIterator]()

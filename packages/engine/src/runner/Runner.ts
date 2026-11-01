@@ -1,5 +1,5 @@
 import {
-  AgentId, DeliveryId, PermissionOption, PermissionRequestId,
+  AgentId, DeliveryId, Event, PermissionOption, PermissionRequestId,
   type Account, type Delivery, type HarnessSettings, type PermissionLevel, type SessionReference,
 } from "@shepherd/contracts";
 import * as Context from "effect/Context";
@@ -8,6 +8,8 @@ import type * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import type * as Stream from "effect/Stream";
+
+import type { folderForSpawn } from "../identity/ceiling.ts";
 
 export class RunnerRejected extends Data.TaggedError("RunnerRejected")<{
   readonly reason: string;
@@ -61,6 +63,12 @@ export const RunnerEvent = Schema.Union([
     kind: Schema.Literals(["message", "plan", "tool-call", "file-change", "available_commands_update"]),
     replay: Schema.Boolean,
     text: Schema.String,
+    content: Schema.optionalKey(Event.pipe(Schema.toTaggedUnion("_tag")).cases.ThreadItem.fields.content),
+  }),
+  Schema.TaggedStruct("modeReported", {
+    agentId: AgentId, incarnation: Schema.NonEmptyString, mode: Schema.String,
+    level: Schema.optionalKey(Schema.Literals(["read-only", "ask", "edit", "full"])),
+    ceiling: Schema.Literals(["read-only", "ask", "edit", "full"]),
   }),
   Schema.TaggedStruct("promptReply", {
     agentId: AgentId,
@@ -79,6 +87,7 @@ interface Spawn {
   readonly agentId: AgentId;
   readonly token: Redacted.Redacted<string>;
   readonly folder: string;
+  readonly grant: Parameters<typeof folderForSpawn>[0];
   readonly harness: HarnessSettings;
   readonly account: Account;
   readonly permission: PermissionLevel;

@@ -48,6 +48,28 @@ lets a web page, a desktop app, or a phone control agents that can run
 commands on the host. Anyone who can reach that API with a valid credential
 can, in effect, run code on the machine.
 
+## Harnesses with no deny-read or deny-write rule
+
+The rule above, which forbids an agent to read the state folder, needs the
+harness to accept it. The same is true of the rule that forbids an agent to
+change its own harness settings. In Shepherd's default settings, no harness
+gets either rule today. The owner can set a launch rule for a harness in its
+settings once one is verified.
+
+- **`claude`.** Its adapter accepts permission rules only inside the
+  session's metadata, and Shepherd's settings contract cannot express rules
+  there yet. See issue 91 in `docs/issues.md`.
+- **`codex`.** No launch-argument rule for it has been verified and recorded,
+  so its default is no rule. See issue 104 in `docs/issues.md`.
+- **`gemini`.** No launch-argument rule for it has been verified and
+  recorded, so its default is no rule. See issue 104 in `docs/issues.md`.
+- **`cursor`.** No launch-argument rule for it has been verified and
+  recorded, so its default is no rule. See issue 104 in `docs/issues.md`.
+
+For these harnesses, the folder rule, the permission ceiling and the approval
+routing are the only guards. They stop an agent's mistakes, not a hostile
+agent.
+
 ## Security rules the design keeps
 
 These rules apply to every change. A change that breaks one is a security bug.

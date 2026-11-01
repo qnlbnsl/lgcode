@@ -31,7 +31,10 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   and reuses an idle worker instead of starting a new one when it can.
 - **Two run modes for every harness** (agreed). Each harness has a run-mode
   setting, which the client API exposes, so it can be changed from a phone.
-  - **ACP mode** (built first). Shepherd starts the agent as a child process
+  - **ACP mode** (built first; partly built in the engine: unit 6a starts
+    the agent, opens its session, sends prompts and turns its updates and
+    permission requests into events; reload, crash notices and recovery are
+    units 6b to 6d). Shepherd starts the agent as a child process
     and drives it through the Agent Client Protocol (ACP): it opens a
     session, sends prompts, and receives structured events (text, plan, tool
     calls, permission requests). Adding a harness means adding its ACP
@@ -69,8 +72,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   work, ask the owner) are offered to agents through a Model Context Protocol
   (MCP) server on a loopback address, as well as through the command line.
   Every tool declares which roles may call it. See research item 1.
-- **A permission ceiling** (built in the engine: units 5a and 5b; the
-  set-back of a mode change made inside the agent is unit 6a's). An agent that a lead starts, swaps or
+- **A permission ceiling** (built in the engine: units 5a, 5b and 6a; unit
+  6a sets back a mode change made inside the agent). An agent that a lead starts, swaps or
   messages never runs with a broader permission mode than the lead. See
   research item 6.
 - **Hand-offs built from records** (idea). A replacement worker starts from a
@@ -110,7 +113,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 
 ## 3. Threads
 
-- **One thread per agent conversation** (idea). Every agent's conversation is
+- **One thread per agent conversation** (partly built in the engine: unit 6a
+  writes each delivery's text, plan, tool calls and file changes as thread
+  items; no client shows them yet). Every agent's conversation is
   visible as a thread, with its messages, approvals, and changed files, in the
   spirit of T3 Code.
 - **Threads where the owner already works** (idea, 2026-11-01). The owner

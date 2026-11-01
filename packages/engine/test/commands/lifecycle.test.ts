@@ -45,6 +45,16 @@ const withRig = <A, E, R>(body: (fakes: Fakes) => Effect.Effect<A, E, R>) =>
     }));
   });
 
+// Unit 6a: exactly one SessionOpened for the agent, written after its
+// StateChanged to starting.
+const expectSessionOpenedAfterStarting = (written: ReadonlyArray<{ readonly _tag: string }>, agentId: string) => {
+  expect(written.filter((event) => event._tag === "SessionOpened")).toEqual([expect.objectContaining({ agentId })]);
+  const starting = written.findIndex((event) => event._tag === "StateChanged"
+    && "state" in event && (event.state as { readonly _tag: string })._tag === "starting");
+  expect(starting).toBeGreaterThanOrEqual(0);
+  expect(written.findIndex((event) => event._tag === "SessionOpened")).toBeGreaterThan(starting);
+};
+
 const tags = (events: ReadonlyArray<{ readonly event: { readonly _tag: string } }>) => events.map((row) => row.event._tag);
 
 // ---------------------------------------------------------------------------
@@ -61,13 +71,16 @@ it.effect("5.4 start: catches a start that writes no AgentStarted, or leaves out
     const written = (yield* logAfter(before)).map((row) => row.event);
     const started = written.find((event) => event._tag === "AgentStarted");
     expect(started).toMatchObject({ _tag: "AgentStarted", agentId, parent: { _tag: "owner" } });
-    expect(written.map((event) => event._tag)).not.toContain("SessionOpened");
+    // Unit 6a: the runner's session result is written as one SessionOpened after the AgentStarted.
+    const tagsWritten = written.map((event) => event._tag);
+    expect(written.filter((event) => event._tag === "SessionOpened")).toEqual([expect.objectContaining({ agentId })]);
+    expect(tagsWritten.indexOf("SessionOpened")).toBeGreaterThan(tagsWritten.indexOf("AgentStarted"));
 
     const row = yield* agentRow(agentId);
     expect(row).toMatchObject({
       agentId, name: "Builder", role: "worker", groups: ["engine"], parent: { _tag: "owner" }, harness: "first",
       account: "primary", model: "test-model", effort: "high", permission: "ask", folder: real, runMode: "acp",
-      state: { _tag: "starting" },
+      state: { _tag: "idle" },
     });
     expect(fakes.runner.callsOf("start")).toHaveLength(1);
     expect(fakes.runner.callsOf("start")[0]?.input.agentId).toBe(agentId);
@@ -184,7 +197,9 @@ for (const from of resumable) it.effect(`5.4 resume (reloadable) from ${from}: c
     const written = (yield* logAfter(before)).map((row) => row.event);
     expect(written).toContainEqual({ _tag: "StateChanged", agentId: "agent-a", state: { _tag: "starting" } });
     expect(written.map((event) => event._tag)).not.toContain("WaitCancelled");
-    expect(yield* stateOf("agent-a")).toBe("starting");
+    // Unit 6a: the runner's session result is written as one SessionOpened after the StateChanged.
+    expectSessionOpenedAfterStarting(written, "agent-a");
+    expect(yield* stateOf("agent-a")).toBe("idle");
     // The wait the agent had before is still there for 5d.1 to re-open and re-check (row 67).
     const views = yield* Views.Views;
     expect((yield* views.snapshot).waits["wait-1"]?.status).toBe("open");
@@ -225,8 +240,10 @@ it.effect("5.4 resume --fresh (row 66): catches a fresh resume that re-queues de
     expect(written).toContainEqual({ _tag: "StateChanged", agentId: "agent-a", state: { _tag: "starting" } });
     const requeued = written.filter((event) => event._tag === "DeliveryRequeued").map((event) => "deliveryId" in event ? event.deliveryId : "");
     expect([...requeued].sort()).toEqual(["delivery-new-1", "delivery-new-2"]);
+    // Unit 6a: the runner's session result is written as one SessionOpened after the StateChanged.
+    expectSessionOpenedAfterStarting(written, "agent-a");
 
-    expect(yield* stateOf("agent-a")).toBe("starting");
+    expect(yield* stateOf("agent-a")).toBe("idle");
     const views = yield* Views.Views;
     const deliveries = (yield* views.snapshot).deliveries;
     expect(deliveries["delivery-new-1"]?.status).toBe("queued");
@@ -240,8 +257,13 @@ it.effect("5.4 resume --fresh: catches a fresh resume refused as 'cannot reload'
   withRig(() => Effect.gen(function* () {
     yield* seedAgent({ id: "agent-a", reloadable: false });
     yield* crashAgent("agent-a");
+    const before = yield* headSequence;
     success(yield* call(ownerCredential, "resume", { agentId: "agent-a", fresh: true }));
-    expect(yield* stateOf("agent-a")).toBe("starting");
+    const written = (yield* logAfter(before)).map((row) => row.event);
+    expect(written).toContainEqual({ _tag: "StateChanged", agentId: "agent-a", state: { _tag: "starting" } });
+    // Unit 6a: the runner's session result is written as one SessionOpened after the StateChanged.
+    expectSessionOpenedAfterStarting(written, "agent-a");
+    expect(yield* stateOf("agent-a")).toBe("idle");
   })).pipe(Effect.orDie));
 
 // ---------------------------------------------------------------------------

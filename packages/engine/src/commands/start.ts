@@ -52,17 +52,27 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
     // Issue 78: the failure carries the wait checks it causes.
     return {
       events: [event], sideRows: { agentTokens: [{ agentId, tokenHash: token.tokenHash, revokedAt: null }] },
-      afterCommit: Effect.suspend(() => runtime.runner.start({ agentId, token: token.token, folder, harness, account,
-        permission: payload.permission, ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }),
-      })).pipe(
-        Effect.asVoid,
-        Effect.catchTag("RunnerRejected", () => runtime.log.transact((append) => Effect.gen(function* () {
-          const snapshot = yield* runtime.views.snapshot;
-          yield* append(actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, [
-            { _tag: "AgentStartFailed", agentId, reason: "agent start failed" },
-          ]), { revokeAgentTokens: [agentId] });
-        })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
-        withLane(runtime.log, agentId),
-      ),
+      afterCommit: Effect.gen(function* () {
+        // The new id becomes visible at commit, before this lane is acquired.
+        // A stop that wins the lane must prevent the later process spawn.
+        if ((yield* runtime.views.snapshot).agents[agentId]?.state._tag !== "starting") return;
+        yield* Effect.suspend(() => runtime.runner.start({ agentId, token: token.token, folder, grant, harness, account,
+          permission: payload.permission, ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }),
+        })).pipe(
+          Effect.flatMap((session) => runtime.log.transact((append) => Effect.gen(function* () {
+            // An exit can arrive while the session result is being returned.
+            if ((yield* runtime.views.snapshot).agents[agentId]?.state._tag !== "starting") return;
+            yield* append(actor, freshRequest(), randomUUID(), [
+              { _tag: "SessionOpened", agentId, ...session },
+            ], {});
+          })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
+          Effect.catchTag("RunnerRejected", () => runtime.log.transact((append) => Effect.gen(function* () {
+            const snapshot = yield* runtime.views.snapshot;
+            yield* append(actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, [
+              { _tag: "AgentStartFailed", agentId, reason: "agent start failed" },
+            ]), { revokeAgentTokens: [agentId] });
+          })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
+        );
+      }).pipe(withLane(runtime.log, agentId)),
     };
   });
