@@ -1591,3 +1591,12 @@ State: open for unit 6d; the follow-up of issue 57.
 What happens: `accounts/SecretStore.ts` stores a value before the account event that references it commits. A failed commit, or a replaced secret, leaves a value in `secrets.json` that no account event refers to.
 What should happen: startup recovery lists the secret references still used in the account views and removes the others from `secrets.json`.
 Why it matters: an unused credential stays on disk (mode 0600) longer than the owner expects.
+
+## 125. Fix-round test F1 assumed a sign-out pauses only the agent that reports it
+
+Found: 2026-11-01, by engine-u6bb, running the full suite for unit 6b.
+State: fixed in unit 6b by engine-lead's ruling.
+
+What happens: `routing/fix-round-one.test.ts` F1 "inherited grandchild" paused a child with the reason `signed-out` and then expected its idle caller, on the same account, to still run `wait`. Rows 28 and 53, and the frozen 6b test T1, make a sign-out pause every agent on the account, so the caller was paused and its `wait` was refused.
+What should happen: the test pauses the child with `out-of-usage` and no reset time, which pauses only that child and keeps the intent of the test (a wait on a paused member).
+Why it matters: two frozen tests disagreed, and the suite could not pass until one changed.
