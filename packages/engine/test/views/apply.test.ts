@@ -29,6 +29,84 @@ const deepFreeze = <T>(value: T): T => {
   return value;
 };
 
+const inheritedIdentities = ["constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"] as const;
+// AccountId is a slug: its first character must be a letter.
+const accountInheritedIdentities = ["constructor", "toString", "hasOwnProperty", "valueOf"] as const;
+
+it.each(inheritedIdentities)("4c F1 agent %s: catches treating an inherited thread member as a stored event list", (identity) => {
+  const value = event({ ...started, agentId: identity });
+  const result = fold([value]);
+  expect(Object.hasOwn(result.agents, identity)).toBe(true);
+  expect(result.agents[identity]).toMatchObject({ agentId: identity, name: "Builder", state: { _tag: "starting" } });
+  expect(Object.hasOwn(result.threads, identity)).toBe(true);
+  expect(result.threads[identity]).toEqual(envelopes([value]));
+});
+
+it.each(inheritedIdentities)("4c F1 thread %s: catches rejecting a thread whose agent has no launch record", (identity) => {
+  const value = event({ _tag: "ThreadItem", agentId: identity, itemId: "item", content: { _tag: "text", text: "Hello." }, replay: false });
+  const result = fold([value]);
+  expect(Object.hasOwn(result.threads, identity)).toBe(true);
+  expect(result.threads[identity]).toEqual(envelopes([value]));
+  expect(Object.hasOwn(result.agents, identity)).toBe(false);
+});
+
+const keyedJourneys = [
+  { view: "requests", events: (id: string) => [
+    event({ ...permission, permissionRequestId: id }),
+    event({ _tag: "PermissionCancelled", agentId: "agent-a", permissionRequestId: id, reason: "cancelled" }),
+  ], want: { status: "cancelled", reason: "cancelled" } },
+  { view: "questions", events: (id: string) => [
+    event({ ...question, questionId: id }),
+    event({ _tag: "QuestionAnswered", agentId: "agent-a", questionId: id, answeredBy: owner, text: "events.ts", deliveryId: "answer" }),
+  ], want: { status: "answered", answer: "events.ts" } },
+  { view: "waits", events: (id: string) => [
+    event({ ...wait, waitId: id }),
+    event({ _tag: "WaitMemberResolved", agentId: "agent-a", waitId: id, member: { agentId: "agent-b", reason: "settled" } }),
+  ], want: { status: "open", resolved: [{ agentId: "agent-b", reason: "settled" }] } },
+  { view: "deliveries", events: (id: string) => [
+    event({ _tag: "DeliveryQueued", delivery: { ...delivery, id } }),
+    event({ _tag: "DeliveryAccepted", agentId: "agent-a", deliveryId: id }),
+  ], want: { status: "accepted", content: { _tag: "prompt", text: "Build the log." } } },
+  { view: "accounts", events: (id: string) => [
+    event({ _tag: "AccountChanged", accountId: id, account: { ...account, id } }),
+    event({ _tag: "AccountOutOfUsage", accountId: id, resetAt: 1_900_000_000_000 }),
+  ], want: { status: "out-of-usage", resetAt: 1_900_000_000_000, displayName: "Primary" } },
+  { view: "devices", events: (id: string) => [
+    event({ _tag: "DeviceAdded", deviceId: id, name: "Phone" }),
+    event({ _tag: "DeviceRevoked", deviceId: id }),
+  ], want: { name: "Phone", revoked: true } },
+] as const;
+
+for (const { view, events, want } of keyedJourneys) {
+  const identities = view === "accounts" ? accountInheritedIdentities : inheritedIdentities;
+  it.each(identities)(`4c F1 ${view} %s: catches losing an own identity on record creation or update`, (identity) => {
+    const result = fold(events(identity));
+    expect(Object.hasOwn(result[view], identity)).toBe(true);
+    expect(result[view][identity]).toMatchObject(want);
+  });
+}
+
+const orphanUpdates = [
+  { view: "agents", event: (id: string) => event({ _tag: "AgentGrouped", agentId: id, groups: ["review"] }) },
+  { view: "requests", event: (id: string) => event({ _tag: "PermissionCancelled", agentId: "agent-a", permissionRequestId: id, reason: "cancelled" }) },
+  { view: "questions", event: (id: string) => event({ _tag: "QuestionAnswered", agentId: "agent-a", questionId: id, answeredBy: owner, text: "events.ts", deliveryId: "answer" }) },
+  { view: "waits", event: (id: string) => event({ _tag: "WaitMemberResolved", agentId: "agent-a", waitId: id, member: { agentId: "agent-b", reason: "settled" } }) },
+  { view: "deliveries", event: (id: string) => event({ _tag: "DeliveryAccepted", agentId: "agent-a", deliveryId: id }) },
+  { view: "accounts", event: (id: string) => event({ _tag: "AccountNeedsSignIn", accountId: id, reason: "expired" }) },
+  { view: "devices", event: (id: string) => event({ _tag: "DeviceRevoked", deviceId: id }) },
+] as const;
+
+for (const { view, event: update } of orphanUpdates) {
+  const identities = view === "accounts" ? accountInheritedIdentities : inheritedIdentities;
+  it.each(identities)(`4c F1 absent ${view} %s: catches updating a prototype member as if an opening event existed`, (identity) => {
+    const ordinary = fold([update("never-opened")]);
+    expect(Object.keys(ordinary[view])).toEqual([]);
+    const result = fold([update(identity)]);
+    expect(Object.hasOwn(result[view], identity)).toBe(false);
+    expect(Object.keys(result[view])).toEqual([]);
+  });
+}
+
 it("4c agents: catches dropping launch metadata or failing to project SessionOpened as idle", () => {
   expect(agent([started])).toMatchObject({
     agentId: "agent-a", name: "Builder", role: "worker", groups: ["engine"], parent: owner,
@@ -207,6 +285,8 @@ it.each(["idle", "working"] as const)("4c rows 52 and 66 post-reload %s: catches
 
 it("4c eight-view property: catches dropping a view branch or mutating nested records on generated valid event sequences", () => {
   fc.assert(fc.property(fc.record({
+    identity: fc.oneof(fc.constantFrom(...inheritedIdentities), fc.string({ minLength: 1, maxLength: 40 })),
+    accountIdentity: fc.oneof(fc.constantFrom(...accountInheritedIdentities), fc.nat().map((id) => `account-${id}`)),
     text: fc.string({ maxLength: 80 }), accept: fc.boolean(), cancelPermission: fc.boolean(),
     answerQuestion: fc.boolean(), cancelWait: fc.boolean(), limit: fc.boolean(), revoke: fc.boolean(),
   }), (sample) => {
@@ -228,7 +308,19 @@ it("4c eight-view property: catches dropping a view branch or mutating nested re
         event({ _tag: "AccountOutOfUsage", accountId: "primary", resetAt: 1_900_000_000_000 }),
         event({ _tag: "StateChanged", agentId: "agent-a", state: { _tag: "paused", reason: "limit", midTurn: false, resetAt: 1_900_000_000_000 } }),
       ] : []),
-    ];
+    ].map((value) => event({
+      ...value,
+      ...("agentId" in value ? { agentId: sample.identity } : {}),
+      ...("permissionRequestId" in value ? { permissionRequestId: sample.identity } : {}),
+      ...("questionId" in value ? { questionId: sample.identity } : {}),
+      ...("waitId" in value ? { waitId: sample.identity } : {}),
+      ...("deliveryId" in value ? { deliveryId: sample.identity } : {}),
+      ...("accountId" in value ? { accountId: sample.accountIdentity } : {}),
+      ...("deviceId" in value ? { deviceId: sample.identity } : {}),
+      ...(value._tag === "AgentStarted" ? { account: sample.accountIdentity } : {}),
+      ...(value._tag === "AccountChanged" && value.account !== undefined ? { account: { ...value.account, id: sample.accountIdentity } } : {}),
+      ...(value._tag === "DeliveryQueued" ? { delivery: { ...value.delivery, id: sample.identity, target: sample.identity } } : {}),
+    }));
     let state: LifecycleState["_tag"] = "starting";
     let result = emptyViews();
     for (const envelope of deepFreeze(envelopes(events))) {
@@ -249,17 +341,17 @@ it("4c eight-view property: catches dropping a view branch or mutating nested re
       result = next;
     }
     expect(result.sequence).toBe(events.length);
-    expect(result.agents["agent-a"]?.state).toEqual(sample.limit
+    expect(result.agents[sample.identity]?.state).toEqual(sample.limit
       ? { _tag: "paused", reason: "limit", midTurn: false, resetAt: 1_900_000_000_000 } : { _tag: "idle" });
-    expect(result.threads["agent-a"]?.find((row) => row.event._tag === "ThreadItem")?.event)
+    expect(result.threads[sample.identity]?.find((row) => row.event._tag === "ThreadItem")?.event)
       .toMatchObject({ content: { _tag: "text", text: sample.text } });
-    expect(result.requests["permission-a"]).toMatchObject({ status: sample.cancelPermission ? "cancelled" : "answered" });
-    expect(result.questions["question-a"]).toMatchObject(sample.answerQuestion
+    expect(result.requests[sample.identity]).toMatchObject({ status: sample.cancelPermission ? "cancelled" : "answered" });
+    expect(result.questions[sample.identity]).toMatchObject(sample.answerQuestion
       ? { status: "answered", answer: sample.text } : { status: "open", text: "Which file?" });
-    expect(result.waits["wait-a"]).toMatchObject({ status: sample.cancelWait ? "cancelled" : "satisfied" });
-    expect(result.deliveries["delivery-a"]).toMatchObject({ status: sample.accept ? "accepted" : "sent", content: { text: sample.text } });
-    expect(result.accounts["primary"]).toMatchObject({ status: sample.limit ? "out-of-usage" : "available" });
-    expect(result.devices["phone"]).toMatchObject({ name: sample.text, revoked: sample.revoke });
+    expect(result.waits[sample.identity]).toMatchObject({ status: sample.cancelWait ? "cancelled" : "satisfied" });
+    expect(result.deliveries[sample.identity]).toMatchObject({ status: sample.accept ? "accepted" : "sent", content: { text: sample.text } });
+    expect(result.accounts[sample.accountIdentity]).toMatchObject({ status: sample.limit ? "out-of-usage" : "available" });
+    expect(result.devices[sample.identity]).toMatchObject({ name: sample.text, revoked: sample.revoke });
   }), { numRuns: 100, seed: 4044 });
 });
 

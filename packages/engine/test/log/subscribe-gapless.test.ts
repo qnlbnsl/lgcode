@@ -438,6 +438,14 @@ it.live("m3 read failure: catches a raw SqlError, or SQL text or event data in t
     const log = yield* EventLog.EventLog;
     const sql = yield* SqlClient.SqlClient;
     const marker = "MARKER-private-event-value-4b31";
+    let payloadRenamed = false;
+    let tableRenamed = false;
+    // Registered after withLog's rebuild hook, so this restores the schema
+    // first when the scope closes, even if an assertion fails.
+    yield* Effect.addFinalizer(() => Effect.gen(function* () {
+      if (tableRenamed) yield* sql`ALTER TABLE events_hidden RENAME TO events`;
+      if (payloadRenamed) yield* sql`ALTER TABLE events RENAME COLUMN payload_hidden TO payload_json`;
+    }).pipe(Effect.orDie));
     yield* log.append(owner, request("private"), bodyHash("private"), [
       { _tag: "AccountNeedsSignIn", accountId, reason: marker },
       eventFor(1),
@@ -481,6 +489,7 @@ it.live("m3 read failure: catches a raw SqlError, or SQL text or event data in t
     // A catch-up page fails while the head read still succeeds: the head
     // query reads only `sequence`, a page reads every column.
     yield* sql`ALTER TABLE events RENAME COLUMN payload_json TO payload_hidden`;
+    payloadRenamed = true;
     expect(yield* SqliteClient.readOnly(sql`SELECT COALESCE(MAX(sequence), 0) AS head FROM events`))
       .toEqual([{ head: 2 }]);
     const pageMessage = yield* rawMessage(sql`SELECT payload_json FROM events`);
@@ -489,6 +498,7 @@ it.live("m3 read failure: catches a raw SqlError, or SQL text or event data in t
 
     // The head read fails.
     yield* sql`ALTER TABLE events RENAME TO events_hidden`;
+    tableRenamed = true;
     const headMessage = yield* rawMessage(sql`SELECT COALESCE(MAX(sequence), 0) AS head FROM events`);
     expect(headMessage).toContain("events");
     yield* expectSafeReadFailure(0, headMessage, "head read");
