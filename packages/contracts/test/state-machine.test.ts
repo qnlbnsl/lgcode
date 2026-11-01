@@ -279,6 +279,9 @@ describe("event table: (lifecycle state, event) cells", () => {
   const overrides: Record<string, Record<StateName, Effect>> = {
     // An agent that exists has already started: `start` creates it, so this event is never valid for one.
     AgentStarted: allStates("invalid"),
+    // Row 70: if the adapter rejects a value, "agent start failed" is written and the agent becomes stopped.
+    // Only an agent that is starting can fail to start.
+    AgentStartFailed: { ...allStates("invalid"), starting: "stopped" },
     SessionOpened: { ...allStates("invalid"), starting: "idle" },
     TurnStarted: { ...allStates("invalid"), working: "keep" },
     TurnEnded: { ...allStates("invalid"), working: "idle" },
@@ -296,7 +299,7 @@ describe("event table: (lifecycle state, event) cells", () => {
   const cells = tags.flatMap((tag) => states.map((state) => [tag, state, expectedFor(tag, state)] as const))
 
   // Catches: the table missing a cell, or an event added to the union that the table does not know
-  // (every event must have an answer in every state, 39 events by 7 states).
+  // (every event must have an answer in every state, 40 events by 7 states).
   it("has a defined answer for every event in every state", () => {
     expect(cells.length).toBe(tags.length * states.length)
     for (const [tag, state] of cells) {

@@ -7,11 +7,13 @@ import { describe, expect, it } from "vitest"
 
 import { Event } from "../src/events.ts"
 
-// Task 3d, in the plan's order, one tag per event. Copied here on purpose: the test must not read
+// Task 3d, in the plan's order, one tag per event, plus AgentStartFailed from decisions row 70 (a later row
+// than 3d, so it wins; the lead confirmed it as the fortieth event). Copied here on purpose: the test must not read
 // the list it checks from the code under test. Plan wording -> tag:
 // "command refused" -> CommandRefused, "agent reload failed" -> AgentReloadFailed, and so on.
 const expectedTags = [
   "AgentStarted",
+  "AgentStartFailed",
   "SessionOpened",
   "PromptSent",
   "ThreadItem",
@@ -66,7 +68,7 @@ const byTag = new Map(members.map((member) => [tagOf(member), member] as const))
 describe("event tags", () => {
   // Catches: an event dropped from, added to, or renamed in the union; two members sharing a tag
   // (the second would never decode).
-  it("are exactly the 39 events of task 3d, each once", () => {
+  it("are exactly the 40 events (task 3d's 39 plus row 70's AgentStartFailed), each once", () => {
     const tags = members.map(tagOf)
     expect(tags).toHaveLength(expectedTags.length)
     expect(new Set(tags).size, "duplicate tags").toBe(tags.length)
