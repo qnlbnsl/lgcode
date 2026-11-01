@@ -1,0 +1,81 @@
+{
+ "id": "engine/backend",
+ "domain": "engine",
+ "work_area": "backend",
+ "source": "AGENTS.md",
+ "summary": "Builds the engine service: event log, views, command handler, identity, agent runner, accounts, the API server, the command-line tool, the MCP tools and their tests.",
+ "edit": [
+  "packages/engine/**",
+  "packages/cli/**",
+  "packages/mcp/**",
+  "packages/testing/**",
+  "docs/issues.md",
+  "packages/client/**"
+ ],
+ "read_only": [
+  "packages/contracts/**",
+  "third_party/**",
+  "docs/specs/**",
+  "AGENTS.md",
+  "SECURITY.md",
+  ".plans/**"
+ ],
+ "sections": [
+  {
+   "heading": "AGENTS.md",
+   "hash": "d148681699e3",
+   "words": 29,
+   "worker": true,
+   "lead": true,
+   "why": "Kept: binds this scope."
+  },
+  {
+   "heading": "What this project is",
+   "hash": "ffc8b8e04f5c",
+   "words": 76,
+   "worker": true,
+   "lead": true,
+   "why": "What Shepherd is and that it is not a Synapse fork; every scope needs it to stay in bounds."
+  },
+  {
+   "heading": "Status",
+   "hash": "55e60471403a",
+   "words": 39,
+   "worker": true,
+   "lead": true,
+   "why": "Says when application code may be added; binds any change."
+  },
+  {
+   "heading": "Language",
+   "hash": "caa91ccd9362",
+   "words": 135,
+   "worker": true,
+   "lead": true,
+   "why": "TypeScript, Effect 4 with the look-it-up rule, and Node.js 26; binds all code in every scope."
+  },
+  {
+   "heading": "How agents are run",
+   "hash": "0b1575d3a749",
+   "words": 101,
+   "worker": true,
+   "lead": true,
+   "why": "ACP first and the one delivery interface; shapes the runner and the contracts."
+  },
+  {
+   "heading": "Rules",
+   "hash": "82c29bd35bad",
+   "words": 275,
+   "worker": true,
+   "lead": true,
+   "why": "Never push upstream, credit copied code, keep the lists, follow SECURITY.md, API parity, no team shapes, no commits unless asked; binds any change."
+  },
+  {
+   "heading": "Writing style for documents",
+   "hash": "9f691fa0d167",
+   "words": 50,
+   "worker": true,
+   "lead": true,
+   "why": "Applies to any document, README or third_party note a unit writes. When in doubt, keep."
+  }
+ ]
+}
