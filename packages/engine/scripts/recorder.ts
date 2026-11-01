@@ -36,9 +36,9 @@ export function scrubText(text: string, context: ScrubContext): string {
       .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, "<redacted>")
       .replace(/\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi, "Bearer <redacted>")
       .replace(/\b(?:github_pat_[A-Za-z0-9_]+|AIza[A-Za-z0-9_-]+|xox[abpr]-[A-Za-z0-9-]+|key_[A-Za-z0-9_-]{16,})\b/g, "<redacted>")
-      .replace(/\b[0-9a-f]{32,}\b/gi, "<redacted>")
+      .replace(/[0-9a-f]{32,}/gi, "<redacted>")
       .replace(/[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,}/g, "<email>")
-      .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+      .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
         (id) => context.sessionIds?.has(id) ? id : "<id>")
   }
   const walk = (value: unknown): unknown => {
