@@ -8,6 +8,7 @@ import {
 } from "@shepherd/contracts";
 import * as SqliteClient from "@shepherd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
+import type * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import type * as Result from "effect/Result";
@@ -22,7 +23,8 @@ import * as EventLog from "../../src/log/EventLog.ts";
 import { migrate } from "../../src/log/migrations.ts";
 import * as Redactor from "../../src/log/Redactor.ts";
 import * as Views from "../../src/views/Views.ts";
-import type { FakeRunner } from "./fakeRunner.ts";
+import { seedFakeProcess, type FakeRunner } from "./fakeRunner.ts";
+import { Runner } from "../../src/runner/Runner.ts";
 
 // Shared setup for the unit 5b tests (lifecycle, authorization, handler). It
 // holds no assertion. Each test file still registers the rebuild check itself
@@ -97,6 +99,8 @@ export interface Fakes {
   readonly secrets: FakeSecrets;
   // Replaces the pass-through redactor, for the side-row text test.
   readonly redactor?: Layer.Layer<Redactor.Redactor>;
+  // Decorates the real writer to hold a post-COMMIT boundary deterministically.
+  readonly wrapLog?: (real: Context.Service.Shape<typeof EventLog.EventLog>) => Context.Service.Shape<typeof EventLog.EventLog>;
 }
 
 // Migrates the file, then builds the event log, the live views, the command
@@ -106,9 +110,12 @@ export interface Fakes {
 export const provideRig = <A, E, R>(
   rig: Rig, fakes: Fakes, program: Effect.Effect<A, E, R>,
 ) => {
-  const log = EventLog.layer.pipe(
+  const baseLog = EventLog.layer.pipe(
     Layer.provideMerge(Views.layer), Layer.provide(fakes.redactor ?? Redactor.layer),
   );
+  const log = fakes.wrapLog === undefined ? baseLog : Layer.effect(EventLog.EventLog,
+    Effect.map(EventLog.EventLog, fakes.wrapLog),
+  ).pipe(Layer.provideMerge(baseLog));
   const services = CommandHandler.layer({
     home: rig.home, stateFolder: rig.stateFolder, pluginRoot: rig.pluginRoot,
   }).pipe(
@@ -119,7 +126,7 @@ export const provideRig = <A, E, R>(
     yield* migrate;
     const sql = yield* SqlClient.SqlClient;
     yield* sql`PRAGMA journal_mode = WAL`;
-    return yield* Effect.scoped(program).pipe(Effect.provide(services));
+    return yield* Effect.scoped(program).pipe(Effect.provide(services), Effect.provide(fakes.runner.layer));
   }).pipe(
     Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })),
     Effect.scoped,
@@ -219,7 +226,13 @@ export const seedAgent = (spec: SeedAgent) => Effect.gen(function* () {
   }
   const after: Record<SeedState, ReadonlyArray<Event>> = {
     starting: [], idle: [],
-    working: [decodeEvent({ _tag: "StateChanged", agentId, state: { _tag: "working" } })],
+    // A working historical process has a real current turn. Turn-end
+    // correlation must not be weakened to accommodate an impossible fixture.
+    working: [
+      decodeEvent({ _tag: "DeliveryQueued", delivery: { id: `seed-turn-${spec.id}`, target: agentId, sender: { _tag: "owner" }, content: { _tag: "prompt", text: "Historical current turn." } } }),
+      decodeEvent({ _tag: "DeliverySent", agentId, deliveryId: `seed-turn-${spec.id}`, method: "acp" }),
+      decodeEvent({ _tag: "DeliveryAccepted", agentId, deliveryId: `seed-turn-${spec.id}` }),
+    ],
     paused: [decodeEvent({ _tag: "StateChanged", agentId, state: { _tag: "paused", reason: "limit", midTurn: false } satisfies LifecycleState })],
     interrupted: [decodeEvent({ _tag: "AgentInterrupted", agentId, previous: "idle" })],
     crashed: [decodeEvent({ _tag: "AgentCrashed", agentId, exitCode: 1, signal: null, stderr: "fake crash" })],
@@ -229,6 +242,7 @@ export const seedAgent = (spec: SeedAgent) => Effect.gen(function* () {
   yield* appendSetup([...events, ...after[state]], {
     agentTokens: [{ agentId, tokenHash: token.tokenHash, revokedAt: revoked ? 1 : null }],
   });
+  seedFakeProcess(yield* Runner, agentId, Redacted.value(token.token), !revoked);
   return { agentId, token: Redacted.value(token.token) };
 });
 
@@ -248,6 +262,7 @@ export const rotateToken = (agentId: AgentId) => Effect.gen(function* () {
     revokeAgentTokens: [agentId],
     agentTokens: [{ agentId, tokenHash: token.tokenHash, revokedAt: null }],
   });
+  seedFakeProcess(yield* Runner, agentId, Redacted.value(token.token), true);
   return Redacted.value(token.token);
 });
 

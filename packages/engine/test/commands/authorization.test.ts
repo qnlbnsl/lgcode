@@ -324,7 +324,8 @@ for (const state of ["idle", "working"] as const) it.effect(`5.3 start as a ${st
     const events = written.map((row) => row.event);
     expect(events.find((event) => event._tag === "AgentStarted")).toMatchObject({ parent: { _tag: "agent", agentId: "boss" } });
     const views = yield* Views.Views;
-    const deliveries = Object.values((yield* views.snapshot).deliveries);
+    const childId = events.find((event) => event._tag === "AgentStarted")!.agentId;
+    const deliveries = Object.values((yield* views.snapshot).deliveries).filter((delivery) => delivery.target === childId);
     expect(deliveries).toHaveLength(1);
     expect(deliveries[0]?.sender).toEqual({ _tag: "agent", agentId: "boss" });
   })).pipe(Effect.orDie));
