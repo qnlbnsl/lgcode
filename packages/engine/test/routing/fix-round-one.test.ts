@@ -413,7 +413,7 @@ it.live("I78 rejected start: catches an open wait left unresolved outside the Ag
   yield* Deferred.succeed(release, undefined);
   success(yield* Fiber.join(starting));
   const batch = appendWith(yield* logAfter(before), (row) => row.event._tag === "AgentStartFailed");
-  expect(tagged(batch, "WaitMemberResolved")).toContainEqual(expect.objectContaining({ waitId, member: { agentId: target.agentId, reason: "crashed" } }));
+  expect(tagged(batch, "WaitMemberResolved")).toContainEqual(expect.objectContaining({ waitId, member: { agentId: target.agentId, reason: "stopped" } }));
   expect(tagged(batch, "WaitSatisfied")).toContainEqual(expect.objectContaining({ waitId }));
   expect((yield* waitRow(waitId))?.status).toBe("satisfied");
 })));
