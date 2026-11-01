@@ -350,3 +350,63 @@ them in neutral words, as the lead instructed. The table in
 What should happen: the owner decides whether the hook should allow file paths.
 Until then, commit messages name `third_party/t3code/README.md` as the file list.
 Why it matters: the rule and the hook cannot both be followed to the letter.
+
+## 23. Task 3d has no event for "agent start failed"
+
+Found: 2026-11-01, while writing the unit 3 tests.
+State: answered by the lead on 2026-11-01: row 70 (closed, later than the list in task 3d) wins, so
+"agent start failed" is a fortieth event, carrying a reason. The unit 3 tests now include it
+(from starting the agent becomes stopped; invalid in every other state). The builder adds it to
+`events.ts`; the plan's task 3d list should be amended. Unit 3 now defines
+`AgentStartFailed` with the agent id and reason, and its starting-to-stopped cell.
+
+What happened: the lifecycle command table in the plan (line 532, row 70) says
+`start` writes "agent start failed" when the adapter rejects a value, and
+criterion 6.11 refers to it. The list of events in task 3d (39 events) has no
+such event, so the event union could not record the failure.
+The focused review also found that the account picker and recovery timers need
+an account-level usage event. The lead's fix-round-1 ruling adds
+`AccountOutOfUsage`, with an optional reset deadline, as the forty-first event.
+The current list is task 3d's 39 events, row 70's `AgentStartFailed`, and the
+lead's `AccountOutOfUsage`. Both additions are now defined in unit 3.
+
+What should happen: task 3d's list is amended to 41 events. Without it,
+unit 5 and unit 6 would have no event to write for a rejected starting value,
+and would invent one outside the shared definitions.
+Why it matters: the shared definitions must hold every event the engine writes.
+
+## 24. The unit 3 review left four details for later units
+
+Found: 2026-11-01, in the focused review of unit 3.
+State: deferred by the lead's fix-round-1 rulings.
+
+- `PromptSent` repeats the prompt text from `DeliveryQueued`; unit 4a decides whether both copies are needed.
+- `SessionOpened.process` overlaps the transactional process side rows; unit 4a decides how these records relate.
+- `CommandRefused.reason` is free text; unit 5 must keep request content, including secret values, out of it.
+- `adapterPath` accepts `/../x`; unit 6 resolves the absolute path before spawning the adapter.
+- The review's remaining minor mutations, M9 and M12, are not covered by tests in this round.
+
+What should happen: the named units resolve the deferred details, and the test
+coverage gaps remain visible until a later review addresses them.
+Why it matters: passing the shared-schema tests does not settle runtime
+redaction, process bookkeeping, path resolution or every mutation check.
+
+## 25. The first shared contracts missed recovery and secret-handling details
+
+Found: 2026-11-01, in the focused review of unit 3.
+State: fixed by the unit 3 fix-round-1 source changes.
+
+What happened: the secret-setting request decoded its value as plain text, so
+ordinary inspection could expose it. The state table refused the direct
+interrupted-to-idle and interrupted-to-working changes that decision 66 requires.
+The subscription stream omitted event identity, time and caller metadata.
+The production service group existed only as a comment, the secret-name rule
+missed password and authentication variants, and displayed states had no shared
+schema.
+What should happen: secret ingress decodes to an Effect Redacted value,
+successful reloads can commit their resulting state, and subscriptions carry a
+shared event envelope. The production group excludes diagnostics by construction.
+Account environment names also recognize PASSWD and CREDENTIAL variants and
+the AUTH segment, and displayed states have a literal schema.
+Why it matters: every later engine unit consumes these contracts, so missing
+security and recovery rules would otherwise propagate into the implementation.
