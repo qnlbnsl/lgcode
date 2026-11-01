@@ -151,6 +151,7 @@ it.effect.each(["agent_tokens", "processes"] as const)(
 
 it.effect("4.1 redaction: catches bypassing the Redactor or redacting only the first event in a batch", () => {
   const markingRedactor = Layer.succeed(Redactor.Redactor, {
+    redactText: (text: string) => Effect.succeed(text),
     redact: (event: Event) => Effect.succeed(event._tag === "AgentStartFailed"
       ? { ...event, reason: "[redacted]" } : event),
   });

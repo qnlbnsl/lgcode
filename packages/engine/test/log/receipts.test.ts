@@ -169,6 +169,7 @@ it.effect("4.2 concurrent duplicate: catches checking receipts outside the write
     const release = yield* Deferred.make<void>();
     let calls = 0;
     const heldRedactor = Layer.succeed(Redactor.Redactor, {
+      redactText: (text: string) => Effect.succeed(text),
       redact: (value: Event) => Effect.gen(function* () {
         if (++calls === 1) {
           yield* Deferred.succeed(entered, undefined);

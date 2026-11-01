@@ -13,7 +13,7 @@ import * as Schema from "effect/Schema";
 import type * as Scope from "effect/Scope";
 import * as Semaphore from "effect/Semaphore";
 import * as SqlClient from "effect/sql/SqlClient";
-import type { SqlError } from "effect/sql/SqlError";
+import { isSqlError, type SqlError } from "effect/sql/SqlError";
 
 import * as Views from "../views/Views.ts";
 import * as Redactor from "./Redactor.ts";
@@ -66,28 +66,30 @@ export interface SideRows {
   readonly processes?: ReadonlyArray<ProcessRow>;
 }
 
+type Append = (
+  caller: Actor, requestId: RequestId, bodyHash: string,
+  events: ReadonlyArray<Event>, sideRows: SideRows,
+  receipt?: false | ((envelopes: ReadonlyArray<EventEnvelope>) => unknown),
+) => Effect.Effect<ReadonlyArray<EventEnvelope>, LogWriteFailed | RequestIdReused>;
+
 export class EventLog extends Context.Service<
   EventLog,
   {
-    readonly append: (
-      caller: Actor,
-      requestId: RequestId,
-      bodyHash: string,
-      events: ReadonlyArray<Event>,
-      sideRows: SideRows,
-    ) => Effect.Effect<ReadonlyArray<EventEnvelope>, LogWriteFailed | RequestIdReused>;
+    readonly append: Append;
     readonly subscribeCommitted: Effect.Effect<PubSub.Subscription<EventEnvelope>, never, Scope.Scope>;
     // Runs an effect while holding the writer's permit, so no batch commits
     // or updates the live views meanwhile. For `compareViews` only.
     readonly withWriterPermit: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+    // Checks and append share the permit and the SQLite transaction. Only
+    // use the supplied append inside the callback; publication follows COMMIT.
+    readonly transact: <A, E, R>(
+      use: (append: Append) => Effect.Effect<A, E, R>,
+    ) => Effect.Effect<A, E | LogWriteFailed, R>;
   }
 >()("shepherd/engine/log/EventLog") {}
 
 const Envelopes = Schema.Array(EventEnvelope);
 const decodeEnvelopes = Schema.decodeUnknownSync(Envelopes);
-
-// The placeholder identifier of the carrier event that redacts side-row text.
-const carrierDeviceId = Schema.decodeUnknownSync(DeviceId)("side-row-text");
 
 // SQLite's primary result code for a full disk.
 const SQLITE_FULL = 13;
@@ -141,6 +143,7 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
   const commit = (
     caller: string, requestId: RequestId, bodyHash: string, events: ReadonlyArray<Event>,
     sideRows: SideRows, actor: Actor, occurredAt: number,
+    receiptResult?: false | ((envelopes: ReadonlyArray<EventEnvelope>) => unknown),
   ): Effect.Effect<{
     readonly envelopes: ReadonlyArray<EventEnvelope>;
     readonly isNew: boolean;
@@ -154,7 +157,11 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
           return yield* Effect.fail(new RequestIdReused({ reason: "request id reused" }));
         }
         const envelopes = yield* Effect.try({
-          try: () => decodeEnvelopes(JSON.parse(receipt.result_json)),
+          try: () => {
+            const result: unknown = JSON.parse(receipt.result_json);
+            return decodeEnvelopes(Array.isArray(result) ? result
+              : Schema.decodeUnknownSync(Schema.Struct({ envelopes: Envelopes }))(result).envelopes);
+          },
           catch: () => new LogWriteFailed({ reason: "stored receipt is unreadable" }),
         });
         return { envelopes, isNew: false };
@@ -198,55 +205,81 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
         yield* sql`INSERT INTO processes (agent_id, group_id, boot_id, start_time, user_id, executable)
           VALUES (${row.agentId}, ${row.groupId}, ${row.bootId}, ${row.startTime}, ${row.userId}, ${row.executable})`;
       }
-      yield* sql`INSERT INTO receipts (caller, request_id, body_hash, result_json, first_sequence)
-        VALUES (${caller}, ${requestId}, ${bodyHash}, ${JSON.stringify(envelopes)}, ${envelopes[0]?.sequence ?? null})`;
+      if (receiptResult !== false) {
+        const result = receiptResult === undefined ? envelopes
+          : { envelopes, reply: yield* redactReceipt(receiptResult(envelopes)) };
+        yield* sql`INSERT INTO receipts (caller, request_id, body_hash, result_json, first_sequence)
+          VALUES (${caller}, ${requestId}, ${bodyHash}, ${JSON.stringify(result)}, ${envelopes[0]?.sequence ?? null})`;
+      }
       return { envelopes, isNew: true };
     }));
 
-  // Free text in a side row passes through the same redactor as the events
-  // (fix round 1, ruling 4). The Redactor service takes only events and its
-  // shape is fixed, so the text rides in the `name` field of a carrier
-  // `DeviceAdded` event; the redactor rewrites every string field alike.
+  // Replies may contain list data as well as identifiers. Keep receipt text
+  // behind the same redactor, including nested strings and record keys.
+  const redactReceipt = (value: unknown): Effect.Effect<unknown> => Effect.gen(function* () {
+    if (typeof value === "string") return yield* redactor.redactText(value);
+    if (Array.isArray(value)) return yield* Effect.forEach(value, redactReceipt);
+    if (typeof value === "object" && value !== null) {
+      const entries = yield* Effect.forEach(Object.entries(value), ([key, item]) => Effect.gen(function* () {
+        return [yield* redactor.redactText(key), yield* redactReceipt(item)] as const;
+      }));
+      return Object.fromEntries(entries);
+    }
+    return value;
+  });
+
   // Identifiers and token hashes are not free text and are left alone.
-  const redactText = (text: string) =>
-    redactor.redact({ _tag: "DeviceAdded", deviceId: carrierDeviceId, name: text }).pipe(
-      // A redactor that returned another event would be a defect; fail closed.
-      Effect.map((event) => event._tag === "DeviceAdded" ? event.name : "[REDACTED]"),
-    );
   const redactSideRows = (sideRows: SideRows): Effect.Effect<SideRows> => Effect.gen(function* () {
     const devices = yield* Effect.forEach(sideRows.devices ?? [], (device) =>
-      Effect.map(redactText(device.name), (name): DeviceRow => ({ ...device, name })));
+      Effect.map(redactor.redactText(device.name), (name): DeviceRow => ({ ...device, name })));
     const processes = yield* Effect.forEach(sideRows.processes ?? [], (row) =>
-      Effect.map(redactText(row.executable), (executable): ProcessRow => ({ ...row, executable })));
+      Effect.map(redactor.redactText(row.executable), (executable): ProcessRow => ({ ...row, executable })));
     return { ...sideRows, devices, processes };
   });
 
-  const append: Context.Service.Shape<typeof EventLog>["append"] = (actor, requestId, bodyHash, events, sideRows) =>
+  const transact: Context.Service.Shape<typeof EventLog>["transact"] = (use) =>
     writer.withPermits(1)(Effect.gen(function* () {
       if (latched !== undefined) return yield* Effect.fail(latched);
-      const redacted = yield* Effect.forEach(events, (event) => redactor.redact(event));
-      const redactedSideRows = yield* redactSideRows(sideRows);
-      const occurredAt = yield* Clock.currentTimeMillis;
+      const published: Array<EventEnvelope> = [];
+      let active = true;
+      const append: Context.Service.Shape<typeof EventLog>["append"] = (actor, requestId, bodyHash, events, sideRows, receiptResult) =>
+        Effect.gen(function* () {
+          if (!active) return yield* new LogWriteFailed({ reason: "writer transaction is closed" });
+          const redacted = yield* Effect.forEach(events, (event) => redactor.redact(event));
+          const redactedSideRows = yield* redactSideRows(sideRows);
+          const occurredAt = yield* Clock.currentTimeMillis;
+          const batch = yield* commit(callerKey(actor), requestId, bodyHash, redacted, redactedSideRows, actor, occurredAt, receiptResult).pipe(
+            Effect.mapError((error) => error._tag === "SqlError"
+              ? new LogWriteFailed({ reason: failureReason(error) }) : error),
+          );
+          if (batch.isNew) published.push(...batch.envelopes);
+          return batch.envelopes;
+        });
       return yield* Effect.gen(function* () {
-        const batch = yield* commit(callerKey(actor), requestId, bodyHash, redacted, redactedSideRows, actor, occurredAt);
-        if (batch.isNew) yield* publishCommitted(batch.envelopes);
-        return batch.envelopes;
+        const result = yield* sql.withTransaction(Effect.suspend(() => use(append))).pipe(
+          Effect.ensuring(Effect.sync(() => { active = false; })),
+          Effect.mapError((error) => isSqlError(error)
+            ? new LogWriteFailed({ reason: failureReason(error) }) : error),
+        );
+        if (published.length > 0) yield* publishCommitted(published);
+        return result;
       }).pipe(
         // A caller's cancellation must not split a successful COMMIT from its
         // publication. Waiting for the writer permit remains interruptible.
         Effect.uninterruptible,
-        Effect.mapError((error) => error._tag === "SqlError"
-          ? new LogWriteFailed({ reason: failureReason(error) })
-          : error),
         // A request-id refusal is the caller's mistake, so only a write failure latches.
-        Effect.tapError((error) => error._tag === "LogWriteFailed"
+        Effect.tapError((error) => error instanceof LogWriteFailed
           ? Effect.sync(() => { latched = error; })
           : Effect.void),
       );
     }));
 
+  const append: Context.Service.Shape<typeof EventLog>["append"] = (...args) =>
+    transact((write) => write(...args));
+
   return EventLog.of({
     append,
+    transact,
     subscribeCommitted: PubSub.subscribe(committedEvents),
     withWriterPermit: writer.withPermits(1),
   });

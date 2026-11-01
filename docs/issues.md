@@ -848,4 +848,61 @@ folder, or for the service to hold memory, beyond what the ceiling promises.
 - **What happens:** `EventLog.append` in `packages/engine/src/log/EventLog.ts` redacts a device name and a process executable by wrapping each one in a `DeviceAdded` event with the device identifier `side-row-text`, passing it to `Redactor.redact`, and reading the `name` field back. It fails closed to `[REDACTED]` if the redactor returns another event.
 - **Why it matters:** the redaction is correct, but the carrier event is a workaround. A redactor that ever treated `DeviceAdded` specially would silently change how side rows are redacted.
 - **What should change:** the `Redactor` service in `packages/engine/src/log/Redactor.ts` gains a `redactText(text)` member, and `EventLog.append` calls it for side-row text. Unit 5b owns this, because it is the next unit that touches the event log's callers.
-- **State:** open. The current behaviour is covered by the side-row tests in `packages/engine/test/identity/redactor-fix-1.test.ts`.
+- **State:** fixed in unit 5b. The service and both layers expose `redactText`, and the event log calls it directly for device names and process executables. No carrier event remains. The existing side-row tests and the unit 5b counting-redactor test cover the boundary.
+
+## 51. No view holds the harness settings, so a `harnesses set` cannot be read back from the views
+
+- **Found:** unit 5b tests, by the test writer.
+- **What happens:** the reducer in `packages/engine/src/views/apply.ts` ignores `HarnessChanged`, and the snapshot has no harness table. The only way to see the settings a `harnesses set` wrote is the reply of `harnesses list`.
+- **Why it matters:** criterion 5.4 says each lifecycle case asserts the event and the view change. For `harnesses set` there is no view change to assert, so the test reads the list reply, and a client that wants the settings has no live view to subscribe to.
+- **What should change:** either unit 5b adds a harness table to the views, or the plan says that the list reply is the harness view.
+- **State:** open. The test `5.4 harnesses set` reads the list reply.
+
+## 52. No suspended-wait marker exists, so "crash suspends waits" has no observable state
+
+- **Found:** unit 5b tests, by the test writer.
+- **What happens:** decision row 67 says a crash suspends an agent's waits and `resume` re-opens them. `WaitRow` has only the statuses open, satisfied and cancelled, and no event marks a wait as suspended.
+- **Why it matters:** the 5.4 `resume` case cannot assert that suspended waits come back. It asserts only that `resume` does not cancel them, which a build with no suspend at all also passes.
+- **What should change:** the owner or the lead decides whether a wait gets a suspended status, or whether a wait simply stays open across a crash. Unit 5d.1 owns the answer.
+- **State:** open.
+
+## 53. The event log gives a command handler no way to check and write in one writer turn
+
+- **Found:** unit 5b tests, by the test writer.
+- **What happens:** `EventLog.append` takes the writer permit itself, and `withWriterPermit` uses the same semaphore without re-entry. A handler that verifies the caller's token and reads the state inside `withWriterPermit` and then calls `append` waits on itself forever. Without a seam the verification would sit outside the permit, and a token revoked while the command waited would still be accepted.
+- **Why it matters:** criterion 5.1 and decision row 32 require the token to be checked in the writer. The test `5.1 token race` fails if it is checked before.
+- **What should change:** unit 5b adds an `append` variant that runs a check inside its permit and transaction, or lets the handler hand `append` a function that builds the events from a state read taken under the permit.
+- **State:** fixed in unit 5b. `EventLog.transact` holds the writer permit and one SQLite transaction around identification, receipt lookup, state and authorization checks, and the supplied append. It publishes only after the outer commit. A callback failure rolls back the events, side rows and receipt without publishing a view change.
+
+## 54. The tests read two behaviours the plan leaves open: crash handling and the shape of a failed start
+
+- **Found:** unit 5b tests, by the test writer.
+- **What happens:** the plan gives `Runner.events` to units 6x but says in unit 5b only that a crash writes `AgentCrashed` with a revocation. The test `5b crash token` assumes a `RunnerEvent` of `{ _tag: "exited", agentId, exitCode, signal, stderr }` that the handler layer turns into the crash. The lifecycle test for a rejected start accepts a reply or a failure, and asserts only the `AgentStartFailed` event and the view.
+- **Why it matters:** if the builder gives the exit event another shape, the crash test fails for a reason that is not a missing behaviour.
+- **What should change:** the lead confirms the shape of the exit event before the builder starts, or moves the crash test to unit 6x.
+- **State:** settled in unit 5b by the lead's task rulings. The handler consumes the stated exit event and appends `AgentCrashed` with token revocation in one transaction. It stores an empty stderr field instead of copying diagnostic text. A rejected start writes the fixed reason `agent start failed`, revokes its token, and leaves the agent stopped. The initial start reply identifies the stopped agent.
+
+## 55. An authorization helper counted earlier successful runner calls as a refusal's side effect
+
+Found: 2026-11-01, while building unit 5b.
+State: fixed with the lead's approval in board post 884.
+
+What happened: `expectOutcome` in `packages/engine/test/commands/authorization.test.ts` required the runner's total call count to be zero after every refusal. The folder test first completed four allowed starts with the same runner. Its next refused start therefore failed although it made no new runner call.
+What changed: the helper records the call count before each command and requires that count to stay unchanged for a refused or rejected command. Its event and view assertions are unchanged.
+
+## 56. The sandbox exits the fake adapter before the redactor integration test completes
+
+Found: 2026-11-01, while running unit 5b's required test subset.
+State: worked around for verification by running the assigned tests outside the sandbox.
+
+What happened: the fake-agent case in `packages/engine/test/identity/redactor.test.ts` failed twice inside the coding sandbox with `AcpProcessExitedError`, exit code zero. The same test passed outside the sandbox without a code change. The complete assigned subset also passed outside it.
+What should happen: run this child-process integration check in an environment that permits the fake adapter's standard-input transport. No real adapter or real harness home is needed.
+
+## 57. A failed account event can leave an unreferenced secret in the store
+
+Found: 2026-11-01, while building unit 5b's secret-store seam.
+State: open for unit 6b's persistent store.
+
+What happens: the handler stores a wrapped secret before it commits the account's new reference. A failed event-log write can leave an unreferenced value in the secret store. The interface has no rollback or removal operation.
+Why it matters: storing after the event commit would instead risk committing a reference whose value was lost, including after a crash. The earlier store keeps committed references resolvable, but can retain an unused secret.
+What should happen: the persistent store defines how to collect unreferenced values or coordinate reference publication. Unit 5b uses only a scoped in-memory store and keeps every stored value wrapped as `Redacted`.
