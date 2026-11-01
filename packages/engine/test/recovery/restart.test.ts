@@ -263,7 +263,7 @@ test("6.7 R09 step 7: catches committing reload state, acceptance or carry-on be
     const release = yield* Deferred.make<void>();
     runner.script("load", (input) => Effect.gen(function* () {
       yield* runner.emitRaw({ _tag: "deliveryUpdate", agentId: input.agentId, incarnation: incarnationOf(Redacted.value(input.token)),
-        deliveryId: "replay-only", kind: "message", replay: true, role: "user", text: `Envelope ${old.delivery}` });
+        deliveryId: "replay-only", kind: "message", replay: true, role: "user", text: `(delivery ${old.delivery})` });
       yield* Deferred.succeed(entered, undefined);
       yield* Deferred.await(release);
       return sessionFor(input.agentId);
@@ -296,8 +296,9 @@ for (const replay of ["split-user", "agent", "plan", "tool-call", "file-change",
     }));
     const runner = yield* makeFakeRunner();
     yield* restart(runner, Effect.gen(function* () {
-      const chunks = replay === "split-user" || replay === "cross-role"
-        ? [old.delivery.slice(0, 12), old.delivery.slice(12)] : [old.delivery];
+      const chunks = replay === "split-user"
+        ? [`(delivery ${old.delivery.slice(0, 12)}`, `${old.delivery.slice(12)})`]
+        : replay === "cross-role" ? [old.delivery.slice(0, 12), old.delivery.slice(12)] : [old.delivery];
       runner.script("load", (input) => Effect.gen(function* () {
         for (const [index, text] of chunks.entries()) yield* runner.emitRaw({
           _tag: "deliveryUpdate", agentId: input.agentId, incarnation: incarnationOf(Redacted.value(input.token)), deliveryId: "replay-not-a-delivery",

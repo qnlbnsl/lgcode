@@ -70,7 +70,7 @@ live("6.7 E01 row 51/PB-A7: catches a real session/load replay losing a chunked 
   const resumedEcho = echoFile(rig);
   const resumedAccount = accountFor(harness.id, {
     protocolVersion: 1,
-    history: [{ role: "user", text: `Envelope ${old.delivery.slice(0, 14)}` }, { role: "user", text: old.delivery.slice(14) },
+    history: [{ role: "user", text: `(delivery ${old.delivery.slice(0, 14)}` }, { role: "user", text: `${old.delivery.slice(14)})` },
       { role: "agent", text: "private-replayed-answer-E01" }],
     turns: [[{ step: "slow", ms: 60_000 }]],
   }, resumedEcho);
