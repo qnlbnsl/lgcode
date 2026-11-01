@@ -221,6 +221,76 @@ it("scrubText replaces a UUID with <id> (breaks if an account or organization UU
   assert.equal(scrubbed, "account <id> and <id>")
 })
 
+// Fix round 3: an identifier is replaced whatever character sits next to it. `_`, a letter and a digit
+// are word characters, so `\b` boundaries missed a UUID joined to them.
+const organizationUuid = "7c1d9a40-2b6e-4f83-a5d7-91e0c3b8f246"
+const skillOwnerUuid = "e84b0f12-93ca-4d5e-b7a1-6c2f8d0e3a59"
+const syncedSkill = (skill: string) => `synced-${organizationUuid}_${skillOwnerUuid}-${skill}`
+
+it("scrubText replaces both UUIDs in a synced-<id>_<id>-<skill> name and keeps the rest of the name (breaks if the UUID rule keeps its word boundaries, so an id joined by an underscore survives; fix round 3 ruling 1)", () => {
+  assert.equal(scrubText(syncedSkill("pdf"), scrubContext), "synced-<id>_<id>-pdf")
+})
+
+it("scrubText replaces a UUID glued to letters and digits on both sides (breaks if the UUID rule keeps its word boundaries; fix round 3 ruling 1)", () => {
+  assert.equal(scrubText(`x${organizationUuid}y`, scrubContext), "x<id>y")
+  assert.equal(scrubText(`7${organizationUuid}9`, scrubContext), "7<id>9")
+  assert.equal(scrubText(`_${organizationUuid}_`, scrubContext), "_<id>_")
+  assert.equal(scrubText(`${organizationUuid}${skillOwnerUuid}`, scrubContext), "<id><id>")
+})
+
+it("scrubText replaces a UUID, not the hex rule's <redacted>, when the hex rule could see it (breaks if the rules are reordered or the hex rule takes a UUID first; fix round 3 ruling 2)", () => {
+  assert.equal(scrubText(`a${organizationUuid.toUpperCase()}b`, scrubContext), "a<id>b")
+  assert.notInclude(scrubText(syncedSkill("pdf"), scrubContext), "<redacted>")
+})
+
+it("scrubText replaces a 40-character hex value after key_ and one before _suffix (breaks if the 32-or-more hex rule keeps its word boundaries, so a value joined to an underscore survives; fix round 3 ruling 2)", () => {
+  assert.notInclude(scrubText(`key_${hex40}`, scrubContext).toLowerCase(), hex40)
+  const before = scrubText(`${hex40}_suffix`, scrubContext)
+  assert.notInclude(before, hex40)
+  assert.equal(before, "<redacted>_suffix")
+  assert.equal(scrubText(`${hex40.toUpperCase()}_suffix`, scrubContext), "<redacted>_suffix")
+})
+
+it("scrubText replaces a hex run of 32 or more characters glued to letters and digits (breaks if the hex rule keeps its word boundaries; fix round 3 ruling 2)", () => {
+  const sample = "0123456789abcdef0123456789abcdef"
+  assert.equal(scrubText(`xy${sample}zw`, scrubContext), "xy<redacted>zw")
+  assert.equal(scrubText(`z${sample.toUpperCase()}z`, scrubContext), "z<redacted>z")
+})
+
+it("scrubText still leaves a 31-character hex value joined to an underscore alone (breaks if removing the boundaries also removes the 32-character floor; fix round 3 ruling 2)", () => {
+  const text = "a_0123456789abcdef0123456789abcde_b"
+  assert.equal(scrubText(text, scrubContext), text)
+})
+
+it("scrubText keeps a UUID the recorder maps as a protocol session id, alone and next to other characters, and still replaces any other UUID beside it (breaks if dropping the boundaries makes the session-id exception stop working; fix round 3 ruling 1)", () => {
+  const sessionId = "0b5d7e91-4a3c-48f2-9d06-5e1a7c2b8f34"
+  const context = { ...scrubContext, sessionIds: new Set([sessionId]) }
+  assert.equal(scrubText(`session ${sessionId}`, context), `session ${sessionId}`)
+  assert.equal(scrubText(`abc_${sessionId}_def`, context), `abc_${sessionId}_def`)
+  assert.equal(scrubText(`x${sessionId}y`, context), `x${sessionId}y`)
+  assert.equal(scrubText(`abc_${sessionId}_${organizationUuid}_def`, context), `abc_${sessionId}_<id>_def`)
+})
+
+it("scrubText removes every planted id from a whole JSON line, in a skill list string and in an object key, and the line stays valid JSON (breaks if only the standalone-id forms are scrubbed, or if object keys are not scrubbed; fix round 3)", () => {
+  const line = JSON.stringify({
+    type: "emit_inbound",
+    frame: {
+      skills: `Available skills: ${syncedSkill("pdf")}, ${syncedSkill("xlsx")}; also x${organizationUuid}y and ${hex40}_suffix`,
+      byName: { [syncedSkill("docx")]: { description: "Make documents", id: `k${skillOwnerUuid.toUpperCase()}` } }
+    }
+  })
+  const scrubbed = scrubText(line, scrubContext)
+  for (const planted of [organizationUuid, skillOwnerUuid, hex40]) {
+    assert.notInclude(scrubbed.toLowerCase(), planted)
+  }
+  const parsed = JSON.parse(scrubbed)
+  assert.include(parsed.frame.skills, "synced-<id>_<id>-pdf")
+  assert.include(parsed.frame.skills, "synced-<id>_<id>-xlsx")
+  assert.deepEqual(Object.keys(parsed.frame.byName), ["synced-<id>_<id>-docx"])
+  assert.equal(parsed.frame.byName["synced-<id>_<id>-docx"].description, "Make documents")
+  assert.equal(parsed.frame.byName["synced-<id>_<id>-docx"].id, "k<id>")
+})
+
 const shapeSamples: ReadonlyArray<readonly [string, string]> = [
   ["github_pat_", "github_pat_11AAAAAAA0abcdefghijkl_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456"],
   ["AIza", "AIzaSyA1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q"],

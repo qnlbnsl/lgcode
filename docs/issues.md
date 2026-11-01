@@ -591,8 +591,8 @@ the others.
 ## 36. The fixture scrubber misses identifiers joined by an underscore
 
 Found: 2026-11-01, by the lead, reading the re-recorded `cursor.ndjson` at 0318c78.
-State: open; a fix round is queued for the unit 8a recorder. The new
-`cursor.ndjson` is held out of the repository until the fix lands.
+State: fixed in the unit 8a recorder, round 3; the third harness is re-recorded
+by the owner after the merge.
 
 What happens: the third harness lists the owner's synced skills by names of
 the form `synced-<id>_<id>-<skill>`. The two ids look like account or
