@@ -841,3 +841,11 @@ final-chunk duties above, and SECURITY.md states the remaining platform and
 worktree limits.
 Why it matters: each limit is a way for an agent-started child to reach a
 folder, or for the service to hold memory, beyond what the ceiling promises.
+
+## 50. Side-row text is redacted through a placeholder device event
+
+- **Found:** unit 5a fix round 1, by the lead at merge (ruling 4, findings U5A-F02 and B9).
+- **What happens:** `EventLog.append` in `packages/engine/src/log/EventLog.ts` redacts a device name and a process executable by wrapping each one in a `DeviceAdded` event with the device identifier `side-row-text`, passing it to `Redactor.redact`, and reading the `name` field back. It fails closed to `[REDACTED]` if the redactor returns another event.
+- **Why it matters:** the redaction is correct, but the carrier event is a workaround. A redactor that ever treated `DeviceAdded` specially would silently change how side rows are redacted.
+- **What should change:** the `Redactor` service in `packages/engine/src/log/Redactor.ts` gains a `redactText(text)` member, and `EventLog.append` calls it for side-row text. Unit 5b owns this, because it is the next unit that touches the event log's callers.
+- **State:** open. The current behaviour is covered by the side-row tests in `packages/engine/test/identity/redactor-fix-1.test.ts`.
