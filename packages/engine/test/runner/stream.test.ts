@@ -1,3 +1,5 @@
+import { inspect } from "node:util";
+
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -257,6 +259,8 @@ live("6.2 secrets (rows 36, 57): an account secret and the agent token written t
       vi.spyOn(process.stdout, "write").mockImplementation(((chunk: unknown, ...rest: Array<any>) => { written.push(String(chunk)); return original.out(chunk as string, ...rest); }) as typeof process.stdout.write),
       vi.spyOn(process.stderr, "write").mockImplementation(((chunk: unknown, ...rest: Array<any>) => { written.push(String(chunk)); return original.err(chunk as string, ...rest); }) as typeof process.stderr.write),
     ];
+    // Review F-2: the console methods are watched too, whether or not they reach the process streams.
+    const consoleSpies = (["log", "info", "warn", "error", "debug"] as const).map((method) => vi.spyOn(console, method));
     return yield* withEngine(rig, { harness, accounts: [account], secrets: { "secret:planted-stream": secret } }, (context) => Effect.gen(function* () {
       yield* registerRebuildCheck();
       const reply = success(yield* call(ownerCredential, "start", startPayloadFor(harness, account, rig.work, { prompt: "first turn" })));
@@ -271,10 +275,61 @@ live("6.2 secrets (rows 36, 57): an account secret and the agent token written t
       const sql = yield* SqlClient.SqlClient;
       const stored = (yield* sql<{ payload_json: string }>`SELECT payload_json FROM events`).map((row) => row.payload_json).join("\n");
       const views = JSON.stringify(yield* (yield* Views.Views).snapshot);
-      for (const [where, text] of [["events", stored], ["views", views], ["log lines", context.logLines.join("\n")], ["process output", written.join("")]] as const) {
+      const consoled = consoleSpies.flatMap((spy) => spy.mock.calls.map((args) => args.map((arg) => typeof arg === "string" ? arg : inspect(arg, { depth: 20 })).join(" "))).join("\n");
+      for (const [where, text] of [["events", stored], ["views", views], ["log lines", context.logLines.join("\n")], ["process output", written.join("")], ["console", consoled]] as const) {
         expect(text.includes(secret), `${where} contain the account secret`).toBe(false);
         expect(text.includes(token), `${where} contain the agent token`).toBe(false);
       }
-      for (const spy of spies) spy.mockRestore();
+      for (const spy of [...spies, ...consoleSpies]) spy.mockRestore();
+    }));
+  }));
+
+// Review of fe4adcd, F-1 (PB-A2): the runner reads the child's stderr all the
+// time, so a child that writes a lot of it never blocks on a full pipe.
+live("6.2 stderr drain (review F-1): an agent that writes 10,000,000 bytes of stderr and then streams text still delivers the text and ends its turn (breaks if the runner stops reading the child's stderr, so the child blocks on a full pipe and the turn never ends)", () =>
+  withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
+    const agent = yield* startAgent(context, { turns: [[{ type: "stderr_flood", bytes: 10_000_000 }, { step: "text", text: "after flood" }]] });
+    const delivery = deliveryFor(agent.agentId, "go");
+    const before = context.events.length;
+    yield* context.runner.prompt({ agentId: agent.agentId, incarnation: agent.incarnation, delivery });
+    yield* context.waitFor(turnEndedFor(delivery.id), before);
+    const own = ofDelivery(context.eventsAfter(before), delivery.id);
+    const text = own.flatMap((event) => event._tag === "deliveryUpdate" && event.kind === "message" ? [event.text] : []).join("");
+    expect(text).toBe("after flood");
+    expect(own.filter((event) => event._tag === "turnEnded")).toHaveLength(1);
+  })));
+
+// Review of fe4adcd, F-9: a turn is over once its turnEnded is emitted, so
+// content the agent sends afterwards belongs to no delivery. A text chunk
+// alone stays in the redactor's carry until the next flush, so a plan update
+// follows it and flushes the carry; neither may become a thread item.
+live("6.2 late content (review F-9): a text chunk the agent sends after its turn ended, after the version 1 prompt reply or after the version 2 idle state, writes no thread item and emits no deliveryUpdate (breaks if the runner keeps the ended turn as the current one and gives later content its delivery)", () =>
+  Effect.gen(function* () {
+    const harness = harnessFor("first", writeFakeAdapter(rig));
+    const accounts = ([1, 2] as const).map((protocolVersion) => accountFor("first", { protocolVersion, turns: [[
+      { step: "text", text: `in turn v${protocolVersion}` },
+      { step: "text_after_turn", text: `late chunk v${protocolVersion}`, ms: 300,
+        plan: [{ content: `late plan v${protocolVersion}`, priority: "low", status: "pending" }] },
+    ]] }, echoFile(rig), {}, `account-v${protocolVersion}`));
+    return yield* withEngine(rig, { harness, accounts }, (context) => Effect.gen(function* () {
+      yield* registerRebuildCheck();
+      for (const account of accounts) {
+        success(yield* call(ownerCredential, "start", startPayloadFor(harness, account, rig.work, { name: `Late ${account.id}`, prompt: "go" })));
+      }
+      yield* eventually(readLog, (rows) => tagged(rows, "TurnEnded").length === 2);
+      // Each late chunk leaves its agent 300 ms after the idle state.
+      yield* pause(1200);
+      const rows = yield* readLog;
+      expect(tagged(rows, "TurnEnded")).toHaveLength(2);
+      const items = JSON.stringify(tagged(rows, "ThreadItem"));
+      expect(items).toContain("in turn v1");
+      expect(items).toContain("in turn v2");
+      expect(items).not.toContain("late chunk");
+      expect(items).not.toContain("late plan");
+      // No deliveryUpdate follows an agent's own turnEnded.
+      for (const ended of context.events.filter((event) => event._tag === "turnEnded")) {
+        const after = context.events.slice(context.events.indexOf(ended) + 1);
+        expect(after.filter((event) => event._tag === "deliveryUpdate" && event.agentId === ended.agentId)).toEqual([]);
+      }
     }));
   }));

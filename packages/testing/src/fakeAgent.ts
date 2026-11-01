@@ -41,6 +41,9 @@ type Step = DiagnosticStep | StepDiagnostic
   | { step: "rpc_error"; message: string; code?: number }
   | { step: "raw_frame"; frame: string }
   | { step: "client_request"; method: string; params: Schema.Json }
+  // Unit 6a fix round 2 (F-9): sends a text chunk `ms` milliseconds after the turn's idle state, so it
+  // arrives after the session/prompt reply, then the plan, if given. The turn's other steps run first.
+  | { step: "text_after_turn"; text: string; ms: number; plan?: AcpSchema.PlanEntry[] }
 interface Script {
   protocolVersion?: 1 | 2
   reportVersion?: boolean
@@ -229,6 +232,7 @@ const program = Effect.gen(function*() {
     const text = (value: string) => update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: value } })
     yield* update({ sessionUpdate: "state_update", state: "running" })
     const steps = script.turns[session.turn++] ?? []
+    const afterTurn: Array<{ text: string; ms: number; plan?: AcpSchema.PlanEntry[] }> = []
     const run = Effect.gen(function*() {
       for (const step of steps) {
         const diagnostic = "type" in step ? { ...step, step: step.type } as StepDiagnostic : step
@@ -280,6 +284,7 @@ const program = Effect.gen(function*() {
             break
           }
           case "slow": yield* Effect.sleep(step.ms); break
+          case "text_after_turn": afterTurn.push(step); break
           case "crash":
             // Flush queued transport writes before simulating an abrupt process exit.
             yield* Effect.sleep(10)
@@ -297,6 +302,11 @@ const program = Effect.gen(function*() {
     const result = yield* Effect.raceFirst(run, Deferred.await(cancel).pipe(Effect.as({ stopReason: "cancelled" })))
     yield* update({ sessionUpdate: "state_update", state: "idle", ...result } as AcpSchema.SessionNotification["update"])
     delete session.cancel
+    for (const late of afterTurn) {
+      const plan = late.plan === undefined ? Effect.void
+        : update({ sessionUpdate: "plan_update", plan: { type: "items", planId: "late-plan", entries: late.plan } })
+      yield* Effect.sleep(late.ms).pipe(Effect.andThen(text(late.text)), Effect.andThen(plan), Effect.ignore, Effect.forkDetach)
+    }
     return {}
   }))
   return yield* Effect.never
