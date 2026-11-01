@@ -1,0 +1,33 @@
+{
+  "name": "@shepherd/testing",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.13 <27"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@effect/platform-node": "catalog:",
+    "@shepherd/client": "workspace:*",
+    "@shepherd/contracts": "workspace:*",
+    "@shepherd/t3-effect-acp": "workspace:*",
+    "@shepherd/t3-provider-testing": "workspace:*",
+    "effect": "catalog:",
+    "ws": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "@types/ws": "catalog:",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,0 +1,32 @@
+packages:
+  - packages/*
+  - third_party/t3code/*
+
+catalog:
+  effect: 4.0.5
+  '@effect/platform-node': 4.0.5
+  '@effect/platform-node-shared': 4.0.5
+  '@effect/vitest': 4.0.5
+  '@effect/openapi-generator': 4.0.5
+  '@types/node': 26.6.6
+  '@types/ws': 8.18.2
+  vitest: 5.0.5
+  # T3 Code builds with this TypeScript port, and the copied packages in
+  # third_party/t3code are checked with the same compiler. Do not change it alone.
+  typescript: npm:@tsc-rs/typescript@0.8.0
+  ws: 8.22.0
+  fast-check: 4.10.2
+
+# Retained for decision 39 and criterion 1.6. This list is not enforced by pnpm 12; allowBuilds is the policy.
+# Keep the two equal.
+onlyBuiltDependencies:
+  - '@tsc-rs/typescript'
+allowBuilds:
+  '@tsc-rs/typescript@0.8.0': true
+strictDepBuilds: true
+
+# platform-node otherwise accepts a newer shared package requiring Effect 4.1.
+overrides:
+  effect: 'catalog:'
+  '@effect/platform-node': 'catalog:'
+  '@effect/platform-node-shared': 'catalog:'

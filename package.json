@@ -1,0 +1,28 @@
+{
+  "name": "shepherd",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.13 <27"
+  },
+  "packageManager": "pnpm@12.16.1",
+  "scripts": {
+    "typecheck": "pnpm -r typecheck && tsc --noEmit",
+    "test": "vitest run",
+    "check": "pnpm -r typecheck && tsc --noEmit && vitest run && scripts/check-credits.sh",
+    "record-fixtures": "node packages/engine/scripts/record-fixtures.ts",
+    "live-check": "node packages/engine/scripts/live-check.ts"
+  },
+  "devDependencies": {
+    "@effect/openapi-generator": "catalog:",
+    "@effect/platform-node": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "@types/ws": "catalog:",
+    "effect": "catalog:",
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

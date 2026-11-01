@@ -1,0 +1,4 @@
+{"type": "transcript_start", "provider": "example", "protocol": "acp", "version": "1", "scenario": "greeting"}
+{"type": "expect_outbound", "label": "initialize", "frame": {"method": "initialize", "cwd": "<workspace>"}}
+{"type": "emit_inbound", "frame": {"result": "ok"}, "afterMs": 5}
+{"type": "runtime_exit", "status": "success"}

@@ -1,0 +1,64 @@
+{
+  "name": "@shepherd/t3-provider-instance",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.13 <27"
+  },
+  "exports": {
+    "./providerInstance": {
+      "types": "./src/providerInstance.ts",
+      "import": "./src/providerInstance.ts"
+    },
+    "./secretReference": {
+      "types": "./src/secretReference.ts",
+      "import": "./src/secretReference.ts"
+    },
+    "./baseSchemas": {
+      "types": "./src/baseSchemas.ts",
+      "import": "./src/baseSchemas.ts"
+    },
+    "./pathExpansion": {
+      "types": "./src/pathExpansion.ts",
+      "import": "./src/pathExpansion.ts"
+    },
+    "./instanceEnvironment": {
+      "types": "./src/instanceEnvironment.ts",
+      "import": "./src/instanceEnvironment.ts"
+    },
+    "./ClaudeHome": {
+      "types": "./src/ClaudeHome.ts",
+      "import": "./src/ClaudeHome.ts"
+    },
+    "./CodexHomeLayout": {
+      "types": "./src/CodexHomeLayout.ts",
+      "import": "./src/CodexHomeLayout.ts"
+    },
+    "./CodexManagedHome": {
+      "types": "./src/CodexManagedHome.ts",
+      "import": "./src/CodexManagedHome.ts"
+    },
+    "./HostProcess": {
+      "types": "./src/HostProcess.ts",
+      "import": "./src/HostProcess.ts"
+    },
+    "./settings": {
+      "types": "./src/settings.ts",
+      "import": "./src/settings.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "effect": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/platform-node": "catalog:",
+    "@effect/vitest": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
