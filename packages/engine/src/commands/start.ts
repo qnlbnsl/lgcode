@@ -60,9 +60,16 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
           Effect.flatMap((session) => runtime.log.transact((append) => Effect.gen(function* () {
             // An exit can arrive while the session result is being returned.
             if ((yield* runtime.views.snapshot).agents[agentId]?.state._tag !== "starting") return;
-            yield* append(actor, freshRequest(), randomUUID(), [
+            // Fix round 1, A2: an account that signed out while this session
+            // was opening pauses the agent in the same append, so no work
+            // reaches it; the owner's "account available" brings it back.
+            const snapshot = yield* runtime.views.snapshot;
+            const signedOut = snapshot.accounts[account.id]?.status === "needs-sign-in";
+            const opened: ReadonlyArray<Event> = [
               { _tag: "SessionOpened", agentId, ...session },
-            ], {});
+              ...(signedOut ? [{ _tag: "StateChanged" as const, agentId, state: { _tag: "paused" as const, reason: "signed-out" as const, midTurn: false } }] : []),
+            ];
+            yield* append(actor, freshRequest(), randomUUID(), signedOut ? withWaitChecks(snapshot, opened) : opened, {});
           })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
           Effect.catchTag("RunnerRejected", () => runtime.log.transact((append) => Effect.gen(function* () {
             const snapshot = yield* runtime.views.snapshot;

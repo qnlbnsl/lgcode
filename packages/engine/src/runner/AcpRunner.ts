@@ -382,9 +382,9 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   });
   const send = (input: Send, compact: boolean) => Effect.gen(function* () {
     const entry = yield* live(input.agentId, input.incarnation);
-    if (input.delivery.target !== input.agentId || (!compact && input.delivery.content._tag !== "prompt")) return yield* rejected("delivery does not match send");
+    if (input.delivery.target !== input.agentId || (!compact && input.delivery.content._tag !== "prompt" && input.delivery.content._tag !== "carry-on")) return yield* rejected("delivery does not match send");
     if (entry.turn !== undefined && !entry.turn.ended) return yield* rejected("agent already has a turn");
-    const text = compact ? yield* compactPrompt(entry.commands) : input.delivery.content._tag === "prompt" ? input.delivery.content.text : "";
+    const text = compact ? yield* compactPrompt(entry.commands) : input.delivery.content._tag === "prompt" || input.delivery.content._tag === "carry-on" ? input.delivery.content.text : "";
     const turn: Turn = { deliveryId: input.delivery.id, replied: false, idle: false, ended: false, text: "" };
     entry.turn = turn;
     const sent = yield* Deferred.make<void, RunnerRejected>();

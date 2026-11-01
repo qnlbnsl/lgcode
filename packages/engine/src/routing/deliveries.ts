@@ -211,7 +211,12 @@ export const dispatchQueued = (agentId: AgentId) => Effect.gen(function* () {
   const views = yield* Views;
   const runner = yield* Runner;
   const sql = yield* SqlClient.SqlClient;
-  const ready = (snapshot: Snapshot) => snapshot.agents[agentId]?.state._tag === "idle" ? nextQueued(snapshot, agentId) : undefined;
+  // Fix round 1, A2: an agent on a signed-out account gets nothing; its
+  // queue waits for the owner's "account available".
+  const ready = (snapshot: Snapshot) => {
+    const agent = snapshot.agents[agentId];
+    return agent?.state._tag === "idle" && snapshot.accounts[agent.account]?.status !== "needs-sign-in" ? nextQueued(snapshot, agentId) : undefined;
+  };
   if (ready(yield* views.snapshot) === undefined) return;
   yield* withLane(log, agentId)(Effect.gen(function* () {
     const reserved = yield* log.transact((append) => Effect.gen(function* () {

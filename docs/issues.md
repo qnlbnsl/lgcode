@@ -1600,3 +1600,39 @@ State: fixed in unit 6b by engine-lead's ruling.
 What happens: `routing/fix-round-one.test.ts` F1 "inherited grandchild" paused a child with the reason `signed-out` and then expected its idle caller, on the same account, to still run `wait`. Rows 28 and 53, and the frozen 6b test T1, make a sign-out pause every agent on the account, so the caller was paused and its `wait` was refused.
 What should happen: the test pauses the child with `out-of-usage` and no reset time, which pauses only that child and keeps the intent of the test (a wait on a paused member).
 Why it matters: two frozen tests disagreed, and the suite could not pass until one changed.
+
+## 131. A carry-on delivery was returned as failed instead of reaching the agent
+
+Found: 2026-11-01, in the focused review of unit 6b (finding A1).
+State: fixed in unit 6b fix round 1.
+
+What happens: `accounts/available.ts` queues a mid-turn agent's carry-on with content tagged `carry-on`. `routing/deliveries.ts` passed it to `runner.prompt` unchanged, and the real runner accepts only content tagged `prompt`, so the delivery came back as "delivery failed" and the agent never saw it.
+What should happen: `AcpRunner.send` accepts carry-on content and sends its text as the prompt (a two-line change; the frozen tests T5 and T7 expect the runner input to keep the `carry-on` tag). The logged delivery keeps its tag too.
+Why it matters: an agent paused mid-turn came back idle without being told to carry on, which row 53 requires.
+
+## 132. A starting agent could get work after its account signed out
+
+Found: 2026-11-01, in the focused review of unit 6b (finding A2).
+State: fixed in unit 6b fix round 1, in two of the three ruled parts.
+
+What happens: a sign-out paused only working and idle agents on the account. A sibling still starting opened its session afterwards and was sent its first prompt on a signed-out account.
+What should happen: (b) when `start` records `SessionOpened` and the account is then `needs-sign-in`, the same append pauses the agent with `signed-out` and `midTurn` false; (c) dispatch never sends to an agent whose account is `needs-sign-in`. Both are done. Part (a), pausing starting agents at the sign-out, is not done: the lifecycle table makes `SessionOpened` invalid from `paused`, so a starting agent paused early could not record its session. Parts (b) and (c) already close the gap, since the agent is paused the moment its session opens.
+Why it matters: work reached an account the owner had to sign in again.
+
+## 133. A symbolic link in the state folder could move the shadow home outside it
+
+Found: 2026-11-01, in the focused review of unit 6b (finding A4).
+State: fixed in unit 6b fix round 1.
+
+What happens: the shadow home path is built under the state folder, but a symbolic link on the way (for example `providers/codex/<account>`) made the copied code create directories and links outside it.
+What should happen: `accounts/shadowHome.ts` resolves the real path of the deepest existing part, and refuses with the fixed reason `account home cannot be prepared` unless the result lies inside the real state folder. It checks before anything is made and again afterwards. The copied source is unchanged.
+Why it matters: a link planted in the state folder could redirect private authentication files out of it.
+
+## 134. An out-of-usage account still sends work to its idle siblings
+
+Found: 2026-11-01, in the focused review of unit 6b (finding C3).
+State: open question for the owner.
+
+What happens: rows 28 and 53 make only a sign-out account-wide. When one agent reports a usage limit, the account is marked out of usage and that agent pauses, but its idle siblings keep receiving work, and each may hit the limit once before it pauses itself.
+What should happen: the owner decides whether idle siblings should pause (and their queued work wait) as soon as the account is known to be out of usage.
+Why it matters: each sibling's first turn after the limit is wasted, and a turn that fails with the limit costs a delivery requeue.
