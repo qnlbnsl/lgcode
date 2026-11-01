@@ -3,6 +3,7 @@ import {
   CommandsRpcGroup, EventEnvelope, commandOutcome, ownerOnlyCommands,
   type Actor, type HarnessSettings, type RequestId,
 } from "@shepherd/contracts";
+import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -15,7 +16,10 @@ import { sha256Hex } from "../identity/credential.ts";
 import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
 import { EventLog, LogWriteFailed } from "../log/EventLog.ts";
-import { Runner } from "../runner/Runner.ts";
+import { Runner, RunnerEvent } from "../runner/Runner.ts";
+import { holderAbove, moveHeld, passAtTurnEnd, passUp } from "../routing/holders.ts";
+import { answer, permissionRequested } from "../routing/permissions.ts";
+import { ask } from "../routing/questions.ts";
 import { Views } from "../views/Views.ts";
 import { apply } from "../views/apply.ts";
 import { SecretStore } from "./SecretStore.ts";
@@ -40,7 +44,7 @@ export class CommandHandler extends Context.Service<CommandHandler, {
   readonly execute: (credential: Credential, name: string, payload: unknown) => Effect.Effect<Record<string, unknown>, CommandRefused | LogWriteFailed>;
 }>()("shepherd/engine/commands/CommandHandler") {}
 
-const supported = new Set(["start", "prompt", "stop", "resume", "compact", "group", "accounts", "accounts set-secret", "accounts mark-available", "harnesses"]);
+const supported = new Set(["start", "prompt", "stop", "resume", "compact", "group", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "answer", "pass-up", "ask"]);
 const targeted = new Set(["prompt", "stop", "resume", "compact", "group"]);
 const owners = new Set<string>(ownerOnlyCommands);
 const canonical = (value: unknown): string => {
@@ -52,22 +56,6 @@ const canonical = (value: unknown): string => {
   return JSON.stringify(value);
 };
 
-// Rights are evaluated from this writer turn's snapshot. A cycle or a missing
-// ancestor fails closed to the owner, rather than walking forever.
-const rightsHolder = (snapshot: Snapshot, target: string): Actor => {
-  let parent = snapshot.agents[target]?.parent;
-  const seen = new Set<string>([target]);
-  while (parent?._tag === "agent") {
-    if (seen.has(parent.agentId)) return { _tag: "owner" };
-    seen.add(parent.agentId);
-    const row = snapshot.agents[parent.agentId];
-    if (row === undefined) return { _tag: "owner" };
-    if (row.state._tag === "idle" || row.state._tag === "working") return parent;
-    parent = row.parent;
-  }
-  return { _tag: "owner" };
-};
-
 // Payloads have been checked with their contract's decoded-value schema.
 const planCommand = (input: Input, name: string, payload: Record<string, unknown>): Effect.Effect<Plan, CommandRefused | LogWriteFailed> =>
   Effect.gen(function* () {
@@ -77,12 +65,15 @@ const planCommand = (input: Input, name: string, payload: Record<string, unknown
     const agent = snapshot.agents[agentId];
     if (targeted.has(name)) {
       if (agent === undefined || commandOutcome(agent.state._tag, name as "prompt" | "stop" | "resume" | "compact" | "group") === "refused") return yield* refused();
-      const holder = rightsHolder(snapshot, agentId);
+      const holder = holderAbove(snapshot, agentId);
       if (actor._tag === "agent" && (holder._tag !== "agent" || holder.agentId !== actor.agentId)) return yield* refused();
     }
     switch (name) {
       case "start": return yield* start(input, payload as Payload<"start">);
       case "prompt": return prompt(input, payload as Payload<"prompt">);
+      case "answer": return yield* answer(input, payload as Payload<"answer">);
+      case "pass-up": return yield* passUp(input, payload as Payload<"pass-up">);
+      case "ask": return yield* ask(input, payload as Payload<"ask">);
       case "compact": return compact(input, payload as Payload<"compact">);
       case "stop": return stop(input, agent!);
       case "resume": return yield* resume(input, agent!, payload as Payload<"resume">);
@@ -102,6 +93,8 @@ const replyFor = (snapshot: Snapshot, name: string, requestId: RequestId, envelo
   const reply: Record<string, unknown> = { requestId };
   const started = events.find((event) => event._tag === "AgentStarted");
   if (started !== undefined) reply.agentId = started.agentId;
+  const asked = events.find((event) => event._tag === "QuestionAsked");
+  if (asked !== undefined) reply.questionId = asked.questionId;
   const queued = events.find((event) => event._tag === "DeliveryQueued");
   if (queued !== undefined) reply.deliveryId = queued.delivery.id;
   if (name === "accounts") reply.accounts = Object.values(envelopes.reduce(apply, snapshot).accounts);
@@ -124,14 +117,37 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
 
     // stderr is deliberately omitted. Even a failed adapter can echo a raw
     // credential there; the contract's required text field receives no data.
-    yield* runner.events.pipe(Stream.runForEach((event) => log.transact((append) => Effect.gen(function* () {
-      const snapshot = yield* views.snapshot;
-      const agent = snapshot.agents[event.agentId];
-      if (agent === undefined || !["starting", "working", "idle", "paused"].includes(agent.state._tag)) return;
-      yield* append({ _tag: "owner" }, freshRequest(), randomUUID(), [{
-        _tag: "AgentCrashed", agentId: event.agentId, exitCode: event.exitCode, signal: event.signal, stderr: "",
-      }], { revokeAgentTokens: [event.agentId] });
-    })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))), Effect.forkScoped);
+    const handleRunnerEvent = (rawEvent: unknown) => Effect.gen(function* () {
+      // A bad adapter event cannot reach the views or the writer, and its
+      // validation error must not expose any of the input it describes.
+      const decoded = yield* Schema.decodeUnknownEffect(RunnerEvent)(rawEvent).pipe(Effect.result);
+      if (decoded._tag === "Failure") return yield* Effect.logWarning("runner event dropped: malformed");
+      const event = decoded.success;
+      yield* log.transact((append) => Effect.gen(function* () {
+        const snapshot = yield* views.snapshot;
+        const agent = snapshot.agents[event.agentId];
+        if (agent === undefined || !["starting", "working", "idle", "paused"].includes(agent.state._tag)) return;
+        const tokens = yield* sql<{ agent_id: string }>`
+          SELECT agent_id FROM agent_tokens WHERE token_hash = ${event.incarnation}
+          AND agent_id = ${event.agentId} AND revoked_at IS NULL`;
+        if (tokens.length === 0) return;
+        if (event._tag !== "exited") {
+          const events = event._tag === "permissionRequested" ? yield* permissionRequested(snapshot, event) : [
+            { _tag: "TurnEnded" as const, agentId: event.agentId, compact: false },
+            ...passAtTurnEnd(snapshot, event.agentId),
+          ];
+          if (events.length > 0) yield* append({ _tag: "owner" }, freshRequest(), randomUUID(), events, {});
+          return;
+        }
+        yield* append({ _tag: "owner" }, freshRequest(), randomUUID(), [{
+          _tag: "AgentCrashed", agentId: event.agentId, exitCode: event.exitCode, signal: event.signal, stderr: "",
+        }, ...moveHeld(snapshot, [event.agentId])], { revokeAgentTokens: [event.agentId] });
+      }));
+    // A failed event is isolated, but scope closure must still stop the stream.
+    }).pipe(Effect.catchCause((cause) => Cause.hasInterrupts(cause)
+      ? Effect.failCause(cause)
+      : Effect.logWarning("runner event dropped: processing failed")));
+    yield* runner.events.pipe(Stream.runForEach(handleRunnerEvent), Effect.forkScoped);
 
     return CommandHandler.of({
       execute: (credential, name, rawPayload) => Effect.gen(function* () {
@@ -165,6 +181,9 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
           });
           const { requestId: id, ...body } = payload;
           const requestId = id as RequestId;
+          // Identifiers bypass event-text redaction. Reject a secret-bearing
+          // id before looking up a receipt or planning even a refusal event.
+          if ((yield* log.redactText(requestId)) !== requestId) return yield* refused();
           const bodyHash = sha256Hex(canonical(name === "accounts set-secret"
             ? { command: name, accountId: payload.accountId, nonce: payload.nonce }
             : { command: name, payload: body }));

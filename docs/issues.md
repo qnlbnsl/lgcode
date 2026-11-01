@@ -937,11 +937,19 @@ What should happen: either remove the envelope-only path once no caller writes i
 ## 61. A runner exit event carries no incarnation, so a late exit could hit a new run
 
 Found: 2026-11-01, in the focused review of unit 5b.
-State: open for unit 6a, which adds the first real producer of runner events.
+State: fixed in the engine by unit 5c fix round 1. The producer remains open
+for unit 6a.
 
-What happens: `RunnerEvent.exited` carries only the agent id (`packages/engine/src/runner/Runner.ts`). The crash consumer in `CommandHandler.ts` checks only the agent's current state.
+What happened: `RunnerEvent.exited` carried only the agent identifier. The
+crash consumer checked only the agent's current state.
 Why it matters: after `stop` and an immediate `resume`, a late exit from the old process would write `AgentCrashed` for the new run and revoke its new token.
-What should happen: the event carries an incarnation id (or the token hash of the run it belongs to), and the consumer ignores an exit whose incarnation is not the current one. Unit 6a should also add a test that reads the token table directly after `stop`, since only one 5b test covers that revocation today.
+What changed: the runner event schema requires an incarnation on every tag,
+including `exited`. The consumer checks both the agent identifier and its
+unrevoked token hash inside the writer transaction before applying an event.
+What remains: unit 6a must take the agent identifier and incarnation from its
+own process table, never from a child's data. Its real process tests must
+check token revocation after a current exit and reject exits from old or
+different agents' incarnations.
 
 ## 62. A failed follow-up append after a rejected runner call leaves the agent starting
 
@@ -969,3 +977,146 @@ State: open for unit 6a.
 What happens: `start.ts` and `resume.ts` discard the `SessionInfo` that `runner.start` and `runner.load` return. No session reference and no `reloadable` flag are ever recorded, so a `resume` without `--fresh` always finds "cannot reload" for an agent started by the engine. Also, a failed reload writes its transition with `previous: "idle"` (`resume.ts`), even when the agent was crashed or stopped.
 Why it matters: reload cannot work end to end until the session is recorded, and the wrong previous state misleads anyone reading the event.
 What should happen: unit 6a writes `SessionOpened` with the session reference and the reloadable flag after a successful start or load, and the failure transition uses the agent's real previous state.
+
+## 65. No event withdraws an owner alert, so a closed request's alert is visible only through its status
+
+Found: 2026-11-01, while writing the unit 5c tests.
+State: open; the owner of the client API (piece 2) or the lead decides.
+
+What happens: decision rows 27 and 51 say that closing or moving a request withdraws its owner alert in the same transaction. The alert is the `OwnerNeeded` event, and the contracts (`packages/contracts/src/events.ts`) have no event that withdraws it. A request never moves down from the owner (row 51), so only closing ends an alert, and a client can see that only from the request's or question's status.
+What should happen: either the contracts gain an "owner alert withdrawn" event, or the plan states that an alert ends when its subject closes, and clients derive it.
+Why it matters: a phone alert for an answered request stays visible until the client checks the subject. The unit 5c tests cannot assert a withdrawal, so they assert only the closed status.
+
+## 66. A request held by the owner still carries a delivery id that names no delivery
+
+Found: 2026-11-01, while writing the unit 5c tests.
+State: open.
+
+What happens: `PermissionRequested`, `PermissionMoved`, `QuestionAsked` and `QuestionMoved` require a `deliveryId`. When the holder is the owner, nothing is queued, because a delivery's target must be an agent. The id then refers to no delivery, and a later withdrawal of it changes no row.
+What should happen: either the field becomes optional for an owner holder, or the plan states that the id is a placeholder there. The unit 5c tests assert only that no delivery is queued for an owner-held request.
+Why it matters: a reader or a later unit that looks the id up finds nothing, and could mistake that for a lost delivery.
+
+## 67. A routing delivery has no sender of its own, so returning it to its sender is undefined
+
+Found: 2026-11-01, while writing the unit 5c tests.
+State: open for unit 5d, which builds returns to the sender.
+
+What happens: the engine queues a delivery to a request's or question's holder, but `Delivery.sender` is an `Actor` (the owner or an agent), and the contracts have no engine sender. Criterion 5.9 returns a failed delivery to its sender. If the sender is recorded as the asking agent, a failed request delivery would be returned to the agent that asked.
+What should happen: unit 5d decides how a delivery with a `source` (permission, question or wait) is handled on failure: moved by the holder rule, requeued, or returned. The unit 5c tests do not assert the sender of a routing delivery.
+Why it matters: a returned request delivery could tell the asker that its own request failed, while the holder never sees it.
+
+## 68. A committed permission answer can fail to reach its runner
+
+Found: 2026-11-01, while building unit 5c.
+State: open for unit 6a.
+
+What happens: the handler commits a permission answer and its receipt before
+calling `Runner.answerPermission`. If that call fails, the answer stays
+recorded. The handler writes one fixed warning through the service logger,
+with no request content or runner error. A retry with the same request
+identifier returns the stored receipt and does not call the runner again.
+What should happen: unit 6a reconciles a committed answer with a runner that
+did not receive it, including after a service interruption between the commit
+and the call. Its recovery must preserve first-answer-wins and avoid replaying
+an answer into a different incarnation.
+Why it matters: an adapter can still be waiting for a permission whose answer
+the client already sees as recorded. The unit 5c boundary test covers the
+committed state, receipt replay, single call and content-free warning.
+
+## 69. One malformed runner event could stop the consumer for every agent
+
+Found: 2026-11-01, in the review and verified attack pass for unit 5c.
+State: fixed in unit 5c fix round 1.
+
+What happened: the event consumer caught only request identifier collisions.
+An empty permission identifier, empty tool call identifier, invalid option
+level or empty option list could cause a schema defect and stop the consumer.
+A failed event transaction could stop it too.
+What changed: the consumer decodes every event against the runner event
+schema before reading state or opening a transaction. It drops malformed
+events with one fixed warning. Each event's work catches failures and defects
+with another fixed warning, while preserving interruption during shutdown.
+Neither warning includes input or failure content. The event log still keeps
+its deliberate failure latch after an actual database write failure.
+The fix-round test initially expected a later append after a trigger-induced
+failure. The lead ruled that the existing latch wins. The corrected test
+observes another fixed warning for the next rejected event instead.
+Why it matters: one bad event must not prevent the consumer from handling
+later valid events for other agents.
+
+## 70. A command request identifier could store a live secret unchanged
+
+Found: 2026-11-01, in the verified attack pass for unit 5c.
+State: fixed in the engine by unit 5c fix round 1. A bounded identifier
+alphabet remains open for the contracts scope.
+
+What happened: the contracts accept any nonempty string as a request
+identifier. The handler could store an agent token unchanged in event and
+receipt keys, envelopes and thread views, because identifier metadata bypasses
+event text redaction.
+What changed: immediately after decoding a command's payload, the handler
+passes the request identifier through the event log's `redactText` delegation
+to its own `Redactor` service. If the identifier changes, the handler refuses
+the command before receipt lookup and writes nothing. This also applies to
+commands that would later be refused for rights or state.
+What remains: the contracts scope must choose a bounded identifier alphabet.
+Why it matters: redacting a reply alone leaves secrets in database keys and
+subscription envelopes.
+
+## 71. A moved request could withdraw an already accepted delivery
+
+Found: 2026-11-01, in the focused review of unit 5c.
+State: fixed in unit 5c fix round 1.
+
+What happened: moving a request or question always wrote `DeliveryWithdrawn`,
+including when the delivery had already been accepted.
+What changed: a move now uses `withdrawQueued`. It withdraws a queued delivery
+and leaves every other delivery status unchanged, while moving the subject
+and notifying its next holder in the same batch.
+Why it matters: a completed delivery remains accepted in the log and views.
+
+## 72. Permission request identifiers must be unique across agents
+
+Found: 2026-11-01, in the focused review and attack pass for unit 5c.
+State: open for unit 6a's runner.
+
+What happens: the engine preserves the first request when a runner reports
+an identifier it already holds. Fix round 1 adds a fixed warning when that
+duplicate names a different agent, with no request content in the warning.
+What should happen: unit 6a mints a request identifier itself, unique across
+agents and incarnations. It never forwards a child's protocol request
+identifier or tool call identifier as the engine permission identifier.
+The runner retains the mapping needed to answer the original protocol call.
+Why it matters: a collision must not overwrite the first request, and dropping
+the second otherwise leaves another adapter waiting without a routed request.
+
+## 73. Permission option safety depends on the runner's option mapping
+
+Found: 2026-11-01, in the unit 5c attack pass. The reported engine ceiling
+bypass was disproved by the verifier; the producer duty remains.
+State: open for unit 6a.
+
+What happens: the engine cannot know what an adapter's option identifier does.
+It trusts the mapped option kind. The ceiling already uses the stricter of
+the reported and implied permission level and persistence. An adapter option
+that persists but is mapped as `allow_once` with no persistence flag can still
+pass an agent's ceiling.
+What should happen: unit 6a maps options against recorded adapter fixtures and
+checks the permission boundary in acceptance case SEC-PB-3. Unknown or
+persistent options must remain owner-only.
+Why it matters: an incorrect mapping could give a one-time approval effects
+that persist beyond the session.
+
+## 74. Requests asked by a crashed or stopped agent remain open
+
+Found: 2026-11-01, in the review of unit 5c.
+State: open for units 6a and 6d.
+
+What happens: no current writer emits `PermissionCancelled` or closes the
+questions asked by an agent that crashes or stops. Moving the subjects it
+holds does not close the subjects it asked.
+What should happen: the runner and recovery units reconcile these subjects
+with their actual sessions and close requests that no longer have a waiter.
+Question closure must use an agreed contract rather than inventing an answer.
+Why it matters: dead sessions leave open subjects and owner alerts that
+nobody can use.

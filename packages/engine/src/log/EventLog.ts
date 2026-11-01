@@ -76,6 +76,8 @@ export class EventLog extends Context.Service<
   EventLog,
   {
     readonly append: Append;
+    // Check metadata with the same redactor instance that protects appends.
+    readonly redactText: (text: string) => Effect.Effect<string>;
     readonly subscribeCommitted: Effect.Effect<PubSub.Subscription<EventEnvelope>, never, Scope.Scope>;
     // Runs an effect while holding the writer's permit, so no batch commits
     // or updates the live views meanwhile. For `compareViews` only.
@@ -279,6 +281,7 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
 
   return EventLog.of({
     append,
+    redactText: redactor.redactText,
     transact,
     subscribeCommitted: PubSub.subscribe(committedEvents),
     withWriterPermit: writer.withPermits(1),
