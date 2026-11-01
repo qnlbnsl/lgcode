@@ -36,6 +36,7 @@ type Step = DiagnosticStep | StepDiagnostic
   | { step: "print_env" }
 interface Script {
   protocolVersion?: 1 | 2
+  reportVersion?: boolean
   agentInfo?: { name: string; version: string }
   configOptions?: AcpSchema.SessionConfigOption[]
   history?: Array<{ role: "user" | "agent"; text: string }>
@@ -43,6 +44,10 @@ interface Script {
 }
 
 const environment = process.env
+if (process.argv.length === 3 && process.argv[2] === "--version") {
+  process.stdout.write("fake-agent 0.0.0\n")
+  process.exit(0)
+}
 let script: Script
 try {
   if (environment.FAKE_AGENT_SCRIPT === undefined) throw new Error()
@@ -82,8 +87,8 @@ const floodStderr = (bytes: number) => Effect.callback<void, AcpRequestError>((r
   write(bytes)
 })
 
-// The server is v2. Adapt only its wire boundary to the pinned adapter's v1 shape.
-const version1Stdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
+// Adapt the v2 server's wire output for scripts with v1 responses or no version.
+const scriptedStdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
   const stdio = yield* Stdio.Stdio
   const methods = new Map<string | number, string>()
   const stops = new Map<string, string>()
@@ -99,9 +104,10 @@ const version1Stdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
     const update = frame.params?.update
     if (update?.sessionUpdate === "state_update" && update.state === "idle") stops.set(frame.params.sessionId, update.stopReason)
     if (frame.result && methods.get(frame.id) === "initialize") {
-      frame.result = { protocolVersion: 1, agentInfo: frame.result.info, agentCapabilities: { loadSession: true }, authMethods: [] }
+      if (script.reportVersion === false) delete frame.result.info.version
+      if (script.protocolVersion === 1) frame.result = { protocolVersion: 1, agentInfo: frame.result.info, agentCapabilities: { loadSession: true }, authMethods: [] }
     }
-    if (frame.result && methods.get(frame.id) === "session/prompt") frame.result.stopReason = [...stops.values()].at(-1) ?? "end_turn"
+    if (script.protocolVersion === 1 && frame.result && methods.get(frame.id) === "session/prompt") frame.result.stopReason = [...stops.values()].at(-1) ?? "end_turn"
     if (frame.id !== undefined && frame.method === undefined) methods.delete(frame.id)
     return JSON.stringify(frame) + "\n"
   }).join("")
@@ -228,7 +234,7 @@ const program = Effect.gen(function*() {
 })
 
 Effect.runPromise(program.pipe(
-  Effect.provide(AcpAgent.layerStdio().pipe(Layer.provide(script.protocolVersion === 1 ? version1Stdio.pipe(Layer.provide(NodeServices.layer)) : NodeServices.layer))),
+  Effect.provide(AcpAgent.layerStdio().pipe(Layer.provide(script.protocolVersion === 1 || script.reportVersion === false ? scriptedStdio.pipe(Layer.provide(NodeServices.layer)) : NodeServices.layer))),
   Effect.provide(Logger.layer([safeLogger])),
   Effect.scoped
 )).catch(() => { process.stderr.write("Fake agent failed\n"); process.exitCode = 1 })

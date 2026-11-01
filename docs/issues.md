@@ -455,6 +455,7 @@ an assertion by changing a real protocol frame.
 Found: 2026-11-01, in the installed first adapter's
 `claude-agent-acp` 0.99.1 `dist/acp-agent.js`, initialize response at line 1416.
 State: handled in the unit 8a recorder; the live check remains owner-run.
+The live run at 4a5ad12 negotiated protocol version 2 with the pinned Claude adapter.
 
 What happened: the pinned adapter's source reports protocol version 1, while the
 fake agent tests require version 2. A recorder that demands version 2 rejects
@@ -567,7 +568,7 @@ become public if the repository ever did.
 ## 35. The fixture recorder stops every harness when one adapter reports no version
 
 Found: 2026-11-01, in the owner-run `pnpm record-fixtures` at 4a5ad12.
-State: open; a recorder fix is queued for the unit 8a builder.
+State: fixed in the unit 8a recorder, round 2.
 
 What happened: Cursor's `agent acp` (version 2026.10.14-941492e, from
 `agent --version`) reports no version in its initialize reply.
