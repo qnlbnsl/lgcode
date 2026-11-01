@@ -11,6 +11,7 @@ import * as Sink from "effect/Sink"
 import * as Stdio from "effect/Stdio"
 import * as Stream from "effect/Stream"
 import { spawn, type ChildProcess } from "node:child_process"
+import { writeFileSync } from "node:fs"
 import WebSocket from "ws"
 
 type DiagnosticStep =
@@ -23,7 +24,7 @@ type Step = DiagnosticStep | StepDiagnostic
   | { step: "plan"; entries: AcpSchema.PlanEntry[] }
   | { step: "tool_call"; toolCallId: string; title: string; kind: AcpSchema.ToolKind; status: AcpSchema.ToolCallStatus; output: string }
   | { step: "file_change"; toolCallId: string; path: string; operation: string; patch: string }
-  | { step: "permission"; toolCallId: string; title: string; options: AcpSchema.PermissionOption[] }
+  | { step: "permission"; toolCallId: string; title: string; options: AcpSchema.PermissionOption[]; locations?: Array<{ path: string }> }
   | { step: "question"; message: string; requestedSchema: Record<string, unknown> }
   | { step: "mode_change"; configId: string; value: string }
   | { step: "config_options"; configOptions: AcpSchema.SessionConfigOption[] }
@@ -34,16 +35,38 @@ type Step = DiagnosticStep | StepDiagnostic
   | { step: "signed_out"; message: string; via?: "idle" | "rpc" }
   | { step: "slow"; ms: number }
   | { step: "print_env" }
+  // Unit 6a. Text in these steps expands ${env:NAME} to the child's own variable, ${env-u:NAME}
+  // to the same value written as JSON \u escapes (raw frames only) and ${session} to the session id.
+  | { step: "stderr"; text: string }
+  | { step: "rpc_error"; message: string; code?: number }
+  | { step: "raw_frame"; frame: string }
+  | { step: "client_request"; method: string; params: Schema.Json }
 interface Script {
   protocolVersion?: 1 | 2
   reportVersion?: boolean
   agentInfo?: { name: string; version: string }
   configOptions?: AcpSchema.SessionConfigOption[]
+  // Unit 6a: refuse set_config_option for an unknown option or a value the option does not list.
+  strictConfigOptions?: boolean
   history?: Array<{ role: "user" | "agent"; text: string }>
   turns: Step[][]
 }
 
 const environment = process.env
+
+// Unit 6a: when FAKE_AGENT_ECHO names a file, the agent writes there, after every inbound frame,
+// what it was started with (pid, arguments, working folder, environment) and every frame it
+// received. Nothing is written without the variable.
+const echoPath = environment.FAKE_AGENT_ECHO
+const echo = { pid: process.pid, argv: [...process.argv], cwd: process.cwd(), env: { ...environment }, inbound: [] as Array<unknown> }
+const writeEcho = () => { if (echoPath !== undefined) writeFileSync(echoPath, JSON.stringify(echo), { mode: 0o600 }) }
+writeEcho()
+
+const expand = (text: string, sessionId: string) => text.replace(/\$\{(env|env-u):([A-Za-z_][A-Za-z0-9_]*)\}|\$\{session\}/g, (match, kind, name) => {
+  if (match === "${session}") return sessionId
+  const value = environment[name] ?? ""
+  return kind === "env" ? value : [...value].map((char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`).join("")
+})
 if (process.argv.length === 3 && process.argv[2] === "--version") {
   process.stdout.write("fake-agent 0.0.0\n")
   process.exit(0)
@@ -86,6 +109,18 @@ const floodStderr = (bytes: number) => Effect.callback<void, AcpRequestError>((r
   }
   write(bytes)
 })
+
+const recordingStdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
+  const stdio = yield* Stdio.Stdio
+  const record = (line: string) => {
+    try { echo.inbound.push(JSON.parse(line)) } catch { echo.inbound.push({ unparsable: line.length }) }
+    writeEcho()
+    return line + "\n"
+  }
+  return Stdio.make({ ...stdio,
+    stdin: stdio.stdin.pipe(Stream.decodeText(), Stream.splitLines, Stream.filter((line) => line.trim().length > 0), Stream.map(record), Stream.encodeText)
+  })
+}))
 
 // Adapt the v2 server's wire output for scripts with v1 responses or no version.
 const scriptedStdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
@@ -163,6 +198,12 @@ const program = Effect.gen(function*() {
   yield* agent.handleSetSessionConfigOption((request) => Effect.suspend(() => {
     const session = sessions.get(request.sessionId)
     if (!session) return Effect.fail(AcpRequestError.invalidParams("Unknown session"))
+    if (script.strictConfigOptions === true) {
+      const option = session.options.find((candidate) => candidate.configId === request.configId) as { options?: Array<{ value?: unknown }> } | undefined
+      if (option === undefined || (Array.isArray(option.options) && !option.options.some((choice) => choice.value === request.value))) {
+        return Effect.fail(AcpRequestError.invalidParams("Unknown configuration value"))
+      }
+    }
     session.options = session.options.map((option) => option.configId === request.configId
       ? { ...option, currentValue: request.value } as AcpSchema.SessionConfigOption : option)
     return Effect.succeed({ configOptions: session.options })
@@ -195,7 +236,8 @@ const program = Effect.gen(function*() {
           case "tool_call": yield* update({ sessionUpdate: "tool_call_update", toolCallId: step.toolCallId, title: step.title, kind: step.kind, status: step.status, content: [{ type: "content", content: { type: "text", text: step.output } }] }); break
           case "file_change": yield* update({ sessionUpdate: "tool_call_update", toolCallId: step.toolCallId, content: [{ type: "diff", changes: [{ operation: step.operation, path: step.path }], patch: { format: "git_patch", text: step.patch } }] } as AcpSchema.SessionNotification["update"]); break
           case "permission": {
-            const response = yield* agent.client.requestPermission({ sessionId: request.sessionId, title: step.title, options: step.options, subject: { type: "tool_call", toolCall: { toolCallId: step.toolCallId, title: step.title } } })
+            const toolCall = { toolCallId: step.toolCallId, title: step.title, ...(step.locations === undefined ? {} : { locations: step.locations }) }
+            const response = yield* agent.client.requestPermission({ sessionId: request.sessionId, title: step.title, options: step.options, subject: { type: "tool_call", toolCall } })
             yield* text(response.outcome.outcome === "selected" ? `permission:selected:${response.outcome.optionId}` : "permission:cancelled")
             break
           }
@@ -210,6 +252,25 @@ const program = Effect.gen(function*() {
           case "config_options": session.options = step.configOptions; yield* update({ sessionUpdate: "config_option_update", configOptions: session.options }); break
           case "shepherd_command": yield* text(yield* shepherdCommand(step.command, step.input)); break
           case "print_env": yield* text(Object.entries(environment).map(([name, value]) => `${name}=${value}`).join("\n")); break
+          case "stderr": {
+            const line = expand(step.text, request.sessionId) + "\n"
+            yield* Effect.callback<void>((resume) => { process.stderr.write(line, () => resume(Effect.void)) })
+            break
+          }
+          case "rpc_error": return yield* Effect.fail(new AcpRequestError({ code: step.code ?? -32603, errorMessage: expand(step.message, request.sessionId) }))
+          case "raw_frame": {
+            const line = expand(step.frame, request.sessionId) + "\n"
+            yield* Effect.callback<void>((resume) => { process.stdout.write(line, () => resume(Effect.void)) })
+            break
+          }
+          case "client_request": {
+            const outcome = yield* agent.raw.request(step.method, step.params).pipe(
+              Effect.map(() => "ok"),
+              Effect.catch((error) => Effect.succeed(`error:${(error as { code?: unknown }).code ?? "unknown"}`))
+            )
+            yield* text(`client_request:${step.method}:${outcome}`)
+            break
+          }
           case "slow": yield* Effect.sleep(step.ms); break
           case "crash":
             // Flush queued transport writes before simulating an abrupt process exit.
@@ -234,7 +295,9 @@ const program = Effect.gen(function*() {
 })
 
 Effect.runPromise(program.pipe(
-  Effect.provide(AcpAgent.layerStdio().pipe(Layer.provide(script.protocolVersion === 1 || script.reportVersion === false ? scriptedStdio.pipe(Layer.provide(NodeServices.layer)) : NodeServices.layer))),
+  // The recorder reads the raw wire, beneath the version adapter.
+  Effect.provide(AcpAgent.layerStdio().pipe(Layer.provide(((base) => script.protocolVersion === 1 || script.reportVersion === false ? scriptedStdio.pipe(Layer.provide(base)) : base)(
+    echoPath === undefined ? NodeServices.layer : recordingStdio.pipe(Layer.provide(NodeServices.layer)))))),
   Effect.provide(Logger.layer([safeLogger])),
   Effect.scoped
 )).catch(() => { process.stderr.write("Fake agent failed\n"); process.exitCode = 1 })
