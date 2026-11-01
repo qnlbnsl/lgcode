@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 
 import { it } from "@effect/vitest";
@@ -66,6 +66,35 @@ it.effect("6.5 E1: catches a second account sharing the first login, missing sha
     expect(readFileSync(join(shared, "auth.json"), "utf8")).toBe(originalAuth);
     expect(readFileSync(join(shared, "config.toml"), "utf8")).toBe(originalConfig);
     expect((yield* readEcho(firstEcho)).env.CODEX_HOME).toBe(firstChild.env.CODEX_HOME);
+  }));
+}).pipe(Effect.orDie));
+
+it.effect("6b A4: catches a symlink ancestor moving the shadow home outside the state folder, spawning a child, or writing shared links outside", () => Effect.gen(function* () {
+  const outside = join(rig.root, "outside-state");
+  const shadow = join(outside, "shadow");
+  mkdirSync(shadow, { recursive: true });
+  writeFileSync(join(shadow, "keep.txt"), "Outside data must stay untouched.\n");
+  const before = readdirSync(outside, { recursive: true }).sort();
+  const provider = join(rig.stateFolder, "providers", "codex");
+  mkdirSync(provider, { recursive: true });
+  symlinkSync(outside, join(provider, "secondary"), "dir");
+  const shared = join(rig.home, ".codex");
+  mkdirSync(shared);
+  writeFileSync(join(shared, "config.toml"), 'model = "fixture-model"\n');
+
+  const echo = echoFile(rig);
+  const harness = harnessFor("codex", writeFakeAdapter(rig));
+  const account = accountFor("codex", { turns: [] }, echo, {}, "secondary");
+  yield* withEngine(rig, { harness, accounts: [account] }, (context) => Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    const reply = success(yield* call(ownerCredential, "start", startPayloadFor(harness, account, rig.work)));
+    expect.soft((yield* snapshot).agents[reply.agentId]?.state._tag).toBe("stopped");
+    expect.soft(existsSync(echo), "the escaped home must be refused before spawning the adapter").toBe(false);
+    expect.soft(readdirSync(outside, { recursive: true }).sort(), "refusal must leave the outside tree untouched").toEqual(before);
+    expect(readFileSync(join(shadow, "keep.txt"), "utf8")).toBe("Outside data must stay untouched.\n");
+    const failures = (yield* readLog).filter((row) => row.event._tag === "AgentStartFailed");
+    expect(failures.map((row) => row.event)).toEqual([{ _tag: "AgentStartFailed", agentId: reply.agentId, reason: "agent start failed" }]);
+    expect(JSON.stringify([failures, context.logLines])).not.toContain(outside);
   }));
 }).pipe(Effect.orDie));
 
