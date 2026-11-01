@@ -7,6 +7,7 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
 import { refused, type Input, type Payload, type Plan, type Snapshot } from "../commands/internal.ts";
+import { envelope, escapeLeadingSlash } from "./envelope.ts";
 
 type Subject = Payload<"pass-up">["subject"];
 
@@ -40,8 +41,8 @@ export const mayActForHolder = (snapshot: Snapshot, actor: Actor, holder: Actor)
 
 export const freshDelivery = (): DeliveryId => Schema.decodeUnknownSync(DeliveryId)(randomUUID());
 
-// Unit 5d owns the transport envelope. Keep agent text labelled as data here,
-// including the delivery id, so a routing prompt never starts with its text.
+// Rows 38 and 58: the asker's text goes inside the envelope, escaped, after
+// a label the engine writes. Issue 67: the asker is the delivery's sender.
 export const routedDelivery = (
   agentId: AgentId, holder: Actor, deliveryId: DeliveryId, subject: Subject, text: string,
 ): ReadonlyArray<Event> => holder._tag === "owner" ? [{
@@ -49,7 +50,7 @@ export const routedDelivery = (
 }] : [{
   _tag: "DeliveryQueued", delivery: {
     id: deliveryId, target: holder.agentId, sender: { _tag: "agent", agentId }, source: subject,
-    content: { _tag: "prompt", text: `Data from another agent (${subject._tag}, delivery ${deliveryId}):\n${JSON.stringify(text)}` },
+    content: { _tag: "prompt", text: envelope(deliveryId, `${subject._tag === "permission" ? "Permission request" : "Question"} ${subject.id} from agent ${agentId}:\n${escapeLeadingSlash(text)}`) },
   },
 }];
 

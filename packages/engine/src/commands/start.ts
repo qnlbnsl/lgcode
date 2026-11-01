@@ -6,6 +6,7 @@ import * as Schema from "effect/Schema";
 import { canUseMode, checkFolder, folderForSpawn } from "../identity/ceiling.ts";
 import { mintAgentToken } from "../identity/tokens.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
+import { agentText } from "../routing/envelope.ts";
 import { freshRequest, readHarnesses, refused, type Input, type Payload, type Plan } from "./internal.ts";
 
 export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Plan, ReturnType<typeof refused> | LogWriteFailed> =>
@@ -31,6 +32,7 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
     );
     const folder = yield* folderForSpawn(grant, "start").pipe(Effect.mapError(() => refused()));
     const agentId = Schema.decodeUnknownSync(AgentId)(randomUUID());
+    const deliveryId = Schema.decodeUnknownSync(DeliveryId)(randomUUID());
     const token = mintAgentToken();
     const event: Event = {
       _tag: "AgentStarted", agentId, name: payload.name, role: payload.role, groups: payload.groups ?? [],
@@ -39,8 +41,8 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
       ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }),
       ...(payload.prompt === undefined ? {} : {
         firstPromptDelivery: {
-          id: Schema.decodeUnknownSync(DeliveryId)(randomUUID()), target: agentId, sender: actor,
-          content: { _tag: "prompt" as const, text: payload.prompt },
+          id: deliveryId, target: agentId, sender: actor,
+          content: { _tag: "prompt" as const, text: agentText(actor, deliveryId, payload.prompt) },
         },
       }),
     };

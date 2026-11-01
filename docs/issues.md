@@ -865,7 +865,7 @@ folder, or for the service to hold memory, beyond what the ceiling promises.
 - **Why it matters:** the 5.4 `resume` case cannot assert that suspended waits come back. It asserts only that `resume` does not cancel them, which a build with no suspend at all also passes.
 - **What should change:** the owner or the lead decides whether a wait gets a suspended status, or whether a wait simply stays open across a crash. Unit 5d.1 owns the answer.
 - **Unit 5d test contract:** Suspension is derived from an open non-blocking wait and its waiter being crashed. The durable `AgentCrashed` event is the suspension marker. A suspended wait stays open, emits no wake, and is re-checked by a successful reloadable `resume`. Only `stop` writes `WaitCancelled`. This uses the existing event contracts, so no separate suspended status is required. The tests also withdraw a wake already queued when its waiter crashes or stops.
-- **State:** the test contract is written; implementation remains open for unit 5d.
+- **State:** fixed in unit 5d. `routing/waits.ts` skips an open non-blocking wait whose waiter is crashed, so it neither resolves nor wakes, and a crash withdraws a wake already queued for that waiter. A `resume` moves the waiter out of "crashed", and the same transaction re-checks its waits. Only `stop` writes `WaitCancelled` for a non-blocking wait; a blocking wait of a crashed waiter is cancelled, because its connection belonged to the crashed run.
 
 ## 53. The event log gives a command handler no way to check and write in one writer turn
 
@@ -1005,6 +1005,7 @@ State: open for unit 5d, which builds returns to the sender.
 What happens: the engine queues a delivery to a request's or question's holder, but `Delivery.sender` is an `Actor` (the owner or an agent), and the contracts have no engine sender. Criterion 5.9 returns a failed delivery to its sender. If the sender is recorded as the asking agent, a failed request delivery would be returned to the agent that asked.
 What should happen: unit 5d decides how a delivery with a `source` (permission, question or wait) is handled on failure: moved by the holder rule, requeued, or returned. The unit 5c tests do not assert the sender of a routing delivery.
 Why it matters: a returned request delivery could tell the asker that its own request failed, while the holder never sees it.
+State: decided by the lead for unit 5d and implemented. The sender of a routed permission or question delivery is its asker. An ordinary error reply returns it to the asker, who gets a notice, and the request stays open with its holder. A stopped or crashed holder's routed delivery is withdrawn, not returned, because its subject moves to the next holder in the same transaction.
 
 ## 68. A committed permission answer can fail to reach its runner
 
@@ -1121,3 +1122,49 @@ with their actual sessions and close requests that no longer have a waiter.
 Question closure must use an agreed contract rather than inventing an answer.
 Why it matters: dead sessions leave open subjects and owner alerts that
 nobody can use.
+
+## 75. The wait contract has no owner waiter
+
+Found: 2026-11-01, while building unit 5d.
+State: open for the contracts scope and unit 7.
+
+What happens: `WaitOpened` requires the waiter's agent identifier, and `Delivery.target` must be an agent. The engine therefore refuses a `wait` from the owner with "command refused".
+Why it matters: decision row 26 gives the owner's terminal `shepherd wait --block`. `AGENTS.md` rule 5 requires that what the owner can do from the terminal is also possible through the API.
+What should happen: the contracts give a wait an owner waiter, at least for blocking waits, which create no delivery.
+
+## 76. Engine notices name the owner as their sender
+
+Found: 2026-11-01, while building unit 5d.
+State: open for the contracts scope.
+
+What happens: a wait's wake, a wait's crash notice and a returned-delivery notice are deliveries the engine writes. `Actor` has only the owner and agents, so these deliveries carry the owner as sender. Their text is still wrapped in the data envelope, and a wake carries its wait as `source`.
+Why it matters: a client cannot tell an engine notice from the owner's own prompt by its sender. A notice that fails is returned to the owner, which ends there, so no notice loops.
+What should happen: the contracts add an engine sender, or the plan states that the owner sender with a data envelope marks an engine notice.
+
+## 77. A blocking wait's retry and its cancellation window
+
+Found: 2026-11-01, while building unit 5d.
+State: open for unit 7a, which owns the transport and its connection handling.
+
+What happens: a blocking `wait` stores its receipt when the wait opens, so a retry with the same request identifier returns the stored "opened" reply, not the final outcome. Separately, the handler runs the blocking part after the opening commit. An interruption that lands after the commit and before the blocking part starts would leave the wait open.
+Why it matters: a blocking wait creates no delivery and never counts against its caller's settled state, so a left-open wait wakes nobody. It still shows as open until recovery step 6 cancels blocking waits (row 66).
+What should happen: the transport retries a blocking wait with a new request identifier, and unit 7a either masks interruption across the commit and the start of the blocking part or cancels open blocking waits of closed connections.
+
+## 78. Follow-up appends after a rejected start or reload skip the wait checks
+
+Found: 2026-11-01, while building unit 5d.
+State: open for unit 6a.
+
+What happens: when the runner rejects a start or a reload, `start.ts` and `resume.ts` append `AgentStartFailed` or `AgentReloadFailed` with `EventLog.append`, outside a transaction that reads the views. Those batches carry no wait checks, so a wait on that agent resolves only at the next check that runs, or at recovery's re-check.
+Why it matters: a parent waiting on a child whose start failed is not woken at once.
+What should happen: unit 6a writes these follow-ups through `EventLog.transact` with the views snapshot and `withWaitChecks`, like the other runner events.
+
+
+## 79. Nine earlier tests assumed a delivery to an idle agent stays queued
+
+Found: 2026-11-01, while building unit 5d.
+State: fixed with the lead's approval in board post 909.
+
+What happened: unit 5d sends a delivery to an idle agent as soon as it is queued, and a stop resolves another agent's wait on the stopped agent. Seven unit 5c tests seeded an idle holder and expected its routed delivery to stay queued or to be withdrawn. The unit 5b stop test expected a wait on the stopped agent to stay open.
+What changed: tests whose point is a withdrawal or a queued move now seed the holder as working, so its delivery stays queued. The two tests whose names need an idle holder keep it idle and assert that the delivery was sent. The stop test asserts that the other agent's wait resolves with the reason "stopped" and is not cancelled. No other assertion changed.
+Why it matters: the old expectations contradicted decision rows 25, 29 and 50.

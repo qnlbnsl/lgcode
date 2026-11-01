@@ -1,5 +1,5 @@
 import {
-  AgentId, PermissionOption, PermissionRequestId,
+  AgentId, DeliveryId, PermissionOption, PermissionRequestId,
   type Account, type Delivery, type HarnessSettings, type PermissionLevel, type SessionReference,
 } from "@shepherd/contracts";
 import * as Context from "effect/Context";
@@ -26,9 +26,13 @@ export interface SessionInfo {
 }
 
 // Every event belongs to the spawn identified by its unrevoked token hash.
-// The runner takes agentId and incarnation from its own process table, never
-// from child data. permissionRequestId is the runner's own id, unique across
-// agents; it must mint that id rather than forward a child-supplied id.
+// The runner takes agentId, incarnation and deliveryId from its own process
+// table, never from child data (issue 61): deliveryId names the delivery the
+// runner itself sent with `prompt` or `compact`. permissionRequestId is the
+// runner's own id, unique across agents; it must mint that id rather than
+// forward a child-supplied id. `deliveryUpdate` reports a notice for the
+// sent delivery; `promptReply` reports the reply to it, and a successful
+// reply that ends the turn comes before that turn's `turnEnded`.
 export const RunnerEvent = Schema.Union([
   Schema.TaggedStruct("exited", {
     agentId: AgentId,
@@ -47,6 +51,24 @@ export const RunnerEvent = Schema.Union([
     settingsWrite: Schema.Boolean,
   }),
   Schema.TaggedStruct("turnEnded", { agentId: AgentId, incarnation: Schema.NonEmptyString }),
+  Schema.TaggedStruct("deliveryUpdate", {
+    agentId: AgentId,
+    incarnation: Schema.NonEmptyString,
+    deliveryId: DeliveryId,
+    kind: Schema.Literals(["message", "plan", "tool-call", "file-change", "available_commands_update"]),
+    replay: Schema.Boolean,
+    text: Schema.String,
+  }),
+  Schema.TaggedStruct("promptReply", {
+    agentId: AgentId,
+    incarnation: Schema.NonEmptyString,
+    deliveryId: DeliveryId,
+    outcome: Schema.Union([
+      Schema.TaggedStruct("success", {}),
+      Schema.TaggedStruct("pause", { reason: Schema.Literals(["out-of-usage", "signed-out"]), error: Schema.String }),
+      Schema.TaggedStruct("error", { error: Schema.String }),
+    ]),
+  }),
 ]);
 export type RunnerEvent = typeof RunnerEvent.Type;
 
@@ -61,6 +83,8 @@ interface Spawn {
   readonly effort?: string;
 }
 
+// `prompt` and `compact` return once the request is sent; the reply arrives
+// later as a `promptReply` event.
 export class Runner extends Context.Service<Runner, {
   readonly start: (input: Spawn) => Effect.Effect<SessionInfo, RunnerRejected>;
   readonly load: (input: Spawn & { readonly session: SessionReference }) => Effect.Effect<SessionInfo, RunnerRejected>;

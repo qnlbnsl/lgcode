@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   CommandsRpcGroup, EventEnvelope, commandOutcome, ownerOnlyCommands,
-  type Actor, type HarnessSettings, type RequestId,
+  type Actor, type Event, type HarnessSettings, type RequestId,
 } from "@shepherd/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -15,11 +15,13 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { sha256Hex } from "../identity/credential.ts";
 import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
-import { EventLog, LogWriteFailed } from "../log/EventLog.ts";
+import { EventLog, LogWriteFailed, type SideRows } from "../log/EventLog.ts";
 import { Runner, RunnerEvent } from "../runner/Runner.ts";
-import { holderAbove, moveHeld, passAtTurnEnd, passUp } from "../routing/holders.ts";
+import { dispatchCommitted, deliveryUpdate, promptReply, targetGone, turnEnded } from "../routing/deliveries.ts";
+import { holderAbove, moveHeld, passUp } from "../routing/holders.ts";
 import { answer, permissionRequested } from "../routing/permissions.ts";
 import { ask } from "../routing/questions.ts";
+import { project, wait, waitReply, withWaitChecks } from "../routing/waits.ts";
 import { Views } from "../views/Views.ts";
 import { apply } from "../views/apply.ts";
 import { SecretStore } from "./SecretStore.ts";
@@ -44,7 +46,7 @@ export class CommandHandler extends Context.Service<CommandHandler, {
   readonly execute: (credential: Credential, name: string, payload: unknown) => Effect.Effect<Record<string, unknown>, CommandRefused | LogWriteFailed>;
 }>()("shepherd/engine/commands/CommandHandler") {}
 
-const supported = new Set(["start", "prompt", "stop", "resume", "compact", "group", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "answer", "pass-up", "ask"]);
+const supported = new Set(["start", "prompt", "stop", "resume", "compact", "group", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "answer", "pass-up", "ask", "wait"]);
 const targeted = new Set(["prompt", "stop", "resume", "compact", "group"]);
 const owners = new Set<string>(ownerOnlyCommands);
 const canonical = (value: unknown): string => {
@@ -74,6 +76,7 @@ const planCommand = (input: Input, name: string, payload: Record<string, unknown
       case "answer": return yield* answer(input, payload as Payload<"answer">);
       case "pass-up": return yield* passUp(input, payload as Payload<"pass-up">);
       case "ask": return yield* ask(input, payload as Payload<"ask">);
+      case "wait": return yield* wait(input, payload as Payload<"wait">);
       case "compact": return compact(input, payload as Payload<"compact">);
       case "stop": return stop(input, agent!);
       case "resume": return yield* resume(input, agent!, payload as Payload<"resume">);
@@ -96,7 +99,8 @@ const replyFor = (snapshot: Snapshot, name: string, requestId: RequestId, envelo
   const asked = events.find((event) => event._tag === "QuestionAsked");
   if (asked !== undefined) reply.questionId = asked.questionId;
   const queued = events.find((event) => event._tag === "DeliveryQueued");
-  if (queued !== undefined) reply.deliveryId = queued.delivery.id;
+  if (queued !== undefined && name !== "wait") reply.deliveryId = queued.delivery.id;
+  if (name === "wait") Object.assign(reply, waitReply(events));
   if (name === "accounts") reply.accounts = Object.values(envelopes.reduce(apply, snapshot).accounts);
   if (name === "harnesses") {
     const harnesses = new Map(settings.map((harness) => [harness.id, harness]));
@@ -113,7 +117,7 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
     const views = yield* Views;
     const runner = yield* Runner;
     const secrets = yield* SecretStore;
-    const runtime: Runtime = { ...configuration, sql, log, runner, secrets };
+    const runtime: Runtime = { ...configuration, sql, log, runner, secrets, views };
 
     // stderr is deliberately omitted. Even a failed adapter can echo a raw
     // credential there; the contract's required text field receives no data.
@@ -131,23 +135,29 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
           SELECT agent_id FROM agent_tokens WHERE token_hash = ${event.incarnation}
           AND agent_id = ${event.agentId} AND revoked_at IS NULL`;
         if (tokens.length === 0) return;
-        if (event._tag !== "exited") {
-          const events = event._tag === "permissionRequested" ? yield* permissionRequested(snapshot, event) : [
-            { _tag: "TurnEnded" as const, agentId: event.agentId, compact: false },
-            ...passAtTurnEnd(snapshot, event.agentId),
-          ];
-          if (events.length > 0) yield* append({ _tag: "owner" }, freshRequest(), randomUUID(), events, {});
-          return;
+        // Every batch carries the wait checks it causes (rows 25 and 50).
+        const write = (events: ReadonlyArray<Event>, sideRows: SideRows = {}) => events.length === 0 ? Effect.void
+          : append({ _tag: "owner" }, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), sideRows).pipe(Effect.asVoid);
+        switch (event._tag) {
+          case "permissionRequested": return yield* write(yield* permissionRequested(snapshot, event));
+          case "turnEnded": return yield* write(turnEnded(snapshot, event.agentId));
+          case "deliveryUpdate": return yield* write(deliveryUpdate(snapshot, event));
+          case "promptReply": return yield* write(yield* promptReply(snapshot, event, log.redactText));
+          case "exited": {
+            const crashed: ReadonlyArray<Event> = [{
+              _tag: "AgentCrashed", agentId: event.agentId, exitCode: event.exitCode, signal: event.signal, stderr: "",
+            }, ...moveHeld(snapshot, [event.agentId])];
+            return yield* write([...crashed, ...targetGone(project(snapshot, crashed), event.agentId, "crashed")],
+              { revokeAgentTokens: [event.agentId] });
+          }
         }
-        yield* append({ _tag: "owner" }, freshRequest(), randomUUID(), [{
-          _tag: "AgentCrashed", agentId: event.agentId, exitCode: event.exitCode, signal: event.signal, stderr: "",
-        }, ...moveHeld(snapshot, [event.agentId])], { revokeAgentTokens: [event.agentId] });
       }));
     // A failed event is isolated, but scope closure must still stop the stream.
     }).pipe(Effect.catchCause((cause) => Cause.hasInterrupts(cause)
       ? Effect.failCause(cause)
       : Effect.logWarning("runner event dropped: processing failed")));
     yield* runner.events.pipe(Stream.runForEach(handleRunnerEvent), Effect.forkScoped);
+    yield* dispatchCommitted;
 
     return CommandHandler.of({
       execute: (credential, name, rawPayload) => Effect.gen(function* () {
@@ -219,7 +229,7 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
             return { failure, afterCommit: undefined };
           }
           const plan = planned.success;
-          yield* append(actor, requestId, bodyHash, plan.events, plan.sideRows ?? {}, (batch) =>
+          yield* append(actor, requestId, bodyHash, withWaitChecks(snapshot, plan.events), plan.sideRows ?? {}, (batch) =>
             replyFor(snapshot, name, requestId, batch, settings).reply);
           // Return precisely the redacted result that a later retry reads.
           const written = yield* sql<{ result_json: string }>`
@@ -228,8 +238,8 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
           return { ...(yield* decodeReceipt(written[0].result_json)), afterCommit: plan.afterCommit };
         }));
         if (outcome.failure !== undefined) return yield* outcome.failure;
-        if (outcome.afterCommit !== undefined) yield* outcome.afterCommit;
-        return outcome.reply!;
+        const late = outcome.afterCommit === undefined ? undefined : yield* outcome.afterCommit;
+        return late ?? outcome.reply!;
       }).pipe(
         Effect.provideService(SqlClient.SqlClient, sql),
         Effect.catchTag("RequestIdReused", () => Effect.fail(refused("request id reused"))),

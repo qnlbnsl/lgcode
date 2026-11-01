@@ -61,6 +61,8 @@ interface WaitRow {
   readonly members: ReadonlyArray<AgentId>;
   readonly mode: "any" | "all";
   readonly blocking: boolean;
+  // Rows 25 and 50: the sequence of the event that opened the wait.
+  readonly since: EventSequence;
   readonly status: "open" | "satisfied" | "cancelled";
   readonly resolved: ReadonlyArray<WaitMember>;
   readonly reason?: string;
@@ -239,11 +241,11 @@ const questionsAfter = (state: State, event: Event): State["questions"] => {
 const wasResolved = (resolved: ReadonlyArray<WaitMember>, member: WaitMember): ReadonlyArray<WaitMember> =>
   [...resolved.filter((row) => row.agentId !== member.agentId), member];
 
-const waitsAfter = (state: State, event: Event): State["waits"] => {
+const waitsAfter = (state: State, { sequence, event }: EventEnvelope): State["waits"] => {
   switch (event._tag) {
     case "WaitOpened": return put(state.waits, event.waitId, {
       waitId: event.waitId, agentId: event.agentId, members: event.members, mode: event.mode,
-      blocking: event.blocking, status: "open", resolved: [],
+      blocking: event.blocking, since: sequence, status: "open", resolved: [],
     });
     case "WaitMemberResolved": return change(state.waits, event.waitId, (row) => ({
       ...row, resolved: wasResolved(row.resolved, event.member),
@@ -335,7 +337,7 @@ export const apply = (state: State, envelope: EventEnvelope): State => {
       : put(state.threads, owner, [...(lookup(state.threads, owner) ?? []), envelope]),
     requests: requestsAfter(state, event),
     questions: questionsAfter(state, event),
-    waits: waitsAfter(state, event),
+    waits: waitsAfter(state, envelope),
     deliveries: deliveriesAfter(state, event),
     accounts: accountsAfter(state, event),
     devices: devicesAfter(state, event),
