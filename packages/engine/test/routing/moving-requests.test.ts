@@ -222,7 +222,10 @@ it.live("5.6 turn end (row 67): catches a holder that ends the turn with an acce
     expect(tagged(batch, "PermissionMoved")).toEqual([
       expect.objectContaining({ permissionRequestId: taken.id, from: agent("lead"), to: agent("grand") }),
     ]);
-    expect(tagged(batch, "DeliveryWithdrawn").map((event) => event.deliveryId)).toEqual([taken.row.deliveryId]);
+    // Fix round 1, ruling 5: the lead had accepted this delivery, so the move
+    // withdraws nothing; only a queued delivery is withdrawn.
+    expect(tagged(batch, "DeliveryWithdrawn")).toEqual([]);
+    expect((yield* deliveryRow(taken.row.deliveryId))?.status).toBe("accepted");
     expect(queuedFor(batch, "permission", taken.id).map((delivery) => delivery.target)).toEqual(["grand"]);
     expect(yield* stateOf("lead")).toBe("idle");
     expect((yield* requestRow(taken.id))?.holder).toEqual(agent("grand"));

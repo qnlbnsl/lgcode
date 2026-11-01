@@ -53,10 +53,12 @@ export const routedDelivery = (
   },
 }];
 
-export const withdrawQueued = (snapshot: Snapshot, deliveryId: string): ReadonlyArray<Event> => {
+export const withdrawQueued = (
+  snapshot: Snapshot, deliveryId: string, reason: "request closed" | "request moved" = "request closed",
+): ReadonlyArray<Event> => {
   const delivery = snapshot.deliveries[deliveryId];
   return delivery?.status === "queued" ? [{
-    _tag: "DeliveryWithdrawn", agentId: delivery.target, deliveryId: delivery.id, reason: "request closed",
+    _tag: "DeliveryWithdrawn", agentId: delivery.target, deliveryId: delivery.id, reason,
   }] : [];
 };
 
@@ -81,10 +83,8 @@ const move = (snapshot: Snapshot, subject: Subject, leaving: ReadonlyArray<strin
     ? { _tag: "PermissionMoved", agentId: row.agentId, permissionRequestId: subject.id, from: row.holder, to, deliveryId }
     : { _tag: "QuestionMoved", agentId: row.agentId, questionId: subject.id, from: row.holder, to, deliveryId };
   const text = "description" in row ? row.description : row.text;
-  return [moved, {
-    _tag: "DeliveryWithdrawn", agentId: row.holder.agentId,
-    deliveryId: Schema.decodeUnknownSync(DeliveryId)(row.deliveryId), reason: "request moved",
-  }, ...routedDelivery(row.agentId, to, deliveryId, subject, text)];
+  return [moved, ...withdrawQueued(snapshot, row.deliveryId, "request moved"),
+    ...routedDelivery(row.agentId, to, deliveryId, subject, text)];
 };
 
 // Stop, crash, pause and recovery append these events with their own cause.

@@ -3,6 +3,7 @@ import {
   CommandsRpcGroup, EventEnvelope, commandOutcome, ownerOnlyCommands,
   type Actor, type HarnessSettings, type RequestId,
 } from "@shepherd/contracts";
+import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -15,7 +16,7 @@ import { sha256Hex } from "../identity/credential.ts";
 import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
 import { EventLog, LogWriteFailed } from "../log/EventLog.ts";
-import { Runner } from "../runner/Runner.ts";
+import { Runner, RunnerEvent } from "../runner/Runner.ts";
 import { holderAbove, moveHeld, passAtTurnEnd, passUp } from "../routing/holders.ts";
 import { answer, permissionRequested } from "../routing/permissions.ts";
 import { ask } from "../routing/questions.ts";
@@ -116,26 +117,37 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
 
     // stderr is deliberately omitted. Even a failed adapter can echo a raw
     // credential there; the contract's required text field receives no data.
-    yield* runner.events.pipe(Stream.runForEach((event) => log.transact((append) => Effect.gen(function* () {
-      const snapshot = yield* views.snapshot;
-      const agent = snapshot.agents[event.agentId];
-      if (agent === undefined || !["starting", "working", "idle", "paused"].includes(agent.state._tag)) return;
-      if (event._tag !== "exited") {
+    const handleRunnerEvent = (rawEvent: unknown) => Effect.gen(function* () {
+      // A bad adapter event cannot reach the views or the writer, and its
+      // validation error must not expose any of the input it describes.
+      const decoded = yield* Schema.decodeUnknownEffect(RunnerEvent)(rawEvent).pipe(Effect.result);
+      if (decoded._tag === "Failure") return yield* Effect.logWarning("runner event dropped: malformed");
+      const event = decoded.success;
+      yield* log.transact((append) => Effect.gen(function* () {
+        const snapshot = yield* views.snapshot;
+        const agent = snapshot.agents[event.agentId];
+        if (agent === undefined || !["starting", "working", "idle", "paused"].includes(agent.state._tag)) return;
         const tokens = yield* sql<{ agent_id: string }>`
           SELECT agent_id FROM agent_tokens WHERE token_hash = ${event.incarnation}
           AND agent_id = ${event.agentId} AND revoked_at IS NULL`;
         if (tokens.length === 0) return;
-        const events = event._tag === "permissionRequested" ? permissionRequested(snapshot, event) : [
-          { _tag: "TurnEnded" as const, agentId: event.agentId, compact: false },
-          ...passAtTurnEnd(snapshot, event.agentId),
-        ];
-        if (events.length > 0) yield* append({ _tag: "owner" }, freshRequest(), randomUUID(), events, {});
-        return;
-      }
-      yield* append({ _tag: "owner" }, freshRequest(), randomUUID(), [{
-        _tag: "AgentCrashed", agentId: event.agentId, exitCode: event.exitCode, signal: event.signal, stderr: "",
-      }, ...moveHeld(snapshot, [event.agentId])], { revokeAgentTokens: [event.agentId] });
-    })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))), Effect.forkScoped);
+        if (event._tag !== "exited") {
+          const events = event._tag === "permissionRequested" ? yield* permissionRequested(snapshot, event) : [
+            { _tag: "TurnEnded" as const, agentId: event.agentId, compact: false },
+            ...passAtTurnEnd(snapshot, event.agentId),
+          ];
+          if (events.length > 0) yield* append({ _tag: "owner" }, freshRequest(), randomUUID(), events, {});
+          return;
+        }
+        yield* append({ _tag: "owner" }, freshRequest(), randomUUID(), [{
+          _tag: "AgentCrashed", agentId: event.agentId, exitCode: event.exitCode, signal: event.signal, stderr: "",
+        }, ...moveHeld(snapshot, [event.agentId])], { revokeAgentTokens: [event.agentId] });
+      }));
+    // A failed event is isolated, but scope closure must still stop the stream.
+    }).pipe(Effect.catchCause((cause) => Cause.hasInterrupts(cause)
+      ? Effect.failCause(cause)
+      : Effect.logWarning("runner event dropped: processing failed")));
+    yield* runner.events.pipe(Stream.runForEach(handleRunnerEvent), Effect.forkScoped);
 
     return CommandHandler.of({
       execute: (credential, name, rawPayload) => Effect.gen(function* () {
@@ -169,6 +181,9 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
           });
           const { requestId: id, ...body } = payload;
           const requestId = id as RequestId;
+          // Identifiers bypass event-text redaction. Reject a secret-bearing
+          // id before looking up a receipt or planning even a refusal event.
+          if ((yield* log.redactText(requestId)) !== requestId) return yield* refused();
           const bodyHash = sha256Hex(canonical(name === "accounts set-secret"
             ? { command: name, accountId: payload.accountId, nonce: payload.nonce }
             : { command: name, payload: body }));

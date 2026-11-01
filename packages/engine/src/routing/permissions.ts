@@ -1,4 +1,4 @@
-import { PermissionLevel, PermissionRequestId, type Event } from "@shepherd/contracts";
+import { PermissionLevel, type Event } from "@shepherd/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
@@ -10,17 +10,21 @@ import { answerQuestion } from "./questions.ts";
 
 export const permissionRequested = (
   snapshot: Snapshot, event: Extract<RunnerEvent, { _tag: "permissionRequested" }>,
-): ReadonlyArray<Event> => {
+): Effect.Effect<ReadonlyArray<Event>> => Effect.gen(function* () {
   // A repeated notification must never reopen or overwrite a subject.
-  if (snapshot.requests[event.permissionRequestId] !== undefined) return [];
-  const permissionRequestId = Schema.decodeUnknownSync(PermissionRequestId)(event.permissionRequestId);
+  const existing = snapshot.requests[event.permissionRequestId];
+  if (existing !== undefined) {
+    if (existing.agentId !== event.agentId) yield* Effect.logWarning("permission request id collision");
+    return [];
+  }
+  const permissionRequestId = event.permissionRequestId;
   const holder = event.settingsWrite ? { _tag: "owner" as const } : holderAbove(snapshot, event.agentId);
   const deliveryId = freshDelivery();
   return [{
     _tag: "PermissionRequested", agentId: event.agentId, permissionRequestId, holder, deliveryId,
     toolCallId: event.toolCallId, description: event.description, options: event.options, settingsWrite: event.settingsWrite,
   }, ...routedDelivery(event.agentId, holder, deliveryId, { _tag: "permission", id: permissionRequestId }, event.description)];
-};
+});
 
 // Called only inside CommandHandler's writer transaction. The runner effect
 // is suspended until after the answer and its receipt have committed.
