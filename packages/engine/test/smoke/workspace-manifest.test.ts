@@ -289,12 +289,12 @@ describe("herdr-plugin.toml (task 1f, criterion 1.4's input)", () => {
   const topLevel = sections[0]?.body ?? "";
   const command = /^command\s*=\s*\[\s*"\.\/bin\/shephrd"\s*,\s*"serve"\s*,\s*"--detach"\s*\]\s*$/m;
 
-  it("identifies the plugin as shephrd 0.0.1 for Herdr 0.8.2 or newer on macOS and Linux (breaks if a top-level field is missing or differs)", () => {
+  it("identifies the plugin as shephrd 0.0.1 for Herdr 0.8.2 or newer on Linux only (breaks if a top-level field is missing or differs)", () => {
     expect(topLevel).toMatch(/^id\s*=\s*"shephrd"\s*$/m);
     expect(topLevel).toMatch(/^name\s*=\s*"Shephrd"\s*$/m);
     expect(topLevel).toMatch(/^version\s*=\s*"0\.0\.1"\s*$/m);
     expect(topLevel).toMatch(/^min_herdr_version\s*=\s*"0\.8\.2"\s*$/m);
-    expect(topLevel).toMatch(/^platforms\s*=\s*\[\s*"macos"\s*,\s*"linux"\s*\]\s*$/m);
+    expect(topLevel).toMatch(/^platforms\s*=\s*\[\s*"linux"\s*\]\s*$/m);
   });
 
   it("starts the engine with `./bin/shephrd serve --detach` when Herdr starts (breaks if the [[startup]] entry is missing or runs another command)", () => {

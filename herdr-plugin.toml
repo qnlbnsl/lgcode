@@ -2,7 +2,7 @@ id = "shephrd"
 name = "Shephrd"
 version = "0.0.1"
 min_herdr_version = "0.8.2"
-platforms = ["macos", "linux"]
+platforms = ["linux"]
 
 [[startup]]
 command = ["./bin/shephrd", "serve", "--detach"]
