@@ -2460,6 +2460,21 @@ assign with the builder's change to the scripted step.
 Why it matters: the older assertion must not force the fake agent to retain
 the invalid wire protocol described in issue 160.
 
+## 176. A blocking wait reports success when it needs its caller to answer
+
+Found: 2026-11-01, while applying engine-lead's ruling in board post 1120.
+State: open for the unit 7b builder's fix round.
+
+What happens: `packages/cli/src/commands/wait.ts` returns exit code 0 for a
+`request-held` reply. All four W02 cases previously expected that code.
+What should happen: decision row 26 requires exit code 2 when a permission
+request or question is held by or routed to the caller of a blocking wait.
+The W02 cases now require 2 for both subjects, whether already held or routed
+after the wait opens. They retain the held-request message and the
+`WaitCancelled` reason `request held` assertions.
+Why it matters: exit code 0 tells a caller that every member has settled,
+although a member still needs the caller's answer.
+
 ## 179. The frozen wait test "already held" races the owner moving the question
 
 Found: 2026-11-01, while building unit 7b's command-line tool.
@@ -2478,12 +2493,14 @@ What should happen: the test should make the wait deterministic, for example by
 holding the parent's turn open until the wait has been answered, or the engine
 should state which outcome a wait after the move must have.
 Why it matters: the criterion cannot be observed reliably, and the command-line
-tool's exit code 0 with the "request held" message is untested by a stable test.
+tool's held-request outcome is untested by a stable test.
 
 Fix: the W02 cases start the parent with a long-running scripted turn and wait
 for its `DeliveryAccepted` before routing a request. The parent remains busy
-when the blocking wait opens. The assertions still require exit code 0, the
-held-request message, and `WaitCancelled` with reason `request held`.
+when the blocking wait opens. Following the lead's ruling in board post 1120,
+the assertions require exit code 2 from decision row 26, the held-request
+message, and `WaitCancelled` with reason `request held`. The remaining product
+exit-code defect is tracked in issue 176.
 
 ## 180. The frozen test F02 cannot pass: its own setup emits an account event
 

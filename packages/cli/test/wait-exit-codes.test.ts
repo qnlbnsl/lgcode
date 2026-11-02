@@ -168,7 +168,9 @@ for (const subject of ["permission", "question"] as const) {
       }
       const exit = yield* Effect.promise(() => finishCli(child));
       expect(exit.signal).toBeNull();
-      expect(exit.code).toBe(0);
+      // Decision row 26: waiting on the caller exits 2, even though the
+      // blocking wait was successfully cancelled instead of deadlocking.
+      expect(exit.code).toBe(2);
       expect(`${child.stdout()}${child.stderr()}`).toMatch(/request.held|holding|permission|question/i);
       const events = yield* finishWindow(context.owner, beforeWait, context.parent);
       expect(events.some((envelope) => envelope.event._tag === "WaitCancelled" && envelope.event.reason === "request held")).toBe(true);
