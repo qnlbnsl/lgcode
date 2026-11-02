@@ -1,4 +1,3 @@
-import * as EffectClock from "effect/Clock"
 import * as Effect from "effect/Effect"
 import { ClientError } from "@shepherd/client"
 
@@ -45,16 +44,20 @@ const deadlineMessage = "the Shepherd service was still recovering after 60 seco
 // The same policy as `retryRecovering`, as an Effect: interrupting the
 // returned Effect interrupts the attempt in flight and the wait between
 // attempts. The attempt is run again as given, so build a retried command's
-// payload outside it when every try must carry the same request id.
-export const retryRecoveringEffect = <A, E, R>(attempt: Effect.Effect<A, E, R>): Effect.Effect<A, E | ClientError, R> =>
-  Effect.gen(function* () {
-    const deadline = (yield* EffectClock.currentTimeMillis) + recoveryDeadline
+// payload outside it when every try must carry the same request id. The clock
+// is read when the Effect runs, so one installed on `realClock` applies.
+export const retryRecoveringEffect = <A, E, R>(
+  attempt: Effect.Effect<A, E, R>, clock: Clock = realClock
+): Effect.Effect<A, E | ClientError, R> =>
+  Effect.suspend(() => {
+    const deadline = clock.now() + recoveryDeadline
     const loop = (delay: number): Effect.Effect<A, E | ClientError, R> =>
-      attempt.pipe(Effect.catchIf(isRecovering, () => Effect.gen(function* () {
-        const remaining = deadline - (yield* EffectClock.currentTimeMillis)
-        if (remaining <= 0) return yield* Effect.fail(new ClientError({ message: deadlineMessage }))
-        yield* Effect.sleep(Math.min(delay, remaining))
-        return yield* loop(Math.min(delay * 2, longestDelay))
+      attempt.pipe(Effect.catchIf(isRecovering, () => Effect.suspend(() => {
+        const remaining = deadline - clock.now()
+        if (remaining <= 0) return Effect.fail(new ClientError({ message: deadlineMessage }))
+        return Effect.promise(() => clock.sleep(Math.min(delay, remaining))).pipe(
+          Effect.andThen(() => loop(Math.min(delay * 2, longestDelay)))
+        )
       }) as Effect.Effect<A, E | ClientError, R>))
-    return yield* loop(firstDelay)
+    return loop(firstDelay)
   })
