@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import {
   WaitId,
   type AgentId, type Event, type EventEnvelope, type WaitMember,
-} from "@shepherd/contracts";
+} from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as PubSub from "effect/PubSub";
 import * as Schema from "effect/Schema";

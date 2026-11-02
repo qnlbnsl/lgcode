@@ -7,18 +7,18 @@ updated: 2026-11-01
 epic: shepherd-foundation
 ---
 
-# Build the Shepherd engine
+# Build the Shephrd engine
 
 ## Overview
 
-This plan builds the first of Shepherd's four pieces: the engine. The engine
+This plan builds the first of Shephrd's four pieces: the engine. The engine
 is a background program that the Herdr plugin starts. It runs coding agents
 (Claude Code, Codex, Gemini CLI and Cursor) through the Agent Client Protocol
 (ACP), the shared protocol that lets one program drive many different coding
 agents. It keeps a complete, numbered record of everything the agents do,
 and it offers one authenticated connection through which agents and the
 owner start, prompt, watch, approve, wait on, stop and resume agents. Today
-none of this exists: the Shepherd repository holds only documents, one file
+none of this exists: the Shephrd repository holds only documents, one file
 copied from T3 Code, and the approved design in
 `docs/specs/2026-11-01-engine-design.md`.
 
@@ -37,30 +37,30 @@ Effect. T3's ACP client, its database code, its account settings and its test
 helpers can be copied with credit. Three parts cannot: T3's agent runner is
 tied to 28 other T3 modules, its event store is tied to T3's own data types,
 and its login tables appear to store credentials in plain text, which
-Shepherd's security rules forbid. Shepherd writes those three itself.
+Shephrd's security rules forbid. Shephrd writes those three itself.
 
 Four independent reviewers checked this plan twice. The first round found
 gaps in the design itself; the second checked the fixes and found more,
 mostly in one area: what happens when the engine restarts while agents are
 working. The owner chose to keep restarts fully automatic. After a restart,
-Shepherd reloads every agent's conversation, re-sends any message that had
+Shephrd reloads every agent's conversation, re-sends any message that had
 not arrived, and tells agents that were mid-task to carry on. This version
 makes that safe. A message the agent already received is recognised by its
 id and not sent twice. Pauses and their timers survive the restart. Agents
-cannot use Shepherd's tools until recovery is finished. The engine's private
+cannot use Shephrd's tools until recovery is finished. The engine's private
 socket file is cleared after a crash, so the engine can start again.
 
-The second round also closed a security hole. If an agent ran Shepherd's
+The second round also closed a security hole. If an agent ran Shephrd's
 command-line tool without its own token, the tool would quietly have acted
 as the owner. Now it refuses, and it checks that the socket it talks to sits
-in Shepherd's private folder before sending any credential. Smaller fixes
+in Shephrd's private folder before sending any credential. Smaller fixes
 harden the permission rules, the removal of secrets from the record, and the
 wrapping of one agent's text before another agent reads it. The design
 document's last section lists every change.
 
 A third and final review round found more problems of the same kind,
 including one more way an agent could act as the owner by accident: if its
-shell dropped both of Shepherd's variables. The fix is that the engine
+shell dropped both of Shephrd's variables. The fix is that the engine
 refuses the owner's credential to any command started from inside an
 agent's process tree. Those round-3 fixes are written into this plan but
 have not been reviewed again, because three rounds is the limit. They are
@@ -80,38 +80,38 @@ The owner has already decided three things on 2026-11-01:
   commit on an `engine` branch, so units can be built in parallel and any
   unit can be undone. Agents push their branches to `qnlbnsl/sheprd` only,
   and finished work merges there through pull requests (row 17).
-- **Agents may read Shepherd's files, for now.** Agents run as the owner's
-  own user, so any agent can read Shepherd's private folder, including the
-  owner's credential. Shepherd's permission rules stop mistakes, not a
+- **Agents may read Shephrd's files, for now.** Agents run as the owner's
+  own user, so any agent can read Shephrd's private folder, including the
+  owner's credential. Shephrd's permission rules stop mistakes, not a
   deliberately hostile agent, and SECURITY.md now says so. Where a harness
-  allows it, Shepherd adds a rule forbidding its agents to read that folder.
-  The real fix, running Shepherd as its own user, is listed as agreed work
+  allows it, Shephrd adds a rule forbidding its agents to read that folder.
+  The real fix, running Shephrd as its own user, is listed as agreed work
   for before remote access is built.
 - **Restarts are fully automatic,** as described above.
 
 Four steps need the owner during the build, in this order. Each runs in
-the main Shepherd folder, `/home/qnlbnsl/projects/personal/herdr-synapse/sheprd`,
+the main Shephrd folder, `/home/qnlbnsl/projects/personal/herdr-synapse/sheprd`,
 which is switched to the `engine` branch after the first commit, so it
 always holds every finished unit:
 
 1. **Install Node.js 26** with `nvm install 26`. The host does not have it
    yet, and nothing can be built without it.
 2. **Link the plugin in Herdr,** at the end of the first unit, by running
-   `herdr plugin link` on the Shepherd folder and then
-   `herdr plugin action list --plugin shepherd`. This checks that Herdr
-   accepts the plugin. Once linked, Herdr runs `shepherd serve --detach`
+   `herdr plugin link` on the Shephrd folder and then
+   `herdr plugin action list --plugin shephrd`. This checks that Herdr
+   accepts the plugin. Once linked, Herdr runs `shephrd serve --detach`
    every time it starts. Until the engine is built, that command only prints
    "not built yet" and exits. Once the connection is built (unit 7b), every
-   Herdr start runs the real engine against Shepherd's real private folder,
-   `~/.local/state/shepherd`; removing the link with Herdr's plugin command
+   Herdr start runs the real engine against Shephrd's real private folder,
+   `~/.local/state/shephrd`; removing the link with Herdr's plugin command
    stops that. Declining only delays this check; the build continues.
 3. **Record the first sample sessions** before the agent runner is built, by
-   running `pnpm record-fixtures` in the Shepherd folder.
+   running `pnpm record-fixtures` in the Shephrd folder.
    - It runs one tiny prompt on each harness that is installed and signed in.
      Claude Code and Codex are required; Gemini CLI and Cursor are recorded
      only if they are installed, and are otherwise listed as skipped.
    - The real agents run in a fresh empty folder under `/tmp`, in read-only
-     mode, because Shepherd's own permission rules do not exist yet.
+     mode, because Shephrd's own permission rules do not exist yet.
    - It spends a little usage on each account it uses.
    - The recordings, with secrets removed, are saved in the repository under
      `packages/testing/fixtures/`, so the tests can replay them.
@@ -136,18 +136,18 @@ always holds every finished unit:
   Unix socket inside a folder only the owner's user can open, and every
   connection must present a credential. The web page and phone connection,
   which needs a network port, comes with piece 2.
-- **Agents never act as the owner by accident.** Shepherd's command-line
+- **Agents never act as the owner by accident.** Shephrd's command-line
   tool uses the owner's credential only when no agent variables are set, and
   it checks the socket's folder before sending anything.
 - **Agents get only what they need.** Each agent gets its own token, which
   stops working when the agent stops, crashes or the engine restarts. It
   gets a short, fixed list of environment variables, never Herdr's, and no
-  file or terminal access through Shepherd. Its own harness's sandbox stays
+  file or terminal access through Shephrd. Its own harness's sandbox stays
   in charge. Owner-only commands are not offered to agents as tools.
 - **The permission ceiling covers more than the starting mode.** A child must
   work inside its parent's folder or a worktree of the same repository, and
-  never in the owner's home folder itself, Shepherd's private folder or
-  Shepherd's own install. An answer that would save a permanent permission
+  never in the owner's home folder itself, Shephrd's private folder or
+  Shephrd's own install. An answer that would save a permanent permission
   rule always goes to the owner.
 - **Rights pass up when a parent is stuck.** If a lead crashes or pauses, its
   workers' requests and the right to manage them pass to the nearest agent
@@ -155,7 +155,7 @@ always holds every finished unit:
 - **Restarts recover automatically,** in a fixed order that is tested by
   killing the engine in the middle of a turn.
 - **The adapters are pinned.** The Claude Code and Codex ACP adapters are
-  installed at exact versions with Shepherd, and their full paths are saved.
+  installed at exact versions with Shephrd, and their full paths are saved.
   Starting an agent never downloads code.
 - **Commits go** on `master` for the first commit and on the `engine`
   branch for each unit. Branches are pushed to `qnlbnsl/sheprd` only, and
@@ -175,7 +175,7 @@ no later unit edits the shared install files. It also gets the Herdr plugin
 manifest and a launcher that finds Node.js 26 through nvm. The risk is that
 Node.js 26, Effect 4.0.5 and Node.js's own database module do not work
 together; a first test opens a database on day one to catch that. When this
-is done, `pnpm check` passes on the empty project and Herdr lists Shepherd's
+is done, `pnpm check` passes on the empty project and Herdr lists Shephrd's
 action.
 
 ### T3 Code's ACP client and helpers, copied with credit
@@ -185,9 +185,9 @@ T3 Code's ACP client, its database client, its account settings, the Codex
 test helpers are copied into `third_party/t3code/`. Each comes with its
 licence, its source commit and a list of changes, and each file is read for
 security problems. Where a copied file uses another T3 module, a small
-Shepherd replacement takes its place, and the change is recorded. The risk is
+Shephrd replacement takes its place, and the change is recorded. The risk is
 a hidden dependency on something T3 sets up elsewhere; T3's own tests for the
-copied code catch that. When this is done, those tests pass in Shepherd's
+copied code catch that. When this is done, those tests pass in Shephrd's
 repository and a script confirms every copied file is credited.
 
 ### One shared definition of every command, event and state
@@ -227,22 +227,22 @@ rule has its own test.
 ### Agents that run, report and recover
 
 The runner starts each harness's ACP adapter with the right account, a fresh
-token, a short fixed environment and Shepherd's tool server. It turns
+token, a short fixed environment and Shephrd's tool server. It turns
 everything the agent streams into events, holds the agent while a permission
 request is open, and sends `/compact` where the harness offers it. Accounts
 are named or picked automatically, and a paused account comes back when its
 usage resets. After a crash, the runner reports and does not restart. After
-a Shepherd restart, it recovers every agent automatically in a fixed order.
+a Shephrd restart, it recovers every agent automatically in a fixed order.
 The risk is that each adapter behaves slightly differently; recorded real
 sessions are replayed in tests to catch that, and the restart order is
 tested by killing the engine in the middle of a turn.
 
 ### One door for agents and the owner
 
-The engine listens on a Unix socket in Shepherd's private folder, and every
+The engine listens on a Unix socket in Shephrd's private folder, and every
 connection must present a credential before anything else. Revoking a
-credential closes its open connections. The `shepherd` command-line tool and
-the `shepherd mcp` tool server, which offers Shepherd's commands to agents as
+credential closes its open connections. The `shephrd` command-line tool and
+the `shephrd mcp` tool server, which offers Shephrd's commands to agents as
 tools through the Model Context Protocol (MCP), are thin clients of that
 connection. Herdr starts the service once at startup. The service refuses to
 start twice, clears its socket file after a crash, and can be started again
@@ -285,7 +285,7 @@ Nothing is deployed and nothing is irreversible.
 
 <details><summary><b>Implementation details (gates 2, 3, 5, 6, 8)</b></summary>
 
-Conventions for every unit. Paths are relative to the Shepherd repository
+Conventions for every unit. Paths are relative to the Shephrd repository
 root. "T3" anchors refer to T3 Code at commit
 `6fc9144a60c4a5f45089316ddd5f7371bafd3bf2` (scouting checkout:
 `/tmp/claude-1000/-home-qnlbnsl-projects-personal-herdr-synapse/1c6c319c-95eb-4ab1-af54-3ec9498592c9/scratchpad/src/t3code`;
@@ -297,9 +297,9 @@ one with `pnpm vitest run <path>`. Abbreviations: RPC (remote procedure call,
 one request and its reply), WAL (SQLite's write-ahead log), NDJSON (one JSON
 object per line), QA (a manual check on a real host), PID (process id).
 "Rows" are decision-log rows in `decisions.md`. The state folder is
-`$SHEPHERD_HOME`, default `$XDG_STATE_HOME/shepherd`, else
-`~/.local/state/shepherd` (row 21). Tests always set their own
-`SHEPHERD_HOME`, created with `mkdtemp` under `/tmp` (row 54). Every unit
+`$SHEPHRD_HOME`, default `$XDG_STATE_HOME/shephrd`, else
+`~/.local/state/shephrd` (row 21). Tests always set their own
+`SHEPHRD_HOME`, created with `mkdtemp` under `/tmp` (row 54). Every unit
 records any problem it finds in `docs/issues.md` in the same change
 (AGENTS.md rule 3); the lead marks features built in `docs/features.md`
 (row 63). Commits: one per finished unit on the `engine` branch, with
@@ -317,7 +317,7 @@ reports the disagreement.
 
 Purpose: give every later unit a workspace, a toolchain, its dependencies and
 one command that proves the repository is healthy, and let Herdr start
-Shepherd.
+Shephrd.
 
 **Done when:**
 
@@ -326,8 +326,8 @@ Shepherd.
 | 1.1 | Node.js 26 is selected and a clean install succeeds | Command: `nvm use && node --version` prints `v26.`; `pnpm install --frozen-lockfile` exits 0 |
 | 1.2 | `pnpm check` runs `pnpm -r typecheck`, `vitest run` and `scripts/check-credits.sh` and exits 0 | Command: `pnpm check` exit code 0 |
 | 1.3 | Node.js 26's SQLite module opens a database under Effect 4.0.5 | Test id: `packages/engine/test/smoke/node-sqlite.test.ts` |
-| 1.4 | Herdr accepts the manifest and lists its action | On-device step (owner, end of unit 1): `herdr plugin link /home/qnlbnsl/projects/personal/herdr-synapse/sheprd`, then `herdr plugin action list --plugin shepherd` lists `serve` (commands from https://herdr.dev/tui/docs/plugins/, read 2026-11-01) |
-| 1.5 | The launcher finds Node.js 26 without `node` on the path | Command: `env -i HOME=$HOME NVM_DIR=$HOME/.nvm ./bin/shepherd serve --detach` runs the stub entry, prints `not built yet` and exits 0; with `NVM_DIR` pointing at an empty folder it exits 1 with an install hint |
+| 1.4 | Herdr accepts the manifest and lists its action | On-device step (owner, end of unit 1): `herdr plugin link /home/qnlbnsl/projects/personal/herdr-synapse/sheprd`, then `herdr plugin action list --plugin shephrd` lists `serve` (commands from https://herdr.dev/tui/docs/plugins/, read 2026-11-01) |
+| 1.5 | The launcher finds Node.js 26 without `node` on the path | Command: `env -i HOME=$HOME NVM_DIR=$HOME/.nvm ./bin/shephrd serve --detach` runs the stub entry, prints `not built yet` and exits 0; with `NVM_DIR` pointing at an empty folder it exits 1 with an install hint |
 | 1.6 | Install scripts of dependencies do not run unless listed (row 77) | Command: `grep -n 'allowBuilds\|strictDepBuilds' pnpm-workspace.yaml` shows the list and `strictDepBuilds: true`, which makes pnpm fail on an unlisted build script; `pnpm install` output names no unlisted build script |
 | 1.7 | Every dependency later units need is declared, and the adapters are pinned exactly | Command: `grep -n '"@agentclientprotocol/claude-agent-acp": "0.99.1"' packages/engine/package.json` and the same for `"@agentclientprotocol/codex-acp": "2.5.0"`, plus `grep` for `ws`, `effect` `4.0.5` and every dependency named in task 1d; `pnpm run` lists `check`, `record-fixtures`, `live-check`; re-run at the end of unit 2 (row 71) |
 
@@ -340,8 +340,8 @@ Shepherd.
 | 1c | `vitest.config.ts` with workspace projects, T3's test timeouts and environment scrub | Target `vitest.config.ts`; pattern T3 `vite.config.ts` lines 98-130 |
 | 1d | Packages `packages/contracts`, `packages/client`, `packages/engine`, `packages/cli`, `packages/mcp`, `packages/testing`, each with `package.json` exporting `./src/*.ts`, its full dependency list (row 59: engine pins both adapters exactly; client and testing depend on `ws`; cli depends on engine, client and mcp; engine has dev dependencies on client and testing) a placeholder `src/index.ts`, and a `tsconfig.json` (rows 23, 59, 71); `packages/testing` also depends on `packages/client` | Target `packages/*/package.json`; pattern T3 package `exports` (Scout A item 9) |
 | 1e | SQLite smoke test (criterion 1.3) | Target `packages/engine/test/smoke/node-sqlite.test.ts`; pattern T3 `packages/shared/src/nodeSqliteClient.ts:layer` |
-| 1f | `herdr-plugin.toml`: `id = "shepherd"`, `name = "Shepherd"`, `version = "0.0.1"`, `min_herdr_version = "0.8.2"`, `platforms = ["macos", "linux"]`, `[[startup]] command = ["./bin/shepherd", "serve", "--detach"]`, `[[actions]]` `id = "serve"`, `contexts = ["global"]` with the same command | Target `herdr-plugin.toml`; pattern Synapse `herdr-plugin.toml` lines 1-9 (Scout B Part A items 1, 3) |
-| 1g | `bin/shepherd`: POSIX shell launcher choosing Node.js per row 22 and running the absolute path of `packages/cli/src/bin.ts`; while that file is absent the launcher runs `bin/stub-entry.ts`, which prints `not built yet` and exits 0 (row 59) | Target `bin/shepherd`, `bin/stub-entry.ts`; pattern Synapse `bin/herdr-synapse` |
+| 1f | `herdr-plugin.toml`: `id = "shephrd"`, `name = "Shephrd"`, `version = "0.0.1"`, `min_herdr_version = "0.8.2"`, `platforms = ["linux"]` (Linux only; macOS later, row 78), `[[startup]] command = ["./bin/shephrd", "serve", "--detach"]`, `[[actions]]` `id = "serve"`, `contexts = ["global"]` with the same command | Target `herdr-plugin.toml`; pattern Synapse `herdr-plugin.toml` lines 1-9 (Scout B Part A items 1, 3) |
+| 1g | `bin/shephrd`: POSIX shell launcher choosing Node.js per row 22 and running the absolute path of `packages/cli/src/bin.ts`; while that file is absent the launcher runs `bin/stub-entry.ts`, which prints `not built yet` and exits 0 (row 59) | Target `bin/shephrd`, `bin/stub-entry.ts`; pattern Synapse `bin/herdr-synapse` |
 | 1h | Change the existing `third_party/t3code/mergeMessage.test.ts` import from `vite-plus/test` to `vitest` and record it in `third_party/t3code/README.md` | Existing `third_party/t3code/mergeMessage.test.ts` line 1 |
 | 1i | `.gitignore`: `node_modules/`, test state folders, `*.sqlite*` under test folders | Target `.gitignore` |
 
@@ -382,10 +382,10 @@ copied code for security problems.
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 2a | Copy `packages/effect-acp` whole (src, `_generated`, `scripts/generate.ts`, tests, `test/fixtures/acp-mock-peer.ts`) to `third_party/t3code/effect-acp/` as `@shepherd/t3-effect-acp`; fix the `extends` path; its dependencies were declared in unit 1 | T3 `packages/effect-acp/src/client.ts:layerChildProcess` (1392), `src/agent.ts:AcpAgent` (34), `layerStdio` (557) (Scout A item 1) |
-| 2b | Copy `packages/shared/src/nodeSqliteClient.ts` and its test to `third_party/t3code/node-sqlite/` as `@shepherd/t3-node-sqlite` | T3 `packages/shared/src/nodeSqliteClient.ts:layer` (Scout A item 4) |
-| 2c | Copy `providerInstance.ts`, `secretReference.ts`, `TrimmedNonEmptyString` from `baseSchemas.ts`, `pathExpansion.ts`, `instanceEnvironment.ts`, `ClaudeHome.ts`, `CodexHomeLayout.ts` and its test, and `apps/server/src/provider/CodexManagedHome.ts` to `third_party/t3code/provider-instance/` as `@shepherd/t3-provider-instance`; replace `@t3tools/shared/HostProcess` with a local `HostProcess.ts` (`HomeDirectory`, `Platform`); replace `CodexSettings`, `ClaudeSettings` and `ProviderDriverKind` with a local `{ homePath, shadowHomePath }` type and a local brand | T3 `packages/contracts/src/providerInstance.ts:ProviderInstanceConfig`; `apps/server/src/provider/Drivers/CodexHomeLayout.ts:materializeCodexShadowHome` (236); `ClaudeHome.ts:makeClaudeEnvironment` (Scout A items 5, 6) |
-| 2d | Copy `packages/provider-testing/src/replayTranscript.ts` and `fakeCli.ts` to `third_party/t3code/provider-testing/` as `@shepherd/t3-provider-testing`; copy the replay schemas from T3 `packages/contracts/src/orchestrationV2.ts` lines 4176-4220 with their header type and `NonNegativeInt`; replace `HostProcess`; drop `TestProviderHost.ts` and `replayGate.ts` | T3 `packages/provider-testing/src/replayTranscript.ts:decodeProviderReplayNdjson`; `fakeCli.ts:writeFakeCli` (Scout A item 7) |
+| 2a | Copy `packages/effect-acp` whole (src, `_generated`, `scripts/generate.ts`, tests, `test/fixtures/acp-mock-peer.ts`) to `third_party/t3code/effect-acp/` as `@shephrd/t3-effect-acp`; fix the `extends` path; its dependencies were declared in unit 1 | T3 `packages/effect-acp/src/client.ts:layerChildProcess` (1392), `src/agent.ts:AcpAgent` (34), `layerStdio` (557) (Scout A item 1) |
+| 2b | Copy `packages/shared/src/nodeSqliteClient.ts` and its test to `third_party/t3code/node-sqlite/` as `@shephrd/t3-node-sqlite` | T3 `packages/shared/src/nodeSqliteClient.ts:layer` (Scout A item 4) |
+| 2c | Copy `providerInstance.ts`, `secretReference.ts`, `TrimmedNonEmptyString` from `baseSchemas.ts`, `pathExpansion.ts`, `instanceEnvironment.ts`, `ClaudeHome.ts`, `CodexHomeLayout.ts` and its test, and `apps/server/src/provider/CodexManagedHome.ts` to `third_party/t3code/provider-instance/` as `@shephrd/t3-provider-instance`; replace `@t3tools/shared/HostProcess` with a local `HostProcess.ts` (`HomeDirectory`, `Platform`); replace `CodexSettings`, `ClaudeSettings` and `ProviderDriverKind` with a local `{ homePath, shadowHomePath }` type and a local brand | T3 `packages/contracts/src/providerInstance.ts:ProviderInstanceConfig`; `apps/server/src/provider/Drivers/CodexHomeLayout.ts:materializeCodexShadowHome` (236); `ClaudeHome.ts:makeClaudeEnvironment` (Scout A items 5, 6) |
+| 2d | Copy `packages/provider-testing/src/replayTranscript.ts` and `fakeCli.ts` to `third_party/t3code/provider-testing/` as `@shephrd/t3-provider-testing`; copy the replay schemas from T3 `packages/contracts/src/orchestrationV2.ts` lines 4176-4220 with their header type and `NonNegativeInt`; replace `HostProcess`; drop `TestProviderHost.ts` and `replayGate.ts` | T3 `packages/provider-testing/src/replayTranscript.ts:decodeProviderReplayNdjson`; `fakeCli.ts:writeFakeCli` (Scout A item 7) |
 | 2e | Move `third_party/t3code/mergeMessage.ts` and its test into `third_party/t3code/source-control/` as a package | Existing `third_party/t3code/mergeMessage.ts:removeAgentCredits` |
 | 2f | Rewrite `third_party/t3code/README.md` as one table (package, file, T3 path, changes); extend `NOTICE` | Existing `third_party/t3code/README.md`, `NOTICE` |
 | 2g | `scripts/check-credits.sh` (criteria 2.5, 2.7) | Target `scripts/check-credits.sh` |
@@ -446,7 +446,7 @@ Displayed-state derivation (criterion 3.5, row 62), first match wins:
 | 3c | `src/stateMachine.ts`: lifecycle states with pause reasons and mid-turn flag, the derivation table, the command and event tables (rows 24, 53, 62) | Target `packages/contracts/src/stateMachine.ts`; spec "Changes after the plan review", "One state machine" |
 | 3d | `src/events.ts`: one tagged union: agent started (with optional first-prompt delivery), session opened (session reference as a tagged union, negotiated protocol version), prompt sent, thread item (text, plan, tool call, file change; replay flag), turn started, turn ended (compact flag), state changed, mode changed, mode refused, permission requested, permission answered, permission moved, permission cancelled, question asked, question answered, question moved, owner needed, wait opened, wait member resolved, wait satisfied, wait cancelled, delivery queued, delivery sent, delivery accepted, delivery requeued, delivery returned, delivery withdrawn, agent crashed, agent interrupted (with previous state), agent reload failed (reason), agent stopped, agent grouped, account changed, account needs sign-in, account available (cause), harness changed, device added, device revoked, command refused (rows 50-53) | Target `packages/contracts/src/events.ts`; pattern T3 `Migrations/055_OrchestrationV2.ts` columns (Scout A item 3) |
 | 3e | `src/commands.ts`: an `effect/rpc` `RpcGroup`, one `Rpc` per command, streaming `subscribe`, and the owner-only list (row 55) | Target `packages/contracts/src/commands.ts`; pattern T3 `apps/server/src/ws.ts` line 108 imports and `packages/effect-acp/src/rpc.ts` |
-| 3f | `src/accounts.ts` (Shepherd's own schema: harness, home path or secret reference, extra environment with the reference rule, enabled) and `src/harnesses.ts` (run mode, absolute adapter path and arguments, permission mapping, model and effort defaults, deny-read mechanism) (rows 33, 39, 61) | Target `packages/contracts/src/accounts.ts`, `harnesses.ts`; pattern `third_party/t3code/provider-instance/providerInstance.ts:ProviderInstanceConfig` |
+| 3f | `src/accounts.ts` (Shephrd's own schema: harness, home path or secret reference, extra environment with the reference rule, enabled) and `src/harnesses.ts` (run mode, absolute adapter path and arguments, permission mapping, model and effort defaults, deny-read mechanism) (rows 33, 39, 61) | Target `packages/contracts/src/accounts.ts`, `harnesses.ts`; pattern `third_party/t3code/provider-instance/providerInstance.ts:ProviderInstanceConfig` |
 
 **Design artifact:** none.
 
@@ -583,14 +583,14 @@ recovery.
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 6.1 | Starting an agent spawns its adapter from the harness's absolute path, at its stored real folder, in a new process group, with exactly the allow-listed environment plus the account's variables and exactly `SHEPHERD_SOCKET` and `SHEPHERD_TOKEN`; `session/new` gets the `shepherd mcp` server with `process.execPath` and an absolute script path; the session id and negotiated protocol version are recorded | Test id: `packages/engine/test/runner/start.test.ts` (the fake agent echoes its environment, its arguments and the `mcpServers` it received; asserts the exact set and no `HERDR_*`) |
+| 6.1 | Starting an agent spawns its adapter from the harness's absolute path, at its stored real folder, in a new process group, with exactly the allow-listed environment plus the account's variables and exactly `SHEPHRD_SOCKET` and `SHEPHRD_TOKEN`; `session/new` gets the `shephrd mcp` server with `process.execPath` and an absolute script path; the session id and negotiated protocol version are recorded | Test id: `packages/engine/test/runner/start.test.ts` (the fake agent echoes its environment, its arguments and the `mcpServers` it received; asserts the exact set and no `HERDR_*`) |
 | 6.2 | Streamed text, plans, tool calls and file changes become thread events in order; replays of real sessions produce the expected events | Test ids: `packages/engine/test/runner/stream.test.ts`; `packages/engine/test/runner/replay.test.ts` over `packages/testing/fixtures/*.ndjson` |
 | 6.3 | A permission request holds the agent until answered, then releases it with the chosen option | Test id: `packages/engine/test/runner/permission-hold.test.ts` |
 | 6.4 | `compact` sends the harness's compact command when advertised, else is refused with a reason | Test id: `packages/engine/test/runner/compact.test.ts` |
 | 6.5 | "Any account" picks per row 28, refuses when none is usable; a second Codex account gets a shadow home | Test ids: `packages/engine/test/accounts/pick.test.ts`, `packages/engine/test/accounts/codex-shadow-home.test.ts` |
 | 6.6 | A crash records the exit code and the last error lines with secrets removed; open requests are cancelled; the token is revoked; waiters get an immediate crash notice; the parent is told, or "owner needed" for an owner-started agent; no restart | Test id: `packages/engine/test/recovery/crash.test.ts` |
 | 6.7 | Restart follows rows 52 and 66, steps 3-10 in order: every token revoked; leftover groups stopped; blocking waits open at the crash cancelled; starting, working and idle agents interrupted with their previous state; paused agents stay paused and are not reloaded; open permission requests cancelled; questions kept with no "owner needed" written; reloadable agents reloaded with new tokens, each in one transaction that sets its state, commits the replay scan and queues its carry-on or re-sends, so no reloaded mid-turn agent counts as settled at step 9; a failed reload writes "agent reload failed"; replayed updates produce no thread events; overdue "account available" marked and sent once at step 10; holders re-evaluated once; every open wait re-checked; step 10 sends; an agent caught starting is started again; `resume` of a non-reloadable agent is refused and `resume --fresh` re-queues its accepted deliveries | Test id: `packages/engine/test/recovery/restart.test.ts` (with the fake runner; the socket half is criterion 7.10) |
-| 6.8 | The leftover sweep stops a recorded group only when boot id, start time, user and executable match and the group id is greater than 1 and not the engine's | Test id: `packages/engine/test/recovery/orphans.test.ts` (Linux; the macOS branch runs only on a macOS host and is otherwise reported as skipped) |
+| 6.8 | The leftover sweep stops a recorded group only when boot id, start time, user and executable match and the group id is greater than 1 and not the engine's | Test id: `packages/engine/test/recovery/orphans.test.ts` (Linux only in version 1; a macOS branch is a later port, decisions row 78) |
 | 6.9 | Signed-out and out-of-usage errors are told apart for each harness | Test id: `packages/engine/test/runner/classify-errors.test.ts` over `packages/testing/fixtures/errors/` |
 | 6.10 | Failure rule 5 and row 53: a signed-out account writes "account needs sign-in" and "owner needed" and pauses its agents; only `accounts mark-available` clears it; an out-of-usage agent pauses with its reset time, or writes "owner needed" if none; "account available" at the wall-clock reset time returns paused agents, releases their deliveries and gives mid-turn ones a carry-on; out of usage on a delivery requeues it and it is sent after the return; a restart while paused keeps the pause and re-arms the timer; a reset time passed during downtime fires at recovery | Test id: `packages/engine/test/accounts/pause-and-return.test.ts` (clock controlled with Effect's `TestClock`) |
 | 6.11 | A `harnesses` override changes the spawned path and arguments; the permission mapping is applied; the model, effort and mode reach the adapter through `session/set_config_option` (`model`, then re-read, then `thought_level`; `mode`), or the older methods only when negotiated; a value outside the harness's recorded options is refused at `start`; a value the adapter rejects writes "agent start failed" and the agent stops (row 70) | Test id: `packages/engine/test/runner/harness-settings.test.ts` |
@@ -608,7 +608,7 @@ recovery.
 | 6a.4 | Compact via advertised commands; mode changes checked against the ceiling; model and effort per row 60; deny-read rules per row 61 | Target `packages/engine/src/runner/compact.ts`, `modes.ts`, `config.ts`, `denyRead.ts`; pattern `third_party/t3code/effect-acp/src/_generated/schema-v1.gen.ts` lines 735-747 (`set_config_option` categories) |
 | 6b.1 | Accounts: the copied `mergeProviderInstanceEnvironment` over 8a's base environment (rows 33, 57), secrets from `secrets.json` (rows 19, 40), shadow home via `materializeCodexShadowHome`; picker and wall-clock "account available" timer (rows 28, 53) | Target `packages/engine/src/accounts/`; pattern `third_party/t3code/provider-instance/instanceEnvironment.ts:mergeProviderInstanceEnvironment`, `CodexHomeLayout.ts:materializeCodexShadowHome` |
 | 6c.1 | Crash handling per criterion 6.6 | Target `packages/engine/src/recovery/crash.ts`; pattern T3 `packages/provider-acp/src/server/stderr.ts` |
-| 6c.2 | Leftover sweep with the boot id (`/proc/sys/kernel/random/boot_id` on Linux, `sysctl kern.boottime` on macOS), start time, user and executable checks | Target `packages/engine/src/recovery/orphans.ts`; pattern T3 `packages/provider-core/src/server/processGroup.ts` (line 8, `process.kill(-pid)`) |
+| 6c.2 | Leftover sweep with the boot id (`/proc/sys/kernel/random/boot_id` on Linux, the macOS reader, `sysctl kern.boottime`, is a later port after version 1, decisions row 78), start time, user and executable checks | Target `packages/engine/src/recovery/orphans.ts`; pattern T3 `packages/provider-core/src/server/processGroup.ts` (line 8, `process.kill(-pid)`) |
 | 6c.3 | Error classification | Target `packages/engine/src/runner/classify.ts` |
 | 6d.1 | Restart recovery steps 3-10 per rows 52 and 66, the paused-agent return path, and `resume --fresh` | Target `packages/engine/src/recovery/restart.ts`; pattern `third_party/t3code/effect-acp/src/client.ts:loadSession` (91) |
 
@@ -625,7 +625,7 @@ recovery.
 | A real adapter's replay does not contain the envelope text | Medium | Then the engine cannot find the delivery id and re-sends; PB-A12 checks each real adapter, and the live check records the result. |
 | Recovery is the most intricate code | High | Its own unit (6d), sized high; criterion 6.7 and failure test 8.4 kill the service mid-turn. |
 
-**Verify:** criteria 6.1-6.14; environment QA: criterion 6.8 on Linux, and on macOS only if the owner has a Mac host.
+**Verify:** criteria 6.1-6.14; environment QA: criterion 6.8 on Linux; macOS is a later port after version 1 (decisions row 78).
 
 **Rollout detail:** rollout steps 7 and 8.
 
@@ -642,29 +642,29 @@ the client, command-line tool and tool server.
 | 7.1 | The state folder is created 0700 with umask 077; the service refuses to start if the folder is a symlink, not owned by its user or not 0700, or if the socket path exceeds 100 bytes; every regular file in it is 0600; the socket is the only listener and there is no TCP listener | Test id: `packages/engine/test/api/state-folder.test.ts` |
 | 7.2 | An upgrade without a credential, with a revoked one, or with a malformed one is refused before any RPC message; revoking a credential closes its open connections | Test id: `packages/engine/test/api/auth.test.ts` |
 | 7.3 | For every event type: an agent's `subscribe` returns only events of itself and its children; agent-less events are owner-only | Test id: `packages/engine/test/api/subscribe-visibility.test.ts` |
-| 7.4 | `shepherd serve --detach` starts one service; two services started at once against one `SHEPHERD_HOME` leave exactly one running and the other exits 0 reporting it; `serve --detach` detects a running service by connecting to the socket | Test id: `packages/cli/test/serve.test.ts` (two real processes) |
-| 7.5 | Every RPC is a `shepherd` subcommand; the MCP server offers exactly the agent-callable commands and none of the owner-only list | Test id: `packages/cli/test/parity.test.ts` (lists the contracts' `RpcGroup` and the owner-only list) |
-| 7.6 | `shepherd wait --block` exit codes per row 62's precedence; it returns at once when the caller already holds a request or question, and when one is routed to it; killing it writes "wait cancelled"; it creates no delivery | Test id: `packages/cli/test/wait-exit-codes.test.ts` |
+| 7.4 | `shephrd serve --detach` starts one service; two services started at once against one `SHEPHRD_HOME` leave exactly one running and the other exits 0 reporting it; `serve --detach` detects a running service by connecting to the socket | Test id: `packages/cli/test/serve.test.ts` (two real processes) |
+| 7.5 | Every RPC is a `shephrd` subcommand; the MCP server offers exactly the agent-callable commands and none of the owner-only list | Test id: `packages/cli/test/parity.test.ts` (lists the contracts' `RpcGroup` and the owner-only list) |
+| 7.6 | `shephrd wait --block` exit codes per row 62's precedence; it returns at once when the caller already holds a request or question, and when one is routed to it; killing it writes "wait cancelled"; it creates no delivery | Test id: `packages/cli/test/wait-exit-codes.test.ts` |
 | 7.7 | The command-line tool strips terminal control characters from thread text | Test id: `packages/cli/test/control-chars.test.ts` |
-| 7.8 | `shepherd mcp` gets its token from the environment only, never from its arguments; it connects on first use and retries "recovering" for up to 60 seconds | Test ids: `packages/mcp/test/token-source.test.ts`, `packages/mcp/test/lazy-connect.test.ts` |
-| 7.9 | The client uses the owner credential only when both Shepherd variables are unset, refuses when only one is set, and refuses a socket whose real path has a parent folder writable by others or not owned by the user or root, or that is not a socket owned by the user, before sending any credential; the engine refuses the owner credential from a caller inside a live adapter's process tree, including one with both variables stripped (row 64) | Test id: `packages/client/test/identity.test.ts`, `packages/engine/test/api/owner-ancestry.test.ts` |
+| 7.8 | `shephrd mcp` gets its token from the environment only, never from its arguments; it connects on first use and retries "recovering" for up to 60 seconds | Test ids: `packages/mcp/test/token-source.test.ts`, `packages/mcp/test/lazy-connect.test.ts` |
+| 7.9 | The client uses the owner credential only when both Shephrd variables are unset, refuses when only one is set, and refuses a socket whose real path has a parent folder writable by others or not owned by the user or root, or that is not a socket owned by the user, before sending any credential; the engine refuses the owner credential from a caller inside a live adapter's process tree, including one with both variables stripped (row 64) | Test id: `packages/client/test/identity.test.ts`, `packages/engine/test/api/owner-ancestry.test.ts` |
 | 7.10 | After `SIGKILL`, a restarted service removes the stale socket, listens, refuses every upgrade with HTTP 503 "recovering" until recovery step 9, then serves; a reloaded fake agent's tool call during its carry-on turn succeeds | Test id: `packages/engine/test/api/restart-socket.test.ts` |
 | 7.11 | The service's own log output contains no planted secret, token or credential | Test id: `packages/engine/test/api/service-log.test.ts` (plants secrets, runs a flow, greps stdout and stderr) |
-| 7.12 | `debug.compare-views` exists only when the service runs with `SHEPHERD_TEST_DEBUG=1`, is owner-only, and returns no difference after a flow | Test id: `packages/engine/test/api/compare-views-rpc.test.ts` |
-| 7.13 | `shepherd mcp` never uses the owner credential and exits before connecting when `SHEPHERD_TOKEN` is absent | Test id: `packages/mcp/test/no-owner.test.ts` |
-| 7.14 | `shepherd --version` prints the package version and exits 0 | Test id: `packages/cli/test/version.test.ts` |
-| 7.15 | The debug group and protocol logging stay off when their flags are set but `SHEPHERD_HOME` is outside the temporary folder, and the service logs when debug is on (row 74) | Test id: `packages/engine/test/api/debug-flags.test.ts` |
+| 7.12 | `debug.compare-views` exists only when the service runs with `SHEPHRD_TEST_DEBUG=1`, is owner-only, and returns no difference after a flow | Test id: `packages/engine/test/api/compare-views-rpc.test.ts` |
+| 7.13 | `shephrd mcp` never uses the owner credential and exits before connecting when `SHEPHRD_TOKEN` is absent | Test id: `packages/mcp/test/no-owner.test.ts` |
+| 7.14 | `shephrd --version` prints the package version and exits 0 | Test id: `packages/cli/test/version.test.ts` |
+| 7.15 | The debug group and protocol logging stay off when their flags are set but `SHEPHRD_HOME` is outside the temporary folder, and the service logs when debug is on (row 74) | Test id: `packages/engine/test/api/debug-flags.test.ts` |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
 | 7a.1 | Node.js HTTP server listening on `engine.sock`, WebSocket upgrade with the credential checked on upgrade, `RpcServer.makeProtocolWithHttpEffectWebsocket` per connection, revocation closing connections by racing each connection against an invalidation signal (row 48) | Target `packages/engine/src/api/server.ts`; pattern T3 `apps/server/src/ws.ts` lines 3293-3330, 3360-3367, 3374-3385 |
-| 7a.2 | Service entry: the lifetime lock with raw `DatabaseSync` (rows 52 step 1, 74), the owner-ancestry check on upgrade (row 64), stale socket removal and listen with "recovering" (step 2), then 6d's recovery, then serving; the service logger through the redactor; `SHEPHERD_TOKEN` removed from its own environment; the debug RPC group only under the test flag (rows 52, 57, 62) | Target `packages/engine/src/service.ts`, `packages/engine/src/lock.ts` |
+| 7a.2 | Service entry: the lifetime lock with raw `DatabaseSync` (rows 52 step 1, 74), the owner-ancestry check on upgrade (row 64), stale socket removal and listen with "recovering" (step 2), then 6d's recovery, then serving; the service logger through the redactor; `SHEPHRD_TOKEN` removed from its own environment; the debug RPC group only under the test flag (rows 52, 57, 62) | Target `packages/engine/src/service.ts`, `packages/engine/src/lock.ts` |
 | 7a.3 | `serve --detach`: connect to the socket first; if nothing answers, spawn `packages/engine/src/service.ts` detached and `unref` (row 71) | Target `packages/cli/src/serve.ts`; pattern Synapse `herdr_team/daemon.py` (double fork, lock; Scout B item 3) |
 | 7b.1 | `packages/client`: the RPC client over the socket using `NodeSocket.layerWebSocketConstructorWS` (`ws+unix:` address, `Authorization` header), the identity rule, the ancestor chain sent on upgrade, and the socket path checks (rows 54, 64, 71) | Target `packages/client/src/`; pattern `@effect/platform-node` 4.0.5 `Socket.ts` lines 896-917 (`makeWebSocket` headers) |
-| 7b.2 | `shepherd` command-line tool: one subcommand per RPC, `--version`, `wait --block`, `accounts set-secret` reading standard input without echo, control-character stripping; replaces unit 1's stub entry | Target `packages/cli/src/bin.ts`, `packages/cli/src/commands/` |
-| 7b.3 | `shepherd mcp`: stdio MCP server built with `effect/ai` `McpServer.layerStdio` (present in the Effect 4 source T3 vendors, `effect/src/ai/McpServer.ts:1437`; confirm in 4.0.5 first, and if absent stop and ask the owner), one tool per agent-callable command, lazy connect with retry (rows 15, 52, 55) | Target `packages/mcp/src/server.ts`; pattern T3 `apps/server/src/mcp/McpHttpServer.ts` (imports `effect/ai`) |
+| 7b.2 | `shephrd` command-line tool: one subcommand per RPC, `--version`, `wait --block`, `accounts set-secret` reading standard input without echo, control-character stripping; replaces unit 1's stub entry | Target `packages/cli/src/bin.ts`, `packages/cli/src/commands/` |
+| 7b.3 | `shephrd mcp`: stdio MCP server built with `effect/ai` `McpServer.layerStdio` (present in the Effect 4 source T3 vendors, `effect/src/ai/McpServer.ts:1437`; confirm in 4.0.5 first, and if absent stop and ask the owner), one tool per agent-callable command, lazy connect with retry (rows 15, 52, 55) | Target `packages/mcp/src/server.ts`; pattern T3 `apps/server/src/mcp/McpHttpServer.ts` (imports `effect/ai`) |
 
 **Design artifact:** none.
 
@@ -691,7 +691,7 @@ recorder; 8b the acceptance suite; 8c the live check.
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 8.1 | The fake agent follows a script (text, plan, tool call, file change, permission request with option kinds, question, mode change, config options, a Shepherd command called with its token, end turn, crash, out of usage, signed out, slow turn, print environment, replay history on load) over real ACP, in the protocol version the real adapters negotiate | Test id: `packages/testing/test/fake-agent.test.ts` |
+| 8.1 | The fake agent follows a script (text, plan, tool call, file change, permission request with option kinds, question, mode change, config options, a Shephrd command called with its token, end turn, crash, out of usage, signed out, slow turn, print environment, replay history on load) over real ACP, in the protocol version the real adapters negotiate | Test id: `packages/testing/test/fake-agent.test.ts` |
 | 8.2 | The fixture recorder runs in a fresh `/tmp` folder in read-only mode, scrubs secrets, and writes `packages/testing/fixtures/claude.ndjson` and `codex.ndjson`, plus `gemini.ndjson` and `cursor.ndjson` when those harnesses are installed (otherwise it prints them as skipped); each file's header records the adapter version and negotiated protocol version | Test id: `packages/testing/test/recorder-scrubs.test.ts`; on-device step: owner runs `pnpm record-fixtures` before unit 6a; it exits 0 and `ls packages/testing/fixtures` shows the files |
 | 8.3 | One acceptance test per capability, through the public socket only, with real tokens and the owner credential | Test ids: `packages/engine/test/acceptance/capability-01-start.test.ts` to `capability-12-accounts.test.ts` |
 | 8.4 | One acceptance test per failure rule; failure 2 runs the service as a child process, sends it `SIGKILL` mid-turn, restarts it, and checks no message is lost or repeated | Test ids: `packages/engine/test/acceptance/failure-1-crash.test.ts` to `failure-8-disk.test.ts` |
@@ -706,7 +706,7 @@ recorder; 8b the acceptance suite; 8c the live check.
 | 8a.2 | Replay player in T3's NDJSON format | Target `packages/testing/src/replay.ts`; pattern `third_party/t3code/provider-testing/replayTranscript.ts:decodeProviderReplayNdjson` |
 | 8a.3 | Harness defaults with absolute paths resolved at install (Claude `claude-agent-acp` 0.99.1 and Codex `codex-acp` 2.5.0 from `node_modules/.bin`, Gemini `gemini --acp`, Cursor `agent acp` from the owner's install) and the allow-listed base environment builder (rows 18, 33, 39, 57, 59); 6a and 6b reuse them | Target `packages/engine/src/runner/harnesses.ts`, `packages/engine/src/runner/baseEnvironment.ts`; Scout B items 5-7; planner's Cursor check |
 | 8a.4 | Fixture recorder `pnpm record-fixtures` (row 42), with scrubbing and the `/tmp` read-only folder; also writes `packages/testing/fixtures/errors/` (out-of-usage and signed-out samples per harness, taken from the adapters' source where a live sample cannot be produced, each file naming its source) | Target `packages/engine/scripts/record-fixtures.ts` |
-| 8b.1 | Acceptance harness, running the service with `SHEPHERD_TEST_DEBUG=1` (row 23) | Target `packages/engine/test/support/acceptance.ts` |
+| 8b.1 | Acceptance harness, running the service with `SHEPHRD_TEST_DEBUG=1` (row 23) | Target `packages/engine/test/support/acceptance.ts` |
 | 8b.2 | The twenty-one acceptance files | Target `packages/engine/test/acceptance/` |
 | 8c.1 | `pnpm live-check`, never part of `pnpm check` | Target `packages/engine/scripts/live-check.ts` |
 
@@ -740,24 +740,24 @@ recorder; 8b the acceptance suite; 8c the live check.
 |---|---|---|---|---|
 | PB-A1 | Stop and crash an agent whose adapter started child processes | The whole process group exits | `ps` output before and after, in the unit 6c report | WS-6 |
 | PB-A2 | An adapter writes a lot to stderr | The runner keeps draining it; the agent does not hang | Test with a fake agent writing 10 MB to stderr | WS-6 |
-| PB-A3 | Each harness's sandbox, with `shepherd mcp` connecting to the socket | The tool call succeeds, or the harness setting that allows it is recorded | Live-check log per harness | WS-7 |
+| PB-A3 | Each harness's sandbox, with `shephrd mcp` connecting to the socket | The tool call succeeds, or the harness setting that allows it is recorded | Live-check log per harness | WS-7 |
 | PB-A4 | Search each adapter's own session files for the agent token | Not found, unless the agent itself printed its environment | `grep` over the adapters' session folders after the live check | WS-6 |
 | PB-A5 | `subscribe` catch-up uses the read-only connection deliberately | The reader setting is chosen and commented | Code review note in unit 4b | WS-4 |
 | PB-A6 | Type-check the copied code with the TypeScript version T3 uses | No new errors | Command output in the unit 2 report | WS-2 |
 | PB-A7 | After a restart, a reloaded agent's old token | Refused | Criterion 6.7; confirmed on real adapters in the live check | WS-6 |
 | PB-A8 | Kill the service with `SIGKILL`, restart it, connect with the command-line tool | The service listens; the connection succeeds | Criterion 7.10 output | WS-7 |
-| PB-A9 | Start two services at once against one `SHEPHERD_HOME` | Exactly one runs; the other reports it and exits 0 | Criterion 7.4 two-process log | WS-7 |
+| PB-A9 | Start two services at once against one `SHEPHRD_HOME` | Exactly one runs; the other reports it and exits 0 | Criterion 7.4 two-process log | WS-7 |
 | PB-A10 | Record each real adapter's negotiated ACP version and its config option categories | Recorded in the fixtures; the model and effort path chosen per harness | Fixture header, unit 6a report | WS-6 |
-| PB-A11 | After a restart, a reloaded real agent calls a Shepherd tool during its carry-on turn | The call succeeds | Live-check log | WS-7 |
+| PB-A11 | After a restart, a reloaded real agent calls a Shephrd tool during its carry-on turn | The call succeeds | Live-check log | WS-7 |
 | PB-A12 | After a reload on each real adapter, the replayed history contains the envelope's delivery id | Found, or the harness is recorded as "re-send on restart" | Live-check log, unit 6d report | WS-6 |
 | SEC-PB-1 | Search real adapters' files and process arguments for the token | Not found (per PB-A4's exception) | Live-check log | WS-6 |
 | SEC-PB-2 | A child's text beginning with `/compact` reaches its parent | It arrives escaped and runs no command | Live-check log | WS-5 |
-| SEC-PB-3 | Each real adapter's permission option kinds | Each maps onto Shepherd's scale, with its persistence | Recorded fixtures, unit 6a report | WS-6 |
+| SEC-PB-3 | Each real adapter's permission option kinds | Each maps onto Shephrd's scale, with its persistence | Recorded fixtures, unit 6a report | WS-6 |
 | SEC-PB-4 | After an "always allow" answer on real `claude-agent-acp` 0.99.1, inspect `.claude/settings.local.json` in the agent's folder | Each option's scope recorded; persistent options routed to the owner | Live-check log | WS-6 |
-| SEC-PB-5 | On each real harness, run a shell command with both Shepherd variables removed | `shepherd` refuses instead of acting as the owner | Live-check log | WS-7 |
+| SEC-PB-5 | On each real harness, run a shell command with both Shephrd variables removed | `shephrd` refuses instead of acting as the owner | Live-check log | WS-7 |
 | SEC-PB-6 | On each real harness, ask the agent to read a file in the state folder | Refused by the deny rule, or the harness is listed in SECURITY.md as having no mechanism | Live-check log | WS-6 |
 | SEC-PB-7 | An agent's prompt to its child beginning with `/compact` | It arrives escaped and runs no command | Live-check log | WS-5 |
-| SEC-PB-8 | Codex with `shell_environment_policy.inherit = "core"` runs `shepherd` | Refused by the ancestry check | Live-check log | WS-7 |
+| SEC-PB-8 | Codex with `shell_environment_policy.inherit = "core"` runs `shephrd` | Refused by the ancestry check | Live-check log | WS-7 |
 
 </details>
 

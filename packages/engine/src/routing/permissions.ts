@@ -1,4 +1,4 @@
-import { PermissionLevel, type Event } from "@shepherd/contracts";
+import { PermissionLevel, type Event } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 

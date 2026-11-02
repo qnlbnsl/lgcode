@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 
-import type { PermissionLevel } from "@shepherd/contracts";
+import type { PermissionLevel } from "@shephrd/contracts";
 import {
   accountFor, alive, echoFile, effortOption, framesOf, harnessFor, makeRunnerRig, modeOption, modelOption, readEcho,
   removeRunnerRig, spawnFor, startPayloadFor, withAcpRunner, withEngine, writeFakeAdapter, type Echo, type RunnerRig,
@@ -29,7 +29,7 @@ let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("SHEPHERD_HOME", rig.stateFolder);
+  vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -65,7 +65,7 @@ live("6.11 override: a harnesses set changes the adapter path and arguments the 
     }));
   }));
 
-live("6.11 permission mapping: each starting level is set as the harness's mapped mode through set_config_option on the mode-category option, never set_mode (breaks if the runner sends Shepherd's level name, the default mode, or uses session/set_mode on protocol version 2)", () =>
+live("6.11 permission mapping: each starting level is set as the harness's mapped mode through set_config_option on the mode-category option, never set_mode (breaks if the runner sends Shephrd's level name, the default mode, or uses session/set_mode on protocol version 2)", () =>
   withAcpRunner(rig, {}, ({ runner }) => Effect.gen(function* () {
     const harness = harnessFor("first", writeFakeAdapter(rig));
     for (const permission of ["read-only", "ask", "edit", "full"] as ReadonlyArray<PermissionLevel>) {

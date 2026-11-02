@@ -32,7 +32,7 @@ async function main() {
   const errorSamples = await Promise.all((await readdir(errorDirectory)).filter((name) => name.endsWith(".json")).map(async (name) =>
     JSON.parse(await readFile(join(errorDirectory, name), "utf8"))
   ))
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "shepherd-record-fixtures-"))
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "shephrd-record-fixtures-"))
   try {
     const results = await Effect.runPromise(recordFixtures({
       harnesses, outputDirectory, temporaryRoot, homeDirectory, parentEnvironment,

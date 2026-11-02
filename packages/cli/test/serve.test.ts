@@ -1,10 +1,10 @@
-// Criterion 7.4 (unit 7a; rows 52 step 1, 71, 74; PB-A9): `shepherd serve
+// Criterion 7.4 (unit 7a; rows 52 step 1, 71, 74; PB-A9): `shephrd serve
 // --detach` starts one service; two services started at once against one
-// SHEPHERD_HOME leave exactly one running and the other exits 0 reporting
+// SHEPHRD_HOME leave exactly one running and the other exits 0 reporting
 // it; `serve --detach` detects a running service by connecting to the
 // socket. Every service here is a real process
 // (`packages/engine/src/service.ts`); `serveDetach` is the function behind
-// `shepherd serve --detach` (`packages/cli/src/serve.ts`).
+// `shephrd serve --detach` (`packages/cli/src/serve.ts`).
 import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { createServer, request } from "node:http";
@@ -31,7 +31,7 @@ const makeRoot = () => {
 type Root = ReturnType<typeof makeRoot>;
 
 const environmentFor = (root: Root): Record<string, string> => ({
-  PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: join(root.root, "home"), SHEPHERD_HOME: root.state,
+  PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: join(root.root, "home"), SHEPHRD_HOME: root.state,
   XDG_STATE_HOME: join(root.root, "xdg"), CODEX_HOME: join(root.root, "codex"), TMPDIR: "/tmp", LANG: "C.UTF-8",
 });
 
@@ -41,7 +41,7 @@ const readText = (path: string) => { try { return readFileSync(path, "utf8"); } 
 const servicesOf = (root: Root): Array<number> => readdirSync("/proc").filter((name) => /^\d+$/.test(name)).map(Number).filter((pid) => {
   const command = readText(`/proc/${pid}/cmdline`);
   const stat = readText(`/proc/${pid}/stat`);
-  return command.includes(servicePath) && readText(`/proc/${pid}/environ`).includes(`SHEPHERD_HOME=${root.state}\u0000`)
+  return command.includes(servicePath) && readText(`/proc/${pid}/environ`).includes(`SHEPHRD_HOME=${root.state}\u0000`)
     && stat.slice(stat.lastIndexOf(")") + 2)[0] !== "Z";
 });
 
@@ -154,7 +154,7 @@ live("7.4 serve --detach detects a service by connecting: a stale socket file is
     }
   }));
 
-live("7.4 two services started at once against one SHEPHERD_HOME leave exactly one running; the other prints 'already running' and exits 0, and the survivor holds an exclusive SQLite lock on engine.lock (breaks if both run, the loser exits non-zero, or the lock is not SQLite's exclusive lock on engine.lock)", () =>
+live("7.4 two services started at once against one SHEPHRD_HOME leave exactly one running; the other prints 'already running' and exits 0, and the survivor holds an exclusive SQLite lock on engine.lock (breaks if both run, the loser exits non-zero, or the lock is not SQLite's exclusive lock on engine.lock)", () =>
   Effect.gen(function* () {
     for (let round = 0; round < 3; round++) {
       const root = makeRoot();

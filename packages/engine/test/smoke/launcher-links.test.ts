@@ -19,19 +19,19 @@ afterAll(() => {
 });
 
 const makeTree = () => {
-  const root = makeScratch("shepherd launcher tree-");
+  const root = makeScratch("shephrd launcher tree-");
   mkdirSync(join(root, "bin"));
-  copyFileSync(join(repoRoot, "bin/shepherd"), join(root, "bin/shepherd"));
-  chmodSync(join(root, "bin/shepherd"), 0o755);
+  copyFileSync(join(repoRoot, "bin/shephrd"), join(root, "bin/shephrd"));
+  chmodSync(join(root, "bin/shephrd"), 0o755);
   copyFileSync(join(repoRoot, "bin/stub-entry.ts"), join(root, "bin/stub-entry.ts"));
-  const home = makeScratch("shepherd-link-home-");
+  const home = makeScratch("shephrd-link-home-");
   const nvm = join(home, "fake-nvm");
   const nodeDirectory = join(nvm, "versions/node/v26.13.0/bin");
   mkdirSync(nodeDirectory, { recursive: true });
   // Use a real runtime, so success means the repository's stub actually ran.
   expect(process.versions.node.split(".")[0], "run smoke tests with Node.js 26").toBe("26");
   symlinkSync(process.execPath, join(nodeDirectory, "node"));
-  return { root, home, nvm, launcher: join(root, "bin/shepherd") };
+  return { root, home, nvm, launcher: join(root, "bin/shephrd") };
 };
 const run = (launcher: string, home: string, nvm: string, path?: string) => spawnSync("/usr/bin/env", [
   "-i", `HOME=${home}`, `NVM_DIR=${nvm}`, ...(path === undefined ? [] : [`PATH=${path}`]),
@@ -42,8 +42,8 @@ const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")
 describe("launcher path resolution", () => {
   it("runs the real stub through a launcher symlink from another folder (breaks if checkout resolution uses the link's directory)", () => {
     const tree = makeTree();
-    const links = makeScratch("shepherd launcher links-");
-    const link = join(links, "shepherd");
+    const links = makeScratch("shephrd launcher links-");
+    const link = join(links, "shephrd");
     symlinkSync(tree.launcher, link);
     const result = run(link, tree.home, tree.nvm);
     expect(result.error).toBeUndefined();
@@ -53,7 +53,7 @@ describe("launcher path resolution", () => {
 
   it("never executes dirname from PATH (breaks if a hostile dirname runs before the selected Node.js)", () => {
     const tree = makeTree();
-    const path = makeScratch("shepherd-hostile-path-");
+    const path = makeScratch("shephrd-hostile-path-");
     const marker = join(path, "dirname-ran");
     const fakeDirname = join(path, "dirname");
     writeFileSync(fakeDirname, `#!/bin/sh\nprintf 'executed\\n' > ${shellQuote(marker)}\nexec /usr/bin/dirname "$@"\n`);

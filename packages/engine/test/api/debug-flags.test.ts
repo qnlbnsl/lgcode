@@ -1,10 +1,10 @@
 // Criterion 7.15 (unit 7a; row 74): the debug RPC group and protocol logging
-// stay off when their flags are set but `SHEPHERD_HOME` is outside the
+// stay off when their flags are set but `SHEPHRD_HOME` is outside the
 // system's temporary folder, and the service logs when debug is on.
 //
 // Reading: "the system's temporary folder" is `os.tmpdir()` in the service,
 // which reads TMPDIR. No folder is ever made outside /tmp: each case sets the
-// service's TMPDIR to one `mkdtemp` folder and puts SHEPHERD_HOME inside a
+// service's TMPDIR to one `mkdtemp` folder and puts SHEPHRD_HOME inside a
 // different one, so the home is outside the service's temporary folder. The
 // comparison is on real paths, so a sibling folder that merely shares the
 // temporary folder's name as a prefix, and a home reached through a symbolic
@@ -55,15 +55,15 @@ const observe = (root: ServiceRoot, env: Record<string, string>) => Effect.gen(f
   return { debug, logged: output.includes(enabledLine), protocol: output.includes(marker) };
 });
 
-const both = { SHEPHERD_TEST_DEBUG: "1", SHEPHERD_TEST_PROTOCOL_LOG: "1" };
+const both = { SHEPHRD_TEST_DEBUG: "1", SHEPHRD_TEST_PROTOCOL_LOG: "1" };
 
-live("7.15 control: with both flags and SHEPHERD_HOME inside TMPDIR, the debug group is served, its line is logged and protocol logging is on (breaks if the gate refuses a home inside the temporary folder, or the service does not log that debug is on)", () =>
+live("7.15 control: with both flags and SHEPHRD_HOME inside TMPDIR, the debug group is served, its line is logged and protocol logging is on (breaks if the gate refuses a home inside the temporary folder, or the service does not log that debug is on)", () =>
   Effect.gen(function* () {
     const root = makeServiceRoot();
     expect(yield* observe(root, { ...both, TMPDIR: root.root })).toEqual({ debug: "success", logged: true, protocol: true });
   }), 120_000);
 
-live("7.15 with both flags but SHEPHERD_HOME in a different temporary folder from TMPDIR, the debug group is not served, nothing says it is on, and protocol logging stays off (breaks if either gate reads only its flag, or compares with /tmp instead of the service's TMPDIR)", () =>
+live("7.15 with both flags but SHEPHRD_HOME in a different temporary folder from TMPDIR, the debug group is not served, nothing says it is on, and protocol logging stays off (breaks if either gate reads only its flag, or compares with /tmp instead of the service's TMPDIR)", () =>
   Effect.gen(function* () {
     const root = makeServiceRoot();
     const elsewhere = makeServiceRoot("/tmp/sh7x-");
@@ -83,16 +83,16 @@ live("7.15 a home in a sibling folder whose name only starts with TMPDIR's, or r
     symlinkSync(target.root, link);
     mkdirSync(join(target.root, "linked-home"), { mode: 0o700 });
     const throughLink = { ...target, state: join(link, "linked-home", "state"), socket: join(link, "linked-home", "state", "engine.sock") };
-    expect(yield* observe(throughLink, { ...both, TMPDIR: temporary.root, SHEPHERD_HOME: throughLink.state }))
+    expect(yield* observe(throughLink, { ...both, TMPDIR: temporary.root, SHEPHRD_HOME: throughLink.state }))
       .toEqual({ debug: "not served", logged: false, protocol: false });
   }), 180_000);
 
 live("7.15 the two flags are gated separately: the protocol flag alone does not serve the debug group, and the debug flag alone does not turn on protocol logging (breaks if one flag enables both)", () =>
   Effect.gen(function* () {
     const protocolOnly = makeServiceRoot();
-    expect(yield* observe(protocolOnly, { SHEPHERD_TEST_PROTOCOL_LOG: "1", TMPDIR: protocolOnly.root }))
+    expect(yield* observe(protocolOnly, { SHEPHRD_TEST_PROTOCOL_LOG: "1", TMPDIR: protocolOnly.root }))
       .toEqual({ debug: "not served", logged: false, protocol: true });
     const debugOnly = makeServiceRoot();
-    expect(yield* observe(debugOnly, { SHEPHERD_TEST_DEBUG: "1", TMPDIR: debugOnly.root }))
+    expect(yield* observe(debugOnly, { SHEPHRD_TEST_DEBUG: "1", TMPDIR: debugOnly.root }))
       .toEqual({ debug: "success", logged: true, protocol: false });
   }), 180_000);

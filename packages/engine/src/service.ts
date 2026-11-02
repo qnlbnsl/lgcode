@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as SqliteClient from "@shepherd/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
@@ -31,8 +31,8 @@ import * as Views from "./views/Views.ts";
 
 // Capture the inherited token for redaction, then erase it before building
 // anything capable of spawning a child. It is never a service identity.
-const inheritedToken = process.env.SHEPHERD_TOKEN;
-delete process.env.SHEPHERD_TOKEN;
+const inheritedToken = process.env.SHEPHRD_TOKEN;
+delete process.env.SHEPHRD_TOKEN;
 process.umask(0o077);
 
 const inTemporaryFolder = (folder: string): boolean => {
@@ -53,7 +53,7 @@ const program = Effect.scoped(Effect.gen(function* () {
   // A detached launcher needs evidence of which child won the lock, rather
   // than inferring it from timing the losing child's exit. This is an
   // inherited parent/child channel, never a second listener.
-  if (process.send !== undefined) process.send({ _tag: "ShepherdLockAcquired" }, () => { if (process.connected) process.disconnect?.(); });
+  if (process.send !== undefined) process.send({ _tag: "ShephrdLockAcquired" }, () => { if (process.connected) process.disconnect?.(); });
   const socketPath = join(folder, "engine.sock");
   yield* Effect.try({ try: () => {
     try {
@@ -63,8 +63,8 @@ const program = Effect.scoped(Effect.gen(function* () {
   }, catch: () => new Error("stale socket removal failed") });
   const listener = yield* listen(socketPath);
   const ownerCredential = yield* loadOwnerCredential(folder);
-  const debug = process.env.SHEPHERD_TEST_DEBUG === "1" && inTemporaryFolder(folder);
-  const protocolLog = process.env.SHEPHERD_TEST_PROTOCOL_LOG === "1" && inTemporaryFolder(folder);
+  const debug = process.env.SHEPHRD_TEST_DEBUG === "1" && inTemporaryFolder(folder);
+  const protocolLog = process.env.SHEPHRD_TEST_PROTOCOL_LOG === "1" && inTemporaryFolder(folder);
   const databasePath = join(folder, "events.sqlite");
   // Enable WAL before the copied client's reader worker can first open it.
   yield* Effect.try({ try: () => {

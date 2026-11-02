@@ -14,13 +14,13 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 // Criterion 6.12 (task 6a.1; rows 33, 34; SECURITY.md): the engine
 // advertises no file or terminal capability, and `fs/*` and `terminal/*`
 // requests from the adapter are refused. Agents read and write files only
-// through their own harness's sandbox, never through Shepherd.
+// through their own harness's sandbox, never through Shephrd.
 
 let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("SHEPHERD_HOME", rig.stateFolder);
+  vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

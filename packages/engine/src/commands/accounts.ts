@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Account } from "@shepherd/contracts";
+import type { Account } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import type { LogWriteFailed } from "../log/EventLog.ts";
 import { refused, type Input, type Payload, type Plan } from "./internal.ts";

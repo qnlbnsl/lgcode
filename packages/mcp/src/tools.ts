@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema"
-import { CommandsRpcGroup, commandAccess } from "@shepherd/contracts"
+import { CommandsRpcGroup, commandAccess } from "@shephrd/contracts"
 
 // Row 55: an explicit allow-list. A new agent command is reviewed before it
 // becomes a tool; owner-only commands and the event stream never appear.

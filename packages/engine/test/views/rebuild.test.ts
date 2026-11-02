@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 
 import { it } from "@effect/vitest";
-import { Actor } from "@shepherd/contracts";
+import { Actor } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
@@ -17,8 +17,8 @@ import { append, sequence, withViews } from "../support/withViews.ts";
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/shepherd-rebuild-");
-  vi.stubEnv("SHEPHERD_HOME", home);
+  home = mkdtempSync("/tmp/shephrd-rebuild-");
+  vi.stubEnv("SHEPHRD_HOME", home);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

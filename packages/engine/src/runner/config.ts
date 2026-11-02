@@ -1,4 +1,4 @@
-import type { AcpClient } from "@shepherd/t3-effect-acp/client";
+import type { AcpClient } from "@shephrd/t3-effect-acp/client";
 import * as Effect from "effect/Effect";
 import { RunnerRejected } from "./Runner.ts";
 

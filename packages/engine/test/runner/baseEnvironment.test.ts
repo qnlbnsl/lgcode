@@ -1,6 +1,6 @@
 // Task 8a.3, decision rows 33 and 57, issue 14: the base environment of a child process.
 //
-//   `buildBaseEnvironment({ parent, accountVariables?, shepherdSocket?, shepherdToken? })`
+//   `buildBaseEnvironment({ parent, accountVariables?, shephrdSocket?, shephrdToken? })`
 //   (module `packages/engine/src/runner/baseEnvironment.ts`) returns a new
 //   `Record<string, string>` that is the whole environment of the child. It takes `parent` as an
 //   argument and never reads `process.env`. Names are matched exactly and case-sensitively.
@@ -8,8 +8,8 @@
 //   Allow-list (row 33): PATH, HOME, USER, LOGNAME, SHELL, LANG, LC_* (the prefix `LC_`), TERM,
 //   TMPDIR and TZ, copied from `parent` when set. Then the account's variables, which win over the
 //   parent's values. Never HERDR_* (parent or account). Never a provider key the account did not
-//   set. The only SHEPHERD_* names are SHEPHERD_SOCKET and SHEPHERD_TOKEN (row 57), and they come
-//   only from the `shepherdSocket` and `shepherdToken` arguments, never from `parent` or from the
+//   set. The only SHEPHRD_* names are SHEPHRD_SOCKET and SHEPHRD_TOKEN (row 57), and they come
+//   only from the `shephrdSocket` and `shephrdToken` arguments, never from `parent` or from the
 //   account's variables.
 import { spawnSync } from "node:child_process"
 
@@ -48,9 +48,9 @@ const secrets = {
   SSH_AUTH_SOCK: "/tmp/ssh-planted/agent.1",
   HERDR_SOCKET_PATH: "/tmp/herdr-planted.sock",
   HERDR_PANE_ID: "p_1",
-  SHEPHERD_SOCKET: "/tmp/parent-planted.sock",
-  SHEPHERD_TOKEN: "shp_a_PLANTEDPARENTTOKEN0123456789",
-  SHEPHERD_HOME: "/tmp/parent-planted-home",
+  SHEPHRD_SOCKET: "/tmp/parent-planted.sock",
+  SHEPHRD_TOKEN: "shp_a_PLANTEDPARENTTOKEN0123456789",
+  SHEPHRD_HOME: "/tmp/parent-planted-home",
   LCX_FOO: "looks-like-lc-but-is-not",
   XLC_ALL: "also-not",
   NODE_OPTIONS: "--require=/tmp/planted.js"
@@ -92,35 +92,35 @@ it("adds the account's variables, including a provider key the account set, and 
   })
 })
 
-it("drops account variables named HERDR_*, SHEPHERD_SOCKET or SHEPHERD_TOKEN (breaks if an account can set the agent's socket or token, or reach the Herdr socket; rows 33 and 57)", () => {
+it("drops account variables named HERDR_*, SHEPHRD_SOCKET or SHEPHRD_TOKEN (breaks if an account can set the agent's socket or token, or reach the Herdr socket; rows 33 and 57)", () => {
   const environment = buildBaseEnvironment({
     parent: { PATH: "/usr/bin" },
     accountVariables: {
       HERDR_SOCKET_PATH: "/tmp/herdr-planted.sock",
       HERDR_ENV: "1",
-      SHEPHERD_SOCKET: "/tmp/account-planted.sock",
-      SHEPHERD_TOKEN: "shp_a_PLANTEDACCOUNTTOKEN0123456789",
+      SHEPHRD_SOCKET: "/tmp/account-planted.sock",
+      SHEPHRD_TOKEN: "shp_a_PLANTEDACCOUNTTOKEN0123456789",
       KEEP_ME: "yes"
     }
   })
   assert.deepEqual(environment, { PATH: "/usr/bin", KEEP_ME: "yes" })
 })
 
-it("sets SHEPHERD_SOCKET and SHEPHERD_TOKEN from the arguments, and no other SHEPHERD_* name (breaks if the wildcard comes back, or the values are taken from the parent; row 57)", () => {
+it("sets SHEPHRD_SOCKET and SHEPHRD_TOKEN from the arguments, and no other SHEPHRD_* name (breaks if the wildcard comes back, or the values are taken from the parent; row 57)", () => {
   const environment = buildBaseEnvironment({
-    parent: { PATH: "/usr/bin", SHEPHERD_SOCKET: "/tmp/parent.sock", SHEPHERD_HOME: "/tmp/home" },
-    shepherdSocket: "/tmp/run/engine.sock",
-    shepherdToken: "shp_a_GIVENTOKEN0123456789"
+    parent: { PATH: "/usr/bin", SHEPHRD_SOCKET: "/tmp/parent.sock", SHEPHRD_HOME: "/tmp/home" },
+    shephrdSocket: "/tmp/run/engine.sock",
+    shephrdToken: "shp_a_GIVENTOKEN0123456789"
   })
   assert.deepEqual(environment, {
     PATH: "/usr/bin",
-    SHEPHERD_SOCKET: "/tmp/run/engine.sock",
-    SHEPHERD_TOKEN: "shp_a_GIVENTOKEN0123456789"
+    SHEPHRD_SOCKET: "/tmp/run/engine.sock",
+    SHEPHRD_TOKEN: "shp_a_GIVENTOKEN0123456789"
   })
 })
 
-it("adds no SHEPHERD_* name when no socket and token are given (breaks if the parent's values are used as a fallback)", () => {
-  const environment = buildBaseEnvironment({ parent: { PATH: "/usr/bin", SHEPHERD_SOCKET: "/tmp/p.sock", SHEPHERD_TOKEN: "shp_a_PARENTPLANTED0123456789" } })
+it("adds no SHEPHRD_* name when no socket and token are given (breaks if the parent's values are used as a fallback)", () => {
+  const environment = buildBaseEnvironment({ parent: { PATH: "/usr/bin", SHEPHRD_SOCKET: "/tmp/p.sock", SHEPHRD_TOKEN: "shp_a_PARENTPLANTED0123456789" } })
   assert.deepEqual(environment, { PATH: "/usr/bin" })
 })
 
@@ -148,8 +148,8 @@ it("a real child started with the built environment sees exactly those names and
   const environment = buildBaseEnvironment({
     parent: { ...allowListed, ...secrets, PATH: `${process.env.PATH ?? "/usr/bin"}` },
     accountVariables: { ACCOUNT_VAR: "from-account" },
-    shepherdSocket: "/tmp/run/engine.sock",
-    shepherdToken: "shp_a_GIVENTOKEN0123456789"
+    shephrdSocket: "/tmp/run/engine.sock",
+    shephrdToken: "shp_a_GIVENTOKEN0123456789"
   })
   const child = spawnSync(process.execPath, ["-e", "console.log(JSON.stringify(Object.keys(process.env).sort()))"], {
     env: environment,
@@ -157,7 +157,7 @@ it("a real child started with the built environment sees exactly those names and
   })
   assert.equal(child.status, 0)
   const seen = JSON.parse(child.stdout) as string[]
-  assert.deepEqual(seen, [...Object.keys(allowListed), "ACCOUNT_VAR", "SHEPHERD_SOCKET", "SHEPHERD_TOKEN"].sort())
+  assert.deepEqual(seen, [...Object.keys(allowListed), "ACCOUNT_VAR", "SHEPHRD_SOCKET", "SHEPHRD_TOKEN"].sort())
   assert.notInclude(child.stdout, "planted")
 })
 

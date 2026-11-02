@@ -47,8 +47,8 @@ const missingRegistrations = (root: string): string[] => {
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/shepherd-rebuild-guard-");
-  vi.stubEnv("SHEPHERD_HOME", home);
+  home = mkdtempSync("/tmp/shephrd-rebuild-guard-");
+  vi.stubEnv("SHEPHRD_HOME", home);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

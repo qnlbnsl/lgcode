@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect"
-import { ClientError } from "@shepherd/client"
+import { ClientError } from "@shephrd/client"
 
 export interface Clock {
   readonly now: () => number
@@ -31,7 +31,7 @@ export const retryRecovering = async <A>(attempt: () => Promise<A>, clock: Clock
       if (!isRecovering(error)) throw error
       const remaining = deadline - clock.now()
       if (remaining <= 0) {
-        throw new Error("the Shepherd service was still recovering after 60 seconds; the retry deadline passed")
+        throw new Error("the Shephrd service was still recovering after 60 seconds; the retry deadline passed")
       }
       await clock.sleep(Math.min(delay, remaining))
       delay = Math.min(delay * 2, longestDelay)
@@ -39,7 +39,7 @@ export const retryRecovering = async <A>(attempt: () => Promise<A>, clock: Clock
   }
 }
 
-const deadlineMessage = "the Shepherd service was still recovering after 60 seconds; the retry deadline passed"
+const deadlineMessage = "the Shephrd service was still recovering after 60 seconds; the retry deadline passed"
 
 // The same policy as `retryRecovering`, as an Effect: interrupting the
 // returned Effect interrupts the attempt in flight and the wait between

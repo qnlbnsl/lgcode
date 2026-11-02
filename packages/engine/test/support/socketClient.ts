@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
-import { CommandsRpcGroup } from "@shepherd/contracts";
+import { CommandsRpcGroup } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as RpcClient from "effect/rpc/RpcClient";
 import * as RpcSerialization from "effect/rpc/RpcSerialization";
@@ -20,10 +20,10 @@ import WebSocket from "ws";
 //   base64url text of the 32 bytes in `<state folder>/owner-credential`
 //   (identity/ownerCredential.ts); an agent token is `shp_a_...`, a device
 //   credential `shp_d_...`.
-// - Row 64's ancestor chain, sent on every upgrade: `Shepherd-Ancestors`,
+// - Row 64's ancestor chain, sent on every upgrade: `Shephrd-Ancestors`,
 //   comma-separated `<pid>:<start time>` pairs from the caller itself up
 //   through each parent to the first process that cannot be read (normally
-//   up to pid 1), and `Shepherd-Process-Group`, the caller's process group
+//   up to pid 1), and `Shephrd-Process-Group`, the caller's process group
 //   id. The start time is field 22 of `/proc/<pid>/stat`, the value
 //   `recovery/orphans.ts` records as a process row's start time.
 
@@ -44,7 +44,7 @@ export const ancestryHeaders = (pid: number = process.pid): Record<string, strin
     chain.push(`${current}:${fields[19]}`);
     current = Number(fields[1]);
   }
-  return { "Shepherd-Ancestors": chain.join(","), "Shepherd-Process-Group": statFields(pid)[2]! };
+  return { "Shephrd-Ancestors": chain.join(","), "Shephrd-Process-Group": statFields(pid)[2]! };
 };
 
 export const ownerBearer = (stateFolder: string): string =>

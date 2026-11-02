@@ -1,4 +1,4 @@
-# What Shepherd should borrow from T3 Code
+# What Shephrd should borrow from T3 Code
 
 Researched on 2026-10-30. T3 Code was read at commit `6fc9144` of
 `github.com/pingdotgg/t3code` (release v0.1.5, 2026-10-29). Paths in this
@@ -11,7 +11,7 @@ for the Synapse fork, at `docs/message-board/features.md` in the
 
 ## The short answer
 
-T3 Code is the wrong engine for Shepherd, but it has the right edges.
+T3 Code is the wrong engine for Shephrd, but it has the right edges.
 
 T3 Code runs every agent headless. Claude runs through Anthropic's Agent
 Software Development Kit (the Agent SDK), Codex runs through its `app-server`
@@ -22,7 +22,7 @@ own FAQ also says that Claude usage through the Agent SDK drains the 5-hour
 limit faster than Claude Code does directly (`docs/user/faq.md`).
 
 The useful parts are around the edges. T3 Code solves five problems that
-Shepherd has:
+Shephrd has:
 
 - how to give each agent a private credential and a tool server, so the agent
   can prove who it is without the terminal pane's environment;
@@ -35,12 +35,12 @@ Shepherd has:
   the agent.
 
 Most of this transfers as design and protocol. Two small algorithms are worth
-copying, with T3 Code's licence notice. Shepherd is written in TypeScript
+copying, with T3 Code's licence notice. Shephrd is written in TypeScript
 (decided 2026-10-30), so they can be copied as they are rather than ported.
 
 ## How T3 Code compares with Herdr and Synapse today
 
-This section records the comparison that led to Shepherd, so the reasoning is
+This section records the comparison that led to Shephrd, so the reasoning is
 not lost.
 
 ### Where T3 Code is ahead
@@ -86,7 +86,7 @@ not lost.
   meters and mission control.
 
 The conclusion was to keep Herdr as the host, keep the team ideas from
-Synapse, and borrow T3 Code's edges. That is Shepherd.
+Synapse, and borrow T3 Code's edges. That is Shephrd.
 
 ## Terms used below
 
@@ -104,11 +104,11 @@ Synapse, and borrow T3 Code's edges. That is Shepherd.
 
 ## Things to borrow, most valuable first
 
-Each entry says what T3 Code does, what it fixes in Shepherd, how to borrow
+Each entry says what T3 Code does, what it fixes in Shephrd, how to borrow
 it, the effort (S, M or L), and whether it fits the rule that agents stay
 visible terminal sessions.
 
-### 1. Shepherd as an MCP server, with a token per agent minted at launch
+### 1. Shephrd as an MCP server, with a token per agent minted at launch
 
 **What T3 Code does.** Before it opens an agent session, it mints a credential
 scoped to that one session. The token is 32 random bytes. Only its SHA-256
@@ -129,7 +129,7 @@ arguments, sets the limits (`apps/server/src/mcp/McpToolAccess.ts`,
 ids are evidence. App ids are identity."
 (`docs/orchestration-v2/entity-ids-and-correlation.md`).
 
-**What it fixes in Shepherd.**
+**What it fixes in Shephrd.**
 
 - **The Codex sandbox** (Synapse-list items 29 and 30). With an MCP server
   over HTTP, the Codex program itself makes the call, not a sandboxed shell
@@ -144,12 +144,12 @@ ids are evidence. App ids are identity."
 
 **How to borrow.** Design and protocol only; no code needs to be copied.
 
-1. Run a loopback HTTP MCP endpoint in the Shepherd daemon. Its tools are the
+1. Run a loopback HTTP MCP endpoint in the Shephrd daemon. Its tools are the
    board's verbs: post, read new posts, read a thread, finish work, set a work
    state, ask the owner.
-2. When Shepherd starts an agent, mint a token for that member. Store
+2. When Shephrd starts an agent, mint a token for that member. Store
    `sha256(token)` with the member, team, role and session. Pass the raw
-   token in an environment variable such as `SHEPHERD_TOKEN`. Revoke it when
+   token in an environment variable such as `SHEPHRD_TOKEN`. Revoke it when
    the member is retired, swapped or leaves.
 3. Let the command-line tool use the same token, so a post from a shell also
    proves who sent it without the Herdr socket.
@@ -164,7 +164,7 @@ normal interactive `claude` and `codex` sessions.
 - Check whether Codex starts a standard-input (stdio) MCP server outside its
   sandbox. An HTTP endpoint avoids the question.
 - Codex may ask for approval on each MCP tool call in some modes, so the
-  Shepherd tools should be approved in the launch configuration.
+  Shephrd tools should be approved in the launch configuration.
 - Do not put long waits behind an MCP call. Pi's MCP support has a 60-second
   request timeout, and Claude Code has its own tool timeout. Use item 2 for
   waiting.
@@ -178,7 +178,7 @@ on its own. T3 Code's recorded test fixtures capture this from live runs
 and `.../claude_background_monitor_wake/`).
 
 **How to borrow.** When an agent joins, it starts one long-lived `Monitor`
-that runs a Shepherd command such as `shepherd inbox --follow`. That command
+that runs a Shephrd command such as `shephrd inbox --follow`. That command
 prints one line only when a post that needs an answer, or a digest, is due.
 Claude Code then starts the turn itself, and the post arrives as the tool's
 output.
@@ -263,7 +263,7 @@ unknown and nothing is scheduled
 `claudePromptCacheTtlMs`).
 
 **Checked on the owner's machine:** interactive Claude Code transcripts carry
-the same field next to a timestamp, so Shepherd can compute the deadline from
+the same field next to a timestamp, so Shephrd can compute the deadline from
 the transcript files with no SDK.
 
 **Why it matters for cost.** A wake after the cache expires writes the whole
@@ -277,7 +277,7 @@ lead costs about as much as many on-time wakes.
 - Replace the Foundry's fixed rule (compact idle leads at 150,000 tokens) with
   "compact an idle lead two minutes before its cache expires, when it is over
   the team's token floor" (Synapse-list items 31 and 46).
-- **A new rule of Shepherd's own:** deliver posts that need an answer, and
+- **A new rule of Shephrd's own:** deliver posts that need an answer, and
   can wait, before a lead's cache expires rather than after. If only an `fyi`
   digest is waiting, let the cache lapse.
 
@@ -389,7 +389,7 @@ or 64 kibibytes before the browser must acknowledge it
 (`apps/server/src/terminal/OutputProtocol.ts`). There are separate
 interactive and read-only ("observe") modes.
 
-**Why it matters more for Shepherd.** If the dashboard replays an agent's pane
+**Why it matters more for Shephrd.** If the dashboard replays an agent's pane
 into a browser terminal and the browser answers an old query, the answer is
 typed into the agent's input box. That is item 14's failure, caused by the
 dashboard. So open agents read-only by default, and switch to typing only
@@ -461,13 +461,13 @@ exactly what the evaluators' issue record needs (Synapse-list items 19 and
 | T3 Code part | Why not |
 |---|---|
 | Running agents headless (the Agent SDK, Codex `app-server`, Pi RPC mode) | It breaks the visible-session rule, and the Agent SDK drains Claude's 5-hour limit faster. |
-| The internal model of runs, turns and tool calls | T3 Code built it because it owns the agent loop. Shepherd watches terminal programs it does not own. Keep only the principle that Shepherd's own ids are the identity. |
+| The internal model of runs, turns and tool calls | T3 Code built it because it owns the agent loop. Shephrd watches terminal programs it does not own. Keep only the principle that Shephrd's own ids are the identity. |
 | Code snapshots with rollback, forking and merge-back | The Foundry already uses worktrees and branches, and a live terminal conversation cannot be rolled back. |
 | Switching providers inside one conversation | The Foundry gives each role a model. Only the hand-off builder (item 5) carries over. |
 | T3 Connect: the relay, the tunnel and the sign-in server | The owner already uses WireGuard and a reverse proxy. |
 | The Expo phone app and the custom WebAssembly terminal | A phone-friendly web page with xterm.js covers the need. Borrow only the replay and flow-control rules (item 10). |
-| Load balancing, multi-account pools, voice input, pull-request linking | Outside Shepherd's scope. |
-| The TypeScript code wholesale | Shepherd is TypeScript too (decided 2026-10-30), but most of T3 Code's code serves its own design. Copy only small, self-contained functions (items 4 and 10), each under `third_party/t3code/`. |
+| Load balancing, multi-account pools, voice input, pull-request linking | Outside Shephrd's scope. |
+| The TypeScript code wholesale | Shephrd is TypeScript too (decided 2026-10-30), but most of T3 Code's code serves its own design. Copy only small, self-contained functions (items 4 and 10), each under `third_party/t3code/`. |
 
 ## Licence obligations
 
@@ -485,7 +485,7 @@ substantial portion of the code.
      MIT License", naming the files;
   3. put a header comment in each ported file naming the T3 Code source file
      and commit `6fc9144`.
-- Shepherd's own licence is not chosen yet (see [README.md](../../README.md)).
+- Shephrd's own licence is not chosen yet (see [README.md](../../README.md)).
   MIT code can be included under any common licence choice.
 
 This is a practical reading, not legal advice.

@@ -1,6 +1,6 @@
-# Shepherd: problems found
+# Shephrd: problems found
 
-A running list of problems found while building or using Shepherd. Add a
+A running list of problems found while building or using Shephrd. Add a
 problem here in the same change that finds it, even if it is not fixed yet.
 Never delete an entry; mark it fixed and say where.
 
@@ -109,19 +109,19 @@ Node.js built-in modules to type-check.
 ## 7. A symbolic link to the launcher runs from the wrong folder
 
 Found: 2026-11-01, in the unit 1 review.
-State: fixed in unit 2: `bin/shepherd` follows links, and
+State: fixed in unit 2: `bin/shephrd` follows links, and
 `launcher-links.test.ts` covers it. Commit: 87e2d4c. The first fix used
 `readlink` from `PATH`; issue 20 replaced that.
 
-What happened: `bin/shepherd` found its checkout with `dirname "$0"` and does
+What happened: `bin/shephrd` found its checkout with `dirname "$0"` and does
 not follow a symbolic link to the file itself. A link such as
-`~/.local/bin/shepherd -> <repo>/bin/shepherd` makes it look for
+`~/.local/bin/shephrd -> <repo>/bin/shephrd` makes it look for
 `bin/stub-entry.ts` next to the link, and Node.js exits 1 with
 `Cannot find module`.
 What should happen: the launcher resolves its own path through any links,
 or prints a clear message when the entry file is missing.
 Why it matters: a link on the path is a likely way for the owner to run
-`shepherd` from any terminal.
+`shephrd` from any terminal.
 
 ## 8. The launcher looks up `dirname` on the path
 
@@ -131,7 +131,7 @@ Commit: 87e2d4c. The first fix still ran `readlink` from `PATH` before the
 chosen Node.js, which the focused review found; issue 20 fixed that, so now
 only shell builtins and the chosen Node.js run.
 
-What happened: `bin/shepherd` ran `dirname` from `PATH`. Decision 22 allows
+What happened: `bin/shephrd` ran `dirname` from `PATH`. Decision 22 allows
 a path lookup only for `node`.
 What should happen: the launcher uses shell parameter expansion, so
 `node` is the only program found through `PATH`.
@@ -168,7 +168,7 @@ What happened: `pnpm-workspace.yaml` aliased `typescript` to the pre-release
 `@tsc-rs/typescript` 0.8.0 with no comment. It matches the T3 Code
 reference, which plan check PB-A6 requires, but nothing in this repository
 said so. `vitest.config.ts` also set `VP_REMOTE_CACHE` and
-`VP_REMOTE_CACHE_URL`, which only the vite-plus tool reads; Shepherd runs
+`VP_REMOTE_CACHE_URL`, which only the vite-plus tool reads; Shephrd runs
 plain Vitest.
 What should happen: one comment names T3 Code as the reason for the alias,
 and the two cache variables are removed or credited to T3 Code.
@@ -182,12 +182,12 @@ State: fixed in `herdr-plugin.toml`; the owner re-runs the link.
 
 What happened: `herdr plugin link` stopped with "TOML parse error at line 10,
 [[actions]]: missing field `title`". The `serve` action had `name = "Start
-Shepherd"`, but Herdr names an action's label `title`, as the Synapse
+Shephrd"`, but Herdr names an action's label `title`, as the Synapse
 manifest does. Neither the plan's task 1f nor the unit 1 manifest test named
 the field, so the test passed.
 What should happen: each `[[actions]]` entry has `id`, `title`, `contexts`
 and `command`.
-Why it matters: Herdr cannot load Shepherd at all until the manifest parses.
+Why it matters: Herdr cannot load Shephrd at all until the manifest parses.
 
 ## 12. The copied SQLite client needed changes for Node.js 26 types
 
@@ -216,8 +216,8 @@ other calls are not gated: `protocol.ts` lines 503 and 599, and
 an encoding failure, which can include a value the handler held. Line 547 logs
 only structural diagnostics.
 What should happen: the service's logger passes through the redactor before
-Shepherd registers any extension handler, and a test greps its output for
-planted secrets, as decision 57 requires. Shepherd never sets `logIncoming`,
+Shephrd registers any extension handler, and a test greps its output for
+planted secrets, as decision 57 requires. Shephrd never sets `logIncoming`,
 `logOutgoing` or `logger` outside tests.
 Rule for the units that run ACP (6a, 6d and 7a): install the redacting service
 logger before constructing any ACP runner or handler. Keep wire logging off,
@@ -225,7 +225,7 @@ except behind the temporary-home test gate of decision 74. Test planted secrets
 through four paths: the core path, notification handlers, extension-handler
 defects, and encoding failures.
 Why it matters: until then, a handler defect could write a secret to the log.
-No Shepherd code registers a handler yet, so nothing leaks today.
+No Shephrd code registers a handler yet, so nothing leaks today.
 
 What changed in unit 7a: the service installs the redacting logger before
 building the runner or handler. The registry includes the owner credential,
@@ -244,8 +244,8 @@ State: open; belongs to the unit that starts harness processes.
 What happens: `mergeProviderInstanceEnvironment` (`instanceEnvironment.ts`) and
 `makeClaudeEnvironment` (`ClaudeHome.ts`) use `process.env` when the caller
 passes no base environment.
-What should happen: Shepherd always passes an explicit base environment, so an
-agent gets exactly `SHEPHERD_SOCKET` and `SHEPHERD_TOKEN` and what the harness
+What should happen: Shephrd always passes an explicit base environment, so an
+agent gets exactly `SHEPHRD_SOCKET` and `SHEPHRD_TOKEN` and what the harness
 needs, as decision 57 says.
 Why it matters: a call without the argument would hand every variable of the
 service to a harness process.
@@ -261,17 +261,17 @@ mode.
 What should happen: tests pass only made-up values to it.
 Why it matters: a real token passed to it would sit in a temporary folder.
 
-## 16. The ACP schema generator cannot finish in Shepherd
+## 16. The ACP schema generator cannot finish in Shephrd
 
 Found: 2026-11-01, in the unit 2 security read.
 State: open; low priority.
 
 What happens: `effect-acp/scripts/generate.ts` downloads schema files from
 GitHub and ends by running `pnpm exec vp fmt`. The `vp` program belongs to the
-vite-plus tool, which Shepherd does not install, so the last step fails after
+vite-plus tool, which Shephrd does not install, so the last step fails after
 the files are written.
-What should happen: if Shepherd regenerates the schemas, the formatting step is
-replaced by a Shepherd tool, and the change is recorded in the README table.
+What should happen: if Shephrd regenerates the schemas, the formatting step is
+replaced by a Shephrd tool, and the change is recorded in the README table.
 Why it matters: someone running `generate` gets a confusing failure.
 
 ## 17. T3 Code has no unit test for the replay helpers
@@ -280,8 +280,8 @@ Found: 2026-11-01, in unit 2.
 State: fixed; recorded in `third_party/t3code/README.md`.
 
 What happened: criterion 2.4 needs a test named `replayTranscript.test.ts`, but
-T3 Code has none for `provider-testing`. A test was written for Shepherd, with
-a fixture, and the README table marks both as written for Shepherd.
+T3 Code has none for `provider-testing`. A test was written for Shephrd, with
+a fixture, and the README table marks both as written for Shephrd.
 What should happen: nothing further.
 Why it matters: the copied helpers would otherwise have no test at all.
 
@@ -294,10 +294,10 @@ What happened: after a frozen install, `import.meta.resolve` failed with
 `ERR_MODULE_NOT_FOUND` from `packages/engine` and `packages/testing` for the
 copied packages. Decision rows 23 and 71 require these edges before the
 manifests freeze.
-What should happen: `engine` depends on `@shepherd/t3-effect-acp`,
-`@shepherd/t3-node-sqlite` and `@shepherd/t3-provider-instance`. `testing`
-depends on `@shepherd/t3-effect-acp` and `@shepherd/t3-provider-testing`, all as
-`workspace:*`. Nothing depends on `@shepherd/t3-source-control`, which has no
+What should happen: `engine` depends on `@shephrd/t3-effect-acp`,
+`@shephrd/t3-node-sqlite` and `@shephrd/t3-provider-instance`. `testing`
+depends on `@shephrd/t3-effect-acp` and `@shephrd/t3-provider-testing`, all as
+`workspace:*`. Nothing depends on `@shephrd/t3-source-control`, which has no
 planned consumer. `testing` does not depend on the provider-instance copy,
 because unit 8a's fake agent only needs the protocol library and the replay
 helpers; unit 8a's harness defaults and environment builder live in `engine`.
@@ -630,8 +630,10 @@ Found: 2026-11-01, by the manager, in the owner-run re-record at 0318c78.
 State: open.
 
 What happens: `scrubText` replaces every value of the parent environment that
-is eight or more characters long. Under pnpm, `npm_package_name` is
-`shepherd`, so ordinary text such as a source note naming
+is eight or more characters long. Under pnpm, `npm_package_name` was
+`shepherd` when this was found (the product is now called Shephrd, whose
+seven-letter package name is below the limit, but the same over-scrubbing
+applies to any longer value), so ordinary text such as a source note naming
 `shepherd-engine` becomes `<redacted>-engine`. The re-recorded
 `errors/cursor-out-of-usage.json` was over-scrubbed this way, so the earlier
 committed copy was kept.
@@ -669,7 +671,7 @@ usage again, the owner re-records it so a real greeting exists. Unit 6a's
 mapping of this harness's out-of-usage reply should use this transcript
 together with `errors/cursor-out-of-usage.json`.
 Why it matters: the adapter reports running out of usage as ordinary agent
-text with a normal stop reason, so Shepherd cannot tell it from a reply by the
+text with a normal stop reason, so Shephrd cannot tell it from a reply by the
 stop reason alone.
 
 ## 39. The read-only connection exists only when the SQLite layer turns on its reader workers
@@ -1225,7 +1227,7 @@ Found: 2026-11-01, while building unit 5d.
 State: open for the contracts scope and unit 7.
 
 What happens: `WaitOpened` requires the waiter's agent identifier, and `Delivery.target` must be an agent. The engine therefore refuses a `wait` from the owner with "command refused".
-Why it matters: decision row 26 gives the owner's terminal `shepherd wait --block`. `AGENTS.md` rule 5 requires that what the owner can do from the terminal is also possible through the API.
+Why it matters: decision row 26 gives the owner's terminal `shephrd wait --block`. `AGENTS.md` rule 5 requires that what the owner can do from the terminal is also possible through the API.
 What should happen: the contracts give a wait an owner waiter, at least for blocking waits, which create no delivery.
 
 ## 76. Engine notices name the owner as their sender
@@ -2196,18 +2198,18 @@ agents the first run had just reloaded, and interrupt them again.
 What changed in unit 7a: a failed recovery exits the service with a nonzero
 status and closes its listener. The service never retries recovery in place.
 
-## 160. The fake agent's Shepherd command step does not speak the engine's protocol
+## 160. The fake agent's Shephrd command step does not speak the engine's protocol
 
 Found: 2026-11-01, while writing the unit 7a tests.
-State: fixed in unit 7b: the step uses the real `@shepherd/client`.
+State: fixed in unit 7b: the step uses the real `@shephrd/client`.
 
-What happens: the `shepherd_command` step in `packages/testing/src/fakeAgent.ts`
-opens a WebSocket to `SHEPHERD_SOCKET` and sends `{ command, input }` as JSON.
+What happens: the `shephrd_command` step in `packages/testing/src/fakeAgent.ts`
+opens a WebSocket to `SHEPHRD_SOCKET` and sends `{ command, input }` as JSON.
 That is not an Effect RPC request, and the step reports
-`shepherd_command:ok` on any reply at all, an error reply included.
+`shephrd_command:ok` on any reply at all, an error reply included.
 What should happen: the step sends a real RPC request through unit 7b's
 client and reports the reply's outcome.
-Why it matters: a test that trusts `shepherd_command:ok` would pass while the
+Why it matters: a test that trusts `shephrd_command:ok` would pass while the
 command failed. Unit 7a's tests do not use the step: criterion 7.10 reads
 the reloaded agent's token from the fake agent's echo file and calls through
 the test-only client in `packages/engine/test/support/socketClient.ts`.
@@ -2446,7 +2448,7 @@ Found: 2026-11-01, while checking the sibling tests for unit 7b.
 State: fixed in unit 7b: the fixture now calls `ask`.
 
 What happens: the test beginning at `packages/testing/test/fake-agent.test.ts:635`
-asks the `shepherd_command` step to call `post`, which is absent from the
+asks the `shephrd_command` step to call `post`, which is absent from the
 contracts' remote procedure call group. It checks the upgrade's bearer
 header, and accepts either an `ok` or a `failed` report. It cannot prove
 that a real command succeeded, or that an error reply was reported as a
@@ -2561,7 +2563,7 @@ Fix: F02 still requires exactly one `CommandRefused` for `accounts`. It now
 checks that no `AccountChanged` follows that refusal, excluding the account
 created by the setup helper before the agent's prompt.
 
-## 181. Foreground `shepherd serve` is not supported
+## 181. Foreground `shephrd serve` is not supported
 
 Found: 2026-11-01, while wiring `serve` in the command-line tool.
 State: open.
@@ -2593,7 +2595,7 @@ Found: 2026-11-01, while building the client's ancestry header.
 State: closed by the owner's ruling, unit 7b fix round 1.
 
 What happened: `packages/client/src/ancestry.ts` reads `/proc/<pid>/stat` to
-build `Shepherd-Ancestors`, and the engine's check had a macOS reader that the
+build `Shephrd-Ancestors`, and the engine's check had a macOS reader that the
 client had no counterpart for.
 Owner ruling, 2026-11-01, verbatim: "yeah linux only for now. shoud be easy
 enought to port to macos". Version 1 is Linux only.
@@ -2606,7 +2608,7 @@ owner credential is refused. Both take the platform as an argument for tests.
 Porting later: add the `ps -o ppid=,lstart=` reader (decision row 64) to both
 halves and lift the two platform checks.
 
-## 184. `shepherd mcp` discards its own logs
+## 184. `shephrd mcp` discards its own logs
 
 Found: 2026-11-01, while building the tool server.
 State: open.
@@ -2631,3 +2633,51 @@ state folder, and a process with that access already holds the owner's
 authority, so the link gives it no new data or authority.
 What could be added later: check that the credential is a regular file, owned
 by the user, with mode 0600, before reading it.
+
+## 190. The Herdr plugin manifest still lists macOS as a supported platform
+
+Found: 2026-11-01, during the rename to Shephrd.
+State: fixed in commit 7887d87 (manifest, frozen test, plan task 1f and decisions
+row 78 now say Linux only).
+
+What happens: `herdr-plugin.toml` said `platforms = ["macos", "linux"]`, and
+the frozen test `packages/engine/test/smoke/workspace-manifest.test.ts` (line
+297) asserts exactly that list. Version 1 runs on Linux only (decisions row
+78, issue 183), and the code refuses the owner credential off Linux.
+What should happen: the manifest lists only `linux` until the macOS port
+(feature list, section 4) is done. Changing it needs the test and plan task
+1f changed in the same step, so the rename left it as it was.
+Why it matters: Herdr on a Mac would offer to start a service whose
+ancestry check and leftover sweep do not work there.
+
+## 191. Planning records outside the rename's edit list still say Shepherd
+
+Found: 2026-11-01, during the rename to Shephrd.
+State: fixed in commit 7887d87 (the twelve prose lines now say Shephrd; slugs and
+paths are kept).
+
+What happens: `.plans/epics/shepherd-foundation/epic.md`, `.plans/roadmap.md`
+and the three `.plans/scopes/engine/*/scope.json` files (their `summary` and
+`why` text) still call the product Shepherd, because the rename task did not
+cover them. The plan folder path and the epic names are kept on purpose, so
+links do not break.
+What should happen: the text in those files uses Shephrd; their file paths and
+topic names stay.
+Why it matters: scope summaries are loaded into every worker's instructions,
+so they will keep teaching the old name.
+
+## 192. The fixture scrubber no longer hits the package name, and the old note is stale
+
+Found: 2026-11-01, during the rename to Shephrd.
+State: open.
+
+What happens: issue 37 was found because pnpm's `npm_package_name` was
+`shepherd`, eight characters, and the scrubber removed it. The new package
+name `shephrd` has seven characters, so the scrubber now leaves it alone, and
+the committed `errors/cursor-out-of-usage.json` keeps its source note
+naming the plan folder `shepherd-engine`. The rule in issue 37 (redact only
+values that can hold secrets) is still not built.
+What should happen: issue 37 is fixed on its own terms and does not depend on
+the length of the product's name.
+Why it matters: the next re-record could over-scrub another long, harmless
+variable and the cause would be hidden.

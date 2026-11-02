@@ -3,8 +3,8 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { it } from "@effect/vitest";
-import { AgentId, BootId, DeviceId, RequestId, type Event } from "@shepherd/contracts";
-import * as SqliteClient from "@shepherd/t3-node-sqlite/nodeSqliteClient";
+import { AgentId, BootId, DeviceId, RequestId, type Event } from "@shephrd/contracts";
+import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -24,9 +24,9 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/shepherd-redactor-fix-1-");
+  home = mkdtempSync("/tmp/shephrd-redactor-fix-1-");
   vi.stubEnv("HOME", home);
-  vi.stubEnv("SHEPHERD_HOME", home);
+  vi.stubEnv("SHEPHRD_HOME", home);
 });
 afterEach(() => {
   vi.restoreAllMocks();

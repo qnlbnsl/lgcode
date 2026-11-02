@@ -1,6 +1,6 @@
 import { realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
-import type { HarnessSettings } from "@shepherd/contracts";
+import type { HarnessSettings } from "@shephrd/contracts";
 
 // Defaults deliberately remain `none`: the first adapter accepts session
 // metadata only (issue 91); the other adapters have no verified launch rule.

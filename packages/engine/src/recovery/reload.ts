@@ -3,7 +3,7 @@
 // a session is reloaded through whichever method the peer advertised. The
 // shape was reused, no code.
 import { randomUUID } from "node:crypto";
-import { PermissionLevel, type Actor, type AgentId, type Event } from "@shepherd/contracts";
+import { PermissionLevel, type Actor, type AgentId, type Event } from "@shephrd/contracts";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";

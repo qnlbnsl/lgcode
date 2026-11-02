@@ -5,8 +5,8 @@ import { join } from "node:path";
 import {
   AgentId, DeviceId, Event as EventSchema, RequestId,
   type Actor, type Event, type LifecycleState, type PermissionLevel,
-} from "@shepherd/contracts";
-import * as SqliteClient from "@shepherd/t3-node-sqlite/nodeSqliteClient";
+} from "@shephrd/contracts";
+import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import type * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
@@ -54,7 +54,7 @@ export interface Rig {
 let defaultFolder = "/tmp";
 
 export const makeRig = (): Rig => {
-  const root = realpathSync(mkdtempSync("/tmp/shepherd-commands-"));
+  const root = realpathSync(mkdtempSync("/tmp/shephrd-commands-"));
   const rig = {
     root, home: join(root, "home"), stateFolder: join(root, "state"), pluginRoot: join(root, "plugin"),
     work: join(root, "work"), outside: join(root, "outside"), database: join(root, "events.sqlite"),

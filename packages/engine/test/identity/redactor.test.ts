@@ -5,9 +5,9 @@ import { fileURLToPath } from "node:url";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
-import { AgentId, DeliveryId, DeviceId, PermissionRequestId, RequestId, type Event } from "@shepherd/contracts";
-import * as AcpClient from "@shepherd/t3-effect-acp/client";
-import * as SqliteClient from "@shepherd/t3-node-sqlite/nodeSqliteClient";
+import { AgentId, DeliveryId, DeviceId, PermissionRequestId, RequestId, type Event } from "@shephrd/contracts";
+import * as AcpClient from "@shephrd/t3-effect-acp/client";
+import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -31,9 +31,9 @@ import { Redactor } from "../../src/log/Redactor.ts";
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/shepherd-redactor-");
+  home = mkdtempSync("/tmp/shephrd-redactor-");
   vi.stubEnv("HOME", home);
-  vi.stubEnv("SHEPHERD_HOME", home);
+  vi.stubEnv("SHEPHRD_HOME", home);
 });
 afterEach(() => { vi.unstubAllEnvs(); rmSync(home, { recursive: true, force: true }); });
 
@@ -238,11 +238,11 @@ it.live("5.11 fake agent: catches a printed token or account key reaching event,
       secrets: () => [Redacted.make(secret)], tokenHashes: () => new Set([minted.tokenHash]),
     });
     const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    const child = yield* spawner.spawn(ChildProcess.make(process.execPath, [fileURLToPath(import.meta.resolve("@shepherd/testing/fakeAgent"))], {
+    const child = yield* spawner.spawn(ChildProcess.make(process.execPath, [fileURLToPath(import.meta.resolve("@shephrd/testing/fakeAgent"))], {
       cwd: home,
       env: {
-        HOME: home, SHEPHERD_HOME: home, TMPDIR: home, PATH: "/usr/bin:/bin",
-        SHEPHERD_TOKEN: raw, ACCOUNT_KEY: secret,
+        HOME: home, SHEPHRD_HOME: home, TMPDIR: home, PATH: "/usr/bin:/bin",
+        SHEPHRD_TOKEN: raw, ACCOUNT_KEY: secret,
         FAKE_AGENT_SCRIPT: JSON.stringify({ turns: [[{ step: "print_env" }]] }),
       },
     }));

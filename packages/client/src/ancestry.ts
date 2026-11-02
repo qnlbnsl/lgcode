@@ -33,5 +33,5 @@ export const ancestryHeaders = (
   } catch {
     throw new ClientError({ message: "the process ancestry cannot be read from /proc" })
   }
-  return { "Shepherd-Ancestors": chain.join(","), "Shepherd-Process-Group": group }
+  return { "Shephrd-Ancestors": chain.join(","), "Shephrd-Process-Group": group }
 }

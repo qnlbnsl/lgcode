@@ -3,8 +3,8 @@ coverage/
 .vitest/
 **/test/.state/
 **/tests/.state/
-**/test/**/shepherd-state/
-**/tests/**/shepherd-state/
+**/test/**/shephrd-state/
+**/tests/**/shephrd-state/
 **/test/**/*.sqlite*
 **/tests/**/*.sqlite*
 .foundry/

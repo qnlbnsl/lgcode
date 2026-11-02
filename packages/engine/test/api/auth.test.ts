@@ -9,7 +9,7 @@ import { chmodSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, it } from "@effect/vitest";
-import { DeviceId } from "@shepherd/contracts";
+import { DeviceId } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";

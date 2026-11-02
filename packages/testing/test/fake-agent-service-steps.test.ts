@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url"
 
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { assert, it } from "@effect/vitest"
-import * as AcpClient from "@shepherd/t3-effect-acp/client"
+import * as AcpClient from "@shephrd/t3-effect-acp/client"
 import * as Effect from "effect/Effect"
 import * as Fiber from "effect/Fiber"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
@@ -23,7 +23,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process"
 const fakeAgentPath = fileURLToPath(new URL("../src/fakeAgent.ts", import.meta.url))
 
 const temporaryFolder = Effect.acquireRelease(
-  Effect.promise(() => mkdtemp(join(tmpdir(), "shepherd-fake-agent-7a-"))),
+  Effect.promise(() => mkdtemp(join(tmpdir(), "shephrd-fake-agent-7a-"))),
   (folder) => Effect.promise(() => rm(folder, { recursive: true, force: true }))
 )
 
@@ -57,12 +57,12 @@ live("exec runs node with the given arguments in the agent's process group, stri
       "import { readFileSync, writeFileSync } from 'node:fs'",
       "const stat = (pid) => { const t = readFileSync(`/proc/${pid}/stat`, 'utf8'); return t.slice(t.lastIndexOf(')') + 2).split(' ') }",
       "writeFileSync(process.argv[2], JSON.stringify({ argv: process.argv.slice(2), ppid: process.ppid, group: Number(stat(process.pid)[2]),",
-      "  socket: process.env.SHEPHERD_SOCKET ?? null, token: process.env.SHEPHERD_TOKEN ?? null, kept: process.env.KEPT_VALUE ?? null }))",
+      "  socket: process.env.SHEPHRD_SOCKET ?? null, token: process.env.SHEPHRD_TOKEN ?? null, kept: process.env.KEPT_VALUE ?? null }))",
       "process.exit(7)"
     ].join("\n")))
     const env = {
-      PATH: "/usr/bin:/bin", HOME: home, SHEPHERD_SOCKET: "/tmp/planted.sock", SHEPHERD_TOKEN: "planted-token", KEPT_VALUE: "kept",
-      FAKE_AGENT_SCRIPT: JSON.stringify({ turns: [[{ step: "exec", argv: [caller, report, "second"], strip: ["SHEPHERD_SOCKET", "SHEPHERD_TOKEN"] }]] })
+      PATH: "/usr/bin:/bin", HOME: home, SHEPHRD_SOCKET: "/tmp/planted.sock", SHEPHRD_TOKEN: "planted-token", KEPT_VALUE: "kept",
+      FAKE_AGENT_SCRIPT: JSON.stringify({ turns: [[{ step: "exec", argv: [caller, report, "second"], strip: ["SHEPHRD_SOCKET", "SHEPHRD_TOKEN"] }]] })
     }
     const handle = yield* spawner.spawn(ChildProcess.make(process.execPath, [fakeAgentPath], { cwd: home, env, detached: true }))
     const texts: Array<string> = []

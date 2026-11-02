@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { it } from "@effect/vitest";
 import {
   AgentId, BootId, EventEnvelope, RequestId, type Actor, type Event,
-} from "@shepherd/contracts";
-import * as SqliteClient from "@shepherd/t3-node-sqlite/nodeSqliteClient";
+} from "@shephrd/contracts";
+import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Result from "effect/Result";
@@ -21,8 +21,8 @@ import * as Redactor from "../../src/log/Redactor.ts";
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/shepherd-append-");
-  vi.stubEnv("SHEPHERD_HOME", home);
+  home = mkdtempSync("/tmp/shephrd-append-");
+  vi.stubEnv("SHEPHRD_HOME", home);
 });
 afterEach(() => {
   vi.unstubAllEnvs();
