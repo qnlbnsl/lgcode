@@ -2637,9 +2637,10 @@ by the user, with mode 0600, before reading it.
 ## 190. The Herdr plugin manifest still lists macOS as a supported platform
 
 Found: 2026-11-01, during the rename to Shephrd.
-State: open.
+State: fixed in commit 7887d87 (manifest, frozen test, plan task 1f and decisions
+row 78 now say Linux only).
 
-What happens: `herdr-plugin.toml` says `platforms = ["macos", "linux"]`, and
+What happens: `herdr-plugin.toml` said `platforms = ["macos", "linux"]`, and
 the frozen test `packages/engine/test/smoke/workspace-manifest.test.ts` (line
 297) asserts exactly that list. Version 1 runs on Linux only (decisions row
 78, issue 183), and the code refuses the owner credential off Linux.
@@ -2652,7 +2653,8 @@ ancestry check and leftover sweep do not work there.
 ## 191. Planning records outside the rename's edit list still say Shepherd
 
 Found: 2026-11-01, during the rename to Shephrd.
-State: open.
+State: fixed in commit 7887d87 (the twelve prose lines now say Shephrd; slugs and
+paths are kept).
 
 What happens: `.plans/epics/shepherd-foundation/epic.md`, `.plans/roadmap.md`
 and the three `.plans/scopes/engine/*/scope.json` files (their `summary` and
