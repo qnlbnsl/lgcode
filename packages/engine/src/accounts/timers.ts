@@ -49,12 +49,17 @@ export const startAccountTimers: Effect.Effect<void, never, Scope.Scope | EventL
   // never more than a minute.
   const tick = Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis;
+    const attempted = new Map<AccountId, number>();
     for (const due of (yield* deadlines).filter((entry) => entry.resetAt <= now)) {
+      attempted.set(due.accountId, due.resetAt);
       yield* release(due.accountId, due.resetAt);
     }
     const later = yield* Clock.currentTimeMillis;
-    // A deadline that is still due failed to release; it waits a minute.
-    const next = (yield* deadlines).map((entry) => entry.resetAt - later).filter((remaining) => remaining > 0);
+    // Only a deadline actually attempted above gets the one-minute retry.
+    // One that became due during this check needs an immediate recheck.
+    const next = (yield* deadlines)
+      .filter((entry) => attempted.get(entry.accountId) !== entry.resetAt)
+      .map((entry) => Math.max(0, entry.resetAt - later));
     return Math.min(RECHECK_MILLIS, ...next);
   }).pipe(Effect.catchCause((cause) => Cause.hasInterrupts(cause)
     ? Effect.failCause(cause)
