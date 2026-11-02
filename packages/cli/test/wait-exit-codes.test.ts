@@ -51,19 +51,26 @@ const noWaitDelivery = (events: ReadonlyArray<EventEnvelope>): void => {
     && envelope.event.delivery.source?._tag === "wait" && ids.has(envelope.event.delivery.source.id));
   expect(deliveries).toHaveLength(0);
 };
-const setup = () => Effect.gen(function* () {
+const workingScript = { turns: [[{ step: "plan", entries: [] }, { step: "slow", ms: 120_000 }]] };
+
+const setup = (busy = false) => Effect.gen(function* () {
   const root = makeServiceRoot("/tmp/s7w-");
   const service = startService(root, { env: { SHEPHERD_TEST_DEBUG: "1" } });
   yield* waitServing(root, service);
   const owner = yield* ownerClient(root);
-  const parent = yield* startFakeAgent(root, owner, owner, { name: "Wait caller", script: { turns: [] } });
+  const before = yield* head(owner);
+  const parent = yield* startFakeAgent(root, owner, owner, {
+    name: "Wait caller", script: busy ? workingScript : { turns: [] },
+    ...(busy ? { prompt: "Hold this turn open while waiting for members." } : {}),
+  });
+  // A real caller waits from inside a turn. An idle holder's requests move
+  // to the owner before an already-held wait can observe them (issue 179).
+  if (busy) yield* eventAfter(owner, before, (envelope) => envelope.agentId === parent.agentId && envelope.event._tag === "DeliveryAccepted");
   const identity = yield* agentToken(parent);
   const caller = yield* connect(root.socket, identity.token);
   const environment = { ...serviceEnvironment(root), SHEPHERD_SOCKET: root.socket, SHEPHERD_TOKEN: identity.token };
   return { root, service, owner, parent, caller, environment, callerToken: identity.token };
 });
-
-const workingScript = { turns: [[{ step: "plan", entries: [] }, { step: "slow", ms: 120_000 }]] };
 
 // A fake executable registered under a recognised harness id exercises the
 // real error classifier; no real harness executable is ever launched.
@@ -128,7 +135,7 @@ for (const [reasons, code] of precedence) {
 for (const subject of ["permission", "question"] as const) {
   for (const timing of ["already held", "arrives while blocked"] as const) {
     it(`W02 ${subject} ${timing} catches a blocking wait deadlocking its caller on a held request/question`, async () => run(Effect.gen(function* () {
-      const context = yield* setup();
+      const context = yield* setup(true);
       const beforeMember = yield* head(context.owner);
       const permissionGate = join(context.root.root, "permission-gate");
       const member = yield* startFakeAgent(context.root, context.owner, context.caller, {

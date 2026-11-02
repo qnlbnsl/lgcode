@@ -2463,7 +2463,7 @@ the invalid wire protocol described in issue 160.
 ## 179. The frozen wait test "already held" races the owner moving the question
 
 Found: 2026-11-01, while building unit 7b's command-line tool.
-State: open for the lead and the test writer.
+State: fixed by keeping the W02 caller inside an accepted, open turn.
 
 What happens: in `packages/cli/test/wait-exit-codes.test.ts`, the two W02
 "already held" cases (permission and question) fail intermittently, and
@@ -2480,10 +2480,15 @@ should state which outcome a wait after the move must have.
 Why it matters: the criterion cannot be observed reliably, and the command-line
 tool's exit code 0 with the "request held" message is untested by a stable test.
 
+Fix: the W02 cases start the parent with a long-running scripted turn and wait
+for its `DeliveryAccepted` before routing a request. The parent remains busy
+when the blocking wait opens. The assertions still require exit code 0, the
+held-request message, and `WaitCancelled` with reason `request held`.
+
 ## 180. The frozen test F02 cannot pass: its own setup emits an account event
 
 Found: 2026-11-01, while building unit 7b's fake-agent client step.
-State: open for the lead and the test writer.
+State: fixed by checking account events after the refused command.
 
 What happens: `packages/testing/test/fake-agent-client-step.test.ts`, case
 F02, records the event sequence before it starts the fake agent. It then
@@ -2495,6 +2500,10 @@ What should happen: take the sequence mark after `startFakeAgent` returns, or
 check that no `AccountChanged` names a different account than the agent's own.
 Why it matters: the test cannot show that a refused owner-only command changed
 nothing.
+
+Fix: F02 still requires exactly one `CommandRefused` for `accounts`. It now
+checks that no `AccountChanged` follows that refusal, excluding the account
+created by the setup helper before the agent's prompt.
 
 ## 181. Foreground `shepherd serve` is not supported
 

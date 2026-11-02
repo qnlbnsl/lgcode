@@ -46,7 +46,10 @@ for (const scenario of [
       expect(question).toMatchObject({ agentId: agent.agentId, text: scenario.input.text });
     } else {
       expect(events.filter((envelope) => envelope.event._tag === "CommandRefused" && envelope.event.command === "accounts")).toHaveLength(1);
-      expect(events.some((envelope) => envelope.event._tag === "AccountChanged")).toBe(false);
+      // Account creation belongs to startFakeAgent, before the prompt. Only
+      // events after this command's refusal can show an unintended change.
+      const refused = events.find((envelope) => envelope.event._tag === "CommandRefused" && envelope.event.command === "accounts")!;
+      expect(events.some((envelope) => envelope.sequence > refused.sequence && envelope.event._tag === "AccountChanged")).toBe(false);
     }
     expect(JSON.stringify(events).includes(identity.token), "agent token reached an event").toBe(false);
     expect(service.output().includes(identity.token), "agent token reached service output").toBe(false);
