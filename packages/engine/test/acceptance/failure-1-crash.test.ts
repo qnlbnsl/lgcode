@@ -65,7 +65,8 @@ scenario("1 crash: the crash is written with the exit code and the error output'
   expect(cancelled[0]!.sequence).toBeGreaterThan(requested[0]!.sequence);
   expect(tagged(settled, "PermissionAnswered", agent.agentId), "a crash answered the request").toHaveLength(0);
   const needed = tagged(settled, "OwnerNeeded", agent.agentId).filter((envelope) => envelope.sequence > requested[0]!.sequence);
-  expect(needed.some((envelope) => (envelope.event as unknown as { reason: string }).reason === "agent crashed"), "the owner was not told about the crash").toBe(true);
+  const crashNotices = (events: typeof needed) => events.filter((envelope) => (envelope.event as unknown as { reason: string }).reason === "agent crashed");
+  expect(crashNotices(needed), "the owner was not told about the crash exactly once").toHaveLength(1);
 
   // The engine does not restart it: the process is gone, the token is dead, and no start follows.
   yield* waitFor("the crashed process to be gone", () => (alive(pid) ? undefined : true));
@@ -74,6 +75,10 @@ scenario("1 crash: the crash is written with the exit code and the error output'
   expect(tagged(yield* since(w.owner, crashed[0]!.sequence), "SessionOpened", agent.agentId), "the engine opened a new session for a crashed agent").toHaveLength(0);
   expect(tagged(yield* since(w.owner, crashed[0]!.sequence), "AgentStarted", agent.agentId)).toHaveLength(0);
   expect(peekEcho(agent.echo)!.pid, "a second process wrote the echo file").toBe(pid);
+  // Late duplicates: the owner is still told once after everything above settled.
+  yield* Effect.sleep(1_000);
+  const lastLook = tagged(yield* since(w.owner, mark), "OwnerNeeded", agent.agentId).filter((envelope) => envelope.sequence > requested[0]!.sequence);
+  expect(crashNotices(lastLook), "the owner was told about the crash more than once").toHaveLength(1);
 }));
 
 scenario("1 crash: a parent that waits on the crashing child is woken once and the owner is not bothered (breaks if the waiter is never woken, woken twice, or the owner is called although a parent can act)", (w) => Effect.gen(function* () {

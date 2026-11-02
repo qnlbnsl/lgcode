@@ -6,7 +6,7 @@ import { afterEach, expect } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
 import {
-  eventsUntil, isTag, peekEcho, plantDatabaseFault, promptsOf, refusal, requestId, scenario, since, stopAllServices, tagged,
+  eventsUntil, isTag, peekEcho, plantDatabaseFault, promptsOf, refusal, requestId, runSql, scenario, since, stopAllServices, tagged,
 } from "../support/acceptance.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
@@ -81,6 +81,15 @@ scenario("3 atomic: when a command's last event cannot be written, none of its e
   expect(tagged(after, "PermissionMoved"), "part of the failed command is in the log").toHaveLength(0);
   expect(tagged(after, "OwnerNeeded")).toHaveLength(0);
 
-  // The final comparison of the views with a rebuild from the log shows the failed command left nothing in either.
+  // The engine is latched after the failed write and takes no commands, so the
+  // final check needs a restart with the fault removed. The restart rebuilds
+  // every view from the log, and the final comparison then shows the failed
+  // command left nothing in the log or in the views.
   writeFileSync(gate, "go");
+  yield* w.kill("SIGKILL");
+  runSql(w.root, "DROP TRIGGER planted_atomic");
+  yield* w.boot();
+  const history = yield* since(w.owner, 0);
+  expect(tagged(history, "PermissionMoved", child.agentId), "part of the failed command is in the log after the restart").toHaveLength(0);
+  expect(tagged(history, "OwnerNeeded", child.agentId)).toHaveLength(0);
 }));

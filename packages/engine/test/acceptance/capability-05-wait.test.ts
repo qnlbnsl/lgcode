@@ -109,3 +109,52 @@ scenario("5 wait: the owner has no waiter and an agent cannot wait on an agent i
   expect(yield* refusal(w.owner.wait({ requestId: requestId(), members: [members[0]!.agentId], mode: "all", block: true } as never))).toBeDefined();
   expect(yield* refusal(strangerClient.wait({ requestId: requestId(), members: [members[0]!.agentId], mode: "all", block: false } as never))).toBeDefined();
 }));
+
+scenario("5 wait (nested): an orchestrator waiting on a lead is not woken while the lead still waits on its own worker, and is woken exactly once, after the lead has handled its own wake (breaks if a lead with an open non-blocking wait counts as settled, so the orchestrator is woken early or at the moment it starts waiting)", (w) => Effect.gen(function* () {
+  const orchestrator = yield* w.start(w.owner, { name: "Orchestrator", role: "orchestrator", permission: "edit", prompt: "Start." });
+  yield* eventsUntil(w.owner, 0, "the orchestrator's first turn", isTag("TurnEnded", orchestrator.agentId));
+  const orchestratorClient = yield* w.asAgent((yield* w.token(orchestrator)).token);
+  const lead = yield* w.start(orchestratorClient, {
+    name: "Lead", role: "lead", permission: "edit", prompt: "Plan.",
+    script: { turns: [[{ step: "text", text: "planned" }], [{ step: "text", text: "handled the wake" }]] },
+  });
+  yield* eventsUntil(w.owner, 0, "the lead's first turn", isTag("TurnEnded", lead.agentId));
+  const leadClient = yield* w.asAgent((yield* w.token(lead)).token);
+  const gate = join(w.root.root, "gate-worker");
+  const worker = yield* w.start(leadClient, {
+    name: "Worker", permission: "edit", prompt: "Work.",
+    script: { turns: [[{ step: "wait_for_file", path: gate }, { step: "text", text: "worked" }]] },
+  });
+  const mark = yield* w.watermark();
+
+  // The lead waits on the worker, then the orchestrator waits on the lead. The
+  // lead is idle with nothing queued, so only its open wait keeps it unsettled.
+  const leadWait = yield* leadClient.wait({ requestId: requestId(), members: [worker.agentId], mode: "all", block: false } as never) as unknown as Effect.Effect<{ waitId: string; outcome: string }>;
+  expect(leadWait.outcome).toBe("opened");
+  const upperWait = yield* orchestratorClient.wait({ requestId: requestId(), members: [lead.agentId], mode: "all", block: false } as never) as unknown as Effect.Effect<{ waitId: string; outcome: string }>;
+  expect(upperWait.outcome, "the lead counted as settled while its own wait was open").toBe("opened");
+
+  yield* Effect.sleep(1_500);
+  const early = yield* since(w.owner, mark);
+  expect(tagged(early, "WaitSatisfied"), "a wait was satisfied while the worker was still working").toHaveLength(0);
+  expect(wakes(early, orchestrator.agentId), "the orchestrator was woken early").toHaveLength(0);
+  expect(wakes(early, lead.agentId), "the lead was woken early").toHaveLength(0);
+
+  writeFileSync(gate, "go");
+  yield* eventsUntil(w.owner, mark, "the orchestrator to take its wake", isTag("DeliveryAccepted", orchestrator.agentId));
+  // Nothing more follows for either wait: both wakes are single.
+  yield* Effect.sleep(1_000);
+  const settled = yield* since(w.owner, mark);
+  const satisfied = tagged(settled, "WaitSatisfied").map((envelope) => ({ sequence: envelope.sequence, ...(envelope.event as unknown as { waitId: string; agentId: string }) }));
+  expect(satisfied.filter((entry) => entry.waitId === leadWait.waitId)).toHaveLength(1);
+  expect(satisfied.filter((entry) => entry.waitId === upperWait.waitId), "the orchestrator's wait was satisfied other than once").toHaveLength(1);
+  expect(wakes(settled, lead.agentId)).toHaveLength(1);
+  expect(wakes(settled, orchestrator.agentId), "the orchestrator was woken other than once").toHaveLength(1);
+  // The orchestrator's wait ended after the lead's turn that handled its own wake.
+  const handled = tagged(settled, "TurnEnded", lead.agentId);
+  expect(handled).toHaveLength(1);
+  expect(satisfied.find((entry) => entry.waitId === upperWait.waitId)!.sequence).toBeGreaterThan(handled[0]!.sequence);
+  const prompts = promptsOf(peekEcho(orchestrator.echo)!);
+  expect(prompts).toHaveLength(2);
+  expect(prompts[1]).toContain(`agent ${lead.agentId}: settled`);
+}));

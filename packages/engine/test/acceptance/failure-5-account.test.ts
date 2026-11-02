@@ -128,3 +128,72 @@ scenario("5 account: a usage limit pauses the agent with the reset time the adap
   const backEvents = yield* eventsUntil(w.owner, clearMark, "the new agent to be placed", (envelope) => envelope.event._tag === "AgentStarted" && envelope.agentId === back.agentId);
   expect(accountOf(backEvents, back.agentId)).toBe("acct-limit");
 }));
+
+// One agent on an account of its own, whose second turn hits a usage limit
+// that resets at `resetAt`. Nothing else uses the account, so only the reset
+// can bring it back.
+const limited = (w: World, accountId: string, resetAt: number) => Effect.gen(function* () {
+  const sick = yield* w.start(w.owner, {
+    name: "Limited", accountId, harness: "claude", prompt: "Go.",
+    script: { turns: [[], [{ step: "out_of_usage", message: "You've hit your usage limit", resetsAt: new Date(resetAt).toISOString() }]] },
+  });
+  yield* eventsUntil(w.owner, 0, "the first turn", isTag("TurnEnded", sick.agentId));
+  return sick;
+});
+
+const pausedBy = (agentId: string) => (envelope: { agentId?: string; event: { _tag: string } }): boolean =>
+  envelope.event._tag === "StateChanged" && envelope.agentId === agentId && (envelope.event as unknown as { state: { _tag: string } }).state._tag === "paused";
+
+const sentIds = (events: ReadonlyArray<{ agentId?: string; event: { _tag: string } }>, agentId: string): ReadonlyArray<string> =>
+  tagged(events as never, "DeliverySent", agentId).map((envelope) => (envelope.event as unknown as { deliveryId: string }).deliveryId);
+
+scenario("5 account: an account out of usage returns on its own at the reset time the adapter gave, and the work queued behind the limit is delivered in order without the owner doing anything (breaks if the reset time is never acted on, the account comes back before it, or the queued work is lost)", (w) => Effect.gen(function* () {
+  const resetAt = Date.now() + 10_000;
+  const sick = yield* limited(w, "acct-auto", resetAt);
+  const mark = yield* w.watermark();
+  const first = yield* w.owner.prompt({ requestId: requestId(), agentId: sick.agentId, text: "Before the limit." } as never) as unknown as Effect.Effect<{ deliveryId: string }>;
+  const paused = yield* eventsUntil(w.owner, mark, "the agent to pause", pausedBy(sick.agentId));
+  expect(tagged(paused, "AccountOutOfUsage")[0]!.event).toMatchObject({ accountId: "acct-auto", resetAt });
+  const second = yield* w.owner.prompt({ requestId: requestId(), agentId: sick.agentId, text: "While paused." } as never) as unknown as Effect.Effect<{ deliveryId: string }>;
+  expect(tagged(paused, "AccountAvailable"), "the account came back before its reset time").toHaveLength(0);
+  expect(Date.now(), "the host was too slow for the reset to be in the future").toBeLessThan(resetAt);
+
+  // The owner does nothing. The account returns by itself, once, not before the reset time.
+  const after = yield* eventsUntil(w.owner, mark, "both messages to be taken", (envelope) =>
+    envelope.event._tag === "DeliveryAccepted" && envelope.agentId === sick.agentId
+    && (envelope.event as unknown as { deliveryId: string }).deliveryId === second.deliveryId, 40_000);
+  const available = tagged(after, "AccountAvailable");
+  expect(available, "the account did not return by itself exactly once").toHaveLength(1);
+  expect(available[0]!.event).toMatchObject({ accountId: "acct-auto", cause: "usage reset" });
+  expect(available[0]!.occurredAt, "the account came back before its reset time").toBeGreaterThanOrEqual(resetAt);
+  // The first message was sent once before the limit (and put back); only what is sent after the account returned counts.
+  const afterReturn = after.filter((envelope) => envelope.sequence > available[0]!.sequence);
+  expect(sentIds(afterReturn, sick.agentId), "the queued work was lost or delivered out of order").toEqual([first.deliveryId, second.deliveryId]);
+}));
+
+scenario("5 account: a reset time that passes while the service is down is acted on when the service starts again, and the work queued behind the limit is delivered (breaks if the engine forgets a pending reset across a restart, or waits a minute or more for it)", (w) => Effect.gen(function* () {
+  const resetAt = Date.now() + 12_000;
+  const sick = yield* limited(w, "acct-overdue", resetAt);
+  const mark = yield* w.watermark();
+  // The message that meets the limit is put back in the queue and waits there.
+  // (One message only: the fake agent starts its script again after a reload, so
+  // a second message would meet the scripted limit a second time.)
+  const queued = yield* w.owner.prompt({ requestId: requestId(), agentId: sick.agentId, text: "Before the limit." } as never) as unknown as Effect.Effect<{ deliveryId: string }>;
+  const paused = yield* eventsUntil(w.owner, mark, "the agent to pause", pausedBy(sick.agentId));
+  expect(tagged(paused, "DeliveryRequeued", sick.agentId).map((envelope) => (envelope.event as unknown as { deliveryId: string }).deliveryId)).toContain(queued.deliveryId);
+  expect(Date.now(), "the host was too slow: the reset passed before the service was stopped").toBeLessThan(resetAt - 1_000);
+
+  yield* w.kill("SIGKILL");
+  yield* Effect.sleep(Math.max(0, resetAt - Date.now() + 500));
+  yield* w.boot();
+
+  const after = yield* eventsUntil(w.owner, mark, "the queued message to be taken", (envelope) =>
+    envelope.event._tag === "DeliveryAccepted" && envelope.agentId === sick.agentId
+    && (envelope.event as unknown as { deliveryId: string }).deliveryId === queued.deliveryId, 40_000);
+  const available = tagged(after, "AccountAvailable");
+  expect(available, "the overdue reset was not acted on exactly once").toHaveLength(1);
+  expect(available[0]!.event).toMatchObject({ accountId: "acct-overdue", cause: "usage reset" });
+  expect(available[0]!.occurredAt, "the account came back before its reset time").toBeGreaterThanOrEqual(resetAt);
+  const afterReturn = after.filter((envelope) => envelope.sequence > available[0]!.sequence);
+  expect(sentIds(afterReturn, sick.agentId), "the queued work was lost").toEqual([queued.deliveryId]);
+}));

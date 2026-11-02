@@ -64,6 +64,12 @@ export interface Spec {
   readonly folder?: string;
   // Account variables beside the script and echo file.
   readonly environment?: Record<string, string>;
+  // Start with `any account` of the harness instead of the named one made
+  // here, so the engine has to pick (the one made here is then the only
+  // account with no agent on it).
+  readonly anyAccount?: boolean;
+  // The request identifier of the start call, to send the same call twice.
+  readonly requestId?: string;
 }
 
 export interface Started {
@@ -96,6 +102,10 @@ export interface World {
   // Every secret value a scenario creates (tokens, stored secrets). The
   // final check proves none reached an event or the service's output.
   readonly secrets: Set<string>;
+  // Every reply and refusal the scenario's clients received, as JSON text.
+  readonly replies: ReadonlyArray<string>;
+  // Adds every token a fake agent has recorded so far to `secrets`.
+  readonly collectTokens: () => void;
   // Starts a service on this root (again, after a kill) and waits until it
   // serves. Replaces `service` and `owner`.
   readonly boot: (options?: { readonly env?: Record<string, string | undefined> }) => Effect.Effect<ServiceProcess, unknown, Scope.Scope>;
@@ -104,6 +114,11 @@ export interface World {
   // A client with this agent token, as the agent's own tool would connect.
   readonly asAgent: (token: string) => Effect.Effect<Client, ClientError, Scope.Scope>;
   readonly start: (caller: Client, spec?: Spec) => Effect.Effect<Started, unknown>;
+  // Makes the harness and the account that `start` would use, without
+  // starting anything, so a scenario can send the start call itself.
+  readonly prepare: (spec?: Spec) => Effect.Effect<Started & { readonly request: Record<string, unknown> }, unknown>;
+  // Every service process this scenario started, oldest first.
+  readonly incarnations: ReadonlyArray<ServiceProcess>;
   readonly token: (agent: Started, notPid?: number) => Effect.Effect<{ readonly token: string; readonly pid: number; readonly echo: Echo }>;
   readonly watermark: () => Effect.Effect<number>;
 }
@@ -208,20 +223,119 @@ const readOwnerCredential = (root: ServiceRoot): ReadonlyArray<string> => {
   } catch { return []; }
 };
 
+// ---- The secret scan (criterion 8.5, security rules) ---------------------
+//
+// A value can reach an event or an output in more forms than the raw one: JSON
+// escaped, base64 at any alignment inside a longer text, base64url, hex, and
+// percent encoded. `findLeaks` looks for every form of every secret in every
+// source and returns only labels ("secret 3 (base64) in output of process 2"),
+// never a value, so a failing scan does not print the credential it found.
+const base64Forms = (value: string): ReadonlyArray<string> => {
+  const bytes = Buffer.from(value, "utf8");
+  return [0, 1, 2].flatMap((offset) => {
+    // Inside a longer text, only the characters whose six bits all come from
+    // the value are the same whatever surrounds it.
+    const encoded = Buffer.concat([Buffer.alloc(offset), bytes]).toString("base64");
+    const from = Math.ceil(offset * 8 / 6);
+    const to = Math.floor((offset + bytes.length) * 8 / 6);
+    return to > from ? [encoded.slice(from, to)] : [];
+  });
+};
+
+const formsOf = (value: string): ReadonlyArray<readonly [string, string]> => {
+  const url = (text: string) => text.replaceAll("+", "-").replaceAll("/", "_");
+  return [
+    ["raw", value],
+    ["json", JSON.stringify(value).slice(1, -1)],
+    ...base64Forms(value).map((form) => ["base64", form] as const),
+    ...base64Forms(value).map((form) => ["base64url", url(form)] as const),
+    ["hex", Buffer.from(value, "utf8").toString("hex")],
+    ["percent", encodeURIComponent(value)],
+  ];
+};
+
+export interface LeakSource {
+  readonly label: string;
+  readonly text: string;
+}
+
+export const findLeaks = (secrets: Iterable<string>, sources: ReadonlyArray<LeakSource>): ReadonlyArray<string> => {
+  const found = new Set<string>();
+  let index = 0;
+  for (const secret of secrets) {
+    index += 1;
+    const seen = new Set<string>();
+    for (const [form, needle] of formsOf(secret)) {
+      // A form that equals one already tried (a plain secret is its own JSON
+      // and percent form) is reported once, under the first name.
+      if (needle.length < 8 || seen.has(needle)) continue;
+      seen.add(needle);
+      for (const source of sources) if (source.text.includes(needle)) found.add(`secret ${index} (${form}) in ${source.label}`);
+    }
+  }
+  return [...found];
+};
+
+// Each agent's own words in one string, text items only, so a secret that an
+// agent's output split over two items is one string again.
+export const threadSources = (events: ReadonlyArray<EventEnvelope>): ReadonlyArray<LeakSource> => {
+  const byAgent = new Map<string, string>();
+  for (const envelope of events) {
+    if (envelope.event._tag !== "ThreadItem" || envelope.agentId === undefined) continue;
+    const content = (envelope.event as { content: { _tag: string; text?: string } }).content;
+    if (content._tag === "text") byAgent.set(envelope.agentId, (byAgent.get(envelope.agentId) ?? "") + (content.text ?? ""));
+  }
+  return [...byAgent.values()].map((text, index) => ({ label: `thread of agent ${index + 1}`, text }));
+};
+
+// A reply or a refusal, as the text a scan reads.
+const show = (value: unknown): string => {
+  try {
+    if (value instanceof Error) return JSON.stringify({ ...value, name: value.name, message: value.message });
+    return JSON.stringify(value) ?? String(value);
+  } catch { return String(value); }
+};
+
+// Records every reply and every refusal of a client call, so the final scan
+// reads what the API said, not only what the log holds. Streams are not
+// recorded; their events are read from the log.
+const recording = (client: Client, sink: Array<string>): Client => new Proxy(client, {
+  get(target, key, receiver) {
+    const value: unknown = Reflect.get(target, key, receiver);
+    if (typeof value !== "function") return value;
+    return (...args: ReadonlyArray<unknown>) => {
+      const result: unknown = value.apply(target, args);
+      if (!Effect.isEffect(result)) return result;
+      return (result as Effect.Effect<unknown, unknown>).pipe(
+        Effect.tap((reply) => Effect.sync(() => { sink.push(show(reply)); })),
+        Effect.tapError((error) => Effect.sync(() => { sink.push(show(error)); })),
+      );
+    };
+  },
+});
+
 // Criterion 8.5 and the security rules: the views rebuilt from the log equal
-// the live views, and no credential or secret appears in any event or in
-// what the service printed.
+// the live views, and no credential or secret appears, in any form, in any
+// event, any reply, the accounts list, or the output of any service process
+// the scenario started.
 export const finish = (world: World): Effect.Effect<void, unknown, Scope.Scope> => Effect.gen(function* () {
   const client = yield* world.reopenOwner();
   const reply = yield* (client["debug.compare-views"]({ requestId: requestId() } as never) as Effect.Effect<{ sequence: number; equal: boolean; differences: ReadonlyArray<string> }, unknown>);
   expect(reply.differences, "debug.compare-views reported a difference between the live views and the rebuild").toEqual([]);
   expect(reply.equal).toBe(true);
   const all = yield* since(client, 0);
-  const text = JSON.stringify(all) + world.service.output();
-  for (const secret of [...world.secrets, ...readOwnerCredential(world.root)]) {
-    expect(secret.length).toBeGreaterThan(8);
-    expect(text.includes(secret), "a credential or secret reached an event or the service's output").toBe(false);
-  }
+  const accounts = yield* client.accounts({ requestId: requestId(), operation: "list" } as never);
+  world.collectTokens();
+  const secrets = [...world.secrets, ...readOwnerCredential(world.root)];
+  for (const secret of secrets) expect(secret.length).toBeGreaterThan(8);
+  const leaks = findLeaks(secrets, [
+    { label: "the events", text: JSON.stringify(all) },
+    { label: "the accounts list", text: show(accounts) },
+    { label: "the replies and refusals", text: world.replies.join("\n") },
+    ...world.incarnations.map((service, index) => ({ label: `the output of service process ${index + 1}`, text: service.output() })),
+    ...threadSources(all),
+  ]);
+  expect(leaks, "a credential or secret reached an event, a reply or the service's output").toEqual([]);
 });
 
 export interface ScenarioOptions {
@@ -231,6 +345,8 @@ export interface ScenarioOptions {
   readonly manual?: boolean;
   readonly timeout?: number;
 }
+
+const writeError = (text: string) => Effect.sync(() => { process.stderr.write(`[acceptance] ${text}\n`); });
 
 // One acceptance scenario. The title names the break the scenario catches.
 export const scenario = (
@@ -242,18 +358,33 @@ export const scenario = (
     const scope = yield* Scope.Scope;
     const root = makeServiceRoot("/tmp/sh8-");
     const secrets = new Set<string>();
+    const replies: Array<string> = [];
+    const incarnations: Array<ServiceProcess> = [];
     let current: ServiceProcess | undefined;
     let owner: Client | undefined;
-    const reopenOwner = () => connectOwner(root).pipe(Effect.provideService(Scope.Scope, scope));
+    const reopenOwner = () => connectOwner(root).pipe(Effect.provideService(Scope.Scope, scope), Effect.map((client) => recording(client, replies)));
+    // Every token the service minted for an agent is in the environment of
+    // that agent's fake, whether or not the scenario asked for it.
+    const collectTokens = () => {
+      try {
+        for (const name of readdirSync(root.root)) {
+          if (!/^echo-.*\.json$/.test(name)) continue;
+          const token = peekEcho(join(root.root, name))?.env.SHEPHRD_TOKEN;
+          if (token !== undefined) secrets.add(token);
+        }
+      } catch { /* the folder is gone or a file is half written; the next look reads it */ }
+    };
     const boot: World["boot"] = (bootOptions = {}) => Effect.gen(function* () {
       const service = startService(root, { env: { SHEPHRD_TEST_DEBUG: "1", ...options.env, ...bootOptions.env } });
       current = service;
+      incarnations.push(service);
       yield* waitServing(root, service);
+      for (const form of readOwnerCredential(root)) secrets.add(form);
       owner = yield* reopenOwner();
       return service;
     });
     const world: World = {
-      root, secrets, boot, reopenOwner,
+      root, secrets, replies, incarnations, boot, reopenOwner, collectTokens,
       get service() { if (current === undefined) throw new Error("No service has been started"); return current; },
       get owner() { if (owner === undefined) throw new Error("No service has been started"); return owner; },
       kill: (signal = "SIGKILL") => Effect.gen(function* () {
@@ -261,8 +392,10 @@ export const scenario = (
         service.child.kill(signal);
         return yield* Effect.promise(() => service.exit);
       }),
-      asAgent: (token) => connect({ environment: { SHEPHRD_SOCKET: root.socket, SHEPHRD_TOKEN: token }, attempts: 1 }).pipe(Effect.provideService(Scope.Scope, scope)),
-      start: (caller, spec = {}) => Effect.gen(function* () {
+      asAgent: (token) => connect({ environment: { SHEPHRD_SOCKET: root.socket, SHEPHRD_TOKEN: token }, attempts: 1 }).pipe(
+        Effect.provideService(Scope.Scope, scope), Effect.map((client) => recording(client, replies)),
+      ),
+      prepare: (spec = {}) => Effect.gen(function* () {
         const harnessId = spec.harness ?? "fake";
         const adapter = join(root.bin, "fake-adapter");
         if (!existsSync(adapter)) writeFakeAdapter(root);
@@ -286,14 +419,20 @@ export const scenario = (
             },
           },
         } as never);
-        const reply = yield* (caller.start({
-          requestId: requestId(), name: spec.name ?? "Acceptance agent", role: spec.role ?? "worker", harness: harnessId,
-          account: { _tag: "named", accountId }, permission: spec.permission ?? "ask", folder: spec.folder ?? root.work,
+        const request = {
+          requestId: spec.requestId ?? requestId(), name: spec.name ?? "Acceptance agent", role: spec.role ?? "worker", harness: harnessId,
+          account: spec.anyAccount === true ? { _tag: "any" } : { _tag: "named", accountId },
+          permission: spec.permission ?? "ask", folder: spec.folder ?? root.work,
           runMode: "acp", groups: spec.groups ?? [],
           ...(spec.model === undefined ? {} : { model: spec.model }), ...(spec.effort === undefined ? {} : { effort: spec.effort }),
           ...(spec.prompt === undefined ? {} : { prompt: spec.prompt }),
-        } as never) as Effect.Effect<{ agentId: string }, unknown>);
-        return { agentId: reply.agentId, echo, accountId } satisfies Started;
+        };
+        return { agentId: "", echo, accountId, request };
+      }),
+      start: (caller, spec = {}) => Effect.gen(function* () {
+        const prepared = yield* world.prepare(spec);
+        const reply = yield* (caller.start(prepared.request as never) as Effect.Effect<{ agentId: string }, unknown>);
+        return { agentId: reply.agentId, echo: prepared.echo, accountId: prepared.accountId } satisfies Started;
       }),
       token: (agent, notPid) => waitFor("the fake agent's environment", () => {
         const echo = peekEcho(agent.echo);
@@ -303,9 +442,34 @@ export const scenario = (
       }),
       watermark: () => head(owner!),
     };
-    if (options.manual !== true) yield* boot();
-    yield* body(world);
-    yield* finish(world);
+    // Looks for new tokens while the scenario runs, so one that a later
+    // restart or a stop removes from view is still on the list.
+    yield* Effect.forever(Effect.sync(collectTokens).pipe(Effect.andThen(Effect.sleep(50)))).pipe(Effect.forkIn(scope));
+
+    // The rebuild comparison and the secret scan run on the way out of the
+    // body, also when the body failed (A5): the body's own failure is the one
+    // that is reported; a failed check after it is written to stderr.
+    const check = Effect.gen(function* () {
+      if (current === undefined) return yield* Effect.die(new Error("could not compare: the service was never started"));
+      if (current.exited()) {
+        // A scenario that ends on a killed service: the check needs one.
+        const recovered = yield* Effect.exit(boot());
+        if (Exit.isFailure(recovered)) {
+          return yield* Effect.die(new Error(`could not compare: the service could not be recovered (${Cause.pretty(recovered.cause).slice(0, 600)})`));
+        }
+      }
+      yield* finish(world);
+    }).pipe(Effect.timeoutOrElse({
+      duration: 60_000,
+      orElse: () => Effect.die(new Error("could not compare: the final check timed out after 60000 ms")),
+    }));
+    const program = Effect.gen(function* () {
+      if (options.manual !== true) yield* boot();
+      yield* body(world);
+    });
+    yield* Effect.onExit(program, (exit) => Exit.isFailure(exit)
+      ? check.pipe(Effect.catchCause((cause) => writeError(`the final check failed after the scenario failed: ${Cause.pretty(cause).slice(0, 1500)}`)))
+      : check);
   })) as Effect.Effect<void, unknown, never>, options.timeout ?? 120_000);
 };
 
