@@ -2463,9 +2463,9 @@ the invalid wire protocol described in issue 160.
 ## 176. A blocking wait reports success when it needs its caller to answer
 
 Found: 2026-11-01, while applying engine-lead's ruling in board post 1120.
-State: open for the unit 7b builder's fix round.
+State: fixed in unit 7b fix round 1 (`reportWait` returns 2 for `request-held`).
 
-What happens: `packages/cli/src/commands/wait.ts` returns exit code 0 for a
+What happened: `packages/cli/src/commands/wait.ts` returned exit code 0 for a
 `request-held` reply. All four W02 cases previously expected that code.
 What should happen: decision row 26 requires exit code 2 when a permission
 request or question is held by or routed to the caller of a blocking wait.
@@ -2559,6 +2559,10 @@ with the error "the process ancestry cannot be read from /proc".
 What should happen: use `ps` or a native lookup on macOS before the desktop
 client ships.
 Why it matters: the owner's mobile and desktop clients are on other systems.
+Owner question (unit 7b fix round 1, ruling 4): is macOS in scope for version
+1? Decision row 64 names `ps -o ppid=,lstart=` for macOS, and both halves are
+missing: the engine's verification (unit 7a) and the client's ancestry header
+read only `/proc`. The gap does not block a Linux merge.
 
 ## 184. `shepherd mcp` discards its own logs
 
@@ -2571,3 +2575,17 @@ failure reaches the agent as a tool error, and nothing is recorded.
 What should happen: write the server's log to a file in the state folder,
 without any credential.
 Why it matters: an owner debugging an agent's failed tool call has no record.
+
+## 185. A symlinked owner credential file is followed
+
+Found: 2026-11-01, by the unit 7b attack pass (B2); the verifier showed no
+break.
+State: open, a hardening note.
+
+What happens: `packages/client/src/identity.ts` reads `owner-credential` with
+`readFileSync`, which follows a symbolic link.
+Why it is not a break: replacing that file needs write access to the private
+state folder, and a process with that access already holds the owner's
+authority, so the link gives it no new data or authority.
+What could be added later: check that the credential is a regular file, owned
+by the user, with mode 0600, before reading it.

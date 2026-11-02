@@ -8,7 +8,8 @@ interface WaitReply {
 
 // Row 62's exit code for a settled wait: 1 when any member crashed or was
 // stopped, else 2 when any is paused or was interrupted, else 0. The whole
-// member list decides, never its first or last entry.
+// member list decides, never its first or last entry. Row 26: a held request
+// or question routed to the caller exits 2, because the caller must answer.
 export const reportWait = (reply: WaitReply): number => {
   switch (reply.outcome) {
     case "opened":
@@ -16,7 +17,7 @@ export const reportWait = (reply: WaitReply): number => {
       return 0
     case "request-held":
       out("request held: a member is holding a permission or question request for you; answer it, then wait again\n")
-      return 0
+      return 2
     case "cancelled":
       process.stderr.write("wait cancelled\n")
       return 1

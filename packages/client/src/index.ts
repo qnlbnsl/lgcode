@@ -36,9 +36,16 @@ export interface ConnectOptions {
   readonly attempts?: number | undefined
 }
 
+// `users` counts the calls and subscriptions running on the connection;
+// `retired` marks one that a transport error replaced. A retired connection's
+// scope closes only when its last user has settled, because closing the scope
+// interrupts every call still pending on it (issue 77's ruling: such a call
+// must end as a transport failure it can retry, not as an interrupt).
 interface Connection {
   readonly client: Client
   readonly scope: Scope.Closeable
+  users: number
+  retired: boolean
 }
 
 // A refused upgrade reaches the socket layer as a `ws` error whose message
@@ -92,12 +99,12 @@ const open = (
       return client as Client
     }).pipe(Scope.provide(scope))
     return yield* built.pipe(
-      Effect.map((client): Connection => ({ client, scope })),
+      Effect.map((client): Connection => ({ client, scope, users: 0, retired: false })),
       Effect.catchIf(
         (error): error is Socket.SocketError => (error as { _tag?: string })._tag === "SocketError",
         (error) => Effect.fail(openFailure(error))
       ),
-      Effect.tapError(() => Scope.close(scope, Exit.void))
+      Effect.onError(() => Scope.close(scope, Exit.void))
     )
   }) as Effect.Effect<Connection, ClientError>
 
@@ -134,23 +141,39 @@ export const connect = (options: ConnectOptions): Effect.Effect<Client, ClientEr
     const lock = yield* Semaphore.make(1)
     let current: Connection | undefined = yield* open(parent, url, headers)
 
+    // Takes a use of the live connection in the same synchronous step that
+    // reads it, so a drop cannot close it between the read and the use.
+    const take = (connection: Connection): Connection => { connection.users += 1; return connection }
     const ensure = lock.withPermit(Effect.suspend(() =>
-      current !== undefined ? Effect.succeed(current) : open(parent, url, headers).pipe(
-        Effect.tap((connection) => Effect.sync(() => { current = connection }))
+      current !== undefined ? Effect.sync(() => take(current!)) : open(parent, url, headers).pipe(
+        Effect.map((connection) => { current = connection; return take(connection) })
       )
     ))
+    const closeIfIdle = (connection: Connection) =>
+      connection.retired && connection.users === 0 ? Scope.close(connection.scope, Exit.void) : Effect.void
+    const release = (connection: Connection) => Effect.suspend(() => {
+      connection.users -= 1
+      return closeIfIdle(connection)
+    })
+    // Replaces the connection for later calls. Calls already pending on it get
+    // the transport error from the protocol themselves and settle; the scope
+    // closes when the last of them has.
     const drop = (connection: Connection) => Effect.suspend(() => {
       if (current === connection) current = undefined
-      return Scope.close(connection.scope, Exit.void)
+      connection.retired = true
+      return closeIfIdle(connection)
     })
     const pause = (attempt: number) => Effect.sleep(100 * attempt)
 
     const unary = (tag: string) => (payload: any, callOptions?: any) => {
       const run = (attempt: number, request: any): Effect.Effect<unknown, unknown> =>
-        ensure.pipe(
-          Effect.flatMap((connection) => (connection.client as any)[tag](request, callOptions).pipe(
+        Effect.acquireUseRelease(
+          ensure,
+          (connection) => (connection.client as any)[tag](request, callOptions).pipe(
             Effect.tapError((error) => isTransport(error) ? drop(connection) : Effect.void)
-          ) as Effect.Effect<unknown, unknown>),
+          ) as Effect.Effect<unknown, unknown>,
+          release
+        ).pipe(
           Effect.catchIf(
             (error) => (isTransport(error) || error instanceof ClientError) && attempt < attempts,
             () => pause(attempt).pipe(Effect.andThen(() => run(attempt + 1, retryPayload(tag, request))))
@@ -174,6 +197,7 @@ export const connect = (options: ConnectOptions): Effect.Effect<Client, ClientEr
           const request = first ? payload : { ...payload, requestId: randomUUID(), after }
           first = false
           return ((connection.client as any).subscribe(request, callOptions) as Stream.Stream<any, unknown>).pipe(
+            Stream.ensuring(release(connection)),
             Stream.tap((event) => Effect.sync(() => { after = event.sequence; failures = 0 })),
             Stream.catchIf(isTransport, (error) =>
               Stream.fromEffect(drop(connection)).pipe(Stream.drain, Stream.concat(
@@ -194,6 +218,8 @@ export const connect = (options: ConnectOptions): Effect.Effect<Client, ClientEr
     for (const [tag, rpc] of CommandsRpcGroup.requests) {
       client[tag] = RpcSchema.isStreamSchema((rpc as any).successSchema) ? subscribe : unary(tag)
     }
-    yield* Effect.addFinalizer(() => Effect.suspend(() => current === undefined ? Effect.void : drop(current)))
+    // Closing the caller's scope closes every connection forked from it, a
+    // retired one still waiting on its last user included.
+    yield* Effect.addFinalizer(() => Effect.suspend(() => current === undefined ? Effect.void : Scope.close(current.scope, Exit.void)))
     return client as unknown as Client
   })

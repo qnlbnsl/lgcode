@@ -24,14 +24,19 @@ export const stateFolder = (environment: Environment): string => {
 
 // Both variables name an agent. Neither names the owner's terminal. One alone
 // is refused, never answered with the owner credential or an unchecked socket.
+// A variable that is set but empty counts as set (rows 54 and 64): the owner
+// fallback applies only when both are unset.
 export const resolveIdentity = (environment: Environment): Identity => {
   const socket = environment.SHEPHERD_SOCKET
   const token = environment.SHEPHERD_TOKEN
-  if (present(socket) && present(token)) {
+  if (socket !== undefined && token !== undefined) {
+    if (socket === "" || token === "") {
+      throw new ClientError({ message: "SHEPHERD_SOCKET and SHEPHERD_TOKEN must both hold a value, or both be left unset" })
+    }
     if (!socket.startsWith("/")) throw new ClientError({ message: "SHEPHERD_SOCKET must be an absolute path" })
     return { kind: "agent", socketPath: socket, bearer: () => token }
   }
-  if (present(socket) || present(token)) {
+  if (socket !== undefined || token !== undefined) {
     throw new ClientError({ message: "SHEPHERD_SOCKET and SHEPHERD_TOKEN must be set together, or both left unset" })
   }
   const folder = stateFolder(environment)

@@ -1,6 +1,13 @@
-import { commandNames, ownerOnlyCommands } from "@shepherd/contracts"
+import { CommandsRpcGroup, ownerOnlyCommands } from "@shepherd/contracts"
+import type * as Rpc from "effect/rpc/Rpc"
+import type * as RpcGroup from "effect/rpc/RpcGroup"
 
-export type CommandName = typeof commandNames[number]
+export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>
+
+// The commands the shepherd command recognises are the requests of the RPC
+// group, the same list the client builds its methods from; only the
+// descriptions below are written here.
+export const commandNames: ReadonlyArray<CommandName> = [...CommandsRpcGroup.requests.keys()] as Array<CommandName>
 
 const summaries: Record<CommandName, string> = {
   start: "Start an agent.",

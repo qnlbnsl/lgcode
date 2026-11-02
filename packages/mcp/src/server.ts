@@ -1,14 +1,14 @@
 import { randomUUID } from "node:crypto"
 import * as Effect from "effect/Effect"
-import * as Exit from "effect/Exit"
 import * as Layer from "effect/Layer"
 import * as Logger from "effect/Logger"
 import * as Schema from "effect/Schema"
 import * as Scope from "effect/Scope"
+import * as Semaphore from "effect/Semaphore"
 import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai"
 import * as NodeStdio from "@effect/platform-node/NodeStdio"
 import { type Client, ClientError, connect } from "@shepherd/client"
-import { retryRecovering } from "./retry.ts"
+import { retryRecoveringEffect } from "./retry.ts"
 import { descriptions, inputSchema, toolNames, type ToolName } from "./tools.ts"
 
 export type Environment = Readonly<Record<string, string | undefined>>
@@ -22,15 +22,6 @@ const failureText = (error: unknown): string => {
     if (tagged._tag === "ClientError" && typeof tagged.message === "string") return tagged.message
   }
   return "the Shepherd service could not be reached or answered with an error"
-}
-
-// Runs an Effect, rejecting with the original failure so a retry can read the
-// HTTP status carried on a ClientError.
-const runOrThrow = async <A, E>(effect: Effect.Effect<A, E>): Promise<A> => {
-  const exit = await Effect.runPromiseExit(effect)
-  if (Exit.isSuccess(exit)) return exit.value
-  const failure = exit.cause.reasons.find((reason) => reason._tag === "Fail")
-  throw failure !== undefined ? (failure as { error: unknown }).error : new Error("the Shepherd client stopped unexpectedly")
 }
 
 // The agent token is read from SHEPHERD_TOKEN and nowhere else; a shell
@@ -48,20 +39,31 @@ export const tokenProblem = (environment: Environment): string | undefined => {
 }
 
 // Connects on the first tool call, not at startup, and keeps the connection.
-const lazyClient = (environment: Environment) => {
-  const scope = Effect.runSync(Scope.make())
-  let pending: Promise<Client> | undefined
-  return () => {
-    pending ??= retryRecovering(() => runOrThrow(Scope.provide(connect({ environment }), scope))).catch((error) => {
-      pending = undefined
-      throw error
-    })
-    return pending
-  }
+// The connection lives in the scope of the layer this is built in, so
+// shutting the server layer down closes it. A failed connect is not kept: the
+// next call tries again.
+const makeLazyClient = (environment: Environment) => Effect.gen(function* () {
+  const scope = yield* Effect.scope
+  const lock = yield* Semaphore.make(1)
+  let current: Client | undefined
+  return lock.withPermit(Effect.suspend(() =>
+    current !== undefined ? Effect.succeed(current) : connect({ environment }).pipe(
+      Scope.provide(scope),
+      Effect.tap((client) => Effect.sync(() => { current = client }))
+    )
+  ))
+})
+
+// The request id is made once per tool call and sent on every retry, so a
+// command that committed before a dropped connection is answered from its
+// stored receipt and never runs twice. A blocking wait that lost its
+// connection is a new wait (the client's own rule), so it takes a new id.
+const payloadFor = (name: ToolName, parameters: unknown, requestId: string) => {
+  const payload: Record<string, unknown> = { ...(parameters as Record<string, unknown>), requestId }
+  return name === "wait" && payload.block === true ? { ...payload, requestId: randomUUID() } : payload
 }
 
 const buildToolkit = (environment: Environment) => {
-  const clientFor = lazyClient(environment)
   const tools = toolNames.map((name) => Tool.dynamic(name, {
     description: descriptions[name],
     parameters: inputSchema(name),
@@ -69,17 +71,20 @@ const buildToolkit = (environment: Environment) => {
     failure: Schema.Unknown
   }))
   const toolkit = Toolkit.make(...tools)
-  const handlers = Object.fromEntries(toolNames.map((name: ToolName) => [
-    name,
-    (parameters: unknown) => Effect.tryPromise({
-      try: async () => {
-        const client = await clientFor()
-        const payload = { ...(parameters as Record<string, unknown>), requestId: randomUUID() }
-        return await runOrThrow((client as any)[name](payload) as Effect.Effect<unknown, unknown>)
-      },
-      catch: (error) => new Error(failureText(error))
-    })
-  ]))
+  const handlers = Effect.gen(function* () {
+    const clientFor = yield* makeLazyClient(environment)
+    return Object.fromEntries(toolNames.map((name: ToolName) => [
+      name,
+      (parameters: unknown) => {
+        const requestId = randomUUID()
+        // The client call is part of this handler's Effect: cancelling the
+        // tool call interrupts it, and the client sends the engine an interrupt.
+        return retryRecoveringEffect(Effect.suspend(() => clientFor.pipe(
+          Effect.flatMap((client) => (client as any)[name](payloadFor(name, parameters, requestId)) as Effect.Effect<unknown, unknown>)
+        ))).pipe(Effect.mapError((error) => new Error(failureText(error))))
+      }
+    ]))
+  })
   return { toolkit, handlers }
 }
 
