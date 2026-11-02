@@ -3099,9 +3099,9 @@ still catch a runner that reports values different from the recording.
 
 Found: 2026-11-02, while investigating the automatic-reset acceptance failure
 at commit b915542 on branch `worker/engine-acfl`.
-State: open. The production fix needs the engine lead's ruling.
+State: fixed in commit `f4d79a68030dae76069fd3b2b102e7132528dbfc`.
 
-What happens: `startAccountTimers` in `packages/engine/src/accounts/timers.ts`
+What happened at b915542: `startAccountTimers` in `packages/engine/src/accounts/timers.ts`
 reads the clock at line 51 and releases deadlines due at that reading.
 It reads the clock again at line 55, then excludes deadlines with no positive
 time remaining at line 57.
@@ -3110,6 +3110,8 @@ excluded from the next wake time.
 With no other future deadline, the timer sleeps for 60,000 milliseconds.
 The comment at line 56 treats every remaining overdue deadline as a failed
 release, although this deadline has never been attempted.
+A sleep that wakes one millisecond before the wall-clock deadline can lead
+to the same crossing on the next check.
 
 Evidence: the original acceptance flow, with event metadata printed by its
 existing wait predicate, failed on the first run with four processor-bound
@@ -3135,15 +3137,31 @@ recheck failed against the production code.
 The load trace does not expose the timer's internal clock readings, so it
 confirms the missing event while the controlled probe proves the race.
 
-What should happen: a deadline that becomes due during the check must cause
-an immediate recheck.
-A release that was actually attempted and failed should retain its bounded
-retry delay.
+What changed: each check remembers the account and deadline pairs whose
+release it attempted.
+Only those pairs are excluded from the next wake time if they remain pending.
+A deadline that becomes due during the check schedules an immediate recheck.
+A release that actually failed retains its one-minute retry delay.
+The release still checks the current account status and deadline inside the
+writer transaction, so sign-outs and replaced deadlines remain protected.
+The first check still runs before startup returns, and account events still
+wake the timer.
+
+Verification: `reset-timer.test.ts` controls the timer's clock and sleep
+boundaries without a database or an adapter process.
+The equal-to-deadline, just-after-deadline and early-wake cases all failed
+against the old timer and passed with the fix.
+The failed-release case passed against both versions and guards the existing
+one-minute backoff.
+The unchanged acceptance file then passed ten consecutive runs with the
+same four processor-bound processes pinned to the same two cores as the
+reproduction.
+The account suite passed all 39 tests across six files.
+The serial acceptance suite passed all 59 tests across 22 files.
+The engine package's type check also passed.
 The restart case shares the timer, but its deliberately overdue deadline is
 already eligible at the first reading and did not fail in this load run.
-Increasing the acceptance timeout would hide the production delay.
-No production or acceptance code was changed because this fixer's task
-requires a handoff when the cause is in production code.
+No acceptance waits or assertions were changed.
 
 Why it matters: work queued behind a usage limit can remain paused for an
 extra minute after the account's reported reset time.
