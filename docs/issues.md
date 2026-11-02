@@ -3197,3 +3197,127 @@ A single step of the clock, such as a time-server correction, does not cause
 the loop.
 Fix, if wanted: give the recheck a floor of one millisecond, or state in the
 file's header comment that the timer assumes the clock does not move back.
+
+## 223. A harness adapter can copy its own login token into the event log, the board and a client
+
+Found: 2026-11-02, by the owner's whole-engine hostile review, finding B1.
+State: fixed in branch `worker/engine-shb`, pending review.
+
+What happened at 8ff4c9b: a Codex adapter running for an ordinary account
+read its own `HOME/.codex/auth.json`.
+It printed `tokens.access_token` as an ordinary Agent Client Protocol (ACP)
+message chunk.
+The exact token was stored in `events.payload_json`.
+Committed events are applied to the live views and published to
+subscribers, so the token also reached the board and owner clients.
+This breaks security rule 6 in `SECURITY.md`, which names "the agent
+harnesses' own login tokens".
+The documented same-user limit does not cover it: that limit lets the local
+process read the token, and rule 6 separately promises that the token is not
+copied into logs, the board or a client.
+
+Root cause: the redactor removes only the values it is given, and no code
+gave it a harness login token.
+The service's registry in `packages/engine/src/service.ts`, lines 77 to 87,
+held the owner credential, the inherited agent token, selected environment
+values, the values in `secrets.json` and stored token hashes.
+The runner in `packages/engine/src/runner/AcpRunner.ts`, lines 217 to 225,
+registered only the agent token and the account's `secret:` values.
+The Codex home step in `packages/engine/src/accounts/shadowHome.ts`, lines
+46 to 64, chose the home but registered nothing from its `auth.json`.
+
+What changed: a new module, `packages/engine/src/accounts/credentialSource.ts`,
+names the login store of each file-backed harness.
+Codex uses `auth.json` in `CODEX_HOME`, or in `HOME/.codex`.
+Claude Code uses `.credentials.json` in `CLAUDE_CONFIG_DIR`, or in
+`HOME/.claude`.
+Gemini uses `HOME/.gemini/oauth_creds.json`.
+The module registers every string value in the store as its own secret,
+never the whole document as one string.
+A short named list of fields that hold ordinary words, such as `auth_mode`
+and `scopes`, is skipped.
+The runner reads the store after the Codex home step and before the adapter
+is spawned.
+A store that exists but is not a regular file, is larger than one mebibyte,
+cannot be read or is not JSON refuses the launch, and nothing is spawned.
+A missing store has no values, because the account is not signed in yet.
+The service's redactor and the runner's own redactor re-read every opened
+store on each redaction, at the cost of one `stat` call per store while it
+is unchanged.
+A value seen once stays registered for the service's whole life, so a
+refreshed token and an adapter's final output are both still covered.
+The redactor already matched the raw, JSON-escaped, base64, base64url,
+hexadecimal and URL-encoded forms of each value, so it was not changed.
+
+Verification: the review's attack test, inverted, is
+`packages/engine/test/security/codex-auth-home-leak.test.ts`.
+It passed against 8ff4c9b, proving the leak, and its inverted form fails
+there.
+`packages/engine/test/security/login-store-launch.test.ts` checks that a
+broken store refuses the launch before any adapter exists, and that a token
+written to the store while the adapter runs is redacted.
+
+Not done: events stored before this fix are not rewritten.
+A log written by an earlier build can still hold a token that an adapter
+printed.
+
+Why it matters: a printed provider token became durable event history and
+reached clients that could not read the harness's home.
+
+## 224. A login store is covered only after a launch has opened it in this service's life
+
+Found: 2026-11-02, while fixing issue 223.
+State: open.
+
+What happens: the redactor learns a login store's tokens when the runner
+launches an account that uses that store.
+Every adapter runs as the same user, so it can read every other harness's
+and every other account's store.
+A Claude Code adapter that prints the token in `HOME/.codex/auth.json`
+before any Codex account has launched in this service's life is not
+redacted.
+After a restart, a token that was refreshed away before the restart is no
+longer known, although it may still be valid until it expires.
+What should happen: every enabled account's store, and the default store of
+every harness, is opened when the service starts and when an account
+changes, so coverage does not depend on launch order.
+Why it matters: it is a narrower form of the rule 6 break in issue 223.
+
+## 225. Cursor's login store is not established, so a Cursor login token in a file is not redacted
+
+Found: 2026-11-02, while fixing issue 223.
+State: open; the owner decides.
+
+What happens: the repository names no file where Cursor's command-line
+agent keeps its login.
+`.plans/plans/shepherd-engine/scouting.md`, line 89, names only
+`CURSOR_API_KEY` and `agent login`.
+So `credentialSourceFor` gives Cursor no store, and Cursor launches are not
+refused.
+A Cursor adapter that prints a token from a login file is not redacted.
+A Cursor key passed through a `secret:` reference is already redacted.
+A third-party analysis, not an official source, reports the file as
+`$XDG_CONFIG_HOME/cursor/auth.json`, or `~/.config/cursor/auth.json`
+(https://seanthegeek.net/doubleagent/research/cursor.html, read 2026-11-02).
+What should happen: the owner chooses between establishing the path from an
+official source and refusing Cursor launches until it is established.
+Why it matters: it leaves a rule 6 gap for one harness.
+
+## 226. The Gemini login store's path is taken from the design, not from a source
+
+Found: 2026-11-02, while fixing issue 223.
+State: open.
+
+What happens: `credentialSourceFor` reads Gemini's tokens from
+`HOME/.gemini/oauth_creds.json`.
+That path comes from the lead's design for issue 223.
+No source in this repository confirms it, and a web search on 2026-11-02
+did not confirm it either.
+It is also not confirmed whether a variable such as `GEMINI_CLI_HOME` moves
+the `.gemini` folder; if one does, an account that sets it is not covered.
+The Claude Code path was confirmed by its documentation
+(https://code.claude.com/docs/en/claude-directory, read 2026-11-02).
+What should happen: the Gemini path, and any variable that moves it, is
+confirmed from Gemini's own documentation or source code.
+Why it matters: a wrong path leaves Gemini login tokens unredacted, because
+a missing store is treated as signed out.

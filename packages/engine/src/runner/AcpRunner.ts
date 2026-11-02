@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { comparePermission, DeliveryId, Event, type PermissionLevel, type SessionReference } from "@shephrd/contracts";
@@ -26,6 +27,7 @@ import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner, makeHandle, type ChildProcessHandle } from "effect/process/ChildProcessSpawner";
+import { credentialSourceFor, makeCredentialRegistry, type CredentialRegistry } from "../accounts/credentialSource.ts";
 import { withCodexHome } from "../accounts/shadowHome.ts";
 import { SecretStore } from "../commands/SecretStore.ts";
 import { folderForSpawn } from "../identity/ceiling.ts";
@@ -51,6 +53,10 @@ export interface AcpRunnerOptions {
   readonly environment: Record<string, string | undefined>;
   // Enabled only by the service after row 74's real temporary-folder check.
   readonly protocolLog?: boolean;
+  // Issue 223: the harness login stores opened by launches. The service
+  // shares one registry with its own redactor; without one the runner keeps
+  // its own, so its redaction still covers them.
+  readonly credentials?: CredentialRegistry;
   readonly classifyError?: (input: { harness: string; text: string }) => "out-of-usage" | "signed-out" | undefined;
 }
 type Spawn = Parameters<Runner["Service"]["start"]>[0];
@@ -112,7 +118,11 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   const suppliedRedactor = yield* Effect.serviceOption(Redactor);
   const processDatabase = yield* Effect.serviceOption(SqlClient.SqlClient);
   const processes = new Map<string, Process>();
-  const fallback = makeRedactor({ secrets: () => [...processes.values()].flatMap((entry) => entry.secrets), tokenHashes: () => new Set() });
+  const credentials = configuration.credentials ?? makeCredentialRegistry();
+  // Login-store leaves are not per-process: they stay registered for the
+  // runner's whole life, so no release of a process's secrets can drop one
+  // before that process's last output is redacted (issue 223).
+  const fallback = makeRedactor({ secrets: () => [...processes.values()].flatMap((entry) => entry.secrets).concat(credentials.secrets()), tokenHashes: () => new Set() });
   const redactText = (text: string) => Option.isSome(suppliedRedactor)
     ? suppliedRedactor.value.redactText(fallback.redactText(text)) : Effect.sync(() => fallback.redactText(text));
   const events = yield* Queue.unbounded<RunnerEvent>();
@@ -237,6 +247,12 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     const environment = yield* mergeProviderInstanceEnvironment(Object.entries(variables).map(([name, value]) => ({ name, value, sensitive: input.account.environment?.[name]?.startsWith("secret:") ?? false })), base).pipe(
       Effect.provideService(HomeDirectory, configuration.environment.HOME ?? input.folder),
     );
+    // Issue 223: the adapter can read its own login store and print a token
+    // from it. Every token in that store is registered before the process
+    // exists, and a store that cannot be inspected refuses the launch.
+    const spawnEnvironment = Object.fromEntries(Object.entries(environment).filter((pair): pair is [string, string] => pair[1] !== undefined));
+    const credentialSource = credentialSourceFor({ harnessId: harness.id, home: spawnEnvironment.HOME ?? homedir(), variables: spawnEnvironment });
+    yield* credentials.open(credentialSource).pipe(Effect.mapError(() => rejected("account credentials cannot be inspected")));
     const args = yield* Effect.try({ try: () => [...harness.adapterArguments, ...denyArguments(harness, input.folder, configuration.stateFolder, environment)], catch: () => rejected("deny rule cannot be resolved") });
     const scope = yield* Scope.fork(lifetime);
     let entry: Process | undefined;
@@ -272,7 +288,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       yield* checkChildFolder;
       // Stderr is consumed continuously and never forwarded to service stdio.
       // The local carry covers spawn credentials even before registration.
-      const stderrRedactor = makeRedactor({ secrets: () => resolvedSecrets, tokenHashes: () => new Set() });
+      const stderrRedactor = makeRedactor({ secrets: () => resolvedSecrets.concat(credentials.secrets()), tokenHashes: () => new Set() });
       const stderrTail = yield* makeStderrTail({ maxLines: stderrTailLines,
         redactChunk: (id, text, final) => redactChunk(id, stderrRedactor.redactChunk(id, text, final), final),
       });
