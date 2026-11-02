@@ -3165,3 +3165,35 @@ No acceptance waits or assertions were changed.
 
 Why it matters: work queued behind a usage limit can remain paused for an
 extra minute after the account's reported reset time.
+
+## 211. The account reset timer's test has one account, and its immediate recheck has no floor
+
+Found: 2026-11-02, in the focused review of the issue 210 fix (commits
+f4d79a6 and 5662a5f on branch `worker/engine-acfl`).
+
+Status: open. Neither point is a defect on a clock that only moves forward.
+
+The first point is a test gap.
+The test file `packages/engine/test/accounts/reset-timer.test.ts` uses a
+single account.
+It has no case with two accounts and no case where a deadline is replaced
+during a check.
+The reviewer changed the timer to match a past release attempt on the account
+alone, instead of on the account and its deadline.
+All four tests still passed with that change.
+In the running engine the change would be masked, because the event that
+replaces a deadline also wakes the timer.
+Fix: add one case with two accounts, one whose release fails and one whose
+deadline is crossed during the check, and one case with a deadline replaced
+during a check.
+
+The second point is about robustness.
+In `packages/engine/src/accounts/timers.ts`, a deadline that comes due during
+a check is rechecked after a wait of zero milliseconds.
+In Effect, a sleep of zero is a yield, so the wait has no floor.
+A wall clock that moved backwards and then forwards across the deadline on
+consecutive checks could make the timer loop quickly.
+A single step of the clock, such as a time-server correction, does not cause
+the loop.
+Fix, if wanted: give the recheck a floor of one millisecond, or state in the
+file's header comment that the timer assumes the clock does not move back.
