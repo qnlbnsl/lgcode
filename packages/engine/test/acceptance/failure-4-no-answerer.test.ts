@@ -91,10 +91,11 @@ scenario("4 no answerer: when the holder crashes the request moves up to the own
   const requested = yield* eventsUntil(w.owner, 0, "the request", isTag("PermissionRequested", child.agentId));
   const id = (tagged(requested, "PermissionRequested", child.agentId)[0]!.event as unknown as { permissionRequestId: string }).permissionRequestId;
 
-  const mark = yield* w.watermark();
-  // The crash comes while the boss works on a second prompt. The request then moves because the holder died,
-  // whether or not the turn-end rule would also have moved it.
-  yield* w.owner.prompt({ requestId: requestId(), agentId: boss.agentId, text: "Do the risky thing." } as never);
+  // The request's own notice is a prompt to the idle boss: the engine delivers it as soon as the request is
+  // routed, so the boss's second turn starts by itself and the scripted crash follows. A prompt from the owner
+  // would race with that turn and be refused once the boss had crashed (issue 208). The mark is the request
+  // itself, so the notice, the crash and the move all lie after it however fast they come.
+  const mark = requested[requested.length - 1]!.sequence;
   const events = yield* eventsUntil(w.owner, mark, "the owner to be told", isTag("OwnerNeeded", child.agentId), 30_000);
   expect(tagged(events, "AgentCrashed", boss.agentId)).toHaveLength(1);
   const move = tagged(events, "PermissionMoved", child.agentId);

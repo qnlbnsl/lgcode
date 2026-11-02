@@ -24,6 +24,18 @@ const until = async (what: string, ready: () => boolean): Promise<void> => {
   }
 };
 
+// A zombie has stopped executing, even if Node has not delivered "close" yet.
+// Only a missing process counts as gone; other read failures must fail the test.
+const stopped = (pid: number): boolean => {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    return stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z ");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return true;
+    throw error;
+  }
+};
+
 afterEach(async () => {
   vi.restoreAllMocks();
   for (const process of children.splice(0)) {
@@ -79,8 +91,16 @@ describe("cleanup of an active run", () => {
       startService: () => ({ ...service, work: fixture.work }),
       config: { ...fixture.deps.config, totalTimeout: failure === "time-limit" ? 150 : 10_000 },
     });
+    // Snapshot synchronously at return: waiting for "close" first would hide
+    // cleanup that returned while one of its processes was still running.
+    const stoppedAtReturn = {
+      service: stopped(service.pid), fake1: stopped(fake1.child.pid!), fake2: stopped(fake2.child.pid!),
+      other: stopped(other.child.pid!),
+    };
     expect(code).toBe(1);
     expect(fixture.lines.some((line) => line.startsWith(`FAIL ${failure}:`))).toBe(true);
+    expect(stoppedAtReturn).toEqual({ service: true, fake1: true, fake2: true, other: false });
+    await until("the stopped service and both fake agents to deliver close", () => service.exited() && fake1.isClosed() && fake2.isClosed());
     expect(service.exited()).toBe(true);
     expect(fake1.isClosed()).toBe(true);
     expect(fake2.isClosed()).toBe(true);

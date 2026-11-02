@@ -2968,3 +2968,77 @@ What happens: `scripts/live-check.ts` prints only the kind of an unexpected erro
 Importing the file runs `main`, so no test can load the handler without starting a run, and the handler is verified by reading it.
 What should happen: the handler moves into a function in `scripts/live/run.ts` that a test can call with an error holding a credential.
 Why it matters: the last place a credential could reach the terminal is the one place no test looks.
+
+## 207. Active-run cleanup tests race the child process close events
+
+Found: 2026-11-02, while checking unit 8c at commit 1d3dc7b.
+State: fixed in d515cd8.
+
+What happens: the active-run cleanup test immediately expects each fake
+agent's child process `close` event after `main` returns.
+The live service confirms termination through the Linux process state.
+A zombie process has stopped executing, but Node.js can deliver its `close`
+event after the cleanup promise resolves.
+This makes the owner-answer and time-limit cases fail intermittently even
+though every owned process has stopped.
+
+Evidence: an instrumented scratch copy reads `/proc/<pid>/stat` synchronously
+at the return boundary under a controlled processor load.
+The service is gone, and both fake agents have state `Z`, while the fake
+agents' `isClosed()` values are still false.
+The original assertions fail in both paths.
+
+What should happen: the test immediately checks that the service and both
+fake agents are gone or zombies, and that the unrelated agent is still
+running.
+It then waits on a bounded, named condition for all three `close` events
+before retaining the original lifecycle assertions.
+The ownership guard and the unrelated-agent checks remain in place.
+The fix changes the test only, because production cleanup already confirms
+that its processes have stopped.
+
+Why it matters: delayed event delivery must not make the full check fail,
+and waiting for an event must not hide cleanup that returns while a process
+is still running.
+
+## 208. The crash case of failure rule 4 raced its owner prompt against the permission notice
+
+Found: 2026-11-02, in the third full check of run engine-build-1 at commit aae856e.
+State: fixed in the test-only commit that follows aae856e on branch worker/engine-u8cfl.
+
+What happens: the second scenario of `failure-4-no-answerer.test.ts` makes a
+boss whose second turn crashes, and then sends the boss a prompt from the
+owner to cause that crash.
+The asker's permission request already has the boss as holder, and the engine
+queues the request's notice to the boss as a prompt.
+The boss is idle, so the notice starts the boss's second turn at once, and
+that turn crashes.
+When the owner's prompt arrives after the crash, the state table refuses a
+prompt to a crashed agent, and the owner's client fails with `CommandError`
+and the reason `command refused`.
+The engine is right to refuse. The test raced its own prompt against the
+notice.
+
+Evidence: a scratch copy of the test that printed the events before and after
+the refused prompt, run in a loop on two processor cores with four
+processor-bound `yes` jobs on the same cores, failed in 4 of 20 runs.
+In a failing run the events after the request were `DeliveryAccepted`,
+`ThreadItem`, `AgentCrashed`, `PermissionMoved`, `OwnerNeeded`,
+`CommandRefused`, so the boss had accepted the notice before the owner's
+prompt was sent.
+The state table (`commandTable` in `packages/contracts/src/stateMachine.ts`)
+refuses `prompt` only for crashed and stopped agents, so a busy boss is not
+the cause.
+
+What should happen: the scenario sends no prompt and lets the notice start the
+boss's second turn, which is the engine's real path.
+It also starts waiting from the request's own sequence number instead of from
+a head read taken after the request was seen, because under load the crash
+could be committed before that read, and the wait for the owner notice would
+then time out.
+All assertions stay: the request moves from the crashed holder to the owner,
+stays open, and a late owner answer reaches the asker.
+The fixed file passed 12 of 12 runs under the same load.
+
+Why it matters: a test that races its own command against the engine's
+delivery fails a full check at random and teaches people to ignore failures.
