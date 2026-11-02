@@ -39,7 +39,14 @@ export const serveDetach = (options: { readonly environment: Record<string, stri
     if ((ownsLock || exited) && (yield* Effect.promise(() => answers(socket)))) {
       return ownsLock ? { outcome: "started", pid: child.pid! } as const : { outcome: "already running" } as const;
     }
-    if (Date.now() >= deadline) return yield* Effect.fail(new Error("service did not answer"));
+    if (Date.now() >= deadline) {
+      if (!exited && child.pid !== undefined) {
+        // This launcher created the detached group. Stop its startup work
+        // before reporting failure, including any descendants it spawned.
+        try { process.kill(-child.pid, "SIGKILL"); } catch { child.kill("SIGKILL"); }
+      }
+      return yield* Effect.fail(new Error("service did not answer"));
+    }
     yield* Effect.sleep(25);
   }
 });

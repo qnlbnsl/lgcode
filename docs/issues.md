@@ -2341,3 +2341,75 @@ available, so disconnection finalizers can still cancel blocking waits. The
 same probe completed with exit code zero in 31 milliseconds after the change.
 Why it matters: a detached service must shut down and release its lifetime
 lock even while an owner or agent client remains connected.
+
+## 168. Read requests trusted an upgrade credential after its revocation
+
+Found: 2026-11-01, in the unit 7a attack pass and independent verification of
+commit 2b33da2, confirmed by the lead for fix round 1.
+State: fixed in unit 7a fix round 1.
+
+What happened: `subscribe` and `debug.compare-views` did not authenticate again
+when a new request began. A revoked connection could serve new reads before
+the event watcher or periodic check closed it. The debug handler also treated
+any credential without an agent identifier as the owner, admitting a paired
+device despite criterion 7.12.
+What changed: both handlers authenticate the original credential before
+starting a read. An invalid credential fails with a fixed command error and
+completes the connection's invalidation signal. Only an owner credential may
+call the debug handler. The existing event watcher and 100 millisecond poll
+still close revoked connections, including idle ones.
+Follow-up rule: any later device-revocation command must write `DeviceRevoked`
+in the same batch as `revokeDevices`, so the event-driven invalidation closes
+the connection without waiting for the poll.
+Why it matters: a connection's earlier authentication must not authorize a
+new read after its credential is revoked.
+
+## 169. Request diagnostics and startup cleanup were incomplete
+
+Found: 2026-11-01, in the focused review of unit 7a at 2b33da2.
+State: fixed in unit 7a fix round 1.
+
+What happened: an application defect returned a fixed HTTP 500 without a log
+line. A detached launcher's 30-second deadline returned an error but left its
+child running. An overlong socket path was checked after creating the state
+folder. The server's source credit omitted one referenced line range.
+What changed: the application logs `request failed: defect` through the
+redacting logger before returning the fixed response, without cause text.
+The service log sink preserves that fixed category. The launcher kills only
+its own still-running detached child process group before reporting its
+deadline failure. The socket-path byte limit is checked before inspecting or
+creating the state folder. The server credits T3 Code `apps/server/src/ws.ts`
+lines 3374-3385 alongside the other referenced ranges.
+Why it matters: a failed request needs a safe diagnostic, and failed startup
+must leave neither a running child nor an unwanted state folder.
+
+## 170. A healthy long catch-up may reach the subscription backlog bound
+
+Found: 2026-11-01, in the focused review of unit 7a at 2b33da2.
+State: open for unit 7b's client; the server's bound is accepted by the lead.
+
+What happens: the live subscription collects events while the client reads
+catch-up. A healthy but long catch-up can reach issue 41's 2,048-event backlog
+bound and close the connection. The server does not drop events.
+What should happen: when the server closes catch-up, the client reconnects
+and subscribes from its last received cursor. The same rule handles a slow
+subscriber reconnecting after a budget disconnect.
+Why it matters: cursor-based resumption preserves every event across a
+disconnect that enforces the server's memory bound.
+
+## 171. Another socket responder can make the launcher report already running
+
+Found: 2026-11-01, in the unit 7a attack pass at 2b33da2.
+State: open usability note for the owner; no code change is required.
+
+What happens: another program of the same user can answer at `engine.sock`
+without holding the engine lock. The launcher then reports `already running`.
+The lead disproved this as a specification break: criterion 7.4, task 7a.3,
+and decision row 71 require detection by connecting, and the frozen launcher
+test explicitly accepts a responder without a lock. That user already holds
+the owner's authority.
+What should happen: retain the specified connection probe. If the wording
+confuses an owner diagnosing a conflicting program, consider clearer text in
+a later usability change.
+Why it matters: an answering socket proves that something is listening, but
+the launcher's message can misidentify that program as the engine.

@@ -2,7 +2,7 @@
 // protocol test mode it also removes arbitrary copied-library causes,
 // annotations and method names, preserving only fixed diagnostic categories.
 const messages = new Set([
-  "debug RPC group enabled", "adapter frame dropped: malformed",
+  "debug RPC group enabled", "request failed: defect", "adapter frame dropped: malformed",
   "adapter request refused: unsupported", "permission answer delivery failed",
   "adapter content dropped: no active turn", "adapter update dropped: malformed",
   "runner event dropped: malformed", "runner event dropped: processing failed",

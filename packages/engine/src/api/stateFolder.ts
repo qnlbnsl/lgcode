@@ -11,6 +11,7 @@ export const stateFolder = (environment: Record<string, string | undefined>): st
 // No repair of unsafe permissions: fail before creating the lock, credential
 // or database, and inspect the path itself rather than following a link.
 export const prepareStateFolder = (folder: string): void => {
+  if (Buffer.byteLength(join(folder, "engine.sock")) > 100) throw new Error("socket path exceeds 100 bytes");
   process.umask(0o077);
   let stats;
   try { stats = lstatSync(folder); } catch (error) {
@@ -22,5 +23,4 @@ export const prepareStateFolder = (folder: string): void => {
   if (!stats.isDirectory()) throw new Error("state folder is not a directory");
   if (stats.uid !== process.getuid?.()) throw new Error("state folder is owned by another user");
   if ((stats.mode & 0o7777) !== 0o700) throw new Error("state folder mode is not 0700");
-  if (Buffer.byteLength(join(folder, "engine.sock")) > 100) throw new Error("socket path exceeds 100 bytes");
 };

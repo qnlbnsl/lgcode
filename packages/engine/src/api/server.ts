@@ -1,5 +1,5 @@
 // Connection assembly pattern: T3 Code apps/server/src/ws.ts, lines
-// 3293-3330 and 3360-3367 (MIT licence). No source code is copied.
+// 3293-3330, 3360-3367 and 3374-3385 (MIT licence). No source code is copied.
 import { timingSafeEqual } from "node:crypto";
 import { createServer } from "node:http";
 import type { Socket } from "node:net";
@@ -110,6 +110,11 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
     if (request.headers.upgrade?.toLowerCase() !== "websocket") return refused(400, "websocket required");
     const invalidated = yield* Deferred.make<void>();
     const invalidate = Deferred.succeed(invalidated, undefined);
+    const authenticateRequest = (requestId: string) => authenticate(raw).pipe(Effect.flatMap((current) =>
+      Option.isNone(current)
+        ? invalidate.pipe(Effect.andThen(Effect.fail(commandError(requestId, "invalid credential"))))
+        : Effect.void,
+    ));
     const check = authenticate(raw).pipe(Effect.flatMap((current) => Option.isNone(current) ? invalidate : Effect.void));
     if (credential._tag !== "owner") {
       const changes = yield* log.subscribeCommitted;
@@ -146,7 +151,7 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
       return subscription;
     }) };
     const handlers = yield* group.toHandlers(Effect.succeed(Object.fromEntries([...group.requests.keys()].map((name) => [name, (payload: { requestId: string; after: number }) => {
-      if (name === "subscribe") return subscribe(payload.after).pipe(
+      if (name === "subscribe") return Stream.unwrap(authenticateRequest(payload.requestId).pipe(Effect.as(subscribe(payload.after).pipe(
         Stream.filterEffect((envelope) => agentId === undefined ? Effect.succeed(true) : views.snapshot.pipe(Effect.map((snapshot) => {
           if (envelope.agentId === undefined) return false;
           const parent = snapshot.agents[envelope.agentId]?.parent;
@@ -154,15 +159,17 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
         }))),
         Stream.mapError(() => commandError(payload.requestId)),
         Stream.provideService(EventLog, boundedLog),
-      );
-      if (name === "debug.compare-views") return agentId === undefined
+      ))));
+      if (name === "debug.compare-views") return authenticateRequest(payload.requestId).pipe(Effect.andThen(credential._tag === "owner"
         ? compareViews().pipe(Effect.map((result) => ({ requestId: payload.requestId, sequence: result.sequence, equal: result.differences.length === 0, differences: result.differences.map((difference) => difference.path.join(".")) })), Effect.mapError(() => commandError(payload.requestId)))
-        : Effect.fail(commandError(payload.requestId));
+        : Effect.fail(commandError(payload.requestId))));
       return handler.execute(credential, name, payload).pipe(Effect.mapError((error) => commandError(payload.requestId, error.reason)));
     }])) as unknown as Handlers));
     yield* RpcServer.make(group).pipe(Effect.provide(handlers), Effect.provideService(RpcServer.Protocol, boundedProtocol), Effect.forkScoped);
     return yield* Effect.raceFirst(httpEffect, Deferred.await(invalidated).pipe(Effect.as(HttpServerResponse.empty())));
-  })).pipe(Effect.provide(services), Effect.catchCause(() => Effect.succeed(refused(500, "request failed"))));
+  })).pipe(Effect.provide(services), Effect.catchCause(() =>
+    Effect.logError("request failed: defect").pipe(Effect.as(refused(500, "request failed"))),
+  ));
   return app;
 });
 
