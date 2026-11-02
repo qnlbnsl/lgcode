@@ -9,8 +9,10 @@ Each feature has a short name, one paragraph saying what it does, and a state:
 
 While the engine is being built, a feature can also be **built in the
 engine** (unit numbers follow). That means its engine part is merged into
-`area/engine` and passes its tests, but nobody can use it yet, because the
-client library and the command-line tool (unit 7b) are not merged. A feature
+`area/engine` and passes its tests. Since unit 7b, the client library, the
+`shepherd` command-line tool and `shepherd mcp` are merged too, so the owner
+and agents can reach the engine from a terminal, but no web or phone client
+exists yet. A feature
 is **partly built in the engine** when only some of what its paragraph
 describes is merged; the note after it says which part.
 
@@ -113,9 +115,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   a post needs it. Claude Code starts the turn by itself, and nothing is typed
   into the pane. Other agents keep a typed nudge that only fires when the
   agent is idle. See research item 2.
-- **Wait results that say why** (partly built in the engine: unit 5d's
-  waits end with a reason per member; the command line's exit codes are
-  unit 7b's). A wait or a collection ends early,
+- **Wait results that say why** (built in the engine: unit 5d's
+  waits end with a reason per member, and unit 7b's `shepherd wait` exits
+  with the codes below). A wait or a collection ends early,
   with a reason, when the agent it waits on is stuck on a question or an
   approval. The command line exits with 0 for done, 1 for failed, and 2 for
   waiting on an answer. See research item 7.
@@ -143,8 +145,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 
 - **One authenticated API for every client** (idea; partly built in the
   engine: unit 7a serves an authenticated WebSocket API on a Unix socket in
-  the owner-only state folder, for the owner, paired devices and agents; the
-  client library is unit 7b). The web page, a future
+  the owner-only state folder, for the owner, paired devices and agents; unit
+  7b adds the client library). The web page, a future
   desktop app, and a future mobile app all use the same API.
 - **Device pairing** (idea). A new device is added with a one-time pairing
   code, as described in [SECURITY.md](../SECURITY.md).
@@ -153,8 +155,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   agent states as a stream, not by polling.
 - **Updates that survive a sleeping phone** (partly built in the engine:
   units 4a to 4c give request receipts, gapless subscriptions and
-  snapshots, and unit 7a serves them over the socket; the client library is
-  unit 7b's). A client gets a snapshot
+  snapshots, unit 7a serves them over the socket, and unit 7b's client library
+  reconnects and resumes from its cursor). A client gets a snapshot
   and then only newer events, picks up where it left off after a reconnect,
   and every action carries a request id so a double tap acts once. See
   research item 9.
