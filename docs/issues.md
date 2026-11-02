@@ -1241,7 +1241,8 @@ What should happen: the contracts add an engine sender, or the plan states that 
 
 Found: 2026-11-01, while building unit 5d.
 State: the cancellation window is fixed in unit 5d's fix round 1. The retry
-part is open for unit 7b, which owns the client. Unit 7a interrupts the
+part is fixed in unit 7b: the client retries a blocking wait with a new request
+identifier after a disconnect. Unit 7a interrupts the
 request scope on disconnection, so the existing handler cancellation finalizer
 runs. A reconnecting client must use a new request identifier for a blocking
 wait.
@@ -2198,7 +2199,7 @@ status and closes its listener. The service never retries recovery in place.
 ## 160. The fake agent's Shepherd command step does not speak the engine's protocol
 
 Found: 2026-11-01, while writing the unit 7a tests.
-State: open for unit 8b, or for unit 7b when its client exists.
+State: fixed in unit 7b: the step uses the real `@shepherd/client`.
 
 What happens: the `shepherd_command` step in `packages/testing/src/fakeAgent.ts`
 opens a WebSocket to `SHEPHERD_SOCKET` and sends `{ command, input }` as JSON.
@@ -2386,7 +2387,8 @@ must leave neither a running child nor an unwanted state folder.
 ## 170. A healthy long catch-up may reach the subscription backlog bound
 
 Found: 2026-11-01, in the focused review of unit 7a at 2b33da2.
-State: open for unit 7b's client; the server's bound is accepted by the lead.
+State: fixed in unit 7b for the client: a subscription resumes after the last
+event received. The server's bound is accepted by the lead.
 
 What happens: the live subscription collects events while the client reads
 catch-up. A healthy but long catch-up can reach issue 41's 2,048-event backlog
@@ -2441,7 +2443,7 @@ identity test uses the real filesystem without that seam.
 ## 175. The older fake-agent command test names a command that does not exist
 
 Found: 2026-11-01, while checking the sibling tests for unit 7b.
-State: open for the unit 7b builder and lead.
+State: fixed in unit 7b: the fixture now calls `ask`.
 
 What happens: the test beginning at `packages/testing/test/fake-agent.test.ts:635`
 asks the `shepherd_command` step to call `post`, which is absent from the
@@ -2457,3 +2459,89 @@ real service. The existing test has been left unchanged for the lead to
 assign with the builder's change to the scripted step.
 Why it matters: the older assertion must not force the fake agent to retain
 the invalid wire protocol described in issue 160.
+
+## 179. The frozen wait test "already held" races the owner moving the question
+
+Found: 2026-11-01, while building unit 7b's command-line tool.
+State: open for the lead and the test writer.
+
+What happens: in `packages/cli/test/wait-exit-codes.test.ts`, the two W02
+"already held" cases (permission and question) fail intermittently, and
+mostly fail. The parent agent holds a question or permission request, and the
+test then calls a blocking `wait` as that agent. After the parent's turn ends,
+the engine moves the held question to the owner (`QuestionMoved`,
+`OwnerNeeded`). The wait then opens without the "request held" cancellation
+the test expects, and it stays blocked until the connection closes. The
+engine's own test client, which does not use the new command-line tool, times
+out in the same way. In the one passing run, the wait arrived before the move.
+What should happen: the test should make the wait deterministic, for example by
+holding the parent's turn open until the wait has been answered, or the engine
+should state which outcome a wait after the move must have.
+Why it matters: the criterion cannot be observed reliably, and the command-line
+tool's exit code 0 with the "request held" message is untested by a stable test.
+
+## 180. The frozen test F02 cannot pass: its own setup emits an account event
+
+Found: 2026-11-01, while building unit 7b's fake-agent client step.
+State: open for the lead and the test writer.
+
+What happens: `packages/testing/test/fake-agent-client-step.test.ts`, case
+F02, records the event sequence before it starts the fake agent. It then
+asserts that no `AccountChanged` event follows. But `startFakeAgent` adds the
+agent's account with `accounts add`, which commits an `AccountChanged` event
+after that mark, so the assertion fails whatever the step does. The refusal
+assertion before it (`CommandRefused` for `accounts`, exactly one) passes.
+What should happen: take the sequence mark after `startFakeAgent` returns, or
+check that no `AccountChanged` names a different account than the agent's own.
+Why it matters: the test cannot show that a refused owner-only command changed
+nothing.
+
+## 181. Foreground `shepherd serve` is not supported
+
+Found: 2026-11-01, while wiring `serve` in the command-line tool.
+State: open.
+
+What happens: unit 7a starts the service when its module is imported, and only
+`serve --detach` has a launcher. The command-line tool accepts `serve --detach`
+only, and refuses plain `serve` with a usage error.
+What should happen: a foreground `serve` that runs the service in the
+terminal, decided by the lead when the acceptance suite needs it.
+Why it matters: an owner debugging the service must read its log file.
+
+## 182. The socket check and the connection are not one atomic step
+
+Found: 2026-11-01, while building the client's socket checks.
+State: open.
+
+What happens: the client checks every parent folder, the socket's folder and
+the socket, and then opens the connection by path. A process running as the
+same user, or a root process, could replace the socket between the check and
+the connection. Only the state folder's owner can do this, so the engine's
+trust boundary is not crossed, but the check is not a guarantee.
+What should happen: if the platform allows it, check the connected
+descriptor's peer credentials after connecting.
+Why it matters: the check protects the owner credential from a swapped socket.
+
+## 183. Process ancestry for the handshake reads `/proc` and works on Linux only
+
+Found: 2026-11-01, while building the client's ancestry header.
+State: open.
+
+What happens: `packages/client/src/ancestry.ts` reads `/proc/<pid>/stat` to
+build `Shepherd-Ancestors`. On a system without `/proc` it refuses to connect
+with the error "the process ancestry cannot be read from /proc".
+What should happen: use `ps` or a native lookup on macOS before the desktop
+client ships.
+Why it matters: the owner's mobile and desktop clients are on other systems.
+
+## 184. `shepherd mcp` discards its own logs
+
+Found: 2026-11-01, while building the tool server.
+State: open.
+
+What happens: the tool server's standard output carries the protocol, so the
+server runs with `Logger.layer([])` and writes no log at all. A connection
+failure reaches the agent as a tool error, and nothing is recorded.
+What should happen: write the server's log to a file in the state folder,
+without any credential.
+Why it matters: an owner debugging an agent's failed tool call has no record.
