@@ -2789,3 +2789,51 @@ a wait on the delivery id, a wait on the echo itself, or a turn end.
 Why it matters: a test that passes on a quiet machine and fails under load
 hides real failures behind noise. The original failure was not reproduced
 locally in three loaded runs; the cause is read from the code.
+
+## 197. The live check cannot look for agent tokens in the harnesses' own session files
+
+Found: 2026-11-02, while writing `pnpm live-check` (unit 8c).
+State: open.
+
+What happens: the plan's secret check (PB-A4) greps the session files that each
+harness writes under its home for the agent's token. The 8b acceptance suite can
+do this because the fake agent records its own environment. `pnpm live-check`
+cannot: an agent's token is given to the agent when it starts and is never
+visible over the socket, so the script has no token to search for. The live
+check scans the events, replies, the accounts list, the service's output and the
+thread text for the owner credential only.
+What should happen: the owner can grep Claude Code's and Codex's session files
+for the tokens of the run by hand, or a later unit can add a debug command that
+returns a one-way hash of each live token for the scan to compare against.
+Why it matters: a token written to a harness's session file would be readable
+by anything that reads that home. Today only the fake-agent suite proves this
+does not happen.
+
+## 198. The recorder's option and result types are not exported
+
+Found: 2026-11-02, while writing `pnpm live-check` (unit 8c).
+State: open; the check works around it.
+
+What happens: `scripts/recorder.ts` exports `recordFixtures`, `formatReport` and
+`hasRecordingFailures`, but not the types `RecordOptions` and `RecordResult`
+that those functions use. `scripts/live/recording.ts` derives them with
+`Parameters<typeof recordFixtures>[0]` and `Effect.Success<ReturnType<...>>`.
+What should happen: the recorder exports its two types, and the live check uses
+them.
+Why it matters: the derived types break silently if the recorder's signature is
+wrapped or overloaded.
+
+## 199. The startup-hook check keeps its own copy of the socket probe
+
+Found: 2026-11-02, while writing `pnpm live-check` (unit 8c).
+State: open.
+
+What happens: `serve --detach` decides whether a service already runs with an
+HTTP GET on `engine.sock`. That helper (`answers`) is not exported from
+`packages/cli/src/serve.ts`,
+so `scripts/live/startupHook.ts` carries a second copy (`socketAnswers`). The
+two can drift: if the service ever stops answering a plain GET, `serve --detach`
+and the live check would disagree.
+What should happen: `packages/cli/src/serve.ts` exports the probe and the live check imports it.
+Why it matters: the live check's claim that "the service answers" should be the
+same claim that the startup hook relies on.

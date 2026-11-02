@@ -5,14 +5,15 @@ import { DatabaseSync } from "node:sqlite";
 
 import { it, expect } from "@effect/vitest";
 import { connect, type Client, type ClientError } from "@shephrd/client";
-import type { EventEnvelope } from "@shephrd/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Redacted from "effect/Redacted";
 import * as Scope from "effect/Scope";
-import * as Stream from "effect/Stream";
 
+import {
+  findLeaks, head, readOwnerCredentialFrom, recordReplies, requestId, show, since, threadSources,
+} from "../../scripts/live/support.ts";
 import {
   alive, fakeHarness, makeServiceRoot, peekEcho, startService, stopAllServices, waitFor, writeFakeAdapter,
   type Echo, type ServiceProcess, type ServiceRoot,
@@ -38,17 +39,13 @@ import {
 export { stopAllServices, alive, peekEcho, waitFor };
 export type { Client, Echo, ServiceProcess, ServiceRoot };
 
-export const requestId = (): string => `request-${randomUUID()}`;
-
-// A call of the client, as an effect that never fails for a refusal: the
-// refusal reason is the value. Used where a scenario asserts a refusal.
-export const refusal = <A>(effect: Effect.Effect<A, unknown>): Effect.Effect<string | undefined> =>
-  effect.pipe(Effect.exit, Effect.map((exit) => {
-    if (Exit.isSuccess(exit)) return undefined;
-    const failure = Cause.findErrorOption(exit.cause);
-    const error = failure._tag === "Some" ? failure.value as { _tag?: string; reason?: string } : undefined;
-    return error?._tag === "CommandError" ? error.reason : `not a refusal: ${String(exit.cause)}`.slice(0, 300);
-  }));
+// Unit 8c moved the helpers that the live check also uses into a module that
+// imports nothing from vitest. They are re-exported, so the scenarios keep
+// their imports.
+export {
+  eventsUntil, findLeaks, head, isTag, next, refusal, requestId, since, stateIs, tagged, threadSources, threadText,
+} from "../../scripts/live/support.ts";
+export type { LeakSource } from "../../scripts/live/support.ts";
 
 export interface Spec {
   readonly script?: Record<string, unknown>;
@@ -140,52 +137,6 @@ const waitServing = (root: ServiceRoot, service: ServiceProcess, limit = 40_000)
   }
 });
 
-export const head = (client: Client): Effect.Effect<number> =>
-  (client["debug.compare-views"]({ requestId: requestId() } as never) as Effect.Effect<{ sequence: number }, unknown>).pipe(
-    Effect.map((reply) => reply.sequence), Effect.orDie,
-  );
-
-// Every event after `after`, up to and including the first that `last`
-// accepts; fails with `what` if none arrives within `limit`.
-export const eventsUntil = (
-  client: Client, after: number, what: string, last: (envelope: EventEnvelope) => boolean, limit = 20_000,
-): Effect.Effect<ReadonlyArray<EventEnvelope>> =>
-  (client.subscribe({ requestId: requestId(), after } as never) as Stream.Stream<EventEnvelope, unknown>).pipe(
-    Stream.takeUntil(last), Stream.runCollect,
-    Effect.timeoutOrElse({ duration: limit, orElse: () => Effect.die(new Error(`Timed out after ${limit} ms waiting for ${what}`)) }),
-    Effect.map((events) => [...events]), Effect.orDie,
-  );
-
-export const next = (
-  client: Client, after: number, what: string, predicate: (envelope: EventEnvelope) => boolean, limit = 20_000,
-): Effect.Effect<EventEnvelope> =>
-  eventsUntil(client, after, what, predicate, limit).pipe(Effect.map((events) => events[events.length - 1]!));
-
-// The events committed after `after`, up to the head now. Used to count
-// what one step caused, never totals (issue 55).
-export const since = (client: Client, after: number): Effect.Effect<ReadonlyArray<EventEnvelope>> => Effect.gen(function* () {
-  const end = yield* head(client);
-  if (end <= after) return [];
-  return yield* eventsUntil(client, after, `catching up to sequence ${end}`, (envelope) => envelope.sequence >= end, 30_000);
-});
-
-export const tagged = (events: ReadonlyArray<EventEnvelope>, tag: string, agentId?: string): ReadonlyArray<EventEnvelope> =>
-  events.filter((envelope) => envelope.event._tag === tag && (agentId === undefined || envelope.agentId === agentId));
-
-export const isTag = (tag: string, agentId?: string) => (envelope: EventEnvelope): boolean =>
-  envelope.event._tag === tag && (agentId === undefined || envelope.agentId === agentId);
-
-export const stateIs = (agentId: string, state: string) => (envelope: EventEnvelope): boolean =>
-  envelope.agentId === agentId && envelope.event._tag === "StateChanged" && (envelope.event as { state: { _tag: string } }).state._tag === state;
-
-// The agent's own words in its thread, in order.
-export const threadText = (events: ReadonlyArray<EventEnvelope>, agentId: string): string =>
-  events.filter((envelope) => envelope.agentId === agentId && envelope.event._tag === "ThreadItem")
-    .map((envelope) => {
-      const content = (envelope.event as { content: { _tag: string; text?: string } }).content;
-      return content._tag === "text" ? content.text ?? "" : `[${content._tag}]`;
-    }).join("");
-
 export const promptsOf = (echo: Echo): ReadonlyArray<string> => echo.inbound
   .filter((frame) => frame.method === "session/prompt")
   .map((frame) => (frame.params.prompt as Array<{ text?: string }>).map((part) => part.text ?? "").join(""));
@@ -216,104 +167,6 @@ export const runSql = (root: ServiceRoot, statement: string): void => {
   try { database.exec("PRAGMA busy_timeout = 5000"); database.exec(statement); } finally { database.close(); }
 };
 
-const readOwnerCredential = (root: ServiceRoot): ReadonlyArray<string> => {
-  try {
-    const bytes = readFileSync(join(root.state, "owner-credential"));
-    return [bytes.toString("base64url"), bytes.toString("base64"), bytes.toString("hex")];
-  } catch { return []; }
-};
-
-// ---- The secret scan (criterion 8.5, security rules) ---------------------
-//
-// A value can reach an event or an output in more forms than the raw one: JSON
-// escaped, base64 at any alignment inside a longer text, base64url, hex, and
-// percent encoded. `findLeaks` looks for every form of every secret in every
-// source and returns only labels ("secret 3 (base64) in output of process 2"),
-// never a value, so a failing scan does not print the credential it found.
-const base64Forms = (value: string): ReadonlyArray<string> => {
-  const bytes = Buffer.from(value, "utf8");
-  return [0, 1, 2].flatMap((offset) => {
-    // Inside a longer text, only the characters whose six bits all come from
-    // the value are the same whatever surrounds it.
-    const encoded = Buffer.concat([Buffer.alloc(offset), bytes]).toString("base64");
-    const from = Math.ceil(offset * 8 / 6);
-    const to = Math.floor((offset + bytes.length) * 8 / 6);
-    return to > from ? [encoded.slice(from, to)] : [];
-  });
-};
-
-const formsOf = (value: string): ReadonlyArray<readonly [string, string]> => {
-  const url = (text: string) => text.replaceAll("+", "-").replaceAll("/", "_");
-  return [
-    ["raw", value],
-    ["json", JSON.stringify(value).slice(1, -1)],
-    ...base64Forms(value).map((form) => ["base64", form] as const),
-    ...base64Forms(value).map((form) => ["base64url", url(form)] as const),
-    ["hex", Buffer.from(value, "utf8").toString("hex")],
-    ["percent", encodeURIComponent(value)],
-  ];
-};
-
-export interface LeakSource {
-  readonly label: string;
-  readonly text: string;
-}
-
-export const findLeaks = (secrets: Iterable<string>, sources: ReadonlyArray<LeakSource>): ReadonlyArray<string> => {
-  const found = new Set<string>();
-  let index = 0;
-  for (const secret of secrets) {
-    index += 1;
-    const seen = new Set<string>();
-    for (const [form, needle] of formsOf(secret)) {
-      // A form that equals one already tried (a plain secret is its own JSON
-      // and percent form) is reported once, under the first name.
-      if (needle.length < 8 || seen.has(needle)) continue;
-      seen.add(needle);
-      for (const source of sources) if (source.text.includes(needle)) found.add(`secret ${index} (${form}) in ${source.label}`);
-    }
-  }
-  return [...found];
-};
-
-// Each agent's own words in one string, text items only, so a secret that an
-// agent's output split over two items is one string again.
-export const threadSources = (events: ReadonlyArray<EventEnvelope>): ReadonlyArray<LeakSource> => {
-  const byAgent = new Map<string, string>();
-  for (const envelope of events) {
-    if (envelope.event._tag !== "ThreadItem" || envelope.agentId === undefined) continue;
-    const content = (envelope.event as { content: { _tag: string; text?: string } }).content;
-    if (content._tag === "text") byAgent.set(envelope.agentId, (byAgent.get(envelope.agentId) ?? "") + (content.text ?? ""));
-  }
-  return [...byAgent.values()].map((text, index) => ({ label: `thread of agent ${index + 1}`, text }));
-};
-
-// A reply or a refusal, as the text a scan reads.
-const show = (value: unknown): string => {
-  try {
-    if (value instanceof Error) return JSON.stringify({ ...value, name: value.name, message: value.message });
-    return JSON.stringify(value) ?? String(value);
-  } catch { return String(value); }
-};
-
-// Records every reply and every refusal of a client call, so the final scan
-// reads what the API said, not only what the log holds. Streams are not
-// recorded; their events are read from the log.
-const recording = (client: Client, sink: Array<string>): Client => new Proxy(client, {
-  get(target, key, receiver) {
-    const value: unknown = Reflect.get(target, key, receiver);
-    if (typeof value !== "function") return value;
-    return (...args: ReadonlyArray<unknown>) => {
-      const result: unknown = value.apply(target, args);
-      if (!Effect.isEffect(result)) return result;
-      return (result as Effect.Effect<unknown, unknown>).pipe(
-        Effect.tap((reply) => Effect.sync(() => { sink.push(show(reply)); })),
-        Effect.tapError((error) => Effect.sync(() => { sink.push(show(error)); })),
-      );
-    };
-  },
-});
-
 // Criterion 8.5 and the security rules: the views rebuilt from the log equal
 // the live views, and no credential or secret appears, in any form, in any
 // event, any reply, the accounts list, or the output of any service process
@@ -326,7 +179,7 @@ export const finish = (world: World): Effect.Effect<void, unknown, Scope.Scope> 
   const all = yield* since(client, 0);
   const accounts = yield* client.accounts({ requestId: requestId(), operation: "list" } as never);
   world.collectTokens();
-  const secrets = [...world.secrets, ...readOwnerCredential(world.root)];
+  const secrets = [...world.secrets, ...readOwnerCredentialFrom(world.root.state)];
   for (const secret of secrets) expect(secret.length).toBeGreaterThan(8);
   const leaks = findLeaks(secrets, [
     { label: "the events", text: JSON.stringify(all) },
@@ -362,7 +215,7 @@ export const scenario = (
     const incarnations: Array<ServiceProcess> = [];
     let current: ServiceProcess | undefined;
     let owner: Client | undefined;
-    const reopenOwner = () => connectOwner(root).pipe(Effect.provideService(Scope.Scope, scope), Effect.map((client) => recording(client, replies)));
+    const reopenOwner = () => connectOwner(root).pipe(Effect.provideService(Scope.Scope, scope), Effect.map((client) => recordReplies(client, replies)));
     // Every token the service minted for an agent is in the environment of
     // that agent's fake, whether or not the scenario asked for it.
     const collectTokens = () => {
@@ -379,7 +232,7 @@ export const scenario = (
       current = service;
       incarnations.push(service);
       yield* waitServing(root, service);
-      for (const form of readOwnerCredential(root)) secrets.add(form);
+      for (const form of readOwnerCredentialFrom(root.state)) secrets.add(form);
       owner = yield* reopenOwner();
       return service;
     });
@@ -393,7 +246,7 @@ export const scenario = (
         return yield* Effect.promise(() => service.exit);
       }),
       asAgent: (token) => connect({ environment: { SHEPHRD_SOCKET: root.socket, SHEPHRD_TOKEN: token }, attempts: 1 }).pipe(
-        Effect.provideService(Scope.Scope, scope), Effect.map((client) => recording(client, replies)),
+        Effect.provideService(Scope.Scope, scope), Effect.map((client) => recordReplies(client, replies)),
       ),
       prepare: (spec = {}) => Effect.gen(function* () {
         const harnessId = spec.harness ?? "fake";

@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as Effect from "effect/Effect"
 import { resolveHarnessDefaults } from "../src/runner/harnesses.ts"
+import { RECORDER_PROMPT } from "./live/prompts.ts"
 import { formatReport, hasRecordingFailures, recordFixtures } from "./recorder.ts"
 
 const parentEnvironment = { ...process.env }
@@ -36,7 +37,7 @@ async function main() {
   try {
     const results = await Effect.runPromise(recordFixtures({
       harnesses, outputDirectory, temporaryRoot, homeDirectory, parentEnvironment,
-      prompt: "Reply with the word ok. Do not run tools or create or change any file.", errorSamples, captureSignedOut: true
+      prompt: RECORDER_PROMPT, errorSamples, captureSignedOut: true
     }))
     process.stdout.write(formatReport(results) + "\n")
     if (hasRecordingFailures(results) || !results.some((result) => result.status === "recorded")) process.exitCode = 1
