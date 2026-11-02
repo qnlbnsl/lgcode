@@ -206,7 +206,7 @@ Why it matters: an unrecorded edit would be lost on the next copy.
 ## 13. Some copied ACP logging calls are on even when protocol logging is off
 
 Found: 2026-11-01, in the unit 2 security read.
-State: open; belongs to the unit that builds the service logger.
+State: fixed in unit 7a.
 
 What happens: decision 57 says the copied ACP protocol debug logging stays off
 outside tests. That is true of `logProtocol` in `effect-acp/src/protocol.ts`
@@ -226,6 +226,15 @@ through four paths: the core path, notification handlers, extension-handler
 defects, and encoding failures.
 Why it matters: until then, a handler defect could write a secret to the log.
 No Shepherd code registers a handler yet, so nothing leaks today.
+
+What changed in unit 7a: the service installs the redacting logger before
+building the runner or handler. The registry includes the owner credential,
+the removed inherited service token, inherited provider credentials, stored
+account secrets, and all stored agent and device credential hashes. Protocol
+payload logging is enabled only by its exact test flag after the real
+temporary-folder check. Malformed adapter frames still produce a fixed
+diagnostic.
+
 
 ## 14. Copied environment helpers default to the whole process environment
 
@@ -666,7 +675,7 @@ stop reason alone.
 ## 39. The read-only connection exists only when the SQLite layer turns on its reader workers
 
 Found: 2026-11-01, while writing the unit 4b tests.
-State: open.
+State: fixed in unit 7a.
 
 What happens: `SqliteClient.readOnly` in the copied client
 (`third_party/t3code/node-sqlite/src/nodeSqliteClient.ts`, `route`, line 1105)
@@ -679,6 +688,11 @@ Why it matters: without the reader workers, a `subscribe` catch-up waits
 behind every open write transaction, and a long catch-up holds up the writer.
 The unit 4b test `packages/engine/test/log/subscribe-gapless.test.ts` turns the
 reader workers on itself, so it cannot see this setting in the service.
+
+What changed in unit 7a: the service enables write-ahead logging before
+opening the Effect SQLite layer and builds that layer with `readerWorker:
+true`.
+
 
 ## 40. The `events.caller` column comment does not match what the log stores
 
@@ -699,7 +713,7 @@ The fix: the migration comment names the stored keys, and `subscribe` decodes
 ## 41. A subscriber that stops reading keeps every later event in memory
 
 Found: 2026-11-01, in the focused review of unit 4b at eb6308b.
-State: open for unit 7a.
+State: fixed in unit 7a.
 
 What happens: `PubSub.unbounded` in `packages/engine/src/log/EventLog.ts`
 keeps publishing committed events while a subscriber is open. If the consumer
@@ -709,6 +723,13 @@ What should happen: unit 7a owns a bound or a disconnect rule for a slow
 client. T3 Code's `apps/server/src/orchestration-v2/LiveStreamBudget.ts`,
 line 333, is a pattern for budgeting the buffered live events during replay.
 Why it matters: one stalled client must not exhaust the engine's memory.
+
+What changed in unit 7a: the transport disconnects a connection whose
+subscription backlog reaches 2,048 events, checked every ten milliseconds. It
+also disconnects a stream whose chunk remains unacknowledged for five seconds,
+including a stalled replay on a quiet log. The transport never drops an event
+to keep a connection alive.
+
 
 ## 42. Invalid subscription cursors could silently skip catch-up
 
@@ -1219,7 +1240,11 @@ What should happen: the contracts add an engine sender, or the plan states that 
 ## 77. A blocking wait's retry and its cancellation window
 
 Found: 2026-11-01, while building unit 5d.
-State: the cancellation window is fixed in unit 5d's fix round 1. The retry part is open for unit 7a, which owns the transport and its connection handling.
+State: the cancellation window is fixed in unit 5d's fix round 1. The retry
+part is open for unit 7b, which owns the client. Unit 7a interrupts the
+request scope on disconnection, so the existing handler cancellation finalizer
+runs. A reconnecting client must use a new request identifier for a blocking
+wait.
 
 What happens: a blocking `wait` stores its receipt when the wait opens, so a retry with the same request identifier returns the stored "opened" reply, not the final outcome. Separately, the handler runs the blocking part after the opening commit. An interruption that lands after the commit and before the blocking part starts would leave the wait open.
 Why it matters: a blocking wait creates no delivery and never counts against its caller's settled state, so a left-open wait wakes nobody. It still shows as open until recovery step 6 cancels blocking waits (row 66).
@@ -1920,7 +1945,7 @@ reloaded, or started if it had no session. A second run writes nothing.
 ## 117. The timer and the persistent secret store are not wired into a running service
 
 Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: the timer half is handled by unit 6d. The persistent secret store and the file system services remain open for the unit that assembles the service.
+State: fixed in units 6d and 7a.
 
 What happens: `packages/engine/src/index.ts` exports nothing, so `startAccountTimers` (`accounts/timers.ts`) and the persistent secret store layer (`accounts/SecretStore.ts`) are called only from tests. The `AcpRunner` layer also now needs `FileSystem` and `Path` services for the Codex shadow home.
 What should happen: the assembly starts `startAccountTimers` inside the service scope, provides the persistent `SecretStore` layer over the state folder, and provides the Node file system and path services.
@@ -1930,6 +1955,12 @@ What changed in unit 6d: `Restart.recover` starts `startAccountTimers` at
 restart step 8, inside the scope `recover` runs in. Unit 7a must not start
 the timers a second time. It must still provide the persistent `SecretStore`
 layer and the Node file system and path services.
+
+What changed in unit 7a: the service provides the persistent secret store, the
+Node platform services, and the redactor before constructing the runner and
+the restart layer. It calls `Restart.recover` once and lets recovery start the
+account timers.
+
 
 ## 118. A classified pause drops the provider's error text
 
@@ -2090,7 +2121,7 @@ Why it matters: the agent's queued work stays stuck until the owner notices.
 ## 153. Nothing records process rows, and swept rows are never removed
 
 Found: 2026-11-01, while building unit 6d.
-State: open for the unit that records adapter processes.
+State: fixed in unit 7a.
 
 What happens: `EventLog` can insert `processes` rows through a side row, but
 no production path passes one, so restart step 5 has nothing to sweep
@@ -2100,6 +2131,13 @@ What should happen: the runner records each adapter's process identity when
 it spawns, and recovery removes or marks the rows it has handled.
 Why it matters: leftover adapters from a crash keep running after a restart,
 and old rows grow without bound.
+
+What changed in unit 7a: the runner records each Linux adapter group, boot
+identifier, start time, user identifier, and executable immediately after
+spawning. The service removes records of dead or replaced identities after
+recovery has swept them. Live identities remain available to the ancestry
+guard. The unsupported macOS reader remains issue 120.
+
 
 ## 154. The replay scan waits a fixed number of yields for the handler
 
@@ -2138,7 +2176,7 @@ Why it matters: a check that fails at random hides real failures and costs a re-
 ## 159. A second recovery on one service could repeat the token revocation and the interrupt
 
 Found: 2026-11-01, in unit 6d's focused review (finding 4) and attack pass (B3), confirmed by the verifier as a library defect not reachable at `9b5853c`.
-State: fixed in unit 6d fix round 1 (`recovery/service.ts`, `recovery/restart.ts`).
+State: fixed in unit 6d fix round 1 (`recovery/service.ts`, `recovery/restart.ts`) and completed in unit 7a (`service.ts`).
 
 What happened: `Restart.recover` set its completed flag only after step 10.
 A run that failed or was interrupted before then could be started again on
@@ -2153,3 +2191,225 @@ failure is fatal to the service, and that unit 7a must start a fresh engine,
 whose new service runs recovery over the same log.
 Why it matters: a repeated step 4 and step 6 would revoke the tokens of
 agents the first run had just reloaded, and interrupt them again.
+
+What changed in unit 7a: a failed recovery exits the service with a nonzero
+status and closes its listener. The service never retries recovery in place.
+
+## 160. The fake agent's Shepherd command step does not speak the engine's protocol
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open for unit 8b, or for unit 7b when its client exists.
+
+What happens: the `shepherd_command` step in `packages/testing/src/fakeAgent.ts`
+opens a WebSocket to `SHEPHERD_SOCKET` and sends `{ command, input }` as JSON.
+That is not an Effect RPC request, and the step reports
+`shepherd_command:ok` on any reply at all, an error reply included.
+What should happen: the step sends a real RPC request through unit 7b's
+client and reports the reply's outcome.
+Why it matters: a test that trusts `shepherd_command:ok` would pass while the
+command failed. Unit 7a's tests do not use the step: criterion 7.10 reads
+the reloaded agent's token from the fake agent's echo file and calls through
+the test-only client in `packages/engine/test/support/socketClient.ts`.
+
+## 161. Row 64 does not say what an upgrade without an ancestor chain means
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open for the lead; the unit 7a tests take the reading below.
+
+What happens: row 64 says the client sends its ancestor chain and process
+group on upgrade, and the engine refuses the owner credential when one of
+them matches a recorded adapter process. It does not say what happens when
+the chain or the group is missing or malformed.
+What should happen (the tests' reading): the engine refuses the owner
+credential with HTTP 403 when either header is missing or malformed, so a
+caller cannot skip the check by leaving the headers out. Agent tokens and
+device credentials do not need the headers.
+Why it matters: reading a missing chain as "outside every adapter" would make
+the check optional for any caller.
+
+## 162. The ancestry check rests on the caller's own claim
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open; a limit of row 64's design, recorded for the attack pass.
+
+What happens: Node.js does not expose a Unix socket peer's process id (row
+48), so the engine cannot read the caller's ancestors itself. It checks the
+chain the client sends. A process inside an adapter's tree that can read
+`owner-credential` can also send a chain that leaves the adapter out.
+What should happen: the check stays as row 64 describes, as a guard against
+an agent's shell acting as the owner by accident. The owner credential file
+also needs the deny-read rule wherever the harness has one (row 61).
+Why it matters: row 64 does not stop a hostile agent on a harness without a
+deny-read mechanism.
+
+## 163. Issue 41's bound for a stalled subscriber has no number
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open for unit 7a's builder; the test sets an upper limit.
+
+What happens: issue 41 asks unit 7a for a bound or a disconnect rule, but no
+row names the size. A subscriber that stops acknowledging Effect RPC stream
+chunks stops the server's stream for it, and the committed events then
+queue in its `PubSub` subscription.
+What should happen (the tests' reading): the server ends the stalled
+subscription, or closes its connection, before 10,000 unacknowledged events
+of about one kilobyte each. Dropping events is not allowed, because
+`subscribe` is gapless; the client subscribes again from its last sequence.
+Why it matters: one stalled client must not hold the engine's memory.
+
+## 164. An agent's subscribe never shows its own refusals or the deliveries queued to it
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open for the lead; criterion 7.3 is followed as written.
+
+What happens: criterion 7.3 makes every agent-less event owner-only. Two
+event types concern an agent without carrying a top-level `agentId`:
+`CommandRefused` (no agent field) and `DeliveryQueued` (its agent is
+`delivery.target`). The log stores no `agent_id` for them, so an agent's
+`subscribe` never returns them, even for its own command or its own queue.
+What should happen: either the criterion stays, or those events gain an
+`agentId` (a contracts change) so they can be shown to the agent concerned.
+Why it matters: an agent following its own thread cannot see that its
+command was refused, or that a message is waiting for it.
+
+## 165. Nothing gives the server the live adapters' process identities
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: fixed in unit 7a.
+
+What happens: row 64's check needs the process id, start time and group of
+every live adapter. `Runner.start` and `Runner.load` return a `SessionInfo`
+without any process identity, `SessionOpened.process` is never written, and
+no production path inserts a `processes` row (issue 153).
+What should happen: the runner reports each adapter's identity when it
+spawns (Linux: `/proc/<pid>/stat` field 22 for the start time, as
+`recovery/orphans.ts` reads it), the engine records it as a `processes` row,
+and the server checks the chain against the rows whose process is still the
+recorded one.
+Why it matters: without it, criterion 7.9's engine half and issue 153's
+sweep have nothing to compare against.
+
+What changed in unit 7a: adapter spawns record their process identity in the
+operational table before speaking the Agent Client Protocol. The upgrade guard
+verifies that each row still matches a live process before comparing the
+caller's claimed ancestry and group.
+
+
+## 166. Frozen service fixtures did not reach the behaviours they asserted
+
+Found: 2026-11-01, while building unit 7a against its frozen tests.
+State: fixed in unit 7a, with the lead's approval for all three edited test files.
+
+What happened: the service test helper passed a plain string to the remote
+procedure call client for `accounts set-secret`. Effect validates the decoded
+payload before encoding it, and the contract requires a `Redacted` value. The
+request never left the client. The restart fixture also waited for an accepted
+delivery while its fake agent only slept. A running-state notice is neither
+content nor a successful prompt reply, so it cannot accept a delivery under
+decision row 51.
+What changed: with the lead's approval at board posts 1081 and 1084, the
+helper wraps the secret in `Redacted.make` with the contract's label, and the
+restart fixture sends an existing empty-plan step before sleeping. The plan is
+content, and the existing handler accepts the delivery. The service-log
+fixture also sent a malformed wire frame before its permission and
+terminal-error probes, although the copied protocol intentionally terminates
+that adapter connection on malformed input. With approval at posts 1086 and
+1088, that probe now runs through a second fake agent in the same service
+after the first flow. Its original token is passed as a stored secret to the
+second agent, so the malformed path still exercises it. The first flow waits
+for either a returned delivery or a turn end, because a prompt error writes a
+returned delivery and idle without a later turn end. Every existing assertion
+and timeout is unchanged.
+Why it matters: a builder must not weaken production validation or reinterpret
+an acknowledgement just to pass a fixture that cannot reach its own expected
+state.
+
+## 167. An open WebSocket could hold service shutdown open
+
+Found: 2026-11-01, while checking unit 7a with an established owner connection.
+State: fixed in unit 7a.
+
+What happened: the first service assembly let the HTTP server wait for
+upgraded connections while the client-waiting WebSocket server finalizer ran
+before the request scopes closed. A real authenticated connection held
+shutdown past a three-second probe deadline. Closing the client then released
+the service.
+What changed: the listener tracks accepted sockets and disconnects them before
+closing its request scope and its separate server scope. The service
+explicitly closes the listener while the handler, runner, and database remain
+available, so disconnection finalizers can still cancel blocking waits. The
+same probe completed with exit code zero in 31 milliseconds after the change.
+Why it matters: a detached service must shut down and release its lifetime
+lock even while an owner or agent client remains connected.
+
+## 168. Read requests trusted an upgrade credential after its revocation
+
+Found: 2026-11-01, in the unit 7a attack pass and independent verification of
+commit 2b33da2, confirmed by the lead for fix round 1.
+State: fixed in unit 7a fix round 1.
+
+What happened: `subscribe` and `debug.compare-views` did not authenticate again
+when a new request began. A revoked connection could serve new reads before
+the event watcher or periodic check closed it. The debug handler also treated
+any credential without an agent identifier as the owner, admitting a paired
+device despite criterion 7.12.
+What changed: both handlers authenticate the original credential before
+starting a read. An invalid credential fails with a fixed command error and
+completes the connection's invalidation signal. Only an owner credential may
+call the debug handler. The existing event watcher and 100 millisecond poll
+still close revoked connections, including idle ones.
+Follow-up rule: any later device-revocation command must write `DeviceRevoked`
+in the same batch as `revokeDevices`, so the event-driven invalidation closes
+the connection without waiting for the poll.
+Why it matters: a connection's earlier authentication must not authorize a
+new read after its credential is revoked.
+
+## 169. Request diagnostics and startup cleanup were incomplete
+
+Found: 2026-11-01, in the focused review of unit 7a at 2b33da2.
+State: fixed in unit 7a fix round 1.
+
+What happened: an application defect returned a fixed HTTP 500 without a log
+line. A detached launcher's 30-second deadline returned an error but left its
+child running. An overlong socket path was checked after creating the state
+folder. The server's source credit omitted one referenced line range.
+What changed: the application logs `request failed: defect` through the
+redacting logger before returning the fixed response, without cause text.
+The service log sink preserves that fixed category. The launcher kills only
+its own still-running detached child process group before reporting its
+deadline failure. The socket-path byte limit is checked before inspecting or
+creating the state folder. The server credits T3 Code `apps/server/src/ws.ts`
+lines 3374-3385 alongside the other referenced ranges.
+Why it matters: a failed request needs a safe diagnostic, and failed startup
+must leave neither a running child nor an unwanted state folder.
+
+## 170. A healthy long catch-up may reach the subscription backlog bound
+
+Found: 2026-11-01, in the focused review of unit 7a at 2b33da2.
+State: open for unit 7b's client; the server's bound is accepted by the lead.
+
+What happens: the live subscription collects events while the client reads
+catch-up. A healthy but long catch-up can reach issue 41's 2,048-event backlog
+bound and close the connection. The server does not drop events.
+What should happen: when the server closes catch-up, the client reconnects
+and subscribes from its last received cursor. The same rule handles a slow
+subscriber reconnecting after a budget disconnect.
+Why it matters: cursor-based resumption preserves every event across a
+disconnect that enforces the server's memory bound.
+
+## 171. Another socket responder can make the launcher report already running
+
+Found: 2026-11-01, in the unit 7a attack pass at 2b33da2.
+State: open usability note for the owner; no code change is required.
+
+What happens: another program of the same user can answer at `engine.sock`
+without holding the engine lock. The launcher then reports `already running`.
+The lead disproved this as a specification break: criterion 7.4, task 7a.3,
+and decision row 71 require detection by connecting, and the frozen launcher
+test explicitly accepts a responder without a lock. That user already holds
+the owner's authority.
+What should happen: retain the specified connection probe. If the wording
+confuses an owner diagnosing a conflicting program, consider clearer text in
+a later usability change.
+Why it matters: an answering socket proves that something is listening, but
+the launcher's message can misidentify that program as the engine.

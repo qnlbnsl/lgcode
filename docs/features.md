@@ -10,7 +10,7 @@ Each feature has a short name, one paragraph saying what it does, and a state:
 While the engine is being built, a feature can also be **built in the
 engine** (unit numbers follow). That means its engine part is merged into
 `area/engine` and passes its tests, but nobody can use it yet, because the
-agent runner (unit 6a) and the server (unit 7a) are not merged. A feature
+client library and the command-line tool (unit 7b) are not merged. A feature
 is **partly built in the engine** when only some of what its paragraph
 describes is merged; the note after it says which part.
 
@@ -38,8 +38,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
     and tells a signed-out account from one out of usage; unit 6d recovers
     agents after an engine restart: it reloads each one with a new token,
     scans the replayed history for delivery ids, then sends a carry-on or
-    re-sends, returns paused agents, and supports `resume --fresh`; the
-    socket half of recovery is unit 7a). Shepherd starts the agent as a child process
+    re-sends, returns paused agents, and supports `resume --fresh`; unit
+    7a answers every connection with 503 until recovery ends). Shepherd starts the agent as a child process
     and drives it through the Agent Client Protocol (ACP): it opens a
     session, sends prompts, and receives structured events (text, plan, tool
     calls, permission requests). Adding a harness means adding its ACP
@@ -59,7 +59,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   in the engine: unit 6b picks an account, reads its secrets, gives a second
   Codex account its own shadow home, pauses agents whose account signs out or
   runs out of usage, and returns them when the account is available again;
-  adding accounts from the API is unit 7a). The owner can
+  unit 7a carries the accounts command over the API). The owner can
   set up more than one account for a harness, such as two ChatGPT accounts
   for Codex or three Cursor accounts, and Shepherd spreads agents across
   them. Each account is its own sign-in, kept apart by its own home
@@ -141,15 +141,20 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 
 ## 4. The client API
 
-- **One authenticated API for every client** (idea). The web page, a future
+- **One authenticated API for every client** (idea; partly built in the
+  engine: unit 7a serves an authenticated WebSocket API on a Unix socket in
+  the owner-only state folder, for the owner, paired devices and agents; the
+  client library is unit 7b). The web page, a future
   desktop app, and a future mobile app all use the same API.
 - **Device pairing** (idea). A new device is added with a one-time pairing
   code, as described in [SECURITY.md](../SECURITY.md).
-- **Live updates** (idea). Clients receive board posts, thread events, and
+- **Live updates** (idea; partly built in the engine: unit 7a's `subscribe`
+  streams events, and an agent sees only its own and its children's). Clients receive board posts, thread events, and
   agent states as a stream, not by polling.
 - **Updates that survive a sleeping phone** (partly built in the engine:
   units 4a to 4c give request receipts, gapless subscriptions and
-  snapshots; the client API that carries them is unit 7a's). A client gets a snapshot
+  snapshots, and unit 7a serves them over the socket; the client library is
+  unit 7b's). A client gets a snapshot
   and then only newer events, picks up where it left off after a reconnect,
   and every action carries a request id so a double tap acts once. See
   research item 9.
