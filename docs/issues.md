@@ -3094,3 +3094,74 @@ failed, and removing each required recorded field produced its named error.
 Why it matters: recording a new session must not break the checks merely
 because the adapter assigns it a new identifier, and replay checks must
 still catch a runner that reports values different from the recording.
+
+## 210. An account reset can be delayed for a minute when its deadline passes during a timer check
+
+Found: 2026-11-02, while investigating the automatic-reset acceptance failure
+at commit b915542 on branch `worker/engine-acfl`.
+State: fixed in commit `f4d79a68030dae76069fd3b2b102e7132528dbfc`.
+
+What happened at b915542: `startAccountTimers` in `packages/engine/src/accounts/timers.ts`
+reads the clock at line 51 and releases deadlines due at that reading.
+It reads the clock again at line 55, then excludes deadlines with no positive
+time remaining at line 57.
+A deadline that passes between those readings was not released, but is also
+excluded from the next wake time.
+With no other future deadline, the timer sleeps for 60,000 milliseconds.
+The comment at line 56 treats every remaining overdue deadline as a failed
+release, although this deadline has never been attempted.
+A sleep that wakes one millisecond before the wall-clock deadline can lead
+to the same crossing on the next check.
+
+Evidence: the original acceptance flow, with event metadata printed by its
+existing wait predicate, failed on the first run with four processor-bound
+`yes` processes and the test pinned to processor cores 4 and 5.
+The other three cases passed, including the restart case.
+The reset time was 1793648397166.
+The log recorded `AccountOutOfUsage`, `DeliveryRequeued`, a paused state,
+and the second `DeliveryQueued`, ending at sequence 13 at 1793648390736.
+No `AccountAvailable` or later delivery event arrived before the 40-second
+wait timed out at 13:40:30.891 local time.
+The missing step was the account's return, before either queued delivery
+could resume.
+
+A separate deterministic probe called the unchanged production timer with a
+controlled clock and its log and view boundaries supplied by test doubles.
+With a reset time of 1000 and clock readings of 999 and 999, it scheduled a
+one-millisecond wait and wrote no availability event.
+With readings of 999 and 1000, or 999 and 1001, it wrote no availability
+event and scheduled a 60,000-millisecond wait.
+With readings of 1001 and 1001, it wrote the availability event immediately.
+An assertion that a newly overdue deadline must release or immediately
+recheck failed against the production code.
+The load trace does not expose the timer's internal clock readings, so it
+confirms the missing event while the controlled probe proves the race.
+
+What changed: each check remembers the account and deadline pairs whose
+release it attempted.
+Only those pairs are excluded from the next wake time if they remain pending.
+A deadline that becomes due during the check schedules an immediate recheck.
+A release that actually failed retains its one-minute retry delay.
+The release still checks the current account status and deadline inside the
+writer transaction, so sign-outs and replaced deadlines remain protected.
+The first check still runs before startup returns, and account events still
+wake the timer.
+
+Verification: `reset-timer.test.ts` controls the timer's clock and sleep
+boundaries without a database or an adapter process.
+The equal-to-deadline, just-after-deadline and early-wake cases all failed
+against the old timer and passed with the fix.
+The failed-release case passed against both versions and guards the existing
+one-minute backoff.
+The unchanged acceptance file then passed ten consecutive runs with the
+same four processor-bound processes pinned to the same two cores as the
+reproduction.
+The account suite passed all 39 tests across six files.
+The serial acceptance suite passed all 59 tests across 22 files.
+The engine package's type check also passed.
+The restart case shares the timer, but its deliberately overdue deadline is
+already eligible at the first reading and did not fail in this load run.
+No acceptance waits or assertions were changed.
+
+Why it matters: work queued behind a usage limit can remain paused for an
+extra minute after the account's reported reset time.
