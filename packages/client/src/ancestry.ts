@@ -10,7 +10,15 @@ const statFields = (pid: number): Array<string> => {
 
 // Row 64's handshake headers: `pid:start time` pairs from this process up
 // through each parent until one cannot be read, and this process's group.
-export const ancestryHeaders = (pid: number = process.pid): Record<string, string> => {
+// Version 1 runs on Linux only (owner, 2026-11-01); any other platform is
+// refused before /proc is read. The platform is an argument so a test can pass
+// another one.
+export const ancestryHeaders = (
+  pid: number = process.pid, platform: NodeJS.Platform = process.platform
+): Record<string, string> => {
+  if (platform !== "linux") {
+    throw new ClientError({ message: "the process ancestry check runs on Linux only in this version" })
+  }
   const chain: Array<string> = []
   let group: string
   try {

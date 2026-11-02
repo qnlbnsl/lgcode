@@ -2551,18 +2551,21 @@ Why it matters: the check protects the owner credential from a swapped socket.
 ## 183. Process ancestry for the handshake reads `/proc` and works on Linux only
 
 Found: 2026-11-01, while building the client's ancestry header.
-State: open.
+State: closed by the owner's ruling, unit 7b fix round 1.
 
-What happens: `packages/client/src/ancestry.ts` reads `/proc/<pid>/stat` to
-build `Shepherd-Ancestors`. On a system without `/proc` it refuses to connect
-with the error "the process ancestry cannot be read from /proc".
-What should happen: use `ps` or a native lookup on macOS before the desktop
-client ships.
-Why it matters: the owner's mobile and desktop clients are on other systems.
-Owner question (unit 7b fix round 1, ruling 4): is macOS in scope for version
-1? Decision row 64 names `ps -o ppid=,lstart=` for macOS, and both halves are
-missing: the engine's verification (unit 7a) and the client's ancestry header
-read only `/proc`. The gap does not block a Linux merge.
+What happened: `packages/client/src/ancestry.ts` reads `/proc/<pid>/stat` to
+build `Shepherd-Ancestors`, and the engine's check had a macOS reader that the
+client had no counterpart for.
+Owner ruling, 2026-11-01, verbatim: "yeah linux only for now. shoud be easy
+enought to port to macos". Version 1 is Linux only.
+What was done: the client's `ancestryHeaders` refuses on any platform other
+than Linux, before it reads `/proc`, with "the process ancestry check runs on
+Linux only in this version". The engine's `outsideAdapters` no longer falls
+back to the macOS reader: on a non-Linux platform it returns false, so the
+owner credential is refused. Both take the platform as an argument for tests.
+`recovery/orphans.ts` keeps its macOS reader, which only recovery uses.
+Porting later: add the `ps -o ppid=,lstart=` reader (decision row 64) to both
+halves and lift the two platform checks.
 
 ## 184. `shepherd mcp` discards its own logs
 

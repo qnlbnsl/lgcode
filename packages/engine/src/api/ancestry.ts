@@ -1,12 +1,17 @@
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 
-import { linuxProcessReader, macosProcessReader } from "../recovery/orphans.ts";
+import { linuxProcessReader } from "../recovery/orphans.ts";
 
 // Row 64 is an accident guard, using the caller's claimed ancestry. The
 // current process identity must also match the recorded spawn: a reused pid
-// or a row from another boot does not identify a live adapter.
-export const outsideAdapters = (chain: string | undefined, group: string | undefined) => Effect.gen(function* () {
+// or a row from another boot does not identify a live adapter. Version 1 runs
+// on Linux only (owner, 2026-11-01): on any other platform the check cannot
+// vouch for the caller, so the owner is refused.
+export const outsideAdapters = (
+  chain: string | undefined, group: string | undefined, platform: NodeJS.Platform = process.platform
+) => Effect.gen(function* () {
+  if (platform !== "linux") return false;
   if (chain === undefined || group === undefined || !/^[1-9]\d*$/.test(group)) return false;
   const groupId = Number(group);
   const entries = chain.split(",");
@@ -22,7 +27,7 @@ export const outsideAdapters = (chain: string | undefined, group: string | undef
   const sql = yield* SqlClient.SqlClient;
   const rows = yield* sql<{ group_id: number; boot_id: string; start_time: string; user_id: number; executable: string }>`
     SELECT group_id, boot_id, start_time, user_id, executable FROM processes`;
-  const reader = process.platform === "linux" ? linuxProcessReader : macosProcessReader;
+  const reader = linuxProcessReader;
   return yield* Effect.sync(() => {
     try {
       for (const row of rows) {
