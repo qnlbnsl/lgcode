@@ -2681,3 +2681,37 @@ What should happen: issue 37 is fixed on its own terms and does not depend on
 the length of the product's name.
 Why it matters: the next re-record could over-scrub another long, harmless
 variable and the cause would be hidden.
+
+## 193. An error from the fake harness is never classified as signed out or out of usage
+
+Found: 2026-11-02, while writing the acceptance suite (unit 8b).
+State: open.
+
+What happens: `packages/engine/src/runner/classify.ts` decides whether a
+failed turn means "signed out" or "out of usage" from the harness id, and only
+the ids `claude`, `codex`, `cursor` and `gemini` have patterns. An agent on a
+harness with any other id, including the fake harness the tests use, gets the
+same message as a plain error and is never paused. The acceptance scenario for
+account failures therefore registers the fake adapter under the harness id
+`claude`.
+What should happen: either the classification patterns are part of the
+harness definition, so a test harness can carry its own, or the limitation is
+written in the harness documentation.
+Why it matters: a new harness added later is silently never paused when its
+account runs out, and the failure shows only as a crashed turn.
+
+## 194. A sent but unaccepted prompt reaches the agent twice after a restart
+
+Found: 2026-11-02, while writing the acceptance suite (unit 8b).
+State: open. Allowed by the specification ("may be sent twice"), so it is a
+decision to confirm, not a defect.
+
+What happens: when the service is killed after a prompt was sent to an agent
+and before the agent accepted it, recovery requeues the delivery and sends it
+again. The agent's transcript then holds the same prompt twice. The log shows
+one delivery, so a reader of the log sees nothing wrong.
+What should happen: the owner confirms that a double delivery is acceptable,
+or the sent event records enough for the engine to tell the agent that the
+prompt may be a repeat.
+Why it matters: an agent that acts twice on the same instruction can do
+harm, for example by repeating a commit or a message to a third party.
