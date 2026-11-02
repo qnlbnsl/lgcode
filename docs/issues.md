@@ -2494,6 +2494,26 @@ completed successfully. X22 deliberately checks resource cleanup without
 requiring a particular shutdown return code, because that behavior is
 outside this fix round's assigned rulings.
 
+## 178. The ancestry checks do not explicitly refuse unsupported platforms
+
+Found: 2026-11-01, while writing T-7 after engine-lead's board request 1132.
+State: open for the unit 7b builder's fix round under the Linux-only ruling.
+
+What happens: the client's `ancestryHeaders` and the engine's
+`outsideAdapters` have no platform argument. Tests against their intended
+last-argument interface pass `darwin`, but the unchanged functions ignore
+it. On the Linux test host, the client reads Linux ancestry and upgrades,
+and the engine grants an outside-adapter identity when the process table
+is empty.
+What should happen: version 1 is Linux only, as ruled by the owner and
+relayed in request 1132. Both functions take a final platform argument that
+defaults to `process.platform`. On `darwin`, the client refuses before an
+upgrade with `the process ancestry check runs on Linux only in this version`,
+and the engine returns false. X71 exercises both the reader and the public
+client connection; X72 uses a real migrated database and a Linux control.
+Why it matters: an unsupported platform must fail closed instead of
+implicitly accepting an ancestry check intended for another platform.
+
 ## 179. The frozen wait test "already held" races the owner moving the question
 
 Found: 2026-11-01, while building unit 7b's command-line tool.
