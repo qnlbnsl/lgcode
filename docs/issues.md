@@ -2475,6 +2475,25 @@ after the wait opens. They retain the held-request message and the
 Why it matters: exit code 0 tells a caller that every member has settled,
 although a member still needs the caller's answer.
 
+## 177. Closing the MCP input can report an error after a successful tool call
+
+Found: 2026-11-01, while writing the unit 7b fix-round tests against commit
+`220efe3`, with uncommitted test helpers.
+State: open shutdown usability note. This does not block the assigned fixes.
+
+What happened: a test host ran the real `runMcp`, initialized the protocol,
+listed the tools, and completed an `ask` against a fake socket peer. After
+the parent closed standard input, `runMcp` returned exit code 1. The host
+stayed alive to inspect the server layer's resource cleanup. The observed
+return code was independent of the leaked connection asserted by X22.
+What should happen: investigate whether the normal end of standard input
+races the protocol layer's termination in `runMcp`. An orderly shutdown
+should not report an error solely because the input ended.
+Why it matters: a caller can see a failed server shutdown after its tools
+completed successfully. X22 deliberately checks resource cleanup without
+requiring a particular shutdown return code, because that behavior is
+outside this fix round's assigned rulings.
+
 ## 179. The frozen wait test "already held" races the owner moving the question
 
 Found: 2026-11-01, while building unit 7b's command-line tool.
