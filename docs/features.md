@@ -15,7 +15,10 @@ and agents can reach the engine from a terminal, but no web or phone client
 exists yet. Since unit 8b, an acceptance suite runs the service as a
 child process and checks each of the engine's twelve capabilities, its
 eight failure rules and one request from start to finish through the
-public socket only, with fake agents. A feature
+public socket only, with fake agents. Since unit 8c, `pnpm live-check`
+runs that request once on a real Claude Code lead and a real Codex worker
+in a fresh `/tmp` service, for the owner to run by hand; it has not been
+run on the owner's accounts yet. A feature
 is **partly built in the engine** when only some of what its paragraph
 describes is merged; the note after it says which part.
 

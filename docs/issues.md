@@ -2789,3 +2789,182 @@ a wait on the delivery id, a wait on the echo itself, or a turn end.
 Why it matters: a test that passes on a quiet machine and fails under load
 hides real failures behind noise. The original failure was not reproduced
 locally in three loaded runs; the cause is read from the code.
+
+## 197. The live check cannot look for agent tokens in the harnesses' own session files
+
+Found: 2026-11-02, while writing `pnpm live-check` (unit 8c).
+State: open.
+
+What happens: the plan's secret check (PB-A4) greps the session files that each
+harness writes under its home for the agent's token. The 8b acceptance suite can
+do this because the fake agent records its own environment. `pnpm live-check`
+cannot: an agent's token is given to the agent when it starts and is never
+visible over the socket, so the script has no token to search for. The live
+check scans the events, replies, the accounts list, the service's output and the
+thread text for the owner credential only.
+What should happen: the owner can grep Claude Code's and Codex's session files
+for the tokens of the run by hand, or a later unit can add a debug command that
+returns a one-way hash of each live token for the scan to compare against.
+Why it matters: a token written to a harness's session file would be readable
+by anything that reads that home. Today only the fake-agent suite proves this
+does not happen.
+
+## 198. The recorder's option and result types are not exported
+
+Found: 2026-11-02, while writing `pnpm live-check` (unit 8c).
+State: open; the check works around it.
+
+What happens: `scripts/recorder.ts` exports `recordFixtures`, `formatReport` and
+`hasRecordingFailures`, but not the types `RecordOptions` and `RecordResult`
+that those functions use. `scripts/live/recording.ts` derives them with
+`Parameters<typeof recordFixtures>[0]` and `Effect.Success<ReturnType<...>>`.
+What should happen: the recorder exports its two types, and the live check uses
+them.
+Why it matters: the derived types break silently if the recorder's signature is
+wrapped or overloaded.
+
+## 199. The startup-hook check keeps its own copy of the socket probe
+
+Found: 2026-11-02, while writing `pnpm live-check` (unit 8c).
+State: open.
+
+What happens: `serve --detach` decides whether a service already runs with an
+HTTP GET on `engine.sock`. That helper (`answers`) is not exported from
+`packages/cli/src/serve.ts`,
+so `scripts/live/startupHook.ts` carries a second copy (`socketAnswers`). The
+two can drift: if the service ever stops answering a plain GET, `serve --detach`
+and the live check would disagree.
+What should happen: `packages/cli/src/serve.ts` exports the probe and the live check imports it.
+Why it matters: the live check's claim that "the service answers" should be the
+same claim that the startup hook relies on.
+
+## 200. The live check can print a credential, and its final scan omits printed lines
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: fixed in f8715ed (unit 8c fix round 1): the printer redacts every line with the run's secret list and the shapes of a credential, an unreadable owner credential now fails the run, and the final scan reads the printed lines.
+
+What happens: the reporter writes an error's message directly to the terminal.
+An injected setup error containing the temporary service's owner credential
+prints the credential in a FAIL line.
+A rejected step containing an Authorization bearer token prints that token.
+The final step scans events, replies, accounts and process output, but it does
+not scan the reporter's lines.
+A credential in a printed model setting can therefore accompany exit code 0.
+
+Evidence: all three tests in
+`packages/engine/test/live-check/printed-secrets.test.ts` fail for these reasons.
+The event, reply and process-output leak cases in `adversarial-flow.test.ts`
+pass, so the missing boundary is the printer.
+What should happen: the reporter redacts credentials before writing any line.
+The runner registers its temporary credential with the redactor as soon as it
+exists, and retains the diagnostic text for the final leak check.
+Why it matters: a failing live check must not expose the credential it was
+supposed to protect, or declare that the secret check passed after a leak.
+
+## 201. A replacement value can leave an unresolved placeholder in a sent prompt
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: fixed in e006f79 (unit 8c fix round 1): `fill` throws when a placeholder remains in the final text.
+
+What happens: `fill` substitutes the original template once, but does not check
+the resulting text for another placeholder.
+For example, a worker model setting of `{{UNRESOLVED_MODEL}}` reaches the lead's
+start request unchanged.
+Evidence: the last two tests in
+`packages/engine/test/live-check/prompt-safety.test.ts` fail because `fill` does
+not throw, and because the start request is sent.
+The tests for all current prompt constants and omitted values pass.
+What should happen: `fill` rejects a result that still contains a placeholder,
+before the driver can send that prompt.
+Why it matters: the owner was promised that unresolved placeholders are errors,
+and are never sent to an agent.
+
+## 202. The live check's total limit returns before the timed-out work has stopped
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: fixed in f8715ed (unit 8c fix round 1): one abort controller covers the startup probe, the journey and the recording; the run awaits all of it, bounded, before cleanup, and prints nothing after the summary; `recorder.ts` gains `runRecording(options, signal)` so the recorder's own process-group cleanup is awaited.
+
+What happens: `main` races the body against a timer, aborts the journey, and
+returns without awaiting the body's completion.
+A delayed owner-connection finalizer is still running when `main` returns.
+The startup-hook probe is outside that journey's cancellation scope.
+If the probe answers after the time limit, the body can start a service after
+the outer cleanup has already finished.
+
+Evidence: the finalizer and delayed startup-hook cases in
+`packages/engine/test/live-check/failure-cleanup.test.ts` fail.
+The finalizer case observes zero closed connections at return, with one open.
+The delayed probe case observes a service start after `main` has returned.
+The middle-step failure and active-journey time-limit cases pass with a real
+temporary service and two fake agents, so ordinary cleanup is exercised too.
+What should happen: cancellation covers the startup check and the journey.
+The runner awaits all cancelled work and its finalizers before the last cleanup
+and return, and prevents any later service start or diagnostic write.
+Why it matters: an exit code must mark the end of the run's work and resource
+ownership, rather than leave a service that no caller can clean up.
+
+## 203. A help flag makes the live check accept an unknown argument
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: fixed in e006f79 (unit 8c fix round 1): every argument is validated before help is chosen.
+
+What happens: `parseArguments` returns help before it validates other arguments.
+Both `--unknown --help` and `--unknown -h` exit 0.
+Evidence: the two combined-argument cases in
+`packages/engine/test/live-check/io-boundaries.test.ts` fail with exit code 0.
+The unknown argument by itself exits nonzero, and the ordinary help and dry run
+perform no home input or output, process start, socket open or signal.
+What should happen: unknown arguments are validated before help is selected.
+Why it matters: the command's promise to reject an unknown argument must hold
+when the caller also asks for help.
+
+## 204. Live-check process discovery and a dry-run test confuse neighboring run folders
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: fixed in 0dda3e3 (unit 8c fix round 1): ownership is a whole-path-part match plus descent from the service child with a recorded pid and start time; the dry-run test observes only its own process with a preload instead of comparing the whole of /tmp.
+
+What happens: `processesNaming` uses a substring search over a process's
+environment and command line to decide whether the process belongs to the run.
+A fake agent whose state folder is a sibling named `<run-root>-other-<random>`
+is signalled by the run's cleanup, despite belonging to a different folder.
+Evidence: the sibling-folder case in
+`packages/engine/test/live-check/failure-cleanup.test.ts` fails because the
+sibling's process identifier is in the signalled list.
+Every signalled process in the test was started by that test.
+
+There is also a test race at the same folder-ownership boundary.
+The existing real-entry case in `dry-run.test.ts` compares every
+`/tmp/shephrd-live-*` folder before and after its child runs.
+It fails if a parallel service test creates or removes its own folder during
+that interval, even when the dry run performs no input or output.
+This occurred in the parallel scoped run, and the case passed in isolation.
+The test writer left the existing test unchanged, as its assignment requires.
+
+What should happen: cleanup matches a complete, verified path boundary and a
+process identity owned by the run, rather than a substring in arbitrary text.
+The dry-run test uses injected input and output spies, or an isolated namespace,
+to observe only its own effects.
+The new `io-boundaries.test.ts` supplies those spies.
+Why it matters: cleanup must spare another run, and one run's test must not
+report another run's temporary folders as its own side effects.
+
+## 205. The live check has no test that a reused process number is spared
+
+Found: 2026-11-02, while fixing issue 204 at commit 0dda3e3.
+State: open.
+
+What happens: the live service's stop records each process's pid and start time and checks both again just before each signal, so a pid that the system gave to a stranger after the original exited is not signalled.
+No test makes a pid change owner between the record and the signal, because a test cannot force the system to reuse a pid.
+The path-boundary, descendant, ignored-signal and unconfirmed-stop cases are tested.
+What should happen: the identity check is moved behind a small function that a test can feed a changed start time.
+Why it matters: the one guard against signalling a stranger after pid reuse is read, not run, by the tests.
+
+## 206. The live check's crash handler is not covered by a test
+
+Found: 2026-11-02, while fixing issue 200 at commit f8715ed.
+State: open.
+
+What happens: `scripts/live-check.ts` prints only the kind of an unexpected error, because its message may repeat a credential.
+Importing the file runs `main`, so no test can load the handler without starting a run, and the handler is verified by reading it.
+What should happen: the handler moves into a function in `scripts/live/run.ts` that a test can call with an error holding a credential.
+Why it matters: the last place a credential could reach the terminal is the one place no test looks.
