@@ -2413,3 +2413,47 @@ confuses an owner diagnosing a conflicting program, consider clearer text in
 a later usability change.
 Why it matters: an answering socket proves that something is listening, but
 the launcher's message can misidentify that program as the engine.
+
+## 174. The socket ancestor rule also rejects the required temporary folder
+
+Found: 2026-11-01, while writing unit 7b's client identity tests.
+State: clarified for unit 7b by engine-lead, board answer 1105.
+
+What happens: decision row 64 rejects every socket ancestor that is writable
+by a group or other users. The same plan requires test sockets under `/tmp`,
+which is normally root-owned with mode 01777. Applying the rule literally
+would reject every required test socket.
+What should happen: the lead amended the reading of row 64. A root-owned
+ancestor with the sticky bit may be writable by a group or other users.
+Every other ancestor must be owned by the current user or root, and must
+not be writable by a group or other users. The socket's own folder remains
+owned by the current user with mode 0700, and the socket must be owned by
+the current user. A non-sticky 0777 ancestor and a foreign-owned sticky
+ancestor must both be refused before a credential is sent.
+Why it matters: this preserves the intended socket trust check while allowing
+private test folders beneath the operating system's temporary folder.
+
+The lead also approved an injectable filesystem and user-id seam for the
+ownership branches that an unprivileged test cannot construct. Real socket
+listeners still observe whether an upgrade was attempted. At least one
+identity test uses the real filesystem without that seam.
+
+## 175. The older fake-agent command test names a command that does not exist
+
+Found: 2026-11-01, while checking the sibling tests for unit 7b.
+State: open for the unit 7b builder and lead.
+
+What happens: the test beginning at `packages/testing/test/fake-agent.test.ts:635`
+asks the `shepherd_command` step to call `post`, which is absent from the
+contracts' remote procedure call group. It checks the upgrade's bearer
+header, and accepts either an `ok` or a `failed` report. It cannot prove
+that a real command succeeded, or that an error reply was reported as a
+failure. A client that validates the command before connecting would also
+fail its upgrade-count assertion for the correct reason.
+What should happen: retain its credential and output checks, but use an
+actual command and its payload, such as `ask`. Unit 7b's new tests separately
+require a successful question and a refused owner-only command through the
+real service. The existing test has been left unchanged for the lead to
+assign with the builder's change to the scripted step.
+Why it matters: the older assertion must not force the fake agent to retain
+the invalid wire protocol described in issue 160.
