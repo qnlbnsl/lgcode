@@ -32,6 +32,8 @@ type Step = DiagnosticStep | StepDiagnostic
   | { step: "mode_change"; configId: string; value: string }
   | { step: "config_options"; configOptions: AcpSchema.SessionConfigOption[] }
   | { step: "shepherd_command"; command: string; input: unknown }
+  // Unit 7b tests release a turn only after a real blocking wait is open.
+  | { step: "wait_for_file"; path: string }
   | { step: "end_turn"; stopReason: string }
   | { step: "crash"; exitCode: number }
   // Unit 6c tests: the agent sends itself the signal, so the runner sees a death by signal with no exit code.
@@ -313,6 +315,7 @@ const program = Effect.gen(function*() {
             yield* update({ sessionUpdate: "config_option_update", configOptions: session.options }); break
           case "config_options": session.options = step.configOptions; yield* update({ sessionUpdate: "config_option_update", configOptions: session.options }); break
           case "shepherd_command": yield* text(yield* shepherdCommand(step.command, step.input)); break
+          case "wait_for_file": yield* awaitGate(step.path); break
           case "exec": yield* text(`exec:${yield* execChild(step.argv, step.strip ?? [])}`); break
           case "print_env": yield* text(Object.entries(environment).map(([name, value]) => `${name}=${value}`).join("\n")); break
           case "stderr": {
