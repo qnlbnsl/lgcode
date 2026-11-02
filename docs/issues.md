@@ -2968,3 +2968,35 @@ What happens: `scripts/live-check.ts` prints only the kind of an unexpected erro
 Importing the file runs `main`, so no test can load the handler without starting a run, and the handler is verified by reading it.
 What should happen: the handler moves into a function in `scripts/live/run.ts` that a test can call with an error holding a credential.
 Why it matters: the last place a credential could reach the terminal is the one place no test looks.
+
+## 207. Active-run cleanup tests race the child process close events
+
+Found: 2026-11-02, while checking unit 8c at commit 1d3dc7b.
+State: fixed in d515cd8.
+
+What happens: the active-run cleanup test immediately expects each fake
+agent's child process `close` event after `main` returns.
+The live service confirms termination through the Linux process state.
+A zombie process has stopped executing, but Node.js can deliver its `close`
+event after the cleanup promise resolves.
+This makes the owner-answer and time-limit cases fail intermittently even
+though every owned process has stopped.
+
+Evidence: an instrumented scratch copy reads `/proc/<pid>/stat` synchronously
+at the return boundary under a controlled processor load.
+The service is gone, and both fake agents have state `Z`, while the fake
+agents' `isClosed()` values are still false.
+The original assertions fail in both paths.
+
+What should happen: the test immediately checks that the service and both
+fake agents are gone or zombies, and that the unrelated agent is still
+running.
+It then waits on a bounded, named condition for all three `close` events
+before retaining the original lifecycle assertions.
+The ownership guard and the unrelated-agent checks remain in place.
+The fix changes the test only, because production cleanup already confirms
+that its processes have stopped.
+
+Why it matters: delayed event delivery must not make the full check fail,
+and waiting for an event must not hide cleanup that returns while a process
+is still running.
