@@ -54,28 +54,66 @@ const messages = (events: ReadonlyArray<RunnerEvent>) =>
 const normal = { _tag: "success" } as const;
 const outOfUsage = { _tag: "pause", reason: "out-of-usage" } as const;
 const recorded = [
-  { name: "claude", file: "claude.ndjson", harness: "claude", protocolVersion: 2, sessionId: "5a051567-eff6-47dd-96cf-b043a7b0635a", text: "ok", outcome: normal },
-  { name: "codex", file: "codex.ndjson", harness: "codex", protocolVersion: 2, sessionId: "01a196cd-177a-7062-a56c-7a0fb3765163", text: "ok", outcome: normal },
-  { name: "cursor out of usage", file: "cursor-out-of-usage.ndjson", harness: "cursor", protocolVersion: 1, sessionId: "ecc95bd5-7b12-40f4-b2e9-5a84cecae71b", text: "\n\nUpgrade your plan to continue", outcome: outOfUsage },
+  { name: "claude", file: "claude.ndjson", harness: "claude", outcome: normal },
+  { name: "codex", file: "codex.ndjson", harness: "codex", outcome: normal },
+  { name: "cursor out of usage", file: "cursor-out-of-usage.ndjson", harness: "cursor", outcome: outOfUsage },
 ] as const;
-// The recording is not here yet, so the case below reads only its shape, not a session id or text.
+// Once recorded, normal Cursor gets the same exact checks as the other fixtures.
 const normalCursor = "cursor.ndjson";
 const normalCursorMissing = "6.2 replay cursor (normal reply): skipped, awaiting the owner's normal Cursor recording (issue 38)";
 
-const replayCase = (c: { readonly name: string; readonly file: string; readonly harness: string; readonly protocolVersion: unknown; readonly sessionId: unknown; readonly text: unknown; readonly outcome: { readonly _tag: string } }) =>
+// Read the expected values independently of the runner, matching responses to
+// recorded request ids. Header metadata and outbound values are not responses.
+const recordingExpectation = (file: string, entries: ReadonlyArray<{ readonly type: string; readonly frame?: unknown }>) => {
+  const object = (value: unknown, field: string): Record<string, unknown> => {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error(`${file}: expected ${field} to be an object`);
+    return value as Record<string, unknown>;
+  };
+  const frames = entries.flatMap((entry) => entry.type === "expect_outbound" || entry.type === "emit_inbound"
+    ? [{ type: entry.type, frame: object(entry.frame, "frame") }] : []);
+  const resultFor = (method: string) => {
+    const requests = frames.filter(({ type, frame }) => type === "expect_outbound" && frame.method === method);
+    expect(requests, `${file}: expected one ${method} request`).toHaveLength(1);
+    const id = requests[0]!.frame.id;
+    if (typeof id !== "number" && typeof id !== "string") throw new Error(`${file}: expected ${method} request id`);
+    const replies = frames.filter(({ type, frame }) => type === "emit_inbound" && frame.method === undefined && frame.id === id);
+    expect(replies, `${file}: expected one ${method} response with request id ${id}`).toHaveLength(1);
+    return object(replies[0]!.frame.result, `${method} result`);
+  };
+  const protocolVersion = resultFor("initialize").protocolVersion;
+  if (typeof protocolVersion !== "number" || !Number.isInteger(protocolVersion) || protocolVersion < 1) throw new Error(`${file}: expected initialize result.protocolVersion to be a positive integer`);
+  const sessionId = resultFor("session/new").sessionId;
+  if (typeof sessionId !== "string" || !sessionId.trim()) throw new Error(`${file}: expected session/new result.sessionId to be a nonempty string`);
+  const chunks = frames.flatMap(({ type, frame }) => {
+    if (type !== "emit_inbound" || frame.method !== "session/update") return [];
+    const params = object(frame.params, "session/update params");
+    const update = object(params.update, "session/update params.update");
+    if (update.sessionUpdate !== "agent_message_chunk") return [];
+    expect(params.sessionId, `${file}: agent_message_chunk sessionId`).toBe(sessionId);
+    const content = object(update.content, "agent_message_chunk content");
+    if (content.type !== "text" || typeof content.text !== "string") throw new Error(`${file}: expected agent_message_chunk content.text to be a string with type text`);
+    return [content.text];
+  });
+  expect(chunks.length, `${file}: expected at least one agent_message_chunk with text`).toBeGreaterThan(0);
+  return { protocolVersion, sessionId, text: chunks.join("") };
+};
+
+const replayCase = (c: { readonly name: string; readonly file: string; readonly harness: string; readonly outcome: { readonly _tag: string } }) =>
   live(`6.2 replay ${c.name}: the recorded session opens with its session id and version, its agent text becomes exactly one message update, then promptReply ${c.outcome._tag === "success" ? "success" : "pause"}, then turnEnded (breaks if the runner misreads this adapter's protocol generation, reports the user's own echoed prompt or usage notices as agent text, or ends the turn before the reply)`, () =>
     withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
+      const transcript = yield* parseReplay(readFileSync(fixturePath(c.file), "utf8"));
+      const expected = recordingExpectation(c.file, transcript.entries);
       const adapter = writeReplayAdapter(rig, c.file, rig.work);
       const spawn = yield* spawnFor(rig, harnessFor(c.harness, adapter), accountFor(c.harness, { turns: [] }, echoFile(rig)));
       const opened = yield* context.runner.start(spawn.input);
-      expect(opened.session).toEqual({ _tag: "acp", sessionId: c.sessionId });
-      expect(opened.protocolVersion).toEqual(c.protocolVersion);
+      expect(opened.session).toEqual({ _tag: "acp", sessionId: expected.sessionId });
+      expect(opened.protocolVersion).toEqual(expected.protocolVersion);
       const delivery = deliveryFor(spawn.agentId, "Reply with the word ok. Do not run tools or create or change any file.");
       const before = context.events.length;
       yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
       yield* context.waitFor((event) => event._tag === "turnEnded" && event.deliveryId === delivery.id, before);
       const own = ofDelivery(context.eventsAfter(before), delivery.id);
-      expect(messages(own)).toEqual([c.text]);
+      expect(messages(own)).toEqual([expected.text]);
       const tags = own.filter((event) => event._tag !== "deliveryUpdate").map((event) => event._tag);
       expect(tags).toEqual(["promptReply", "turnEnded"]);
       expect(own.find((event) => event._tag === "promptReply")).toMatchObject({ outcome: c.outcome });
@@ -87,7 +125,7 @@ for (const c of recorded) replayCase(c);
 
 // A normal Cursor greeting: a successful reply with text and no pause, like claude and codex.
 if (existsSync(fixturePath(normalCursor))) {
-  replayCase({ name: "cursor (normal reply)", file: normalCursor, harness: "cursor", protocolVersion: expect.any(Number), sessionId: expect.stringMatching(/\S/), text: expect.stringMatching(/\S/), outcome: normal });
+  replayCase({ name: "cursor (normal reply)", file: normalCursor, harness: "cursor", outcome: normal });
 } else {
   plainIt.skip(normalCursorMissing, () => {});
 }
@@ -99,9 +137,10 @@ it.effect("6.2 fixtures: every recorded fixture parses, and a broken one fails w
       const transcript = yield* parseReplay(readFileSync(fixturePath(file), "utf8"));
       expect(transcript.provider).toBe(harness);
     }
-    const broken = yield* parseReplay(`${readFileSync(fixturePath("codex.ndjson"), "utf8")}{broken\n`).pipe(Effect.flip);
+    const valid = readFileSync(fixturePath("codex.ndjson"), "utf8").trimEnd();
+    const broken = yield* parseReplay(`${valid}\n{broken\n`).pipe(Effect.flip);
     expect(broken).toBeInstanceOf(ReplayParseError);
-    expect(broken.lineNumber).toBe(19);
+    expect(broken.lineNumber).toBe(valid.split(/\r?\n/).length + 1);
   }));
 
 live("6.2 row 51, runner: every update the adapter sends while session/load runs is tagged replay, and updates after load are not (breaks if replayed history is reported as live updates, or live updates stay tagged after the load)", () =>
