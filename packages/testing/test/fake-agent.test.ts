@@ -649,7 +649,7 @@ live("a Shepherd command step connects to SHEPHERD_SOCKET with the token in an A
     )
 
     const run = yield* converse(
-      { turns: [[{ step: "shepherd_command", command: "post", input: { to: "someone", text: "hi" } }]] },
+      { turns: [[{ step: "shepherd_command", command: "ask", input: { text: "hi" } }]] },
       { env: { SHEPHERD_SOCKET: socketPath, SHEPHERD_TOKEN: secretToken } }
     )
     assert.deepEqual(upgrades, [{ authorization: `Bearer ${secretToken}` }])

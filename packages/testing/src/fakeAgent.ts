@@ -12,7 +12,8 @@ import * as Stdio from "effect/Stdio"
 import * as Stream from "effect/Stream"
 import { spawn, type ChildProcess } from "node:child_process"
 import { existsSync, writeFileSync } from "node:fs"
-import WebSocket from "ws"
+import { randomUUID } from "node:crypto"
+import { connect } from "@shepherd/client"
 
 type DiagnosticStep =
   | { type: "ext_notification"; method: string; params: Schema.Json }
@@ -32,6 +33,8 @@ type Step = DiagnosticStep | StepDiagnostic
   | { step: "mode_change"; configId: string; value: string }
   | { step: "config_options"; configOptions: AcpSchema.SessionConfigOption[] }
   | { step: "shepherd_command"; command: string; input: unknown }
+  // Unit 7b tests release a turn only after a real blocking wait is open.
+  | { step: "wait_for_file"; path: string }
   | { step: "end_turn"; stopReason: string }
   | { step: "crash"; exitCode: number }
   // Unit 6c tests: the agent sends itself the signal, so the runner sees a death by signal with no exit code.
@@ -209,26 +212,15 @@ const awaitGate = (gate: string) => Effect.callback<void>((resume) => {
   return Effect.sync(() => clearInterval(timer))
 })
 
-const shepherdCommand = (command: string, input: unknown) => Effect.callback<string>((resume) => {
-  const socket = environment.SHEPHERD_SOCKET
-  const token = environment.SHEPHERD_TOKEN
-  if (!socket || !token) { resume(Effect.succeed("shepherd_command:failed")); return }
-  const connection = new WebSocket(`ws+unix://${socket}:/`, { headers: { Authorization: `Bearer ${token}` } })
-  let settled = false
-  const finish = (result: string) => {
-    if (settled) return
-    settled = true
-    clearTimeout(timer)
-    connection.terminate()
-    resume(Effect.succeed(result))
-  }
-  const timer = setTimeout(() => finish("shepherd_command:failed"), 5000)
-  connection.on("open", () => connection.send(JSON.stringify({ command, input })))
-  connection.on("message", () => finish("shepherd_command:ok"))
-  connection.on("error", () => finish("shepherd_command:failed"))
-  connection.on("close", () => finish("shepherd_command:failed"))
-  return Effect.sync(() => { clearTimeout(timer); connection.terminate() })
-})
+// Issue 160: the step speaks the same RPC as the shepherd tool, through the
+// shared client. A refusal reports "failed", as does any transport error.
+const shepherdCommand = (command: string, input: unknown) => Effect.scoped(Effect.gen(function*() {
+  const client = yield* connect({ environment, attempts: 1 })
+  const call = (client as unknown as Record<string, ((payload: unknown) => Effect.Effect<unknown, unknown>) | undefined>)[command]
+  if (call === undefined) return "shepherd_command:failed"
+  yield* call({ requestId: randomUUID(), ...(input as Record<string, unknown>) })
+  return "shepherd_command:ok"
+})).pipe(Effect.timeout(5000), Effect.catchCause(() => Effect.succeed("shepherd_command:failed")))
 
 const program = Effect.gen(function*() {
   const agent = yield* AcpAgent.AcpAgent
@@ -313,6 +305,7 @@ const program = Effect.gen(function*() {
             yield* update({ sessionUpdate: "config_option_update", configOptions: session.options }); break
           case "config_options": session.options = step.configOptions; yield* update({ sessionUpdate: "config_option_update", configOptions: session.options }); break
           case "shepherd_command": yield* text(yield* shepherdCommand(step.command, step.input)); break
+          case "wait_for_file": yield* awaitGate(step.path); break
           case "exec": yield* text(`exec:${yield* execChild(step.argv, step.strip ?? [])}`); break
           case "print_env": yield* text(Object.entries(environment).map(([name, value]) => `${name}=${value}`).join("\n")); break
           case "stderr": {

@@ -1241,7 +1241,8 @@ What should happen: the contracts add an engine sender, or the plan states that 
 
 Found: 2026-11-01, while building unit 5d.
 State: the cancellation window is fixed in unit 5d's fix round 1. The retry
-part is open for unit 7b, which owns the client. Unit 7a interrupts the
+part is fixed in unit 7b: the client retries a blocking wait with a new request
+identifier after a disconnect. Unit 7a interrupts the
 request scope on disconnection, so the existing handler cancellation finalizer
 runs. A reconnecting client must use a new request identifier for a blocking
 wait.
@@ -2198,7 +2199,7 @@ status and closes its listener. The service never retries recovery in place.
 ## 160. The fake agent's Shepherd command step does not speak the engine's protocol
 
 Found: 2026-11-01, while writing the unit 7a tests.
-State: open for unit 8b, or for unit 7b when its client exists.
+State: fixed in unit 7b: the step uses the real `@shepherd/client`.
 
 What happens: the `shepherd_command` step in `packages/testing/src/fakeAgent.ts`
 opens a WebSocket to `SHEPHERD_SOCKET` and sends `{ command, input }` as JSON.
@@ -2386,7 +2387,8 @@ must leave neither a running child nor an unwanted state folder.
 ## 170. A healthy long catch-up may reach the subscription backlog bound
 
 Found: 2026-11-01, in the focused review of unit 7a at 2b33da2.
-State: open for unit 7b's client; the server's bound is accepted by the lead.
+State: fixed in unit 7b for the client: a subscription resumes after the last
+event received. The server's bound is accepted by the lead.
 
 What happens: the live subscription collects events while the client reads
 catch-up. A healthy but long catch-up can reach issue 41's 2,048-event backlog
@@ -2413,3 +2415,219 @@ confuses an owner diagnosing a conflicting program, consider clearer text in
 a later usability change.
 Why it matters: an answering socket proves that something is listening, but
 the launcher's message can misidentify that program as the engine.
+
+## 174. The socket ancestor rule also rejects the required temporary folder
+
+Found: 2026-11-01, while writing unit 7b's client identity tests.
+State: clarified for unit 7b by engine-lead, board answer 1105.
+
+What happens: decision row 64 rejects every socket ancestor that is writable
+by a group or other users. The same plan requires test sockets under `/tmp`,
+which is normally root-owned with mode 01777. Applying the rule literally
+would reject every required test socket.
+What should happen: the lead amended the reading of row 64. A root-owned
+ancestor with the sticky bit may be writable by a group or other users.
+Every other ancestor must be owned by the current user or root, and must
+not be writable by a group or other users. The socket's own folder remains
+owned by the current user with mode 0700, and the socket must be owned by
+the current user. A non-sticky 0777 ancestor and a foreign-owned sticky
+ancestor must both be refused before a credential is sent.
+Why it matters: this preserves the intended socket trust check while allowing
+private test folders beneath the operating system's temporary folder.
+
+The lead also approved an injectable filesystem and user-id seam for the
+ownership branches that an unprivileged test cannot construct. Real socket
+listeners still observe whether an upgrade was attempted. At least one
+identity test uses the real filesystem without that seam.
+
+## 175. The older fake-agent command test names a command that does not exist
+
+Found: 2026-11-01, while checking the sibling tests for unit 7b.
+State: fixed in unit 7b: the fixture now calls `ask`.
+
+What happens: the test beginning at `packages/testing/test/fake-agent.test.ts:635`
+asks the `shepherd_command` step to call `post`, which is absent from the
+contracts' remote procedure call group. It checks the upgrade's bearer
+header, and accepts either an `ok` or a `failed` report. It cannot prove
+that a real command succeeded, or that an error reply was reported as a
+failure. A client that validates the command before connecting would also
+fail its upgrade-count assertion for the correct reason.
+What should happen: retain its credential and output checks, but use an
+actual command and its payload, such as `ask`. Unit 7b's new tests separately
+require a successful question and a refused owner-only command through the
+real service. The existing test has been left unchanged for the lead to
+assign with the builder's change to the scripted step.
+Why it matters: the older assertion must not force the fake agent to retain
+the invalid wire protocol described in issue 160.
+
+## 176. A blocking wait reports success when it needs its caller to answer
+
+Found: 2026-11-01, while applying engine-lead's ruling in board post 1120.
+State: fixed in unit 7b fix round 1 (`reportWait` returns 2 for `request-held`).
+
+What happened: `packages/cli/src/commands/wait.ts` returned exit code 0 for a
+`request-held` reply. All four W02 cases previously expected that code.
+What should happen: decision row 26 requires exit code 2 when a permission
+request or question is held by or routed to the caller of a blocking wait.
+The W02 cases now require 2 for both subjects, whether already held or routed
+after the wait opens. They retain the held-request message and the
+`WaitCancelled` reason `request held` assertions.
+Why it matters: exit code 0 tells a caller that every member has settled,
+although a member still needs the caller's answer.
+
+## 177. Closing the MCP input can report an error after a successful tool call
+
+Found: 2026-11-01, while writing the unit 7b fix-round tests against commit
+`220efe3`, with uncommitted test helpers.
+State: open shutdown usability note. This does not block the assigned fixes.
+
+What happened: a test host ran the real `runMcp`, initialized the protocol,
+listed the tools, and completed an `ask` against a fake socket peer. After
+the parent closed standard input, `runMcp` returned exit code 1. The host
+stayed alive to inspect the server layer's resource cleanup. The observed
+return code was independent of the leaked connection asserted by X22.
+What should happen: investigate whether the normal end of standard input
+races the protocol layer's termination in `runMcp`. An orderly shutdown
+should not report an error solely because the input ended.
+Why it matters: a caller can see a failed server shutdown after its tools
+completed successfully. X22 deliberately checks resource cleanup without
+requiring a particular shutdown return code, because that behavior is
+outside this fix round's assigned rulings.
+
+## 178. The ancestry checks do not explicitly refuse unsupported platforms
+
+Found: 2026-11-01, while writing T-7 after engine-lead's board request 1132.
+State: open for the unit 7b builder's fix round under the Linux-only ruling.
+
+What happens: the client's `ancestryHeaders` and the engine's
+`outsideAdapters` have no platform argument. Tests against their intended
+last-argument interface pass `darwin`, but the unchanged functions ignore
+it. On the Linux test host, the client reads Linux ancestry and upgrades,
+and the engine grants an outside-adapter identity when the process table
+is empty.
+What should happen: version 1 is Linux only, as ruled by the owner and
+relayed in request 1132. Both functions take a final platform argument that
+defaults to `process.platform`. On `darwin`, the client refuses before an
+upgrade with `the process ancestry check runs on Linux only in this version`,
+and the engine returns false. X71 exercises both the reader and the public
+client connection; X72 uses a real migrated database and a Linux control.
+Why it matters: an unsupported platform must fail closed instead of
+implicitly accepting an ancestry check intended for another platform.
+
+## 179. The frozen wait test "already held" races the owner moving the question
+
+Found: 2026-11-01, while building unit 7b's command-line tool.
+State: fixed by keeping the W02 caller inside an accepted, open turn.
+
+What happens: in `packages/cli/test/wait-exit-codes.test.ts`, the two W02
+"already held" cases (permission and question) fail intermittently, and
+mostly fail. The parent agent holds a question or permission request, and the
+test then calls a blocking `wait` as that agent. After the parent's turn ends,
+the engine moves the held question to the owner (`QuestionMoved`,
+`OwnerNeeded`). The wait then opens without the "request held" cancellation
+the test expects, and it stays blocked until the connection closes. The
+engine's own test client, which does not use the new command-line tool, times
+out in the same way. In the one passing run, the wait arrived before the move.
+What should happen: the test should make the wait deterministic, for example by
+holding the parent's turn open until the wait has been answered, or the engine
+should state which outcome a wait after the move must have.
+Why it matters: the criterion cannot be observed reliably, and the command-line
+tool's held-request outcome is untested by a stable test.
+
+Fix: the W02 cases start the parent with a long-running scripted turn and wait
+for its `DeliveryAccepted` before routing a request. The parent remains busy
+when the blocking wait opens. Following the lead's ruling in board post 1120,
+the assertions require exit code 2 from decision row 26, the held-request
+message, and `WaitCancelled` with reason `request held`. The remaining product
+exit-code defect is tracked in issue 176.
+
+## 180. The frozen test F02 cannot pass: its own setup emits an account event
+
+Found: 2026-11-01, while building unit 7b's fake-agent client step.
+State: fixed by checking account events after the refused command.
+
+What happens: `packages/testing/test/fake-agent-client-step.test.ts`, case
+F02, records the event sequence before it starts the fake agent. It then
+asserts that no `AccountChanged` event follows. But `startFakeAgent` adds the
+agent's account with `accounts add`, which commits an `AccountChanged` event
+after that mark, so the assertion fails whatever the step does. The refusal
+assertion before it (`CommandRefused` for `accounts`, exactly one) passes.
+What should happen: take the sequence mark after `startFakeAgent` returns, or
+check that no `AccountChanged` names a different account than the agent's own.
+Why it matters: the test cannot show that a refused owner-only command changed
+nothing.
+
+Fix: F02 still requires exactly one `CommandRefused` for `accounts`. It now
+checks that no `AccountChanged` follows that refusal, excluding the account
+created by the setup helper before the agent's prompt.
+
+## 181. Foreground `shepherd serve` is not supported
+
+Found: 2026-11-01, while wiring `serve` in the command-line tool.
+State: open.
+
+What happens: unit 7a starts the service when its module is imported, and only
+`serve --detach` has a launcher. The command-line tool accepts `serve --detach`
+only, and refuses plain `serve` with a usage error.
+What should happen: a foreground `serve` that runs the service in the
+terminal, decided by the lead when the acceptance suite needs it.
+Why it matters: an owner debugging the service must read its log file.
+
+## 182. The socket check and the connection are not one atomic step
+
+Found: 2026-11-01, while building the client's socket checks.
+State: open.
+
+What happens: the client checks every parent folder, the socket's folder and
+the socket, and then opens the connection by path. A process running as the
+same user, or a root process, could replace the socket between the check and
+the connection. Only the state folder's owner can do this, so the engine's
+trust boundary is not crossed, but the check is not a guarantee.
+What should happen: if the platform allows it, check the connected
+descriptor's peer credentials after connecting.
+Why it matters: the check protects the owner credential from a swapped socket.
+
+## 183. Process ancestry for the handshake reads `/proc` and works on Linux only
+
+Found: 2026-11-01, while building the client's ancestry header.
+State: closed by the owner's ruling, unit 7b fix round 1.
+
+What happened: `packages/client/src/ancestry.ts` reads `/proc/<pid>/stat` to
+build `Shepherd-Ancestors`, and the engine's check had a macOS reader that the
+client had no counterpart for.
+Owner ruling, 2026-11-01, verbatim: "yeah linux only for now. shoud be easy
+enought to port to macos". Version 1 is Linux only.
+What was done: the client's `ancestryHeaders` refuses on any platform other
+than Linux, before it reads `/proc`, with "the process ancestry check runs on
+Linux only in this version". The engine's `outsideAdapters` no longer falls
+back to the macOS reader: on a non-Linux platform it returns false, so the
+owner credential is refused. Both take the platform as an argument for tests.
+`recovery/orphans.ts` keeps its macOS reader, which only recovery uses.
+Porting later: add the `ps -o ppid=,lstart=` reader (decision row 64) to both
+halves and lift the two platform checks.
+
+## 184. `shepherd mcp` discards its own logs
+
+Found: 2026-11-01, while building the tool server.
+State: open.
+
+What happens: the tool server's standard output carries the protocol, so the
+server runs with `Logger.layer([])` and writes no log at all. A connection
+failure reaches the agent as a tool error, and nothing is recorded.
+What should happen: write the server's log to a file in the state folder,
+without any credential.
+Why it matters: an owner debugging an agent's failed tool call has no record.
+
+## 185. A symlinked owner credential file is followed
+
+Found: 2026-11-01, by the unit 7b attack pass (B2); the verifier showed no
+break.
+State: open, a hardening note.
+
+What happens: `packages/client/src/identity.ts` reads `owner-credential` with
+`readFileSync`, which follows a symbolic link.
+Why it is not a break: replacing that file needs write access to the private
+state folder, and a process with that access already holds the owner's
+authority, so the link gives it no new data or authority.
+What could be added later: check that the credential is a regular file, owned
+by the user, with mode 0600, before reading it.
