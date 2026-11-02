@@ -59,7 +59,6 @@ live("7.11 no planted secret, token or credential appears in the service's stdou
     const frames = [
       '{"jsonrpc":"2.0","method":"_planted/notice","params":{"leak":"${env:PLANTED_KEY}","token":"${env:SHEPHERD_TOKEN}"}}',
       '{"jsonrpc":"2.0","id":9001,"method":"_planted/request","params":{"leak":"${env:PLANTED_KEY}","token":"${env:SHEPHERD_TOKEN}"}}',
-      'not json ${env:PLANTED_KEY} ${env:SHEPHERD_TOKEN}',
       '{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"${session}","update":{"sessionUpdate":"planted_kind","leak":"${env:PLANTED_KEY}"}}}',
       '{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"${session}","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"escaped ${env-u:PLANTED_KEY}"}}}}',
     ];
@@ -86,7 +85,19 @@ live("7.11 no planted secret, token or credential appears in the service's stdou
       yield* owner.answer({ requestId: requestId(), kind: "permission", id: request.permissionRequestId, optionId: "allow-once" } as never);
       const later = owner.subscribe({ requestId: requestId(), after: 0 } as never) as Stream.Stream<EventEnvelope, unknown>;
       yield* later.pipe(
-        Stream.takeUntil((envelope) => envelope.event._tag === "TurnEnded" && envelope.agentId === started.agentId),
+        Stream.takeUntil((envelope) => (envelope.event._tag === "DeliveryReturned" || envelope.event._tag === "TurnEnded") && envelope.agentId === started.agentId),
+        Stream.runDrain, Effect.timeout(30_000),
+      );
+      // A malformed wire frame deliberately ends that adapter's connection.
+      // Exercise it separately so it cannot prevent the permission and
+      // terminal-error paths above from running in this same service.
+      const malformed = yield* startFakeAgent(root, owner, owner, {
+        secrets: { PLANTED_KEY: accountSecret, PLANTED_TOKEN: (yield* agentToken(started)).token },
+        script: { turns: [[{ step: "raw_frame", frame: "not json ${env:PLANTED_KEY} ${env:PLANTED_TOKEN} ${env:SHEPHERD_TOKEN}" }]] },
+        prompt: "Exercise the malformed frame path.",
+      });
+      yield* (owner.subscribe({ requestId: requestId(), after: 0 } as never) as Stream.Stream<EventEnvelope, unknown>).pipe(
+        Stream.takeUntil((envelope) => envelope.event._tag === "DeliveryReturned" && envelope.agentId === malformed.agentId),
         Stream.runDrain, Effect.timeout(30_000),
       );
       return started;

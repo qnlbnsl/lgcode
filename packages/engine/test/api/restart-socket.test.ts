@@ -56,7 +56,7 @@ live("7.10 after SIGKILL the restarted service replaces the stale socket, refuse
     const agent = yield* Effect.scoped(Effect.gen(function* () {
       const client = yield* ownerClient(root);
       const started = yield* startFakeAgent(root, client, client, {
-        script: { outliveStdin: true, loadGate: gate, turns: [[{ step: "slow", ms: 60_000 }]] },
+        script: { outliveStdin: true, loadGate: gate, turns: [[{ step: "plan", entries: [] }, { step: "slow", ms: 60_000 }]] },
         prompt: "Work on the log.",
       });
       // The turn is committed as accepted before the crash, so the agent was working (row 52, step 6).

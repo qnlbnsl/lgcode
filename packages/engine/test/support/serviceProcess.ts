@@ -8,6 +8,7 @@ import type { EventEnvelope, HarnessSettings } from "@shepherd/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Redacted from "effect/Redacted";
 import * as Stream from "effect/Stream";
 
 import { modeOption } from "./acpRunnerRig.ts";
@@ -244,7 +245,7 @@ export const startFakeAgent = (root: ServiceRoot, owner: Client, caller: Client,
     },
   } as never);
   for (const [name, value] of Object.entries(spec.secrets ?? {})) {
-    yield* owner["accounts set-secret"]({ requestId: requestId(), accountId, name, nonce: `nonce-${randomUUID()}`, value } as never);
+    yield* owner["accounts set-secret"]({ requestId: requestId(), accountId, name, nonce: `nonce-${randomUUID()}`, value: Redacted.make(value, { label: "secret value" }) } as never);
   }
   const reply = yield* (caller.start({
     requestId: requestId(), name: spec.name ?? "Service test agent", role: "worker", harness: "fake",
