@@ -1,5 +1,4 @@
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { connect, type Client } from "@shephrd/client";
@@ -10,9 +9,11 @@ import * as Exit from "effect/Exit";
 import * as Scope from "effect/Scope";
 
 import { resolveHarnessDefaults } from "../../src/runner/harnesses.ts";
-import { liveConfig, liveDriver, LIVE_VARIABLES, registerAccounts, type LiveConfig } from "./driver.ts";
+import { agentText, envelope } from "../../src/routing/envelope.ts";
+import { routedDelivery } from "../../src/routing/holders.ts";
+import { liveConfig, liveDriver, liveFolders, LIVE_VARIABLES, registerAccounts, renderedPrompts, REPRESENTATIVE_ROOT, type LiveConfig } from "./driver.ts";
 import { flow, makeStepRunner, StepFailed } from "./flow.ts";
-import { PROMPTS, placeholdersOf } from "./prompts.ts";
+import { PROMPTS, placeholdersOf, WORKER_PROMPT } from "./prompts.ts";
 import { realRecord, recordLive, type RecordingDeps } from "./recording.ts";
 import { createReporter, messageOf } from "./reporter.ts";
 import { startLiveService, type LiveService } from "./service.ts";
@@ -44,26 +45,70 @@ export type ParsedArguments =
   | { readonly kind: "error"; readonly message: string };
 
 export const parseArguments = (argv: ReadonlyArray<string>): ParsedArguments => {
-  if (argv.includes("--help") || argv.includes("-h")) return { kind: "help" };
-  const unknown = argv.filter((argument) => argument !== "--dry-run");
+  // Every argument is checked first, so help beside a typo is still an error.
+  const unknown = argv.filter((argument) => argument !== "--dry-run" && argument !== "--help" && argument !== "-h");
   if (unknown.length > 0) return { kind: "error", message: `Unknown argument: ${unknown[0]}` };
+  if (argv.includes("--help") || argv.includes("-h")) return { kind: "help" };
   return { kind: argv.includes("--dry-run") ? "dry-run" : "run" };
 };
 
-// Everything the run would send and do, in full, and nothing else.
-export const dryRunText = (): string => {
-  const lines: Array<string> = ["live-check --dry-run: nothing is sent, started or read.", ""];
-  PROMPTS.forEach((prompt, index) => {
-    const placeholders = placeholdersOf(prompt.text);
+// What the engine itself writes around the script's prompts, built by the
+// engine's own formatting functions with stand-in ids. The marker in an
+// envelope is random for each one; it is shown as MARKER.
+const engineText = (): { readonly firstPrompt: string; readonly permission: string; readonly wait: string } => {
+  const lead = { _tag: "agent", agentId: "LEAD_ID" } as const;
+  const [queued] = routedDelivery("WORKER_ID" as never, lead as never, "DELIVERY_ID" as never, { _tag: "permission", id: "REQUEST_ID" } as never, "<the worker's description of the change>");
+  const permission = queued !== undefined && queued._tag === "DeliveryQueued" && queued.delivery.content._tag === "prompt" ? queued.delivery.content.text : "";
+  const plain = (text: string): string => {
+    const marker = /Data from another agent \[([^\]]+)\]/.exec(text)?.[1];
+    return marker === undefined ? text : text.replaceAll(marker, "MARKER");
+  };
+  return {
+    firstPrompt: plain(agentText(lead as never, "DELIVERY_ID", WORKER_PROMPT)),
+    permission: plain(permission),
+    wait: plain(envelope("DELIVERY_ID", "Wait WAIT_ID finished.\n- agent WORKER_ID: settled")),
+  };
+};
+
+// Everything the run would send and do, exactly as it would send it, and
+// nothing else. The prompts are rendered by the function the driver uses; the
+// folder in the lead's prompt is an example, because the run's own folder
+// does not exist until the run starts.
+export const dryRunText = (config: LiveConfig = liveConfig({})): string => {
+  const exampleWork = `${REPRESENTATIVE_ROOT}/work`;
+  const exampleWorker = liveFolders(exampleWork).worker;
+  const prompts = renderedPrompts(config, exampleWorker);
+  const lines: Array<string> = [
+    "live-check --dry-run: nothing is sent, started or read.",
+    `Models: lead ${config.leadHarness} ${config.leadModel} (effort ${config.leadEffort}); worker ${config.workerHarness} ${config.workerModel} (effort ${config.workerEffort}).`,
+    `The example folder ${exampleWorker} stands in for the run's own folder, which is a new folder under /tmp.`, "",
+  ];
+  prompts.forEach((prompt, index) => {
+    const placeholders = placeholdersOf(PROMPTS[index]!.text);
     lines.push(
-      `Prompt ${index + 1} of ${PROMPTS.length}: ${prompt.name}`,
+      `Prompt ${index + 1} of ${prompts.length}: ${prompt.name}`,
       `Sent to: ${prompt.receiver}`,
       `When: ${prompt.step}`,
-      `Placeholders filled in at run time: ${placeholders.length === 0 ? "none" : placeholders.map((name) => `{{${name}}}`).join(", ")}`,
+      `Values filled in above: ${placeholders.length === 0 ? "none" : placeholders.join(", ")}`,
       "----", prompt.text, "----", "",
     );
   });
-  lines.push("Steps the run would take, in order:");
+  const engine = engineText();
+  lines.push(
+    "What else the agents receive. The engine writes these, not this script (it builds each with the same formatting code):",
+    "",
+    "A. The worker's first prompt reaches Codex wrapped in the engine's envelope, because the lead sent it (src/routing/envelope.ts, agentText):",
+    "----", engine.firstPrompt, "----", "",
+    "B. When the worker asks for permission, the lead receives this notice (src/routing/holders.ts, routedDelivery). The lead's prompt names it:",
+    "----", engine.permission, "----", "",
+    "C. When the lead's wait finishes, the lead receives this notice (src/routing/waits.ts, the notice built in check):",
+    "----", engine.wait, "----", "",
+    "The re-record step (scripts/live/recording.ts, scripts/recorder.ts) then starts more model sessions, each sent the RECORDER_PROMPT above:",
+    "- one Claude Code recording and one Codex recording, each in a new temporary folder;",
+    "- after a recording succeeds, one signed-out probe for that harness: the adapter is started with an empty temporary home and no account variables, and is expected to be refused for authentication.",
+    "In all a full run starts at most 6 model sessions: 2 in the journey (the lead and the worker), 2 recordings, and up to 2 signed-out probes.", "",
+    "Steps the run would take, in order:",
+  );
   ALL_STEPS.forEach((step, index) => { lines.push(`${index + 1}. ${step.id}: ${step.title}`); });
   return lines.join("\n");
 };
@@ -110,7 +155,7 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
   const parsed = parseArguments(argv);
   if (parsed.kind === "help") { deps.write(HELP); return 0; }
   if (parsed.kind === "error") { deps.write(`${parsed.message}\n${HELP}`); return 2; }
-  if (parsed.kind === "dry-run") { deps.write(dryRunText()); return 0; }
+  if (parsed.kind === "dry-run") { deps.write(dryRunText(deps.config)); return 0; }
 
   const reporter = createReporter(deps.write, deps.clock);
   const step = makeStepRunner(reporter, deps.clock);
@@ -151,10 +196,8 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
         return recordReplies(client, replies);
       }), () => `service ${service?.pid} in ${service?.root}`);
       const live = service!;
-      const leadFolder = join(live.work, "lead");
-      const workerFolder = join(live.work, "project");
+      const { lead: leadFolder, worker: workerFolder } = liveFolders(live.work);
       yield* step(SETUP_STEP, Effect.gen(function* () {
-        mkdirSync(leadFolder, { mode: 0o700 });
         mkdirSync(workerFolder, { mode: 0o700 });
         yield* registerAccounts(owner, config, yield* Effect.promise(() => deps.harnessSettings()), deps.environment);
       }), () => `${config.leadHarness} (${config.leadModel}, ${config.leadEffort}) and ${config.workerHarness} (${config.workerModel}, ${config.workerEffort})`);

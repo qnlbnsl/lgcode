@@ -1,9 +1,10 @@
+import { join } from "node:path";
 import type { Client } from "@shephrd/client";
 import type { HarnessSettings } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 
 import type { AgentRef, FlowDriver } from "./flow.ts";
-import { fill, LEAD_PROMPT, WORKER_PROMPT } from "./prompts.ts";
+import { fill, LEAD_PROMPT, PROMPTS, WORKER_PROMPT } from "./prompts.ts";
 import { requestId } from "./support.ts";
 
 // Unit 8c: the live side of the journey. The lead is a real Claude Code agent
@@ -74,12 +75,28 @@ export const registerAccounts = (
   }
 });
 
+// The lead's folder is the work root and the worker's is a folder beneath it,
+// because the engine accepts a child's folder only within its parent's
+// (src/identity/ceiling.ts). `main`, the setup step and the dry run all take
+// both folders from here.
+export const liveFolders = (work: string): { readonly lead: string; readonly worker: string } =>
+  ({ lead: work, worker: join(work, "project") });
+
+// The folder the dry run shows in place of the run's own, which does not exist
+// until the run starts.
+export const REPRESENTATIVE_ROOT = "/tmp/shephrd-live-EXAMPLE";
+
 export const leadPromptFor = (config: LiveConfig, workerFolder: string): string => fill(LEAD_PROMPT, {
   WORKER_FOLDER: JSON.stringify(workerFolder).slice(1, -1),
   WORKER_MODEL: config.workerModel,
   WORKER_EFFORT: config.workerEffort,
   WORKER_PROMPT_JSON: JSON.stringify(WORKER_PROMPT),
 });
+
+// Every prompt of the script exactly as the run sends it, in send order. The
+// lead's is filled in by `leadPromptFor`, the function the driver calls.
+export const renderedPrompts = (config: LiveConfig, workerFolder: string): ReadonlyArray<{ readonly name: string; readonly receiver: string; readonly step: string; readonly text: string }> =>
+  PROMPTS.map((entry) => ({ ...entry, text: entry.name === "LEAD_PROMPT" ? leadPromptFor(config, workerFolder) : entry.text }));
 
 export const liveDriver = (owner: Client, config: LiveConfig, leadFolder: string, workerFolder: string): FlowDriver => ({
   startLead: () => Effect.gen(function* () {

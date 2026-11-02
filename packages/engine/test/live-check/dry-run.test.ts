@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { leadPromptFor, liveConfig, liveFolders, REPRESENTATIVE_ROOT } from "../../scripts/live/driver.ts";
 import * as prompts from "../../scripts/live/prompts.ts";
 import { dryRunText, HELP, main, parseArguments, type RunDeps } from "../../scripts/live/run.ts";
 import { ALL_STEPS } from "../../scripts/live/steps.ts";
@@ -21,6 +22,11 @@ const entry = fileURLToPath(new URL("../../scripts/live-check.ts", import.meta.u
 
 const promptConstants: ReadonlyArray<readonly [string, string]> = Object.entries(prompts as Record<string, unknown>)
   .flatMap(([name, value]) => typeof value === "string" ? [[name, value] as const] : []);
+
+// What the dry run shows for a prompt constant: the lead's prompt is shown
+// filled in (fix round 1, F8), the others as written.
+const shownFor = (name: string, text: string, config = liveConfig({})): string =>
+  name === "LEAD_PROMPT" ? leadPromptFor(config, liveFolders(`${REPRESENTATIVE_ROOT}/work`).worker) : text;
 
 // Every dependency that would start, connect or read something counts its calls.
 const counting = (): { readonly deps: RunDeps; readonly calls: Array<string>; readonly lines: Array<string> } => {
@@ -51,7 +57,7 @@ describe("pnpm live-check --dry-run", () => {
     expect(calls).toEqual([]);
     expect(promptConstants.map(([name]) => name).sort()).toEqual(["LEAD_PROMPT", "RECORDER_PROMPT", "WORKER_PROMPT"]);
     for (const [name, text] of promptConstants) {
-      expect(output, `the dry run does not show ${name} in full`).toContain(text);
+      expect(output, `the dry run does not show ${name} in full`).toContain(shownFor(name, text, deps.config));
       expect(output).toContain(name);
     }
   });
@@ -95,7 +101,7 @@ describe("pnpm live-check --dry-run", () => {
     const run = spawnSync(process.execPath, [entry, "--dry-run"], { env: { HOME: home, PATH: "" }, encoding: "utf8", timeout: 60_000 });
     expect(run.status, run.stderr).toBe(0);
     for (const [name, text] of promptConstants) {
-      expect(run.stdout).toContain(text);
+      expect(run.stdout).toContain(shownFor(name, text));
       expect(run.stdout).toContain(name);
     }
     expect(run.stderr).toBe("");

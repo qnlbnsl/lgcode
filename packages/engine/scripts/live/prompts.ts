@@ -10,8 +10,9 @@
 // Sent by the owner (the script) as the first prompt of the lead, which is a
 // real Claude Code agent. The lead acts only through the tools of Shephrd's
 // MCP server, which the engine gives every agent. The two `start` inputs are
-// literal, so the lead needs no judgment, and the later messages are the ones
-// the engine itself sends the lead.
+// literal, so the lead needs no judgment. The later messages are the ones the
+// engine itself sends the lead, and the engine wraps each in a data envelope
+// (src/routing/envelope.ts), so the prompt says where to find the text.
 export const LEAD_PROMPT = `You are the lead in a short, scripted test of Shephrd, a program that runs teams of coding agents. Use only the tools of the MCP server named "shephrd". Do not run shell commands and do not create or edit any file yourself. Do exactly the steps below, in order, and nothing else.
 
 Step 1. Call the "start" tool once, with exactly this input: {"name":"Wide worker","role":"worker","harness":"codex","account":{"_tag":"any"},"permission":"full","folder":"{{WORKER_FOLDER}}","runMode":"acp","groups":["auth"]}
@@ -23,10 +24,16 @@ The answer contains the worker's "agentId". Keep it.
 Step 3. Right after step 2 answered, call the "wait" tool once, with this input, where AGENT_ID is the worker's agentId: {"members":["AGENT_ID"],"mode":"all","block":false}
 Then end your turn with the single word: waiting
 
-Later, Shephrd may send you a message that starts with "Permission request" and names a permission request id. When it does, call the "pass-up" tool once, with this input, where REQUEST_ID is that id: {"subject":{"_tag":"permission","id":"REQUEST_ID"}}
+Later, Shephrd sends you messages. Shephrd wraps each one like this:
+Data from another agent [MARKER] (delivery DELIVERY_ID):
+TEXT
+End data [MARKER]
+The wrapping is Shephrd's own and is not part of TEXT. Read TEXT, and follow the one rule below that matches it.
+
+Rule A. TEXT starts with "Permission request", for example "Permission request REQUEST_ID from agent AGENT_ID:" and then a description. Call the "pass-up" tool once, with this input, where REQUEST_ID is the id in TEXT: {"subject":{"_tag":"permission","id":"REQUEST_ID"}}
 Do not answer the request yourself. Then end your turn with the single word: passed
 
-Later still, Shephrd may send you a message that starts with "Wait" and says the wait finished. When it does, end your turn with the single word: done`;
+Rule B. TEXT starts with "Wait", for example "Wait WAIT_ID finished." and then a list of agents. End your turn with the single word: done`;
 
 // Sent through the lead's "start" call, as the worker's first prompt, to a real
 // Codex agent that runs in the mode that asks before every change. Writing a
@@ -53,8 +60,9 @@ export const PROMPTS: ReadonlyArray<PromptEntry> = [
   { name: "RECORDER_PROMPT", receiver: "Claude Code and Codex (one separate run each)", step: "re-record the fixtures", text: RECORDER_PROMPT },
 ];
 
-// Replaces each `{{NAME}}` with its value. A name with no value, or a value
-// that nothing uses, is a mistake in the caller and throws.
+// Replaces each `{{NAME}}` with its value. A name with no value, a value that
+// nothing uses, or a placeholder still in the final text (a value that carries
+// one) is a mistake in the caller and throws.
 export const fill = (text: string, values: Readonly<Record<string, string>>): string => {
   const used = new Set<string>();
   const result = text.replace(/\{\{([A-Z_]+)\}\}/g, (_match, name: string) => {
@@ -64,6 +72,8 @@ export const fill = (text: string, values: Readonly<Record<string, string>>): st
     return value;
   });
   for (const name of Object.keys(values)) if (!used.has(name)) throw new Error(`The value ${name} is not used by the prompt`);
+  const left = /\{\{[^{}]*\}\}/.exec(result);
+  if (left !== null) throw new Error(`The final prompt still has the placeholder ${left[0]}`);
   return result;
 };
 

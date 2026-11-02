@@ -219,6 +219,8 @@ export const flow = (options: FlowOptions): Effect.Effect<FlowResult, StepFailed
   const requested = yield* step(FLOW_STEP["live-view"], Effect.gen(function* () {
     const events = yield* eventsUntil(watcher, mark, "the worker's permission request on the second connection", isTag("PermissionRequested", worker.agentId), wait);
     yield* check(tagged(events, "TurnEnded", worker.agentId).length === 0, "the worker's turn ended before its permission was answered");
+    // The step claims the second connection sees the work, so work must be there.
+    yield* check(tagged(events, "ThreadItem", worker.agentId).length > 0, "the second connection saw no thread item of the worker before its permission request, so it showed no work");
     return events;
   }));
   const request = yield* step(FLOW_STEP.routed, Effect.gen(function* () {

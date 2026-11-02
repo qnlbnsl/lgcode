@@ -7,7 +7,7 @@ import type { EventEnvelope, HarnessSettings } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 
-import { liveConfig } from "../../scripts/live/driver.ts";
+import { liveConfig, liveFolders } from "../../scripts/live/driver.ts";
 import type { RecordResults } from "../../scripts/live/recording.ts";
 import type { RunDeps } from "../../scripts/live/run.ts";
 import type { LiveService } from "../../scripts/live/service.ts";
@@ -20,6 +20,8 @@ export interface Faults {
   leak?: "event" | "reply" | "output";
   secret?: string;
   hangAnswer?: boolean;
+  // The worker's thread shows nothing before the permission is asked for.
+  noThreadItem?: boolean;
 }
 
 export const cleanRecordings = (): RecordResults => ["claude", "codex"].map((harness) => ({
@@ -41,6 +43,7 @@ export const scriptedApi = (fault: Faults = {}) => {
   const replies: string[] = [];
   const calls: string[] = [];
   const answers: Array<{ connection: number; input: unknown }> = [];
+  const starts: Array<{ folder: string; prompt: string; model?: string; effort?: string }> = [];
   const events: EventEnvelope[] = [];
   const owner = { _tag: "owner" };
   const lead = { _tag: "agent", agentId: "lead" };
@@ -64,17 +67,18 @@ export const scriptedApi = (fault: Faults = {}) => {
   const begin = (): void => {
     active = true;
     emit({ _tag: "AgentStarted", agentId: "lead", name: "Lead", role: "lead", groups: [], parent: owner,
-      harness: "claude", account: "claude", permission: "edit", folder: join(work, "lead"), runMode: "acp" });
+      harness: "claude", account: "claude", permission: "edit", folder: liveFolders(work).lead, runMode: "acp" });
     if (!fault.wideAccepted && fault.step !== "wide-start") emit({ _tag: "CommandRefused", command: "start", reason: "permission exceeds ceiling" }, lead);
     emit({ _tag: "AgentStarted", agentId: "worker", name: "Worker", role: "worker", groups: ["auth"], parent: lead,
       harness: "codex", account: "codex", permission: fault.step === "worker-start" || fault.wideAccepted ? "full" : "ask",
-      folder: join(work, "project"), runMode: "acp", firstPromptDelivery: {
+      folder: liveFolders(work).worker, runMode: "acp", firstPromptDelivery: {
         id: "first", target: "worker", sender: fault.step === "session" ? owner : lead,
         content: { _tag: "prompt", text: "Write hello.txt" },
       } }, lead);
     emit({ _tag: "SessionOpened", agentId: "worker", session: { _tag: "acp", sessionId: "session" }, protocolVersion: 1, reloadable: false });
     emit({ _tag: "DeliveryAccepted", agentId: "worker", deliveryId: "first" });
     if (fault.step === "live-view") emit({ _tag: "TurnEnded", agentId: "worker", compact: false });
+    if (!fault.noThreadItem) emit({ _tag: "ThreadItem", agentId: "worker", itemId: "progress", replay: false, content: { _tag: "text", text: "writing hello.txt" } });
     emit({ _tag: "PermissionRequested", agentId: "worker", permissionRequestId: "permission", holder: fault.step === "routed" ? owner : lead,
       deliveryId: "permission-delivery", toolCallId: "edit-file", description: "Write hello.txt", settingsWrite: false,
       options: [{ id: "allow-once", name: "Allow once", kind: "allow_once", level: "ask", persistent: false }] });
@@ -96,8 +100,9 @@ export const scriptedApi = (fault: Faults = {}) => {
   const makeClient = (id: number): Client => ({
     harnesses: (input: { requestId: string }) => Effect.succeed({ requestId: input.requestId, harnesses: [] }),
     accounts: (input: { requestId: string }) => Effect.succeed({ requestId: input.requestId, accounts: [] }),
-    start: (input: { requestId: string; prompt: string }) => Effect.suspend(() => {
+    start: (input: { requestId: string; prompt: string; folder: string; model?: string; effort?: string }) => Effect.suspend(() => {
       calls.push("start");
+      starts.push({ folder: input.folder, prompt: input.prompt, ...(input.model === undefined ? {} : { model: input.model }), ...(input.effort === undefined ? {} : { effort: input.effort }) });
       if (fault.step === "lead") return Effect.fail(new Error("lead could not start"));
       calls.push(`prompt:${input.prompt}`);
       begin();
@@ -142,7 +147,7 @@ export const scriptedApi = (fault: Faults = {}) => {
     outputDirectory, config: { ...liveConfig({}), agentTimeout: 60, totalTimeout: 10_000 }, clock: Date.now,
     engineTimeout: 60, settle: 1, serveTimeout: 100,
   };
-  return { root, home, state, work, secret, lines, replies, calls, answers, events, deps, service, emit,
+  return { root, home, state, work, secret, lines, replies, calls, answers, starts, events, deps, service, emit,
     get stopCount() { return stopCount; }, get removeCount() { return removeCount; },
     dispose: () => { rmSync(root, { recursive: true, force: true }); },
   };
