@@ -2841,7 +2841,7 @@ same claim that the startup hook relies on.
 ## 200. The live check can print a credential, and its final scan omits printed lines
 
 Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
-State: open, with failing regression tests.
+State: fixed in f8715ed (unit 8c fix round 1): the printer redacts every line with the run's secret list and the shapes of a credential, an unreadable owner credential now fails the run, and the final scan reads the printed lines.
 
 What happens: the reporter writes an error's message directly to the terminal.
 An injected setup error containing the temporary service's owner credential
@@ -2864,7 +2864,7 @@ supposed to protect, or declare that the secret check passed after a leak.
 ## 201. A replacement value can leave an unresolved placeholder in a sent prompt
 
 Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
-State: open, with failing regression tests.
+State: fixed in e006f79 (unit 8c fix round 1): `fill` throws when a placeholder remains in the final text.
 
 What happens: `fill` substitutes the original template once, but does not check
 the resulting text for another placeholder.
@@ -2882,7 +2882,7 @@ and are never sent to an agent.
 ## 202. The live check's total limit returns before the timed-out work has stopped
 
 Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
-State: open, with failing regression tests.
+State: fixed in f8715ed (unit 8c fix round 1): one abort controller covers the startup probe, the journey and the recording; the run awaits all of it, bounded, before cleanup, and prints nothing after the summary; `recorder.ts` gains `runRecording(options, signal)` so the recorder's own process-group cleanup is awaited.
 
 What happens: `main` races the body against a timer, aborts the journey, and
 returns without awaiting the body's completion.
@@ -2906,7 +2906,7 @@ ownership, rather than leave a service that no caller can clean up.
 ## 203. A help flag makes the live check accept an unknown argument
 
 Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
-State: open, with failing regression tests.
+State: fixed in e006f79 (unit 8c fix round 1): every argument is validated before help is chosen.
 
 What happens: `parseArguments` returns help before it validates other arguments.
 Both `--unknown --help` and `--unknown -h` exit 0.
@@ -2921,7 +2921,7 @@ when the caller also asks for help.
 ## 204. Live-check process discovery and a dry-run test confuse neighboring run folders
 
 Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
-State: open, with a failing cleanup regression test and an existing test race.
+State: fixed in 0dda3e3 (unit 8c fix round 1): ownership is a whole-path-part match plus descent from the service child with a recorded pid and start time; the dry-run test observes only its own process with a preload instead of comparing the whole of /tmp.
 
 What happens: `processesNaming` uses a substring search over a process's
 environment and command line to decide whether the process belongs to the run.
@@ -2947,3 +2947,24 @@ to observe only its own effects.
 The new `io-boundaries.test.ts` supplies those spies.
 Why it matters: cleanup must spare another run, and one run's test must not
 report another run's temporary folders as its own side effects.
+
+## 205. The live check has no test that a reused process number is spared
+
+Found: 2026-11-02, while fixing issue 204 at commit 0dda3e3.
+State: open.
+
+What happens: the live service's stop records each process's pid and start time and checks both again just before each signal, so a pid that the system gave to a stranger after the original exited is not signalled.
+No test makes a pid change owner between the record and the signal, because a test cannot force the system to reuse a pid.
+The path-boundary, descendant, ignored-signal and unconfirmed-stop cases are tested.
+What should happen: the identity check is moved behind a small function that a test can feed a changed start time.
+Why it matters: the one guard against signalling a stranger after pid reuse is read, not run, by the tests.
+
+## 206. The live check's crash handler is not covered by a test
+
+Found: 2026-11-02, while fixing issue 200 at commit f8715ed.
+State: open.
+
+What happens: `scripts/live-check.ts` prints only the kind of an unexpected error, because its message may repeat a credential.
+Importing the file runs `main`, so no test can load the handler without starting a run, and the handler is verified by reading it.
+What should happen: the handler moves into a function in `scripts/live/run.ts` that a test can call with an error holding a credential.
+Why it matters: the last place a credential could reach the terminal is the one place no test looks.
