@@ -2837,3 +2837,113 @@ and the live check would disagree.
 What should happen: `packages/cli/src/serve.ts` exports the probe and the live check imports it.
 Why it matters: the live check's claim that "the service answers" should be the
 same claim that the startup hook relies on.
+
+## 200. The live check can print a credential, and its final scan omits printed lines
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: open, with failing regression tests.
+
+What happens: the reporter writes an error's message directly to the terminal.
+An injected setup error containing the temporary service's owner credential
+prints the credential in a FAIL line.
+A rejected step containing an Authorization bearer token prints that token.
+The final step scans events, replies, accounts and process output, but it does
+not scan the reporter's lines.
+A credential in a printed model setting can therefore accompany exit code 0.
+
+Evidence: all three tests in
+`packages/engine/test/live-check/printed-secrets.test.ts` fail for these reasons.
+The event, reply and process-output leak cases in `adversarial-flow.test.ts`
+pass, so the missing boundary is the printer.
+What should happen: the reporter redacts credentials before writing any line.
+The runner registers its temporary credential with the redactor as soon as it
+exists, and retains the diagnostic text for the final leak check.
+Why it matters: a failing live check must not expose the credential it was
+supposed to protect, or declare that the secret check passed after a leak.
+
+## 201. A replacement value can leave an unresolved placeholder in a sent prompt
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: open, with failing regression tests.
+
+What happens: `fill` substitutes the original template once, but does not check
+the resulting text for another placeholder.
+For example, a worker model setting of `{{UNRESOLVED_MODEL}}` reaches the lead's
+start request unchanged.
+Evidence: the last two tests in
+`packages/engine/test/live-check/prompt-safety.test.ts` fail because `fill` does
+not throw, and because the start request is sent.
+The tests for all current prompt constants and omitted values pass.
+What should happen: `fill` rejects a result that still contains a placeholder,
+before the driver can send that prompt.
+Why it matters: the owner was promised that unresolved placeholders are errors,
+and are never sent to an agent.
+
+## 202. The live check's total limit returns before the timed-out work has stopped
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: open, with failing regression tests.
+
+What happens: `main` races the body against a timer, aborts the journey, and
+returns without awaiting the body's completion.
+A delayed owner-connection finalizer is still running when `main` returns.
+The startup-hook probe is outside that journey's cancellation scope.
+If the probe answers after the time limit, the body can start a service after
+the outer cleanup has already finished.
+
+Evidence: the finalizer and delayed startup-hook cases in
+`packages/engine/test/live-check/failure-cleanup.test.ts` fail.
+The finalizer case observes zero closed connections at return, with one open.
+The delayed probe case observes a service start after `main` has returned.
+The middle-step failure and active-journey time-limit cases pass with a real
+temporary service and two fake agents, so ordinary cleanup is exercised too.
+What should happen: cancellation covers the startup check and the journey.
+The runner awaits all cancelled work and its finalizers before the last cleanup
+and return, and prevents any later service start or diagnostic write.
+Why it matters: an exit code must mark the end of the run's work and resource
+ownership, rather than leave a service that no caller can clean up.
+
+## 203. A help flag makes the live check accept an unknown argument
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: open, with failing regression tests.
+
+What happens: `parseArguments` returns help before it validates other arguments.
+Both `--unknown --help` and `--unknown -h` exit 0.
+Evidence: the two combined-argument cases in
+`packages/engine/test/live-check/io-boundaries.test.ts` fail with exit code 0.
+The unknown argument by itself exits nonzero, and the ordinary help and dry run
+perform no home input or output, process start, socket open or signal.
+What should happen: unknown arguments are validated before help is selected.
+Why it matters: the command's promise to reject an unknown argument must hold
+when the caller also asks for help.
+
+## 204. Live-check process discovery and a dry-run test confuse neighboring run folders
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: open, with a failing cleanup regression test and an existing test race.
+
+What happens: `processesNaming` uses a substring search over a process's
+environment and command line to decide whether the process belongs to the run.
+A fake agent whose state folder is a sibling named `<run-root>-other-<random>`
+is signalled by the run's cleanup, despite belonging to a different folder.
+Evidence: the sibling-folder case in
+`packages/engine/test/live-check/failure-cleanup.test.ts` fails because the
+sibling's process identifier is in the signalled list.
+Every signalled process in the test was started by that test.
+
+There is also a test race at the same folder-ownership boundary.
+The existing real-entry case in `dry-run.test.ts` compares every
+`/tmp/shephrd-live-*` folder before and after its child runs.
+It fails if a parallel service test creates or removes its own folder during
+that interval, even when the dry run performs no input or output.
+This occurred in the parallel scoped run, and the case passed in isolation.
+The test writer left the existing test unchanged, as its assignment requires.
+
+What should happen: cleanup matches a complete, verified path boundary and a
+process identity owned by the run, rather than a substring in arbitrary text.
+The dry-run test uses injected input and output spies, or an isolated namespace,
+to observe only its own effects.
+The new `io-boundaries.test.ts` supplies those spies.
+Why it matters: cleanup must spare another run, and one run's test must not
+report another run's temporary folders as its own side effects.
