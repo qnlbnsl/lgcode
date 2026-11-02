@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { chmodSync, createWriteStream, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { chmodSync, createWriteStream, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,9 +8,9 @@ import { fileURLToPath } from "node:url";
 // own under /tmp, with its own owner credential. It is not the service that
 // Herdr's startup hook started: that one is only looked at, never touched.
 //
-// The script stops only what it started: this child, and any process whose
-// environment names this run's own folder (the adapters the child started). A
-// pid that does not name the folder is never signalled.
+// The script stops only what it started: this child, its descendants, and any
+// process that names this run's own folder as a whole path (the adapters the
+// child started). Each is signalled only while its recorded identity holds.
 
 export const servicePath = fileURLToPath(new URL("../../src/service.ts", import.meta.url));
 
@@ -42,31 +42,83 @@ export const serviceEnvironment = (parent: Readonly<Record<string, string | unde
   return { ...environment, SHEPHRD_HOME: state, SHEPHRD_TEST_DEBUG: "1", TMPDIR: "/tmp" };
 };
 
-const alive = (pid: number): boolean => {
+// ---- Which processes belong to this run (findings F4 and F10) ------------
+//
+// A process belongs to the run when it is the service child, a descendant of
+// it, or any process whose working folder, environment value or command-line
+// argument is the run's folder or a path inside it. "Inside" is decided on
+// whole path parts: `<root>-other` is not inside `<root>`. A process is
+// signalled only after its identity (pid and start time, field 22 of
+// /proc/<pid>/stat) matches the one recorded when the run found it, so a pid
+// that was reused by a stranger is never signalled.
+
+interface Stat { readonly state: string; readonly parent: number; readonly start: string }
+
+const statOf = (pid: number): Stat | undefined => {
   try {
     const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
-    return stat.slice(stat.lastIndexOf(")") + 2)[0] !== "Z";
-  } catch { return false; }
+    const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
+    const [state, parent, start] = [fields[0], fields[1], fields[19]];
+    return state === undefined || parent === undefined || start === undefined ? undefined : { state, parent: Number(parent), start };
+  } catch { return undefined; }
+};
+
+const alive = (pid: number): boolean => {
+  const stat = statOf(pid);
+  return stat !== undefined && stat.state !== "Z";
+};
+
+const within = (root: string, path: string): boolean => path === root || path.startsWith(`${root}/`);
+
+// A value names the folder when it is a path inside it, or an option that sets one (`--dir=/tmp/...`).
+const valueWithin = (root: string, value: string): boolean => {
+  if (within(root, value)) return true;
+  const equals = value.indexOf("=");
+  return equals > 0 && within(root, value.slice(equals + 1));
 };
 
 const namesRoot = (pid: number, root: string): boolean => {
   try {
-    return readFileSync(`/proc/${pid}/environ`, "utf8").includes(root) || readFileSync(`/proc/${pid}/cmdline`, "utf8").includes(root);
+    if (within(root, readlinkSync(`/proc/${pid}/cwd`))) return true;
+  } catch { /* gone, or not ours to read */ }
+  try {
+    if (readFileSync(`/proc/${pid}/environ`, "utf8").split("\0").some((entry) => within(root, entry.slice(entry.indexOf("=") + 1)))) return true;
+    return readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0").some((argument) => valueWithin(root, argument));
   } catch { return false; }
 };
 
-// Processes of this user whose environment or command line names the run's
-// folder. The folder name is random and unique to this run.
-export const processesNaming = (root: string, except: ReadonlyArray<number> = []): ReadonlyArray<number> => {
-  let names: ReadonlyArray<string>;
-  try { names = readdirSync("/proc"); } catch { return []; }
-  return names.filter((name) => /^\d+$/.test(name)).map(Number)
-    .filter((pid) => pid !== process.pid && !except.includes(pid) && alive(pid) && namesRoot(pid, root));
+const livePids = (): ReadonlyArray<number> => {
+  try { return readdirSync("/proc").filter((name) => /^\d+$/.test(name)).map(Number).filter((pid) => pid !== process.pid); } catch { return []; }
+};
+
+// Processes of this user that belong to the run: those that name its folder,
+// and the descendants of those and of `seeds` (the service child).
+export const processesNaming = (root: string, except: ReadonlyArray<number> = [], seeds: ReadonlyArray<number> = []): ReadonlyArray<number> => {
+  const pids = livePids().filter((pid) => alive(pid));
+  const owned = new Set<number>(pids.filter((pid) => seeds.includes(pid) || namesRoot(pid, root)));
+  const parents = new Map(pids.map((pid) => [pid, statOf(pid)?.parent] as const));
+  for (let grew = true; grew;) {
+    grew = false;
+    for (const pid of pids) {
+      const parent = parents.get(pid);
+      if (!owned.has(pid) && parent !== undefined && owned.has(parent)) { owned.add(pid); grew = true; }
+    }
+  }
+  return [...owned].filter((pid) => !except.includes(pid));
 };
 
 const sleep = (milliseconds: number): Promise<void> => new Promise((done) => setTimeout(done, milliseconds));
 
-const signal = (pid: number, name: NodeJS.Signals): void => { try { process.kill(pid, name); } catch { /* gone */ } };
+// Waits until nothing is left, polling; true when it was reached in time.
+const until = async (done: () => boolean, milliseconds: number): Promise<boolean> => {
+  for (let waited = 0; ; waited += 50) {
+    if (done()) return true;
+    if (waited >= milliseconds) return false;
+    await sleep(50);
+  }
+};
+
+const signal = (pid: number, name: NodeJS.Signals): void => { try { process.kill(pid, name); } catch { /* gone; a process that stays is found by the liveness check */ } };
 
 export const startLiveService = (parent: Readonly<Record<string, string | undefined>>): LiveService => {
   const root = realpathSync(mkdtempSync("/tmp/shephrd-live-"));
@@ -89,14 +141,33 @@ export const startLiveService = (parent: Readonly<Record<string, string | undefi
     exited: () => done,
     stop: async () => {
       const killed: Array<number> = [];
+      // pid -> start time, recorded the first time the run finds the process.
+      const known = new Map<number, string>();
+      const remember = (): void => {
+        for (const pid of processesNaming(root, [], [child.pid!])) {
+          const start = statOf(pid)?.start;
+          if (start !== undefined && !known.has(pid)) known.set(pid, start);
+        }
+      };
+      const mine = (pid: number): boolean => statOf(pid)?.start === known.get(pid);
+      const survivors = (): ReadonlyArray<number> => [...known.keys()].filter((pid) => mine(pid) && alive(pid));
+      const sweep = (name: NodeJS.Signals): void => {
+        remember();
+        // Identity is checked again just before each signal.
+        for (const pid of survivors()) signal(pid, name);
+      };
+      remember();
       if (!done) signal(child.pid!, "SIGTERM");
       await Promise.race([closed, sleep(10_000)]);
-      if (!done) { killed.push(child.pid!); signal(child.pid!, "SIGKILL"); await Promise.race([closed, sleep(5_000)]); }
-      // The adapters the service started should have ended with it.
-      const strays = processesNaming(root);
-      for (const pid of strays) signal(pid, "SIGTERM");
-      for (let waited = 0; waited < 5_000 && strays.some(alive); waited += 100) await sleep(100);
-      for (const pid of strays.filter(alive)) { killed.push(pid); signal(pid, "SIGKILL"); }
+      sweep("SIGTERM");
+      await until(() => survivors().length === 0, 5_000);
+      if (survivors().length > 0) {
+        for (const pid of survivors()) killed.push(pid);
+        sweep("SIGKILL");
+        await until(() => survivors().length === 0, 5_000);
+      }
+      const left = survivors();
+      if (left.length > 0) throw new Error(`cleanup was not confirmed: ${left.join(", ")} still running`);
       return killed;
     },
     remove: () => { rmSync(root, { recursive: true, force: true }); },

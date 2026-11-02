@@ -4,7 +4,7 @@
 // and the real entry file run as a child process with an empty home and an
 // empty PATH, where a start of any adapter or service could not succeed.
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readdirSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,6 +19,7 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 registerRebuildCheck({ noLog: true });
 
 const entry = fileURLToPath(new URL("../../scripts/live-check.ts", import.meta.url));
+const observer = fileURLToPath(new URL("./observe-process.mjs", import.meta.url));
 
 const promptConstants: ReadonlyArray<readonly [string, string]> = Object.entries(prompts as Record<string, unknown>)
   .flatMap(([name, value]) => typeof value === "string" ? [[name, value] as const] : []);
@@ -94,11 +95,16 @@ describe("pnpm live-check --dry-run", () => {
     expect(help.calls).toEqual([]);
   });
 
-  it("run as the real entry file, with an empty home and no PATH, prints every prompt, exits 0, and leaves nothing behind in /tmp (breaks if the entry starts a service or adapter, or reads the home)", () => {
+  it("run as the real entry file, with an empty home and no PATH, prints every prompt, exits 0, and itself creates no folder in /tmp and starts no process (breaks if the entry starts a service or adapter, or reads the home)", () => {
     const home = realpathSync(mkdtempSync(join(tmpdir(), "sh8c-dry-")));
-    folders.push(home);
-    const before = readdirSync("/tmp").filter((name) => name.startsWith("shephrd-live-"));
-    const run = spawnSync(process.execPath, [entry, "--dry-run"], { env: { HOME: home, PATH: "" }, encoding: "utf8", timeout: 60_000 });
+    const observed = realpathSync(mkdtempSync(join(tmpdir(), "sh8c-dry-observed-")));
+    folders.push(home, observed);
+    const log = join(observed, "calls.log");
+    // Fix round 1, finding F4: this used to compare the whole of /tmp before
+    // and after, which fails when another run (or another test file) creates
+    // or removes a `shephrd-live-` folder meanwhile. The observer records what
+    // this one process asks the system to do, so only its own actions count.
+    const run = spawnSync(process.execPath, ["--import", observer, entry, "--dry-run"], { env: { HOME: home, PATH: "", OBSERVE_LOG: log }, encoding: "utf8", timeout: 60_000 });
     expect(run.status, run.stderr).toBe(0);
     for (const [name, text] of promptConstants) {
       expect(run.stdout).toContain(shownFor(name, text));
@@ -106,6 +112,9 @@ describe("pnpm live-check --dry-run", () => {
     }
     expect(run.stderr).toBe("");
     expect(readdirSync(home)).toEqual([]);
-    expect(readdirSync("/tmp").filter((name) => name.startsWith("shephrd-live-"))).toEqual(before);
+    const calls = readFileSync(log, "utf8").trim().split("\n");
+    expect(calls[0], "the observer did not run, so nothing below proves anything").toBe("observer started");
+    expect(calls.filter((call) => /^(spawn|spawnSync|exec|execSync|execFile|execFileSync|fork) /.test(call)), "the dry run started a process").toEqual([]);
+    expect(calls.filter((call) => /^(mkdtempSync|mkdirSync|mkdir|mkdtemp|createWriteStream) /.test(call) && call.includes("/tmp/shephrd-live-")), "the dry run made a run folder").toEqual([]);
   });
 });
