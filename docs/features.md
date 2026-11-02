@@ -12,7 +12,10 @@ engine** (unit numbers follow). That means its engine part is merged into
 `area/engine` and passes its tests. Since unit 7b, the client library, the
 `shephrd` command-line tool and `shephrd mcp` are merged too, so the owner
 and agents can reach the engine from a terminal, but no web or phone client
-exists yet. A feature
+exists yet. Since unit 8b, an acceptance suite runs the service as a
+child process and checks each of the engine's twelve capabilities, its
+eight failure rules and one request from start to finish through the
+public socket only, with fake agents. A feature
 is **partly built in the engine** when only some of what its paragraph
 describes is merged; the note after it says which part.
 

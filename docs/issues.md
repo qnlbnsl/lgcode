@@ -2681,3 +2681,111 @@ What should happen: issue 37 is fixed on its own terms and does not depend on
 the length of the product's name.
 Why it matters: the next re-record could over-scrub another long, harmless
 variable and the cause would be hidden.
+
+## 193. An error from the fake harness is never classified as signed out or out of usage
+
+Found: 2026-11-02, while writing the acceptance suite (unit 8b).
+State: open.
+
+What happens: `packages/engine/src/runner/classify.ts` decides whether a
+failed turn means "signed out" or "out of usage" from the harness id, and only
+the ids `claude`, `codex`, `cursor` and `gemini` have patterns. An agent on a
+harness with any other id, including the fake harness the tests use, gets the
+same message as a plain error and is never paused. The acceptance scenario for
+account failures therefore registers the fake adapter under the harness id
+`claude`.
+What should happen: either the classification patterns are part of the
+harness definition, so a test harness can carry its own, or the limitation is
+written in the harness documentation.
+Why it matters: a new harness added later is silently never paused when its
+account runs out, and the failure shows only as a crashed turn.
+
+## 194. A sent but unaccepted prompt reaches the agent twice after a restart
+
+Found: 2026-11-02, while writing the acceptance suite (unit 8b).
+State: open. Allowed by the specification ("may be sent twice"), so it is a
+decision to confirm, not a defect.
+
+What happens: when the service is killed after a prompt was sent to an agent
+and before the agent accepted it, recovery requeues the delivery and sends it
+again. The agent's transcript then holds the same prompt twice. The log shows
+one delivery, so a reader of the log sees nothing wrong.
+What should happen: the owner confirms that a double delivery is acceptable,
+or the sent event records enough for the engine to tell the agent that the
+prompt may be a repeat.
+Why it matters: an agent that acts twice on the same instruction can do
+harm, for example by repeating a commit or a message to a third party.
+
+## 195. The acceptance suite leaves some specification clauses to lower-level tests or to nothing
+
+Found: 2026-11-02, by the focused review of unit 8b (finding C1), after fix
+round 1 of that unit.
+State: open. Not a defect in the engine. It is a map of what the acceptance
+suite does not itself check.
+
+What happens: fix round 1 closed the review's findings A1 to A5. The flow now
+follows all eight steps of "One request, start to finish". The disk test
+observes the adapter. The nested wait, the automatic usage reset and the
+overdue reset across a restart are exercised. The secret scan covers every
+service process, every minted token, the accounts list and all replies. Many
+clauses the review's table lists were not turned into acceptance scenarios. The
+table below names, for each one, the lower-level test file that covers it, or
+says "not covered". A file is named only when it exists in
+`packages/engine/test` and its test titles speak about the clause. Its
+assertions were matched by title, not audited line by line.
+
+| Clause not checked by the acceptance suite | Covered at a lower level by |
+|---|---|
+| Protected folder relationships, forbidden home, state and install folders, worktree boundaries | `identity/ceiling.test.ts`, `identity/ceiling-fix-1.test.ts`, `commands/authorization.test.ts` |
+| Adapter-reported mode elevation, extended ceiling with persistent permission options | `runner/mode-ceiling.test.ts`, `runner/hardening.test.ts` |
+| Unrelated inherited environment excluded | `runner/baseEnvironment.test.ts` |
+| Leading slash and whitespace-plus-slash prompts, closing markers, distinct markers per send | `routing/text-is-data.test.ts` |
+| Open permission and question counts, complete paused, interrupted and crashed state sequences | `views/apply.test.ts`; the counts are not covered |
+| Wait settled-state exclusions for an open request or question, held subject, outstanding delivery, compaction | `routing/waits.test.ts` (W01 to W05) |
+| Wait resolution by stop, pause or nonreloadable interruption, held-request early return, member returning to work, crashed-waiter suspension and resume, disconnect cancellation | `routing/waits.test.ts` (W11 to W21) |
+| Exact member-state payload of a wait | not covered |
+| Plan entries of a stream | `runner/stream.test.ts` (6.2) |
+| Split and encoded secrets met by the real redactor | `identity/redactor.test.ts`, `identity/redactor-fix-1.test.ts`, `runner/hardening.test.ts`; the acceptance scan itself is proven only on synthetic text by `acceptance/secret-scan.test.ts` |
+| Parent reading its child's complete thread | not covered |
+| Busy-holder delivery order of a routed permission request, persistent and settings options | `routing/permissions.test.ts`, `routing/permission-boundaries.test.ts` |
+| `resume --fresh`, nonreloadable session refusal and fresh session | `commands/lifecycle.test.ts`, `recovery/restart.test.ts` |
+| Picker distinguishing stopped, crashed and interrupted agents and other harnesses | `accounts/pick.test.ts` (P1 to P3) |
+| Stored secret echoed by the adapter and redacted | `commands/request-id-secrets.test.ts`, `runner/hardening.test.ts` |
+| Crash of a parent without an open wait, stderr truncation to a tail | `routing/waits.test.ts` (W10) and `recovery/crash.test.ts`; truncation is covered by `identity/redactor-fix-1.test.ts` |
+| Nonreloadable agent, failed reload, idle reload with zero prompts, agent caught starting, blocking-wait cancellation, surviving question, paused-account recovery | `recovery/restart.test.ts`, `recovery/restart-regressions.test.ts`, `recovery/restart-accounts.test.ts`, `routing/waits.test.ts` (W20) |
+| Automatic timeout deadline of a moved permission request, withdrawal of the old holder's copy, paused or interrupted holder, no move back down | `routing/move-withdrawal.test.ts`, `routing/moving-requests.test.ts`; a timeout deadline is not covered |
+| Unknown usage reset time alerts the owner, mid-turn carry-on after acceptance | `accounts/pause-and-return.test.ts` (T4, T5), `accounts/carry-on-dispatch.test.ts` |
+| Message to an agent that stays nonreloadably interrupted, ordinary adapter error reply returning the message with redacted error text | `routing/deliveries.test.ts`, `runner/classify-errors.test.ts` |
+| Cleanup before serving, boot, user and executable mismatch controls, bounded record removal | `recovery/orphans.test.ts` (6.8 guards); the order "before serving" is not covered |
+| File-mode protections of the state folder and owner credential | `api/state-folder.test.ts`, `identity/owner-credential.test.ts` |
+
+What should happen: the owner decides whether the acceptance suite must show
+any of the "not covered" rows itself, or whether the lower-level tests are
+enough for the unit's sign-off. A row naming a file is a pointer, not a proof
+that the file checks the whole clause.
+Why it matters: a reader of the acceptance suite's titles could believe that
+every clause of the specification's amendments is checked end to end. Only the
+journeys above are.
+
+## 196. A wait for one delivery was followed by an assertion about two
+
+Found: 2026-11-02, by the test runner (`pnpm check` at 0a58595, under load).
+State: fixed in commit f33000c (test only; no production code changed).
+
+What happens: `failure-6-undeliverable.test.ts` waited for the first
+`DeliveryAccepted` for the boss, then read the boss's echo once and expected
+a "was returned" prompt for each of two queued messages. The two notices are
+separate deliveries, so under load the second had not reached the boss yet and
+the test failed with "the boss was not told that <id> came back". The same
+shape was in `flow-start-to-finish.test.ts`: it waited for the first accepted
+delivery for the lead after a restart and then asserted about one particular
+prompt, which a carry-on delivery could precede.
+What should happen: a wait names the thing the next assertion is about. The
+failure-6 test now waits, bounded, until the boss's echo holds a notice for
+every queued id, and checks that there is exactly one notice per id. The flow
+test waits for the delivery id of its own prompt. A sweep of the other
+acceptance files found no further case: their single-echo reads follow either
+a wait on the delivery id, a wait on the echo itself, or a turn end.
+Why it matters: a test that passes on a quiet machine and fails under load
+hides real failures behind noise. The original failure was not reproduced
+locally in three loaded runs; the cause is read from the code.
