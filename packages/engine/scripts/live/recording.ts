@@ -4,7 +4,7 @@ import { join } from "node:path";
 import type { HarnessSettings } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 
-import { formatReport, hasRecordingFailures, recordFixtures } from "../recorder.ts";
+import { formatReport, hasRecordingFailures, recordFixtures, runRecording } from "../recorder.ts";
 import { RECORDER_PROMPT } from "./prompts.ts";
 
 // Unit 8c: the last step of `pnpm live-check`. It re-records the fixtures of
@@ -28,10 +28,17 @@ export interface RecordingDeps {
   readonly settings: ReadonlyArray<HarnessSettings>;
   // The fixtures folder (`packages/testing/fixtures`).
   readonly outputDirectory: string;
-  readonly record: (options: RecordOptions) => Promise<RecordResults>;
+  // The second argument is the run's cancellation: the recorder kills its
+  // adapters' process groups when it aborts, and the promise settles only after.
+  readonly record: (options: RecordOptions, signal?: AbortSignal) => Promise<RecordResults>;
+  readonly signal?: AbortSignal;
 }
 
-export const realRecord = (options: RecordOptions): Promise<RecordResults> => Effect.runPromise(recordFixtures(options));
+export const realRecord = async (options: RecordOptions, signal: AbortSignal = new AbortController().signal): Promise<RecordResults> => {
+  try { return await runRecording(options, signal); }
+  // Never retain a raw transport, filesystem or child-process error, as `recordFixtures` does.
+  catch { throw new Error("Fixture recording failed"); }
+};
 
 export interface RecordingOutcome {
   readonly passed: boolean;
@@ -66,7 +73,7 @@ export const recordLive = async (deps: RecordingDeps): Promise<RecordingOutcome>
     const results = await deps.record({
       harnesses, outputDirectory: deps.outputDirectory, temporaryRoot, homeDirectory, parentEnvironment,
       prompt: RECORDER_PROMPT, errorSamples, captureSignedOut: true,
-    } as RecordOptions);
+    } as RecordOptions, deps.signal);
     return judge(results);
   } finally { await rm(temporaryRoot, { recursive: true, force: true }); }
 };

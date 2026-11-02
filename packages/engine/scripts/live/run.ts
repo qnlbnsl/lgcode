@@ -15,11 +15,11 @@ import { liveConfig, liveDriver, liveFolders, LIVE_VARIABLES, registerAccounts, 
 import { flow, makeStepRunner, StepFailed } from "./flow.ts";
 import { PROMPTS, placeholdersOf, WORKER_PROMPT } from "./prompts.ts";
 import { realRecord, recordLive, type RecordingDeps } from "./recording.ts";
-import { createReporter, messageOf } from "./reporter.ts";
+import { createReporter, messageOf, StepCancelled } from "./reporter.ts";
 import { startLiveService, type LiveService } from "./service.ts";
 import { checkStartupHook, realStartupHookDeps, type StartupHookDeps } from "./startupHook.ts";
 import { ALL_STEPS, RECORDING_STEP, SERVICE_STEP, SETUP_STEP, STARTUP_HOOK_STEP } from "./steps.ts";
-import { readOwnerCredentialFrom, recordReplies } from "./support.ts";
+import { readOwnerCredentialFrom, recordReplies, redactSecrets, redactShapes } from "./support.ts";
 
 // Unit 8c: `pnpm live-check` (criterion 8.6). The owner runs it on the Herdr
 // host. It is never part of `pnpm check`: it uses the owner's real Claude Code
@@ -129,6 +129,8 @@ export interface RunDeps {
   readonly engineTimeout: number;
   readonly settle: number;
   readonly serveTimeout: number;
+  // After the total limit, how long to wait for the cancelled work to end.
+  readonly cancelGrace?: number;
 }
 
 const fixturesFolder = fileURLToPath(new URL("../../../testing/fixtures", import.meta.url));
@@ -148,37 +150,79 @@ export const realDeps = (environment: Readonly<Record<string, string | undefined
   engineTimeout: 30_000, settle: 5_000, serveTimeout: 60_000,
 });
 
+// How long the run waits, after the total limit cancels it, for the body to
+// finish its own cleanup (the journey's finalizers, the recorder's process
+// groups) before it gives up and says the cleanup was not confirmed.
+const DEFAULT_CANCEL_GRACE = 30_000;
+
 // Runs the check and returns the exit code. A step that fails stops the run:
 // the steps after it are printed as skipped, so the owner reads the first
 // cause, and a failed run spends no more of their usage than it must.
+//
+// One AbortController owns the whole body (the startup-hook probe, the
+// journey and the recording). The total limit aborts it, then the run waits
+// for the body to end, stops what it started, prints the summary last and
+// closes the output. Nothing starts and nothing prints after `main` returns.
 export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<number> => {
   const parsed = parseArguments(argv);
   if (parsed.kind === "help") { deps.write(HELP); return 0; }
   if (parsed.kind === "error") { deps.write(`${parsed.message}\n${HELP}`); return 2; }
   if (parsed.kind === "dry-run") { deps.write(dryRunText(deps.config)); return 0; }
 
-  const reporter = createReporter(deps.write, deps.clock);
-  const step = makeStepRunner(reporter, deps.clock);
-  const config = deps.config;
   let service: LiveService | undefined;
   let stopped = false;
   let timedOut = false;
+  let cleanupUnconfirmed = false;
+  let open = true;
   const controller = new AbortController();
+
+  // The run's secret list. The owner credential joins it the first time it can
+  // be read and stays on it; every printed line is redacted with the list.
+  let credential: ReadonlyArray<string> = [];
+  const registered = (): ReadonlyArray<string> => {
+    if (credential.length === 0 && service !== undefined) {
+      try { credential = readOwnerCredentialFrom(service.state); } catch { /* The final step reports an unreadable credential. */ }
+    }
+    return credential;
+  };
+  const reporter = createReporter(
+    (line) => { if (open) deps.write(line); }, deps.clock,
+    (line) => redactShapes(redactSecrets(line, registered())),
+  );
+  const step = makeStepRunner(reporter, deps.clock);
+  const config = deps.config;
+
+  // A promise that is abandoned, not awaited, when the run is cancelled: the
+  // step ends at once, and a late result is dropped.
+  const abortable = <A>(promise: Promise<A>): Promise<A> => new Promise<A>((resolve, reject) => {
+    if (controller.signal.aborted) { reject(new StepCancelled()); return; }
+    const onAbort = (): void => { reject(new StepCancelled()); };
+    controller.signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => { controller.signal.removeEventListener("abort", onAbort); resolve(value); },
+      (error) => { controller.signal.removeEventListener("abort", onAbort); reject(error); },
+    );
+  });
 
   const stopService = async (): Promise<void> => {
     if (service === undefined || stopped) return;
     stopped = true;
-    const killed = await service.stop();
-    if (killed.length > 0) reporter.note(`These processes ignored the first signal and were killed: ${killed.join(", ")}`);
+    try {
+      const killed = await service.stop();
+      if (killed.length > 0) reporter.note(`These processes ignored the first signal and were killed: ${killed.join(", ")}`);
+    } catch (error) {
+      cleanupUnconfirmed = true;
+      reporter.fail({ id: "cleanup", title: "every process this run started has stopped" }, messageOf(error));
+    }
   };
 
   const body = async (): Promise<void> => {
     const hook = await reporter.step(STARTUP_HOOK_STEP, async () => {
-      const result = await checkStartupHook(deps.hook);
+      const result = await abortable(checkStartupHook(deps.hook));
       if (!result.passed) throw new Error(result.reason);
       return result;
     }, (result) => result.reason);
-    if (!hook.passed) return;
+    if (!hook.passed || controller.signal.aborted) return;
 
     const replies: Array<string> = [];
     const journey = Effect.scoped(Effect.gen(function* () {
@@ -206,11 +250,16 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
         driver: liveDriver(owner, config, leadFolder, workerFolder), step,
         leadHarness: config.leadHarness, workerHarness: config.workerHarness, workerFolder,
         agentTimeout: config.agentTimeout, engineTimeout: deps.engineTimeout, settle: deps.settle,
+        // Fails when the credential cannot be read, and the final step names that.
         secrets: () => readOwnerCredentialFrom(live.state),
-        outputs: () => [{ label: "the output of the service process", text: live.output() }],
+        outputs: () => [
+          { label: "the output of the service process", text: live.output() },
+          { label: "the lines the script printed", text: reporter.printed() },
+        ],
         replies: () => replies,
       });
     }));
+    // Awaited to the end, including the finalizers of every owner connection.
     const exit = await Effect.runPromiseExit(journey, { signal: controller.signal });
     if (Exit.isFailure(exit)) {
       if (timedOut) return;
@@ -222,31 +271,60 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
       return;
     }
     await stopService();
+    if (cleanupUnconfirmed || controller.signal.aborted) return;
     await reporter.step(RECORDING_STEP, async () => {
-      const outcome = await recordLive({
-        environment: deps.environment, settings: await deps.harnessSettings(), outputDirectory: deps.outputDirectory, record: deps.record,
-      });
+      let outcome: Awaited<ReturnType<typeof recordLive>>;
+      try {
+        outcome = await recordLive({
+          environment: deps.environment, settings: await deps.harnessSettings(), outputDirectory: deps.outputDirectory,
+          record: deps.record, signal: controller.signal,
+        });
+      } catch (error) {
+        if (controller.signal.aborted) throw new StepCancelled();
+        throw error;
+      }
+      if (controller.signal.aborted) throw new StepCancelled();
       reporter.note(outcome.report.replaceAll("\n", " | "));
       if (!outcome.passed) throw new Error(outcome.reason);
       return outcome;
     }, (outcome) => outcome.reason);
   };
 
-  const limit = new Promise<"timeout">((done) => {
-    const timer = setTimeout(() => done("timeout"), config.totalTimeout);
-    timer.unref();
-  });
+  let finished = false;
+  let reachLimit: () => void = () => undefined;
+  const limitReached = new Promise<void>((done) => { reachLimit = done; });
+  const limit = setTimeout(() => {
+    if (finished) return;
+    timedOut = true;
+    controller.abort();
+    reporter.fail({ id: "time-limit", title: `the whole run finishes within ${config.totalTimeout / 1000} seconds` }, "the run took longer; the last step printed above was the one still running");
+    reachLimit();
+  }, config.totalTimeout);
+  const grace = deps.cancelGrace ?? DEFAULT_CANCEL_GRACE;
+  let graceTimer: NodeJS.Timeout | undefined;
   try {
-    const outcome = await Promise.race([body().then(() => "done" as const), limit]);
-    if (outcome === "timeout") {
-      timedOut = true;
-      controller.abort();
-      reporter.fail({ id: "time-limit", title: `the whole run finishes within ${config.totalTimeout / 1000} seconds` }, "the run took longer; the last step printed above was the one still running");
+    const running = body().catch((error: unknown) => {
+      if (!(error instanceof StepCancelled)) reporter.fail({ id: "journey", title: "the journey ran without an unexpected error" }, messageOf(error));
+    });
+    // The body ends by itself, or ends because the limit cancelled it. After a
+    // cancel it is still awaited, for a bounded time, so that the recorder's
+    // process groups and the journey's finalizers have ended before cleanup.
+    const ended = await Promise.race([
+      running.then(() => "ended" as const),
+      limitReached.then(() => new Promise<"ended" | "late">((done) => {
+        void running.then(() => { done("ended"); });
+        graceTimer = setTimeout(() => { done("late"); }, grace);
+      })),
+    ]);
+    if (ended === "late") {
+      cleanupUnconfirmed = true;
+      reporter.fail({ id: "cleanup", title: "the run's work has stopped after the time limit" }, `the work did not end within ${grace / 1000} seconds of the limit`);
     }
-  } catch (error) {
-    reporter.fail({ id: "journey", title: "the journey ran without an unexpected error" }, messageOf(error));
   } finally {
-    await stopService().catch(() => undefined);
+    finished = true;
+    clearTimeout(limit);
+    clearTimeout(graceTimer);
+    await stopService();
   }
 
   if (reporter.failed()) {
@@ -254,6 +332,7 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
     for (const spec of ALL_STEPS) if (!ran.has(spec.id)) reporter.skip(spec, "an earlier step failed");
     if (service !== undefined) {
       reporter.note(`The run's folder is kept at ${service.root}; the service's log is ${service.logFile}. The real service was not touched.`);
+      if (cleanupUnconfirmed) reporter.note("Cleanup was not confirmed: a process this run started may still be running. Check the folder above before you remove it.");
     }
   } else if (service !== undefined) {
     service.remove();
@@ -262,5 +341,6 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
   deps.write(code === 0
     ? `live-check: all ${ALL_STEPS.length} steps passed`
     : `live-check: failed (${reporter.results().filter((result) => result.passed).length} of ${ALL_STEPS.length} steps passed)`);
+  open = false;
   return code;
 };

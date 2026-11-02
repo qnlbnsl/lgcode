@@ -312,6 +312,7 @@ export const flow = (options: FlowOptions): Effect.Effect<FlowResult, StepFailed
     const all = yield* since(owner, 0);
     const accounts = yield* (owner.accounts({ requestId: requestId(), operation: "list" } as never) as Effect.Effect<unknown, unknown>);
     const secrets = [...options.secrets()];
+    yield* check(secrets.length > 0, "the run has no secret to scan for, so the scan would pass without looking");
     for (const secret of secrets) yield* check(secret.length > 8, "a secret of the run is too short to scan for");
     const leaks = findLeaks(secrets, [
       { label: "the events", text: JSON.stringify(all) },

@@ -74,11 +74,17 @@ export const threadText = (events: ReadonlyArray<EventEnvelope>, agentId: string
 
 // The owner credential of a service, in the forms a leak could take. The file
 // is the service's own, in the state folder of the `/tmp` root it was given.
+// A file that cannot be read is an error, not an empty list: a scan with
+// nothing to look for would pass, and so would a redaction that hides nothing.
 export const readOwnerCredentialFrom = (stateFolder: string): ReadonlyArray<string> => {
+  let bytes: Buffer;
   try {
-    const bytes = readFileSync(join(stateFolder, "owner-credential"));
-    return [bytes.toString("base64url"), bytes.toString("base64"), bytes.toString("hex")];
-  } catch { return []; }
+    bytes = readFileSync(join(stateFolder, "owner-credential"));
+  } catch (error) {
+    throw new Error(`the owner credential could not be read (${error instanceof Error && "code" in error ? String(error.code) : "unreadable"}), so nothing can be scanned for or hidden`);
+  }
+  if (bytes.length === 0) throw new Error("the owner credential could not be read (the file is empty), so nothing can be scanned for or hidden");
+  return [bytes.toString("base64url"), bytes.toString("base64"), bytes.toString("hex")];
 };
 
 // ---- The secret scan (criterion 8.5, security rules) ---------------------
@@ -133,6 +139,23 @@ export const findLeaks = (secrets: Iterable<string>, sources: ReadonlyArray<Leak
   }
   return [...found];
 };
+
+// The text with every form of every secret replaced, longest form first so a
+// form that contains a shorter one is hidden whole. Only the forms `findLeaks`
+// looks for are hidden, so what the scan can find is what the printer hides.
+export const redactSecrets = (text: string, secrets: Iterable<string>): string => {
+  const needles = new Set<string>();
+  for (const secret of secrets) for (const [, needle] of formsOf(secret)) if (needle.length >= 8) needles.add(needle);
+  let result = text;
+  for (const needle of [...needles].sort((left, right) => right.length - left.length)) result = result.replaceAll(needle, "[redacted]");
+  return result;
+};
+
+// Shapes that look like a credential whatever the run knows: a bearer or basic
+// token, and a value assigned to a name such as token, password or api key.
+export const redactShapes = (text: string): string => text
+  .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9._~+\/=-]{8,}/gi, "$1 [redacted]")
+  .replace(/\b(authorization|token|secret|password|passwd|api[_-]?key|credential)(["']?\s*[:=]\s*["']?)(?!\[redacted\]|Bearer\b|Basic\b)([^\s"',;}]+)/gi, "$1$2[redacted]");
 
 // Each agent's own words in one string, text items only, so a secret that an
 // agent's output split over two items is one string again.
