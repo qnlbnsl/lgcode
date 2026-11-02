@@ -2153,3 +2153,97 @@ failure is fatal to the service, and that unit 7a must start a fresh engine,
 whose new service runs recovery over the same log.
 Why it matters: a repeated step 4 and step 6 would revoke the tokens of
 agents the first run had just reloaded, and interrupt them again.
+
+## 160. The fake agent's Shepherd command step does not speak the engine's protocol
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open for unit 8b, or for unit 7b when its client exists.
+
+What happens: the `shepherd_command` step in `packages/testing/src/fakeAgent.ts`
+opens a WebSocket to `SHEPHERD_SOCKET` and sends `{ command, input }` as JSON.
+That is not an Effect RPC request, and the step reports
+`shepherd_command:ok` on any reply at all, an error reply included.
+What should happen: the step sends a real RPC request through unit 7b's
+client and reports the reply's outcome.
+Why it matters: a test that trusts `shepherd_command:ok` would pass while the
+command failed. Unit 7a's tests do not use the step: criterion 7.10 reads
+the reloaded agent's token from the fake agent's echo file and calls through
+the test-only client in `packages/engine/test/support/socketClient.ts`.
+
+## 161. Row 64 does not say what an upgrade without an ancestor chain means
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open for the lead; the unit 7a tests take the reading below.
+
+What happens: row 64 says the client sends its ancestor chain and process
+group on upgrade, and the engine refuses the owner credential when one of
+them matches a recorded adapter process. It does not say what happens when
+the chain or the group is missing or malformed.
+What should happen (the tests' reading): the engine refuses the owner
+credential with HTTP 403 when either header is missing or malformed, so a
+caller cannot skip the check by leaving the headers out. Agent tokens and
+device credentials do not need the headers.
+Why it matters: reading a missing chain as "outside every adapter" would make
+the check optional for any caller.
+
+## 162. The ancestry check rests on the caller's own claim
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open; a limit of row 64's design, recorded for the attack pass.
+
+What happens: Node.js does not expose a Unix socket peer's process id (row
+48), so the engine cannot read the caller's ancestors itself. It checks the
+chain the client sends. A process inside an adapter's tree that can read
+`owner-credential` can also send a chain that leaves the adapter out.
+What should happen: the check stays as row 64 describes, as a guard against
+an agent's shell acting as the owner by accident. The owner credential file
+also needs the deny-read rule wherever the harness has one (row 61).
+Why it matters: row 64 does not stop a hostile agent on a harness without a
+deny-read mechanism.
+
+## 163. Issue 41's bound for a stalled subscriber has no number
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open for unit 7a's builder; the test sets an upper limit.
+
+What happens: issue 41 asks unit 7a for a bound or a disconnect rule, but no
+row names the size. A subscriber that stops acknowledging Effect RPC stream
+chunks stops the server's stream for it, and the committed events then
+queue in its `PubSub` subscription.
+What should happen (the tests' reading): the server ends the stalled
+subscription, or closes its connection, before 10,000 unacknowledged events
+of about one kilobyte each. Dropping events is not allowed, because
+`subscribe` is gapless; the client subscribes again from its last sequence.
+Why it matters: one stalled client must not hold the engine's memory.
+
+## 164. An agent's subscribe never shows its own refusals or the deliveries queued to it
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open for the lead; criterion 7.3 is followed as written.
+
+What happens: criterion 7.3 makes every agent-less event owner-only. Two
+event types concern an agent without carrying a top-level `agentId`:
+`CommandRefused` (no agent field) and `DeliveryQueued` (its agent is
+`delivery.target`). The log stores no `agent_id` for them, so an agent's
+`subscribe` never returns them, even for its own command or its own queue.
+What should happen: either the criterion stays, or those events gain an
+`agentId` (a contracts change) so they can be shown to the agent concerned.
+Why it matters: an agent following its own thread cannot see that its
+command was refused, or that a message is waiting for it.
+
+## 165. Nothing gives the server the live adapters' process identities
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open for unit 7a's builder, together with issue 153.
+
+What happens: row 64's check needs the process id, start time and group of
+every live adapter. `Runner.start` and `Runner.load` return a `SessionInfo`
+without any process identity, `SessionOpened.process` is never written, and
+no production path inserts a `processes` row (issue 153).
+What should happen: the runner reports each adapter's identity when it
+spawns (Linux: `/proc/<pid>/stat` field 22 for the start time, as
+`recovery/orphans.ts` reads it), the engine records it as a `processes` row,
+and the server checks the chain against the rows whose process is still the
+recorded one.
+Why it matters: without it, criterion 7.9's engine half and issue 153's
+sweep have nothing to compare against.
