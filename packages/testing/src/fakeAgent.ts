@@ -11,7 +11,7 @@ import * as Sink from "effect/Sink"
 import * as Stdio from "effect/Stdio"
 import * as Stream from "effect/Stream"
 import { spawn, type ChildProcess } from "node:child_process"
-import { writeFileSync } from "node:fs"
+import { existsSync, writeFileSync } from "node:fs"
 import WebSocket from "ws"
 
 type DiagnosticStep =
@@ -52,6 +52,10 @@ type Step = DiagnosticStep | StepDiagnostic
   // Unit 6a fix round 2 (F-9): sends a text chunk `ms` milliseconds after the turn's idle state, so it
   // arrives after the session/prompt reply, then the plan, if given. The turn's other steps run first.
   | { step: "text_after_turn"; text: string; ms: number; plan?: AcpSchema.PlanEntry[] }
+  // Unit 7a tests: runs `node <argv...>` as a child in the agent's own process group, with the
+  // agent's environment minus the names in `strip`, waits for it to exit, then sends the text
+  // `exec:<exit code>`. The child's stdio is ignored; a caller script reports through its own file.
+  | { step: "exec"; argv: string[]; strip?: string[] }
 interface Script {
   protocolVersion?: 1 | 2
   // Unit 6d: advertise a peer that cannot reload, without starting a real adapter.
@@ -64,6 +68,13 @@ interface Script {
   // Repeat emits separate replay chunks without exceeding the operating system's per-variable limit.
   history?: Array<{ role: "user" | "agent"; text: string; repeat?: number }>
   turns: Step[][]
+  // Unit 7a tests: keep running after standard input ends, as an adapter that hangs after the
+  // engine dies would, until a signal stops it. It ends by itself after two minutes, so a test
+  // that fails to stop it leaves nothing running for long.
+  outliveStdin?: boolean
+  // Unit 7a tests: session/load does not reply until this file exists, so a test can hold the
+  // engine's restart recovery inside its reload step.
+  loadGate?: string
 }
 
 const environment = process.env
@@ -186,6 +197,18 @@ const scriptedStdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
   })
 }))
 
+const execChild = (argv: ReadonlyArray<string>, strip: ReadonlyArray<string>) => Effect.callback<number, AcpRequestError>((resume) => {
+  const env = { ...environment }
+  for (const name of strip) delete env[name]
+  const child = spawn(process.execPath, [...argv], { env, stdio: "ignore" })
+  child.once("error", () => resume(Effect.fail(AcpRequestError.internalError("Unable to start exec child"))))
+  child.once("exit", (code) => resume(Effect.succeed(code ?? -1)))
+})
+const awaitGate = (gate: string) => Effect.callback<void>((resume) => {
+  const timer = setInterval(() => { if (existsSync(gate)) { clearInterval(timer); resume(Effect.void) } }, 20)
+  return Effect.sync(() => clearInterval(timer))
+})
+
 const shepherdCommand = (command: string, input: unknown) => Effect.callback<string>((resume) => {
   const socket = environment.SHEPHERD_SOCKET
   const token = environment.SHEPHERD_TOKEN
@@ -221,6 +244,7 @@ const program = Effect.gen(function*() {
   yield* agent.handleLoadSession((request) => Effect.gen(function*() {
     const options = structuredClone(script.configOptions ?? [])
     sessions.set(request.sessionId, { turn: 0, options })
+    if (script.loadGate !== undefined) yield* awaitGate(script.loadGate)
     for (const item of script.history ?? []) {
       for (let index = 0; index < (item.repeat ?? 1); index++) {
         yield* agent.client.sessionUpdate({ sessionId: request.sessionId, update: {
@@ -289,6 +313,7 @@ const program = Effect.gen(function*() {
             yield* update({ sessionUpdate: "config_option_update", configOptions: session.options }); break
           case "config_options": session.options = step.configOptions; yield* update({ sessionUpdate: "config_option_update", configOptions: session.options }); break
           case "shepherd_command": yield* text(yield* shepherdCommand(step.command, step.input)); break
+          case "exec": yield* text(`exec:${yield* execChild(step.argv, step.strip ?? [])}`); break
           case "print_env": yield* text(Object.entries(environment).map(([name, value]) => `${name}=${value}`).join("\n")); break
           case "stderr": {
             const line = expand(step.text, request.sessionId) + "\n"
@@ -350,10 +375,19 @@ const program = Effect.gen(function*() {
   return yield* Effect.never
 })
 
+// Unit 7a: standard input that never ends, for `outliveStdin`.
+const unendingStdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
+  const stdio = yield* Stdio.Stdio
+  return Stdio.make({ ...stdio, stdin: Stream.concat(stdio.stdin, Stream.never) })
+}))
+if (script.outliveStdin === true) setTimeout(() => process.exit(0), 120_000)
+const baseStdio = echoPath === undefined ? NodeServices.layer : recordingStdio.pipe(Layer.provide(NodeServices.layer))
+const inputStdio = script.outliveStdin === true ? unendingStdio.pipe(Layer.provide(baseStdio)) : baseStdio
+
 Effect.runPromise(program.pipe(
   // The recorder reads the raw wire, beneath the version adapter.
   Effect.provide(AcpAgent.layerStdio().pipe(Layer.provide(((base) => script.protocolVersion === 1 || script.reportVersion === false ? scriptedStdio.pipe(Layer.provide(base)) : base)(
-    echoPath === undefined ? NodeServices.layer : recordingStdio.pipe(Layer.provide(NodeServices.layer)))))),
+    inputStdio)))),
   Effect.provide(Logger.layer([safeLogger])),
   Effect.scoped
 )).catch(() => { process.stderr.write("Fake agent failed\n"); process.exitCode = 1 })
