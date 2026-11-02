@@ -3000,3 +3000,45 @@ that its processes have stopped.
 Why it matters: delayed event delivery must not make the full check fail,
 and waiting for an event must not hide cleanup that returns while a process
 is still running.
+
+## 208. The crash case of failure rule 4 raced its owner prompt against the permission notice
+
+Found: 2026-11-02, in the third full check of run engine-build-1 at commit aae856e.
+State: fixed in the test-only commit that follows aae856e on branch worker/engine-u8cfl.
+
+What happens: the second scenario of `failure-4-no-answerer.test.ts` makes a
+boss whose second turn crashes, and then sends the boss a prompt from the
+owner to cause that crash.
+The asker's permission request already has the boss as holder, and the engine
+queues the request's notice to the boss as a prompt.
+The boss is idle, so the notice starts the boss's second turn at once, and
+that turn crashes.
+When the owner's prompt arrives after the crash, the state table refuses a
+prompt to a crashed agent, and the owner's client fails with `CommandError`
+and the reason `command refused`.
+The engine is right to refuse. The test raced its own prompt against the
+notice.
+
+Evidence: a scratch copy of the test that printed the events before and after
+the refused prompt, run in a loop on two processor cores with four
+processor-bound `yes` jobs on the same cores, failed in 4 of 20 runs.
+In a failing run the events after the request were `DeliveryAccepted`,
+`ThreadItem`, `AgentCrashed`, `PermissionMoved`, `OwnerNeeded`,
+`CommandRefused`, so the boss had accepted the notice before the owner's
+prompt was sent.
+The state table (`commandTable` in `packages/contracts/src/stateMachine.ts`)
+refuses `prompt` only for crashed and stopped agents, so a busy boss is not
+the cause.
+
+What should happen: the scenario sends no prompt and lets the notice start the
+boss's second turn, which is the engine's real path.
+It also starts waiting from the request's own sequence number instead of from
+a head read taken after the request was seen, because under load the crash
+could be committed before that read, and the wait for the owner notice would
+then time out.
+All assertions stay: the request moves from the crashed holder to the owner,
+stays open, and a late owner answer reaches the asker.
+The fixed file passed 12 of 12 runs under the same load.
+
+Why it matters: a test that races its own command against the engine's
+delivery fails a full check at random and teaches people to ignore failures.
