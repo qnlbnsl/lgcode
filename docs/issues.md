@@ -2766,3 +2766,26 @@ that the file checks the whole clause.
 Why it matters: a reader of the acceptance suite's titles could believe that
 every clause of the specification's amendments is checked end to end. Only the
 journeys above are.
+
+## 196. A wait for one delivery was followed by an assertion about two
+
+Found: 2026-11-02, by the test runner (`pnpm check` at 0a58595, under load).
+State: fixed in commit f33000c (test only; no production code changed).
+
+What happens: `failure-6-undeliverable.test.ts` waited for the first
+`DeliveryAccepted` for the boss, then read the boss's echo once and expected
+a "was returned" prompt for each of two queued messages. The two notices are
+separate deliveries, so under load the second had not reached the boss yet and
+the test failed with "the boss was not told that <id> came back". The same
+shape was in `flow-start-to-finish.test.ts`: it waited for the first accepted
+delivery for the lead after a restart and then asserted about one particular
+prompt, which a carry-on delivery could precede.
+What should happen: a wait names the thing the next assertion is about. The
+failure-6 test now waits, bounded, until the boss's echo holds a notice for
+every queued id, and checks that there is exactly one notice per id. The flow
+test waits for the delivery id of its own prompt. A sweep of the other
+acceptance files found no further case: their single-echo reads follow either
+a wait on the delivery id, a wait on the echo itself, or a turn end.
+Why it matters: a test that passes on a quiet machine and fails under load
+hides real failures behind noise. The original failure was not reproduced
+locally in three loaded runs; the cause is read from the code.
