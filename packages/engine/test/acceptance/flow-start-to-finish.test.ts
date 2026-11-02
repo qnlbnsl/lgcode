@@ -209,8 +209,11 @@ scenario("flow (stop, resume, restart): the lead stops and resumes its worker, w
   expect(tagged(after, "PermissionAnswered", worker.agentId)).toHaveLength(2);
   expect(tagged(after, "AgentStarted").map((envelope) => envelope.agentId).sort()).toEqual([lead.agentId, worker.agentId].sort());
   const mark = yield* w.watermark();
-  yield* w.owner.prompt({ requestId: requestId(), agentId: lead.agentId, text: "Status after the restart?" } as never);
-  const reply = yield* eventsUntil(w.owner, mark, "the lead's reply after the restart", isTag("DeliveryAccepted", lead.agentId), 30_000);
+  const status = (yield* w.owner.prompt({ requestId: requestId(), agentId: lead.agentId, text: "Status after the restart?" } as never)) as { deliveryId: string };
+  // Not the first delivery the lead takes after the restart (a carry-on could come first), but this one.
+  const reply = yield* eventsUntil(w.owner, mark, "the lead to take the status question after the restart", (envelope) =>
+    envelope.event._tag === "DeliveryAccepted" && envelope.agentId === lead.agentId
+    && (envelope.event as unknown as { deliveryId: string }).deliveryId === status.deliveryId, 30_000);
   expect(tagged(reply, "DeliveryAccepted", lead.agentId).length).toBeGreaterThan(0);
   expect(promptsOf(peekEcho(lead.echo)!).join("\n")).toContain("Status after the restart?");
 }));

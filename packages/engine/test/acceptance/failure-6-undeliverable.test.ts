@@ -71,8 +71,14 @@ scenario("6 undeliverable: messages still queued for an agent that then crashes 
   writeFileSync(gate, "go");
   yield* eventsUntil(w.owner, mark, "the crash", isTag("AgentCrashed", child.agentId), 30_000);
   yield* waitFor("the crashed process to be gone", () => (alive(pid) ? undefined : true));
-  yield* eventsUntil(w.owner, mark, "the boss to be told about both", (envelope) =>
-    envelope.event._tag === "DeliveryAccepted" && envelope.agentId === boss.agentId);
+  // The boss gets one notice per returned message, each its own delivery, so the first
+  // accepted delivery does not mean the second notice has arrived. Wait for the boss's
+  // adapter to hold a notice for every queued id before reading what it was told.
+  const noticesFor = (): ReadonlyArray<string> => promptsOf(peekEcho(boss.echo)!).filter((text) => text.includes("was returned"));
+  const told = yield* waitFor("the boss's adapter to receive a 'was returned' notice for each queued message", () => {
+    const notices = noticesFor();
+    return queued.every((id) => notices.some((text) => text.includes(id))) ? notices : undefined;
+  });
   const settled = yield* since(w.owner, mark);
 
   const returned = tagged(settled, "DeliveryReturned", child.agentId);
@@ -83,8 +89,10 @@ scenario("6 undeliverable: messages still queued for an agent that then crashes 
   expect(tagged(settled, "DeliveryReturned").map(deliveryOf), "the message already being worked on was returned").not.toContain(firstId);
   expect(tagged(settled, "DeliveryWithdrawn", child.agentId).map(deliveryOf).sort()).toEqual([...queued].sort());
   // The boss is told, once per message, which delivery came back.
-  const told = promptsOf(peekEcho(boss.echo)!).filter((text) => text.includes("was returned"));
-  for (const id of queued) expect(told.some((text) => text.includes(id)), `the boss was not told that ${id} came back`).toBe(true);
+  for (const id of queued) {
+    expect(told.some((text) => text.includes(id)), `the boss was not told that ${id} came back`).toBe(true);
+    expect(told.filter((text) => text.includes(id)), `the boss was not told exactly once that ${id} came back`).toHaveLength(1);
+  }
 
   // A message for the crashed agent is refused at once, not queued for nobody.
   const after = yield* w.watermark();
