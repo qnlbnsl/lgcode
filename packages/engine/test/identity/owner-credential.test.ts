@@ -6,8 +6,8 @@ import {
 import { join } from "node:path";
 
 import { it } from "@effect/vitest";
-import { DeviceId, RequestId } from "@shepherd/contracts";
-import * as SqliteClient from "@shepherd/t3-node-sqlite/nodeSqliteClient";
+import { DeviceId, RequestId } from "@shephrd/contracts";
+import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -28,11 +28,11 @@ let home: string;
 let state: string;
 let oldMask: number;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/shepherd-owner-credential-");
+  home = mkdtempSync("/tmp/shephrd-owner-credential-");
   state = join(home, "state");
   oldMask = process.umask();
   vi.stubEnv("HOME", home);
-  vi.stubEnv("SHEPHERD_HOME", state);
+  vi.stubEnv("SHEPHRD_HOME", state);
 });
 afterEach(() => {
   process.umask(oldMask);

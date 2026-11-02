@@ -1,5 +1,5 @@
 import { delimiter, isAbsolute, join, resolve } from "node:path"
-import { HarnessId, type HarnessSettings } from "@shepherd/contracts"
+import { HarnessId, type HarnessSettings } from "@shephrd/contracts"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Schema from "effect/Schema"

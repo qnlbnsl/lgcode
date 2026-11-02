@@ -1,5 +1,5 @@
 import { it } from "@effect/vitest";
-import type { DeliveryId } from "@shepherd/contracts";
+import type { DeliveryId } from "@shephrd/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -26,7 +26,7 @@ import {
 } from "../support/deliveryRig.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHERD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const run = <A, E, R>(body: Parameters<typeof deliveryRig<A, E, R>>[1], redactor?: Parameters<typeof deliveryRig>[2]) =>
   deliveryRig(rig, (runner) => Effect.gen(function* () {

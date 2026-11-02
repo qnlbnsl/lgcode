@@ -6,7 +6,7 @@ import { dirname, isAbsolute, join, parse, resolve, sep } from "node:path";
 import {
   acpPermissionOptionKinds, comparePermission, permissionForOptionKind,
   type Actor, type PermissionLevel,
-} from "@shepherd/contracts";
+} from "@shephrd/contracts";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 

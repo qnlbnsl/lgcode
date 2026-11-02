@@ -1,4 +1,4 @@
-import type { Event } from "@shepherd/contracts";
+import type { Event } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 

@@ -1,7 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import * as AcpAgent from "@shepherd/t3-effect-acp/agent"
-import { AcpRequestError } from "@shepherd/t3-effect-acp/errors"
-import type * as AcpSchema from "@shepherd/t3-effect-acp/schema"
+import * as AcpAgent from "@shephrd/t3-effect-acp/agent"
+import { AcpRequestError } from "@shephrd/t3-effect-acp/errors"
+import type * as AcpSchema from "@shephrd/t3-effect-acp/schema"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -11,8 +11,9 @@ import * as Sink from "effect/Sink"
 import * as Stdio from "effect/Stdio"
 import * as Stream from "effect/Stream"
 import { spawn, type ChildProcess } from "node:child_process"
-import { writeFileSync } from "node:fs"
-import WebSocket from "ws"
+import { existsSync, writeFileSync } from "node:fs"
+import { randomUUID } from "node:crypto"
+import { connect } from "@shephrd/client"
 
 type DiagnosticStep =
   | { type: "ext_notification"; method: string; params: Schema.Json }
@@ -31,7 +32,9 @@ type Step = DiagnosticStep | StepDiagnostic
   | { step: "question"; message: string; requestedSchema: Record<string, unknown> }
   | { step: "mode_change"; configId: string; value: string }
   | { step: "config_options"; configOptions: AcpSchema.SessionConfigOption[] }
-  | { step: "shepherd_command"; command: string; input: unknown }
+  | { step: "shephrd_command"; command: string; input: unknown }
+  // Unit 7b tests release a turn only after a real blocking wait is open.
+  | { step: "wait_for_file"; path: string }
   | { step: "end_turn"; stopReason: string }
   | { step: "crash"; exitCode: number }
   // Unit 6c tests: the agent sends itself the signal, so the runner sees a death by signal with no exit code.
@@ -52,6 +55,10 @@ type Step = DiagnosticStep | StepDiagnostic
   // Unit 6a fix round 2 (F-9): sends a text chunk `ms` milliseconds after the turn's idle state, so it
   // arrives after the session/prompt reply, then the plan, if given. The turn's other steps run first.
   | { step: "text_after_turn"; text: string; ms: number; plan?: AcpSchema.PlanEntry[] }
+  // Unit 7a tests: runs `node <argv...>` as a child in the agent's own process group, with the
+  // agent's environment minus the names in `strip`, waits for it to exit, then sends the text
+  // `exec:<exit code>`. The child's stdio is ignored; a caller script reports through its own file.
+  | { step: "exec"; argv: string[]; strip?: string[] }
 interface Script {
   protocolVersion?: 1 | 2
   // Unit 6d: advertise a peer that cannot reload, without starting a real adapter.
@@ -64,6 +71,13 @@ interface Script {
   // Repeat emits separate replay chunks without exceeding the operating system's per-variable limit.
   history?: Array<{ role: "user" | "agent"; text: string; repeat?: number }>
   turns: Step[][]
+  // Unit 7a tests: keep running after standard input ends, as an adapter that hangs after the
+  // engine dies would, until a signal stops it. It ends by itself after two minutes, so a test
+  // that fails to stop it leaves nothing running for long.
+  outliveStdin?: boolean
+  // Unit 7a tests: session/load does not reply until this file exists, so a test can hold the
+  // engine's restart recovery inside its reload step.
+  loadGate?: string
 }
 
 const environment = process.env
@@ -186,26 +200,27 @@ const scriptedStdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
   })
 }))
 
-const shepherdCommand = (command: string, input: unknown) => Effect.callback<string>((resume) => {
-  const socket = environment.SHEPHERD_SOCKET
-  const token = environment.SHEPHERD_TOKEN
-  if (!socket || !token) { resume(Effect.succeed("shepherd_command:failed")); return }
-  const connection = new WebSocket(`ws+unix://${socket}:/`, { headers: { Authorization: `Bearer ${token}` } })
-  let settled = false
-  const finish = (result: string) => {
-    if (settled) return
-    settled = true
-    clearTimeout(timer)
-    connection.terminate()
-    resume(Effect.succeed(result))
-  }
-  const timer = setTimeout(() => finish("shepherd_command:failed"), 5000)
-  connection.on("open", () => connection.send(JSON.stringify({ command, input })))
-  connection.on("message", () => finish("shepherd_command:ok"))
-  connection.on("error", () => finish("shepherd_command:failed"))
-  connection.on("close", () => finish("shepherd_command:failed"))
-  return Effect.sync(() => { clearTimeout(timer); connection.terminate() })
+const execChild = (argv: ReadonlyArray<string>, strip: ReadonlyArray<string>) => Effect.callback<number, AcpRequestError>((resume) => {
+  const env = { ...environment }
+  for (const name of strip) delete env[name]
+  const child = spawn(process.execPath, [...argv], { env, stdio: "ignore" })
+  child.once("error", () => resume(Effect.fail(AcpRequestError.internalError("Unable to start exec child"))))
+  child.once("exit", (code) => resume(Effect.succeed(code ?? -1)))
 })
+const awaitGate = (gate: string) => Effect.callback<void>((resume) => {
+  const timer = setInterval(() => { if (existsSync(gate)) { clearInterval(timer); resume(Effect.void) } }, 20)
+  return Effect.sync(() => clearInterval(timer))
+})
+
+// Issue 160: the step speaks the same RPC as the shephrd tool, through the
+// shared client. A refusal reports "failed", as does any transport error.
+const shephrdCommand = (command: string, input: unknown) => Effect.scoped(Effect.gen(function*() {
+  const client = yield* connect({ environment, attempts: 1 })
+  const call = (client as unknown as Record<string, ((payload: unknown) => Effect.Effect<unknown, unknown>) | undefined>)[command]
+  if (call === undefined) return "shephrd_command:failed"
+  yield* call({ requestId: randomUUID(), ...(input as Record<string, unknown>) })
+  return "shephrd_command:ok"
+})).pipe(Effect.timeout(5000), Effect.catchCause(() => Effect.succeed("shephrd_command:failed")))
 
 const program = Effect.gen(function*() {
   const agent = yield* AcpAgent.AcpAgent
@@ -221,6 +236,7 @@ const program = Effect.gen(function*() {
   yield* agent.handleLoadSession((request) => Effect.gen(function*() {
     const options = structuredClone(script.configOptions ?? [])
     sessions.set(request.sessionId, { turn: 0, options })
+    if (script.loadGate !== undefined) yield* awaitGate(script.loadGate)
     for (const item of script.history ?? []) {
       for (let index = 0; index < (item.repeat ?? 1); index++) {
         yield* agent.client.sessionUpdate({ sessionId: request.sessionId, update: {
@@ -288,7 +304,9 @@ const program = Effect.gen(function*() {
             session.options = session.options.map((option) => option.configId === step.configId ? { ...option, currentValue: step.value } as AcpSchema.SessionConfigOption : option)
             yield* update({ sessionUpdate: "config_option_update", configOptions: session.options }); break
           case "config_options": session.options = step.configOptions; yield* update({ sessionUpdate: "config_option_update", configOptions: session.options }); break
-          case "shepherd_command": yield* text(yield* shepherdCommand(step.command, step.input)); break
+          case "shephrd_command": yield* text(yield* shephrdCommand(step.command, step.input)); break
+          case "wait_for_file": yield* awaitGate(step.path); break
+          case "exec": yield* text(`exec:${yield* execChild(step.argv, step.strip ?? [])}`); break
           case "print_env": yield* text(Object.entries(environment).map(([name, value]) => `${name}=${value}`).join("\n")); break
           case "stderr": {
             const line = expand(step.text, request.sessionId) + "\n"
@@ -350,10 +368,19 @@ const program = Effect.gen(function*() {
   return yield* Effect.never
 })
 
+// Unit 7a: standard input that never ends, for `outliveStdin`.
+const unendingStdio = Layer.effect(Stdio.Stdio, Effect.gen(function*() {
+  const stdio = yield* Stdio.Stdio
+  return Stdio.make({ ...stdio, stdin: Stream.concat(stdio.stdin, Stream.never) })
+}))
+if (script.outliveStdin === true) setTimeout(() => process.exit(0), 120_000)
+const baseStdio = echoPath === undefined ? NodeServices.layer : recordingStdio.pipe(Layer.provide(NodeServices.layer))
+const inputStdio = script.outliveStdin === true ? unendingStdio.pipe(Layer.provide(baseStdio)) : baseStdio
+
 Effect.runPromise(program.pipe(
   // The recorder reads the raw wire, beneath the version adapter.
   Effect.provide(AcpAgent.layerStdio().pipe(Layer.provide(((base) => script.protocolVersion === 1 || script.reportVersion === false ? scriptedStdio.pipe(Layer.provide(base)) : base)(
-    echoPath === undefined ? NodeServices.layer : recordingStdio.pipe(Layer.provide(NodeServices.layer)))))),
+    inputStdio)))),
   Effect.provide(Logger.layer([safeLogger])),
   Effect.scoped
 )).catch(() => { process.stderr.write("Fake agent failed\n"); process.exitCode = 1 })

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import type { Actor } from "@shepherd/contracts";
+import type { Actor } from "@shephrd/contracts";
 
 // Decision rows 38 and 58. A prompt an agent sends to another agent must not
 // start with a slash command, after any leading whitespace: every Unicode

@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, chmod, writeFile, realpath } from "node:fs/promises"
 import { join, relative, isAbsolute } from "node:path"
 import { tmpdir } from "node:os"
 import { createInterface } from "node:readline"
-import type { HarnessSettings } from "@shepherd/contracts"
+import type { HarnessSettings } from "@shephrd/contracts"
 import * as Effect from "effect/Effect"
 import * as Logger from "effect/Logger"
 import { buildBaseEnvironment } from "../src/runner/baseEnvironment.ts"
@@ -209,7 +209,7 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
   if (signal.aborted) abort()
   const timer = setTimeout(() => { fail(new RecordingError("Recording timed out", "timeout")); terminate("SIGTERM") }, 60_000)
   try {
-    const info = { name: "shepherd-recorder", version: "0.0.1" }
+    const info = { name: "shephrd-recorder", version: "0.0.1" }
     const initialized = await request("initialize", { protocolVersion: 2, info, clientInfo: info, capabilities: {}, clientCapabilities: {} })
     if (![1, 2].includes(initialized.protocolVersion)) throw new RecordingError("Adapter negotiated an unsupported protocol version")
     // Shipped adapters can report a v1-shaped response even with protocolVersion 2.
@@ -248,8 +248,9 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
   }
 }
 
-export const recordFixtures = (options: RecordOptions) => Effect.tryPromise({
-  try: async (signal) => {
+// The recording itself, apart from Effect, so a caller that owns a cancellation
+// signal (`pnpm live-check`) can await the end of the recorder's process-group cleanup.
+export const runRecording = async (options: RecordOptions, signal: AbortSignal) => {
     const lexicalTemporaryPath = relative(tmpdir(), options.temporaryRoot)
     if (lexicalTemporaryPath.startsWith("..") || isAbsolute(lexicalTemporaryPath)) throw new RecordingError("Recording workspaces must be inside the system temporary folder")
     for (const sample of options.errorSamples ?? []) {
@@ -337,7 +338,10 @@ export const recordFixtures = (options: RecordOptions) => Effect.tryPromise({
       } catch (error) { markFailed(sample.harness, error, "samples") }
     }
     return results
-  },
+}
+
+export const recordFixtures = (options: RecordOptions) => Effect.tryPromise({
+  try: (signal) => runRecording(options, signal),
   // Never retain a raw transport, filesystem or child-process error as a cause.
   catch: (error) => error instanceof RecordingError ? error : new RecordingError("Fixture recording failed")
 }).pipe(Effect.provide(Logger.layer([Logger.make(() => { process.stderr.write("[redacted recorder diagnostic]\n") })])))

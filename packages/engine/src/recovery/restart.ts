@@ -1,9 +1,9 @@
 // Pattern: T3 Code packages/effect-acp/src/client.ts (`loadSession`, line 91;
 // MIT licence; the copy here is third_party/t3code/effect-acp/src/client.ts)
-// for the reload itself, through reload.ts. The recovery order is Shepherd's
+// for the reload itself, through reload.ts. The recovery order is Shephrd's
 // own (decision rows 31, 52 and 66).
 import { randomUUID } from "node:crypto";
-import { BootId, Event as EventSchema, PermissionRequestId, WaitId, type AgentId, type Event } from "@shepherd/contracts";
+import { BootId, Event as EventSchema, PermissionRequestId, WaitId, type AgentId, type Event } from "@shephrd/contracts";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";

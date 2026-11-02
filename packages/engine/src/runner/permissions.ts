@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { resolve } from "node:path";
-import { AgentId, PermissionRequestId, permissionForOptionKind, type PermissionOption } from "@shepherd/contracts";
-import type { RequestPermissionOutcome } from "@shepherd/t3-effect-acp/schema-v1";
+import { AgentId, PermissionRequestId, permissionForOptionKind, type PermissionOption } from "@shephrd/contracts";
+import type { RequestPermissionOutcome } from "@shephrd/t3-effect-acp/schema-v1";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";

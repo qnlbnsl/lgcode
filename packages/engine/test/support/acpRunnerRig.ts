@@ -8,8 +8,8 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import {
   Account as AccountSchema, AgentId, DeliveryId, HarnessSettings as HarnessSchema,
   type Account, type Delivery, type HarnessSettings, type PermissionLevel,
-} from "@shepherd/contracts";
-import * as SqliteClient from "@shepherd/t3-node-sqlite/nodeSqliteClient";
+} from "@shephrd/contracts";
+import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -78,7 +78,7 @@ export interface RunnerRig {
 }
 
 export const makeRunnerRig = (): RunnerRig => {
-  const root = realpathSync(mkdtempSync("/tmp/shepherd-runner-"));
+  const root = realpathSync(mkdtempSync("/tmp/shephrd-runner-"));
   const rig: RunnerRig = {
     root, home: join(root, "home"), stateFolder: join(root, "state"), pluginRoot: join(root, "plugin"),
     work: join(root, "work"), bin: join(root, "bin"), socket: join(root, "state", "engine.sock"),
@@ -174,11 +174,11 @@ export const accountFor = (harness: string, script: Record<string, unknown>, ech
 // holds every kind of variable a child must not get.
 export const allowListed = ["PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "TMPDIR", "TZ"] as const;
 export const serviceEnvironment = (rig: RunnerRig): Record<string, string> => ({
-  PATH: "/usr/bin:/bin", HOME: rig.home, USER: "shepherd-test", LOGNAME: "shepherd-test", SHELL: "/bin/sh",
+  PATH: "/usr/bin:/bin", HOME: rig.home, USER: "shephrd-test", LOGNAME: "shephrd-test", SHELL: "/bin/sh",
   LANG: "C.UTF-8", LC_ALL: "C.UTF-8", LC_CTYPE: "C.UTF-8", TERM: "dumb", TMPDIR: rig.root, TZ: "UTC",
   HERDR_SOCKET_PATH: "/tmp/herdr-planted.sock", HERDR_ENV: "1", HERDR_PANE_ID: "w9:p9",
   ANTHROPIC_API_KEY: "inherited-provider-key-planted-1", OPENAI_API_KEY: "inherited-provider-key-planted-2",
-  SHEPHERD_TOKEN: "shp_a_the-service-own-token-planted", SHEPHERD_HOME: rig.stateFolder, SHEPHERD_TEST_DEBUG: "1",
+  SHEPHRD_TOKEN: "shp_a_the-service-own-token-planted", SHEPHRD_HOME: rig.stateFolder, SHEPHRD_TEST_DEBUG: "1",
   NODE_OPTIONS: "--require /tmp/planted-preload.js", FAKE_AGENT_SCRIPT: "{\"turns\":[]}", XDG_STATE_HOME: rig.root,
 });
 

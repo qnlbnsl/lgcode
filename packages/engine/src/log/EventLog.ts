@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   EventEnvelope, type Actor, type AgentId, type BootId, DeviceId, type Event, type RequestId,
-} from "@shepherd/contracts";
+} from "@shephrd/contracts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
@@ -88,7 +88,7 @@ export class EventLog extends Context.Service<
       use: (append: Append) => Effect.Effect<A, E, R>,
     ) => Effect.Effect<A, E | LogWriteFailed, R>;
   }
->()("shepherd/engine/log/EventLog") {}
+>()("shephrd/engine/log/EventLog") {}
 
 const Envelopes = Schema.Array(EventEnvelope);
 const decodeEnvelopes = Schema.decodeUnknownSync(Envelopes);

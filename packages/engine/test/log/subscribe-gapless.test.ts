@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { it } from "@effect/vitest";
 import {
   AccountId, AgentId, RequestId, type Actor, type Event, type EventEnvelope,
-} from "@shepherd/contracts";
-import * as SqliteClient from "@shepherd/t3-node-sqlite/nodeSqliteClient";
+} from "@shephrd/contracts";
+import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import * as Deferred from "effect/Deferred";
 import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -28,8 +28,8 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/shepherd-subscribe-");
-  vi.stubEnv("SHEPHERD_HOME", home);
+  home = mkdtempSync("/tmp/shephrd-subscribe-");
+  vi.stubEnv("SHEPHRD_HOME", home);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

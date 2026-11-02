@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   CommandsRpcGroup, EventEnvelope, commandOutcome, ownerOnlyCommands,
   type Actor, type Event, type HarnessSettings, type RequestId,
-} from "@shepherd/contracts";
+} from "@shephrd/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -49,7 +49,7 @@ type Credential =
 
 export class CommandHandler extends Context.Service<CommandHandler, {
   readonly execute: (credential: Credential, name: string, payload: unknown) => Effect.Effect<Record<string, unknown>, CommandRefused | LogWriteFailed>;
-}>()("shepherd/engine/commands/CommandHandler") {}
+}>()("shephrd/engine/commands/CommandHandler") {}
 
 const supported = new Set(["start", "prompt", "stop", "resume", "compact", "group", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "answer", "pass-up", "ask", "wait"]);
 const targeted = new Set(["prompt", "stop", "resume", "compact", "group"]);

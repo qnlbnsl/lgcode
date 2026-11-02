@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { Actor, Event, PermissionLevel, PermissionOption } from "@shepherd/contracts";
+import type { Actor, Event, PermissionLevel, PermissionOption } from "@shephrd/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -46,7 +46,7 @@ export const option = (
   id: string, kind: string, level: PermissionLevel, persistent = false, name = `Option ${id}`,
 ): PermissionOption => ({ id, name, kind, level, persistent });
 
-// The options an ACP adapter typically offers, mapped onto Shepherd's scale
+// The options an ACP adapter typically offers, mapped onto Shephrd's scale
 // as `permissionForOptionKind` maps them, plus two one-off options above
 // "ask" for the mode checks.
 export const standardOptions: ReadonlyArray<PermissionOption> = [

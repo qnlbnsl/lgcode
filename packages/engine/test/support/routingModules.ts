@@ -1,4 +1,4 @@
-import type { AgentId } from "@shepherd/contracts";
+import type { AgentId } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import type * as SqlClient from "effect/sql/SqlClient";
 import type * as EventLog from "../../src/log/EventLog.ts";

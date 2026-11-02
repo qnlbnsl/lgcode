@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { comparePermission, DeliveryId, Event, type PermissionLevel, type SessionReference } from "@shepherd/contracts";
-import { AcpClient, layerChildProcess } from "@shepherd/t3-effect-acp/client";
-import { AcpRequestError } from "@shepherd/t3-effect-acp/errors";
-import type { AgentCapabilities } from "@shepherd/t3-effect-acp/schema-v1";
-import { mergeProviderInstanceEnvironment } from "@shepherd/t3-provider-instance/instanceEnvironment";
-import { HomeDirectory } from "@shepherd/t3-provider-instance/HostProcess";
+import { comparePermission, DeliveryId, Event, type PermissionLevel, type SessionReference } from "@shephrd/contracts";
+import { AcpClient, layerChildProcess } from "@shephrd/t3-effect-acp/client";
+import { AcpRequestError } from "@shephrd/t3-effect-acp/errors";
+import type { AgentCapabilities } from "@shephrd/t3-effect-acp/schema-v1";
+import { mergeProviderInstanceEnvironment } from "@shephrd/t3-provider-instance/instanceEnvironment";
+import { HomeDirectory } from "@shephrd/t3-provider-instance/HostProcess";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -23,6 +23,7 @@ import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Sink from "effect/Sink";
 import * as Stream from "effect/Stream";
+import * as SqlClient from "effect/sql/SqlClient";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner, makeHandle, type ChildProcessHandle } from "effect/process/ChildProcessSpawner";
 import { withCodexHome } from "../accounts/shadowHome.ts";
@@ -32,6 +33,7 @@ import { sha256Hex } from "../identity/credential.ts";
 import { makeRedactor } from "../identity/redactor.ts";
 import { Redactor } from "../log/Redactor.ts";
 import { makeStderrTail, stderrTailLines } from "../recovery/crash.ts";
+import { linuxProcessReader } from "../recovery/orphans.ts";
 import { buildBaseEnvironment } from "./baseEnvironment.ts";
 import { classifyError } from "./classify.ts";
 import { compactPrompt } from "./compact.ts";
@@ -47,6 +49,8 @@ export interface AcpRunnerOptions {
   readonly socketPath: string;
   readonly stateFolder: string;
   readonly environment: Record<string, string | undefined>;
+  // Enabled only by the service after row 74's real temporary-folder check.
+  readonly protocolLog?: boolean;
   readonly classifyError?: (input: { harness: string; text: string }) => "out-of-usage" | "signed-out" | undefined;
 }
 type Spawn = Parameters<Runner["Service"]["start"]>[0];
@@ -106,6 +110,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   const pathService = yield* Path.Path;
   const lifetime = yield* Effect.scope;
   const suppliedRedactor = yield* Effect.serviceOption(Redactor);
+  const processDatabase = yield* Effect.serviceOption(SqlClient.SqlClient);
   const processes = new Map<string, Process>();
   const fallback = makeRedactor({ secrets: () => [...processes.values()].flatMap((entry) => entry.secrets), tokenHashes: () => new Set() });
   const redactText = (text: string) => Option.isSome(suppliedRedactor)
@@ -212,7 +217,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     const resolvedSecrets = [input.token];
     const variables: Record<string, string> = {};
     for (const [name, value] of Object.entries(input.account.environment ?? {})) {
-      if (name.startsWith("HERDR_") || name.startsWith("SHEPHERD_")) continue;
+      if (name.startsWith("HERDR_") || name.startsWith("SHEPHRD_")) continue;
       if (value.startsWith("secret:")) {
         const secret = yield* secrets.resolve(value);
         if (secret === undefined) return yield* rejected("account secret is unavailable");
@@ -228,7 +233,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       Object.assign(variables, homed);
     }
     const base = buildBaseEnvironment({ parent: configuration.environment, accountVariables: variables,
-      shepherdSocket: configuration.socketPath, shepherdToken: Redacted.value(input.token) });
+      shephrdSocket: configuration.socketPath, shephrdToken: Redacted.value(input.token) });
     const environment = yield* mergeProviderInstanceEnvironment(Object.entries(variables).map(([name, value]) => ({ name, value, sensitive: input.account.environment?.[name]?.startsWith("secret:") ?? false })), base).pipe(
       Effect.provideService(HomeDirectory, configuration.environment.HOME ?? input.folder),
     );
@@ -244,6 +249,17 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         Scope.provide(scope), Effect.mapError(() => rejected("adapter spawn failed")),
       );
       yield* Scope.addFinalizer(scope, Effect.sync(() => { try { process.kill(-Number(child.pid), "SIGKILL"); } catch { /* gone */ } }));
+      // Persist before speaking ACP: a killed service must leave enough
+      // identity for both the orphan sweep and owner-upgrade ancestry guard.
+      if (Option.isSome(processDatabase) && process.platform === "linux") {
+        const facts = linuxProcessReader.facts(Number(child.pid));
+        if (facts === undefined) return yield* rejected("adapter process identity unavailable");
+        const sql = processDatabase.value;
+        yield* sql`INSERT INTO processes (agent_id, group_id, boot_id, start_time, user_id, executable)
+          VALUES (${input.agentId}, ${Number(child.pid)}, ${linuxProcessReader.bootId()}, ${facts.startTime}, ${facts.userId}, ${facts.executable})`.pipe(
+          Effect.mapError(() => rejected("adapter process identity could not be recorded")),
+        );
+      }
       const checkChildFolder = Effect.gen(function* () {
         yield* folderForSpawn(input.grant, session === undefined ? "start" : "reload").pipe(Effect.mapError(() => rejected("folder grant is no longer valid")));
         if (process.platform !== "linux") return;
@@ -276,10 +292,11 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         }))),
       ) });
       const context = yield* Layer.build(layerChildProcess(transportHandle, {
-        logIncoming: true, logOutgoing: false,
-        // Protocol logging is observed only to emit this fixed diagnostic;
-        // the logger never forwards frame payloads, methods or request ids.
-        logger: (event) => event.stage === "decode_failed" ? Effect.logWarning("adapter frame dropped: malformed") : Effect.void,
+        logIncoming: true, logOutgoing: configuration.protocolLog === true,
+        // Outside gated protocol test mode this callback emits only the
+        // fixed diagnostic, without frame payloads, methods or request ids.
+        logger: (event) => event.stage === "decode_failed" ? Effect.logWarning("adapter frame dropped: malformed")
+          : configuration.protocolLog === true ? Effect.logInfo(event.payload) : Effect.void,
         onIncomingRequest: (_id, method) => method === "session/request_permission" ? Effect.void : Effect.logWarning("adapter request refused: unsupported"),
         onOutgoingResponse: (id) => Effect.gen(function* () {
           const delivered = entry?.responses.get(id);
@@ -399,11 +416,11 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           toolCallId: tool.toolCallId, description, options: mapped, settingsWrite: settingsWrite((tool.locations ?? []).map((location) => location.path), folder, environment.CLAUDE_CONFIG_DIR) });
         return { outcome: yield* Deferred.await(hold.answer) };
       }));
-      const initialized = yield* client.agent.initialize({ protocolVersion: 2, clientInfo: { name: "shepherd", version: "0.0.1" }, clientCapabilities: {} }).pipe(Effect.mapError(() => rejected("adapter initialization failed")));
+      const initialized = yield* client.agent.initialize({ protocolVersion: 2, clientInfo: { name: "shephrd", version: "0.0.1" }, clientCapabilities: {} }).pipe(Effect.mapError(() => rejected("adapter initialization failed")));
       processEntry.version = initialized.protocolVersion;
       if (initialized.agentCapabilities !== undefined) processEntry.capabilities = initialized.agentCapabilities;
-      const mcpServers = [{ type: "stdio" as const, name: "shepherd", command: process.execPath, args: [fileURLToPath(new URL("../../../cli/src/bin.ts", import.meta.url)), "mcp"],
-        env: [{ name: "SHEPHERD_SOCKET", value: configuration.socketPath }, { name: "SHEPHERD_TOKEN", value: Redacted.value(input.token) }] }];
+      const mcpServers = [{ type: "stdio" as const, name: "shephrd", command: process.execPath, args: [fileURLToPath(new URL("../../../cli/src/bin.ts", import.meta.url)), "mcp"],
+        env: [{ name: "SHEPHRD_SOCKET", value: configuration.socketPath }, { name: "SHEPHRD_TOKEN", value: Redacted.value(input.token) }] }];
       // Row 66 and issue 93: reload only through a method this peer
       // advertised at initialize, `session/load` first, else `session/resume`.
       const loads = processEntry.capabilities?.loadSession === true;

@@ -1,6 +1,6 @@
-# Shepherd: problems found
+# Shephrd: problems found
 
-A running list of problems found while building or using Shepherd. Add a
+A running list of problems found while building or using Shephrd. Add a
 problem here in the same change that finds it, even if it is not fixed yet.
 Never delete an entry; mark it fixed and say where.
 
@@ -109,19 +109,19 @@ Node.js built-in modules to type-check.
 ## 7. A symbolic link to the launcher runs from the wrong folder
 
 Found: 2026-11-01, in the unit 1 review.
-State: fixed in unit 2: `bin/shepherd` follows links, and
+State: fixed in unit 2: `bin/shephrd` follows links, and
 `launcher-links.test.ts` covers it. Commit: 87e2d4c. The first fix used
 `readlink` from `PATH`; issue 20 replaced that.
 
-What happened: `bin/shepherd` found its checkout with `dirname "$0"` and does
+What happened: `bin/shephrd` found its checkout with `dirname "$0"` and does
 not follow a symbolic link to the file itself. A link such as
-`~/.local/bin/shepherd -> <repo>/bin/shepherd` makes it look for
+`~/.local/bin/shephrd -> <repo>/bin/shephrd` makes it look for
 `bin/stub-entry.ts` next to the link, and Node.js exits 1 with
 `Cannot find module`.
 What should happen: the launcher resolves its own path through any links,
 or prints a clear message when the entry file is missing.
 Why it matters: a link on the path is a likely way for the owner to run
-`shepherd` from any terminal.
+`shephrd` from any terminal.
 
 ## 8. The launcher looks up `dirname` on the path
 
@@ -131,7 +131,7 @@ Commit: 87e2d4c. The first fix still ran `readlink` from `PATH` before the
 chosen Node.js, which the focused review found; issue 20 fixed that, so now
 only shell builtins and the chosen Node.js run.
 
-What happened: `bin/shepherd` ran `dirname` from `PATH`. Decision 22 allows
+What happened: `bin/shephrd` ran `dirname` from `PATH`. Decision 22 allows
 a path lookup only for `node`.
 What should happen: the launcher uses shell parameter expansion, so
 `node` is the only program found through `PATH`.
@@ -168,7 +168,7 @@ What happened: `pnpm-workspace.yaml` aliased `typescript` to the pre-release
 `@tsc-rs/typescript` 0.8.0 with no comment. It matches the T3 Code
 reference, which plan check PB-A6 requires, but nothing in this repository
 said so. `vitest.config.ts` also set `VP_REMOTE_CACHE` and
-`VP_REMOTE_CACHE_URL`, which only the vite-plus tool reads; Shepherd runs
+`VP_REMOTE_CACHE_URL`, which only the vite-plus tool reads; Shephrd runs
 plain Vitest.
 What should happen: one comment names T3 Code as the reason for the alias,
 and the two cache variables are removed or credited to T3 Code.
@@ -182,12 +182,12 @@ State: fixed in `herdr-plugin.toml`; the owner re-runs the link.
 
 What happened: `herdr plugin link` stopped with "TOML parse error at line 10,
 [[actions]]: missing field `title`". The `serve` action had `name = "Start
-Shepherd"`, but Herdr names an action's label `title`, as the Synapse
+Shephrd"`, but Herdr names an action's label `title`, as the Synapse
 manifest does. Neither the plan's task 1f nor the unit 1 manifest test named
 the field, so the test passed.
 What should happen: each `[[actions]]` entry has `id`, `title`, `contexts`
 and `command`.
-Why it matters: Herdr cannot load Shepherd at all until the manifest parses.
+Why it matters: Herdr cannot load Shephrd at all until the manifest parses.
 
 ## 12. The copied SQLite client needed changes for Node.js 26 types
 
@@ -206,7 +206,7 @@ Why it matters: an unrecorded edit would be lost on the next copy.
 ## 13. Some copied ACP logging calls are on even when protocol logging is off
 
 Found: 2026-11-01, in the unit 2 security read.
-State: open; belongs to the unit that builds the service logger.
+State: fixed in unit 7a.
 
 What happens: decision 57 says the copied ACP protocol debug logging stays off
 outside tests. That is true of `logProtocol` in `effect-acp/src/protocol.ts`
@@ -216,8 +216,8 @@ other calls are not gated: `protocol.ts` lines 503 and 599, and
 an encoding failure, which can include a value the handler held. Line 547 logs
 only structural diagnostics.
 What should happen: the service's logger passes through the redactor before
-Shepherd registers any extension handler, and a test greps its output for
-planted secrets, as decision 57 requires. Shepherd never sets `logIncoming`,
+Shephrd registers any extension handler, and a test greps its output for
+planted secrets, as decision 57 requires. Shephrd never sets `logIncoming`,
 `logOutgoing` or `logger` outside tests.
 Rule for the units that run ACP (6a, 6d and 7a): install the redacting service
 logger before constructing any ACP runner or handler. Keep wire logging off,
@@ -225,7 +225,16 @@ except behind the temporary-home test gate of decision 74. Test planted secrets
 through four paths: the core path, notification handlers, extension-handler
 defects, and encoding failures.
 Why it matters: until then, a handler defect could write a secret to the log.
-No Shepherd code registers a handler yet, so nothing leaks today.
+No Shephrd code registers a handler yet, so nothing leaks today.
+
+What changed in unit 7a: the service installs the redacting logger before
+building the runner or handler. The registry includes the owner credential,
+the removed inherited service token, inherited provider credentials, stored
+account secrets, and all stored agent and device credential hashes. Protocol
+payload logging is enabled only by its exact test flag after the real
+temporary-folder check. Malformed adapter frames still produce a fixed
+diagnostic.
+
 
 ## 14. Copied environment helpers default to the whole process environment
 
@@ -235,8 +244,8 @@ State: open; belongs to the unit that starts harness processes.
 What happens: `mergeProviderInstanceEnvironment` (`instanceEnvironment.ts`) and
 `makeClaudeEnvironment` (`ClaudeHome.ts`) use `process.env` when the caller
 passes no base environment.
-What should happen: Shepherd always passes an explicit base environment, so an
-agent gets exactly `SHEPHERD_SOCKET` and `SHEPHERD_TOKEN` and what the harness
+What should happen: Shephrd always passes an explicit base environment, so an
+agent gets exactly `SHEPHRD_SOCKET` and `SHEPHRD_TOKEN` and what the harness
 needs, as decision 57 says.
 Why it matters: a call without the argument would hand every variable of the
 service to a harness process.
@@ -252,17 +261,17 @@ mode.
 What should happen: tests pass only made-up values to it.
 Why it matters: a real token passed to it would sit in a temporary folder.
 
-## 16. The ACP schema generator cannot finish in Shepherd
+## 16. The ACP schema generator cannot finish in Shephrd
 
 Found: 2026-11-01, in the unit 2 security read.
 State: open; low priority.
 
 What happens: `effect-acp/scripts/generate.ts` downloads schema files from
 GitHub and ends by running `pnpm exec vp fmt`. The `vp` program belongs to the
-vite-plus tool, which Shepherd does not install, so the last step fails after
+vite-plus tool, which Shephrd does not install, so the last step fails after
 the files are written.
-What should happen: if Shepherd regenerates the schemas, the formatting step is
-replaced by a Shepherd tool, and the change is recorded in the README table.
+What should happen: if Shephrd regenerates the schemas, the formatting step is
+replaced by a Shephrd tool, and the change is recorded in the README table.
 Why it matters: someone running `generate` gets a confusing failure.
 
 ## 17. T3 Code has no unit test for the replay helpers
@@ -271,8 +280,8 @@ Found: 2026-11-01, in unit 2.
 State: fixed; recorded in `third_party/t3code/README.md`.
 
 What happened: criterion 2.4 needs a test named `replayTranscript.test.ts`, but
-T3 Code has none for `provider-testing`. A test was written for Shepherd, with
-a fixture, and the README table marks both as written for Shepherd.
+T3 Code has none for `provider-testing`. A test was written for Shephrd, with
+a fixture, and the README table marks both as written for Shephrd.
 What should happen: nothing further.
 Why it matters: the copied helpers would otherwise have no test at all.
 
@@ -285,10 +294,10 @@ What happened: after a frozen install, `import.meta.resolve` failed with
 `ERR_MODULE_NOT_FOUND` from `packages/engine` and `packages/testing` for the
 copied packages. Decision rows 23 and 71 require these edges before the
 manifests freeze.
-What should happen: `engine` depends on `@shepherd/t3-effect-acp`,
-`@shepherd/t3-node-sqlite` and `@shepherd/t3-provider-instance`. `testing`
-depends on `@shepherd/t3-effect-acp` and `@shepherd/t3-provider-testing`, all as
-`workspace:*`. Nothing depends on `@shepherd/t3-source-control`, which has no
+What should happen: `engine` depends on `@shephrd/t3-effect-acp`,
+`@shephrd/t3-node-sqlite` and `@shephrd/t3-provider-instance`. `testing`
+depends on `@shephrd/t3-effect-acp` and `@shephrd/t3-provider-testing`, all as
+`workspace:*`. Nothing depends on `@shephrd/t3-source-control`, which has no
 planned consumer. `testing` does not depend on the provider-instance copy,
 because unit 8a's fake agent only needs the protocol library and the replay
 helpers; unit 8a's harness defaults and environment builder live in `engine`.
@@ -621,8 +630,10 @@ Found: 2026-11-01, by the manager, in the owner-run re-record at 0318c78.
 State: open.
 
 What happens: `scrubText` replaces every value of the parent environment that
-is eight or more characters long. Under pnpm, `npm_package_name` is
-`shepherd`, so ordinary text such as a source note naming
+is eight or more characters long. Under pnpm, `npm_package_name` was
+`shepherd` when this was found (the product is now called Shephrd, whose
+seven-letter package name is below the limit, but the same over-scrubbing
+applies to any longer value), so ordinary text such as a source note naming
 `shepherd-engine` becomes `<redacted>-engine`. The re-recorded
 `errors/cursor-out-of-usage.json` was over-scrubbed this way, so the earlier
 committed copy was kept.
@@ -660,13 +671,13 @@ usage again, the owner re-records it so a real greeting exists. Unit 6a's
 mapping of this harness's out-of-usage reply should use this transcript
 together with `errors/cursor-out-of-usage.json`.
 Why it matters: the adapter reports running out of usage as ordinary agent
-text with a normal stop reason, so Shepherd cannot tell it from a reply by the
+text with a normal stop reason, so Shephrd cannot tell it from a reply by the
 stop reason alone.
 
 ## 39. The read-only connection exists only when the SQLite layer turns on its reader workers
 
 Found: 2026-11-01, while writing the unit 4b tests.
-State: open.
+State: fixed in unit 7a.
 
 What happens: `SqliteClient.readOnly` in the copied client
 (`third_party/t3code/node-sqlite/src/nodeSqliteClient.ts`, `route`, line 1105)
@@ -679,6 +690,11 @@ Why it matters: without the reader workers, a `subscribe` catch-up waits
 behind every open write transaction, and a long catch-up holds up the writer.
 The unit 4b test `packages/engine/test/log/subscribe-gapless.test.ts` turns the
 reader workers on itself, so it cannot see this setting in the service.
+
+What changed in unit 7a: the service enables write-ahead logging before
+opening the Effect SQLite layer and builds that layer with `readerWorker:
+true`.
+
 
 ## 40. The `events.caller` column comment does not match what the log stores
 
@@ -699,7 +715,7 @@ The fix: the migration comment names the stored keys, and `subscribe` decodes
 ## 41. A subscriber that stops reading keeps every later event in memory
 
 Found: 2026-11-01, in the focused review of unit 4b at eb6308b.
-State: open for unit 7a.
+State: fixed in unit 7a.
 
 What happens: `PubSub.unbounded` in `packages/engine/src/log/EventLog.ts`
 keeps publishing committed events while a subscriber is open. If the consumer
@@ -709,6 +725,13 @@ What should happen: unit 7a owns a bound or a disconnect rule for a slow
 client. T3 Code's `apps/server/src/orchestration-v2/LiveStreamBudget.ts`,
 line 333, is a pattern for budgeting the buffered live events during replay.
 Why it matters: one stalled client must not exhaust the engine's memory.
+
+What changed in unit 7a: the transport disconnects a connection whose
+subscription backlog reaches 2,048 events, checked every ten milliseconds. It
+also disconnects a stream whose chunk remains unacknowledged for five seconds,
+including a stalled replay on a quiet log. The transport never drops an event
+to keep a connection alive.
+
 
 ## 42. Invalid subscription cursors could silently skip catch-up
 
@@ -1204,7 +1227,7 @@ Found: 2026-11-01, while building unit 5d.
 State: open for the contracts scope and unit 7.
 
 What happens: `WaitOpened` requires the waiter's agent identifier, and `Delivery.target` must be an agent. The engine therefore refuses a `wait` from the owner with "command refused".
-Why it matters: decision row 26 gives the owner's terminal `shepherd wait --block`. `AGENTS.md` rule 5 requires that what the owner can do from the terminal is also possible through the API.
+Why it matters: decision row 26 gives the owner's terminal `shephrd wait --block`. `AGENTS.md` rule 5 requires that what the owner can do from the terminal is also possible through the API.
 What should happen: the contracts give a wait an owner waiter, at least for blocking waits, which create no delivery.
 
 ## 76. Engine notices name the owner as their sender
@@ -1219,7 +1242,12 @@ What should happen: the contracts add an engine sender, or the plan states that 
 ## 77. A blocking wait's retry and its cancellation window
 
 Found: 2026-11-01, while building unit 5d.
-State: the cancellation window is fixed in unit 5d's fix round 1. The retry part is open for unit 7a, which owns the transport and its connection handling.
+State: the cancellation window is fixed in unit 5d's fix round 1. The retry
+part is fixed in unit 7b: the client retries a blocking wait with a new request
+identifier after a disconnect. Unit 7a interrupts the
+request scope on disconnection, so the existing handler cancellation finalizer
+runs. A reconnecting client must use a new request identifier for a blocking
+wait.
 
 What happens: a blocking `wait` stores its receipt when the wait opens, so a retry with the same request identifier returns the stored "opened" reply, not the final outcome. Separately, the handler runs the blocking part after the opening commit. An interruption that lands after the commit and before the blocking part starts would leave the wait open.
 Why it matters: a blocking wait creates no delivery and never counts against its caller's settled state, so a left-open wait wakes nobody. It still shows as open until recovery step 6 cancels blocking waits (row 66).
@@ -1920,7 +1948,7 @@ reloaded, or started if it had no session. A second run writes nothing.
 ## 117. The timer and the persistent secret store are not wired into a running service
 
 Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: the timer half is handled by unit 6d. The persistent secret store and the file system services remain open for the unit that assembles the service.
+State: fixed in units 6d and 7a.
 
 What happens: `packages/engine/src/index.ts` exports nothing, so `startAccountTimers` (`accounts/timers.ts`) and the persistent secret store layer (`accounts/SecretStore.ts`) are called only from tests. The `AcpRunner` layer also now needs `FileSystem` and `Path` services for the Codex shadow home.
 What should happen: the assembly starts `startAccountTimers` inside the service scope, provides the persistent `SecretStore` layer over the state folder, and provides the Node file system and path services.
@@ -1930,6 +1958,12 @@ What changed in unit 6d: `Restart.recover` starts `startAccountTimers` at
 restart step 8, inside the scope `recover` runs in. Unit 7a must not start
 the timers a second time. It must still provide the persistent `SecretStore`
 layer and the Node file system and path services.
+
+What changed in unit 7a: the service provides the persistent secret store, the
+Node platform services, and the redactor before constructing the runner and
+the restart layer. It calls `Restart.recover` once and lets recovery start the
+account timers.
+
 
 ## 118. A classified pause drops the provider's error text
 
@@ -2090,7 +2124,7 @@ Why it matters: the agent's queued work stays stuck until the owner notices.
 ## 153. Nothing records process rows, and swept rows are never removed
 
 Found: 2026-11-01, while building unit 6d.
-State: open for the unit that records adapter processes.
+State: fixed in unit 7a.
 
 What happens: `EventLog` can insert `processes` rows through a side row, but
 no production path passes one, so restart step 5 has nothing to sweep
@@ -2100,6 +2134,13 @@ What should happen: the runner records each adapter's process identity when
 it spawns, and recovery removes or marks the rows it has handled.
 Why it matters: leftover adapters from a crash keep running after a restart,
 and old rows grow without bound.
+
+What changed in unit 7a: the runner records each Linux adapter group, boot
+identifier, start time, user identifier, and executable immediately after
+spawning. The service removes records of dead or replaced identities after
+recovery has swept them. Live identities remain available to the ancestry
+guard. The unsupported macOS reader remains issue 120.
+
 
 ## 154. The replay scan waits a fixed number of yields for the handler
 
@@ -2138,7 +2179,7 @@ Why it matters: a check that fails at random hides real failures and costs a re-
 ## 159. A second recovery on one service could repeat the token revocation and the interrupt
 
 Found: 2026-11-01, in unit 6d's focused review (finding 4) and attack pass (B3), confirmed by the verifier as a library defect not reachable at `9b5853c`.
-State: fixed in unit 6d fix round 1 (`recovery/service.ts`, `recovery/restart.ts`).
+State: fixed in unit 6d fix round 1 (`recovery/service.ts`, `recovery/restart.ts`) and completed in unit 7a (`service.ts`).
 
 What happened: `Restart.recover` set its completed flag only after step 10.
 A run that failed or was interrupted before then could be started again on
@@ -2153,3 +2194,851 @@ failure is fatal to the service, and that unit 7a must start a fresh engine,
 whose new service runs recovery over the same log.
 Why it matters: a repeated step 4 and step 6 would revoke the tokens of
 agents the first run had just reloaded, and interrupt them again.
+
+What changed in unit 7a: a failed recovery exits the service with a nonzero
+status and closes its listener. The service never retries recovery in place.
+
+## 160. The fake agent's Shephrd command step does not speak the engine's protocol
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: fixed in unit 7b: the step uses the real `@shephrd/client`.
+
+What happens: the `shephrd_command` step in `packages/testing/src/fakeAgent.ts`
+opens a WebSocket to `SHEPHRD_SOCKET` and sends `{ command, input }` as JSON.
+That is not an Effect RPC request, and the step reports
+`shephrd_command:ok` on any reply at all, an error reply included.
+What should happen: the step sends a real RPC request through unit 7b's
+client and reports the reply's outcome.
+Why it matters: a test that trusts `shephrd_command:ok` would pass while the
+command failed. Unit 7a's tests do not use the step: criterion 7.10 reads
+the reloaded agent's token from the fake agent's echo file and calls through
+the test-only client in `packages/engine/test/support/socketClient.ts`.
+
+## 161. Row 64 does not say what an upgrade without an ancestor chain means
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open for the lead; the unit 7a tests take the reading below.
+
+What happens: row 64 says the client sends its ancestor chain and process
+group on upgrade, and the engine refuses the owner credential when one of
+them matches a recorded adapter process. It does not say what happens when
+the chain or the group is missing or malformed.
+What should happen (the tests' reading): the engine refuses the owner
+credential with HTTP 403 when either header is missing or malformed, so a
+caller cannot skip the check by leaving the headers out. Agent tokens and
+device credentials do not need the headers.
+Why it matters: reading a missing chain as "outside every adapter" would make
+the check optional for any caller.
+
+## 162. The ancestry check rests on the caller's own claim
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open; a limit of row 64's design, recorded for the attack pass.
+
+What happens: Node.js does not expose a Unix socket peer's process id (row
+48), so the engine cannot read the caller's ancestors itself. It checks the
+chain the client sends. A process inside an adapter's tree that can read
+`owner-credential` can also send a chain that leaves the adapter out.
+What should happen: the check stays as row 64 describes, as a guard against
+an agent's shell acting as the owner by accident. The owner credential file
+also needs the deny-read rule wherever the harness has one (row 61).
+Why it matters: row 64 does not stop a hostile agent on a harness without a
+deny-read mechanism.
+
+## 163. Issue 41's bound for a stalled subscriber has no number
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open for unit 7a's builder; the test sets an upper limit.
+
+What happens: issue 41 asks unit 7a for a bound or a disconnect rule, but no
+row names the size. A subscriber that stops acknowledging Effect RPC stream
+chunks stops the server's stream for it, and the committed events then
+queue in its `PubSub` subscription.
+What should happen (the tests' reading): the server ends the stalled
+subscription, or closes its connection, before 10,000 unacknowledged events
+of about one kilobyte each. Dropping events is not allowed, because
+`subscribe` is gapless; the client subscribes again from its last sequence.
+Why it matters: one stalled client must not hold the engine's memory.
+
+## 164. An agent's subscribe never shows its own refusals or the deliveries queued to it
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: open for the lead; criterion 7.3 is followed as written.
+
+What happens: criterion 7.3 makes every agent-less event owner-only. Two
+event types concern an agent without carrying a top-level `agentId`:
+`CommandRefused` (no agent field) and `DeliveryQueued` (its agent is
+`delivery.target`). The log stores no `agent_id` for them, so an agent's
+`subscribe` never returns them, even for its own command or its own queue.
+What should happen: either the criterion stays, or those events gain an
+`agentId` (a contracts change) so they can be shown to the agent concerned.
+Why it matters: an agent following its own thread cannot see that its
+command was refused, or that a message is waiting for it.
+
+## 165. Nothing gives the server the live adapters' process identities
+
+Found: 2026-11-01, while writing the unit 7a tests.
+State: fixed in unit 7a.
+
+What happens: row 64's check needs the process id, start time and group of
+every live adapter. `Runner.start` and `Runner.load` return a `SessionInfo`
+without any process identity, `SessionOpened.process` is never written, and
+no production path inserts a `processes` row (issue 153).
+What should happen: the runner reports each adapter's identity when it
+spawns (Linux: `/proc/<pid>/stat` field 22 for the start time, as
+`recovery/orphans.ts` reads it), the engine records it as a `processes` row,
+and the server checks the chain against the rows whose process is still the
+recorded one.
+Why it matters: without it, criterion 7.9's engine half and issue 153's
+sweep have nothing to compare against.
+
+What changed in unit 7a: adapter spawns record their process identity in the
+operational table before speaking the Agent Client Protocol. The upgrade guard
+verifies that each row still matches a live process before comparing the
+caller's claimed ancestry and group.
+
+
+## 166. Frozen service fixtures did not reach the behaviours they asserted
+
+Found: 2026-11-01, while building unit 7a against its frozen tests.
+State: fixed in unit 7a, with the lead's approval for all three edited test files.
+
+What happened: the service test helper passed a plain string to the remote
+procedure call client for `accounts set-secret`. Effect validates the decoded
+payload before encoding it, and the contract requires a `Redacted` value. The
+request never left the client. The restart fixture also waited for an accepted
+delivery while its fake agent only slept. A running-state notice is neither
+content nor a successful prompt reply, so it cannot accept a delivery under
+decision row 51.
+What changed: with the lead's approval at board posts 1081 and 1084, the
+helper wraps the secret in `Redacted.make` with the contract's label, and the
+restart fixture sends an existing empty-plan step before sleeping. The plan is
+content, and the existing handler accepts the delivery. The service-log
+fixture also sent a malformed wire frame before its permission and
+terminal-error probes, although the copied protocol intentionally terminates
+that adapter connection on malformed input. With approval at posts 1086 and
+1088, that probe now runs through a second fake agent in the same service
+after the first flow. Its original token is passed as a stored secret to the
+second agent, so the malformed path still exercises it. The first flow waits
+for either a returned delivery or a turn end, because a prompt error writes a
+returned delivery and idle without a later turn end. Every existing assertion
+and timeout is unchanged.
+Why it matters: a builder must not weaken production validation or reinterpret
+an acknowledgement just to pass a fixture that cannot reach its own expected
+state.
+
+## 167. An open WebSocket could hold service shutdown open
+
+Found: 2026-11-01, while checking unit 7a with an established owner connection.
+State: fixed in unit 7a.
+
+What happened: the first service assembly let the HTTP server wait for
+upgraded connections while the client-waiting WebSocket server finalizer ran
+before the request scopes closed. A real authenticated connection held
+shutdown past a three-second probe deadline. Closing the client then released
+the service.
+What changed: the listener tracks accepted sockets and disconnects them before
+closing its request scope and its separate server scope. The service
+explicitly closes the listener while the handler, runner, and database remain
+available, so disconnection finalizers can still cancel blocking waits. The
+same probe completed with exit code zero in 31 milliseconds after the change.
+Why it matters: a detached service must shut down and release its lifetime
+lock even while an owner or agent client remains connected.
+
+## 168. Read requests trusted an upgrade credential after its revocation
+
+Found: 2026-11-01, in the unit 7a attack pass and independent verification of
+commit 2b33da2, confirmed by the lead for fix round 1.
+State: fixed in unit 7a fix round 1.
+
+What happened: `subscribe` and `debug.compare-views` did not authenticate again
+when a new request began. A revoked connection could serve new reads before
+the event watcher or periodic check closed it. The debug handler also treated
+any credential without an agent identifier as the owner, admitting a paired
+device despite criterion 7.12.
+What changed: both handlers authenticate the original credential before
+starting a read. An invalid credential fails with a fixed command error and
+completes the connection's invalidation signal. Only an owner credential may
+call the debug handler. The existing event watcher and 100 millisecond poll
+still close revoked connections, including idle ones.
+Follow-up rule: any later device-revocation command must write `DeviceRevoked`
+in the same batch as `revokeDevices`, so the event-driven invalidation closes
+the connection without waiting for the poll.
+Why it matters: a connection's earlier authentication must not authorize a
+new read after its credential is revoked.
+
+## 169. Request diagnostics and startup cleanup were incomplete
+
+Found: 2026-11-01, in the focused review of unit 7a at 2b33da2.
+State: fixed in unit 7a fix round 1.
+
+What happened: an application defect returned a fixed HTTP 500 without a log
+line. A detached launcher's 30-second deadline returned an error but left its
+child running. An overlong socket path was checked after creating the state
+folder. The server's source credit omitted one referenced line range.
+What changed: the application logs `request failed: defect` through the
+redacting logger before returning the fixed response, without cause text.
+The service log sink preserves that fixed category. The launcher kills only
+its own still-running detached child process group before reporting its
+deadline failure. The socket-path byte limit is checked before inspecting or
+creating the state folder. The server credits T3 Code `apps/server/src/ws.ts`
+lines 3374-3385 alongside the other referenced ranges.
+Why it matters: a failed request needs a safe diagnostic, and failed startup
+must leave neither a running child nor an unwanted state folder.
+
+## 170. A healthy long catch-up may reach the subscription backlog bound
+
+Found: 2026-11-01, in the focused review of unit 7a at 2b33da2.
+State: fixed in unit 7b for the client: a subscription resumes after the last
+event received. The server's bound is accepted by the lead.
+
+What happens: the live subscription collects events while the client reads
+catch-up. A healthy but long catch-up can reach issue 41's 2,048-event backlog
+bound and close the connection. The server does not drop events.
+What should happen: when the server closes catch-up, the client reconnects
+and subscribes from its last received cursor. The same rule handles a slow
+subscriber reconnecting after a budget disconnect.
+Why it matters: cursor-based resumption preserves every event across a
+disconnect that enforces the server's memory bound.
+
+## 171. Another socket responder can make the launcher report already running
+
+Found: 2026-11-01, in the unit 7a attack pass at 2b33da2.
+State: open usability note for the owner; no code change is required.
+
+What happens: another program of the same user can answer at `engine.sock`
+without holding the engine lock. The launcher then reports `already running`.
+The lead disproved this as a specification break: criterion 7.4, task 7a.3,
+and decision row 71 require detection by connecting, and the frozen launcher
+test explicitly accepts a responder without a lock. That user already holds
+the owner's authority.
+What should happen: retain the specified connection probe. If the wording
+confuses an owner diagnosing a conflicting program, consider clearer text in
+a later usability change.
+Why it matters: an answering socket proves that something is listening, but
+the launcher's message can misidentify that program as the engine.
+
+## 174. The socket ancestor rule also rejects the required temporary folder
+
+Found: 2026-11-01, while writing unit 7b's client identity tests.
+State: clarified for unit 7b by engine-lead, board answer 1105.
+
+What happens: decision row 64 rejects every socket ancestor that is writable
+by a group or other users. The same plan requires test sockets under `/tmp`,
+which is normally root-owned with mode 01777. Applying the rule literally
+would reject every required test socket.
+What should happen: the lead amended the reading of row 64. A root-owned
+ancestor with the sticky bit may be writable by a group or other users.
+Every other ancestor must be owned by the current user or root, and must
+not be writable by a group or other users. The socket's own folder remains
+owned by the current user with mode 0700, and the socket must be owned by
+the current user. A non-sticky 0777 ancestor and a foreign-owned sticky
+ancestor must both be refused before a credential is sent.
+Why it matters: this preserves the intended socket trust check while allowing
+private test folders beneath the operating system's temporary folder.
+
+The lead also approved an injectable filesystem and user-id seam for the
+ownership branches that an unprivileged test cannot construct. Real socket
+listeners still observe whether an upgrade was attempted. At least one
+identity test uses the real filesystem without that seam.
+
+## 175. The older fake-agent command test names a command that does not exist
+
+Found: 2026-11-01, while checking the sibling tests for unit 7b.
+State: fixed in unit 7b: the fixture now calls `ask`.
+
+What happens: the test beginning at `packages/testing/test/fake-agent.test.ts:635`
+asks the `shephrd_command` step to call `post`, which is absent from the
+contracts' remote procedure call group. It checks the upgrade's bearer
+header, and accepts either an `ok` or a `failed` report. It cannot prove
+that a real command succeeded, or that an error reply was reported as a
+failure. A client that validates the command before connecting would also
+fail its upgrade-count assertion for the correct reason.
+What should happen: retain its credential and output checks, but use an
+actual command and its payload, such as `ask`. Unit 7b's new tests separately
+require a successful question and a refused owner-only command through the
+real service. The existing test has been left unchanged for the lead to
+assign with the builder's change to the scripted step.
+Why it matters: the older assertion must not force the fake agent to retain
+the invalid wire protocol described in issue 160.
+
+## 176. A blocking wait reports success when it needs its caller to answer
+
+Found: 2026-11-01, while applying engine-lead's ruling in board post 1120.
+State: fixed in unit 7b fix round 1 (`reportWait` returns 2 for `request-held`).
+
+What happened: `packages/cli/src/commands/wait.ts` returned exit code 0 for a
+`request-held` reply. All four W02 cases previously expected that code.
+What should happen: decision row 26 requires exit code 2 when a permission
+request or question is held by or routed to the caller of a blocking wait.
+The W02 cases now require 2 for both subjects, whether already held or routed
+after the wait opens. They retain the held-request message and the
+`WaitCancelled` reason `request held` assertions.
+Why it matters: exit code 0 tells a caller that every member has settled,
+although a member still needs the caller's answer.
+
+## 177. Closing the MCP input can report an error after a successful tool call
+
+Found: 2026-11-01, while writing the unit 7b fix-round tests against commit
+`220efe3`, with uncommitted test helpers.
+State: open shutdown usability note. This does not block the assigned fixes.
+
+What happened: a test host ran the real `runMcp`, initialized the protocol,
+listed the tools, and completed an `ask` against a fake socket peer. After
+the parent closed standard input, `runMcp` returned exit code 1. The host
+stayed alive to inspect the server layer's resource cleanup. The observed
+return code was independent of the leaked connection asserted by X22.
+What should happen: investigate whether the normal end of standard input
+races the protocol layer's termination in `runMcp`. An orderly shutdown
+should not report an error solely because the input ended.
+Why it matters: a caller can see a failed server shutdown after its tools
+completed successfully. X22 deliberately checks resource cleanup without
+requiring a particular shutdown return code, because that behavior is
+outside this fix round's assigned rulings.
+
+## 178. The ancestry checks do not explicitly refuse unsupported platforms
+
+Found: 2026-11-01, while writing T-7 after engine-lead's board request 1132.
+State: open for the unit 7b builder's fix round under the Linux-only ruling.
+
+What happens: the client's `ancestryHeaders` and the engine's
+`outsideAdapters` have no platform argument. Tests against their intended
+last-argument interface pass `darwin`, but the unchanged functions ignore
+it. On the Linux test host, the client reads Linux ancestry and upgrades,
+and the engine grants an outside-adapter identity when the process table
+is empty.
+What should happen: version 1 is Linux only, as ruled by the owner and
+relayed in request 1132. Both functions take a final platform argument that
+defaults to `process.platform`. On `darwin`, the client refuses before an
+upgrade with `the process ancestry check runs on Linux only in this version`,
+and the engine returns false. X71 exercises both the reader and the public
+client connection; X72 uses a real migrated database and a Linux control.
+Why it matters: an unsupported platform must fail closed instead of
+implicitly accepting an ancestry check intended for another platform.
+
+## 179. The frozen wait test "already held" races the owner moving the question
+
+Found: 2026-11-01, while building unit 7b's command-line tool.
+State: fixed by keeping the W02 caller inside an accepted, open turn.
+
+What happens: in `packages/cli/test/wait-exit-codes.test.ts`, the two W02
+"already held" cases (permission and question) fail intermittently, and
+mostly fail. The parent agent holds a question or permission request, and the
+test then calls a blocking `wait` as that agent. After the parent's turn ends,
+the engine moves the held question to the owner (`QuestionMoved`,
+`OwnerNeeded`). The wait then opens without the "request held" cancellation
+the test expects, and it stays blocked until the connection closes. The
+engine's own test client, which does not use the new command-line tool, times
+out in the same way. In the one passing run, the wait arrived before the move.
+What should happen: the test should make the wait deterministic, for example by
+holding the parent's turn open until the wait has been answered, or the engine
+should state which outcome a wait after the move must have.
+Why it matters: the criterion cannot be observed reliably, and the command-line
+tool's held-request outcome is untested by a stable test.
+
+Fix: the W02 cases start the parent with a long-running scripted turn and wait
+for its `DeliveryAccepted` before routing a request. The parent remains busy
+when the blocking wait opens. Following the lead's ruling in board post 1120,
+the assertions require exit code 2 from decision row 26, the held-request
+message, and `WaitCancelled` with reason `request held`. The remaining product
+exit-code defect is tracked in issue 176.
+
+## 180. The frozen test F02 cannot pass: its own setup emits an account event
+
+Found: 2026-11-01, while building unit 7b's fake-agent client step.
+State: fixed by checking account events after the refused command.
+
+What happens: `packages/testing/test/fake-agent-client-step.test.ts`, case
+F02, records the event sequence before it starts the fake agent. It then
+asserts that no `AccountChanged` event follows. But `startFakeAgent` adds the
+agent's account with `accounts add`, which commits an `AccountChanged` event
+after that mark, so the assertion fails whatever the step does. The refusal
+assertion before it (`CommandRefused` for `accounts`, exactly one) passes.
+What should happen: take the sequence mark after `startFakeAgent` returns, or
+check that no `AccountChanged` names a different account than the agent's own.
+Why it matters: the test cannot show that a refused owner-only command changed
+nothing.
+
+Fix: F02 still requires exactly one `CommandRefused` for `accounts`. It now
+checks that no `AccountChanged` follows that refusal, excluding the account
+created by the setup helper before the agent's prompt.
+
+## 181. Foreground `shephrd serve` is not supported
+
+Found: 2026-11-01, while wiring `serve` in the command-line tool.
+State: open.
+
+What happens: unit 7a starts the service when its module is imported, and only
+`serve --detach` has a launcher. The command-line tool accepts `serve --detach`
+only, and refuses plain `serve` with a usage error.
+What should happen: a foreground `serve` that runs the service in the
+terminal, decided by the lead when the acceptance suite needs it.
+Why it matters: an owner debugging the service must read its log file.
+
+## 182. The socket check and the connection are not one atomic step
+
+Found: 2026-11-01, while building the client's socket checks.
+State: open.
+
+What happens: the client checks every parent folder, the socket's folder and
+the socket, and then opens the connection by path. A process running as the
+same user, or a root process, could replace the socket between the check and
+the connection. Only the state folder's owner can do this, so the engine's
+trust boundary is not crossed, but the check is not a guarantee.
+What should happen: if the platform allows it, check the connected
+descriptor's peer credentials after connecting.
+Why it matters: the check protects the owner credential from a swapped socket.
+
+## 183. Process ancestry for the handshake reads `/proc` and works on Linux only
+
+Found: 2026-11-01, while building the client's ancestry header.
+State: closed by the owner's ruling, unit 7b fix round 1.
+
+What happened: `packages/client/src/ancestry.ts` reads `/proc/<pid>/stat` to
+build `Shephrd-Ancestors`, and the engine's check had a macOS reader that the
+client had no counterpart for.
+Owner ruling, 2026-11-01, verbatim: "yeah linux only for now. shoud be easy
+enought to port to macos". Version 1 is Linux only.
+What was done: the client's `ancestryHeaders` refuses on any platform other
+than Linux, before it reads `/proc`, with "the process ancestry check runs on
+Linux only in this version". The engine's `outsideAdapters` no longer falls
+back to the macOS reader: on a non-Linux platform it returns false, so the
+owner credential is refused. Both take the platform as an argument for tests.
+`recovery/orphans.ts` keeps its macOS reader, which only recovery uses.
+Porting later: add the `ps -o ppid=,lstart=` reader (decision row 64) to both
+halves and lift the two platform checks.
+
+## 184. `shephrd mcp` discards its own logs
+
+Found: 2026-11-01, while building the tool server.
+State: open.
+
+What happens: the tool server's standard output carries the protocol, so the
+server runs with `Logger.layer([])` and writes no log at all. A connection
+failure reaches the agent as a tool error, and nothing is recorded.
+What should happen: write the server's log to a file in the state folder,
+without any credential.
+Why it matters: an owner debugging an agent's failed tool call has no record.
+
+## 185. A symlinked owner credential file is followed
+
+Found: 2026-11-01, by the unit 7b attack pass (B2); the verifier showed no
+break.
+State: open, a hardening note.
+
+What happens: `packages/client/src/identity.ts` reads `owner-credential` with
+`readFileSync`, which follows a symbolic link.
+Why it is not a break: replacing that file needs write access to the private
+state folder, and a process with that access already holds the owner's
+authority, so the link gives it no new data or authority.
+What could be added later: check that the credential is a regular file, owned
+by the user, with mode 0600, before reading it.
+
+## 190. The Herdr plugin manifest still lists macOS as a supported platform
+
+Found: 2026-11-01, during the rename to Shephrd.
+State: fixed in commit 7887d87 (manifest, frozen test, plan task 1f and decisions
+row 78 now say Linux only).
+
+What happens: `herdr-plugin.toml` said `platforms = ["macos", "linux"]`, and
+the frozen test `packages/engine/test/smoke/workspace-manifest.test.ts` (line
+297) asserts exactly that list. Version 1 runs on Linux only (decisions row
+78, issue 183), and the code refuses the owner credential off Linux.
+What should happen: the manifest lists only `linux` until the macOS port
+(feature list, section 4) is done. Changing it needs the test and plan task
+1f changed in the same step, so the rename left it as it was.
+Why it matters: Herdr on a Mac would offer to start a service whose
+ancestry check and leftover sweep do not work there.
+
+## 191. Planning records outside the rename's edit list still say Shepherd
+
+Found: 2026-11-01, during the rename to Shephrd.
+State: fixed in commit 7887d87 (the twelve prose lines now say Shephrd; slugs and
+paths are kept).
+
+What happens: `.plans/epics/shepherd-foundation/epic.md`, `.plans/roadmap.md`
+and the three `.plans/scopes/engine/*/scope.json` files (their `summary` and
+`why` text) still call the product Shepherd, because the rename task did not
+cover them. The plan folder path and the epic names are kept on purpose, so
+links do not break.
+What should happen: the text in those files uses Shephrd; their file paths and
+topic names stay.
+Why it matters: scope summaries are loaded into every worker's instructions,
+so they will keep teaching the old name.
+
+## 192. The fixture scrubber no longer hits the package name, and the old note is stale
+
+Found: 2026-11-01, during the rename to Shephrd.
+State: open.
+
+What happens: issue 37 was found because pnpm's `npm_package_name` was
+`shepherd`, eight characters, and the scrubber removed it. The new package
+name `shephrd` has seven characters, so the scrubber now leaves it alone, and
+the committed `errors/cursor-out-of-usage.json` keeps its source note
+naming the plan folder `shepherd-engine`. The rule in issue 37 (redact only
+values that can hold secrets) is still not built.
+What should happen: issue 37 is fixed on its own terms and does not depend on
+the length of the product's name.
+Why it matters: the next re-record could over-scrub another long, harmless
+variable and the cause would be hidden.
+
+## 193. An error from the fake harness is never classified as signed out or out of usage
+
+Found: 2026-11-02, while writing the acceptance suite (unit 8b).
+State: open.
+
+What happens: `packages/engine/src/runner/classify.ts` decides whether a
+failed turn means "signed out" or "out of usage" from the harness id, and only
+the ids `claude`, `codex`, `cursor` and `gemini` have patterns. An agent on a
+harness with any other id, including the fake harness the tests use, gets the
+same message as a plain error and is never paused. The acceptance scenario for
+account failures therefore registers the fake adapter under the harness id
+`claude`.
+What should happen: either the classification patterns are part of the
+harness definition, so a test harness can carry its own, or the limitation is
+written in the harness documentation.
+Why it matters: a new harness added later is silently never paused when its
+account runs out, and the failure shows only as a crashed turn.
+
+## 194. A sent but unaccepted prompt reaches the agent twice after a restart
+
+Found: 2026-11-02, while writing the acceptance suite (unit 8b).
+State: open. Allowed by the specification ("may be sent twice"), so it is a
+decision to confirm, not a defect.
+
+What happens: when the service is killed after a prompt was sent to an agent
+and before the agent accepted it, recovery requeues the delivery and sends it
+again. The agent's transcript then holds the same prompt twice. The log shows
+one delivery, so a reader of the log sees nothing wrong.
+What should happen: the owner confirms that a double delivery is acceptable,
+or the sent event records enough for the engine to tell the agent that the
+prompt may be a repeat.
+Why it matters: an agent that acts twice on the same instruction can do
+harm, for example by repeating a commit or a message to a third party.
+
+## 195. The acceptance suite leaves some specification clauses to lower-level tests or to nothing
+
+Found: 2026-11-02, by the focused review of unit 8b (finding C1), after fix
+round 1 of that unit.
+State: open. Not a defect in the engine. It is a map of what the acceptance
+suite does not itself check.
+
+What happens: fix round 1 closed the review's findings A1 to A5. The flow now
+follows all eight steps of "One request, start to finish". The disk test
+observes the adapter. The nested wait, the automatic usage reset and the
+overdue reset across a restart are exercised. The secret scan covers every
+service process, every minted token, the accounts list and all replies. Many
+clauses the review's table lists were not turned into acceptance scenarios. The
+table below names, for each one, the lower-level test file that covers it, or
+says "not covered". A file is named only when it exists in
+`packages/engine/test` and its test titles speak about the clause. Its
+assertions were matched by title, not audited line by line.
+
+| Clause not checked by the acceptance suite | Covered at a lower level by |
+|---|---|
+| Protected folder relationships, forbidden home, state and install folders, worktree boundaries | `identity/ceiling.test.ts`, `identity/ceiling-fix-1.test.ts`, `commands/authorization.test.ts` |
+| Adapter-reported mode elevation, extended ceiling with persistent permission options | `runner/mode-ceiling.test.ts`, `runner/hardening.test.ts` |
+| Unrelated inherited environment excluded | `runner/baseEnvironment.test.ts` |
+| Leading slash and whitespace-plus-slash prompts, closing markers, distinct markers per send | `routing/text-is-data.test.ts` |
+| Open permission and question counts, complete paused, interrupted and crashed state sequences | `views/apply.test.ts`; the counts are not covered |
+| Wait settled-state exclusions for an open request or question, held subject, outstanding delivery, compaction | `routing/waits.test.ts` (W01 to W05) |
+| Wait resolution by stop, pause or nonreloadable interruption, held-request early return, member returning to work, crashed-waiter suspension and resume, disconnect cancellation | `routing/waits.test.ts` (W11 to W21) |
+| Exact member-state payload of a wait | not covered |
+| Plan entries of a stream | `runner/stream.test.ts` (6.2) |
+| Split and encoded secrets met by the real redactor | `identity/redactor.test.ts`, `identity/redactor-fix-1.test.ts`, `runner/hardening.test.ts`; the acceptance scan itself is proven only on synthetic text by `acceptance/secret-scan.test.ts` |
+| Parent reading its child's complete thread | not covered |
+| Busy-holder delivery order of a routed permission request, persistent and settings options | `routing/permissions.test.ts`, `routing/permission-boundaries.test.ts` |
+| `resume --fresh`, nonreloadable session refusal and fresh session | `commands/lifecycle.test.ts`, `recovery/restart.test.ts` |
+| Picker distinguishing stopped, crashed and interrupted agents and other harnesses | `accounts/pick.test.ts` (P1 to P3) |
+| Stored secret echoed by the adapter and redacted | `commands/request-id-secrets.test.ts`, `runner/hardening.test.ts` |
+| Crash of a parent without an open wait, stderr truncation to a tail | `routing/waits.test.ts` (W10) and `recovery/crash.test.ts`; truncation is covered by `identity/redactor-fix-1.test.ts` |
+| Nonreloadable agent, failed reload, idle reload with zero prompts, agent caught starting, blocking-wait cancellation, surviving question, paused-account recovery | `recovery/restart.test.ts`, `recovery/restart-regressions.test.ts`, `recovery/restart-accounts.test.ts`, `routing/waits.test.ts` (W20) |
+| Automatic timeout deadline of a moved permission request, withdrawal of the old holder's copy, paused or interrupted holder, no move back down | `routing/move-withdrawal.test.ts`, `routing/moving-requests.test.ts`; a timeout deadline is not covered |
+| Unknown usage reset time alerts the owner, mid-turn carry-on after acceptance | `accounts/pause-and-return.test.ts` (T4, T5), `accounts/carry-on-dispatch.test.ts` |
+| Message to an agent that stays nonreloadably interrupted, ordinary adapter error reply returning the message with redacted error text | `routing/deliveries.test.ts`, `runner/classify-errors.test.ts` |
+| Cleanup before serving, boot, user and executable mismatch controls, bounded record removal | `recovery/orphans.test.ts` (6.8 guards); the order "before serving" is not covered |
+| File-mode protections of the state folder and owner credential | `api/state-folder.test.ts`, `identity/owner-credential.test.ts` |
+
+What should happen: the owner decides whether the acceptance suite must show
+any of the "not covered" rows itself, or whether the lower-level tests are
+enough for the unit's sign-off. A row naming a file is a pointer, not a proof
+that the file checks the whole clause.
+Why it matters: a reader of the acceptance suite's titles could believe that
+every clause of the specification's amendments is checked end to end. Only the
+journeys above are.
+
+## 196. A wait for one delivery was followed by an assertion about two
+
+Found: 2026-11-02, by the test runner (`pnpm check` at 0a58595, under load).
+State: fixed in commit f33000c (test only; no production code changed).
+
+What happens: `failure-6-undeliverable.test.ts` waited for the first
+`DeliveryAccepted` for the boss, then read the boss's echo once and expected
+a "was returned" prompt for each of two queued messages. The two notices are
+separate deliveries, so under load the second had not reached the boss yet and
+the test failed with "the boss was not told that <id> came back". The same
+shape was in `flow-start-to-finish.test.ts`: it waited for the first accepted
+delivery for the lead after a restart and then asserted about one particular
+prompt, which a carry-on delivery could precede.
+What should happen: a wait names the thing the next assertion is about. The
+failure-6 test now waits, bounded, until the boss's echo holds a notice for
+every queued id, and checks that there is exactly one notice per id. The flow
+test waits for the delivery id of its own prompt. A sweep of the other
+acceptance files found no further case: their single-echo reads follow either
+a wait on the delivery id, a wait on the echo itself, or a turn end.
+Why it matters: a test that passes on a quiet machine and fails under load
+hides real failures behind noise. The original failure was not reproduced
+locally in three loaded runs; the cause is read from the code.
+
+## 197. The live check cannot look for agent tokens in the harnesses' own session files
+
+Found: 2026-11-02, while writing `pnpm live-check` (unit 8c).
+State: open.
+
+What happens: the plan's secret check (PB-A4) greps the session files that each
+harness writes under its home for the agent's token. The 8b acceptance suite can
+do this because the fake agent records its own environment. `pnpm live-check`
+cannot: an agent's token is given to the agent when it starts and is never
+visible over the socket, so the script has no token to search for. The live
+check scans the events, replies, the accounts list, the service's output and the
+thread text for the owner credential only.
+What should happen: the owner can grep Claude Code's and Codex's session files
+for the tokens of the run by hand, or a later unit can add a debug command that
+returns a one-way hash of each live token for the scan to compare against.
+Why it matters: a token written to a harness's session file would be readable
+by anything that reads that home. Today only the fake-agent suite proves this
+does not happen.
+
+## 198. The recorder's option and result types are not exported
+
+Found: 2026-11-02, while writing `pnpm live-check` (unit 8c).
+State: open; the check works around it.
+
+What happens: `scripts/recorder.ts` exports `recordFixtures`, `formatReport` and
+`hasRecordingFailures`, but not the types `RecordOptions` and `RecordResult`
+that those functions use. `scripts/live/recording.ts` derives them with
+`Parameters<typeof recordFixtures>[0]` and `Effect.Success<ReturnType<...>>`.
+What should happen: the recorder exports its two types, and the live check uses
+them.
+Why it matters: the derived types break silently if the recorder's signature is
+wrapped or overloaded.
+
+## 199. The startup-hook check keeps its own copy of the socket probe
+
+Found: 2026-11-02, while writing `pnpm live-check` (unit 8c).
+State: open.
+
+What happens: `serve --detach` decides whether a service already runs with an
+HTTP GET on `engine.sock`. That helper (`answers`) is not exported from
+`packages/cli/src/serve.ts`,
+so `scripts/live/startupHook.ts` carries a second copy (`socketAnswers`). The
+two can drift: if the service ever stops answering a plain GET, `serve --detach`
+and the live check would disagree.
+What should happen: `packages/cli/src/serve.ts` exports the probe and the live check imports it.
+Why it matters: the live check's claim that "the service answers" should be the
+same claim that the startup hook relies on.
+
+## 200. The live check can print a credential, and its final scan omits printed lines
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: fixed in f8715ed (unit 8c fix round 1): the printer redacts every line with the run's secret list and the shapes of a credential, an unreadable owner credential now fails the run, and the final scan reads the printed lines.
+
+What happens: the reporter writes an error's message directly to the terminal.
+An injected setup error containing the temporary service's owner credential
+prints the credential in a FAIL line.
+A rejected step containing an Authorization bearer token prints that token.
+The final step scans events, replies, accounts and process output, but it does
+not scan the reporter's lines.
+A credential in a printed model setting can therefore accompany exit code 0.
+
+Evidence: all three tests in
+`packages/engine/test/live-check/printed-secrets.test.ts` fail for these reasons.
+The event, reply and process-output leak cases in `adversarial-flow.test.ts`
+pass, so the missing boundary is the printer.
+What should happen: the reporter redacts credentials before writing any line.
+The runner registers its temporary credential with the redactor as soon as it
+exists, and retains the diagnostic text for the final leak check.
+Why it matters: a failing live check must not expose the credential it was
+supposed to protect, or declare that the secret check passed after a leak.
+
+## 201. A replacement value can leave an unresolved placeholder in a sent prompt
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: fixed in e006f79 (unit 8c fix round 1): `fill` throws when a placeholder remains in the final text.
+
+What happens: `fill` substitutes the original template once, but does not check
+the resulting text for another placeholder.
+For example, a worker model setting of `{{UNRESOLVED_MODEL}}` reaches the lead's
+start request unchanged.
+Evidence: the last two tests in
+`packages/engine/test/live-check/prompt-safety.test.ts` fail because `fill` does
+not throw, and because the start request is sent.
+The tests for all current prompt constants and omitted values pass.
+What should happen: `fill` rejects a result that still contains a placeholder,
+before the driver can send that prompt.
+Why it matters: the owner was promised that unresolved placeholders are errors,
+and are never sent to an agent.
+
+## 202. The live check's total limit returns before the timed-out work has stopped
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: fixed in f8715ed (unit 8c fix round 1): one abort controller covers the startup probe, the journey and the recording; the run awaits all of it, bounded, before cleanup, and prints nothing after the summary; `recorder.ts` gains `runRecording(options, signal)` so the recorder's own process-group cleanup is awaited.
+
+What happens: `main` races the body against a timer, aborts the journey, and
+returns without awaiting the body's completion.
+A delayed owner-connection finalizer is still running when `main` returns.
+The startup-hook probe is outside that journey's cancellation scope.
+If the probe answers after the time limit, the body can start a service after
+the outer cleanup has already finished.
+
+Evidence: the finalizer and delayed startup-hook cases in
+`packages/engine/test/live-check/failure-cleanup.test.ts` fail.
+The finalizer case observes zero closed connections at return, with one open.
+The delayed probe case observes a service start after `main` has returned.
+The middle-step failure and active-journey time-limit cases pass with a real
+temporary service and two fake agents, so ordinary cleanup is exercised too.
+What should happen: cancellation covers the startup check and the journey.
+The runner awaits all cancelled work and its finalizers before the last cleanup
+and return, and prevents any later service start or diagnostic write.
+Why it matters: an exit code must mark the end of the run's work and resource
+ownership, rather than leave a service that no caller can clean up.
+
+## 203. A help flag makes the live check accept an unknown argument
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: fixed in e006f79 (unit 8c fix round 1): every argument is validated before help is chosen.
+
+What happens: `parseArguments` returns help before it validates other arguments.
+Both `--unknown --help` and `--unknown -h` exit 0.
+Evidence: the two combined-argument cases in
+`packages/engine/test/live-check/io-boundaries.test.ts` fail with exit code 0.
+The unknown argument by itself exits nonzero, and the ordinary help and dry run
+perform no home input or output, process start, socket open or signal.
+What should happen: unknown arguments are validated before help is selected.
+Why it matters: the command's promise to reject an unknown argument must hold
+when the caller also asks for help.
+
+## 204. Live-check process discovery and a dry-run test confuse neighboring run folders
+
+Found: 2026-11-02, while testing unit 8c at commit 2d1a7da.
+State: fixed in 0dda3e3 (unit 8c fix round 1): ownership is a whole-path-part match plus descent from the service child with a recorded pid and start time; the dry-run test observes only its own process with a preload instead of comparing the whole of /tmp.
+
+What happens: `processesNaming` uses a substring search over a process's
+environment and command line to decide whether the process belongs to the run.
+A fake agent whose state folder is a sibling named `<run-root>-other-<random>`
+is signalled by the run's cleanup, despite belonging to a different folder.
+Evidence: the sibling-folder case in
+`packages/engine/test/live-check/failure-cleanup.test.ts` fails because the
+sibling's process identifier is in the signalled list.
+Every signalled process in the test was started by that test.
+
+There is also a test race at the same folder-ownership boundary.
+The existing real-entry case in `dry-run.test.ts` compares every
+`/tmp/shephrd-live-*` folder before and after its child runs.
+It fails if a parallel service test creates or removes its own folder during
+that interval, even when the dry run performs no input or output.
+This occurred in the parallel scoped run, and the case passed in isolation.
+The test writer left the existing test unchanged, as its assignment requires.
+
+What should happen: cleanup matches a complete, verified path boundary and a
+process identity owned by the run, rather than a substring in arbitrary text.
+The dry-run test uses injected input and output spies, or an isolated namespace,
+to observe only its own effects.
+The new `io-boundaries.test.ts` supplies those spies.
+Why it matters: cleanup must spare another run, and one run's test must not
+report another run's temporary folders as its own side effects.
+
+## 205. The live check has no test that a reused process number is spared
+
+Found: 2026-11-02, while fixing issue 204 at commit 0dda3e3.
+State: open.
+
+What happens: the live service's stop records each process's pid and start time and checks both again just before each signal, so a pid that the system gave to a stranger after the original exited is not signalled.
+No test makes a pid change owner between the record and the signal, because a test cannot force the system to reuse a pid.
+The path-boundary, descendant, ignored-signal and unconfirmed-stop cases are tested.
+What should happen: the identity check is moved behind a small function that a test can feed a changed start time.
+Why it matters: the one guard against signalling a stranger after pid reuse is read, not run, by the tests.
+
+## 206. The live check's crash handler is not covered by a test
+
+Found: 2026-11-02, while fixing issue 200 at commit f8715ed.
+State: open.
+
+What happens: `scripts/live-check.ts` prints only the kind of an unexpected error, because its message may repeat a credential.
+Importing the file runs `main`, so no test can load the handler without starting a run, and the handler is verified by reading it.
+What should happen: the handler moves into a function in `scripts/live/run.ts` that a test can call with an error holding a credential.
+Why it matters: the last place a credential could reach the terminal is the one place no test looks.
+
+## 207. Active-run cleanup tests race the child process close events
+
+Found: 2026-11-02, while checking unit 8c at commit 1d3dc7b.
+State: fixed in d515cd8.
+
+What happens: the active-run cleanup test immediately expects each fake
+agent's child process `close` event after `main` returns.
+The live service confirms termination through the Linux process state.
+A zombie process has stopped executing, but Node.js can deliver its `close`
+event after the cleanup promise resolves.
+This makes the owner-answer and time-limit cases fail intermittently even
+though every owned process has stopped.
+
+Evidence: an instrumented scratch copy reads `/proc/<pid>/stat` synchronously
+at the return boundary under a controlled processor load.
+The service is gone, and both fake agents have state `Z`, while the fake
+agents' `isClosed()` values are still false.
+The original assertions fail in both paths.
+
+What should happen: the test immediately checks that the service and both
+fake agents are gone or zombies, and that the unrelated agent is still
+running.
+It then waits on a bounded, named condition for all three `close` events
+before retaining the original lifecycle assertions.
+The ownership guard and the unrelated-agent checks remain in place.
+The fix changes the test only, because production cleanup already confirms
+that its processes have stopped.
+
+Why it matters: delayed event delivery must not make the full check fail,
+and waiting for an event must not hide cleanup that returns while a process
+is still running.
+
+## 208. The crash case of failure rule 4 raced its owner prompt against the permission notice
+
+Found: 2026-11-02, in the third full check of run engine-build-1 at commit aae856e.
+State: fixed in the test-only commit that follows aae856e on branch worker/engine-u8cfl.
+
+What happens: the second scenario of `failure-4-no-answerer.test.ts` makes a
+boss whose second turn crashes, and then sends the boss a prompt from the
+owner to cause that crash.
+The asker's permission request already has the boss as holder, and the engine
+queues the request's notice to the boss as a prompt.
+The boss is idle, so the notice starts the boss's second turn at once, and
+that turn crashes.
+When the owner's prompt arrives after the crash, the state table refuses a
+prompt to a crashed agent, and the owner's client fails with `CommandError`
+and the reason `command refused`.
+The engine is right to refuse. The test raced its own prompt against the
+notice.
+
+Evidence: a scratch copy of the test that printed the events before and after
+the refused prompt, run in a loop on two processor cores with four
+processor-bound `yes` jobs on the same cores, failed in 4 of 20 runs.
+In a failing run the events after the request were `DeliveryAccepted`,
+`ThreadItem`, `AgentCrashed`, `PermissionMoved`, `OwnerNeeded`,
+`CommandRefused`, so the boss had accepted the notice before the owner's
+prompt was sent.
+The state table (`commandTable` in `packages/contracts/src/stateMachine.ts`)
+refuses `prompt` only for crashed and stopped agents, so a busy boss is not
+the cause.
+
+What should happen: the scenario sends no prompt and lets the notice start the
+boss's second turn, which is the engine's real path.
+It also starts waiting from the request's own sequence number instead of from
+a head read taken after the request was seen, because under load the crash
+could be committed before that read, and the wait for the owner notice would
+then time out.
+All assertions stay: the request moves from the crashed holder to the owner,
+stays open, and a late owner answer reaches the asker.
+The fixed file passed 12 of 12 runs under the same load.
+
+Why it matters: a test that races its own command against the engine's
+delivery fails a full check at random and teaches people to ignore failures.
