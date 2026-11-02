@@ -643,6 +643,19 @@ secret, such as the package name, version and script name.
 Why it matters: over-scrubbing is the safe direction, but it corrupts the
 fixtures' text and can hide real differences between recordings.
 
+Rechecked: 2026-11-02, against the live-check recordings from engine 71d13c1.
+The refreshed first and second harness recordings both keep
+`shephrd-recorder`, and neither has an over-redacted ordinary word.
+The second recording's `msg_<redacted>` is a scrubbed message identifier.
+The cause remains in `packages/engine/scripts/recorder.ts`, line 26:
+`scrubText` still adds every environment value of eight or more characters
+to its replacement list, without checking the variable name.
+Calling it with `npm_package_name: "shepherd"` changes `shepherd-recorder`
+to `<redacted>-recorder`; using `npm_package_name: "shephrd"` leaves
+`shephrd-recorder` intact.
+The symptom disappeared because the package name is shorter, so this issue
+stays open, as issue 192 also records.
+
 ## 38. The third harness's greeting fixture records an out-of-usage reply
 
 Found: 2026-11-01, by the lead, reading the `cursor.ndjson` recorded at e93bb00.
@@ -3042,3 +3055,42 @@ The fixed file passed 12 of 12 runs under the same load.
 
 Why it matters: a test that races its own command against the engine's
 delivery fails a full check at random and teaches people to ignore failures.
+
+## 209. The runner replay tests hard-code values from an earlier recording
+
+Found: 2026-11-02, when the owner's passing live check refreshed the first
+and second harness recordings at engine 71d13c1.
+State: fixed by this change on branch `worker/engine-rpfx`.
+
+What happened: `packages/engine/test/runner/replay.test.ts` stored literal
+session identifiers, protocol versions and reply text in its case table.
+The refreshed recordings opened successfully through the runner, but both
+cases failed because their new session identifiers differed from the table.
+The optional normal third-harness case used broad matchers instead of exact
+values, and the corrupted-fixture check assumed a fixed line count.
+
+What changed: the cases read the expected protocol version from the recorded
+`initialize` response and the session identifier from the recorded
+`session/new` response, matching each response to its request identifier.
+They join only recorded agent message chunks for the exact reply text.
+Missing or malformed fields fail with the fixture name and the expected field.
+The harness and expected outcome remain in the table, and the event tags,
+message count, incarnation and replay checks remain exact.
+The normal third-harness case uses these same checks when its file exists,
+and stays skipped while that recording is absent.
+The corrupted-fixture check derives the appended line's number from the file.
+Both new recordings are retained byte for byte.
+
+Evidence: the refreshed fixtures failed the two old session assertions before
+the fix, while the other five active tests passed.
+After the fix, all seven active tests in the file passed, and the normal
+third-harness case stayed skipped.
+The engine package's type check also passed.
+Changing one character of the expected session identifier in a temporary
+copy made the second harness's case fail on that exact mismatch.
+Separate temporary mutations of the version, reply text and event tags also
+failed, and removing each required recorded field produced its named error.
+
+Why it matters: recording a new session must not break the checks merely
+because the adapter assigns it a new identifier, and replay checks must
+still catch a runner that reports values different from the recording.
