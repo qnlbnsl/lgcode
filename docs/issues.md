@@ -2633,3 +2633,49 @@ state folder, and a process with that access already holds the owner's
 authority, so the link gives it no new data or authority.
 What could be added later: check that the credential is a regular file, owned
 by the user, with mode 0600, before reading it.
+
+## 190. The Herdr plugin manifest still lists macOS as a supported platform
+
+Found: 2026-11-01, during the rename to Shephrd.
+State: open.
+
+What happens: `herdr-plugin.toml` says `platforms = ["macos", "linux"]`, and
+the frozen test `packages/engine/test/smoke/workspace-manifest.test.ts` (line
+297) asserts exactly that list. Version 1 runs on Linux only (decisions row
+78, issue 183), and the code refuses the owner credential off Linux.
+What should happen: the manifest lists only `linux` until the macOS port
+(feature list, section 4) is done. Changing it needs the test and plan task
+1f changed in the same step, so the rename left it as it was.
+Why it matters: Herdr on a Mac would offer to start a service whose
+ancestry check and leftover sweep do not work there.
+
+## 191. Planning records outside the rename's edit list still say Shepherd
+
+Found: 2026-11-01, during the rename to Shephrd.
+State: open.
+
+What happens: `.plans/epics/shepherd-foundation/epic.md`, `.plans/roadmap.md`
+and the three `.plans/scopes/engine/*/scope.json` files (their `summary` and
+`why` text) still call the product Shepherd, because the rename task did not
+cover them. The plan folder path and the epic names are kept on purpose, so
+links do not break.
+What should happen: the text in those files uses Shephrd; their file paths and
+topic names stay.
+Why it matters: scope summaries are loaded into every worker's instructions,
+so they will keep teaching the old name.
+
+## 192. The fixture scrubber no longer hits the package name, and the old note is stale
+
+Found: 2026-11-01, during the rename to Shephrd.
+State: open.
+
+What happens: issue 37 was found because pnpm's `npm_package_name` was
+`shepherd`, eight characters, and the scrubber removed it. The new package
+name `shephrd` has seven characters, so the scrubber now leaves it alone, and
+the committed `errors/cursor-out-of-usage.json` keeps its source note
+naming the plan folder `shepherd-engine`. The rule in issue 37 (redact only
+values that can hold secrets) is still not built.
+What should happen: issue 37 is fixed on its own terms and does not depend on
+the length of the product's name.
+Why it matters: the next re-record could over-scrub another long, harmless
+variable and the cause would be hidden.
