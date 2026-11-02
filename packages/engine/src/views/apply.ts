@@ -2,7 +2,7 @@ import {
   EventSequence as EventSequenceSchema, eventEffect,
   type Account, type Actor, type AgentId, type Delivery, type Event, type EventEnvelope, type EventSequence, type LifecycleState,
   type PermissionOption, type SessionReference, type WaitMember,
-} from "@shepherd/contracts";
+} from "@shephrd/contracts";
 import * as Schema from "effect/Schema";
 
 // The eight views. Every record keeps the plain data the log holds, so a

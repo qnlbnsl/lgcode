@@ -1,4 +1,4 @@
-import { CommandsRpcGroup, ownerOnlyCommands } from "@shepherd/contracts";
+import { CommandsRpcGroup, ownerOnlyCommands } from "@shephrd/contracts";
 import { afterEach, expect, it } from "vitest";
 import {
   agentEnvironment, assertNoSecrets, chunk, cleanupUnit7b, fakeEngine, finishCli, mcpPeer, prepareRoot, serviceEnvironment, startCli, succeed, token,
@@ -8,7 +8,7 @@ afterEach(cleanupUnit7b);
 
 // Inventory comes from the RPC group, never from a second CLI-maintained list.
 for (const command of CommandsRpcGroup.requests.keys()) {
-  it(`P01 ${command} (7.5) catches omitting this RPC's shepherd subcommand/help registration`, async () => {
+  it(`P01 ${command} (7.5) catches omitting this RPC's shephrd subcommand/help registration`, async () => {
     const child = startCli(prepareRoot(), [...command.split(" "), "--help"]);
     expect(await finishCli(child)).toEqual({ code: 0, signal: null });
     expect(child.stdout()).toMatch(/usage|options|arguments/i);

@@ -1,6 +1,6 @@
 // Criterion 7.9, the engine half (unit 7a; row 64): the engine refuses the
 // owner credential from a caller inside a live adapter's process tree,
-// including one with both Shepherd variables stripped. The caller is a Node.js
+// including one with both Shephrd variables stripped. The caller is a Node.js
 // script that the fake agent runs with its `exec` step; it reads the owner
 // credential file itself and sends its true ancestor chain and process group
 // (`test/support/socketClient.ts` names the headers). The service is a real
@@ -55,10 +55,10 @@ const run = () => {
   }
   const headers = {
     Authorization: "Bearer " + readFileSync(credentialFile).toString("base64url"),
-    "Shepherd-Ancestors": chain.join(","), "Shepherd-Process-Group": stat(process.pid)[2],
+    "Shephrd-Ancestors": chain.join(","), "Shephrd-Process-Group": stat(process.pid)[2],
   };
   const done = (status, body) => { writeFileSync(report, JSON.stringify({ status, body, chain, group: Number(stat(process.pid)[2]),
-    socket: process.env.SHEPHERD_SOCKET ?? null, token: process.env.SHEPHERD_TOKEN ? "present" : null })); process.exit(0); };
+    socket: process.env.SHEPHRD_SOCKET ?? null, token: process.env.SHEPHRD_TOKEN ? "present" : null })); process.exit(0); };
   const socket = new WebSocket("ws+unix://" + socketPath + ":/", { headers });
   socket.once("open", () => { socket.terminate(); done(101, ""); });
   socket.once("unexpected-response", (_request, response) => {
@@ -85,7 +85,7 @@ const setup = (root: ServiceRoot) => {
   return caller;
 };
 
-live("7.9 the owner credential is refused from inside a live adapter's tree: with the agent's variables, with both Shepherd variables stripped, and from a re-parented process left in the adapter's group (breaks if the engine trusts the credential alone, checks only the parent, or ignores the process group)", () =>
+live("7.9 the owner credential is refused from inside a live adapter's tree: with the agent's variables, with both Shephrd variables stripped, and from a re-parented process left in the adapter's group (breaks if the engine trusts the credential alone, checks only the parent, or ignores the process group)", () =>
   Effect.gen(function* () {
     const root = makeServiceRoot();
     const caller = setup(root);
@@ -104,11 +104,11 @@ live("7.9 the owner credential is refused from inside a live adapter's tree: wit
       return yield* startFakeAgent(root, owner, owner, {
         script: { turns: [[
           { step: "exec", argv: [caller, root.socket, credentialFile, reports.kept, "direct"] },
-          { step: "exec", argv: [caller, root.socket, credentialFile, reports.stripped, "direct"], strip: ["SHEPHERD_SOCKET", "SHEPHERD_TOKEN"] },
-          { step: "exec", argv: [caller, root.socket, credentialFile, reports.orphan, "orphan"], strip: ["SHEPHERD_SOCKET", "SHEPHERD_TOKEN"] },
+          { step: "exec", argv: [caller, root.socket, credentialFile, reports.stripped, "direct"], strip: ["SHEPHRD_SOCKET", "SHEPHRD_TOKEN"] },
+          { step: "exec", argv: [caller, root.socket, credentialFile, reports.orphan, "orphan"], strip: ["SHEPHRD_SOCKET", "SHEPHRD_TOKEN"] },
           { step: "slow", ms: 60_000 },
         ]] },
-        prompt: "Call Shepherd as the owner.",
+        prompt: "Call Shephrd as the owner.",
       });
     }));
     const adapterPid = (yield* waitFor("the fake agent's echo", () => peekEcho(agent.echo))).pid;
@@ -142,10 +142,10 @@ live("7.9 the owner credential without an ancestor chain, or with a malformed on
     const own = ancestryHeaders();
     for (const headers of [
       bearer,
-      { ...bearer, "Shepherd-Process-Group": own["Shepherd-Process-Group"]! },
-      { ...bearer, "Shepherd-Ancestors": own["Shepherd-Ancestors"]! },
-      { ...bearer, "Shepherd-Ancestors": "not a chain", "Shepherd-Process-Group": own["Shepherd-Process-Group"]! },
-      { ...bearer, "Shepherd-Ancestors": own["Shepherd-Ancestors"]!, "Shepherd-Process-Group": "-1" },
+      { ...bearer, "Shephrd-Process-Group": own["Shephrd-Process-Group"]! },
+      { ...bearer, "Shephrd-Ancestors": own["Shephrd-Ancestors"]! },
+      { ...bearer, "Shephrd-Ancestors": "not a chain", "Shephrd-Process-Group": own["Shephrd-Process-Group"]! },
+      { ...bearer, "Shephrd-Ancestors": own["Shephrd-Ancestors"]!, "Shephrd-Process-Group": "-1" },
     ]) {
       const outcome = yield* Effect.promise(() => upgradeStatus(root.socket, headers));
       expect([Object.keys(headers).join(","), outcome.status]).toEqual([Object.keys(headers).join(","), 403]);

@@ -18,7 +18,7 @@ let rig: Rig;
 beforeEach(() => {
   rig = makeRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("SHEPHERD_HOME", rig.stateFolder);
+  vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
 });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 registerRebuildCheck({ noLog: true });

@@ -1,5 +1,5 @@
 {
-  "name": "@shepherd/cli",
+  "name": "@shephrd/cli",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -15,10 +15,10 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
-    "@shepherd/client": "workspace:*",
-    "@shepherd/contracts": "workspace:*",
-    "@shepherd/engine": "workspace:*",
-    "@shepherd/mcp": "workspace:*",
+    "@shephrd/client": "workspace:*",
+    "@shephrd/contracts": "workspace:*",
+    "@shephrd/engine": "workspace:*",
+    "@shephrd/mcp": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

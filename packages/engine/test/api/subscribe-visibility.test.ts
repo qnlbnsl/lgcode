@@ -11,7 +11,7 @@ import { chmodSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, it } from "@effect/vitest";
-import { Event, type EventEnvelope } from "@shepherd/contracts";
+import { Event, type EventEnvelope } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Redacted from "effect/Redacted";

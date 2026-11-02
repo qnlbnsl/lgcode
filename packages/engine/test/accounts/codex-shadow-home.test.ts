@@ -19,7 +19,7 @@ import { snapshot } from "../support/routingRig.ts";
 let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
-  vi.stubEnv("SHEPHERD_HOME", rig.stateFolder);
+  vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
   vi.stubEnv("HOME", rig.home);
   vi.stubEnv("CODEX_HOME", join(rig.home, ".codex"));
 });
@@ -105,8 +105,8 @@ it.effect("6.5 E2: catches inherited provider credentials, unresolved references
   const account = accountFor("claude", {}, echo, {
     REGION: "account-region", LANG: "account-locale", CLAUDE_CONFIG_DIR: "~/separate-config",
     HERDR_SOCKET_PATH: join(rig.root, "must-not-reach-child.sock"), HERDR_ENV: "1",
-    SHEPHERD_SOCKET: join(rig.root, "wrong-engine.sock"), SHEPHERD_TOKEN: "secret:ignored",
-    SHEPHERD_TEST_DEBUG: "1",
+    SHEPHRD_SOCKET: join(rig.root, "wrong-engine.sock"), SHEPHRD_TOKEN: "secret:ignored",
+    SHEPHRD_TEST_DEBUG: "1",
   });
   const store = persistentSecretStore({ stateFolder: rig.stateFolder });
   const parent = serviceEnvironment(rig);
@@ -127,19 +127,19 @@ it.effect("6.5 E2: catches inherited provider credentials, unresolved references
     const started = success(yield* call(ownerCredential, "start", startPayloadFor(harness, changed, rig.work)));
     const child = yield* readEcho(echo);
     expect(child.env).toMatchObject({
-      PATH: "/usr/bin:/bin", HOME: rig.home, USER: "shepherd-test", LOGNAME: "shepherd-test", SHELL: "/bin/sh",
+      PATH: "/usr/bin:/bin", HOME: rig.home, USER: "shephrd-test", LOGNAME: "shephrd-test", SHELL: "/bin/sh",
       LANG: "account-locale", LC_ALL: "C.UTF-8", LC_CTYPE: "C.UTF-8", TERM: "dumb", TMPDIR: rig.root, TZ: "UTC",
       REGION: "account-region", CLAUDE_CONFIG_DIR: join(rig.home, "separate-config"),
-      ANTHROPIC_API_KEY: planted, SHEPHERD_SOCKET: rig.socket,
+      ANTHROPIC_API_KEY: planted, SHEPHRD_SOCKET: rig.socket,
     });
-    expect(child.env.SHEPHERD_TOKEN).toMatch(/^shp_a_/);
-    expect(child.env.SHEPHERD_TOKEN).not.toBe(parent.SHEPHERD_TOKEN);
-    expect(Object.keys(child.env).filter((key) => key.startsWith("SHEPHERD_")).sort()).toEqual(["SHEPHERD_SOCKET", "SHEPHERD_TOKEN"]);
+    expect(child.env.SHEPHRD_TOKEN).toMatch(/^shp_a_/);
+    expect(child.env.SHEPHRD_TOKEN).not.toBe(parent.SHEPHRD_TOKEN);
+    expect(Object.keys(child.env).filter((key) => key.startsWith("SHEPHRD_")).sort()).toEqual(["SHEPHRD_SOCKET", "SHEPHRD_TOKEN"]);
     expect(Object.keys(child.env).filter((key) => key.startsWith("HERDR_"))).toEqual([]);
     for (const name of ["OPENAI_API_KEY", "NODE_OPTIONS", "XDG_STATE_HOME"]) expect(child.env[name]).toBeUndefined();
     expect(JSON.stringify(child.env)).not.toContain("secret:");
     const publicData = JSON.stringify([yield* readLog, yield* snapshot, stored, started, context.logLines]);
-    for (const secret of [planted, Buffer.from(planted).toString("base64"), child.env.SHEPHERD_TOKEN!]) expect(publicData).not.toContain(secret);
+    for (const secret of [planted, Buffer.from(planted).toString("base64"), child.env.SHEPHRD_TOKEN!]) expect(publicData).not.toContain(secret);
     // A fresh store layer reads the committed value from disk, rather than
     // borrowing the first layer's map or the redaction fixture.
     const reference = changed.environment!.ANTHROPIC_API_KEY!;

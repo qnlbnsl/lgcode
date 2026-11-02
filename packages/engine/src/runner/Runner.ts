@@ -1,7 +1,7 @@
 import {
   AgentId, DeliveryId, EpochMilliseconds, Event, PermissionOption, PermissionRequestId,
   type Account, type Delivery, type HarnessSettings, type PermissionLevel, type SessionReference,
-} from "@shepherd/contracts";
+} from "@shephrd/contracts";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import type * as Effect from "effect/Effect";
@@ -127,4 +127,4 @@ export class Runner extends Context.Service<Runner, {
   readonly stop: (input: { readonly agentId: AgentId }) => Effect.Effect<void, RunnerRejected>;
   readonly capabilities: RunnerCapabilities;
   readonly events: Stream.Stream<RunnerEvent>;
-}>()("shepherd/engine/runner/Runner") {}
+}>()("shephrd/engine/runner/Runner") {}

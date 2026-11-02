@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   CommandsRpcGroup, Event as EventSchema, RequestId,
   type Actor, type Event, type HarnessSettings,
-} from "@shepherd/contracts";
+} from "@shephrd/contracts";
 import type * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";

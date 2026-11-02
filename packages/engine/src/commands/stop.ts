@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import { WaitId, type Event } from "@shepherd/contracts";
+import { WaitId, type Event } from "@shephrd/contracts";
 import * as Schema from "effect/Schema";
 import { targetGone } from "../routing/deliveries.ts";
 import { moveHeld } from "../routing/holders.ts";

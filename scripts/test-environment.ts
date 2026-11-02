@@ -4,11 +4,11 @@ import { join } from "node:path";
 import { afterAll } from "vitest";
 
 // Test files start without the invoking agent's credentials or socket settings.
-const privateEnvironment = /^(?:ANTHROPIC|CLAUDE|CODEX|OPENAI|GEMINI|GOOGLE|CURSOR|T3CODE|SHEPHERD)_/;
+const privateEnvironment = /^(?:ANTHROPIC|CLAUDE|CODEX|OPENAI|GEMINI|GOOGLE|CURSOR|T3CODE|SHEPHRD)_/;
 for (const name of Object.keys(process.env)) {
   if (privateEnvironment.test(name)) delete process.env[name];
 }
 
-const stateDirectory = realpathSync(mkdtempSync(join(tmpdir(), "shepherd-test-")));
-process.env["SHEPHERD_HOME"] = stateDirectory;
+const stateDirectory = realpathSync(mkdtempSync(join(tmpdir(), "shephrd-test-")));
+process.env["SHEPHRD_HOME"] = stateDirectory;
 afterAll(() => rmSync(stateDirectory, { recursive: true, force: true }));

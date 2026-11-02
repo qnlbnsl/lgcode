@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AccountId, Event } from "@shepherd/contracts";
+import type { AccountId, Event } from "@shephrd/contracts";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";

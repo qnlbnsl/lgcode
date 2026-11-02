@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { comparePermission, DeliveryId, Event, type PermissionLevel, type SessionReference } from "@shepherd/contracts";
-import { AcpClient, layerChildProcess } from "@shepherd/t3-effect-acp/client";
-import { AcpRequestError } from "@shepherd/t3-effect-acp/errors";
-import type { AgentCapabilities } from "@shepherd/t3-effect-acp/schema-v1";
-import { mergeProviderInstanceEnvironment } from "@shepherd/t3-provider-instance/instanceEnvironment";
-import { HomeDirectory } from "@shepherd/t3-provider-instance/HostProcess";
+import { comparePermission, DeliveryId, Event, type PermissionLevel, type SessionReference } from "@shephrd/contracts";
+import { AcpClient, layerChildProcess } from "@shephrd/t3-effect-acp/client";
+import { AcpRequestError } from "@shephrd/t3-effect-acp/errors";
+import type { AgentCapabilities } from "@shephrd/t3-effect-acp/schema-v1";
+import { mergeProviderInstanceEnvironment } from "@shephrd/t3-provider-instance/instanceEnvironment";
+import { HomeDirectory } from "@shephrd/t3-provider-instance/HostProcess";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -217,7 +217,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     const resolvedSecrets = [input.token];
     const variables: Record<string, string> = {};
     for (const [name, value] of Object.entries(input.account.environment ?? {})) {
-      if (name.startsWith("HERDR_") || name.startsWith("SHEPHERD_")) continue;
+      if (name.startsWith("HERDR_") || name.startsWith("SHEPHRD_")) continue;
       if (value.startsWith("secret:")) {
         const secret = yield* secrets.resolve(value);
         if (secret === undefined) return yield* rejected("account secret is unavailable");
@@ -233,7 +233,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       Object.assign(variables, homed);
     }
     const base = buildBaseEnvironment({ parent: configuration.environment, accountVariables: variables,
-      shepherdSocket: configuration.socketPath, shepherdToken: Redacted.value(input.token) });
+      shephrdSocket: configuration.socketPath, shephrdToken: Redacted.value(input.token) });
     const environment = yield* mergeProviderInstanceEnvironment(Object.entries(variables).map(([name, value]) => ({ name, value, sensitive: input.account.environment?.[name]?.startsWith("secret:") ?? false })), base).pipe(
       Effect.provideService(HomeDirectory, configuration.environment.HOME ?? input.folder),
     );
@@ -416,11 +416,11 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           toolCallId: tool.toolCallId, description, options: mapped, settingsWrite: settingsWrite((tool.locations ?? []).map((location) => location.path), folder, environment.CLAUDE_CONFIG_DIR) });
         return { outcome: yield* Deferred.await(hold.answer) };
       }));
-      const initialized = yield* client.agent.initialize({ protocolVersion: 2, clientInfo: { name: "shepherd", version: "0.0.1" }, clientCapabilities: {} }).pipe(Effect.mapError(() => rejected("adapter initialization failed")));
+      const initialized = yield* client.agent.initialize({ protocolVersion: 2, clientInfo: { name: "shephrd", version: "0.0.1" }, clientCapabilities: {} }).pipe(Effect.mapError(() => rejected("adapter initialization failed")));
       processEntry.version = initialized.protocolVersion;
       if (initialized.agentCapabilities !== undefined) processEntry.capabilities = initialized.agentCapabilities;
-      const mcpServers = [{ type: "stdio" as const, name: "shepherd", command: process.execPath, args: [fileURLToPath(new URL("../../../cli/src/bin.ts", import.meta.url)), "mcp"],
-        env: [{ name: "SHEPHERD_SOCKET", value: configuration.socketPath }, { name: "SHEPHERD_TOKEN", value: Redacted.value(input.token) }] }];
+      const mcpServers = [{ type: "stdio" as const, name: "shephrd", command: process.execPath, args: [fileURLToPath(new URL("../../../cli/src/bin.ts", import.meta.url)), "mcp"],
+        env: [{ name: "SHEPHRD_SOCKET", value: configuration.socketPath }, { name: "SHEPHRD_TOKEN", value: Redacted.value(input.token) }] }];
       // Row 66 and issue 93: reload only through a method this peer
       // advertised at initialize, `session/load` first, else `session/resume`.
       const loads = processEntry.capabilities?.loadSession === true;

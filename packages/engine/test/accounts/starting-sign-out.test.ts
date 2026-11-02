@@ -15,7 +15,7 @@ import { appendWith, deliveryRow, eventually, pause, snapshot, tagged } from "..
 let rig: Rig;
 beforeEach(() => {
   rig = makeRig();
-  vi.stubEnv("SHEPHERD_HOME", rig.stateFolder);
+  vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
   vi.stubEnv("HOME", rig.home);
   vi.stubEnv("CODEX_HOME", `${rig.home}/.codex`);
 });

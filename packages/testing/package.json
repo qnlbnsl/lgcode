@@ -1,5 +1,5 @@
 {
-  "name": "@shepherd/testing",
+  "name": "@shephrd/testing",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -15,10 +15,10 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
-    "@shepherd/client": "workspace:*",
-    "@shepherd/contracts": "workspace:*",
-    "@shepherd/t3-effect-acp": "workspace:*",
-    "@shepherd/t3-provider-testing": "workspace:*",
+    "@shephrd/client": "workspace:*",
+    "@shephrd/contracts": "workspace:*",
+    "@shephrd/t3-effect-acp": "workspace:*",
+    "@shephrd/t3-provider-testing": "workspace:*",
     "effect": "catalog:",
     "ws": "catalog:"
   },

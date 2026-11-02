@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url"
 
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { assert, it } from "@effect/vitest"
-import { HarnessSettings } from "@shepherd/contracts"
+import { HarnessSettings } from "@shephrd/contracts"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { afterEach, beforeEach, vi } from "vitest"
@@ -45,7 +45,7 @@ const program = async (directory: string, name: string, mode = 0o755) => {
 }
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), "shepherd-harnesses-"))
+  root = await mkdtemp(join(tmpdir(), "shephrd-harnesses-"))
   binDirectory = join(root, "bin")
   pathDirectory = join(root, "path-one")
   otherPathDirectory = join(root, "path-two")

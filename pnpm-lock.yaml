@@ -231,16 +231,16 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.5
         version: 4.0.5(effect@4.0.5)(redis@6.3.1(@opentelemetry/api@1.10.0))
-      '@shepherd/client':
+      '@shephrd/client':
         specifier: workspace:*
         version: link:../client
-      '@shepherd/contracts':
+      '@shephrd/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@shepherd/engine':
+      '@shephrd/engine':
         specifier: workspace:*
         version: link:../engine
-      '@shepherd/mcp':
+      '@shephrd/mcp':
         specifier: workspace:*
         version: link:../mcp
       effect:
@@ -268,7 +268,7 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.5
         version: 4.0.5(effect@4.0.5)(redis@6.3.1(@opentelemetry/api@1.10.0))
-      '@shepherd/contracts':
+      '@shephrd/contracts':
         specifier: workspace:*
         version: link:../contracts
       effect:
@@ -330,16 +330,16 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.5
         version: 4.0.5(effect@4.0.5)(redis@6.3.1(@opentelemetry/api@1.10.0))
-      '@shepherd/contracts':
+      '@shephrd/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@shepherd/t3-effect-acp':
+      '@shephrd/t3-effect-acp':
         specifier: workspace:*
         version: link:../../third_party/t3code/effect-acp
-      '@shepherd/t3-node-sqlite':
+      '@shephrd/t3-node-sqlite':
         specifier: workspace:*
         version: link:../../third_party/t3code/node-sqlite
-      '@shepherd/t3-provider-instance':
+      '@shephrd/t3-provider-instance':
         specifier: workspace:*
         version: link:../../third_party/t3code/provider-instance
       effect:
@@ -352,10 +352,10 @@ importers:
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.5(effect@4.0.5)(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)))
-      '@shepherd/client':
+      '@shephrd/client':
         specifier: workspace:*
         version: link:../client
-      '@shepherd/testing':
+      '@shephrd/testing':
         specifier: workspace:*
         version: link:../testing
       '@types/node':
@@ -379,10 +379,10 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.5
         version: 4.0.5(effect@4.0.5)(redis@6.3.1(@opentelemetry/api@1.10.0))
-      '@shepherd/client':
+      '@shephrd/client':
         specifier: workspace:*
         version: link:../client
-      '@shepherd/contracts':
+      '@shephrd/contracts':
         specifier: workspace:*
         version: link:../contracts
       effect:
@@ -410,16 +410,16 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.5
         version: 4.0.5(effect@4.0.5)(redis@6.3.1(@opentelemetry/api@1.10.0))
-      '@shepherd/client':
+      '@shephrd/client':
         specifier: workspace:*
         version: link:../client
-      '@shepherd/contracts':
+      '@shephrd/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@shepherd/t3-effect-acp':
+      '@shephrd/t3-effect-acp':
         specifier: workspace:*
         version: link:../../third_party/t3code/effect-acp
-      '@shepherd/t3-provider-testing':
+      '@shephrd/t3-provider-testing':
         specifier: workspace:*
         version: link:../../third_party/t3code/provider-testing
       effect:

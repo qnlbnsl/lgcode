@@ -13,6 +13,6 @@ export const auditCredentialReads = (credential: string, marker: string): (() =>
   return () => { fs.readFileSync = read; syncBuiltinESMExports(); };
 };
 
-if (process.env.SHEPHERD_TEST_CREDENTIAL_PATH && process.env.SHEPHERD_TEST_CREDENTIAL_READS) {
-  auditCredentialReads(process.env.SHEPHERD_TEST_CREDENTIAL_PATH, process.env.SHEPHERD_TEST_CREDENTIAL_READS);
+if (process.env.SHEPHRD_TEST_CREDENTIAL_PATH && process.env.SHEPHRD_TEST_CREDENTIAL_READS) {
+  auditCredentialReads(process.env.SHEPHRD_TEST_CREDENTIAL_PATH, process.env.SHEPHRD_TEST_CREDENTIAL_READS);
 }

@@ -1,14 +1,14 @@
-id = "shepherd"
-name = "Shepherd"
+id = "shephrd"
+name = "Shephrd"
 version = "0.0.1"
 min_herdr_version = "0.8.2"
 platforms = ["macos", "linux"]
 
 [[startup]]
-command = ["./bin/shepherd", "serve", "--detach"]
+command = ["./bin/shephrd", "serve", "--detach"]
 
 [[actions]]
 id = "serve"
-title = "Start Shepherd"
+title = "Start Shephrd"
 contexts = ["global"]
-command = ["./bin/shepherd", "serve", "--detach"]
+command = ["./bin/shephrd", "serve", "--detach"]

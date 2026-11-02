@@ -47,7 +47,7 @@ export const parseArguments = (command: CommandName, args: ReadonlyArray<string>
     else if (command === "wait" && flag === "--mode") mode = value()
     else if (command === "subscribe" && flag === "--after") after = value()
     else if (command === "wait" && !arg.startsWith("-")) members.push(arg)
-    else throw new UsageError(`unexpected argument ${JSON.stringify(arg.slice(0, 40))}; see shepherd ${command} --help`)
+    else throw new UsageError(`unexpected argument ${JSON.stringify(arg.slice(0, 40))}; see shephrd ${command} --help`)
   }
   if (help) return { help, payload: undefined, block }
   const short = block || mode !== undefined || after !== undefined || members.length > 0
@@ -65,5 +65,5 @@ export const parseArguments = (command: CommandName, args: ReadonlyArray<string>
     if (!Number.isInteger(sequence) || sequence < 0) throw new UsageError("--after must be a whole number from 0")
     return { help, block, payload: { requestId: randomUUID(), after: sequence } }
   }
-  throw new UsageError(`${command} needs --input '<JSON payload>'; see shepherd ${command} --help`)
+  throw new UsageError(`${command} needs --input '<JSON payload>'; see shephrd ${command} --help`)
 }

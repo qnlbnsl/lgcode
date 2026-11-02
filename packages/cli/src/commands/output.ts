@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@shepherd/contracts"
+import type { EventEnvelope } from "@shephrd/contracts"
 import { sanitize, sanitizeJson } from "./sanitize.ts"
 
 export const out = (text: string): void => { process.stdout.write(text) }

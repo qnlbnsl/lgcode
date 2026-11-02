@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { PermissionRequestId, type Event } from "@shepherd/contracts";
+import { PermissionRequestId, type Event } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type { Snapshot } from "../commands/internal.ts";

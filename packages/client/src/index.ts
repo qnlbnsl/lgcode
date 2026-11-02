@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 
 import * as NodeSocket from "@effect/platform-node/NodeSocket"
-import { CommandsRpcGroup } from "@shepherd/contracts"
+import { CommandsRpcGroup } from "@shephrd/contracts"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"

@@ -9,12 +9,12 @@ for (const socketSet of [false, true]) {
   it(`N01 socket ${socketSet ? "set" : "unset"} (7.13) catches MCP falling back to a readable owner credential when the agent token is absent`, async () => {
     const root = prepareRoot();
     const engine = await fakeEngine(root);
-    const environment = { ...serviceEnvironment(root), ...(socketSet ? { SHEPHERD_SOCKET: root.socket } : {}) };
+    const environment = { ...serviceEnvironment(root), ...(socketSet ? { SHEPHRD_SOCKET: root.socket } : {}) };
     const child = startCli(root, ["mcp"], environment);
     const exit = await finishCli(child);
     expect(exit.code).not.toBe(0);
     expect(exit.signal).toBeNull();
-    expect(child.stderr()).toMatch(/SHEPHERD_TOKEN|agent token/i);
+    expect(child.stderr()).toMatch(/SHEPHRD_TOKEN|agent token/i);
     expect(engine.upgrades).toHaveLength(0);
     assertNoSecrets(child, [ownerCredential]);
   });

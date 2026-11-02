@@ -10,11 +10,11 @@ import { agentEnvironment, cleanupUnit7b, fakeEngine, loadClient, ownerCredentia
 afterEach(cleanupUnit7b);
 
 for (const [name, variables] of [
-  ["empty socket", { SHEPHERD_SOCKET: "" }],
-  ["empty token", { SHEPHERD_TOKEN: "" }],
-  ["both empty", { SHEPHERD_SOCKET: "", SHEPHERD_TOKEN: "" }],
-  ["empty socket with token", { SHEPHERD_SOCKET: "", SHEPHERD_TOKEN: token }],
-  ["empty token with socket", { SHEPHERD_SOCKET: "SOCKET_FIXTURE", SHEPHERD_TOKEN: "" }],
+  ["empty socket", { SHEPHRD_SOCKET: "" }],
+  ["empty token", { SHEPHRD_TOKEN: "" }],
+  ["both empty", { SHEPHRD_SOCKET: "", SHEPHRD_TOKEN: "" }],
+  ["empty socket with token", { SHEPHRD_SOCKET: "", SHEPHRD_TOKEN: token }],
+  ["empty token with socket", { SHEPHRD_SOCKET: "SOCKET_FIXTURE", SHEPHRD_TOKEN: "" }],
 ] as const) {
   it(`X31 client ${name} (T-3) catches treating an explicitly empty identity as unset and reading the owner credential`, async () => {
     const connect = await loadClient();
@@ -25,12 +25,12 @@ for (const [name, variables] of [
     const restore = auditCredentialReads(join(root.state, "owner-credential"), marker);
     try {
       const environment: Record<string, string> = { ...serviceEnvironment(root), ...variables };
-      if (environment.SHEPHERD_SOCKET === "SOCKET_FIXTURE") environment.SHEPHERD_SOCKET = root.socket;
+      if (environment.SHEPHRD_SOCKET === "SOCKET_FIXTURE") environment.SHEPHRD_SOCKET = root.socket;
       const exit = await Effect.runPromiseExit(Effect.scoped(connect({ environment })));
       expect.soft(readFileSync(marker, "utf8"), "owner credential was read before refusing an incomplete agent identity").toBe("");
       expect.soft(peer.upgrades, "an empty identity reached a peer").toHaveLength(0);
       expect.soft(Exit.isFailure(exit), "an explicitly empty identity must fail").toBe(true);
-      if (Exit.isFailure(exit)) expect(Cause.pretty(exit.cause)).toMatch(/SHEPHERD_SOCKET|SHEPHERD_TOKEN|identity|empty/i);
+      if (Exit.isFailure(exit)) expect(Cause.pretty(exit.cause)).toMatch(/SHEPHRD_SOCKET|SHEPHRD_TOKEN|identity|empty/i);
     } finally { restore(); }
   });
 }

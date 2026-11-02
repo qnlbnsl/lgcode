@@ -7,7 +7,7 @@ import * as Scope from "effect/Scope"
 import * as Semaphore from "effect/Semaphore"
 import { McpProtocol, McpServer, Tool, Toolkit } from "effect/ai"
 import * as NodeStdio from "@effect/platform-node/NodeStdio"
-import { type Client, ClientError, connect } from "@shepherd/client"
+import { type Client, ClientError, connect } from "@shephrd/client"
 import { retryRecoveringEffect } from "./retry.ts"
 import { descriptions, inputSchema, toolNames, type ToolName } from "./tools.ts"
 
@@ -21,19 +21,19 @@ const failureText = (error: unknown): string => {
     if (tagged._tag === "CommandError" && typeof tagged.reason === "string") return `the engine refused the command: ${tagged.reason}`
     if (tagged._tag === "ClientError" && typeof tagged.message === "string") return tagged.message
   }
-  return "the Shepherd service could not be reached or answered with an error"
+  return "the Shephrd service could not be reached or answered with an error"
 }
 
-// The agent token is read from SHEPHERD_TOKEN and nowhere else; a shell
+// The agent token is read from SHEPHRD_TOKEN and nowhere else; a shell
 // argument never reaches this process's identity (row 55).
 export const tokenProblem = (environment: Environment): string | undefined => {
-  const token = environment.SHEPHERD_TOKEN
-  const socket = environment.SHEPHERD_SOCKET
+  const token = environment.SHEPHRD_TOKEN
+  const socket = environment.SHEPHRD_SOCKET
   if (token === undefined || token === "") {
-    return "shepherd mcp needs the agent token in SHEPHERD_TOKEN (with SHEPHERD_SOCKET); it never uses the owner credential"
+    return "shephrd mcp needs the agent token in SHEPHRD_TOKEN (with SHEPHRD_SOCKET); it never uses the owner credential"
   }
   if (socket === undefined || socket === "") {
-    return "SHEPHERD_SOCKET and SHEPHERD_TOKEN must be set together for shepherd mcp"
+    return "SHEPHRD_SOCKET and SHEPHRD_TOKEN must be set together for shephrd mcp"
   }
   return undefined
 }
@@ -93,7 +93,7 @@ export const serverLayer = (environment: Environment) => {
   return McpServer.toolkit(toolkit as never).pipe(
     Layer.provide(toolkit.toLayer(handlers as never) as never),
     Layer.provideMerge(McpServer.layerStdio({
-      name: "shepherd", version, protocols: [McpProtocol.v2025_11_25]
+      name: "shephrd", version, protocols: [McpProtocol.v2025_11_25]
     })),
     Layer.provide(NodeStdio.layer),
     // Standard output carries only protocol lines; logs never go there and a
@@ -117,7 +117,7 @@ export const runMcp = (options: { readonly environment: Environment }): Effect.E
     stdinClosed
   ).pipe(
     Effect.as(0),
-    Effect.catchCause(() => Effect.sync(() => { process.stderr.write("shepherd mcp stopped after an error\n"); return 1 }))
+    Effect.catchCause(() => Effect.sync(() => { process.stderr.write("shephrd mcp stopped after an error\n"); return 1 }))
   )
 }
 

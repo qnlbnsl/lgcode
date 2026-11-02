@@ -1,10 +1,10 @@
-import { CommandsRpcGroup, ownerOnlyCommands } from "@shepherd/contracts"
+import { CommandsRpcGroup, ownerOnlyCommands } from "@shephrd/contracts"
 import type * as Rpc from "effect/rpc/Rpc"
 import type * as RpcGroup from "effect/rpc/RpcGroup"
 
 export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>
 
-// The commands the shepherd command recognises are the requests of the RPC
+// The commands the shephrd command recognises are the requests of the RPC
 // group, the same list the client builds its methods from; only the
 // descriptions below are written here.
 export const commandNames: ReadonlyArray<CommandName> = [...CommandsRpcGroup.requests.keys()] as Array<CommandName>
@@ -45,7 +45,7 @@ export const helpText = (command: CommandName): string => {
     ? "This command is for the owner's terminal; an agent's identity is refused.\n" : ""
   if (command === "accounts set-secret") {
     return [
-      "Usage: shepherd accounts set-secret <account-id> <env-name>", "",
+      "Usage: shephrd accounts set-secret <account-id> <env-name>", "",
       summaries[command], owner,
       "Arguments:",
       "  <account-id>  The account the secret belongs to.",
@@ -67,5 +67,5 @@ export const helpText = (command: CommandName): string => {
       "  <agent-id>...   The agents to wait for, with --block or --mode.")
   }
   if (command === "subscribe") options.splice(1, 0, "  --after <n>     Print events after this sequence (default 0).")
-  return [`Usage: shepherd ${command} [options]`, "", summaries[command], owner, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
+  return [`Usage: shephrd ${command} [options]`, "", summaries[command], owner, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
 }
