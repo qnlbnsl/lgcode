@@ -3704,3 +3704,44 @@ A possible fix is an iterative maximum, with the forms cached until the set
 of secrets changes.
 Why it matters: an exception in redaction stops that output path, and the
 per-call cost grows with every secret.
+
+## 235. Several acceptance and runner tests fail when `pnpm check` runs at high machine load
+
+Found: 2026-11-03, by the test runner (`pnpm check` at 8830d8b, posts #1319,
+and at ebe060f, post #1321).
+State: open. No test or production code has been changed for it.
+
+What happens: two batches of `pnpm check` runs failed only on tests that the
+branches under check did not touch, and the failing tests differed between
+runs.
+
+- At 8830d8b, runs 2 and 3 started at a load average of about 21, beside
+  another branch's checks. Both failed the same test,
+  `packages/engine/test/api/subscribe-visibility.test.ts`, "7.3 issue 41: a
+  subscriber that stops acknowledging is disconnected while the writer runs
+  on". Its client failed with `SocketOpenError: timeout waiting for "open"`.
+- At ebe060f, three runs started at a load average of 92.9, above the test
+  runner's limit of 24. Run 1 failed
+  `packages/engine/test/acceptance/failure-1-crash.test.ts` ("1 crash: a
+  parent that waits on the crashing child is woken once"), with the parent's
+  echo not yet holding the crash notice. It also failed
+  `packages/engine/test/runner/classify-turn-text.test.ts` (6.9 A3) and
+  `packages/engine/test/runner/reset-time.test.ts` (6.10 F-4), each with
+  "Test timed out in 30000ms". Run 2 failed
+  `packages/engine/test/recovery/orphans.test.ts` (6.8 sweep, Linux), with an
+  unexpected extra process group in the sweep result. Run 3 failed
+  `reset-time.test.ts` (6.10 F-4) again, by the same timeout.
+
+Each failing file passed when run alone: `subscribe-visibility.test.ts` three
+times at load 47, and the four files from ebe060f together once at load 81.
+Both heads then passed `pnpm check` when the runs were repeated one at a time
+below the load limit (8830d8b in post #1325).
+Why it matters: a test that fails only under load hides real failures behind
+noise, and a check run at high load costs a full repeat. The orphan sweep
+failure may be a real race, because the sweep found a process group it did
+not expect; it has not been reproduced.
+What should happen: the test runner keeps waiting for load below its limit
+and runs one check at a time. If a test from this list fails again at normal
+load, the wait or timeout in that test is examined, as in issue 196: the wait
+should name the thing the next assertion is about, and fixed 30-second
+timeouts should be checked against the work the test does.
