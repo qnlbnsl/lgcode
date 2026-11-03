@@ -253,3 +253,87 @@ as row 98.
 L26).** The plans edit the engine directly wherever they need to. There is
 no extension seam and no rule that existing behaviour stays the same.
 Logged as rows 99 and 100.
+
+## Q6 (decision rows 103 to 119): round 4's contract changes, for the board and the client API
+
+Round 4 needs four changes to the client API contract version 4
+(`8e80a13`) and one to the board's own contract. Each is given as exact
+text. Please also confirm that `8e80a13` is the version 4 the board should
+build on (row 119).
+
+**Change 1, client API section 3, "Waiting, for owners and devices"
+(row 103; logic M1, architect R4-A3, logic R4-L1).** Replace "Each piece
+writes its condition in its folder in `packages/contracts` as a pure
+function over its own snapshot section. So the helper needs a caller whose
+snapshot holds those sections: the owner, a device or a service." with:
+
+> Each piece writes its condition in its folder in `packages/contracts` as
+> a pure function (lead ruling L28). A client does not hold a piece's full
+> view. So a piece whose condition reads its view, such as the board's,
+> carries in its snapshot section the ids of the agents for which its
+> condition holds and the sequence they were computed at, and offers a
+> read that returns the same lists at the current sequence (for the board,
+> `board.status` with no agent). The helper never ends a wait on a piece
+> result older than the stream it has applied. Whenever the engine's part
+> of the settled test says the waited agents are settled, it reads each
+> such piece's lists. If they are newer than the stream it has applied, it
+> applies the stream up to their sequence and decides again. It ends the
+> wait only when the engine's part and every piece's lists agree at one
+> sequence. No timer and no polling are added. So the helper needs a
+> caller whose snapshot holds those sections and who may make those reads:
+> the owner, a device or a service.
+
+**Change 2, client API edit E19 (row 104; critic C4-03, logic R4-L2).**
+Replace "The board's plan writes the board's: an agent with an open post
+of its own that needs a reply is not settled. The client helper
+`waitForAgents` applies the same table (section 3)." with:
+
+> The input carries the engine's deliveries with their status by delivery
+> id. A piece's entry also takes the piece's own view, which the engine
+> passes. The board's plan writes the board's entry, a function of both,
+> because its third clause asks whether a queued or sent board wake
+> carries a post (board contract, "Settled and waiting"). The client
+> helper `waitForAgents` applies the engine's part of the test itself, and
+> each piece's part through that piece's results (section 3).
+
+**Change 3, client API edit E18, the "At send time" bullet (row 118;
+logic m7).** Add at the end of the bullet:
+
+> The withdrawal runs the engine's wait checks (`withWaitChecks`,
+> `routing/waits.ts:110`), as the failed-send batch does
+> (`routing/deliveries.ts:259`), so a wait on the target is judged again
+> in the same batch.
+
+**Change 4, client API section 1, "Reactors", and edit E23 (row 105;
+logic M3).** In section 1, after "It records the last sequence it handled
+in its own view, so after a restart it resumes from there.", add:
+
+> A reactor whose rules are all level rules over the current views, such
+> as the board's, keeps no position instead: it runs over what each batch
+> touches, and over the whole state at start-up.
+
+In edit E23, after "and the reactor counts that event as handled, so a
+restart does not retry it forever.", add:
+
+> A reactor with level rules instead tries that duty again only after a
+> later batch touches it, or at start-up.
+
+**Change 5, the board's contract version 7.** Replace `contract.md` with
+`attack/contract-v7-proposed.md` (ref `board-contract-v7-proposed.md`).
+Against version 6, it changes these rules: the manager seat moves only on
+a stop, with an acting manager while it is crashed, a plain channel's
+opener as an explicit member, and no manager in a direct channel
+(row 106); "read" counts a `board.read` page, the third hold-unsettled
+clause reads "not read", and the reactor queues unread questions (row 104);
+`board.status` with no agent, and the owner's wait rule (row 103); level
+rules for the reactor, which writes through edit E23 (row 105);
+`board.read` as a read with marks, and the five planners' replies
+(rows 107, 108); a wake returned after an accept is not re-queued
+(row 110); a completion names at most 17 reply ids (row 111); the stop and
+resume fold (row 114); one copy of a completion at a time (row 115); the
+off switch keeps `board.status` and its reason (row 116); and the service
+grant's wording (row 117). It assumes changes 1 to 4.
+
+**Answer (lead ruling L30, posts #172 and #180).** Yes to changes 1 to 4,
+now in the client API contract version 5 at `09018d6`, and yes to
+contract version 7. `8e80a13` is version 4. Logged as row 120.

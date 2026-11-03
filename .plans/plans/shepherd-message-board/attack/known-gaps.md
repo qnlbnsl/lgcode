@@ -1,8 +1,8 @@
 # Known gaps: shepherd-message-board
 
 Gaps the planner could not close before the freeze. Reviewers: these are
-already known; look for new problems. Updated for plan version 5, the
-rework under lead ruling L26.
+already known; look for new problems. Updated for plan version 6, after
+round 4.
 
 1. **Vendor limits.** The planner cannot read each vendor's remaining
    weekly allowance. The lead checks it before launching any unit.
@@ -34,6 +34,9 @@ rework under lead ruling L26.
    makes the reach check run on every board delivery and uses the "no
    disposition" wording; lead ruling L23 (`ced973b`) passes the delivery
    to the check and moves the dispatcher on after a withdrawal (row 98).
+10. **Closed: question Q6.** Lead ruling L30 approved the four client API
+    changes, now in its version 5 at `09018d6`, and contract version 7
+    (row 120).
 9. **Effect functions.** Shephrd pins Effect 4.0.5 (`pnpm-workspace.yaml`,
    catalog). The plan names no Effect function that the engine does not
    already use at the anchor given. A context7 lookup of Effect 4's
