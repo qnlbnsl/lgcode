@@ -3260,7 +3260,9 @@ delivery being accepted early and then re-sent as successful replay evidence.
 
 Found: 2026-11-02, by the L-1 probe test writer.
 
-Status: open. A failing test guards it:
+Status: fixed in commit `5c726da6d4d8bf0885afeb73a8edcdeb48b867a6` (fix round 1).
+
+A regression test guards it:
 `packages/engine/test/live-check/probe-adversarial.test.ts`, "issue 218".
 
 The state-read probe (SEC-PB-6, Security Post-Build check 6) records
@@ -3281,7 +3283,9 @@ the read still failed; record "not attempted" when the probe itself rejected.
 
 Found: 2026-11-02, by the L-1 probe test writer.
 
-Status: open. Failing tests guard it:
+Status: fixed in commit `5c726da6d4d8bf0885afeb73a8edcdeb48b867a6` (fix round 1).
+
+Regression tests guard it:
 `packages/engine/test/live-check/probe-adversarial.test.ts`, "issue 219",
 for both slash-up and slash-down.
 
@@ -3301,7 +3305,9 @@ delivery was sent, begins with the payload itself.
 
 Found: 2026-11-02, by the L-1 probe test writer.
 
-Status: open. A failing test guards it:
+Status: fixed in commit `5c726da6d4d8bf0885afeb73a8edcdeb48b867a6` (fix round 1).
+
+A regression test guards it:
 `packages/engine/test/live-check/probe-adversarial.test.ts`, "issue 220".
 
 In the always-allow step (SEC-PB-4), the probe chooses the "allow always"
@@ -3319,7 +3325,9 @@ owner.
 
 Found: 2026-11-02, by the L-1 probe test writer.
 
-Status: open. Failing tests guard it:
+Status: fixed in commit `5c726da6d4d8bf0885afeb73a8edcdeb48b867a6` (fix round 1).
+
+Regression tests guard it:
 `packages/engine/test/live-check/probe-adversarial.test.ts`, the three
 tests named "issue 221".
 
@@ -3342,7 +3350,9 @@ that harness's own captured token before its row can record "not found".
 
 Found: 2026-11-02, by the L-1 probe test writer.
 
-Status: open. Failing tests guard it:
+Status: fixed in commit `5c726da6d4d8bf0885afeb73a8edcdeb48b867a6` (fix round 1).
+
+Regression tests guard it:
 `packages/engine/test/live-check/probe-reload.test.ts`, the two tests
 named "issue 222".
 
