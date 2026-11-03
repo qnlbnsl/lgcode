@@ -3736,6 +3736,16 @@ Each failing file passed when run alone: `subscribe-visibility.test.ts` three
 times at load 47, and the four files from ebe060f together once at load 81.
 Both heads then passed `pnpm check` when the runs were repeated one at a time
 below the load limit (8830d8b in post #1325).
+At 9340f71 (post #1329), run 2 of 3 failed `classify-turn-text.test.ts`
+(6.9 A3) and `reset-time.test.ts` (6.10 F-4) again, each by the 30-second
+timeout, although the load was below 24. Runs 1 and 3 passed. Run alone at
+load 26, the slowest case in each file took 19.6 seconds (6.9 A3, "a
+successful turn whose text says 'authentication required'") and 17.4 seconds
+(6.10 F-4, the list of bad reset values). Both cases start a fake adapter for
+each harness or each value in turn, so their fixed 30-second limit leaves
+little margin when the full suite runs in parallel. These two failures are
+therefore test sizing, not load alone, and they predate the B1 merge (they
+also failed at ebe060f).
 Why it matters: a test that fails only under load hides real failures behind
 noise, and a check run at high load costs a full repeat. The orphan sweep
 failure may be a real race, because the sweep found a process group it did
@@ -3745,3 +3755,41 @@ and runs one check at a time. If a test from this list fails again at normal
 load, the wait or timeout in that test is examined, as in issue 196: the wait
 should name the thing the next assertion is about, and fixed 30-second
 timeouts should be checked against the work the test does.
+
+## 236. A Codex agent's call to a Shephrd tool is cancelled before Shephrd sees it
+
+Found: 2026-11-03, by the live check at 9340f71 (live-check-2, run 1, step
+`sandbox-mcp`, criterion PB-A3), against the real Codex adapter
+(`@agentclientprotocol/codex-acp` 2.5.0, `@openai/codex` 0.165.0).
+State: open. Nothing has been changed for it; the owner decides the fix.
+
+What happens: the Codex worker, started with the permission "ask", was told
+to call the Shephrd MCP (Model Context Protocol) tool `ask` once. It did call
+`mcp.shephrd.ask` with the right arguments (event 112), but the call failed
+with `{"error":{"message":"user cancelled MCP tool call"}}` (event 113), and
+the agent reported "The ask call was cancelled by the user." No
+`PermissionRequested` event was written between the two, so neither the lead
+nor the owner was asked. The Claude lead's call to the same tool in the same
+run asked for permission, was allowed, and wrote its `QuestionAsked` event.
+Root cause, read from the adapter's code: Codex asks for approval of an MCP
+tool call as an elicitation. `codex-acp` forwards a form elicitation only when
+the client advertises form elicitation, and it falls back to an ordinary
+permission request only for a URL elicitation or a form with no fields
+(`dist/index.js:38997-39011`, `:39129-39149`). In every other case it answers
+"cancel" itself. Shephrd's runner initializes every adapter with
+`clientCapabilities: {}` (`packages/engine/src/runner/AcpRunner.ts:510`), so
+the approval is cancelled inside the adapter. The exact elicitation was not
+captured, because the protocol log was off for this run.
+Why it matters: a Codex agent that asks before changes may be unable to use
+any Shephrd tool (ask, post, wait and the others) unless Codex skips approval
+for it. A Codex worker then cannot report back or ask its lead through
+Shephrd, and the live check's PB-A3 row for Codex fails.
+What should happen (options for the owner):
+- Advertise form elicitation in the runner and route a tool-approval
+  elicitation through Shephrd's permission flow, like any other permission
+  request. This changes the runner and may need a contract for the answer.
+- Or start Codex with Shephrd's own MCP server marked as not needing approval.
+  This is smaller, but it removes a prompt, so it is a permission decision for
+  the owner.
+Evidence: `.scratch/foundry-runs/engine-build-1/live-check-2/live-check-run1.log`
+and `run1-sandbox-mcp-events.txt` beside it.
