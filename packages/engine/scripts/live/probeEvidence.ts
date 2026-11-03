@@ -101,6 +101,15 @@ export const mcpAskDiscovery = (tool: { input?: string; title: string; status: s
       && reference.tool_name === "mcp__shephrd__ask" && Object.keys(reference).length === 2);
   } catch { return false; }
 };
+// terminal.ts emits redacted replacement snapshots in the existing serialized
+// tool-output field. Decode before inspecting line-oriented shell evidence.
+export const terminalToolOutput = (output: string | undefined): string | undefined => {
+  try {
+    const value = JSON.parse(output ?? "null");
+    if (typeof value?.terminalId !== "string" || typeof value.output !== "string" || typeof value.truncated !== "boolean") return undefined;
+    return value.output + (Number.isSafeInteger(value.exitCode) ? `\nExit code: ${value.exitCode}\n` : "");
+  } catch { return undefined; }
+};
 export const authRefused = (output: string, exitCode: number | undefined): boolean =>
   exitCode !== undefined && exitCode !== 0 && /the engine refused this identity \(HTTP 403\)/.test(output);
 

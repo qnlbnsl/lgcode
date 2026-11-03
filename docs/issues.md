@@ -4032,8 +4032,9 @@ path is used for every other non-Codex harness, so each needs the same check.
 
 Found: 2026-11-03, while diagnosing live-check-2 run 2 at 9e10ed6.
 
-Status: open. This is a real security finding for SEC-PB-5. No engine code
-was changed in this diagnostic round.
+Status: open, deferred to the hostile pass by the fix-round-5 addendum
+(2026-11-03). This is a real security finding for SEC-PB-5. The round-5
+terminal-output fix does not change the ancestry guard.
 
 The Claude lead ran the exact removed-variable command. Events 157-158
 record its input, event 159 requests permission, event 161 selects allow-once,
@@ -4059,8 +4060,10 @@ It contains no token value.
 
 Found: 2026-11-03, while diagnosing live-check-2 run 2 at 9e10ed6.
 
-Status: open. This is a real engine bug. This round permits diagnosis and
-probe fixes only, so no engine code was changed.
+Status: fixed locally by fix round 5 in the implementation commit
+`fix: retain redacted terminal output in tool updates`. Real-adapter
+confirmation and engine review remain for the lead. The manager authorized
+this engine fix in the round-5 addendum.
 
 The Claude canary call, toolu_01TVjd63cUyrVjoXchJwiCSx, appears at events
 239-245. The Codex call, exec-9c103f2b-ee5f-498f-b122-f94a49f6c20b, appears
@@ -4080,17 +4083,44 @@ the metadata contains terminal output and exit fields. Version 2 selects
 this path even with empty clientCapabilities. The output travels in later
 notifications, rather than rawOutput on the completed tool call.
 
-packages/engine/src/runner/translate.ts only handles message, plan and
-tool-call updates. It ignores terminal notifications and does not retain
-their metadata. This source path explains the missing output. The run did
-not retain raw Agent Client Protocol frames, so the exact wire notifications
-cannot be replayed from it. A fix should preserve terminal output and exits,
-correlate them with their tool call and retain the existing secret redaction
-before persistence. It must not fill output from model prose.
+At the failing run, packages/engine/src/runner/translate.ts handled only
+message, plan and tool-call updates. It ignored terminal notifications and
+did not retain their metadata. This source path explains the missing output.
+The run did not retain raw Agent Client Protocol frames, so its exact wire
+notifications cannot be replayed. The round-5 fix preserves terminal output and exits,
+correlates them with their tool call and retains the existing secret redaction
+before persistence. The probes use these tool updates for shell evidence.
 
 This also hides the owner-access result in issue 241 and the Codex refusal
 in issue 243. The session evidence is Claude lines 101-102 and 110-111, and
 Codex lines 44-47 and 59-62, in the paths named by live-check-run2.log.
+
+Fix round 5 handles both the terminal metadata and the version 2 snapshot
+and chunk notifications. It associates output only through an explicit
+terminal reference or terminal_info, including reports that arrive after
+their output. A later status-only report retains the associated output
+snapshot. Unknown terminals never borrow another call's id. The existing
+serialized tool-output field holds the terminalId, redacted output,
+truncated flag and numeric exitCode, when the adapter supplies one. A signal
+is retained when supplied. No contract or client terminal capability changes.
+
+Decoded output uses the runner's streaming redactors before serialization,
+including the decoded-field redaction from issue 223. The carry joins secret
+fragments across chunks. Only the last 16,384 redacted characters of each
+terminal are retained, matching the runner's stderr line bound. Each process
+tracks at most 256 terminals in a turn. A completed turn or replay drains its
+carry and clears those correlations. Encoded or partial terminal payloads
+are withheld from gated protocol logs, whose separate frames cannot safely
+release a split secret. Other structured fields keep their existing redaction.
+
+Regressions in runner/terminal-output.test.ts use both pinned harness shapes,
+with real handler, log and view entry points. They cover snapshots, chunks,
+terminal metadata, nonzero exits, unknown ids, the retention bound, and raw
+and split registered secrets and agent tokens. The secret frames are built
+inside the fake child after spawn, so setup redaction cannot sanitize the
+attack before the runner receives it. Live-check probes decode these tool
+snapshots directly, including their exit codes; they do not read sessions or
+model claims for shell evidence. Missing output still fails.
 
 ## 243. The real Codex shell stops at socket ownership before the ancestry check
 
@@ -4116,6 +4146,11 @@ cause has not been established. The guard must not be weakened to force a pass.
 
 Evidence: the kept events.sqlite and lines 44-47 of
 /home/qnlbnsl/.codex/sessions/2026/11/03/rollout-2026-11-03T13-35-25-01a1a2e8-be04-7a62-86d6-6820e17dcee2.jsonl.
+
+Fix round 5 reports `not observable (issue 243)` in the Codex ancestry row
+when this exact socket ownership rejection is observed in the tool output.
+That outcome remains failing. It does not count as an HTTP 403 ancestry
+refusal and does not change the socket ownership check.
 
 ## 244. The sandbox probe rejects the exact lookup needed for a deferred tool
 
@@ -4167,14 +4202,64 @@ An ended turn without the exact shell hold now fails immediately with a
 named missing attempt instead of waiting for the whole timeout. No service
 kill occurs on that path. Regressions are in probe-fix-round-4.test.ts.
 Fix round 5 replaces the standalone sleep in both restart phases with the
-absolute Node.js executable running a two-minute setTimeout command. The
-implementation is the commit `fix: run restart holds as exact foreground commands`.
+absolute Node.js executable running a two-minute setTimeout command. The implementation commit is
+`138197a7d719fb5d7ba65ec48caf856536e798b1`
+(`fix: run restart holds as exact foreground commands`).
 Both prompts require foreground shell execution and explain the two-minute
 wait. The exact command is shared with the printed dry run and approval
 gates. A standalone sleep, a clock call or background execution is rejected.
 The historical harness block above remains the recorded reason for the
 failed run. The restart criteria remain unproven until an authorized real
 run establishes them.
+
+## 246. Generic tool output has no runner retention bound
+
+Found: 2026-11-03, while selecting the retention bound for issue 242.
+
+Status: open. The round-5 scope adds a terminal-output bound and does not
+change other tools' output behavior.
+
+packages/engine/src/runner/translate.ts serializes rawOutput or the whole
+content array without truncation. AcpRunner.ts then redacts and emits the
+whole translated tool update. There is no generic retained-output bound in
+those paths. The existing bounded diagnostic path is recovery/crash.ts,
+which keeps 30 stderr lines of at most 16,384 characters each. The new
+terminal-output path reuses that character bound for each terminal rather
+than claiming a generic tool bound already existed. Broader retention policy
+for other tools needs a separate decision and change.
+
+## 247. The live readiness regression can observe a killed child after its fixed wait
+
+Found: 2026-11-03, during fix round 5, at 138197a with the terminal-output
+changes uncommitted.
+
+Status: open test reliability finding. No readiness behavior or frozen test
+was changed for this round.
+
+The live-check folder failed once in probe-fix-round-3.test.ts:151. The test
+kills its worker, waits 20 milliseconds and expects the readiness check to
+report no live process. The check instead returned undefined. The same
+folder had passed earlier in the round. The failed run overlapped a runner
+folder run. A scheduling race is suspected, but the process state at the
+failed assertion was not captured, so the cause is not established. Future
+diagnosis should observe the child exit rather than assume the fixed wait
+establishes it. This finding does not authorize weakening the readiness gate.
+
+## 248. The API subscription regression had a transient WebSocket open timeout
+
+Found: 2026-11-03, during fix round 5, at 138197a with the terminal-output
+changes uncommitted.
+
+Status: open test reliability finding. No API code or test was changed.
+
+The security and API folder run failed in subscribe-visibility.test.ts,
+in the stalled-subscription regression for issue 41. Its healthy client
+timed out waiting for the WebSocket open event. Two cleanup errors said the
+WebSocket was closed before the connection was established. The file then
+passed alone, and the combined security and API folders passed on rerun.
+The failed run overlapped other test folders. This test uses a fake runner,
+so it does not exercise AcpRunner's new terminal path. The connection state
+was not captured, and the source of the timeout remains unconfirmed.
 
 ## 250. A fresh service has no harness settings, so its first start is refused
 

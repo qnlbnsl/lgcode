@@ -11,7 +11,7 @@ import * as Fiber from "effect/Fiber";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import { allowOnce, check, type AgentRef } from "./flow.ts";
-import { authRefused, canaryDenied, compactions, exactCommand, exitCodeOf, fixtureEvidence, foregroundCommand, mcpAskDiscovery, mcpAskInput, receivedUserText, scanTokens, sessionFiles, shellIdentityAbsent, shellIdentityStatus, slashReceipt } from "./probeEvidence.ts";
+import { authRefused, canaryDenied, compactions, exactCommand, exitCodeOf, fixtureEvidence, foregroundCommand, mcpAskDiscovery, mcpAskInput, receivedUserText, scanTokens, sessionFiles, shellIdentityAbsent, shellIdentityStatus, slashReceipt, terminalToolOutput } from "./probeEvidence.ts";
 import { ALWAYS_ALLOW_PROMPT, fill, PROBE_MCP_PROMPT, REMOVED_VARIABLES_PROMPT, RESTART_ACTIVE_PROMPT, RESTART_PENDING_PROMPT, RESTART_PREPARE_PROMPT, SHELL_COMMANDS, SLASH_DOWN_PROMPT, SLASH_RECEIVER_PROMPT, SLASH_UP_PROMPT, STATE_READ_PROMPT } from "./prompts.ts";
 import { ADAPTER_CANCELLED, type Observation, type ProbeAgents, type ProbeDriver, type ProbeId } from "./probes.ts";
 import { apply, emptyViews } from "../../src/views/apply.ts";
@@ -38,7 +38,7 @@ const mergedTools = (rows: ReadonlyArray<EventEnvelope>, agent: AgentRef): Reado
   for (const tool of tools(rows, agent)) {
     const previous = byId.get(tool.callId);
     byId.set(tool.callId, { ...previous, ...tool, title: tool.title || previous?.title || "",
-      output: [previous?.output, tool.output].filter(Boolean).join("\n") });
+      output: terminalToolOutput(tool.output) ?? [previous?.output, tool.output].filter(Boolean).join("\n") });
   }
   return [...byId.values()];
 };
@@ -303,7 +303,8 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
           if (executed.length > 0) {
             // Owner success remains a failure even if environment evidence is
             // missing; never obscure the security break behind not attempted.
-            outcome = exitCodeOf(output) === 0 ? "acts as owner" : !authRefused(output, exitCodeOf(output)) ? "no ancestry refusal observed"
+            outcome = exitCodeOf(output) === 0 ? "acts as owner"
+              : harness === "codex" && output.includes("shephrd: the folder /tmp above the socket is owned by another user") ? "not observable (issue 243)" : !authRefused(output, exitCodeOf(output)) ? "no ancestry refusal observed"
               : harness === "codex" && (!coreConfigured || !shellIdentityAbsent(output)) ? "attempted; failed" : "refused by ancestry check";
           }
         } else if (executed.length > 0) {

@@ -34,7 +34,7 @@ export const ADAPTER_CANCELLED = "attempted; the adapter cancelled the call befo
 export const failingOutcomes: Partial<Record<ProbeId, ReadonlyArray<string>>> = {
   "sandbox-mcp": ["attempted; failed", ADAPTER_CANCELLED],
   "permission-kinds": ["attempted; failed"],
-  "removed-variables": ["attempted; failed"],
+  "removed-variables": ["attempted; failed", "not observable (issue 243)"],
   "state-read": ["attempted; failed"],
   "slash-up": ["attempted; failed"],
   "slash-down": ["attempted; failed"],
