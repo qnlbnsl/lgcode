@@ -1644,9 +1644,9 @@ log's redaction boundary.
 ## 103. Adapter setup has no timeout, and spawn registration is not atomic
 
 Found: 2026-11-01, in unit 6a's focused review, finding F-8.
-State: open, fix on branch worker/review-2, commit `c9ff320`.
-The plain `start` remainder is being fixed as post-build A3 on branch `worker/review-2`, with a two-minute setup bound and stop pre-emption.
-The post-build A3 correction at `8596f63` has residual cleanup and writer limits in issues 267 and 268.
+State: fixed in pull request #9 (post-build A3, commits `ddbb1d4` and `4014f7e`), merged on 2026-11-03. Residual limits stay open in issues 266, 267 and 268.
+The plain `start` remainder was fixed as post-build A3, with a two-minute setup bound and stop pre-emption.
+The post-build A3 corrections leave residual cleanup and writer limits in issues 267 and 268.
 
 What happens: initialization, session creation, session load and initial
 configuration have no deadline. An adapter that never responds can keep a
@@ -1670,8 +1670,8 @@ advertised `loadSession`, otherwise `session/resume` when it advertised
 resume, and otherwise it is refused with "adapter cannot reload". The plain
 `start` command was not bounded at the reviewed commit `8ff4c9b`.
 
-What changed on branch `worker/review-2`: commit `c9ff320` applies the same
-two-minute setup bound to a plain start and lets an authorized stop pre-empt
+What changed in pull request #9: commits `ddbb1d4` and `4014f7e` apply the same
+two-minute setup bound to a plain start and let an authorized stop pre-empt
 that setup.
 The post-build result for task 2 reports passing setup tests and a clean
 engine type check on that branch.
@@ -3585,7 +3585,7 @@ per-call cost grows with every secret.
 ## 250. A fresh service has no harness settings, so its first start is refused
 
 Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding N-1.
-State: open, fix on branch worker/review-1.
+State: fixed in pull request #8 (post-build N-1 with A16, commit `79d0421`), merged on 2026-11-03.
 
 Evidence: source inspection confirms the missing defaults in
 `.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-1.md` (not tracked).
@@ -3607,7 +3607,7 @@ refuses every harness until the owner supplies its full settings by hand.
 What should happen: the owner chose automatic loading on the service's first
 start when no harness settings exist.
 The owner also requested a `harnesses reset` command to reload the defaults.
-This is being fixed in this round together with post-build A16 on branch `worker/review-1`.
+This was fixed together with post-build A16 in pull request #8.
 An empty model or effort list means that the value is not checked.
 
 Score: MAJOR, severity 6 × fallout 3 × probability 10 = 180, band fix before release.
@@ -4227,8 +4227,8 @@ are stronger than the persistence path and the test establish.
 ## 269. An account home that equals a stored secret value is redacted, so the account event fails its schema and later account commands are refused
 
 Found: 2026-11-03, in the re-review of the post-build A9 fix at `1f2602a`.
-State: open, residual after the last fix round; code on branch
-`worker/review-1` at `1f2602a`.
+State: open, residual after the last fix round; the code reviewed at
+`1f2602a` is merged in pull request #8.
 
 Evidence: finding F-1 is in
 `.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/rresult-1b.md` (not tracked).
@@ -4270,9 +4270,9 @@ matching setting while preserving secret removal.
 Do not exempt secrets from redaction.
 The registry in `packages/engine/src/service.ts` is also involved in
 owner finding B1, recorded in issue 223.
-Post-build A4 is being fixed on branch `worker/review-4`.
-It has no issue entry.
-The post-build A4 fixer must account for this residual when changing that registry.
+Post-build A4 was fixed in pull request #11 and has no issue entry.
+The A4 fix leaves this failure open: `home` is still free text, so it is still redacted
+(`rresult-4.md`, question 4, in the same run folder).
 
 Score: not assigned, because this is a residual after the last fix round.
 The re-review labels the finding MAJOR.
