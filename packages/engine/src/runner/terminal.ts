@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { StringDecoder } from "node:string_decoder";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import type { Translated } from "./translate.ts";
 
@@ -24,6 +25,16 @@ export const withoutTerminalData = (value: unknown): unknown => {
   return { ...row, _meta: Object.fromEntries(Object.entries(row._meta).filter(([key]) => !keys.includes(key))) };
 };
 
+// A v1 delta-only report has no independent tool information. Emitting its
+// stripped, empty tool report would bypass the terminal snapshot throttle.
+export const terminalDataOnly = (value: unknown): boolean => {
+  const row = object(value);
+  const meta = object(row?._meta);
+  return row?.sessionUpdate === "tool_call_update" && meta !== undefined
+    && Object.keys(meta).length > 0 && Object.keys(meta).every((key) => keys.includes(key))
+    && Object.keys(row).every((key) => ["sessionUpdate", "toolCallId", "_meta"].includes(key));
+};
+
 export const withoutTerminalPayload = (value: unknown): unknown => {
   if (Array.isArray(value)) return value.map(withoutTerminalPayload);
   const row = object(withoutTerminalData(value));
@@ -37,8 +48,9 @@ interface Terminal {
   call?: { callId: string; title: string; status: "pending" | "in_progress" | "completed" | "failed" };
   output: string;
   truncated: boolean;
-  seen: boolean;
   ended: boolean;
+  dirty: boolean;
+  publishedAt?: number;
   exitCode?: number;
   signal?: string;
 }
@@ -46,27 +58,48 @@ interface Terminal {
 // Only redacted text is retained; the redactor separately bounds raw carry.
 const outputCharacters = 16_384;
 const terminalCount = 256;
+// Two output snapshots per second keep interactive progress visible without
+// repeatedly persisting a 16 KiB tail for every small adapter chunk.
+const publishWindowMs = 500;
 export const makeTerminalOutput = (options: {
   readonly redactChunk: (id: string, text: string, final: boolean) => Effect.Effect<string>;
   readonly redactText: (text: string) => Effect.Effect<string>;
 }) => {
   const terminals = new Map<string, Terminal>();
-  const get = (id: unknown): Terminal | undefined => {
+  let capWarned = false;
+  const get = (id: unknown, evicted: Translated[]): Effect.Effect<Terminal | undefined> => Effect.gen(function* () {
     if (typeof id !== "string" || id === "") return undefined;
     const previous = terminals.get(id);
     if (previous !== undefined) return previous;
-    if (terminals.size >= terminalCount) return undefined; // Fail closed; never guess another call.
-    const entry: Terminal = { terminalId: id, stream: randomUUID(), decoder: new StringDecoder("utf8"), output: "", truncated: false, seen: false, ended: false };
+    if (terminals.size >= terminalCount) {
+      if (!capWarned) {
+        capWarned = true;
+        yield* Effect.logWarning("terminal limit reached: retaining at most 256 terminals in this turn");
+      }
+      const oldest = [...terminals.values()].find((entry) => entry.ended || entry.call === undefined);
+      if (oldest === undefined) return undefined; // Never steal an active call's terminal.
+      // Release the evicted stream's bounded redactor carry, discarding its
+      // result. Unclaimed output must never be attributed to another call.
+      if (oldest.ended && oldest.dirty) evicted.push(...yield* report(oldest, true));
+      if (!oldest.ended) yield* options.redactChunk(oldest.stream, oldest.decoder.end(), true);
+      terminals.delete(oldest.terminalId);
+    }
+    const entry: Terminal = { terminalId: id, stream: randomUUID(), decoder: new StringDecoder("utf8"), output: "", truncated: false, ended: false, dirty: false };
     terminals.set(id, entry);
     return entry;
-  };
+  });
   const append = (entry: Terminal, text: string) => {
     const combined = entry.output + text;
     entry.truncated ||= combined.length > outputCharacters;
     entry.output = combined.slice(-outputCharacters);
+    entry.dirty ||= text.length > 0;
   };
-  const report = (entry: Terminal): Effect.Effect<ReadonlyArray<Translated>> => Effect.gen(function* () {
-    if (entry.call === undefined || !entry.seen) return [];
+  const report = (entry: Terminal, immediate = false): Effect.Effect<ReadonlyArray<Translated>> => Effect.gen(function* () {
+    if (entry.call === undefined || (!entry.dirty && !immediate)) return [];
+    const now = yield* Clock.currentTimeMillis;
+    if (!immediate && entry.publishedAt !== undefined && now - entry.publishedAt < publishWindowMs) return [];
+    entry.publishedAt = now;
+    entry.dirty = false;
     const callId = yield* options.redactText(entry.call.callId);
     const title = yield* options.redactText(entry.call.title);
     // ThreadContent already serializes structured tool output as a string.
@@ -74,8 +107,8 @@ export const makeTerminalOutput = (options: {
     const output = JSON.stringify({ terminalId: yield* options.redactText(entry.terminalId), output: entry.output, truncated: entry.truncated,
       ...(entry.exitCode === undefined ? {} : { exitCode: entry.exitCode }),
       ...(entry.signal === undefined ? {} : { signal: yield* options.redactText(entry.signal) }) });
-    const status = entry.exitCode !== undefined || entry.signal !== undefined
-      ? entry.signal !== undefined || entry.exitCode !== 0 ? "failed" : "completed" : entry.call.status;
+    const status = entry.call.status === "failed" || entry.signal !== undefined || (entry.exitCode !== undefined && entry.exitCode !== 0)
+      ? "failed" : entry.exitCode === 0 ? "completed" : entry.call.status;
     return [{ kind: "tool-call", text: output, content: { _tag: "tool-call", callId, title, status, output } }];
   });
   const end = (entry: Terminal) => Effect.gen(function* () {
@@ -91,20 +124,22 @@ export const makeTerminalOutput = (options: {
       entry.stream = randomUUID(); entry.decoder = new StringDecoder("utf8");
       entry.output = ""; entry.truncated = false; entry.ended = false;
     } else if (entry.ended) return;
-    entry.seen = true;
+    entry.dirty = true;
     append(entry, yield* options.redactChunk(entry.stream, text, false));
   });
   const push = (value: unknown): Effect.Effect<ReadonlyArray<Translated>> => Effect.gen(function* () {
     const row = object(value);
     if (row === undefined) return [];
+    const evicted: Translated[] = [];
     const changed = new Set<Terminal>();
+    const immediate = new Set<Terminal>();
     if (row.sessionUpdate === "terminal_update" || row.sessionUpdate === "terminal_output_chunk") {
-      const entry = get(row.terminalId);
-      if (entry === undefined) return [];
+      const entry = yield* get(row.terminalId, evicted);
+      if (entry === undefined) return evicted;
       const encoded = row.sessionUpdate === "terminal_output_chunk" ? row.data : object(row.output)?.data;
       if (typeof encoded === "string") {
         // V2's data is bytes, not text to redact while still base64 encoded.
-        if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) return [];
+        if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(encoded)) return evicted;
         const bytes = Buffer.from(encoded, "base64");
         if (row.sessionUpdate === "terminal_update") {
           yield* data(entry, bytes.toString("utf8"), true);
@@ -115,15 +150,18 @@ export const makeTerminalOutput = (options: {
       if (exit !== undefined) {
         if (Number.isSafeInteger(exit.exitCode)) entry.exitCode = exit.exitCode;
         if (typeof exit.signal === "string" && exit.signal !== "") entry.signal = exit.signal;
-        entry.seen = true; yield* end(entry); changed.add(entry);
+        entry.dirty = true; yield* end(entry); changed.add(entry); immediate.add(entry);
       }
     } else if ((row.sessionUpdate === "tool_call" || row.sessionUpdate === "tool_call_update") && typeof row.toolCallId === "string") {
       const meta = object(row._meta);
+      const genericReport = !terminalDataOnly(row);
       const references = Array.isArray(row.content) ? row.content.filter((part: any) => part?.type === "terminal").map((part: any) => part.terminalId) : [];
       if (object(meta?.terminal_info) !== undefined) references.push(meta!.terminal_info.terminal_id);
       for (const id of references) {
-        const entry = get(id);
+        const entry = yield* get(id, evicted);
         if (entry === undefined || (entry.call !== undefined && entry.call.callId !== row.toolCallId)) continue;
+        if (entry.call === undefined) immediate.add(entry);
+        entry.dirty = true;
         entry.call = { callId: row.toolCallId, title: typeof row.title === "string" ? row.title : entry.call?.title ?? "",
           status: ["pending", "in_progress", "completed", "failed"].includes(row.status) ? row.status : entry.call?.status ?? "pending" };
         changed.add(entry);
@@ -132,32 +170,37 @@ export const makeTerminalOutput = (options: {
       // Refresh only terminals already explicitly bound to this call.
       for (const entry of terminals.values()) {
         if (entry.call?.callId !== row.toolCallId) continue;
-        if (typeof row.title === "string") entry.call.title = row.title;
-        if (["pending", "in_progress", "completed", "failed"].includes(row.status)) entry.call.status = row.status;
+        // An independent tool report is emitted before these snapshots. Even
+        // unchanged status must leave a dirty snapshot to restore at finish.
+        entry.dirty ||= genericReport;
+        if (typeof row.title === "string") { entry.dirty ||= entry.call.title !== row.title; entry.call.title = row.title; }
+        if (["pending", "in_progress", "completed", "failed"].includes(row.status)) { entry.dirty ||= entry.call.status !== row.status; entry.call.status = row.status; }
         changed.add(entry);
       }
       for (const key of ["terminal_output", "terminal_output_delta", "terminal_exit"] as const) {
         const part = object(meta?.[key]);
         if (part === undefined) continue;
-        const entry = get(part.terminal_id);
+        const entry = yield* get(part.terminal_id, evicted);
         // Metadata cannot reassign a terminal already owned by another call.
         if (entry === undefined || entry.call?.callId !== row.toolCallId) continue;
         if (key === "terminal_exit") {
           if (Number.isSafeInteger(part.exit_code)) entry.exitCode = part.exit_code;
           if (typeof part.signal === "string" && part.signal !== "") entry.signal = part.signal;
-          entry.seen = true; yield* end(entry);
+          entry.dirty = true; yield* end(entry); immediate.add(entry);
         } else if (typeof part.data === "string") yield* data(entry, part.data, key === "terminal_output");
         changed.add(entry);
       }
     }
-    return (yield* Effect.forEach(changed, report)).flat();
+    return [...evicted, ...(yield* Effect.forEach(changed, (entry) => report(entry, immediate.has(entry)))).flat()];
   });
-  const finish = (): Effect.Effect<ReadonlyArray<Translated>> => Effect.gen(function* () {
+  const finish = ({ resetLimitWarning = true }: { readonly resetLimitWarning?: boolean } = {}): Effect.Effect<ReadonlyArray<Translated>> => Effect.gen(function* () {
     const pending: Translated[] = [];
     for (const entry of terminals.values()) {
-      if (!entry.ended) { yield* end(entry); pending.push(...yield* report(entry)); }
+      yield* end(entry);
+      if (entry.dirty) pending.push(...yield* report(entry, true));
     }
     terminals.clear();
+    if (resetLimitWarning) capWarned = false;
     return pending;
   });
   return { push, finish };

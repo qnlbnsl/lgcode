@@ -47,7 +47,7 @@ import { makePermissionHold, mapPermissionOption, settingsWrite } from "./permis
 import { resetTimeFromError } from "./resetTime.ts";
 import { Runner, RunnerRejected, type ReplayItem, type RunnerEvent, type SessionInfo } from "./Runner.ts";
 import { translate, type Translated } from "./translate.ts";
-import { makeTerminalOutput, withoutTerminalData, withoutTerminalPayload } from "./terminal.ts";
+import { makeTerminalOutput, terminalDataOnly, withoutTerminalData, withoutTerminalPayload } from "./terminal.ts";
 
 export interface AcpRunnerOptions {
   readonly socketPath: string;
@@ -231,12 +231,22 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     if (entry.turn === undefined && !entry.loading) return;
     for (const translated of updates) {
       const deliveryId = entry.turn?.deliveryId ?? Schema.decodeUnknownSync(DeliveryId)(`replay-${randomUUID()}`);
-      const content = yield* cleanStructure(translated.content, entry.covered).pipe(Effect.flatMap(Schema.decodeUnknownEffect(threadContent)),
-        Effect.mapError(() => rejected("adapter terminal content is malformed")));
-      const text = yield* redactText(translated.text, entry.covered);
+      // Latch coverage loss for this publication, including a store change
+      // during redaction. Withholding trusted schema keys makes an invalid
+      // shape, so replace the whole item instead of decoding that shape.
+      let lost = false;
+      const covered = () => { lost ||= !entry.covered(); return !lost; };
+      const content = covered() ? yield* cleanStructure(translated.content, covered).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(threadContent)),
+        Effect.catch(() => covered() ? Effect.fail(rejected("adapter terminal content is malformed")) : Effect.succeed(undefined)),
+      ) : undefined;
+      const text = yield* redactText(translated.text, covered);
+      const withheld = content === undefined || !covered();
       if (entry.loading) noteReplay(entry, { _tag: "break" });
       yield* emit({ _tag: "deliveryUpdate", agentId: entry.input.agentId, incarnation: entry.incarnation, deliveryId,
-        kind: "tool-call", replay: entry.loading, text, content });
+        kind: withheld ? "message" : "tool-call", replay: entry.loading,
+        ...(withheld ? { role: "agent" as const } : {}),
+        text: withheld ? withheldText : text, content: withheld ? { _tag: "text", text: withheldText } : content });
     }
   });
   const drainTerminals = (entry: Process) => entry.terminalOutput.finish().pipe(Effect.flatMap((updates) => publishTerminals(entry, updates)));
@@ -492,7 +502,8 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         // non-message update becomes one fixed withheld item. It is
         // translated raw only to learn its items; none of its data is used.
         const lost = !chunk && !current.covered();
-        const translatedUpdates = translate(chunk || lost ? update : yield* cleanStructure(withoutTerminalData(update), current.covered), current.loading);
+        const translatedUpdates = !lost && terminalDataOnly(update) ? []
+          : translate(chunk || lost ? update : yield* cleanStructure(withoutTerminalData(update), current.covered), current.loading);
         if (current.turn === undefined && !current.loading) {
           if (translatedUpdates.length > 0) yield* Effect.logWarning("adapter content dropped: no active turn");
           return;
@@ -501,7 +512,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         if (lost) {
           // Discard pending terminal carry when coverage is lost; no raw text
           // from that interval may be released after the login store recovers.
-          yield* current.terminalOutput.finish();
+          yield* current.terminalOutput.finish({ resetLimitWarning: false });
         } else {
           terminalUpdates = yield* current.terminalOutput.push(update);
         }

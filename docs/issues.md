@@ -3739,6 +3739,23 @@ least logged.
 Why it matters: the last output before a crash, often the most useful for
 diagnosis, can be missing from the thread.
 
+Additional evidence from the issue 242 focused review, finding E, on
+2026-11-03: stopping an agent also loses the redactor's held tail for both
+ordinary text and terminal output.
+The two `E diagnostic` regressions in
+`packages/engine/test/runner/terminal-lifecycle-round-7.test.ts` start a fake
+adapter through the real command handler, wait for a notification behind
+the held tail, and stop the agent through the owner command.
+Both tails appear in the runner's delivery updates during stop.
+Neither appears in a stored thread item.
+This is a separate loss point from the queued-notification race above.
+`packages/engine/src/commands/stop.ts:19-20` revokes the token in the stop
+transaction before calling the runner.
+`packages/engine/src/commands/CommandHandler.ts:142-147` ignores runner
+events after the agent leaves a live state or its token is revoked.
+The terminal path flushes its carry in `AcpRunner.ts` during close.
+The issue 242 round-7 scope leaves this shared stop-state path unchanged.
+
 ## 232. A token encoded twice, such as base64 of its JSON-escaped form, is not redacted
 
 Found: 2026-11-02, by the security review of the issue 223 fix (commit
@@ -4153,6 +4170,15 @@ attack before the runner receives it. Live-check probes decode these tool
 snapshots directly, including their exit codes; they do not read sessions or
 model claims for shell evidence. Missing output still fails.
 
+The round-7 review follow-up is recorded in issues 249, 270 and 271.
+A zero exit now preserves a failed status reported by the adapter.
+A new truncation-edge regression splits a registered secret across chunks
+and cuts the retained tail through that secret's original position.
+Removing the chunk redaction calls makes this regression fail on the
+remaining raw secret fragment, even with publication-time redaction enabled.
+The restored implementation passes that regression.
+The shared stop-path tail loss remains open under issue 231.
+
 ## 243. The real Codex shell stops at socket ownership before the ancestry check
 
 Found: 2026-11-03, while diagnosing live-check-2 run 2 at 9e10ed6.
@@ -4258,6 +4284,8 @@ which keeps 30 stderr lines of at most 16,384 characters each. The new
 terminal-output path reuses that character bound for each terminal rather
 than claiming a generic tool bound already existed. Broader retention policy
 for other tools needs a separate decision and change.
+Issue 270 records the separate, fixed amplification of bounded terminal
+snapshots. Its fix does not bound generic tool output.
 
 ## 247. The live readiness regression can observe a killed child after its fixed wait
 
@@ -4291,6 +4319,34 @@ passed alone, and the combined security and API folders passed on rerun.
 The failed run overlapped other test folders. This test uses a fake runner,
 so it does not exercise AcpRunner's new terminal path. The connection state
 was not captured, and the source of the timeout remains unconfirmed.
+
+## 249. Lost credential coverage with pending terminal output hangs turn completion
+
+Found: 2026-11-03, in the focused review of issue 242, finding A.
+Status: fixed in the round-7 terminal fix on `worker/engine-lcpb`.
+
+At commit `34af123`, `packages/engine/src/runner/AcpRunner.ts:251` marks the
+turn ended before draining its terminal output.
+The terminal publication at lines 234-235 redacts every string key and leaf
+before schema decoding.
+If the credential file becomes unreadable while the terminal holds its tail,
+the coverage guard replaces those schema keys with the fixed withheld text.
+The schema decoder rejects that shape.
+The completion fiber never emits its prompt reply or turn-ended event.
+The ended flag prevents a later completion attempt.
+A fixed diagnostic at that decoder confirmed this failure in both new
+coverage-loss regressions.
+The streaming decoder itself did not fail.
+
+The fix latches coverage loss during each terminal publication and substitutes
+one fixed withheld-text item instead of decoding the damaged shape.
+The turn completes without storing the pending output.
+Once the credential store is repaired, the next turn can run and its terminal
+output is redacted normally.
+The `249` regressions in
+`packages/engine/test/runner/terminal-lifecycle-round-7.test.ts` exercise both
+journeys through a real command handler and a fake adapter.
+They corrupt only a credential file in the test's temporary home.
 
 ## 250. A fresh service has no harness settings, so its first start is refused
 
@@ -4989,3 +5045,68 @@ Score: not assigned, because this is a residual after the last fix round.
 The re-review labels the finding MAJOR.
 Why it matters: a matching login-folder configuration can fail after
 persisting its secret and leave later account commands refused.
+
+
+## 270. Every terminal chunk persisted another whole retained snapshot
+
+Found: 2026-11-03, in the focused review of issue 242, finding B.
+Status: fixed in the round-7 terminal fix on `worker/engine-lcpb`.
+
+At commit `34af123`, `packages/engine/src/runner/terminal.ts:153` reports every
+changed terminal immediately.
+Two thousand chunks of 100 characters produce 2,002 tool-call events in the
+new version 2 regression against that code.
+The review measured about 32 megabytes of event payload for that journey.
+The 16,384-character retention limit bounds a snapshot, but not its repeated
+publication cost.
+Version 1 metadata-only deltas also produce empty generic tool reports after
+the terminal metadata is stripped.
+
+The fix uses the Effect clock and a 500-millisecond window per terminal.
+Two output snapshots per second preserve interactive progress without
+persisting the whole retained tail for every small chunk.
+Binding and exit publish immediately.
+Turn end and stop flush any unpublished output or status.
+Metadata-only terminal deltas no longer emit empty generic tool reports.
+The final snapshot retains the same last 16,384 redacted characters.
+A repeated, unchanged tool status also marks the snapshot unpublished, so
+its empty generic report cannot hide the retained output at turn end.
+The tests use the Effect test clock to check the window boundaries and the
+independence of two terminals without real timing sleeps.
+
+The `270` regressions in `terminal-output-round-7.test.ts` bound the helper's
+2,000-chunk journey to three snapshots and less than 40 kibibytes of payload.
+The version 1 and version 2 journeys in `terminal-lifecycle-round-7.test.ts`
+use the real command handler and bound stored tool-call events to fewer than
+ten and their serialized payload to less than 100 kibibytes.
+Both require the complete retained tail at turn end.
+These files are under `packages/engine/test/runner/`.
+Issue 246 remains open for generic tool-output retention.
+
+## 271. The terminal cap silently refused later terminals and unclaimed ids consumed its slots
+
+Found: 2026-11-03, in the focused review of issue 242, finding C.
+Status: fixed in the round-7 terminal fix on `worker/engine-lcpb`.
+
+At commit `34af123`, `packages/engine/src/runner/terminal.ts:58` returns nothing
+for a new terminal after the map reaches 256 entries.
+Completed terminals remain in the map until the turn ends.
+Unclaimed ids use the same slots as terminals associated with real calls.
+The new regressions against that code retain only 256 of 300 completed
+terminals and refuse a real call after 256 unclaimed ids.
+
+The fix logs one fixed warning per overflowing turn without including
+terminal output or ids.
+It evicts the oldest ended or unclaimed terminal before refusing a new one.
+It flushes an ended terminal's unpublished status before eviction and
+discards an unclaimed terminal's redactor carry.
+An active terminal associated with a call is never evicted.
+The 256-entry state bound remains in place.
+Discarding terminal carry on a temporary coverage loss keeps the warning
+latch until the actual turn ends.
+The `271` regressions in
+`packages/engine/test/runner/terminal-output-round-7.test.ts` cover both
+starvation cases and the unpublished-status flush.
+The logger regression in `terminal-lifecycle-round-7.test.ts` verifies one
+warning in each of two overflowing turns and checks that it contains no
+output text.
