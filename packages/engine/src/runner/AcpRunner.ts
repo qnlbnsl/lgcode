@@ -37,6 +37,7 @@ import { Redactor } from "../log/Redactor.ts";
 import { makeStderrTail, stderrTailLines } from "../recovery/crash.ts";
 import { linuxProcessReader } from "../recovery/orphans.ts";
 import { buildBaseEnvironment } from "./baseEnvironment.ts";
+import { harnessLogin, homeConflict, loginRefusal } from "./harnesses.ts";
 import { classifyError } from "./classify.ts";
 import { compactPrompt } from "./compact.ts";
 import { setConfig, type ConfigOption } from "./config.ts";
@@ -285,6 +286,11 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       || (input.effort !== undefined && harness.efforts.length > 0 && !harness.efforts.includes(input.effort))) return yield* rejected("configuration is not recorded");
     const startingMode = harness.permissionMapping[input.permission];
     if (harness.reportedModes.length > 0 && !harness.reportedModes.some((mode) => mode.id === startingMode)) return yield* rejected("mode is not recorded");
+    // Fix round 2, F-1: a field the harness cannot apply would run the agent on
+    // another login than the account names, so it is refused here as well as
+    // when the account is set.
+    const unsupported = loginRefusal(harness.id, input.account);
+    if (unsupported !== undefined) return yield* rejected(unsupported);
     const resolvedSecrets = [input.token];
     const variables: Record<string, string> = {};
     for (const [name, value] of Object.entries(input.account.environment ?? {})) {
@@ -296,8 +302,24 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         variables[name] = Redacted.value(secret);
       } else variables[name] = value;
     }
+    // Fix round 1, A9: the account's `home` goes to the harness's own login
+    // variable and its `secret` to the harness's key variable. HOME is not
+    // touched, so the keychain login stays reachable.
+    const login = harnessLogin(harness.id);
+    // The environment is already resolved, so a reference to the same folder is no conflict.
+    const conflict = homeConflict(harness.id, input.account.home, login.homeVariable === undefined ? undefined : variables[login.homeVariable]);
+    if (conflict !== undefined) return yield* rejected(`account home differs from ${conflict}`);
+    if (input.account.home !== undefined && login.homeVariable !== undefined && harness.id !== "codex") variables[login.homeVariable] = input.account.home;
+    const secretVariable = input.account.secret !== undefined && login.keyVariable !== undefined && variables[login.keyVariable] === undefined ? login.keyVariable : undefined;
+    if (secretVariable !== undefined && input.account.secret !== undefined) {
+      const secret = yield* secrets.resolve(input.account.secret);
+      if (secret === undefined) return yield* rejected("account secret is unavailable");
+      resolvedSecrets.push(secret);
+      variables[secretVariable] = Redacted.value(secret);
+    }
     if (harness.id === "codex") {
-      const homed = yield* withCodexHome({ stateFolder: configuration.stateFolder, home: configuration.environment.HOME ?? input.folder, accountId: input.account.id, variables }).pipe(
+      const homed = yield* withCodexHome({ stateFolder: configuration.stateFolder, home: configuration.environment.HOME ?? input.folder, accountId: input.account.id, variables,
+        ...(input.account.home === undefined ? {} : { homePath: input.account.home }) }).pipe(
         Effect.provideService(FileSystem.FileSystem, fileSystem), Effect.provideService(Path.Path, pathService),
         Effect.mapError(() => rejected("account home cannot be prepared")),
       );
@@ -305,7 +327,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     }
     const base = buildBaseEnvironment({ parent: configuration.environment, accountVariables: variables,
       shephrdSocket: configuration.socketPath, shephrdToken: Redacted.value(input.token) });
-    const environment = yield* mergeProviderInstanceEnvironment(Object.entries(variables).map(([name, value]) => ({ name, value, sensitive: input.account.environment?.[name]?.startsWith("secret:") ?? false })), base).pipe(
+    const environment = yield* mergeProviderInstanceEnvironment(Object.entries(variables).map(([name, value]) => ({ name, value, sensitive: name === secretVariable || (input.account.environment?.[name]?.startsWith("secret:") ?? false) })), base).pipe(
       Effect.provideService(HomeDirectory, configuration.environment.HOME ?? input.folder),
     );
     // Issue 223: the adapter can read its own login store and print a token
