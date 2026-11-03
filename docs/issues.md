@@ -5297,3 +5297,64 @@ command, passed in every run.
 The fix is to filter both post-restart assertions by the failed request's id.
 "Permission moved" carries that id as `permissionRequestId`, and "owner needed"
 carries it as `subject.id`.
+
+## 280. A short explicit secret equal to a schema word makes a terminal snapshot fail to decode and drops the terminal item
+
+Found: 2026-11-03, in the post-build re-baseline at `ce50c50` (the merge of
+pull request #13).
+State: open, recorded, not fixed. The fix round was at its two-round cap.
+The review lead scored it 36, which is the record band.
+The re-reviewer's scoring was adopted: severity 6, because a core feature
+stays wrong until the configuration is corrected by hand; fallout 3, because
+the owner can change the conflicting configuration and restart the affected
+work without support; and probability 2, because the conflicting credential
+configuration is unusual but needs no privileged access.
+
+Evidence: finding F-1 is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/rresult-6.md` (not tracked).
+The re-reviewer reproduced it with an in-memory probe that used the real
+terminal output builder, the `cleanStructure` and `publishTerminals` bodies
+copied unchanged from `ce50c50`, and the real `threadContent` schema.
+The review lead read the same code and confirmed the path.
+The re-reviewer also ran nine targeted test files, of which 38 tests passed and
+35 failed.
+The child-process tests were run, but adapter initialization failures prevented
+validation of the full live path.
+
+What happens: `publishTerminals` in `packages/engine/src/runner/AcpRunner.ts`
+passes the generated terminal content through `cleanStructure`.
+That helper redacts every object key and every string leaf, including the
+`_tag` key and its value `tool-call`.
+It therefore bypasses the structure protection that pull request #11 added to
+the event log.
+If a registered secret collides with part of a required key, discriminator or
+enumerated value, the content no longer decodes as `threadContent`.
+The redactor matches occurrences within strings, so the secret does not need
+to equal the whole word.
+The demonstrated examples are the explicit secrets `_tag`, `tool-call` and `t`.
+The eight-character inferred values `ool-call` and `tool-cal` also corrupt the
+`tool-call` discriminator and fail in the same way.
+The decode failure becomes the rejection "adapter terminal content is
+malformed".
+The update handler catches that rejection and drops the terminal item.
+A drain at the end of a turn can propagate the same rejection to its caller.
+With an unrelated secret the same terminal publishes one item.
+No secret leaks, because the failure closes the path.
+The cost is lost terminal output, and possibly a turn that does not reply.
+
+Why the probability is not higher: a registered secret has to collide with part
+of the schema vocabulary.
+An inferred value also needs an environment variable whose name matches the
+service's secret-name pattern, and a value that passes the length and
+scalar exclusions in `packages/engine/src/identity/inferredSecret.ts`.
+
+The fix: redact the outer tool-call structure without rewriting its keys or
+its discriminator.
+Keep redacting the call identifier, the title, the signal and the whole
+serialized output as text, including any `_tag` inside that string.
+Keep the coverage-loss latch.
+If redaction makes another required field invalid, publish a fixed withheld
+item instead of dropping the terminal or failing the drain.
+Add a runner-to-log test for the short explicit-secret collisions.
+The existing terminal tests use a long secret, and the existing structure
+tests exercise the event-log redactor without this publication step.
