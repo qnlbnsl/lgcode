@@ -5250,3 +5250,50 @@ wait and the documents.
 A model's refusal is an honest outcome, and the probes do not count it as a pass.
 A later change could reword these prompts, or could run the probes on a stronger
 model. Either would need another real run.
+
+## 276. The atomic-write acceptance test can fail on a later, unrelated request
+
+Found: 2026-11-03, by the test runner (`pnpm check` at `f5e002c`, post #1343).
+Status: open, recorded, not fixed. The fault is in the test, not in the engine.
+No test or production code has been changed for it.
+
+The test is the third scenario in
+`packages/engine/test/acceptance/failure-3-atomic.test.ts`.
+It plants a database fault, so that a pass-up command cannot write its last
+event.
+It then restarts the service and asserts that the child has no "permission
+moved" event in the whole log.
+That assertion fails with this message: "part of the failed command is in the
+log after the restart".
+Run 1 of 3 at `f5e002c` failed this way, and runs 2 and 3 passed.
+Run 2 at `bd38b78` failed with the same message (test-run log
+`review-13-run2-bd38b78-check.log`).
+The earlier failure was not reproduced at that older head.
+
+The message is misleading, because the event comes from a later request.
+A restart cancels the open request, and the reloaded child then asks again under
+a new request id.
+The holder's turn ends without an answer, so the engine moves the new request to
+the owner.
+That move is ordinary behaviour.
+The assertion matches on the child's agent id, not on the failed request's id.
+It therefore fails whenever the log read happens after that move.
+
+A temporary copy of the test showed this, and the copy has been deleted.
+With a six-second wait before the read, the copy failed every time it ran (one
+run), at sequence 38, the same sequence as the failed check.
+Its log showed the failed request `f8bb32df` with a cancel at sequence 20 and no
+move.
+The move at sequence 38 belonged to the new request `61fc71d8`.
+With the assertion narrowed to the failed request's id, the same delayed copy
+passed.
+Without the wait, 24 runs of the unchanged assertion passed, so the failure
+depends on read timing.
+
+Atomicity itself is not in doubt in these runs.
+The check before the restart, which looks for a partial write of the failed
+command, passed in every run.
+
+The fix is to filter both post-restart assertions by the failed request's id.
+"Permission moved" carries that id as `permissionRequestId`, and "owner needed"
+carries it as `subject.id`.
