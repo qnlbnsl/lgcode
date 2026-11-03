@@ -393,8 +393,10 @@ The client library offers a helper, `waitForAgents`, that takes a set of
 agents and "any" or "all". It takes a snapshot, subscribes, and finishes when
 the agents meet the same "settled" test the engine uses for agent waits. The
 seam moves that test from the engine into the engine's contracts package,
-so the helper and the engine share one copy and cannot disagree. The command-line tool's `shephrd wait --block` for the owner uses
-this helper.
+so the helper and the engine share one copy and cannot disagree. The owner's
+terminal waits with a new subcommand, `shephrd client wait`, which runs
+this helper over `subscribe`. The engine's own `shephrd wait` and its
+owner-choice A10 test stay as they are.
 
 ## 4. From "owner needed" to an alert
 
