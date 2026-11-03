@@ -1,8 +1,8 @@
 # Known gaps: shepherd-message-board
 
 Gaps the planner could not close before the freeze. Reviewers: these are
-already known; look for new problems. Updated for plan version 4, after
-round 3.
+already known; look for new problems. Updated for plan version 5, the
+rework under lead ruling L26.
 
 1. **Vendor limits.** The planner cannot read each vendor's remaining
    weekly allowance. The lead checks it before launching any unit.
@@ -16,17 +16,16 @@ round 3.
    words and the engine-authenticated id (row 63). The client API's
    section 2 no longer says the envelope names the calling agent
    (`ed1755d`).
-5. **New packages, test-runner projects and scopes.** The board's code is
-   in two new packages, `packages/board-contracts` and `packages/board`.
-   Their manifests, their workspace entries, and their entries in the root
-   `vitest.config.ts`, which lists test projects by name, are changes no
-   board unit may make. The lead decides whether the seam unit creates
-   them or a unit is given that right. Criterion 1.9 checks that the test
-   runner lists both packages. The scopes `board/contracts` and
-   `board/backend` do not exist; the lead runs the scoping skill for both
-   before launch.
-6. **The owner's answer to row 9 is pending.** If the owner says no, the
-   plan and `contract.md` are withdrawn and rewritten.
+5. **Scopes.** The board now adds no package: its code is in
+   `packages/contracts/src/board/` and `packages/engine/src/board/`
+   (row 100), so no manifest, workspace entry or test project is needed.
+   Criterion 1.9 checks that the test runner lists the board's test
+   folders. The scopes `board/contracts` and `board/backend` do not exist;
+   the lead runs the scoping skill for both before launch. They must cover
+   the board's lines in the engine files that the engine-change table
+   names.
+6. **Closed: the owner's answer to row 9.** The owner said to edit the
+   engine directly (row 99).
 7. **The owner's confirmation of four exclusions.** Row 44 marks work
    items, file and branch watches, the test queue and usage meters as
    WIDENED. The lead confirms them with the owner at acceptance (ruling

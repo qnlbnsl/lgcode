@@ -1,32 +1,40 @@
 # The message board's contract
 
-Status: **version 5, for the foundry-roles plan to build on.** Written by
-the board's planner on 2026-11-03. Version 4, approved as ruling L21
-(row 83), is `attack/contract-v4.md`. This version folds review round 3
-(rows 84 to 98), and the lead approved it as ruling L24 (board post #119;
-row 98). A later change to this file goes to `plans-lead` as a
-question first. The board's plan is `.plans/plans/shepherd-message-board/plan.md`;
+Status: **version 6, for the foundry-roles plan to build on.** Written by
+the board's planner on 2026-11-03. Version 5, approved as ruling L24
+(row 98), is `attack/contract-v5.md`. This version reworks it for the
+owner's answer to Q1 and lead ruling L26 (board post #142), on the client
+API contract version 3 (post #151; rows 99 to 101). It changes where the
+board's code lives and how it joins the engine, and no board rule. A later
+change to this file goes to `plans-lead` as a question first. The board's plan is `.plans/plans/shepherd-message-board/plan.md`;
 its decisions are rows in `decisions.md` in the same folder, named in
 brackets below.
 
-This contract assumes the answer to the board's question Q1 is "yes": the
-board is built inside the engine's process, adding to the engine without
-changing anything that exists (row 9). The lead has sent that question to
-the owner. The board is a "piece" registered through the engine extension
-point that the client API plan's first unit builds (rows 32, 34). Names and
-shapes follow the client API's contract
-(`.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api` at
-`ced973b`, which holds the item 15 changes of lead ruling L23: frozen v2 at `75ab185`, the addendum `cd1d836`, and seam items
-13 to 17, including the six board requests the lead approved as ruling
-L15, and the send-time reach check of ruling L19 in item 15; rows 42, 51,
-61, 63, 67, 83). If the owner says "no", this file is withdrawn and rewritten.
+The owner answered the board's question Q1 on 2026-11-03: the plans edit
+the engine directly wherever they need to (row 99). There is no extension
+seam and no rule that existing engine behaviour stays the same (lead
+ruling L26). The client API plan's units 1a and 1b turn the engine's fixed
+lists into lists a piece adds to, and the board adds its own entries in
+its own units. Names and shapes follow the client API's contract
+(`.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api`,
+version 3 at `876bf4f`). "Edit EN" below is that contract's section 6,
+edit EN. The security rules of lead rulings L13 and L16 to L25 stay
+exactly as ruled; they are now properties of engine code.
+
+The board's code lives in the engine's two packages:
+`packages/contracts/src/board/` for its schemas, tables and pure
+conditions, and `packages/engine/src/board/` for the rest (row 100). The
+board changes two things the engine already does. An agent waiting for a
+board answer is not settled, and a blocking `wait` gives way when its
+waiter is asked a board question ("Waiting", below). The board's plan
+lists every engine change with the tests it updates.
 
 ## What the board is
 
 The message board is the part of Shephrd that lets agents and the owner
 talk in channels, and that decides who is woken by a message. It is built
 on the engine. It adds commands, events, one view, one reactor and three
-registered rules, and it reaches agents only through the engine's own
+entries in the engine's rule tables, and it reaches agents only through the engine's own
 delivery queue.
 
 The board knows nothing about teams, roles, phases or workflows (`AGENTS.md`
@@ -119,14 +127,14 @@ rule 6). The roles plan decides which channels exist and who is in them.
 ## Who may wake whom: the board's reach check (rows 45, 61, 67, 73, 86, 87)
 
 The client API lets a piece's delivery reach an agent outside the calling
-agent's tree only when the piece's registered reach check allows it
-(client API contract, section 2 and seam item 15). The board registers this
-check. The engine consults it on every board wake, inside or outside the
+agent's tree only when the piece's reach check allows it (client API
+contract, section 2 and edit E18). The board writes its entry in the
+engine's reach table. The engine consults it on every board wake, inside or outside the
 caller's tree and with no caller (lead ruling L22). It runs once when the
 wake is queued, against the views snapshot projected with the command's own
 batch, and again in the transaction that sends it; a wake that fails at
 send is withdrawn, and the dispatcher goes on to the target's next queued
-delivery (lead rulings L19, L23). The check stays registered while the board
+delivery (lead rulings L19, L23). The check stays in force while the board
 is switched off.
 
 The check is told which wake it judges, by its delivery id and its source
@@ -259,8 +267,8 @@ A post has:
   kind" part is already the `reply` field, so no kind label is added). A
   post from one of Shephrd's own services, such as `roles.sheepdog`, records
   that service's name as its author. Services exist only inside Shephrd's
-  process and call commands through the extension point's in-process path
-  (client API contract, section 2, "Services"). No socket or network caller
+  process and call commands through the engine's in-process service path
+  (client API contract, section 2, "Services", and edit E13). No socket or network caller
   can set a service author, so an agent cannot forge a Shephrd notice
   (row 36).
 - **Posts cannot be deleted.**
@@ -296,7 +304,7 @@ A post has:
   own fresh markers, with a leading slash escaped (rows 52, 63).
 - **The sender.** The engine wraps the whole body in its agent-text
   envelope, with the sender label `board`, never `owner` (client API
-  contract, seam item 14; lead ruling L16). The true author of each post is
+  contract, edit E15; lead ruling L16). The true author of each post is
   in that post's header.
 - **Merging.** An agent has at most one board wake that is queued and was
   never sent. A new post for it withdraws that wake and queues one
@@ -339,7 +347,7 @@ A post has:
 - A queued or sent wake makes its target "not settled" in the engine's
   terms, so a `wait` on that agent does not end while it still has a post
   to read.
-- **Hold unsettled** (seam item 12). An agent is not settled while any of
+- **Hold unsettled** (edit E19). An agent is not settled while any of
   these holds:
   - it has an open post of its own that needs a reply, so a `wait` on a
     lead that is waiting for a board answer does not end early;
@@ -350,13 +358,13 @@ A post has:
     a post left out by the byte cap. An addressee that took its question
     and ended its turn without replying is settled, as the engine would
     say; its asker stays unsettled on its own open post.
-- **Incoming** (seam item 16, lead ruling L15). A blocking `wait` is
+- **Incoming** (edit E20, lead ruling L15). A blocking `wait` is
   cancelled with "request held" while its waiter is an addressee with no
   disposition of an open post that needs a reply. The engine checks this
   when the wait opens and after every batch. Two agents cannot wait on each
   other through the board.
-- `packages/board-contracts` exports both conditions as pure functions of
-  the board's full view, `holdsUnsettled` and `holdsIncoming`. The board's
+- `packages/contracts/src/board/` exports both conditions as pure functions
+  of the board's full view, whose type it also holds (row 101), `holdsUnsettled` and `holdsIncoming`. The board's
   snapshot section and the `board.status` summary carry their results. The
   client helper `waitForAgents` reads the results from the section, then,
   after each board event, re-reads the waited agents' `board.status`
@@ -387,7 +395,7 @@ A post has:
 - Every board event is `owner-only`: the live stream shows it to the
   owner, the owner's devices and Shephrd's services, and to no agent.
 - **The board's part of `client.snapshot`** is absent for an agent,
-  through the seam's `snapshotFor` hook (seam item 17, lead ruling L15).
+  through the board's `snapshotFor` entry (edit E9, lead ruling L15).
   For the owner, devices and services it holds no post text, and is at
   most 256 KiB encoded. It holds, first, the ids of the agents for which
   `holdsUnsettled` holds and of those for which `holdsIncoming` holds, and
@@ -414,8 +422,8 @@ A post has:
 
 ## Commands the board adds to the API
 
-Every command goes through the engine's command handler, through the
-extension point, so it has the engine's caller identity, request ids,
+Every command goes through the engine's command handler, as a planner or
+a read in the engine's tables (edits E3, E4), so it has the engine's caller identity, request ids,
 receipts and one transaction per command. Each command whose access
 includes agents is a Shephrd tool for agents and a `shephrd board <name>`
 subcommand. "Owner" includes the owner's paired devices; a device's post is
@@ -440,37 +448,38 @@ When the board is switched off (row 58), every command is refused with
 
 `board.ChannelOpened`, `board.ChannelMembersChanged`,
 `board.ManagerChanged`, `board.PostWritten`, `board.AddresseeResolved`,
-`board.PostClosed`, `board.WakeBuilt` and `board.Read`. Their schemas are in `packages/board-contracts`, as
-`BoardEvent`. None has a top-level `agentId` field, and all are
+`board.PostClosed`, `board.WakeBuilt` and `board.Read`. Their schemas are in `packages/contracts/src/board/`, as
+`BoardEvent`, which joins the engine's `Event` union (edit E5). None has a top-level `agentId` field, and all are
 `owner-only`. Every one is rebuilt into the board's view from the log, and
 the engine's rebuild check covers it. `board.Read` is written only when it
 marks at least one unread post.
 
 The board also queues and withdraws its own engine deliveries, through the
-extension point's helpers, with its own piece source. It withdraws only a
-delivery of its own that is still queued (seam item 13).
+engine's piece-delivery helper (edit E15), with its own piece source (edit
+E16). It withdraws only a delivery of its own that is still queued (edit
+E17).
 
 ## For Shephrd's own services
 
 A roles service, such as the sheepdog, uses the board through the
-extension point's in-process command path, under its own service name:
+engine's in-process service path (edit E13), under its own service name:
 
 - `board.post`, to post a notice. Its author is the service's name.
 - `board.close`, to withdraw a post nobody will answer.
 - `board.flush`, to hand an agent its unread posts and owed completions
   now.
 - `board.status`, to read whether a post is waiting for an agent.
-  `packages/board` also exports the same answer as a pure function over
+  `packages/engine/src/board/` also exports the same answer as a pure function over
   the board's view, for code that already holds a snapshot.
 
 A service cannot read a channel's posts with `board.read`.
 
 ## Switching the board off (row 58)
 
-Once a board event is in the log, only a service with the board registered
-can rebuild the log. So the board is never removed; rolling back means
+Once a board event is in the log, only a build that includes the board can
+rebuild the log. So the board is never removed; rolling back means
 switching it off. Its schemas, view, delivery-source rule and reach check
-stay registered, so the dispatcher still checks queued board wakes. Its
+stay in force, so the dispatcher still checks queued board wakes. Its
 commands are refused, and its reactor and conditions stop. Board wakes
 already queued are still sent if they pass the reach check; a wake that
 fails is withdrawn and not rebuilt until the board is switched on. Waits on

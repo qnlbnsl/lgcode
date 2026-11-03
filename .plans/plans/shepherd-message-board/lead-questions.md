@@ -248,3 +248,8 @@ rows 84 to 97. It assumes changes 1 to 4.
 replaces `contract.md`. The lead added that the service-and-agent direct
 pair must pass the reach check at queue and at send, with a test. Logged
 as row 98.
+
+**Answer to Q1 (owner, relayed by the lead in post #142; lead ruling
+L26).** The plans edit the engine directly wherever they need to. There is
+no extension seam and no rule that existing behaviour stays the same.
+Logged as rows 99 and 100.
