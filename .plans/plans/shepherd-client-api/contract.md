@@ -97,8 +97,8 @@ engine's two existing packages (row 65):
 
 | Folder | Holds |
 | --- | --- |
-| `packages/contracts/src/<namespace>/` | The piece's command group, event structs, access entries, visibility entries and alert sources. It imports only `effect` and the rest of `packages/contracts`. |
-| `packages/engine/src/<namespace>/` | The piece's command planners, view, reactors, migrations, reach check and conditions. It may import any engine module. |
+| `packages/contracts/src/<namespace>/` | The piece's command group, event structs, access entries, visibility entries, alert sources, view types, and its pure hold-unsettled and request-held conditions (edits E19 and E20). It imports only `effect` and the rest of `packages/contracts`. The conditions live here because E19's table is in `packages/contracts`, which cannot import the engine (lead ruling L28). |
+| `packages/engine/src/<namespace>/` | The piece's command planners, view reducer, reactors, migrations and reach check. It may import any engine module. |
 
 The web page (`packages/web`) and the pane viewer (`packages/viewer`) stay
 packages of their own, because the web page is built for a browser (row
