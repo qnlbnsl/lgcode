@@ -1,6 +1,6 @@
 ---
 topic: shepherd-message-board
-status: assemble
+status: attack
 tier: M
 created: 2026-11-03
 updated: 2026-11-03
@@ -189,7 +189,8 @@ anchors do not exist yet; greenfield anchors below give the target path and
 the neighbouring pattern file, and every unit re-reads the frozen contract
 before it starts. A "test id" is a Vitest file path, run with
 `pnpm vitest run <path>`. "Rows" are rows in this plan's `decisions.md`.
-RPC means remote procedure call: one request and its reply. MCP means the
+RPC means remote procedure call: one request and its reply. ACP is the
+Agent Client Protocol, through which the engine drives agents. MCP means the
 Model Context Protocol, through which agents get Shephrd's tools. Effect
 code is written from Effect 4.0.5's current documentation, looked up,
 never from memory (`AGENTS.md`, "Language"); this plan names no Effect
