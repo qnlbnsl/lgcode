@@ -182,8 +182,9 @@ the log, its tables are its own, and no existing table changes.
 Conventions for every unit. Paths are relative to the Shephrd repository
 root. Engine anchors come from `scouting.md` (scans at `8ff4c9b`). "The
 seam" is the extension point in the client API contract
-(`.plans/plans/shepherd-client-api/contract.md`, sections 1 to 3 and 6);
-"seam item N" is that contract's section 6, item N. Its own file and symbol
+(`.plans/plans/shepherd-client-api/contract.md`, sections 1 to 3 and 6,
+frozen as v2 at `75ab185` with the addendum `cd1d836` and items 13 and 14,
+row 42); "seam item N" is that contract's section 6, item N. Its own file and symbol
 anchors do not exist yet; greenfield anchors below give the target path and
 the neighbouring pattern file, and every unit re-reads the frozen contract
 before it starts. A "test id" is a Vitest file path, run with
@@ -308,11 +309,15 @@ mode is met return `board.PostClosed`; compute the wake set (the
 addressees of a post that needs a reply, minus the author and the owner,
 plus the asker of any post this one closed); for each agent in the wake
 set, if its board wake is still queued, return `DeliveryWithdrawn` for it
-through the seam's planning helper (row 37); then return one
-`DeliveryQueued` through the same helper, with content `prompt`, source
-`{ namespace: "board", id: <wake id> }`, and text built from every post
-that wake must carry plus up to 20 unread posts that need no reply from
-it. The engine checks those engine events against its own rules and adds
+through the seam's planning helper (seam item 13, row 41); then return
+one `DeliveryQueued` through the delivery helper (seam item 14), with
+source `{ namespace: "board", id: <wake id> }`, the sender label
+`board`, and a plain-text body built from every post that wake must carry
+plus up to 20 unread posts that need no reply from it. In the body, each
+post sits between its own fresh random markers, after a line naming its
+author, channel and reply mode, with its leading slash escaped. The engine
+wraps the whole body in its agent-text envelope; the board never passes
+pre-wrapped text. The engine checks those engine events against its own rules and adds
 its wait checks.
 
 **Done when:**
@@ -324,7 +329,7 @@ its wait checks.
 | 3.3 | In `any` mode the first addressee's reply closes the post and wakes the asker once; a non-addressee's reply closes nothing | Test id: `packages/board/test/wakes.test.ts`, "any mode" |
 | 3.4 | In `all` mode the asker is woken once, when the last live addressee replies, with every reply; earlier replies wake nobody | Test id: `packages/board/test/wakes.test.ts`, "all mode" |
 | 3.5 | Three posts for one agent while its wake is queued leave exactly one queued board wake carrying all three; a wake already sent is not withdrawn | Test id: `packages/board/test/wakes.test.ts`, "wakes merge" |
-| 3.6 | Each post in a wake sits in its own envelope with a fresh marker, and a leading slash is escaped | Test id: `packages/board/test/wakes.test.ts`, "text is data" (cases from `packages/engine/src/routing/envelope.ts`, `escapeLeadingSlash`) |
+| 3.6 | The wake reaches the agent inside the engine's agent-text envelope; inside it, each post sits between its own fresh markers with a leading slash escaped, so a post that copies another post's header cannot end it | Test id: `packages/board/test/wakes.test.ts`, "text is data" (cases from `packages/engine/src/routing/envelope.ts`, `escapeLeadingSlash`) |
 | 3.7 | A secret registered with the redactor never appears in a stored post or wake | Test id: `packages/board/test/wakes.test.ts`, "redacted" |
 | 3.8 | When every remaining addressee of an open post stops or crashes, the post closes as unanswerable and the author is woken once | Test id: `packages/board/test/reactor.test.ts`, "unanswerable" |
 | 3.9 | When the author stops or crashes, its open posts close as withdrawn and nobody is woken; a board wake for a stopped agent is withdrawn and never returned to a sender | Test id: `packages/board/test/reactor.test.ts`, "author gone" |
@@ -338,10 +343,10 @@ its wait checks.
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
 | 3a.1 | Handlers for `board.open`, `board.members`, `board.post`, `board.read`, `board.channels`, `board.status` and `board.flush`, each returning events | Greenfield `packages/board/src/commands.ts`; pattern `packages/engine/src/routing/questions.ts`, `ask`, and `packages/engine/src/commands/internal.ts`, `Plan`, `refused` |
-| 3a.2 | Build a wake's text from posts | Greenfield `packages/board/src/wake.ts`; uses `packages/engine/src/routing/envelope.ts`, `envelope`, `escapeLeadingSlash`, through the seam's exports |
+| 3a.2 | Build a wake's plain-text body from posts | Greenfield `packages/board/src/wake.ts`; markers drawn as in `packages/engine/src/routing/envelope.ts`, `envelope`, and slashes escaped with `escapeLeadingSlash`, through the seam's exports; the engine's own wrapping is seam item 14 |
 | 3a.3 | The board's rule for its wake when the target stops: withdraw, never return | Registered through seam item 11; the engine's existing rule for a `wait` source is `packages/engine/src/routing/deliveries.ts`, `movedOrWake` |
 | 3b.1 | The reactor: closes for gone addressees and authors, read positions on accepted wakes | Greenfield `packages/board/src/reactor.ts`; pattern `packages/engine/src/accounts/available.ts`, `followAvailability`; registered through seam item 1 ("reactors") |
-| 3b.2 | The "hold unsettled" condition: an agent with an open post of its own that needs a reply | Greenfield `packages/board/src/settled.ts`; registered through the seam's hook (row 33); the engine's test is `packages/engine/src/routing/waits.ts`, `settled` |
+| 3b.2 | The "hold unsettled" condition: an agent with an open post of its own that needs a reply | Greenfield `packages/board/src/settled.ts`; registered through seam item 12 (row 33); the engine's test is `packages/engine/src/routing/waits.ts`, `settled` |
 
 **Risks:**
 

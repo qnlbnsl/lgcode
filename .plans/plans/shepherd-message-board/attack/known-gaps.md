@@ -20,12 +20,10 @@ already known; look for new problems.
    the lead decides whether the seam unit creates them or a unit is given
    that right. The scopes `board/contracts` and `board/backend` do not
    exist; the lead runs the scoping skill for both before launch.
-5. **The seam is written against draft v1.** The plan follows the client
-   API contract as read on 2026-11-03 (rows 34 to 40). Two board needs are
-   not in v1: a piece withdrawing its own still-queued delivery, and a
-   piece setting a delivery's text and shown sender (asked of the lead,
-   post #37). The seam has no file anchors yet; tasks give greenfield paths
-   and today's engine patterns.
+5. **Seam items 13 and 14 are approved but not yet in the contract text.**
+   The lead approved them (row 41) and asked plans-api to add them. The
+   seam has no file anchors yet; tasks give greenfield paths and today's
+   engine patterns.
 6. **The owner's answer to row 9 is pending.** If the owner says no, the
    plan and `contract.md` are withdrawn and rewritten.
 7. **Effect functions.** The plan names no Effect function that the engine

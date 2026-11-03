@@ -11,10 +11,10 @@ board is built inside the engine's process, adding to the engine without
 changing anything that exists (row 9). The lead has sent that question to
 the owner. The board is a "piece" registered through the engine extension
 point that the client API plan's first unit builds (rows 32, 34). Names and
-shapes follow the client API's draft contract v1
-(`.plans/plans/shepherd-client-api/contract.md`); this file is re-checked
-when the lead freezes v2. If the owner says "no", this file is withdrawn
-and rewritten.
+shapes follow the client API's frozen contract v2
+(`.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api` at
+`75ab185`, with the addendum `cd1d836` and seam items 13 and 14; row 42).
+If the owner says "no", this file is withdrawn and rewritten.
 
 ## What the board is
 
@@ -112,9 +112,11 @@ A post has:
   take it. The board never reads an agent's run mode, so an ACP agent and an
   interactive agent are woken the same way (roles request 1:
   **accepted**; this is the one delivery interface).
-- Each post in a wake is wrapped in the engine's envelope, with a fresh
-  marker, and a leading slash is escaped. A wake says who wrote each post,
-  in which channel, and what reply it needs.
+- A wake's body is plain text. Each post in it sits between its own fresh
+  markers, after a line saying who wrote it, in which channel, and what
+  reply it needs, with a leading slash escaped. The engine wraps the whole
+  body in its agent-text envelope and shows the sender as the board (client
+  API contract, seam item 14; row 41).
 - An agent has at most one board wake waiting to be sent. A new wake for
   it withdraws the waiting one and queues one combined wake, in the same
   transaction. A wake already sent is never changed.
