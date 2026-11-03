@@ -151,7 +151,7 @@ describe("reload (PB-A7, PB-A8, PB-A11, PB-A12) on a scripted engine and a real 
     } });
     const run = await runProbe(engine, "reload");
     expect(run.passed).toBe(false);
-    expect(run.reason).toContain("not attempted");
+    expect(run.reason).toContain("attempted; failed");
   }, 60_000);
 
   it("fails when the pending delivery was accepted before the kill and recovery accepts it again", async () => {

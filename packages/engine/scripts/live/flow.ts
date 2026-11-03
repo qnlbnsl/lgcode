@@ -44,13 +44,15 @@ export class StepFailed extends Error {
   constructor(stepId: string, message: string) { super(message); this.name = "StepFailed"; this.stepId = stepId; }
 }
 
-export type StepRunner = <A, R>(
-  spec: StepSpec, effect: Effect.Effect<A, unknown, R>, reason?: (value: A) => string,
-) => Effect.Effect<A, StepFailed, R>;
+export interface StepRunner {
+  <A, R>(spec: StepSpec, effect: Effect.Effect<A, unknown, R>, reason?: (value: A) => string): Effect.Effect<A, StepFailed, R>;
+  readonly skip: (spec: StepSpec, because: string) => Effect.Effect<void>;
+}
 
 // Runs an effect as one printed step. A failure is printed once, with its
-// message, and stops the run by failing with `StepFailed`.
-export const makeStepRunner = (reporter: Reporter, now: () => number = Date.now): StepRunner => (spec, effect, reason) =>
+// message, and fails with `StepFailed`. The caller decides whether to continue.
+export const makeStepRunner = (reporter: Reporter, now: () => number = Date.now): StepRunner => Object.assign(
+  <A, R>(spec: StepSpec, effect: Effect.Effect<A, unknown, R>, reason?: (value: A) => string): Effect.Effect<A, StepFailed, R> =>
   Effect.gen(function* () {
     const started = now();
     const exit = yield* Effect.exit(effect);
@@ -61,7 +63,9 @@ export const makeStepRunner = (reporter: Reporter, now: () => number = Date.now)
     const message = messageOf(Cause.squash(exit.cause));
     reporter.fail(spec, message, now() - started);
     return yield* Effect.fail(new StepFailed(spec.id, message));
-  });
+  }),
+  { skip: (spec: StepSpec, because: string) => Effect.sync(() => reporter.skip(spec, because)) },
+);
 
 export interface FlowOptions {
   readonly owner: Client;
@@ -311,14 +315,16 @@ export const flow = (options: FlowOptions): Effect.Effect<FlowResult, StepFailed
   // The journey's broad legacy approvals must end before exact-command probes.
   if (leadApprovals !== undefined) yield* Fiber.interrupt(leadApprovals);
   yield* Fiber.interrupt(laterApprovals);
-  if (options.probes !== undefined) yield* runProbes(options.probes, step, { lead, worker }, options.probeNote);
-  // A restart invalidates old socket connections. The final scan uses a fresh one.
-  const finalOwner = options.probes === undefined ? owner : yield* options.openOwner().pipe(Effect.orDie);
+  const probeExit = options.probes === undefined ? undefined
+    : yield* Effect.exit(runProbes(options.probes, step, { lead, worker }, options.probeNote));
 
   // Criterion 8.5: the views rebuilt from the log equal the live views, and no
   // secret appears in any form in an event, a reply, the accounts list or the
   // output of a process this run started.
   yield* step(FINAL_STEP, Effect.gen(function* () {
+    // A restart invalidates old sockets. Reconnection belongs to this step,
+    // so even a dead service after a failed probe records a final failure.
+    const finalOwner = options.probes === undefined ? owner : yield* options.openOwner();
     const reply = yield* (finalOwner["debug.compare-views"]({ requestId: requestId() } as never) as Effect.Effect<{ sequence: number; equal: boolean; differences: ReadonlyArray<string> }, unknown>);
     yield* check(reply.equal && reply.differences.length === 0, `the live views differ from the rebuild: ${JSON.stringify(reply.differences.slice(0, 5))}`);
     const all = yield* since(finalOwner, 0);
@@ -337,6 +343,7 @@ export const flow = (options: FlowOptions): Effect.Effect<FlowResult, StepFailed
     return secrets.length;
   }), (count) => `${count} secret forms scanned for`);
 
+  if (probeExit !== undefined && Exit.isFailure(probeExit)) return yield* Effect.failCause(probeExit.cause);
   return { lead, worker, permissionRequestId: requestIdValue, waitId, mark };
 }).pipe(Effect.catchCause((cause) => Cause.hasDies(cause) || Cause.hasFails(cause)
   ? Effect.fail(Cause.squash(cause) instanceof StepFailed ? Cause.squash(cause) as StepFailed : new StepFailed("flow", messageOf(Cause.squash(cause))))

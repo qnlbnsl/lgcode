@@ -13,9 +13,11 @@ import * as Stream from "effect/Stream";
 import { allowOnce, check, type AgentRef } from "./flow.ts";
 import { authRefused, canaryDenied, compactions, exactCommand, exitCodeOf, fixtureEvidence, mcpAskInput, receivedUserText, scanTokens, sessionFiles, shellIdentityAbsent, slashReceipt } from "./probeEvidence.ts";
 import { ALWAYS_ALLOW_PROMPT, fill, PROBE_MCP_PROMPT, REMOVED_VARIABLES_PROMPT, RESTART_ACTIVE_PROMPT, RESTART_PENDING_PROMPT, RESTART_PREPARE_PROMPT, SHELL_COMMANDS, SLASH_DOWN_PROMPT, SLASH_RECEIVER_PROMPT, SLASH_UP_PROMPT, STATE_READ_PROMPT } from "./prompts.ts";
-import type { Observation, ProbeAgents, ProbeDriver, ProbeId } from "./probes.ts";
+import { ADAPTER_CANCELLED, type Observation, type ProbeAgents, type ProbeDriver, type ProbeId } from "./probes.ts";
+import { apply, emptyViews } from "../../src/views/apply.ts";
+import { oneLine } from "./reporter.ts";
 import { processesNaming, type LiveService } from "./service.ts";
-import { eventsUntil, head, requestId, since, tagged, type LeakSource } from "./support.ts";
+import { eventsUntil, head, readOwnerCredentialFrom, redactSecrets, redactShapes, requestId, since, tagged, type LeakSource } from "./support.ts";
 
 export const CORE_CONFIG = { shell_environment_policy: { inherit: "core" } } as const;
 export const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`;
@@ -96,7 +98,8 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
   const members = () => [{ harness: "claude", agent: agents.lead, folder: options.service().work },
     { harness: "codex", agent: agents.worker, folder: join(options.service().work, "project") }];
 
-  const snapshot = (): void => {
+  const snapshot = (): ReadonlySet<string> => {
+    const capturedAgents = new Set<string>();
     const service = options.service();
     for (const pid of processesNaming(service.root, [], [service.pid])) {
       try {
@@ -116,6 +119,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
         const folder = readlinkSync(`/proc/${pid}/cwd`);
         for (const member of members()) if (folder === member.folder) {
           const id = member.agent.agentId;
+          capturedAgents.add(id);
           tokens.set(id, token);
           const captured = agentTokens.get(id) ?? new Set<string>();
           captured.add(token); agentTokens.set(id, captured);
@@ -133,6 +137,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
         throw new Error(`run process ${pid} could not be inspected`);
       }
     }
+    return capturedAgents;
   };
   const agentClient = (agent: AgentRef) => Effect.gen(function* () {
     snapshot();
@@ -149,9 +154,9 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       : join(environment.CODEX_HOME ?? join(home, ".codex"), "sessions");
     return [...new Set([...ids].flatMap((id) => sessionFiles(directory, id)))];
   };
-  const sessionText = (harness: string, agent: AgentRef, rows: ReadonlyArray<EventEnvelope>): string => {
+  const sessionText = (harness: string, agent: AgentRef, rows: ReadonlyArray<EventEnvelope>, attempted = false): string => {
     const files = filesFor(harness, agent, rows);
-    if (files.length === 0) throw new Error(`not attempted: no ${harness} session file found by this run's session ids`);
+    if (files.length === 0) throw new Error(`${attempted ? "attempted; failed" : "not attempted"}: no ${harness} session file found by this run's session ids`);
     return files.map((path) => readFileSync(path, "utf8")).join("\n");
   };
 
@@ -200,7 +205,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
     const reply = yield* (owner.prompt({ requestId: requestId(), agentId: agent.agentId, text } as never) as Effect.Effect<{ deliveryId: string }, unknown>);
     const sent = yield* eventsUntil(owner, mark, "the probe delivery to be sent", (row) => row.event._tag === "DeliverySent" && event<{ deliveryId: string }>(row).deliveryId === reply.deliveryId, options.agentTimeout);
     const afterSent = sent.at(-1)!.sequence;
-    yield* eventsUntil(owner, afterSent, "the probe turn to end (not attempted if no tool was used)", (row) => row.agentId === agent.agentId && row.event._tag === "TurnEnded", options.agentTimeout);
+    yield* eventsUntil(owner, afterSent, "the probe turn to end", (row) => row.agentId === agent.agentId && row.event._tag === "TurnEnded", options.agentTimeout);
     yield* Fiber.interrupt(watcher);
     snapshot();
     yield* check(unexpected.length === 0, unexpected.join("; "));
@@ -213,6 +218,35 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
   const askedBy = (rows: ReadonlyArray<EventEnvelope>, agent: AgentRef, marker: string): boolean =>
     tagged(rows, "QuestionAsked", agent.agentId).some((row) => event<{ text: string }>(row).text === marker
       && row.caller?._tag === "agent" && row.caller.agentId === agent.agentId);
+
+  const toolErrors = (calls: ReadonlyArray<Tool>): string => {
+    const secrets = [...allTokens, ...options.secrets];
+    try { secrets.push(...readOwnerCredentialFrom(options.service().state)); }
+    catch { /* Synthetic boundaries have no owner credential; final checks it in a real run. */ }
+    return oneLine(redactShapes(redactSecrets(calls.map((tool) => `${tool.status}: ${tool.output || "no error output"}`).join("; "), secrets)), 300);
+  };
+  const unavailable: NonNullable<ProbeDriver["unavailable"]> = (id, given) => Effect.gen(function* () {
+    agents = given;
+    if (options.service().exited()) return "the run's service is not up";
+    // A bounded real socket round-trip, not just a PID check. An unavailable
+    // service prevents this probe; it is not evidence of an adapter failure.
+    const reached = yield* Effect.exit(Effect.scoped(Effect.gen(function* () {
+      const owner = yield* options.openOwner();
+      return yield* since(owner, 0);
+    })).pipe(Effect.timeoutOrElse({ duration: options.engineTimeout, orElse: () => Effect.fail(new Error("readiness timed out")) })));
+    if (Exit.isFailure(reached)) return "the run's service did not answer the readiness check";
+    const history = reached.value;
+    if (id === "permission-kinds") return undefined; // Reads existing log evidence only.
+    const live = snapshot();
+    const state = history.reduce(apply, emptyViews());
+    const needed = id === "always-allow" ? [given.lead] : [given.lead, given.worker];
+    for (const agent of needed) {
+      if (!live.has(agent.agentId)) return `agent ${agent.agentId} has no live process in this run`;
+      const lifecycle = state.agents[agent.agentId]?.state._tag;
+      if (lifecycle !== "idle") return `agent ${agent.agentId} is ${lifecycle ?? "unknown"}, not idle`;
+    }
+    return undefined;
+  });
 
   const observe = (id: ProbeId, given: ProbeAgents): Effect.Effect<ReadonlyArray<Observation>, unknown, Scope.Scope> => Effect.gen(function* () {
     agents = given;
@@ -229,7 +263,14 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       for (const { harness, agent } of members()) {
         const marker = "lcp-mcp-" + randomBytes(8).toString("hex");
         const result = yield* turn(owner, agent, fill(PROBE_MCP_PROMPT, { MARKER: marker }), askInput(agent, marker));
-        results.push({ harness, outcome: askedBy(result.rows, agent, marker) ? "succeeds" : "not attempted", detail: `authenticated QuestionAsked event with the agent as caller, via its MCP ask tool; ${citations.get(harness)}` });
+        const calls = mergedTools(result.rows, agent).filter(askInput(agent, marker));
+        const failed = calls.find((tool) => tool.status === "failed");
+        const question = tagged(result.rows, "QuestionAsked").some((row) => event<{ text: string }>(row).text === marker);
+        const cancelled = failed !== undefined && /user cancelled MCP tool call/i.test(failed.output ?? "") && !question
+          && !tagged(result.rows, "PermissionRequested", agent.agentId).some((row) => event<Permission>(row).toolCallId === failed.callId);
+        const outcome = askedBy(result.rows, agent, marker) ? "succeeds" : calls.length === 0 ? "not attempted"
+          : cancelled ? ADAPTER_CANCELLED : "attempted; failed";
+        results.push({ harness, outcome, detail: `${outcome === "succeeds" ? "authenticated QuestionAsked event with the agent as caller, via its MCP ask tool" : `exact ask tool calls=${calls.length}; errors=${toolErrors(calls)}`}; ${citations.get(harness)}` });
       }
       return results;
     }
@@ -243,7 +284,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
           const modeRaise = harness === "claude" && /^exit-plan-(?:clear-)?(?:bypass|auto)$/.test(option.id);
           return option.level === (modeRaise ? "full" : scale.level) && option.persistent === (modeRaise || scale.persistent);
         });
-        return { harness, outcome: valid ? "recorded" : "not attempted", detail: kinds.map((option) => `${option.id}/${option.kind}: ${option.level}, persistent=${String(option.persistent)}`).join("; ") || "no observed permission options" };
+        return { harness, outcome: valid ? "recorded" : asked.length > 0 ? "attempted; failed" : "not attempted", detail: kinds.map((option) => `${option.id}/${option.kind}: ${option.level}, persistent=${String(option.persistent)}`).join("; ") || "no observed permission options" };
       });
     }
     if (id === "removed-variables" || id === "state-read") {
@@ -252,22 +293,24 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       const results: Observation[] = [];
       for (const { harness, agent } of members()) {
         const result = yield* turn(owner, agent, fill(id === "removed-variables" ? REMOVED_VARIABLES_PROMPT : STATE_READ_PROMPT, { COMMAND: command }), (tool) => exactCommand(tool.input, command));
-        const executed = mergedTools(result.rows, agent).filter((tool) => exactCommand(tool.input, command) && ["completed", "failed"].includes(tool.status) && !result.rejected.has(tool.callId));
+        const attempted = mergedTools(result.rows, agent).filter((tool) => exactCommand(tool.input, command));
+        const executed = attempted.filter((tool) => ["completed", "failed"].includes(tool.status) && !result.rejected.has(tool.callId));
         const output = executed.map((tool) => tool.output ?? "").join("\n");
-        let outcome = "not attempted";
+        let outcome = attempted.length > 0 ? "attempted; failed" : "not attempted";
         if (id === "removed-variables") {
           if (executed.length > 0) {
             // Owner success remains a failure even if environment evidence is
             // missing; never obscure the security break behind not attempted.
             outcome = exitCodeOf(output) === 0 ? "acts as owner" : !authRefused(output, exitCodeOf(output)) ? "no ancestry refusal observed"
-              : harness === "codex" && (!coreConfigured || !shellIdentityAbsent(output)) ? "not attempted" : "refused by ancestry check";
+              : harness === "codex" && (!coreConfigured || !shellIdentityAbsent(output)) ? "attempted; failed" : "refused by ancestry check";
           }
         } else if (executed.length > 0) {
           outcome = output.includes(canary) ? "no mechanism: the agent read the canary file"
-            : executed.some((tool) => tool.status === "failed" && canaryDenied(tool.output ?? "", join(options.service().state, "live-canary"))) ? "refused" : "not attempted";
+            : executed.some((tool) => tool.status === "failed" && canaryDenied(tool.output ?? "", join(options.service().state, "live-canary"))) ? "refused" : "attempted; failed";
         }
-        results.push({ harness, outcome, detail: id === "state-read" ? `exact canary command; completed tool calls=${executed.length}; SECURITY.md:51 lists no default deny-read rule`
-          : `exact command; completed tool calls=${executed.length}; ${harness === "codex" ? `core inheritance configured=${String(coreConfigured)}; shell identity variable names absent=${String(shellIdentityAbsent(output))} (SEC-PB-8)` : "both Shephrd variables removed (SEC-PB-5)"}` });
+        const detail = id === "state-read" ? `exact canary command; completed tool calls=${executed.length}; SECURITY.md:51 lists no default deny-read rule`
+          : `exact command; completed tool calls=${executed.length}; ${harness === "codex" ? `core inheritance configured=${String(coreConfigured)}; shell identity variable names absent=${String(shellIdentityAbsent(output))} (SEC-PB-8)` : "both Shephrd variables removed (SEC-PB-5)"}`;
+        results.push({ harness, outcome, detail: `${detail}${outcome === "attempted; failed" ? `; errors=${toolErrors(attempted)}` : ""}` });
       }
       return results;
     }
@@ -287,10 +330,11 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       }) : yield* (client.prompt({ requestId: requestId(), agentId: target.agent.agentId, text: payload } as never) as Effect.Effect<{ deliveryId: string }, unknown>);
       const sent = yield* eventsUntil(owner, mark, "slash data delivery", (row) => row.event._tag === "DeliverySent" && event<{ deliveryId: string }>(row).deliveryId === reply.deliveryId, options.agentTimeout);
       const rows = yield* eventsUntil(owner, sent.at(-1)!.sequence, "slash receiver turn", (row) => row.agentId === target.agent.agentId && row.event._tag === "TurnEnded", options.agentTimeout);
-      const text = sessionText(target.harness, target.agent, yield* since(owner, 0));
+      const text = sessionText(target.harness, target.agent, yield* since(owner, 0), true);
       const compacted = tagged(rows, "TurnEnded", target.agent.agentId).some((row) => event<{ compact: boolean }>(row).compact)
         || compactions(text) !== compactBefore || tagged(rows, "CommandRefused").some((row) => event<{ command: string }>(row).command === "compact");
-      const observation = { harness: target.harness, outcome: slashReceipt(receivedUserText(text), reply.deliveryId, payload, compacted), detail: `${sender.agentId} -> ${target.agent.agentId}; ${target.harness} receiver only; received its own user session content; delivery ${reply.deliveryId}; compaction boundaries unchanged=${String(!compacted)}` };
+      const receipt = slashReceipt(receivedUserText(text), reply.deliveryId, payload, compacted);
+      const observation = { harness: target.harness, outcome: receipt === "not attempted" ? "attempted; failed" : receipt, detail: `${sender.agentId} -> ${target.agent.agentId}; ${target.harness} receiver only; received its own user session content; delivery ${reply.deliveryId}; compaction boundaries unchanged=${String(!compacted)}` };
       const notApplicable = id === "slash-up" ? { harness: "codex", outcome: "not applicable (no codex parent receiver in this team)", detail: "SEC-PB-2 observes Claude upward only; Codex is the child, whose downward receive path is checked in SEC-PB-7" }
         : { harness: "claude", outcome: "not applicable (no claude child receiver in this team)", detail: "SEC-PB-7 observes Codex downward only; Claude is the parent, whose upward receive path is checked in SEC-PB-2" };
       return id === "slash-up" ? [observation, notApplicable] : [notApplicable, observation];
@@ -316,14 +360,16 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       try { before = settings(); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; before = {}; }
       const result = yield* turn(owner, agent, fill(ALWAYS_ALLOW_PROMPT, { COMMAND: commands.alwaysAllow }), (tool) => commandInFolder(tool, commands.alwaysAllow, options.service().work), true);
       if (result.noSafePersistent) return rows("no safe persistent option offered", "persistent destination absent or outside localSettings/session; rejected before answering always; current public permission contract does not expose the destination");
+      const calls = mergedTools(result.rows, agent);
+      const failureOutcome = calls.length > 0 ? "attempted; failed" : "not attempted";
       let after: { permissions?: { allow?: string[] } };
-      try { after = settings(); } catch { return rows("not attempted", "settings.local.json was not written after always allow"); }
+      try { after = settings(); } catch { return rows(failureOutcome, `settings.local.json was not written after always allow; errors=${toolErrors(mergedTools(result.rows, agent))}`); }
       const offered = result.asked.flatMap((request) => request.options);
       const persistent = offered.filter((option) => option.persistent && option.kind === "allow_always");
       const scopes = (after.permissions?.allow ?? []).filter((rule) => !(before.permissions?.allow ?? []).includes(rule));
       const safe = result.asked.length > 0 && result.asked.every((request) => request.holder._tag === "owner") && persistent.length === 1
         && result.chosen.length === result.asked.length && result.chosen.every((choice) => choice.destination === "localSettings" || choice.destination === "session") && scopes.length > 0;
-      return rows(safe ? "scopes recorded; persistent options routed to owner" : "not attempted", `${path}; ${offered.map((option) => `${option.id}: ${option.kind}, persistent=${String(option.persistent)}, destination=${option.destination ?? "unknown"}, scope=${option.persistent ? JSON.stringify(scopes) : "one request; no saved rule selected"}`).join("; ")}; saved scopes=${JSON.stringify(scopes)}`);
+      return rows(safe ? "scopes recorded; persistent options routed to owner" : failureOutcome, `${path}; ${offered.map((option) => `${option.id}: ${option.kind}, persistent=${String(option.persistent)}, destination=${option.destination ?? "unknown"}, scope=${option.persistent ? JSON.stringify(scopes) : "one request; no saved rule selected"}`).join("; ")}; saved scopes=${JSON.stringify(scopes)}`);
     }
     if (id === "reload") {
       const markers = new Map<string, string>();
@@ -388,7 +434,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
         const carryId = carry === undefined ? undefined : event<{ delivery: { id: string } }>(carry).delivery.id;
         const sent = carryId === undefined ? undefined : history.find((row) => row.event._tag === "DeliverySent" && event<{ deliveryId: string }>(row).deliveryId === carryId);
         const called = carry !== undefined && sent !== undefined && askedBy(history.filter((row) => row.sequence > sent.sequence), agent, markers.get(agent.agentId)!);
-        yield* check(called, "not attempted: authenticated tool call was not made in a carry-on turn");
+        yield* check(called, "attempted; failed: authenticated tool call was not made in a carry-on turn");
         firstPhase.set(agent.agentId, { refused, called });
         yield* eventsUntil(carriedOwner, sent!.sequence, "carry-on turn to settle before the replay probe", (row) => row.agentId === agent.agentId && row.event._tag === "TurnEnded", options.agentTimeout);
       }
@@ -463,9 +509,9 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
           && event<{ deliveryId: string }>(row).deliveryId === pending.get(agent.agentId) && row.sequence < session.sequence);
         const duringRecovery = receipt !== undefined && session !== undefined && receipt.sequence > session.sequence && receipt.requestId === session.requestId
           && !history.some((row) => row.event._tag === "DeliverySent" && event<{ deliveryId: string }>(row).deliveryId === pending.get(agent.agentId) && row.sequence > session.sequence);
-        const replay = duringRecovery ? "found" : requeued !== undefined ? "re-send on restart" : "not attempted";
-        const outcome = !refused ? "old token accepted or refusal not observed" : earlyAcceptance ? "not attempted: pending delivery accepted before reload (restart race)"
-          : session === undefined || !firstPhase.get(agent.agentId)?.called ? "not attempted" : `old token refused; tool succeeds; ${replay}`;
+        const replay = duringRecovery ? "found" : requeued !== undefined ? "re-send on restart" : "attempted; failed";
+        const outcome = !refused ? "old token accepted or refusal not observed" : earlyAcceptance ? "attempted; failed: pending delivery accepted before reload (restart race)"
+          : session === undefined || !firstPhase.get(agent.agentId)?.called || replay === "attempted; failed" ? "attempted; failed" : `old token refused; tool succeeds; ${replay}`;
         results.push({ harness, outcome, detail: `SIGKILL own service, owner socket and actual CLI reconnected (PB-A8); ${agent.agentId}, delivery ${pending.get(agent.agentId)}; reload=${String(session !== undefined)}, carry-on tool succeeded in first restart=${String(firstPhase.get(agent.agentId)?.called)}; each restart checks its immediately preceding token; second kill follows DeliverySent; any content acceptance winning that race fails, never counts as replay` });
       }
       yield* Fiber.interrupt(approval);
@@ -487,5 +533,5 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
         detail: `session files=${scan.files}, own agent tokens=${ownTokens.size}, process argument snapshots=${ownArguments.length}, environment snapshots=${environments.length}; additional run argument snapshots=${arguments_.size}; environment variable names inspected privately, identity values retained only for scanning; paths=${scan.paths.join(",")}${scan.leaks.length > 0 ? `; ${scan.leaks.join("; ")}` : ""}` };
     });
   });
-  return { observe };
+  return { observe, unavailable };
 };

@@ -3253,7 +3253,7 @@ No production contract change was made for this limitation.
 The replay probe asks a pending turn to sleep, then requests the second kill
 as soon as the deliveries are sent. A content update may still accept a
 delivery before the kill. The probe checks the whole interval again after
-reload, and records that race as not attempted. It never counts the same
+reload, and records that race as a failed attempt. It never counts the same
 delivery being accepted early and then re-sent as successful replay evidence.
 
 Fix round 2 addresses review findings m-7 and m-8. After the second restart,
@@ -3761,7 +3761,8 @@ timeouts should be checked against the work the test does.
 Found: 2026-11-03, by the live check at 9340f71 (live-check-2, run 1, step
 `sandbox-mcp`, criterion PB-A3), against the real Codex adapter
 (`@agentclientprotocol/codex-acp` 2.5.0, `@openai/codex` 0.165.0).
-State: open. Nothing has been changed for it; the owner decides the fix.
+State: fixed locally by owner option (b), in fix round 3 of the live-check
+probes. Real-adapter validation remains pending the lead's next run.
 
 What happens: the Codex worker, started with the permission "ask", was told
 to call the Shephrd MCP (Model Context Protocol) tool `ask` once. It did call
@@ -3784,7 +3785,7 @@ Why it matters: a Codex agent that asks before changes may be unable to use
 any Shephrd tool (ask, post, wait and the others) unless Codex skips approval
 for it. A Codex worker then cannot report back or ask its lead through
 Shephrd, and the live check's PB-A3 row for Codex fails.
-What should happen (options for the owner):
+The owner chose option (b) on 2026-11-03. The original options were:
 - Advertise form elicitation in the runner and route a tool-approval
   elicitation through Shephrd's permission flow, like any other permission
   request. This changes the runner and may need a contract for the answer.
@@ -3793,3 +3794,111 @@ What should happen (options for the owner):
   the owner.
 Evidence: `.scratch/foundry-runs/engine-build-1/live-check-2/live-check-run1.log`
 and `run1-sandbox-mcp-events.txt` beside it.
+
+The runner now configures only the Codex Shephrd server with
+`default_tools_approval_mode: "approve"` through the adapter's `CODEX_CONFIG`.
+It passes an empty ACP server list for start, load and resume, because the
+adapter replaces the configured server map when that list is populated.
+The configuration names `SHEPHRD_SOCKET` and `SHEPHRD_TOKEN` in `env_vars`;
+it contains neither variable's value. Other account keys and servers retain
+their settings. Invalid account JSON and a pre-existing Shephrd server refuse
+the launch before spawning, with a fixed reason that exposes no value.
+
+This departs from plan row 6.1 and decision 21 for Codex only: its server is
+configured through `CODEX_CONFIG`, rather than `session/new`. Every other
+harness keeps the existing ACP server entry. No other server receives a new
+approval setting. The option (a) work remains open as issue 237.
+
+The Codex 0.165.0 source confirms that `approve` requires no tool approval in
+[`requires_mcp_tool_approval_for_mode`](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/core/src/mcp_tool_call.rs#L2440-L2450).
+Its [`create_env_for_mcp_server`](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/rmcp-client/src/utils.rs#L14-L56)
+reads the named variables from Codex's own environment independently of the
+shell policy, so `shell_environment_policy.inherit=core` does not remove them
+from this MCP environment. These source facts were checked on 2026-11-03.
+The fake-agent tests in `runner/shephrd-server.test.ts` cover all three
+session methods, preservation, refusal before spawning and unchanged Claude
+behavior. The actual adapter and server journey awaits the lead's run.
+
+## 237. Approval-gated tool servers need form elicitation routed through Shephrd
+
+Found: 2026-11-03, while the owner decided issue 236.
+
+Status: open. This is option (a), reserved as a follow-up by the owner.
+
+The runner advertises no form elicitation capability. A Codex adapter can
+therefore cancel a tool-approval elicitation before Shephrd sees a permission
+request. Issue 236 configures Shephrd's own server to need no such approval,
+but other tool servers retain their approval settings.
+
+Advertise form elicitation and route a tool-approval elicitation through
+Shephrd's permission flow. This is needed once agents use other tool servers
+that require approval. The work must preserve the server's requested approval
+and carry its answer through the adapter, rather than cancel it internally.
+
+## 238. A failed live probe prevents independent evidence collection
+
+Found: 2026-11-03, in live-check-2 run 1 at 9340f71, after the
+`sandbox-mcp` failure described in issue 236.
+
+Status: fixed locally in fix round 3 of the live-check probes.
+Real-adapter validation remains pending the lead's next run.
+
+The shared step runner stopped the flow on every failure. Consequently, a
+failed sandbox probe skipped all eight later probes and the final views and
+secret check, even when the service and agents remained usable.
+
+Probe failures now remain recorded while the other probes continue. Each
+probe closes its subscriptions before the next one starts. Before a live
+probe runs, the harness checks that its service answers. A probe that sends
+turns also requires its needed agents to have live processes in the run and
+an idle lifecycle in the existing event projection. The persistent-scope
+probe needs only the lead. The permission-metadata probe reads existing
+events, so it needs no live agent. Unavailable preconditions produce a skip
+with the reason and any preceding failed probe named.
+
+The startup-hook through wake journey stays fail-fast. The final check runs
+after probe failures, including an attempt to reconnect after a restart.
+Recording still requires every earlier step to pass. Its skip names the
+failed dependencies. Any failure or skip keeps the overall exit code at 1.
+No failed observation becomes passing evidence.
+
+Regression tests in `probe-fix-round-3.test.ts` exercise the real main flow
+with a scripted public client, a failed sandbox probe, later passing probes,
+failed final secret checks, final reconnect failure, unavailable preconditions,
+and resource cleanup between probes. A separate case checks the live
+precondition logic against real test-owned processes under `/tmp`.
+
+## 239. The live probes call a failed observed attempt not attempted
+
+Found: 2026-11-03, in live-check-2 run 1 at 9340f71, events 112 and 113.
+
+Status: fixed locally in fix round 3 of the live-check probes.
+Issue 236 is addressed separately by the owner-approved runner change below.
+
+The worker made the exact Model Context Protocol (MCP) ask call with the
+sandbox probe's marker. Its adapter reported `user cancelled MCP tool call`
+and no permission request or question was recorded. The probe nevertheless
+reported `not attempted`, obscuring the attempted call and its failure.
+
+The sandbox probe now reports that adapter cancellation when the exact call
+failed with that error and neither a permission request for the call nor a
+question with the marker was recorded. Other exact calls without an
+authenticated successful question report `attempted; failed`. The detail
+contains bounded tool output, redacted for the run's known secret forms and
+credential shapes before it is truncated. Both outcomes fail the closed gate.
+
+The sibling check found the same ambiguity in observed invalid or empty
+permission options, an exact shell command without the required evidence,
+a sent slash payload without its escaped receipt, a persistent command that
+wrote no verifiable scope, and a completed restart without replay evidence.
+These now report failed attempts. A declined command, missing token-scan
+preconditions, or a restart phase whose prerequisites prevented it from
+running still reports no attempt. Security failures such as acting as owner,
+unescaped slash text, accepted old tokens and found tokens keep their
+specific failing outcomes.
+
+`probe-fix-round-3.test.ts` checks the failed-call outcomes, bounded redaction,
+permission and no-permission paths, other adapter errors, each affected
+sibling observation, and the no-command control. The reload regression in
+`probe-reload.test.ts` requires a failed-attempt result when recovery neither
+accepts nor requeues the already-sent delivery.

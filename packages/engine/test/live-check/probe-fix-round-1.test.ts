@@ -64,7 +64,7 @@ it.each(["claude", "codex"])("M-1: an inapplicable result on the observed %s rec
     outcome: id === target && name === harness ? `not applicable (no ${harness} ${harness === "claude" ? "child" : "parent"} receiver in this team)` : accepted[id], detail: "test evidence" }))) };
   const reporter = createReporter(() => undefined);
   await Effect.runPromiseExit(Effect.scoped(runProbes(driver, makeStepRunner(reporter), { lead: { agentId: LEAD }, worker: { agentId: WORKER } })));
-  expect(reporter.results().at(-1)).toMatchObject({ id: target, passed: false });
+  expect(reporter.results().find((row) => row.id === target)).toMatchObject({ id: target, passed: false });
 });
 
 it("m-1: the rendered pending replay prompt holds its turn with the named exact sleep command", () => {

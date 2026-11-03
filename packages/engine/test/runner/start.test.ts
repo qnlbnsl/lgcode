@@ -19,9 +19,9 @@ import { eventually, tagged } from "../support/routingRig.ts";
 // an agent spawns its adapter from the harness's absolute path, at its stored
 // real folder, in a new process group, with exactly the allow-listed
 // environment plus the account's variables and exactly `SHEPHRD_SOCKET` and
-// `SHEPHRD_TOKEN`. `session/new` gets the `shephrd mcp` server with
-// `process.execPath` and an absolute script path, and the session id and the
-// negotiated protocol version are recorded.
+// `SHEPHRD_TOKEN`. Except for Codex (issue 236, shephrd-server.test.ts),
+// `session/new` gets the `shephrd mcp` server with `process.execPath` and
+// an absolute script path. The session id and negotiated version are recorded.
 //
 // The child is the fake agent, which writes what it was started with to its
 // echo file (support/acpRunnerRig.ts). Each test name says which production

@@ -108,6 +108,7 @@ export const dryRunText = (config: LiveConfig = liveConfig({})): string => {
     "The re-record step (scripts/live/recording.ts, scripts/recorder.ts) then starts more model sessions, each sent the RECORDER_PROMPT above:",
     "- one Claude Code recording and one Codex recording, each in a new temporary folder;",
     "- after a recording succeeds, one signed-out probe for that harness: the adapter is started with an empty temporary home and no account variables, and is expected to be refused for authentication.",
+    "The journey steps startup-hook through wake remain fail-fast. The probes sandbox-mcp through token-scan continue after a probe failure when their own preconditions hold: the service answers and their needed agents are alive and idle. A probe with unavailable preconditions is skipped with its reason; final still runs after a probe failure; recording requires every earlier step to pass. Any failure keeps the overall exit nonzero.",
     "The probe prompts above add turns to the same two sessions. The reload step restarts the service twice: one working-turn carry-on, then one pending-envelope replay. Each uses SIGKILL on this run's service child only.",
     "The worker account sets CODEX_CONFIG to shell_environment_policy.inherit=core for SEC-PB-8. Shell permissions are answered only for the exact printed command; always allow is used only in its named step.",
     "PB-A10 already has real evidence in packages/testing/fixtures/{claude,codex}.ndjson. The sandbox-mcp log cites the adapter versions, negotiated ACP versions and config categories; no separate probe is added.",
@@ -165,9 +166,9 @@ export const realDeps = (environment: Readonly<Record<string, string | undefined
 // groups) before it gives up and says the cleanup was not confirmed.
 const DEFAULT_CANCEL_GRACE = 30_000;
 
-// Runs the check and returns the exit code. A step that fails stops the run:
-// the steps after it are printed as skipped, so the owner reads the first
-// cause, and a failed run spends no more of their usage than it must.
+// The journey is fail-fast. Probes collect independent evidence after a
+// failure, then final still checks the views and secrets. Recording requires
+// every earlier step to pass. Any failure keeps the overall exit nonzero.
 //
 // One AbortController owns the whole body (the startup-hook probe, the
 // journey and the recording). The total limit aborts it, then the run waits
@@ -361,7 +362,9 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
 
   if (reporter.failed()) {
     const ran = new Set(reporter.results().map((result) => result.id));
-    for (const spec of ALL_STEPS) if (!ran.has(spec.id)) reporter.skip(spec, "an earlier step failed");
+    for (const spec of ALL_STEPS) if (!ran.has(spec.id)) reporter.skip(spec, spec.id === "recording"
+      ? `requires every earlier step to pass; failed: ${reporter.results().filter((row) => !row.passed && row.id !== "recording").map((row) => row.id).join(", ")}`
+      : `depends on ${reporter.results().find((row) => !row.passed)?.id ?? "an earlier step"}`);
     if (service !== undefined) {
       reporter.note(`The run's folder is kept at ${service.root}; the service's log is ${service.logFile}. The real service was not touched.`);
       if (cleanupUnconfirmed) reporter.note("Cleanup was not confirmed: a process this run started may still be running. Check the folder above before you remove it.");

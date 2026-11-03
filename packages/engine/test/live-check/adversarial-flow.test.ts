@@ -36,11 +36,12 @@ describe("the real runner and flow against a controlled API", () => {
     expect(fixture.lines.at(-1)).toBe("live-check: all 23 steps passed");
   });
 
-  it.each(ids)("a defect at %s exits nonzero and prints SKIP for every later step (catches an ignored failure at any position, including the first and last)", async (id) => {
+  it.each(ids)("a defect at %s exits nonzero; journey failures skip later steps, probe failures keep independent evidence (catches ignored failures or lost evidence)", async (id) => {
     const fixture = setup({ step: id });
     expect(await main([], fixture.deps)).toBe(1);
     const at = ids.indexOf(id);
-    expect(printed(fixture.lines)).toEqual(ids.flatMap((step, index) => [index < at ? "PASS" : index === at ? "FAIL" : "SKIP", step]));
+    const probeFailure = at >= 12 && at <= 20;
+    expect(printed(fixture.lines)).toEqual(ids.flatMap((step, index) => [index === at ? "FAIL" : index < at || (probeFailure && step !== "recording") ? "PASS" : "SKIP", step]));
     expect(fixture.stopCount).toBe(id === "startup-hook" ? 0 : 1);
     expect(fixture.removeCount).toBe(0);
     expect(fixture.calls.filter((call) => call === "record")).toHaveLength(id === "recording" ? 1 : 0);

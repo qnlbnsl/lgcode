@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { comparePermission, DeliveryId, Event, type PermissionLevel, type SessionReference } from "@shephrd/contracts";
 import { AcpClient, layerChildProcess } from "@shephrd/t3-effect-acp/client";
 import { AcpRequestError } from "@shephrd/t3-effect-acp/errors";
@@ -38,6 +37,7 @@ import { makeStderrTail, stderrTailLines } from "../recovery/crash.ts";
 import { linuxProcessReader } from "../recovery/orphans.ts";
 import { buildBaseEnvironment } from "./baseEnvironment.ts";
 import { classifyError } from "./classify.ts";
+import { mcpScriptPath, withShephrdMcp } from "./codexMcp.ts";
 import { compactPrompt } from "./compact.ts";
 import { setConfig, type ConfigOption } from "./config.ts";
 import { denyArguments } from "./denyRead.ts";
@@ -297,6 +297,10 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       } else variables[name] = value;
     }
     if (harness.id === "codex") {
+      variables.CODEX_CONFIG = yield* Effect.try({
+        try: () => withShephrdMcp(variables.CODEX_CONFIG),
+        catch: () => rejected("account tool server configuration cannot be prepared"),
+      });
       const homed = yield* withCodexHome({ stateFolder: configuration.stateFolder, home: configuration.environment.HOME ?? input.folder, accountId: input.account.id, variables }).pipe(
         Effect.provideService(FileSystem.FileSystem, fileSystem), Effect.provideService(Path.Path, pathService),
         Effect.mapError(() => rejected("account home cannot be prepared")),
@@ -510,7 +514,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       const initialized = yield* client.agent.initialize({ protocolVersion: 2, clientInfo: { name: "shephrd", version: "0.0.1" }, clientCapabilities: {} }).pipe(Effect.mapError(() => rejected("adapter initialization failed")));
       processEntry.version = initialized.protocolVersion;
       if (initialized.agentCapabilities !== undefined) processEntry.capabilities = initialized.agentCapabilities;
-      const mcpServers = [{ type: "stdio" as const, name: "shephrd", command: process.execPath, args: [fileURLToPath(new URL("../../../cli/src/bin.ts", import.meta.url)), "mcp"],
+      const mcpServers = harness.id === "codex" ? [] : [{ type: "stdio" as const, name: "shephrd", command: process.execPath, args: [mcpScriptPath, "mcp"],
         env: [{ name: "SHEPHRD_SOCKET", value: configuration.socketPath }, { name: "SHEPHRD_TOKEN", value: Redacted.value(input.token) }] }];
       // Row 66 and issue 93: reload only through a method this peer
       // advertised at initialize, `session/load` first, else `session/resume`.

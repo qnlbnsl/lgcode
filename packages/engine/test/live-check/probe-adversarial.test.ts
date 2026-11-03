@@ -179,7 +179,7 @@ describe("removed-variables (SEC-PB-5, SEC-PB-8) passes only on the exact comman
     engine.script = refused(engine, (command) => ({ command }));
     const run = await runProbe(engine, "removed-variables");
     expect(run.passed).toBe(false);
-    expect(run.rows.find((row) => row.harness === "codex")?.outcome).toBe("not attempted");
+    expect(run.rows.find((row) => row.harness === "codex")?.outcome).toBe("attempted; failed");
   });
 });
 
@@ -301,7 +301,7 @@ describe("slash-up and slash-down (SEC-PB-2, SEC-PB-7) pass only on an escaped r
       : { type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text: envelope(p.deliveryId, `\\${p.text}`) }] } }]);
     const run = await runProbe(engine, probe);
     expect(run.passed).toBe(false);
-    expect(run.reason).toContain("not attempted");
+    expect(run.reason).toContain("attempted; failed");
   });
 
   it.each(["slash-up", "slash-down"] as const)("%s fails when the payload arrives unescaped inside the envelope", async (probe) => {

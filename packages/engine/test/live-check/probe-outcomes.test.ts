@@ -40,7 +40,8 @@ describe("live probe outcome gates", () => {
   it.each(PROBE_STEPS)("fails $id when the adapter did not attempt it", async ({ id }) => {
     const { exit, reporter } = await run({ id, outcome: "not attempted" });
     expect(exit._tag).toBe("Failure");
-    expect(reporter.results().at(-1)).toMatchObject({ id, passed: false, reason: expect.stringContaining("not attempted") });
+    expect(reporter.results()).toHaveLength(9);
+    expect(reporter.results().find((row) => row.id === id)).toMatchObject({ id, passed: false, reason: expect.stringContaining("not attempted") });
   });
   it.each([
     ["sandbox-mcp", "tool failed"], ["permission-kinds", "missing options"], ["removed-variables", "acts as owner"],
@@ -48,7 +49,7 @@ describe("live probe outcome gates", () => {
     ["always-allow", "persistent option held by agent"], ["reload", "old token accepted"],
     ["token-scan", "token found"],
   ])("fails %s on %s", async (id, outcome) => {
-    expect((await run({ id, outcome })).reporter.results().at(-1)).toMatchObject({ id, passed: false });
+    expect((await run({ id, outcome })).reporter.results().find((row) => row.id === id)).toMatchObject({ id, passed: false });
   });
   it("accepts an observed deny rule and a recorded re-send instead of pretending history was found", async () => {
     expect((await run({ id: "state-read", outcome: "refused" })).exit._tag).toBe("Success");

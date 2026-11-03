@@ -36,7 +36,7 @@ it("m-8: Codex cannot claim core inheritance from a refusal without the shell's 
   } };
   const result = await runProbe(e, "removed-variables");
   expect(result.rows[0]?.outcome).toBe("refused by ancestry check");
-  expect(result.rows[1]?.outcome).toBe("not attempted");
+  expect(result.rows[1]?.outcome).toBe("attempted; failed");
   expect(result.passed).toBe(false);
 });
 
