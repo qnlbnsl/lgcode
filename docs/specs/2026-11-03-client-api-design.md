@@ -172,23 +172,28 @@ engine's existing rule for agents' processes to it.
 1. The kernel's socket tables, `/proc/net/tcp` and `/proc/net/tcp6`, list
    each loopback connection with its two ports, the user id that owns it and
    its socket's inode number.
-2. If that user id is not Shephrd's own user id, the peer is not an agent,
-   because every agent runs as the owner's user. The connection is allowed.
-   A reverse proxy that runs as its own user, such as `caddy`, passes here.
+2. If that user id is not Shephrd's own user id, the connection is refused,
+   unless proxy mode is on and the user id matches the "proxy user id"
+   setting, which the owner sets at the computer. A reverse proxy that runs
+   as its own user, such as `caddy`, passes only this way. The first draft let
+   every other user id through; the lead's review ruling replaced that
+   (row 92).
 3. If the user id is Shephrd's own, Shephrd finds the process that holds the
    socket's inode, by reading the `/proc/<pid>/fd` links of the owner's
    processes. It then walks that process's parents and applies the engine's
    check from `packages/engine/src/api/ancestry.ts`: a process in a recorded
    agent adapter's process group, or descended from a recorded adapter, is an
    agent.
-4. An agent's process is refused. A same-user process whose owner cannot be
-   found is also refused, so a lookup failure fails closed.
-5. In proxy mode, a request whose forwarded client address is one of the
-   host's own addresses is refused. An agent that connects to the proxy's
-   public address on the same machine then arrives with the host's own
-   address. Only the last `X-Forwarded-For` entry, the one the proxy adds,
-   is checked, and outside proxy mode forwarded headers are ignored
-   (row 89).
+4. An agent's process is refused, and so is a socket that an agent's process
+   holds along with another process. A same-user process whose owner cannot
+   be found is also refused, so a lookup failure fails closed.
+5. In proxy mode, a public request is refused when its last
+   `X-Forwarded-For` entry, the one the proxy adds, is missing, is one of the
+   host's own addresses, or is outside the "allowed client networks" setting,
+   which the owner sets at the computer and which has no default. An agent
+   that connects to the proxy's public address on the same machine arrives
+   with the host's own address. Outside proxy mode, forwarded headers are
+   ignored (rows 89, 91, 113).
 
 **Whether it holds.** It holds against an agent, or a program an agent
 starts, that connects to the web server directly. That is the easy case the
@@ -197,7 +202,8 @@ guard, like the engine's existing ancestry check, and not a security
 boundary.
 
 **What it costs.** One read of the two socket tables and one scan of the
-owner's processes' open files when a connection opens, not on every message.
+owner's processes' open files when a connection opens, after the `Host` and
+`Origin` checks, not on every message.
 The web page holds one WebSocket open, so this runs rarely. There is no new
 dependency, and Shephrd already runs on Linux only.
 
@@ -208,9 +214,9 @@ dependency, and Shephrd already runs on Linux only.
 - It asks a program that is not its descendant to connect for it, such as
   a user service manager, a scheduled job, or a terminal outside its tree.
 - It reaches the web server through the proxy from another machine or
-  network namespace whose address is not one of the host's own.
-- It runs a container as another user, whose connection then looks like a
-  non-agent's.
+  network namespace whose address is inside the allowed client networks and
+  is not one of the host's own.
+- Its adapter dies, so an orphaned process no longer has a recorded ancestor.
 
 **What was chosen.** Build the guard, in the one function that decides the
 caller, and say plainly in SECURITY.md that it stops accidents and simple
@@ -222,6 +228,6 @@ slots into the same function.
 
 - When authentication and pairing are added, and when Shephrd's own Unix
   user is built. The owner deferred both to "once it is up and running".
-- The epic's second "done when" names "a phone that was paired with a
-  one-time code". Pairing is now deferred, so the epic's wording is for the
-  lead to update.
+- Whether the phone may choose "Allow always" while the web server has no
+  login. This is the owner's question 6, and the plan folds the recommended
+  answer, marked pending (row 95).

@@ -89,6 +89,8 @@ These rules apply to every change. A change that breaks one is a security bug.
    authentication unchanged. The risk the owner accepted: every agent on the
    machine can reach the open server on `127.0.0.1`, and so can anyone who
    reaches the owner's proxy. Either can act with the owner's full control.
+   Over the open web server, an approval needs no credential, so rule 7's
+   "unless the owner's credential approves it" does not hold there.
    An agent stuck on an approval could approve itself, or start agents with
    full access, which bypasses the permission ceiling and the ancestry
    check. Two limits stay in force while it is open. First, three commands
@@ -98,8 +100,12 @@ These rules apply to every change. A change that breaks one is a security bug.
    server refuses a connection from a process that descends from an agent.
    That second check stops accidents and simple misuse, not a hostile agent:
    an agent can start a process outside its own process tree, or ask
-   another program to connect for it. Authentication, with pairing, ends
-   this suspension.
+   another program to connect for it. The web server also refuses another
+   user's process, unless proxy mode is on and it is the proxy's user, which
+   the owner names at the computer. In proxy mode, it refuses a public request
+   whose forwarded client address is missing or outside the networks the owner
+   allowed at the computer. Authentication, with pairing, ends this
+   suspension.
 3. **A new device is paired with a short-lived, single-use pairing code.**
    A pairing code is never reusable and never stored in plain text.
 4. **Each device gets its own credential, and each credential can be revoked

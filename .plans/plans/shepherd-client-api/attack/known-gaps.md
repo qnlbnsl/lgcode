@@ -14,11 +14,15 @@ close it. "Rows" are rows of `decisions.md` in this folder.
   (row 78).
 - **Each vendor's remaining weekly allowance is unknown.** The planner
   cannot read it. The lead checks each vendor's limit before launching the
-  47 launches in the sizing section.
-- **The epic's second "done when" names a paired phone.** It reads "a
-  phone that was paired with a one-time code". The owner deferred pairing
-  (rows 80, 86), so unit 11 proves the flow without pairing. The lead
-  rewords the epic.
+  51 launches in the sizing section.
+- **The owner's question 6 is pending.** The plan folds the recommended
+  answer: from a device caller, the engine refuses a persistent or
+  always-allow option (row 95, edit E28, criterion 1.41). The other answer
+  removes that one edit and that one criterion. AGENTS.md rule 5 changes only
+  after the owner answers.
+- **Row 51 is widened.** No owner quote backs the exclusion of the VS Code
+  extension, so the row stays open until the lead cites one or the owner
+  confirms it. The plan builds no extension (row 121).
 - **`docs/issues.md` and `docs/features.md` are not updated here.** They
   go through the lead. The wanted entries are in the planner's result
   file.
@@ -32,9 +36,33 @@ close it. "Rows" are rows of `decisions.md` in this folder.
   permission requests and starting agents with full access.
 - **Shephrd has no Unix user of its own.** Any agent can read Shephrd's
   state folder, including the stored account keys (row 78).
-- **A caller of the open web server can change the alert carrier's
-  settings,** and so redirect or silence alerts. Such a caller could
-  already answer requests, so this adds no new power (row 88).
+- **A caller of the open web server can change the alert carrier's server
+  and topic,** and so redirect or silence alerts. Such a caller could already
+  answer requests, so this adds no new power (row 88). The token does not
+  follow a change of server (row 93).
+
+## Gaps the plan names and leaves open
+
+- **Lasting settings stay open to the web.** A harness's adapter path and
+  arguments, an account's environment and secrets, the carrier's server and
+  topic, and the roles' role file and settings can all be changed by a web
+  caller, and they outlast the moment's access. None grants more than the open
+  server already gives, so none moved to the computer-only list. A change
+  raises a `client.lasting-setting` alert, and nothing prevents it (row 98).
+- **A phone can get an alert twice.** Delivery is at least once. A crash
+  after the carrier accepts and before the local record sends it again. ntfy's
+  sequence id replaces the earlier one where the server honours it (row 106).
+- **Plain HTTP inside WireGuard is refused.** A public request must carry
+  `X-Forwarded-Proto: https`, so an owner who wants plain HTTP inside
+  WireGuard cannot have it. This goes beyond the ruling. The owner can ask for
+  the other choice (row 113).
+- **ntfy's own settings cannot be enforced.** The owner's server decides its
+  access rules. `docs/remote-access.md` advises deny-all, and Shephrd cannot
+  check it (row 115).
+- **A question from a stopped asker stays open in the engine.** Answering it
+  queues a reply to a stopped agent. The alert closes, by the level table, but
+  the question row remains. The wanted issue is in the planner's result file
+  (row 107).
 
 ## Where the same-machine guard fails
 
@@ -46,9 +74,10 @@ so. A deliberate agent gets past it in these ways:
 - It asks a program that is not its descendant to connect for it, such as
   a user service manager, a scheduled job, or a terminal outside its tree.
 - It reaches the web server through the proxy from another machine or
-  network namespace whose address is not one of the host's own.
-- It runs a container as another user, whose connection then looks like a
-  non-agent's.
+  network namespace whose address is inside the allowed client networks and
+  is not one of the host's own.
+- Its adapter dies, so an orphaned process no longer has a recorded ancestor
+  (`packages/engine/src/api/ancestry.ts:33-36`).
 
 If the host hides other processes' `/proc/<pid>/fd` links, the guard
 refuses every same-user peer, including the owner's own browser on the
@@ -56,7 +85,9 @@ host. Post-build check PB-4 confirms this on the owner's host.
 
 ## Facts the planner could not verify
 
-- **Caddy's forwarded-header behaviour.** Whether Caddy's reverse proxy
-  appends to or replaces a client-sent `X-Forwarded-For` is not checked
-  here. Post-build check PB-2 checks it before criterion 10.2 is written
-  (row 89).
+- **The owner's real proxy.** Caddy's documentation answers how its defaults
+  treat `X-Forwarded-For`, `X-Forwarded-Proto` and `Host`, but the owner said
+  "a caddy or something". Post-build check PB-2 tests the real one (rows 89,
+  113).
+- **The owner's ntfy server.** Post-build check PB-5 confirms that it honours
+  the sequence id and the delete by it.
