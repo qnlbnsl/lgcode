@@ -646,13 +646,17 @@ optional field to an existing schema; no existing value changes meaning.
     wraps the body in its agent-text envelope, with a fresh random marker,
     and escapes a leading `/`. A piece can never send a raw prompt.
 15. **A piece's reach check** (lead ruling L13). A piece may register one
-    reach check. The engine consults it only for a delivery the piece
-    queues with its own source, when the target is outside the calling
-    agent's tree (section 2). Its inputs are the caller, the target and the
-    views snapshot of the same transaction, never an earlier read (lead
-    ruling L15). It grants no other right.
+    reach check. Once registered, the engine consults it on every delivery
+    the piece queues with its own source (lead ruling L22): for a target
+    inside the calling agent's tree as well as outside it, and for a
+    delivery the piece builds with no caller. The clause "outside the
+    calling agent's tree" (section 2) limits only what the check may
+    allow: it is the one case where the check can let a delivery through
+    that the engine's tree rule alone would not. Its inputs are the caller,
+    when there is one, the target and the views snapshot of the same
+    transaction, never an earlier read (lead ruling L15). It grants no other right.
     The engine checks it twice (lead ruling L19). It checks it first when
-    the piece queues the delivery. The delivery dispatcher checks it again
+    the piece queues any delivery, as above. The delivery dispatcher checks it again
     inside the send transaction, against the views snapshot at send time.
     A delivery that fails the second check is withdrawn with
     `DeliveryWithdrawn` and never sent. With nothing registered, dispatch
@@ -662,7 +666,7 @@ optional field to an existing schema; no existing value changes meaning.
     with "request held" when the waiter holds an engine request or
     question (`routing/waits.ts`, `holds`). A piece may register a matching
     condition; the board's is "the waiter is an addressee of an open post
-    that needs its reply and has not answered it". The engine checks it
+    that needs its reply and has no disposition for it". The engine checks it
     when the wait opens and after every batch, as it checks `holds`. With
     nothing registered, behaviour is unchanged.
 17. **A per-caller snapshot hook** (lead ruling L15). Each piece supplies

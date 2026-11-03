@@ -277,6 +277,7 @@ items 1 to 17.
 | 1.21 | A registered "request held" condition ends a blocking wait at open and after a batch; with none registered, every existing wait test passes | Test id: `packages/engine/test/extension/request-held.test.ts`, plus criterion 1.1 |
 | 1.22 | A piece's `snapshotFor` hook can leave its section out for a caller; an agent's snapshot has no board-like test section, the owner's has it | Test id: `packages/engine/test/extension/snapshot-hook.test.ts` |
 | 1.23 | The dispatcher re-runs the reach check in the send transaction: a target that left the channel after its delivery was queued gets `DeliveryWithdrawn` and is never sent; with no reach check registered, dispatch matches today's | Test id: `packages/engine/test/extension/piece-reach-at-send.test.ts`, plus criterion 1.1 |
+| 1.24 | A registered reach check runs on every delivery its piece queues, including one to the caller's own child and one with no caller, and can refuse either | Test id: `packages/engine/test/extension/piece-reach-every.test.ts` |
 
 **Tasks:**
 
@@ -308,7 +309,7 @@ items 1 to 17.
 | A piece's view drifts from the log | Medium | Pieces' views join the rebuild check (criterion 1.2). |
 | The unit is too big for one build | Medium | Split into 1a and 1b, each with its own criteria. |
 
-**Verify:** criteria 1.1-1.23; environment QA: none.
+**Verify:** criteria 1.1-1.24; environment QA: none.
 
 **Rollout detail:** rollout step 3. Unit 1a merges before 1b starts. The
 board and roles plans start their engine-facing units only after 1b merges.
@@ -716,7 +717,7 @@ when"; the engine design's capabilities 6, 8 and 9 and "What this spec
 leaves open" (client API); `docs/features.md` section 3 ("Threads where the
 owner already works") and section 4; `docs/research/t3-code.md` items 9 to
 12; `docs/issues.md` issues 65, 75 and 164; owner choice A10; lead rulings
-L1 to L4, L10, L11, L13, L15, L16 and L19; the roles planner's requests 1 to 6 and the board
+L1 to L4, L10, L11, L13, L15, L16, L19 and L22; the roles planner's requests 1 to 6 and the board
 planner's R1 items 1 to 6; SECURITY.md security rules 1 to 7.
 
 | Source item | Workstream | Status |
@@ -760,6 +761,7 @@ planner's R1 items 1 to 6; SECURITY.md security rules 1 to 7.
 | Lead L15 | WS-1 (1.17, 1.20-1.22), WS-2 (2.6), WS-3 (3.5), WS-6 (6.5) | planned |
 | Lead L16 | WS-1 (criterion 1.19) | planned |
 | Lead L19 | WS-1 (criterion 1.23) | planned |
+| Lead L22 | WS-1 (criteria 1.21, 1.24) | planned |
 | Roles requests 1-6 | WS-1, WS-3, WS-6; contract section 7 | planned |
 | Board R1 items 1-6 | WS-1, WS-2, WS-5, WS-6; contract section 7 | planned |
 | SECURITY.md rules 1-7 | Guardrails fold | planned |
