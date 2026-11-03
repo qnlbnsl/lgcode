@@ -99,7 +99,7 @@ that outsiders can reach.
   choice A10 asked.
 
 Full log → `decisions.md`. The contract the other two plans build on is
-`contract.md`, version 4 at `8e80a13`.
+`contract.md`, version 5 at `09018d6`.
 
 ## Workstreams
 
@@ -223,7 +223,7 @@ Conventions for every unit. Paths are relative to the Shephrd repository
 root. Anchors are at engine commit `8ff4c9b` (`scouting.md`). "Rows" are
 rows of this plan's `decisions.md`; "engine rows" are rows of
 `.plans/plans/shepherd-engine/decisions.md`. "The contract" is
-`contract.md` in this folder, version 4 at `8e80a13`; where a
+`contract.md` in this folder, version 5 at `09018d6`; where a
 unit and the contract disagree, the unit reports it to the lead. A test id
 is a Vitest file path, run with `pnpm vitest run <path>`; Playwright tests
 run with `pnpm playwright test <path>`. Effect code is written from Effect
