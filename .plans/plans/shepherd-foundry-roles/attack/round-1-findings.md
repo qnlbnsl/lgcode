@@ -9,8 +9,8 @@ review (Opus), Ls the logic review (Sol), F the threat model (Opus), and
 TM the threat model (Sol). The folded plan is frozen as `attack/plan-v2.md`.
 
 Lead rulings applied: L20 (board #93) for F1 to F4, Lo-L6 and the matcher;
-L17 (board #85) for the dropped fallback; L19 (board #95) cited, with no
-change to the plan (row 52).
+L17 (board #85) for the dropped fallback; L19 (board #95) and L22 (board #103) cited, at client API `586a7ff`,
+with no change to the plan (row 52).
 
 | Finding | Severity | Fold | Where |
 |---|---|---|---|

@@ -264,8 +264,8 @@ uses no `herdr agent` command, `collect.sh` or `board-waker.sh`.
 
 **Sources this plan builds on.** "CAPI §n" is the client API contract,
 `.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api` at
-`ed1755d` (v2 frozen at `75ab185`, with seam items 12 to 17 and lead rulings
-L15, L16 and L19; decision rows 21, 32, 33, 52). "Board" is the message board
+`586a7ff` (v2 frozen at `75ab185`, with seam items 12 to 17 and lead rulings
+L15, L16, L19 and L22; decision rows 21, 32, 33, 52). "Board" is the message board
 contract v3, `.plans/plans/shepherd-message-board/contract.md` on
 `worker/plans-board` at `07b3386` (rows 29, 31, 33), with lead ruling L17's
 service-to-agent direct pair (row 34). Both assume the extension seam
@@ -826,7 +826,7 @@ Source universe: (A) epic row 4 and the epic's three "Done when" bullets;
 Steps 3, 4, 5 and 8 and the scripts `collect.sh`, `board-waker.sh`,
 `team-idle-watch.sh`, `context-keeper.sh` and `capacity-retry.sh`; (F) CAPI
 §7, "The foundry roles"; (G) the board contract's answers to the roles'
-seven needs; (H) decisions.md; (I) lead rulings L17, L19 and L20.
+seven needs; (H) decisions.md; (I) lead rulings L17, L19, L20 and L22.
 
 | Source item | Workstream | Status |
 |---|---|---|
@@ -867,7 +867,7 @@ seven needs; (H) decisions.md; (I) lead rulings L17, L19 and L20.
 | G: needs 1, 3, 4, 5, 6, 7 accepted; 2 refused | WS-3, WS-4, WS-5 | accepted needs used as given; work state derived (row 25) |
 | H: rows 1 to 53 | all | each row names its workstream in its own text |
 | I: L17 (service direct pair; no engine-prompt fallback) | WS-3 | mapped (row 34) |
-| I: L19 (reach check re-run at send) | — | the roles register no reach check (row 52) |
+| I: L19 and L22 (reach check at queue and send, on every piece delivery) | — | the roles register no reach check; the sheepdog's notices pass the board's, which L17's direct pair allows (row 52) |
 | I: L20 (standing-rule matching) | WS-2, WS-7a | mapped (row 35) |
 
 </details>

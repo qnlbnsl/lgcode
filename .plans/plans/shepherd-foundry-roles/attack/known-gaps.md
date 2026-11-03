@@ -2,7 +2,7 @@
 
 1. Gate 10 load line: the planner cannot read either vendor's remaining weekly allowance; launch counts are estimates, and the lead checks limits before launching.
 2. Decision rows 11, 19, 30 and 53 are unanswered with the owner: the extension seam (built in the client API plan) and the three engine changes in WS-7, two of which round 1 reshaped (row 53). Each affected workstream states its fallback; if the seam itself is declined, both contracts and this plan return to DISCOVER.
-3. Both contracts are frozen (client API `ed1755d`, board v3 `07b3386`), but neither is built; the roles depend on the seam's in-process service path accepting piece commands such as `board.post` (post-build check 3).
+3. Both contracts are frozen (client API `586a7ff`, board v3 `07b3386`), but neither is built; the roles depend on the seam's in-process service path accepting piece commands such as `board.post` (post-build check 3), and on the board's reach check allowing L17's service-and-agent direct pair once L22 runs it on every board delivery.
 4. The scopes `roles/backend`, `roles/contracts` and `roles/docs-research` do not exist; the lead runs the scoping skill before launch.
 5. Without WS-7c, timed compaction covers Claude agents only, and depends on the adapter writing a transcript where the reader can find it (post-build check 2).
 6. Without WS-7b, the sheepdog re-sends only plain engine prompts, so the agent sees the sheepdog's fixed header naming the original sender, and the sender is still woken once by the engine's returned delivery. A board wake that meets a capacity error keeps the board's own rule (one immediate retry, then `undeliverable`), so without WS-7b a capacity outage can end that addressee's part of a post (row 49).
