@@ -3,8 +3,9 @@
 Status: **version 10, for the foundry-roles plan to build on.** Written by
 the board's planner on 2026-11-03. Version 9 is `attack/contract-v9.md`.
 This version folds the client API contract version 11 (`3bd2358`; lead's
-post #240; rows 135 to 139). It builds on that version, whose copy is
-`client-api-contract-v11.md` in this folder. A later change to this file goes to `plans-lead` as a
+post #240; rows 135 to 139). It builds on the client API contract version 12
+(`8a34e59`), whose copy is `client-api-contract-v12.md` in this folder. That
+version changes only citations here, so this stays version 10 (row 142). A later change to this file goes to `plans-lead` as a
 question first. The board's plan is `.plans/plans/shepherd-message-board/plan.md`;
 its decisions are rows in `decisions.md` in the same folder, named in
 brackets below.
@@ -16,7 +17,7 @@ ruling L26). The client API plan's units 1a and 1b turn the engine's fixed
 lists into lists a piece adds to, and the board adds its own entries in
 its own units. Names and shapes follow the client API's contract
 (`.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api`,
-version 11 at `3bd2358`). "Edit EN" below is that contract's section 6,
+version 12 at `8a34e59`). "Edit EN" below is that contract's section 6,
 edit EN. The security rules of lead rulings L13 and L16 to L25 stay
 exactly as ruled; they are now properties of engine code.
 
@@ -406,7 +407,10 @@ A post has:
   it, so the board has no rule for it. A held wake is a queued wake that was
   sent, so it is not merged, cleanup may withdraw it, and it counts no return.
   A wake the board withdraws and replaces stays behind the hold, and the
-  reactor's guard counts it as a queued wake (row 138).
+  reactor's guard counts it as a queued wake (row 138). An open hold keeps its
+  agent unsettled in the engine's part of the settled test, even once its queue
+  is empty (client API section 3, its row 177), and the board adds nothing for
+  it (rows 141, 142).
 - **Restarts.** The board holds one logical wake per post and target, and
   its commands act once per request id. A wake that was sent but not proven
   received may be sent again after a restart, as the engine allows.
