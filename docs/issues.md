@@ -1633,7 +1633,7 @@ log's redaction boundary.
 ## 103. Adapter setup has no timeout, and spawn registration is not atomic
 
 Found: 2026-11-01, in unit 6a's focused review, finding F-8.
-State: fixed in unit 6d (`recovery/reload.ts`, `runner/AcpRunner.ts`).
+State: open, fix on branch worker/review-2, commit `c9ff320`.
 The plain `start` remainder is being fixed as post-build A3 on branch `worker/review-2`, with a two-minute setup bound and stop pre-emption.
 
 What happens: initialization, session creation, session load and initial
@@ -1656,7 +1656,14 @@ check, so two direct callers cannot create two processes. A reload uses only
 the method the peer advertised at initialize: `session/load` when it
 advertised `loadSession`, otherwise `session/resume` when it advertised
 resume, and otherwise it is refused with "adapter cannot reload". The plain
-`start` command is not bounded yet.
+`start` command was not bounded at the reviewed commit `8ff4c9b`.
+
+What changed on branch `worker/review-2`: commit `c9ff320` applies the same
+two-minute setup bound to a plain start and lets an authorized stop pre-empt
+that setup.
+The post-build result for task 2 reports passing setup tests and a clean
+engine type check on that branch.
+The stalled-send stop path remains open in issue 227.
 
 ## 104. Three harnesses have no verified deny-read or deny-write rule
 
@@ -3964,3 +3971,72 @@ No cleanup implementation change is authorized by this record-only decision.
 Score: MAJOR, severity 6 × fallout 3 × probability 2 = 36, band record.
 Why it matters: cleanup can stop unrelated owner work after an early exit
 and process-identifier reuse.
+
+## 226. The orphan-sweep test for a surviving group times out before its own deadline
+
+Found: 2026-11-03, by review-fix-2 while verifying the post-build A3 fix.
+State: open, recorded at the review lead's request in board post 8.
+
+Evidence: `fix-round-1/result-2.md` reports a five-second test timeout in
+`packages/engine/test/recovery/orphans.test.ts`, case F-3.
+The case is named "a group that survives SIGKILL".
+The full engine run on branch `worker/review-2`, commit `c9ff320`, had
+1,627 passing tests, one failing test and two skipped tests.
+Review-fix-2 reproduced the same failure on the untouched base commit
+`8ff4c9b` in a temporary worktree, which was then removed.
+I did not reproduce the runtime failure in this worktree.
+
+What happens: the case keeps one fake process group alive after both signals.
+It allows the sweep eight seconds to return through `Effect.timeoutOption`.
+In `packages/engine/src/recovery/orphans.ts`, the default wait after the
+kill signal is five seconds, after the case's 30-millisecond grace period.
+The reported five-second test timeout therefore expires before that expected
+sweep can complete.
+The root `vitest.config.ts` declares a 60-second test timeout.
+Its effective timeout for this workspace case still needs verification.
+The report does not establish a production sweep failure or an A3 regression.
+
+What should happen: make the case's effective test deadline cover the
+deliberate sweep bound, or inject a shorter sweep wait without weakening
+the assertion that a surviving group is left alone and the next row is swept.
+No test or production implementation is changed by this record.
+
+Score: not assigned, because the new evidence establishes a test failure
+rather than a scored production defect.
+Why it matters: a failure already present on the base commit prevents a
+clean full-suite result for unrelated engine changes.
+
+## 227. A stalled prompt send holds the lane that a stop command needs
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding flow3 F-5.
+State: open, record only under the owner's 2026-11-03 review choices.
+
+Evidence: `results/flow3.md`, F-5, confirms the path by source inspection
+and hand reasoning, without executing a stalled-send test.
+The A6 adjudication in `adj/result-5.md` keeps this stop-control consequence
+separate from the cross-agent recovery scheduling defect.
+Issue 215 records that recovery scheduling defect.
+
+What happens: an adapter can stop reading while a large prompt fills its
+standard-input pipe.
+In `packages/engine/src/routing/deliveries.ts`, dispatch holds the agent's
+lane through the runner's prompt call.
+In `packages/engine/src/runner/AcpRunner.ts`, that call waits for the write
+acknowledgement without a send deadline.
+In `packages/engine/src/commands/CommandHandler.ts`, a stop waits for the
+same lane before it can stop the process.
+The stop therefore waits for the adapter to exit or for an external kill.
+
+The A3 fix on `worker/review-2`, commit `c9ff320`, does not cover this path.
+Its `packages/engine/src/routing/lanes.ts` cancellation registration is used
+only by start setup, as the fixer's result confirms.
+An ordinary stalled send registers no such cancellation signal.
+
+What should happen: bound or cancel the send acknowledgement, or let an
+authorized stop pre-empt the send before acquiring its lane.
+The original flow score is severity 6 × fallout 3 × probability 2 = 36, band record.
+The flow reviewer labelled it MINOR.
+The A6 adjudicator considers indefinitely failing stop control a MAJOR
+consequence, while keeping this finding separate from A6.
+Why it matters: an ordinary stop can fail to end the affected agent until
+the owner intervenes outside the command path.
