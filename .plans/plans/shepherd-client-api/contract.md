@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v11, review round 3 folded
-version: 11
+status: v12, two lines added with no review round
+version: 12
 updated: 2026-11-03
 ---
 
@@ -262,6 +262,11 @@ table that holds a function per piece:
   they still agree.
 - **A piece-decided visibility rule and a piece's read are outside the table.** A
   thrown visibility rule hides the event. A thrown read fails that read alone.
+- **Two named functions are not table entries** (row 178). The roles' standing-rule
+  matcher and their capacity-hold condition are called directly by the engine, so
+  `guardPiece` does not cover them. Each keeps its own rule: an error or a malformed
+  result is logged with no request content and counts as "no". `guardPiece` still
+  covers every table function, and any function that is added to a table.
 - **It is not a write failure.** An alert source that throws costs that event's
   alert, and the error log shows it. The reactor still stops at an event only for
   `LogWriteFailed`.
@@ -529,6 +534,12 @@ hold, not by a fixture:
   sequence. `toolInput` is never in the snapshot (edit E29).
 - **Agent entries** hold a name cut to 64 bytes and a team of at most 8 labels
   and 128 bytes, as an alert does, with the fixed fields of `client.roster`.
+- **`capacityHeld`** (row 177) is one more field of an agent entry, added by roles
+  unit 11b. It is true while the agent has an open capacity hold, and the wait helper
+  reads it. An owner, a device and a service get it, and an agent's snapshot leaves it
+  out, as it leaves out `reloadable`. It fits the size cap: it is one boolean of about
+  20 encoded bytes, so on the 200-agent fixture it adds about 4 KiB to a cap of 4 MiB,
+  about 0.1 percent. The snapshot's size test sets it on every agent once it exists.
 - **The account section** holds each account's id, status and flags, and, for
   its environment, each variable's name and whether its value is a secret
   reference. It holds no value. The stream's `AccountChanged` and the
@@ -706,6 +717,13 @@ same visibility rule. It is how a client recovers an event that the filtered
 stream replaced with a marker, including one that belongs to no thread, such
 as `HarnessChanged`. Its access is `owner`, `device`, `service` and `agent`.
 
+The reply carries the event with its envelope, including `occurredAt` and the
+sequence (row 176). So a piece can read an event's time here, which a reducer may not
+hold, because a projection passes `occurredAt: 0` (`routing/waits.ts:28-31`). The
+roles' sheepdog re-arms its timers this way after a restart. It calls `client.event`
+as the service caller that this table already allows, through its entry in the service
+list, and this gives it no new reach, because it already sees every event.
+
 An agent reads under the read rule its stream obeys, so an agent can recover
 every marker its stream shows it, and nothing more (row 158). The reply comes in
 the same data envelope as an agent's thread page. An `owner-only` event, including
@@ -749,7 +767,7 @@ disagree. Each member has one result, read from its current state:
 | Member's state and conditions | Result | What the helper does |
 | --- | --- | --- |
 | Idle, with no engine or piece hold | `settled` | The member counts as resolved. |
-| Idle, with a queued or sent delivery, an open request or question, a hold, or an open non-blocking wait | None | It keeps waiting. |
+| Idle, with a queued or sent delivery, an open request or question, a hold, an open capacity hold even once its queue is empty, or an open non-blocking wait | None | It keeps waiting. |
 | Idle, with a piece's hold at the agreed sequence | None | It keeps waiting. |
 | Starting or working | None | It keeps waiting. |
 | Crashed or stopped | `crashed` or `stopped` | The member counts as resolved. Exit 1 when the wait closes. |
@@ -2021,6 +2039,18 @@ waits, all of which the snapshot holds (section 3). The client's fold of those
 inputs from the stream also lives in `settled.ts`, as a pure function, and a
 property test replays a log through it and through the engine's `apply`, and
 compares them at every sequence (row 150).
+
+**A capacity hold keeps an agent unsettled** (row 177). The engine's part of the
+settled test gains one clause: an agent with an open capacity hold is not settled,
+even once its queue is empty. This is the engine's part, and not the hold-unsettled
+table, so the roles' entry in that table stays "never". No wait hangs on it, because
+a hold always has a release (roles row 129). Roles unit 11b writes the clause, the
+open holds in `settled.ts`'s input, the `capacityHeld` field of `client.snapshot`'s
+agent entry, and the client's fold of `DeliveryHeld`, `DeliveryReleased`, and the stop
+and the crash that end a hold. It also adds these events to row 150's property test.
+This plan's unit 1b supplies `settled.ts` and its input, and unit 3 supplies the
+snapshot's agent entry, so roles unit 11b depends on both.
+
 `waits.ts` imports them, with no re-export at the old place. A
 hold-unsettled table, typed over `PieceNamespace`, holds each piece's
 condition: while it holds for an agent, that agent is not settled (lead
@@ -2349,7 +2379,9 @@ because the tables run inside pure folds (`views/apply.ts:336-337`). It reports 
 small sink that the service drains to the error log, at most once a minute for one
 namespace and table, because a rebuild can meet the same throw many times. Section 1
 states the rule and the fallbacks. The edits E6, E9, E16, E18, E19, E20 and E27 call
-their tables through it, and the alert reactor calls its two tables through it.
+their tables through it, and the alert reactor calls its two tables through it. It
+covers table functions only. The roles' standing-rule matcher and capacity-hold
+condition are the two named exceptions, as section 1 says (row 178).
 
 - Behaviour change: none, while the tables hold only unit 1's entries. A later throw
   no longer stops the engine.
@@ -2402,7 +2434,8 @@ The library does not reconnect a stream while a recovery read is running.
   hold-unsettled, request-held and snapshot-section tables.
 - **The roles' plan** adds the `roles` group, events, view, alert sources,
   snapshot entry, and its two services on the service list. Its
-  standing-rule matcher stays as ruled.
+  standing-rule matcher stays as ruled. Its unit 11b adds the capacity-hold clause to
+  the engine's part of the settled test, and `capacityHeld` (edit E19, row 177).
 
 ### Size, and the order of the two units
 
