@@ -57,31 +57,37 @@ replaced, Shephrd builds the replacement's first message from the record of
 what the old worker did, so no model turn is spent writing a summary.
 
 Two other plans are being written at the same time, and this one builds on
-both. The client API plan gives the sheepdog a narrow credential of its own,
-so its actions are logged as the sheepdog's and not the owner's, and gives
-agents a way to list who is on their team. The message board plan gives the
+both. The client API plan adds one extension point to the engine, so the
+sheepdog can run inside Shephrd as a narrow "service" caller whose actions
+are logged as the sheepdog's and not the owner's, and gives agents a way to
+list who is on their team. The message board plan gives the
 sheepdog one way to deliver a nudge to any agent and a record of each
 agent's work state. This plan cannot be frozen until both of their contracts
 are.
 
-One owner decision is open. Three small engine changes would make the roles
+One owner decision is open, and the lead sent it to the owner as one
+question with the client API plan's extension point. Besides that point,
+three small engine changes would make the roles
 much cheaper to run: checking standing rules before a request reaches the
 lead, so the lead is not woken at all; telling a "model at capacity" error
 apart from other errors, so the lead is not woken for each one; and
 recording how large each agent's context is, so compaction can be timed for
-every harness. The lead sent this to the owner on 2026-11-03 with the
-recommendation to allow those three only. Each workstream below also says
+every harness. The recommendation, sent on 2026-11-03, is to allow the
+extension point and those three changes only, under the rule that nothing
+the engine already does changes. Each workstream below also says
 what it does if the answer is no: it still works, but some wakes remain.
 
 ## Key decisions
 
-- **The roles sit beside the engine, not inside it.** The sheepdog is a
-  separate program that reads the engine's event log through the same
-  connection every client uses. It keeps no database of its own: after a
-  restart it reads the log again and knows everything it knew before. The
-  consequence is that it can be built and tested without touching the
-  engine, and that it can lag the engine by a moment, never by a missed
-  event.
+- **The roles plug into the engine through one seam, without changing
+  what it does.** Pending the owner (decision rows 19 and 20). The client
+  API plan adds one extension seam to the engine, and the sheepdog runs
+  inside the Shephrd service on it, as a narrow "service" caller whose
+  actions the log names as the sheepdog's. If the owner declines, the
+  sheepdog runs as a separate program over the same connection every
+  client uses. Either way it keeps no database of its own: after a restart
+  it reads the event log again and knows everything it knew before, so it
+  can lag the engine by a moment but never miss an event.
 - **Role rules are advice in this version.** The lead's ruling of
   2026-11-03. The consequence is that a confused agent can still do
   something its role should not, but its parent is told. Enforcement can be
@@ -336,7 +342,7 @@ rules of its own; WS-4, WS-5 and WS-2's answerer plug into it.
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 3.1 | `shephrd sheepdog` connects with the service credential, subscribes from sequence 0 and folds every event into its state; the folded state equals a fold of the same log read from the database | `packages/sheepdog/test/fold.test.ts` S01 |
+| 3.1 | The sheepdog starts as the service caller (on the seam, or as `shephrd sheepdog` without it), subscribes from sequence 0 and folds every event into its state; the folded state equals a fold of the same log read from the database | `packages/sheepdog/test/fold.test.ts` S01 |
 | 3.2 | After a restart in the middle of a run, the sheepdog sends no nudge or notice it had already sent (it finds its own past actions in the log) | `fold.test.ts` S02 |
 | 3.3 | Two copies started at once: the second exits, naming the first | `packages/sheepdog/test/lock.test.ts` L01 |
 | 3.4 | Every nudge goes through the board's delivery interface; every notice to a parent is a needs-reply post from the system author | `packages/sheepdog/test/notices.test.ts` N01-N02; **contract pending** (B-1, B-4) |
@@ -347,7 +353,7 @@ rules of its own; WS-4, WS-5 and WS-2's answerer plug into it.
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 3a | Package and entry point; lifetime lock in the state folder | target `packages/sheepdog/src/main.ts`; pattern `packages/engine/src/lock.ts` |
+| 3a | Package and entry point: registration on the client API plan's extension seam (rows 19, 20), or, if the seam is declined, a separate program with a lifetime lock in the state folder | target `packages/sheepdog/src/main.ts`; **contract pending** (client API seam); fallback pattern `packages/engine/src/lock.ts` |
 | 3b | Fold of events into the sheepdog's state (agents, groups, open items, turns, its own past actions), as a pure function | target `packages/sheepdog/src/fold.ts:apply`; pattern `packages/engine/src/views/apply.ts:apply`, `emptyViews` |
 | 3c | Connection and resumed subscription | `packages/client/src/index.ts:connect`, `subscribe` (auto-resumes after the last sequence) |
 | 3d | Settings shape (every limit in decision row 16), defaults, per-role overrides from WS-1's role file | target `packages/sheepdog/src/settings.ts`; **contract pending** (CA-4) |
