@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import {
   AgentId, DeviceId, Event as EventSchema, RequestId,
-  type Actor, type Event, type LifecycleState, type PermissionLevel,
+  type Actor, type Event, type HarnessSettings, type LifecycleState, type PermissionLevel,
 } from "@shephrd/contracts";
 import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
@@ -97,6 +97,9 @@ export const makeFakeSecrets = (): FakeSecrets => {
 export interface Fakes {
   readonly runner: FakeRunner;
   readonly secrets: FakeSecrets;
+  // The harness defaults the service loads on a first start and on
+  // `harnesses reset`. A rig that leaves it out has none (fix round 1, N-1).
+  readonly harnessDefaults?: Effect.Effect<ReadonlyArray<HarnessSettings>>;
   // Replaces the pass-through redactor, for the side-row text test.
   readonly redactor?: Layer.Layer<Redactor.Redactor>;
   // Decorates the real writer to hold a post-COMMIT boundary deterministically.
@@ -118,6 +121,7 @@ export const provideRig = <A, E, R>(
   ).pipe(Layer.provideMerge(baseLog));
   const services = CommandHandler.layer({
     home: rig.home, stateFolder: rig.stateFolder, pluginRoot: rig.pluginRoot,
+    ...(fakes.harnessDefaults === undefined ? {} : { harnessDefaults: fakes.harnessDefaults }),
   }).pipe(
     Layer.provideMerge(log),
     Layer.provide(Layer.merge(fakes.runner.layer, fakes.secrets.layer)),

@@ -33,7 +33,7 @@ import { SecretStore } from "./SecretStore.ts";
 import { accounts, setSecret, markAvailable } from "./accounts.ts";
 import { compact } from "./compact.ts";
 import { group } from "./group.ts";
-import { harnesses } from "./harnesses.ts";
+import { harnesses, loadFirstDefaults } from "./harnesses.ts";
 import { prompt } from "./prompt.ts";
 import { resume } from "./resume.ts";
 import { start } from "./start.ts";
@@ -89,7 +89,7 @@ const planCommand = (input: Input, name: string, payload: Record<string, unknown
       case "accounts": return yield* accounts(input, payload as Payload<"accounts">);
       case "accounts set-secret": return yield* setSecret(input, payload as Payload<"accounts set-secret">);
       case "accounts mark-available": return yield* markAvailable(input, payload as Payload<"accounts mark-available">);
-      case "harnesses": return harnesses(payload as Payload<"harnesses">);
+      case "harnesses": return yield* harnesses(input, payload as Payload<"harnesses">);
       default: return yield* refused();
     }
   });
@@ -115,7 +115,7 @@ const replyFor = (snapshot: Snapshot, name: string, requestId: RequestId, envelo
   return { reply };
 };
 
-export const layer = (configuration: { readonly home: string; readonly stateFolder: string; readonly pluginRoot: string }) =>
+export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults">) =>
   Layer.effect(CommandHandler, Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const log = yield* EventLog;
@@ -123,6 +123,8 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
     const runner = yield* Runner;
     const secrets = yield* SecretStore;
     const runtime: Runtime = { ...configuration, sql, log, runner, secrets, views };
+    // Fix round 1, N-1: the first start loads the harness defaults.
+    yield* loadFirstDefaults(runtime);
     // Issue 88 and row 52: while restart recovery is present and has not
     // finished step 9, no command runs.
     const recovery = yield* Effect.serviceOption(Restart);

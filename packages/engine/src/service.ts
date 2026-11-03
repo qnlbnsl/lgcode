@@ -28,6 +28,7 @@ import { migrate } from "./log/migrations.ts";
 import * as Restart from "./recovery/restart.ts";
 import { linuxProcessReader } from "./recovery/orphans.ts";
 import * as AcpRunner from "./runner/AcpRunner.ts";
+import { installedHarnessDefaults } from "./runner/harnesses.ts";
 import * as Views from "./views/Views.ts";
 
 // Capture the inherited token for redaction, then erase it before building
@@ -90,7 +91,8 @@ const program = Effect.scoped(Effect.gen(function* () {
       },
       tokenHashes: () => new Set((registry.prepare("SELECT token_hash FROM agent_tokens UNION SELECT token_hash FROM devices").all() as Array<{ token_hash: string }>).map((row) => row.token_hash)),
     });
-    const configuration = { home: process.env.HOME ?? folder, stateFolder: folder, pluginRoot: fileURLToPath(new URL("../../..", import.meta.url)) };
+    const configuration = { home: process.env.HOME ?? folder, stateFolder: folder, pluginRoot: fileURLToPath(new URL("../../..", import.meta.url)),
+      harnessDefaults: installedHarnessDefaults(process.env.PATH ?? "") };
     const base = EventLog.layer.pipe(Layer.provideMerge(Views.layer));
     const runner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: { ...process.env }, protocolLog, credentials }).pipe(
       Layer.provideMerge(SecretStore.layer({ stateFolder: folder })),

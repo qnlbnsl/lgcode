@@ -32,6 +32,8 @@ export interface Runtime {
   readonly home: string;
   readonly stateFolder: string;
   readonly pluginRoot: string;
+  // The harness defaults of this installation, when the service has them.
+  readonly harnessDefaults?: Effect.Effect<ReadonlyArray<HarnessSettings>>;
 }
 export interface Input {
   readonly runtime: Runtime;

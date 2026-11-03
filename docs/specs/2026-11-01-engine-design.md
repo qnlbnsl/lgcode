@@ -168,7 +168,7 @@ The commands are:
 | `compact` | The owner, or the agent's parent | Asks an agent to compact its context. |
 | `group` | The owner, or the agent's parent | Adds or removes an agent's group labels. |
 | `accounts` | The owner only | Adds, changes, disables or removes an account. |
-| `harnesses` | The owner only | Reads and changes each harness's settings: its run mode, its ACP adapter command, and how its permission modes map onto Shephrd's scale. |
+| `harnesses` | The owner only | Reads and changes each harness's settings: its run mode, its ACP adapter command, and how its permission modes map onto Shephrd's scale. The service loads the defaults itself on its first start, when its log holds no harness settings, and `harnesses reset` loads them again. An empty list of models or efforts means the list is not checked. |
 | `subscribe` | The owner, or any agent | Sends every event after a given sequence number, then each new event as it is written. |
 
 "The agent's parent" means the agent that started it. **Chosen in this spec:**

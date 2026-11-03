@@ -124,7 +124,9 @@ export const CommandsRpcGroup = RpcGroup.make(
   Rpc.make("harnesses", {
     payload: Schema.Union([
       Schema.Struct({ ...request, operation: Schema.Literal("list") }),
-      Schema.Struct({ ...request, operation: Schema.Literal("set"), harness: HarnessSettings })
+      Schema.Struct({ ...request, operation: Schema.Literal("set"), harness: HarnessSettings }),
+      // Loads the defaults again over the settings of the harnesses they name.
+      Schema.Struct({ ...request, operation: Schema.Literal("reset") })
     ]),
     success: Schema.Struct({ ...request, harnesses: Schema.Array(HarnessSettings) }), error: Refused
   }),
