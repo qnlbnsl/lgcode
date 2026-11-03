@@ -125,6 +125,51 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   const fallback = makeRedactor({ secrets: () => [...processes.values()].flatMap((entry) => entry.secrets).concat(credentials.secrets()), tokenHashes: () => new Set() });
   const redactText = (text: string) => Option.isSome(suppliedRedactor)
     ? suppliedRedactor.value.redactText(fallback.redactText(text)) : Effect.sync(() => fallback.redactText(text));
+  // Issue 223: decoded adapter data can hold a secret in its JSON-escaped
+  // form. Serializing that data again escapes it a second time, a form the
+  // redactor does not match, and a client decoding the result gets the
+  // secret back. So structured adapter data is redacted at its decoded
+  // string leaves and keys before anything serializes it.
+  // One redaction pass per value: every key and string leaf, in walk order,
+  // joined by a separator no encoded form contains. A match that crossed a
+  // separator would swallow it, so a changed count falls back to one pass
+  // per string. Per-string passes alone made each update slow enough to
+  // lose the race with the adapter's exit.
+  const separator = "\n\u0000\n";
+  const strings = (value: unknown, found: Array<string>): void => {
+    if (typeof value === "string") found.push(value);
+    else if (Array.isArray(value)) for (const item of value) strings(item, found);
+    else if (value !== null && typeof value === "object") for (const [key, item] of Object.entries(value)) { found.push(key); strings(item, found); }
+  };
+  const rebuild = (value: unknown, next: () => string): unknown => {
+    if (typeof value === "string") return next();
+    if (Array.isArray(value)) return value.map((item) => rebuild(item, next));
+    if (value === null || typeof value !== "object") return value;
+    const copy: Record<string, unknown> = {};
+    for (const [, item] of Object.entries(value)) {
+      // Defined, not assigned, so a `__proto__` key stays an ordinary field.
+      const key = next();
+      Object.defineProperty(copy, key, { value: rebuild(item, next), enumerable: true, writable: true, configurable: true });
+    }
+    return copy;
+  };
+  const cleanStructure = (value: unknown): Effect.Effect<unknown> => Effect.gen(function* () {
+    const found: Array<string> = [];
+    strings(value, found);
+    if (found.length === 0) return value;
+    let clean = (yield* redactText(found.join(separator))).split(separator);
+    if (clean.length !== found.length) clean = yield* Effect.forEach(found, redactText);
+    let at = 0;
+    return rebuild(value, () => clean[at++]!);
+  });
+  // The gated protocol log writes whole frames. Each line is decoded and
+  // cleaned as structure; a line that is not a whole frame is withheld.
+  const protocolPayload = (payload: unknown): Effect.Effect<unknown> => typeof payload !== "string" ? cleanStructure(payload)
+    : Effect.forEach(payload.split("\n").filter((line) => line.trim() !== ""), (line) => {
+      let frame: unknown;
+      try { frame = JSON.parse(line); } catch { return Effect.succeed("adapter frame withheld: not a whole frame"); }
+      return cleanStructure(frame).pipe(Effect.map((clean) => JSON.stringify(clean)));
+    }).pipe(Effect.map((lines) => lines.join("\n")));
   const events = yield* Queue.unbounded<RunnerEvent>();
   const redactChunk = (itemId: string, text: string, final: boolean) => Effect.gen(function* () {
     // Resolved spawn credentials are covered even before the service's
@@ -312,7 +357,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         // Outside gated protocol test mode this callback emits only the
         // fixed diagnostic, without frame payloads, methods or request ids.
         logger: (event) => event.stage === "decode_failed" ? Effect.logWarning("adapter frame dropped: malformed")
-          : configuration.protocolLog === true ? Effect.logInfo(event.payload) : Effect.void,
+          : configuration.protocolLog === true ? protocolPayload(event.payload).pipe(Effect.flatMap((payload) => Effect.logInfo(payload))) : Effect.void,
         onIncomingRequest: (_id, method) => method === "session/request_permission" ? Effect.void : Effect.logWarning("adapter request refused: unsupported"),
         onOutgoingResponse: (id) => Effect.gen(function* () {
           const delivered = entry?.responses.get(id);
@@ -378,7 +423,10 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           }
           return;
         }
-        const translatedUpdates = translate(update, current.loading);
+        // Message chunks stay raw for the streaming redactor; every other
+        // update is serialized by the translator, so it is cleaned first.
+        const chunk = update.sessionUpdate === "agent_message_chunk" || update.sessionUpdate === "user_message_chunk";
+        const translatedUpdates = translate(chunk ? update : yield* cleanStructure(update), current.loading);
         if (current.turn === undefined && !current.loading) {
           if (translatedUpdates.length > 0) yield* Effect.logWarning("adapter content dropped: no active turn");
           return;

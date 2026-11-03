@@ -3249,6 +3249,20 @@ refreshed token and an adapter's final output are both still covered.
 The redactor already matched the raw, JSON-escaped, base64, base64url,
 hexadecimal and URL-encoded forms of each value, so it was not changed.
 
+The test writer's regression found a second path for the JSON-escaped form.
+The translator in `packages/engine/src/runner/translate.ts` stores a tool
+call's output, input and whole update, and a plan's entries, as JSON text.
+A token that the adapter sent in its JSON-escaped form was escaped a second
+time by that step.
+The redactor does not match a twice-escaped form, and a client that decodes
+the stored JSON gets the once-escaped token back.
+The gated protocol log, which writes whole frames in test mode, had the same
+problem.
+The runner now redacts every decoded string and key of a non-message update
+before the translator serializes it, in one redaction pass per update.
+The protocol log decodes each frame line and redacts it the same way; a line
+that is not a whole frame is withheld.
+
 Verification: the review's attack test, inverted, is
 `packages/engine/test/security/codex-auth-home-leak.test.ts`.
 It passed against 8ff4c9b, proving the leak, and its inverted form fails
