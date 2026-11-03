@@ -611,6 +611,12 @@ its most refusing form, and each piece's plan replaces its own entry. So no
 table ever has a missing entry, and no rule depends on whether a piece has
 been built.
 
+The service builder (`packages/engine/src/service.ts`), the command
+handler, the views and the dispatcher take these lists and tables as
+arguments, with the engine's own as the default. So unit 1's tests run a
+fixture piece before any real piece is built. Production code always uses
+the engine's own lists.
+
 ### The engine's lists that a piece adds itself to
 
 **E1. One command group.** In `packages/contracts/src/commands.ts`,
@@ -709,6 +715,11 @@ own. So start-up rebuild, `debug.compare-views` and the rebuild check
 (`packages/engine/test/support/rebuildCheck.ts`) cover every piece with no
 more code, and "the log is the whole truth" holds for every piece.
 
+- A piece's reactors join the engine's followers of committed events,
+  started in `packages/engine/src/service.ts`. A reactor reads events in
+  sequence order, writes through the same transaction path, and records
+  the last sequence it handled in its own view (section 1, "Views and
+  reactors").
 - Behaviour change: the views state gains fields, and `debug.compare-views`
   reports differences in them.
 - Tests updated: `packages/engine/test/views/apply.test.ts`,
