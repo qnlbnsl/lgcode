@@ -29,9 +29,11 @@ export const WORKER = "agent-worker";
 type Harness = "claude" | "codex";
 const agentOf: Record<Harness, string> = { claude: LEAD, codex: WORKER };
 
-export interface Option { readonly id: string; readonly kind: string; readonly level: string; readonly persistent: boolean }
+export interface Option { readonly id: string; readonly kind: string; readonly level: string; readonly persistent: boolean; readonly destination?: string }
 export const ONCE: Option = { id: "allow-once", kind: "allow_once", level: "ask", persistent: false };
-export const ALWAYS: Option = { id: "allow-always", kind: "allow_always", level: "edit", persistent: true };
+// Synthetic verified metadata for the safe control. Today's public API omits
+// destination; separate tests remove it and require rejection before a write.
+export const ALWAYS: Option = { id: "allow-always", kind: "allow_always", level: "edit", persistent: true, destination: "localSettings" };
 export const REJECT: Option = { id: "reject-once", kind: "reject_once", level: "read-only", persistent: false };
 
 export interface Prompted { readonly agentId: string; readonly text: string; readonly deliveryId: string; readonly from: string }
@@ -136,7 +138,18 @@ export const fakeEngine = (setup: { codexCore?: boolean; agents?: ReadonlyArray<
     root, state, work, home, codexHome, events, answers, prompts, valid, tokenOf, sessionOf, script: {},
     emit,
     tool: (agentId, callId, input, title = "Bash") => { emit(agentId, { _tag: "ThreadItem", content: { _tag: "tool-call", callId, title, status: "pending", input: typeof input === "string" ? input : JSON.stringify(input) } }); },
-    finish: (agentId, callId, status, output) => { emit(agentId, { _tag: "ThreadItem", content: { _tag: "tool-call", callId, title: "", status, output } }); },
+    finish: (agentId, callId, status, output) => {
+      const call = events.findLast((row) => row.agentId === agentId && row.event._tag === "ThreadItem"
+        && (row.event as { content: { callId?: string; input?: string } }).content.callId === callId && (row.event as { content: { input?: string } }).content.input !== undefined);
+      const input = call === undefined ? "" : (call.event as { content: { input: string } }).content.input;
+      // Models of the shell boundary must now supply the name-only listing
+      // requested by the exact command, before its explicit env -u. Preserve
+      // caller-supplied listings so adversarial names/empty evidence survive.
+      if (input.includes("LCP_ENV_BEGIN") && !output.includes("LCP_ENV_BEGIN")) {
+        output = `LCP_ENV_BEGIN\n${agentId === WORKER && setup.codexCore !== false ? "PATH" : "PATH\nSHEPHRD_SOCKET\nSHEPHRD_TOKEN"}\nLCP_ENV_END\n${output}`;
+      }
+      emit(agentId, { _tag: "ThreadItem", content: { _tag: "tool-call", callId, title: "", status, output } });
+    },
     permission: (agentId, callId, options, holder = { _tag: "owner" }) => {
       const permissionRequestId = id("permission");
       emit(agentId, { _tag: "PermissionRequested", permissionRequestId, toolCallId: callId, holder, description: "run a command", options });

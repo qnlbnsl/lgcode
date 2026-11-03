@@ -111,6 +111,9 @@ export const dryRunText = (config: LiveConfig = liveConfig({})): string => {
     "The probe prompts above add turns to the same two sessions. The reload step restarts the service twice: one working-turn carry-on, then one pending-envelope replay. Each uses SIGKILL on this run's service child only.",
     "The worker account sets CODEX_CONFIG to shell_environment_policy.inherit=core for SEC-PB-8. Shell permissions are answered only for the exact printed command; always allow is used only in its named step.",
     "PB-A10 already has real evidence in packages/testing/fixtures/{claude,codex}.ndjson. The sandbox-mcp log cites the adapter versions, negotiated ACP versions and config categories; no separate probe is added.",
+    "Slash evidence is direction-specific: SEC-PB-2 observes only the Claude parent receiver, and SEC-PB-7 only the Codex child receiver. The other row is explicitly not applicable. PB-A7 old-token refusal is checked for both agents at each restart.",
+    "Core inheritance requires the shell's name-only environment listing to omit both identity variables before env -u removes them. Token-scan requires each agent's own tokens, nonempty session files, arguments and environment snapshots.",
+    "Persistent permission options with no verifiable localSettings/session destination are denied as no safe persistent option offered. Today's public permission contract omits that destination, so SEC-PB-4 may remain unproven.",
     "In all a full run starts at most 6 model sessions: 2 in the journey (the lead and the worker), 2 recordings, and up to 2 signed-out probes.", "",
     "Steps the run would take, in order:",
   );

@@ -72,7 +72,7 @@ const reload = (plan: Reload = {}): Script => {
   let counter = 0;
   return {
     onPrompt: (e, p) => {
-      if (p.text === RESTART_PENDING_PROMPT) { pending.set(p.agentId, p.deliveryId); return; }
+      if (p.text.startsWith(RESTART_PENDING_PROMPT.slice(0, 30))) { pending.set(p.agentId, p.deliveryId); return; }
       if (p.text.startsWith(RESTART_PREPARE_PROMPT.slice(0, 40))) { markers.set(p.agentId, markerIn(p.text)); e.turnEnded(p.agentId); return; }
       if (p.text.startsWith(RESTART_ACTIVE_PROMPT.slice(0, 30))) {
         e.tool(p.agentId, `hold-${p.agentId}`, { command: "sleep 120" });

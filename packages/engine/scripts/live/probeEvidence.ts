@@ -29,6 +29,7 @@ export const scanTokens = (tokens: ReadonlyArray<string>, files: ReadonlyArray<s
   if (tokens.length === 0 || tokens.some((token) => token.length < 16)) throw new Error("not attempted: no usable agent token to scan for");
   if (files.length === 0) throw new Error("not attempted: no session files found for this run");
   const sources = files.map((path) => ({ label: path, text: readFileSync(path, "utf8") }));
+  if (sources.some((source) => source.text.trim().length === 0)) throw new Error("not attempted: a session file has no content");
   return { files: sources.length, arguments: arguments_.length, paths: files, leaks: findLeaks(tokens, [...sources, ...arguments_]) };
 };
 
@@ -50,6 +51,7 @@ export const compactions = (ndjson: string): number => records(ndjson).filter((r
 // assistant's claim or a quoted tool result. Both directions use this rule.
 export const slashReceipt = (received: ReadonlyArray<string>, id: string, payload: string, compacted: boolean): string => {
   if (compacted) return "command ran";
+  if (received.some((text) => text.trimStart().startsWith(payload))) return "unescaped";
   const matching = received.filter((text) => text.includes(`(delivery ${id}):`));
   if (matching.some((text) => text.includes(`\n${payload}\n`))) return "unescaped";
   return matching.some((text) => text.includes(`\n\\${payload}\nEnd data [`)) ? "escaped; no command" : "not attempted";
@@ -78,6 +80,37 @@ export const mcpAskInput = (input: string | undefined, title: string, marker: st
 };
 export const authRefused = (output: string, exitCode: number | undefined): boolean =>
   exitCode !== undefined && exitCode !== 0 && /the engine refused this identity \(HTTP 403\)/.test(output);
+
+export const fixtureEvidence = (ndjson: string, harness: string, path: string): string => {
+  let rows: Json[];
+  try { rows = records(ndjson); } catch { throw new Error("not attempted: invalid real adapter fixture JSON"); }
+  const header = rows[0];
+  const categories = [...new Set(rows.flatMap((row) => row.frame?.result?.configOptions ?? []).map((entry: Json) => entry.category).filter(Boolean))];
+  if (header?.type !== "transcript_start" || header.provider !== harness || header.protocol !== "acp"
+    || typeof header.version !== "string" || header.version.trim() === ""
+    || !Number.isInteger(header.metadata?.protocolVersion) || header.metadata.protocolVersion < 1
+    || !categories.includes("model") || !categories.includes("thought_level")) {
+    throw new Error(`not attempted: ${harness} fixture lacks a matching adapter header, version, negotiated protocol or config categories`);
+  }
+  return `PB-A10 existing evidence cited: ${path}:1; ${harness} adapter ${header.version}, ACP ${header.metadata.protocolVersion}; categories ${categories.join(",")}; no separate probe`;
+};
+
+// The command prints names before explicitly removing identity variables, so
+// this observes the shell policy rather than just the env -u operation.
+export const shellIdentityAbsent = (output: string): boolean => {
+  const listing = /(?:^|\n)LCP_ENV_BEGIN\r?\n([\s\S]*?)\r?\nLCP_ENV_END(?:\r?\n|$)/.exec(output)?.[1];
+  if (listing === undefined) return false;
+  const names = listing.split(/\r?\n/);
+  return names.length > 0 && names.every((name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
+    && !names.includes("SHEPHRD_SOCKET") && !names.includes("SHEPHRD_TOKEN");
+};
+
+export const canaryDenied = (output: string, path: string): boolean => {
+  const lines = output.split(/\r?\n/);
+  return lines.some((line) => ["Permission denied", "Operation not permitted"].some((reason) =>
+    line === `cat: ${path}: ${reason}` || line === `cat: '${path}': ${reason}`)
+    || /^Permission to read \/tmp\/[^\r\n]*\/live-canary has been denied by a deny rule\.$/.test(line));
+};
 
 // Read the original tool output, not the agent's prose. The adapters nest a
 // terminal result differently; recurse through JSON wrappers but not strings

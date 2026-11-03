@@ -36,7 +36,10 @@ export const runProbes = (driver: ProbeDriver, step: StepRunner, agents: ProbeAg
         for (let at = 0; at < detail.length; at += 400) note?.(detail.slice(at, at + 400));
       }
       for (const row of rows) {
-        yield* check(row.detail.length > 0 && (accepted[spec.id].includes(row.outcome) || (spec.id === "always-allow" && row.harness === "codex" && row.outcome === "not applicable (criterion names Claude only)")), `${row.harness}: ${row.outcome}; ${row.detail}`);
+        const inapplicable = (spec.id === "slash-up" && row.harness === "codex" && row.outcome === "not applicable (no codex parent receiver in this team)")
+          || (spec.id === "slash-down" && row.harness === "claude" && row.outcome === "not applicable (no claude child receiver in this team)")
+          || (spec.id === "always-allow" && row.harness === "codex" && row.outcome === "not applicable (criterion names Claude only)");
+        yield* check(row.detail.length > 0 && (accepted[spec.id].includes(row.outcome) || inapplicable), `${row.harness}: ${row.outcome}; ${row.detail}`);
       }
       return rows.map((row) => `${row.harness}: ${row.outcome}`).join(" | ");
     }), (reason) => reason);

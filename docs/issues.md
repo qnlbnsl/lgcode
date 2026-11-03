@@ -3233,6 +3233,29 @@ old-token refusal after a real service restart with a fake adapter, planted
 tokens in session files and arguments, and each probe's failure outcomes.
 These checks do not establish real-adapter behavior or close the live gate.
 
+Fix round 1 makes the evidence limits explicit. The two-agent tree proves
+the upward slash receive path only for the first harness, and the downward
+path only for the second. Its other rows are direction-specific and not
+applicable. The core-inheritance check now requires a name-only listing from
+the shell before explicit variable removal. Each token-scan row requires its
+own agent token, nonempty session files, arguments and environment snapshots.
+
+The saved-permission criterion remains unproven when a destination cannot be
+verified before answering. The public permission-option contract carries an
+identifier, name, kind, level and persistence, but no destination. The
+installed first adapter's wire request omits its provider suggestions too.
+The probe therefore rejects every persistent option without a verified
+local-settings or session destination. It records "no safe persistent option
+offered" and fails. It never infers the destination from a label and never
+answers persistently before checking that the owner holds the request.
+No production contract change was made for this limitation.
+
+The replay probe asks a pending turn to sleep, then requests the second kill
+as soon as the deliveries are sent. A content update may still accept a
+delivery before the kill. The probe checks the whole interval again after
+reload, and records that race as not attempted. It never counts the same
+delivery being accepted early and then re-sent as successful replay evidence.
+
 ## 218. The state-read probe records the owner's own rejection as a deny rule
 
 Found: 2026-11-02, by the L-1 probe test writer.

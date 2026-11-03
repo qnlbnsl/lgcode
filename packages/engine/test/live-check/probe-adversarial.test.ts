@@ -268,7 +268,9 @@ describe("slash-up and slash-down (SEC-PB-2, SEC-PB-7) pass only on an escaped r
     const engine = make();
     engine.script = receive(escaped);
     const run = await runProbe(engine, probe);
-    expect(run.reason).toBe("claude: escaped; no command | codex: escaped; no command");
+    expect(run.reason).toBe(probe === "slash-up"
+      ? "claude: escaped; no command | codex: not applicable (no codex parent receiver in this team)"
+      : "claude: not applicable (no claude child receiver in this team) | codex: escaped; no command");
   });
 
   it.each(["slash-up", "slash-down"] as const)("issue 219: %s fails when the raw /compact also arrives as its own user message", async (probe) => {

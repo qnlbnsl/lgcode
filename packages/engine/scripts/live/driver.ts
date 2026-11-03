@@ -104,6 +104,7 @@ export const probePromptFor = (name: string, text: string, workerFolder: string)
     : name === "STATE_READ_PROMPT" ? { COMMAND: commands.stateRead }
     : name === "ALWAYS_ALLOW_PROMPT" ? { COMMAND: commands.alwaysAllow }
     : name === "RESTART_ACTIVE_PROMPT" ? { COMMAND: SHELL_COMMANDS.restartHold, MARKER: "RUN_RANDOM_MARKER" }
+    : name === "RESTART_PENDING_PROMPT" ? { COMMAND: SHELL_COMMANDS.restartHold }
     : name === "PROBE_MCP_PROMPT" || name === "RESTART_PREPARE_PROMPT" ? { MARKER: "RUN_RANDOM_MARKER" } : {};
   return fill(text, values);
 };
