@@ -230,8 +230,9 @@ These rules apply to the four kinds:
   outside the calling agent's tree, but only when that piece's registered
   reach check allows it. For the board, the reach check is channel
   membership, so a worker can message a sibling in the same channel. The
-  reach check is a pure function of the caller, the target and the views,
-  like a visibility rule. The exception grants no lifecycle right: it never
+  reach check is a pure function of the caller, the target and the views
+  snapshot taken in the same transaction as the delivery, like a
+  visibility rule (lead ruling L15). The exception grants no lifecycle right: it never
   allows `stop`, `answer`, `compact`, `resume` or an engine `prompt` on the
   target. The envelope names the true sender, the calling agent, never the
   piece alone and never the owner. The text is still wrapped as data
@@ -295,7 +296,11 @@ fixed rights: the foundry roles' sheepdog and their standing-rule answerer
    picture and the sequence number it was taken at: agents and their
    displayed states, open permission requests and questions, open alerts,
    accounts without secrets, devices without credentials, and each piece's
-   own snapshot section under its namespace (row 15).
+   own snapshot section under its namespace (row 15). A piece supplies its
+   section through a per-caller hook, `snapshotFor(caller, view)`, which
+   may leave the section out (lead ruling L15). The board's section is its
+   whole view for the owner, devices and services, and absent for an
+   agent.
 2. **Subscribe.** The client calls the engine's `subscribe` with
    `after` set to that sequence number. It receives every later event it
    may see, in order, with no gaps, then each new event as it is written.
@@ -405,7 +410,12 @@ The client library offers a helper, `waitForAgents`, that takes a set of
 agents and "any" or "all". It takes a snapshot, subscribes, and finishes when
 the agents meet the same "settled" test the engine uses for agent waits. The
 seam moves that test from the engine into the engine's contracts package,
-so the helper and the engine share one copy and cannot disagree. The owner's
+so the helper and the engine share one copy and cannot disagree. The helper
+also applies every registered hold-unsettled condition (section 6, item
+12), so the owner's wait and an agent's wait agree (lead ruling L15). Each
+piece exports its condition from its contracts package as a pure function
+over its own snapshot section. So the helper needs a caller whose snapshot
+holds those sections: the owner, a device or a service. The owner's
 terminal waits with a new subcommand, `shephrd client wait`, which runs
 this helper over `subscribe`. The engine's own `shephrd wait` and its
 owner-choice A10 test stay as they are.
@@ -502,8 +512,14 @@ an alert.
 
 An alert that leaves the host carries only four things: its kind, the
 agent's name, a title that Shephrd writes from fixed text, and a link to
-the page (row 19). It never carries agent text, tool output, file contents
-or any secret. The owner reads the details inside an authenticated client.
+the page (row 19). It never carries any other agent text, tool output, file
+contents or any secret. The owner reads the details inside an
+authenticated client.
+
+The agent's name is agent-chosen text: the agent's parent chose it (lead
+ruling L15). So it is treated as data. It travels in its own field, marked
+as the agent's name, never inside Shephrd's title. Control and formatting
+characters and line breaks are removed, and it is cut to 64 characters.
 
 Whether that link can answer a question by itself is one of the four
 design questions. This contract leaves a named slot for it,
@@ -548,11 +564,15 @@ design questions. This contract leaves a named slot for it,
   already dispatches every command in its group this way
   (`api/server.ts`, `application`).
 - **Message size.** The network listener sets an explicit limit of 1
-  mebibyte (1,048,576 bytes) for one message. That holds the board's
-  largest planned post, 16,384 characters, even at four bytes a character
-  (65,536 bytes), with its envelope, many times over. The engine's socket
-  sets no explicit limit today (scouting, planner's checks) and the seam
-  does not add one there.
+  mebibyte (1,048,576 bytes) for one message. The limit is sized against
+  the largest single event or reply any piece can produce, not against a
+  post's text (lead ruling L15). Each piece states its largest event and
+  its largest page. The board caps a wake body at 256 KiB and a
+  `board.read` page at 512 KiB of encoded text, so its largest message,
+  with its envelope, stays under 1 MiB. A test in `packages/api` checks
+  every piece's stated maxima, plus the envelope, against the limit. The
+  engine's socket sets no explicit limit today (scouting, planner's
+  checks) and the seam does not add one there.
 
 ## 6. What the engine must offer (the extension seam, pending the owner)
 
@@ -610,8 +630,8 @@ optional field to an existing schema; no existing value changes meaning.
 13. **A piece may withdraw its own queued delivery** (lead ruling L11,
     from the board's request, board post #37). A piece's handler may
     return the engine's existing `DeliveryWithdrawn` event for a delivery
-    that the same piece queued, and only while that delivery is still
-    queued. The engine checks both conditions inside the transaction and
+    whose source is the piece's own namespace, and only while that
+    delivery is still queued (narrowed by lead ruling L15). The engine checks both conditions inside the transaction and
     refuses the whole command otherwise. A delivery that was sent or
     accepted cannot be withdrawn this way, and a piece can never withdraw
     another piece's or the engine's delivery.
@@ -624,7 +644,20 @@ optional field to an existing schema; no existing value changes meaning.
 15. **A piece's reach check** (lead ruling L13). A piece may register one
     reach check. The engine consults it only for a delivery the piece
     queues with its own source, when the target is outside the calling
-    agent's tree (section 2). It grants no other right.
+    agent's tree (section 2). Its inputs are the caller, the target and the
+    views snapshot of the same transaction, never an earlier read (lead
+    ruling L15). It grants no other right.
+16. **A registered "request held" condition** (lead ruling L15), the
+    incoming twin of item 12. The engine already ends a blocking `wait`
+    with "request held" when the waiter holds an engine request or
+    question (`routing/waits.ts`, `holds`). A piece may register a matching
+    condition; the board's is "the waiter is an addressee of an open post
+    that needs its reply and has not answered it". The engine checks it
+    when the wait opens and after every batch, as it checks `holds`. With
+    nothing registered, behaviour is unchanged.
+17. **A per-caller snapshot hook** (lead ruling L15). Each piece supplies
+    its `client.snapshot` section through `snapshotFor(caller, view)`,
+    which may return nothing for a caller (section 3).
 
 The planner estimates this as one engine unit of high complexity, built
 before any piece unit, with an attack pass, because it changes the engine's
@@ -665,7 +698,7 @@ The message board planner listed six needs, in section R1 of
 | 3 | An alert for a post addressed to the owner, ideally with a `post` subject on `OwnerNeeded` | Taken in through an alert source, kind `board.post`, keyed by the post, opening the post (section 4, row 35). Refused in part: no `post` subject on `OwnerNeeded`, because that changes an existing engine event, and the board does not write `OwnerNeeded` at all, so one matter raises one alert. |
 | 4 | Paged reads with a cursor | Taken in: one paged-read shape for every piece (section 1, "Paged reads", row 32). |
 | 5 | The owner posts from any device as the owner, reusing any device field | Taken in: the caller stays `owner`; the envelope's optional `device` field records the device, and the board adds no field of its own (section 2, row 33). |
-| 6 | A transport message limit of at least a 16,384-character post plus its envelope | Taken in: the network listener's limit is 1 mebibyte; the engine's socket keeps its current behaviour (section 5, row 36). |
+| 6 | A transport message limit of at least a 16,384-character post plus its envelope | Taken in: the network listener's limit is 1 mebibyte, sized against each piece's largest event and page (lead ruling L15); the engine's socket keeps its current behaviour (section 5, rows 36, 58). |
 
 The board's delivery source for posts, from its question Q1, is section 6,
 item 11.

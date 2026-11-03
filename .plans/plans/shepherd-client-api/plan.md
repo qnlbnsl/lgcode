@@ -248,7 +248,7 @@ Purpose: give pieces 2 to 4 one registered way into the engine's commands,
 log, views and callers, so none of them edits the engine's server or
 command handler, and the record always names the real actor. Units: 1a the
 registry and pieces' data; 1b callers and helpers. Contract section 6,
-items 1 to 15.
+items 1 to 17.
 
 **Done when:**
 
@@ -270,9 +270,12 @@ items 1 to 15.
 | 1.14 | A piece's delivery source: a delivery queued by a piece to a target that stops follows the piece's rule; existing sources behave as before | Test id: `packages/engine/test/extension/delivery-source.test.ts` |
 | 1.15 | A registered hold-unsettled condition keeps a wait open while it holds and lets it close when it ends; with none registered, every existing wait test passes | Test id: `packages/engine/test/extension/hold-unsettled.test.ts`, plus criterion 1.1 |
 | 1.16 | The settled test lives in `packages/contracts` and is re-exported from its old place | Command: `pnpm -r typecheck` exits 0; test id: `packages/contracts/test/settled.test.ts` |
-| 1.17 | A piece may write `DeliveryWithdrawn` only for a delivery it queued and only while it is still queued; withdrawing a sent, accepted, engine-queued or other piece's delivery refuses the whole command | Test id: `packages/engine/test/extension/piece-withdraw.test.ts` |
+| 1.17 | A piece may write `DeliveryWithdrawn` only for a delivery whose source is its own namespace and only while it is still queued; withdrawing a sent, accepted, engine-queued or other piece's delivery refuses the whole command | Test id: `packages/engine/test/extension/piece-withdraw.test.ts` |
 | 1.18 | A piece's delivery is always wrapped in the engine's agent-text envelope with a fresh marker, its leading `/` escaped, and its sender shown as the piece's label; no helper sends a raw prompt | Test id: `packages/engine/test/extension/piece-delivery-text.test.ts` |
 | 1.19 | A piece's delivery to a target outside the caller's tree is queued only when the piece's reach check allows it; it names the calling agent as sender; the same target stays refused for `stop`, `answer`, `compact`, `resume` and `prompt` from that caller | Test id: `packages/engine/test/extension/piece-reach.test.ts` |
+| 1.20 | The reach check sees the views of the same transaction: a target that leaves the channel in an earlier command of the same batch is refused | Test id: `packages/engine/test/extension/piece-reach.test.ts` |
+| 1.21 | A registered "request held" condition ends a blocking wait at open and after a batch; with none registered, every existing wait test passes | Test id: `packages/engine/test/extension/request-held.test.ts`, plus criterion 1.1 |
+| 1.22 | A piece's `snapshotFor` hook can leave its section out for a caller; an agent's snapshot has no board-like test section, the owner's has it | Test id: `packages/engine/test/extension/snapshot-hook.test.ts` |
 
 **Tasks:**
 
@@ -304,7 +307,7 @@ items 1 to 15.
 | A piece's view drifts from the log | Medium | Pieces' views join the rebuild check (criterion 1.2). |
 | The unit is too big for one build | Medium | Split into 1a and 1b, each with its own criteria. |
 
-**Verify:** criteria 1.1-1.19; environment QA: none.
+**Verify:** criteria 1.1-1.22; environment QA: none.
 
 **Rollout detail:** rollout step 3. Unit 1a merges before 1b starts. The
 board and roles plans start their engine-facing units only after 1b merges.
@@ -323,6 +326,7 @@ and unknown events safe. Unit 2.
 | 2.3 | Every piece command's payload, reply and error carries a non-empty `requestId` | Test id: `packages/api/test/request-id.test.ts` |
 | 2.4 | A client that receives an event tag it does not know records an unknown event and moves its cursor past it | Test id: `packages/client/test/unknown-event.test.ts` |
 | 2.5 | Every command in `ApiRpcGroup` is a `shephrd` subcommand, and the MCP server offers exactly the commands whose access includes `agent` | Test id: `packages/cli/test/api-parity.test.ts` (new; the engine's `parity.test.ts` is unchanged) |
+| 2.6 | Every piece's stated largest event and largest page, plus the envelope, fit under the 1 MiB listener limit | Test id: `packages/api/test/size-limits.test.ts` |
 
 **Tasks:**
 
@@ -343,7 +347,7 @@ and unknown events safe. Unit 2.
 | An older page breaks on a newer event | Medium | Criterion 2.4. |
 | An owner-only piece command is offered to agents as a tool | High | Criterion 2.5. |
 
-**Verify:** criteria 2.1-2.5; environment QA: none.
+**Verify:** criteria 2.1-2.6; environment QA: none.
 
 **Rollout detail:** rollout step 4.
 
@@ -361,7 +365,7 @@ Contract section 3. Unit 3.
 | 3.2 | `client.roster` returns the contract's fields, filters by group, role and parent, shows an agent itself and its children but not its grandchildren, and names its parent | Test id: `packages/client-api/test/roster.test.ts` |
 | 3.3 | `client.thread` pages one agent's thread, at most 500 events a page, with `next` absent on the last page, under the visibility rule | Test id: `packages/client-api/test/thread.test.ts` |
 | 3.4 | `client.subscribe` filters by agent, group and event kind; an agent that joins a group mid-stream is included from that event on; a checkpoint arrives at least every 30 seconds while events are skipped (test clock) | Test id: `packages/client-api/test/filtered-subscribe.test.ts` |
-| 3.5 | `waitForAgents` with "any" and "all" finishes exactly when the engine's settled test says so, including a registered hold condition | Test id: `packages/client/test/wait-for-agents.test.ts` |
+| 3.5 | `waitForAgents` with "any" and "all" finishes exactly when the engine's settled test says so, applying every registered hold-unsettled condition from the pieces' contracts | Test id: `packages/client/test/wait-for-agents.test.ts` |
 | 3.6 | `shephrd client wait --block` exits with engine row 26's codes; the engine's `shephrd wait` is unchanged | Test id: `packages/cli/test/client-wait.test.ts`; criterion 1.1 |
 | 3.7 | `shephrd thread export <agent> --out <file>` writes the caller's file from paged reads; the service writes no file | Test id: `packages/cli/test/thread-export.test.ts` |
 
@@ -482,7 +486,7 @@ recorded alerts, push them, and clear them. Contract section 4. Rows 18,
 | 6.2 | One alert is open per key; each kind clears on the contract's closing event; `client.alerts.dismiss` clears one | Test id: `packages/client-api/test/alert-life.test.ts` |
 | 6.3 | Killing the service between an event and its alert gives exactly one alert after restart | Test id: `packages/client-api/test/alert-reactor-restart.test.ts` |
 | 6.4 | A test piece's alert source raises and ends its own kind | Test id: `packages/client-api/test/alert-piece-source.test.ts` |
-| 6.5 | An agent string planted in a request, a question and a crash appears in no `AlertRaised` event and no pushed payload | Test id: `packages/client-api/test/alert-no-agent-text.test.ts` |
+| 6.5 | An agent string planted in a request, a question and a crash appears in no `AlertRaised` event and no pushed payload; the agent's name travels in its own field, with control and formatting characters and line breaks removed, cut to 64 characters, never inside the title | Test id: `packages/client-api/test/alert-no-agent-text.test.ts` |
 | 6.6 | Each kind's push setting has the contract's default and can be changed by the owner and a device | Test id: `packages/client-api/test/alert-settings.test.ts` |
 | 6.7 | ntfy: an alert is posted to the configured server and topic with its title, kind, agent name and link; the access token comes from the secrets store by reference | Test id: `packages/client-api/test/alert-ntfy.test.ts` (against a local fake ntfy server) |
 | 6.8 | A failed push is recorded as `client.AlertDeliveryFailed`, retried with backoff a bounded number of times, and never stops the reactor | Test id: `packages/client-api/test/alert-ntfy-retry.test.ts` |
@@ -711,7 +715,7 @@ when"; the engine design's capabilities 6, 8 and 9 and "What this spec
 leaves open" (client API); `docs/features.md` section 3 ("Threads where the
 owner already works") and section 4; `docs/research/t3-code.md` items 9 to
 12; `docs/issues.md` issues 65, 75 and 164; owner choice A10; lead rulings
-L1 to L4, L10, L11 and L13; the roles planner's requests 1 to 6 and the board
+L1 to L4, L10, L11, L13 and L15; the roles planner's requests 1 to 6 and the board
 planner's R1 items 1 to 6; SECURITY.md security rules 1 to 7.
 
 | Source item | Workstream | Status |
@@ -752,6 +756,7 @@ planner's R1 items 1 to 6; SECURITY.md security rules 1 to 7.
 | Lead L10 | WS-1 (criterion 1.15) | planned |
 | Lead L11 | WS-1 (criteria 1.17, 1.18) | planned |
 | Lead L13 | WS-1 (criterion 1.19) | planned |
+| Lead L15 | WS-1 (1.17, 1.20-1.22), WS-2 (2.6), WS-3 (3.5), WS-6 (6.5) | planned |
 | Roles requests 1-6 | WS-1, WS-3, WS-6; contract section 7 | planned |
 | Board R1 items 1-6 | WS-1, WS-2, WS-5, WS-6; contract section 7 | planned |
 | SECURITY.md rules 1-7 | Guardrails fold | planned |
