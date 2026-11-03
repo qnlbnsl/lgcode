@@ -1,8 +1,8 @@
 # Known gaps: shepherd-message-board
 
 Gaps the planner could not close before the freeze. Reviewers: these are
-already known; look for new problems. Updated for plan version 6, after
-round 4.
+already known; look for new problems. Updated for plan version 7, after
+the client API version 9 fold. That fold was not a review round.
 
 1. **Vendor limits.** The planner cannot read each vendor's remaining
    weekly allowance. The lead checks it before launching any unit.
@@ -20,10 +20,10 @@ round 4.
    `packages/contracts/src/board/` and `packages/engine/src/board/`
    (row 100), so no manifest, workspace entry or test project is needed.
    Criterion 1.9 checks that the test runner lists the board's test
-   folders. The scopes `board/contracts` and `board/backend` do not exist;
-   the lead runs the scoping skill for both before launch. They must cover
-   the board's lines in the engine files that the engine-change table
-   names.
+   folders. The scopes `board/contracts`, `board/backend` and `board/web`
+   do not exist; the lead runs the scoping skill for all three before
+   launch. They must cover the board's lines in the files that the
+   engine-change table names.
 6. **Closed: the owner's answer to row 9.** The owner said to edit the
    engine directly (row 99).
 7. **The owner's confirmation of four exclusions.** Row 44 marks work

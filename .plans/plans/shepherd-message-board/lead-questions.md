@@ -337,3 +337,66 @@ grant's wording (row 117). It assumes changes 1 to 4.
 **Answer (lead ruling L30, posts #172 and #180).** Yes to changes 1 to 4,
 now in the client API contract version 5 at `09018d6`, and yes to
 contract version 7. `8e80a13` is version 4. Logged as row 120.
+
+## Q7 (decision rows 122 and 123): two board contract additions and two client API points that the client API v8 fold needs
+
+The board agrees to both additions of post #212: the `ownerHeld` list, and
+the entry in the thread page's subject panel with its end-to-end test. No
+alternative is proposed. Folding them finds four points. Two change the
+board's contract beyond what post #212 lists. Two are in the client API's
+text, and only its planner can change them. Each is given as exact text.
+
+**Change 1, board contract, "Reading" and the command table (row 122).**
+The panel entry must read the one post the alert names. Today's `board.read`
+has no way to do that. A channel cursor is opaque, and paging `incoming`
+would mark every other post it passes as read, and could not show a post
+that has closed. After "for a member of its channel." add:
+
+> With `post` set to a post id, it returns that one post, with its channel
+> id, author, `to`, reply mode, `replyTo` and state, to a member of its
+> channel or the owner, and marks it read.
+
+In the table's `board.read` row, after "or the replies to one post
+(`repliesTo`)", add ", or one post by its id (`post`)".
+
+**Change 2, board contract, "The owner as addressee" (row 122).** An alert
+opens its author's thread, and a service has no thread. So the alert for a
+service's question could not be read or answered from the page, and could
+never close from there. The roles plan never asks the owner through a
+post (its row 29): a service reaches the owner through its own alert kind.
+At the end of the bullet add:
+
+> A post from a service that needs a reply may not name the owner in `to`;
+> a service reaches the owner through its own alert kind, and such a post
+> would have no thread for its alert to open.
+
+**Point 3, client API section 3, "The owner's own request held" (row 123).**
+It says that a piece's `ownerHeld` is "checked at open and after every batch
+the helper applies". A client does not hold the board's view, and the helper
+reads the lists only when the engine's part says settled, with no polling.
+So the list is only as fresh as its last read, and acting on an older one
+would end a wait on a post the owner has just answered. Nothing hangs: an
+agent held only by a post waiting for the owner is settled by the engine's
+part, and that triggers the read. Proposed text, after "checked at open and
+after every batch the helper applies.":
+
+> A piece's `ownerHeld` list is read with its other lists. So the helper acts
+> on it at open and at each such read, and never on a result older than the
+> stream it has applied.
+
+**Point 4, client API section 3 and edit E9, `snapshotFor(caller, view)`
+(row 123).** The board's section needs the agents and the deliveries as well
+as its own field, because `holdsUnsettled` reads delivery statuses. Edit E19
+says of its table that a piece's entry "takes the piece's own view", so
+`view` could be read as only the piece's field. Proposed text, in edit E9,
+after "returns the piece's section or nothing (lead ruling L15).":
+
+> Its `view` is that one views value, not only the piece's own field.
+
+Everything else in the fold follows from post #212's list, and it is logged
+as rows 121 to 127. If points 3 and 4 are refused, the board's plan needs
+another way to compute its section, so please say so.
+
+**Answer (lead ruling L31, posts #217 and #221).** All four approved as
+written. Points 3 and 4 are in the client API contract version 9 at
+`5ceb503`. Logged as row 128.

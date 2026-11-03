@@ -1,11 +1,13 @@
 # The message board's contract
 
-Status: **version 7, for the foundry-roles plan to build on.** Written by
-the board's planner on 2026-11-03. Version 6 is `attack/contract-v6.md`.
-This version folds review round 4 (rows 102 to 120), and the lead
-approved it as ruling L30 (board post #172; row 120). It builds on the
-client API contract version 5 (`09018d6`). A later change to this file
-goes to `plans-lead` as a question first. The board's plan is `.plans/plans/shepherd-message-board/plan.md`;
+Status: **version 8, for the foundry-roles plan to build on.** Written by
+the board's planner on 2026-11-03. Version 7 is `attack/contract-v7.md`.
+This version folds the client API contract version 8 (`04e1f83`; lead's
+post #212; rows 121 to 128), and the lead approved its two additions beyond
+that list as ruling L31 (post #217). It builds on the client API contract
+version 9 (`5ceb503`), whose copy is `client-api-contract-v9.md` in this
+folder. A later change to this file goes to `plans-lead` as a
+question first. The board's plan is `.plans/plans/shepherd-message-board/plan.md`;
 its decisions are rows in `decisions.md` in the same folder, named in
 brackets below.
 
@@ -16,7 +18,7 @@ ruling L26). The client API plan's units 1a and 1b turn the engine's fixed
 lists into lists a piece adds to, and the board adds its own entries in
 its own units. Names and shapes follow the client API's contract
 (`.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api`,
-version 5 at `09018d6`, which holds the changes of lead ruling L30). "Edit EN" below is that contract's section 6,
+version 9 at `5ceb503`). "Edit EN" below is that contract's section 6,
 edit EN. The security rules of lead rulings L13 and L16 to L25 stay
 exactly as ruled; they are now properties of engine code.
 
@@ -283,10 +285,18 @@ A post has:
   `RESULT: done` lines (roles request 3: **accepted**, in this form).
 - **The owner as addressee.** A post that needs the owner's reply raises
   one owner alert of kind `board.post`, keyed `post:<postId>`, through the
-  client API's alert sources. It ends when the post closes. The board never
-  writes the engine's `OwnerNeeded` (row 35). One agent may have at most 3
-  open posts that need the owner's reply; a fourth is refused with the
-  reason.
+  client API's alert sources. The source names that kind and key, the
+  author's agent id, and the post's id as its subject. It never names a
+  title: the title comes from the client API's fixed table, to which the
+  board adds one entry for its kind (row 122). The alert ends when the post
+  closes. A tap opens the author's thread, where the board's entry in the
+  subject panel reads and answers the post ("The board's entry on the
+  thread page", below). The board never writes the engine's `OwnerNeeded`
+  (row 35). One agent may have at most 3 open posts that need the owner's
+  reply; a fourth is refused with the reason. A post from a service that
+  needs a reply may not name the owner in `to`; a service reaches the owner
+  through its own alert kind, and such a post would have no thread for its
+  alert to open (row 122).
 - **Shephrd as author** (roles request 4: **accepted**; the "needs-reply
   kind" part is already the `reply` field, so no kind label is added). A
   post from one of Shephrd's own services, such as `roles.sheepdog`, records
@@ -311,8 +321,7 @@ A post has:
   it carries. The wake's status is read from the engine's deliveries view;
   the board does not keep it twice.
 - **The body.** A wake's body is plain text, at most 256 KiB as JSON
-  encodes it, so each event that carries it stays under the network's
-  1 MiB message limit. It carries, in order: the target's owed
+  encodes it ("Sizes", below). It carries, in order: the target's owed
   completions that no other queued or sent wake carries, using at most
   128 KiB; every open post that needs the target's reply, that the target
   has not read, and that no other queued or sent wake carries to it; up to
@@ -352,8 +361,9 @@ A post has:
   carried again (row 115). A wake already sent
   may cost its target a turn on a closed post; its header said the post's
   state when it was built.
-- **Returned wakes.** A board wake the engine returns before accepting it
-  counts one return for each post and completion it carried, for its
+- **Returned wakes.** The engine writes `DeliveryReturned` for a board wake
+  it returns, and no source rule applies to it (edit E16; row 126). A board
+  wake the engine returns before accepting it counts one return for each post and completion it carried, for its
   target. The reactor's level rules then queue a new wake for whatever is
   still owed. A second such return for the same post and target resolves
   that addressee as `undeliverable`; a second return of a completion
@@ -367,7 +377,10 @@ A post has:
   change. The dispatcher's own check stops a wake that the reactor has not
   yet rebuilt. Text already sent cannot be recalled.
 - **Stopped or crashed targets.** A wake for an agent that stops or crashes
-  is withdrawn and never returned to anyone. A crashed agent's completions
+  is withdrawn and never returned to anyone. That is the board's entry in
+  the engine's source-rule table (edit E16). No wake is queued for a stopped
+  or crashed agent, because the piece batch path refuses a `DeliveryQueued`
+  for one (edit E23, check 2; row 125). A crashed agent's completions
   stay owed; a stopped agent's are dropped. When a stopped agent is
   resumed, its read state in every channel it is a member of restarts at
   that channel's last post, so its first wake carries nothing written
@@ -419,6 +432,18 @@ A post has:
   event does not end the owner's wait, and an accepted completion ends it
   with no later board event. No timer and no polling are added: the read
   happens only when the engine's part says settled.
+- **The owner-held list** (row 123). The same section and the same read
+  also carry `ownerHeld`: the ids of the agents that are the authors of an
+  open post with the owner in `to`. While a post is open, the owner has no
+  disposition in it, because the owner's reply closes it. Only the owner can
+  end this hold, so the owner's wait helper ends early with exit 2 when a
+  waited agent is on the list, as it does for an engine request the owner
+  holds (client API section 3). The helper acts on the list only at open and
+  at each read of the lists, and never on a result older than the stream it
+  has applied. An agent held only by such a post is settled by the engine's
+  part, so that read always comes. An agent waiting on another agent that
+  waits for the owner is not on the list. `packages/contracts/src/board/`
+  exports the list as a pure function of the board's view, `ownerHeld`.
 
 ## Reading (rows 19, 39, 48, 53, 55, 71, 75, 79, 80, 85, 88, 89)
 
@@ -430,11 +455,13 @@ A post has:
   receipt. Marks only move read state forward, so writing them twice is
   safe. It uses the client API's paged-read shape: `after`, `limit` (at most 200), and a reply of `items`
   and `next` (row 39). A page also closes when its encoded size passes
-  512 KiB. With `open` set, it returns the caller's own open posts instead.
+  512 KiB, and it always holds at least one item. With `open` set, it returns the caller's own open posts instead.
   With `incoming` set, it returns the open posts across the caller's
   channels that need its reply and where it has no disposition. With
   `repliesTo` set to a post id, it returns the replies to that post, for a
-  member of its channel.
+  member of its channel. With `post` set to a post id, it returns that one
+  post, with its channel id, author, `to`, reply mode, `replyTo` and state,
+  to a member of its channel or the owner, and marks it read (row 122).
 - **Read state** is kept per member and channel, as a watermark (every
   post at or before it is read) plus the post ids read above it. A
   member's watermark starts at the channel's last post when it joins:
@@ -452,9 +479,11 @@ A post has:
 - **The board's part of `client.snapshot`** is absent for an agent,
   through the board's `snapshotFor` entry (edit E9, lead ruling L15).
   For the owner, devices and services it holds no post text, and is at
-  most 256 KiB encoded. It holds, first, the ids of the agents for which
-  `holdsUnsettled` holds and of those for which `holdsIncoming` holds, and
-  the sequence they were computed at; this part is bounded by the number of
+  most 256 KiB encoded. Every part of it comes from the one views value the
+  snapshot reads, and its sequence is that value's own (edit E9). It holds,
+  first, the ids of the agents for which `holdsUnsettled` holds, of those
+  for which `holdsIncoming` holds, and of those on `ownerHeld`, and the
+  sequence they were computed at; this part is bounded by the number of
   agents and is never left out. Then come the open posts' metadata (id,
   channel, author, `to`, reply mode, `replyTo`, dispositions), owed
   completions, the channels (id, name, kind, manager, anchor, label,
@@ -462,7 +491,7 @@ A post has:
   board wakes' ids. If that would pass the cap, it sets `truncated`, and
   the client pages the rest with `board.channels` and `board.status`.
   While the board is switched off, the section says `disabled`, and its
-  condition lists are empty (row 116).
+  condition lists and `ownerHeld` are empty (row 116).
   Post text is read with `board.read`.
 - **Privacy has stated edges.** Through the board's commands, a channel is
   readable only by its members and the owner. Channels separate routing
@@ -509,15 +538,15 @@ field (row 40).
 | `board.members` | The owner, or the channel's manager | Adds or removes members of a plain channel. |
 | `board.post` | The owner, a member, or a Shephrd service | Writes a post in a channel, or in a direct channel with `direct`, and queues its wakes. Returns the post id. |
 | `board.close` | The post's author, the channel's manager or acting manager, the owner, or a Shephrd service | Withdraws an open post and removes it from queued wakes (row 50). |
-| `board.read` | The owner, or a member; never a service | Returns a page of a channel's posts after a cursor, the caller's own open posts (`open`), the posts waiting for its reply (`incoming`), or the replies to one post (`repliesTo`), and marks them read. |
+| `board.read` | The owner, or a member; never a service | Returns a page of a channel's posts after a cursor, the caller's own open posts (`open`), the posts waiting for its reply (`incoming`), or the replies to one post (`repliesTo`), or one post by its id (`post`), and marks them read. |
 | `board.channels` | The owner, or any agent | Lists the channels the caller can read, in the paged shape, closing at 512 KiB encoded. |
-| `board.status` | The owner, a Shephrd service, the agent's holder, or the agent itself | For one agent, ids, counts and states only, never post text or channel names. By default, a fixed-size summary: unread, incoming open, own open, owed and failed-completion counts; whether a board wake is queued or sent; the results of `holdsUnsettled` and `holdsIncoming`; and the sequence it was computed at. With `detail` set to `incoming`, `own` or `completions`, the matching list in the paged shape, closing at 512 KiB encoded: post ids, channel ids, reply modes, addressees and dispositions (roles request 7: **accepted**; rows 74, 89). With no agent, for the owner, devices and services only: the ids of the agents for which each condition holds, and the sequence, bounded by the number of agents (row 103). |
-| `board.flush` | The owner, or a Shephrd service; never an agent | Queues one board wake now with the agent's owed completions, including failed ones, and its unread posts, if it has any. Does nothing if the agent already has a never-sent board wake queued (rows 62, 92; roles request 6: **accepted** in this form). |
+| `board.status` | The owner, a Shephrd service, the agent's holder, or the agent itself | For one agent, ids, counts and states only, never post text or channel names. By default, a fixed-size summary: unread, incoming open, own open, owed and failed-completion counts; whether a board wake is queued or sent; the results of `holdsUnsettled` and `holdsIncoming`; and the sequence it was computed at. With `detail` set to `incoming`, `own` or `completions`, the matching list in the paged shape, closing at 512 KiB encoded: post ids, channel ids, reply modes, addressees and dispositions (roles request 7: **accepted**; rows 74, 89). With no agent, for the owner, devices and services only: the ids of the agents for which each condition holds, the ids on `ownerHeld`, and the sequence of the one views value they come from, bounded by the number of agents (rows 103, 123). |
+| `board.flush` | The owner, or a Shephrd service; never an agent | Queues one board wake now with the agent's owed completions, including failed ones, and its unread posts, if it has any. Does nothing if the agent already has a never-sent board wake queued (rows 62, 92; roles request 6: **accepted** in this form). Refused with the engine's reason if the agent is stopped or crashed (row 125). |
 
 When the board is switched off (row 58), every command but `board.status`
 is refused with "board disabled", a reason the engine's public error
 filter passes (rows 116, 117). `board.status` stays readable and says
-`disabled`, with empty condition lists.
+`disabled`, with empty condition lists and an empty `ownerHeld`.
 
 ## Events the board adds to the log
 
@@ -543,7 +572,25 @@ withdraws only a delivery of its own that is still queued (edit E17). A
 returned board wake carries the sender `piece { namespace: "board" }` in
 its `DeliveryReturned` (edit E15; row 109).
 
-## The board's reactor (rows 104, 105)
+## Sizes: the board's largest event and page (row 127)
+
+The client API's budgets are in its section 5, "Message size": a page closes
+at 900 KiB of encoded items, and `client.subscribe` replaces an event over
+256 KiB with a `client.Oversized` marker, which the client reads whole with
+`client.thread`. The board states its largest in
+`packages/contracts/src/board/limits.ts`, and the client API's test
+`packages/contracts/test/size-limits.test.ts` checks them as real encoded
+frames.
+
+| What | The board's largest | Against the budget |
+| --- | --- | --- |
+| A page: `board.read`, `board.channels`, `board.status` with `detail` | 512 KiB of encoded items, with at least one item | Under the 900 KiB page budget. One post encodes to at most about 64 KiB, so one item never passes it. |
+| A board event: `board.PostWritten` | One post of 16,384 characters, with at most 16 addressees: about 64 KiB | Under 256 KiB, so it is never replaced by a marker. |
+| A board event: `board.WakeBuilt` | Ids only, for what one body of 256 KiB can carry. Each item costs its header and markers in the body, so the event stays well under the body's size | Under 256 KiB, so it is never replaced by a marker. |
+| An engine event: the `DeliveryQueued` and `PromptSent` of a wake | A body of 256 KiB, plus the engine's envelope and the event's own fields | May pass 256 KiB. In `client.subscribe` it then becomes a `client.Oversized` marker, and `client.thread` returns it whole, to whoever may read it. `subscribe` is unchanged. |
+| A snapshot section | 256 KiB, with the condition lists always whole | Counted in the client API's test on its large fixture, which fails above 4 MiB. |
+
+## The board's reactor (rows 104, 105, 124, 125)
 
 - Every rule of the reactor is a level rule: a condition over the board's
   view and the engine's views, and the duty it owes while the condition
@@ -555,16 +602,28 @@ its `DeliveryReturned` (edit E15; row 109).
   `board.ManagerChanged`; a still-queued wake carrying a post its target
   may no longer read is rebuilt; an owed completion or an unread open
   must-reply post that no queued or sent wake carries is queued, while its
-  target has no board wake queued or sent, until its return count reaches
-  two.
+  target is neither stopped nor crashed and has no board wake queued or
+  sent, until its return count reaches two.
 - It runs after every committed batch, over the agents, channels and posts
   that batch touches, and over the whole state at start-up and when the
   board is switched on. It keeps no position: a duty lost to a restart is
   found again by the next run.
 - It writes only through the piece batch path (edit E23), recorded with the
-  caller `piece { namespace: "board" }`. A refused batch is not written;
-  the engine records one `CommandRefused`, and the reactor tries that duty
-  again only after a later batch touches it, or at start-up.
+  caller `piece { namespace: "board" }`. It gives that path a function from
+  the views to its batch, so the batch is built inside the writer's
+  transaction, from the views the checks read (edit E23). A refused batch
+  is not written; the engine records one `CommandRefused`, with the sequence
+  of the batch the reactor was handling or, in a whole-state run, of the
+  views it read, and the reactor tries that duty again only after a later
+  batch touches it, or at start-up. A `CommandRefused` touches nothing, so a
+  refusal never starts another run.
+- It follows the client API's rules for every reactor (section 1, row 108).
+  It starts only after `recovery.whenReady`, so an interrupted agent that
+  recovery can still reload is never judged early. It writes no first-start
+  event, because it keeps no position. On `LogWriteFailed` it stops, and a
+  restart finds its duties again by the whole-state run. A defect is logged
+  at error level with no event text, and the reactor restarts after a pause
+  with a whole-state run.
 
 ## For Shephrd's own services
 
@@ -593,8 +652,34 @@ stop. Board wakes already queued are still sent if they pass the reach
 check; a wake that fails is withdrawn and not rebuilt until the board is
 switched on. Waits on board authors may then end early, and the owner's
 wait agrees with an agent's, because `board.status` reports empty
-condition lists. When the board is switched on, its reactor runs once over
+condition lists and an empty `ownerHeld`. When the board is switched on, its reactor runs once over
 the whole state (row 116).
+
+## The board's entry on the thread page (row 122)
+
+An alert for a board post opens the author's thread. The client API's thread
+page has a subject panel, with a table keyed by namespace (client API
+section 4, "The subject panel"; its unit 7b builds the panel and its
+fallback). The board's plan writes the board's entry, in
+`packages/web/src/thread/subjects/board.tsx`.
+
+- **Before a tap.** The entry shows the alert's fixed title and a button. It
+  runs no command, because opening a link runs no state-changing command and
+  `board.read` writes marks.
+- **On a tap.** It calls `board.read` with `post` set to the alert's post
+  id. The post's text is agent text, so it is shown as React text only, never
+  as HTML or Markdown, and it looks different from Shephrd's controls. The
+  author is shown by the same fixed words and id as a wake's header.
+- **Answering.** While the post is open, the entry offers a reply box. It
+  calls `board.post` with the post's channel id and `replyTo` set to the
+  post's id, and with one request id for each reply, so a double tap acts
+  once. The owner's reply closes the post `answered`, so the alert ends and
+  the author is woken once with its completion. A closed post shows its state
+  and no reply box.
+- **A web caller.** The entry's calls arrive as the owner with
+  `device: open-web` (edit E12). Whether the owner's question 6 is answered
+  yes or no changes nothing here, because that question concerns the
+  engine's `answer` command, and the entry uses `board.post`.
 
 ## What the board refuses, and why
 
