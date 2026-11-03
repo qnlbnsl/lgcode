@@ -85,7 +85,7 @@ that outsiders can reach.
   A phone can do everything the terminal can, except create a pairing code,
   change the network settings, or add a standing permission rule. Each of
   those would outlive a stolen phone's revocation. This narrows AGENTS.md
-  rule 5 and is with the lead as question 2.
+  rule 5, so the owner decides it in the design talk; the plan assumes yes.
 - **The web page holds its credential in a cookie its scripts cannot
   read,** and every connection must come from Shephrd's own page.
 - **Phone alerts carry no agent text.** An alert says what kind of thing
@@ -417,7 +417,7 @@ SECURITY.md rules 3 and 4. Rows 23, 47, 48, 49. Unit 4.
 | Risk | Severity | Mitigation |
 |---|---|---|
 | A code is guessed | High | 40 bits, five attempts, ten minutes (row 48); criterion 4.3; attack pass. |
-| A stolen phone adds more devices | High | Pairing codes are host-only (criterion 4.5, question Q2). |
+| A stolen phone adds more devices | High | Pairing codes are host-only (criterion 4.5, row 55, pending the owner). |
 | A credential leaks into the record | High | The redactor registers device credentials (`service.ts:87`); criterion 4.2. |
 
 **Verify:** criteria 4.1-4.5; environment QA: none.
@@ -764,7 +764,7 @@ planner's R1 items 1 to 6; SECURITY.md security rules 1 to 7.
 | AGENTS.md rule 2: credit copied code | No code is copied in this plan. A unit that copies any (for example from Synapse's web page) follows rule 2 under `third_party/`. |
 | AGENTS.md rule 3: keep the lists current | Each unit records problems in `docs/issues.md`; this planner's finds go to the lead in the result file. |
 | AGENTS.md rule 4: SECURITY.md is binding | Rule 1: WS-5 criterion 5.1. Rule 2: rows 14, 49; criteria 5.2, 4.2. Rule 3: row 48; criteria 4.1, 4.3. Rule 4: criterion 4.4. Rule 5: WS-10; criterion 10.2. Rule 6: criteria 4.2, 6.5, 6.9. Rule 7: rows 19, 37; criteria 1.13, 7.4. |
-| AGENTS.md rule 5: the API is the product's surface | Every owner action is an API command; devices have the owner's rights except the host-only list (question Q2, row 23); `shephrd client wait` runs on the API (row 50). |
+| AGENTS.md rule 5: the API is the product's surface | Every owner action is an API command; devices have the owner's rights except the host-only list (row 55, pending the owner); `shephrd client wait` runs on the API (row 50). |
 | AGENTS.md rule 6: team shapes do not belong here | No team shape or workflow is defined; alert kinds and services are mechanisms. |
 | AGENTS.md rule 7: commit only when asked | The run's team rules allow commits; units commit per the lead. |
 | AGENTS.md, "Language": TypeScript, Effect 4, Node.js 26 | All code is TypeScript with Effect 4.0.5; Effect claims checked against the installed source (rows 24, scouting). |
