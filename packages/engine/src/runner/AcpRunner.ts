@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { comparePermission, DeliveryId, Event, type PermissionLevel, type SessionReference } from "@shephrd/contracts";
 import { AcpClient, layerChildProcess } from "@shephrd/t3-effect-acp/client";
 import { AcpRequestError } from "@shephrd/t3-effect-acp/errors";
@@ -39,6 +38,7 @@ import { linuxProcessReader } from "../recovery/orphans.ts";
 import { buildBaseEnvironment } from "./baseEnvironment.ts";
 import { harnessLogin, homeConflict, loginRefusal } from "./harnesses.ts";
 import { classifyError } from "./classify.ts";
+import { mcpScriptPath, withShephrdMcp } from "./codexMcp.ts";
 import { compactPrompt } from "./compact.ts";
 import { setConfig, type ConfigOption } from "./config.ts";
 import { denyArguments } from "./denyRead.ts";
@@ -46,7 +46,8 @@ import { reportedLevel } from "./modes.ts";
 import { makePermissionHold, mapPermissionOption, settingsWrite } from "./permissions.ts";
 import { resetTimeFromError } from "./resetTime.ts";
 import { Runner, RunnerRejected, type ReplayItem, type RunnerEvent, type SessionInfo } from "./Runner.ts";
-import { translate } from "./translate.ts";
+import { translate, type Translated } from "./translate.ts";
+import { makeTerminalOutput, terminalDataOnly, withoutTerminalData, withoutTerminalPayload } from "./terminal.ts";
 
 export interface AcpRunnerOptions {
   readonly socketPath: string;
@@ -101,6 +102,7 @@ interface Process {
     readonly pending: Array<{ readonly length: number; readonly event: Extract<RunnerEvent, { _tag: "deliveryUpdate" }> }>;
     released: string;
   };
+  readonly terminalOutput: ReturnType<typeof makeTerminalOutput>;
   turn?: Turn;
   sent?: Deferred.Deferred<void, RunnerRejected>;
 }
@@ -181,11 +183,11 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   });
   // The gated protocol log writes whole frames. Each line is decoded and
   // cleaned as structure; a line that is not a whole frame is withheld.
-  const protocolPayload = (payload: unknown, covered: () => boolean): Effect.Effect<unknown> => typeof payload !== "string" ? cleanStructure(payload, covered)
+  const protocolPayload = (payload: unknown, covered: () => boolean): Effect.Effect<unknown> => typeof payload !== "string" ? cleanStructure(withoutTerminalPayload(payload), covered)
     : Effect.forEach(payload.split("\n").filter((line) => line.trim() !== ""), (line) => {
       let frame: unknown;
       try { frame = JSON.parse(line); } catch { return Effect.succeed("adapter frame withheld: not a whole frame"); }
-      return cleanStructure(frame, covered).pipe(Effect.map((clean) => JSON.stringify(clean)));
+      return cleanStructure(withoutTerminalPayload(frame), covered).pipe(Effect.map((clean) => JSON.stringify(clean)));
     }).pipe(Effect.map((lines) => lines.join("\n")));
   const events = yield* Queue.unbounded<RunnerEvent>();
   const redactChunk = (itemId: string, text: string, final: boolean, covered: () => boolean = always) => guarded(covered, Effect.gen(function* () {
@@ -225,6 +227,29 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     }
     if (final) delete entry.message;
   });
+  const publishTerminals = (entry: Process, updates: ReadonlyArray<Translated>) => Effect.gen(function* () {
+    if (entry.turn === undefined && !entry.loading) return;
+    for (const translated of updates) {
+      const deliveryId = entry.turn?.deliveryId ?? Schema.decodeUnknownSync(DeliveryId)(`replay-${randomUUID()}`);
+      // Latch coverage loss for this publication, including a store change
+      // during redaction. Withholding trusted schema keys makes an invalid
+      // shape, so replace the whole item instead of decoding that shape.
+      let lost = false;
+      const covered = () => { lost ||= !entry.covered(); return !lost; };
+      const content = covered() ? yield* cleanStructure(translated.content, covered).pipe(
+        Effect.flatMap(Schema.decodeUnknownEffect(threadContent)),
+        Effect.catch(() => covered() ? Effect.fail(rejected("adapter terminal content is malformed")) : Effect.succeed(undefined)),
+      ) : undefined;
+      const text = yield* redactText(translated.text, covered);
+      const withheld = content === undefined || !covered();
+      if (entry.loading) noteReplay(entry, { _tag: "break" });
+      yield* emit({ _tag: "deliveryUpdate", agentId: entry.input.agentId, incarnation: entry.incarnation, deliveryId,
+        kind: withheld ? "message" : "tool-call", replay: entry.loading,
+        ...(withheld ? { role: "agent" as const } : {}),
+        text: withheld ? withheldText : text, content: withheld ? { _tag: "text", text: withheldText } : content });
+    }
+  });
+  const drainTerminals = (entry: Process) => entry.terminalOutput.finish().pipe(Effect.flatMap((updates) => publishTerminals(entry, updates)));
   const identity = (entry: Process) => ({ agentId: entry.input.agentId, incarnation: entry.incarnation });
   const live = (agentId: string, incarnation?: string) => Effect.suspend(() => {
     const entry = processes.get(agentId);
@@ -235,6 +260,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     if (turn.ended || !turn.replied || !turn.idle || entry.stopped || entry.dead) return;
     turn.ended = true;
     yield* drainMessages(entry, true);
+    yield* drainTerminals(entry);
     const clean = yield* redactText(turn.error ?? turn.text, entry.covered);
     const harness = entry.input.harness.id;
     // Only the recorded cursor adapter reports usage exhaustion as a
@@ -257,6 +283,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   const close = (entry: Process) => Effect.gen(function* () {
     entry.stopped = true;
     yield* drainMessages(entry, true);
+    yield* drainTerminals(entry);
     if (entry.sent !== undefined) yield* Deferred.fail(entry.sent, rejected("agent process stopped"));
     for (const delivered of entry.responses.values()) yield* Deferred.fail(delivered, rejected("permission answer delivery failed"));
     entry.responses.clear();
@@ -318,6 +345,10 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       variables[secretVariable] = Redacted.value(secret);
     }
     if (harness.id === "codex") {
+      variables.CODEX_CONFIG = yield* Effect.try({
+        try: () => withShephrdMcp(variables.CODEX_CONFIG),
+        catch: () => rejected("account tool server configuration cannot be prepared"),
+      });
       const homed = yield* withCodexHome({ stateFolder: configuration.stateFolder, home: configuration.environment.HOME ?? input.folder, accountId: input.account.id, variables,
         ...(input.account.home === undefined ? {} : { homePath: input.account.home }) }).pipe(
         Effect.provideService(FileSystem.FileSystem, fileSystem), Effect.provideService(Path.Path, pathService),
@@ -417,7 +448,8 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       })).pipe(Scope.provide(scope));
       const client = Context.get(context, AcpClient);
       const processEntry: Process = { input, incarnation: sha256Hex(Redacted.value(input.token)), scope, child, client, secrets: resolvedSecrets, covered,
-        holds: new Map(), responses: new Map(), replay: [], sessionId: session?._tag === "acp" ? session.sessionId : "", version: 0,
+        holds: new Map(), responses: new Map(), replay: [],
+        terminalOutput: makeTerminalOutput({ redactChunk: (id, text, final) => redactChunk(id, text, final, covered), redactText: (text) => redactText(text, covered) }), sessionId: session?._tag === "acp" ? session.sessionId : "", version: 0,
         loading: session !== undefined, ready: false, stopped: false, dead: false, mode: startingMode, options: [], commands: [] };
       entry = processEntry;
       processes.set(input.agentId, processEntry);
@@ -426,6 +458,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         yield* Fiber.interrupt(stderrReader);
         yield* stderrTail.finish();
         yield* drainMessages(processEntry, true);
+        yield* drainTerminals(processEntry).pipe(Effect.catch(() => Effect.logWarning("adapter terminal output dropped: malformed")));
       }).pipe(Effect.ensuring(Effect.sync(() => {
         processEntry.secrets.length = 0;
         if (processes.get(input.agentId) === processEntry) processes.delete(input.agentId);
@@ -469,10 +502,19 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         // non-message update becomes one fixed withheld item. It is
         // translated raw only to learn its items; none of its data is used.
         const lost = !chunk && !current.covered();
-        const translatedUpdates = translate(chunk || lost ? update : yield* cleanStructure(update, current.covered), current.loading);
+        const translatedUpdates = !lost && terminalDataOnly(update) ? []
+          : translate(chunk || lost ? update : yield* cleanStructure(withoutTerminalData(update), current.covered), current.loading);
         if (current.turn === undefined && !current.loading) {
           if (translatedUpdates.length > 0) yield* Effect.logWarning("adapter content dropped: no active turn");
           return;
+        }
+        let terminalUpdates: ReadonlyArray<Translated> = [];
+        if (lost) {
+          // Discard pending terminal carry when coverage is lost; no raw text
+          // from that interval may be released after the login store recovers.
+          yield* current.terminalOutput.finish({ resetLimitWarning: false });
+        } else {
+          terminalUpdates = yield* current.terminalOutput.push(update);
         }
         for (const translated of translatedUpdates) {
           const deliveryId = current.turn?.deliveryId ?? Schema.decodeUnknownSync(DeliveryId)(`replay-${randomUUID()}`);
@@ -509,6 +551,9 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           yield* emit({ _tag: "deliveryUpdate", ...identity(current), deliveryId,
             kind: translated.kind, replay: current.loading, text, content });
         }
+        // The pinned adapters emit terminal data before the tool report. Keep
+        // the retained snapshot last so an empty report cannot hide it.
+        yield* publishTerminals(current, terminalUpdates);
       }).pipe(Effect.catch(() => Effect.logWarning("adapter update dropped: malformed"))));
       yield* client.handleRequestPermission((request, context) => Effect.gen(function* () {
         yield* drainMessages(processEntry, true);
@@ -532,7 +577,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       const initialized = yield* client.agent.initialize({ protocolVersion: 2, clientInfo: { name: "shephrd", version: "0.0.1" }, clientCapabilities: {} }).pipe(Effect.mapError(() => rejected("adapter initialization failed")));
       processEntry.version = initialized.protocolVersion;
       if (initialized.agentCapabilities !== undefined) processEntry.capabilities = initialized.agentCapabilities;
-      const mcpServers = [{ type: "stdio" as const, name: "shephrd", command: process.execPath, args: [fileURLToPath(new URL("../../../cli/src/bin.ts", import.meta.url)), "mcp"],
+      const mcpServers = harness.id === "codex" ? [] : [{ type: "stdio" as const, name: "shephrd", command: process.execPath, args: [mcpScriptPath, "mcp"],
         env: [{ name: "SHEPHRD_SOCKET", value: configuration.socketPath }, { name: "SHEPHRD_TOKEN", value: Redacted.value(input.token) }] }];
       // Row 66 and issue 93: reload only through a method this peer
       // advertised at initialize, `session/load` first, else `session/resume`.
@@ -546,6 +591,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       if (processEntry.sessionId === "" || (yield* redactText(processEntry.sessionId, processEntry.covered)) !== processEntry.sessionId) return yield* rejected("adapter session identifier refused");
       yield* checkChildFolder;
       yield* drainMessages(processEntry, true);
+      yield* drainTerminals(processEntry);
       processEntry.loading = false;
       processEntry.options = (opened.configOptions ?? []) as ReadonlyArray<ConfigOption>;
       if (input.model !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "model", input.model, processEntry.version);
@@ -562,6 +608,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         if (Option.isNone(drained)) yield* Fiber.interrupt(stderrReader);
         const stderr = yield* stderrTail.finish();
         yield* drainMessages(processEntry, true);
+        yield* drainTerminals(processEntry);
         if (processEntry.sent !== undefined) yield* Deferred.fail(processEntry.sent, rejected("agent process exited"));
         for (const delivered of processEntry.responses.values()) yield* Deferred.fail(delivered, rejected("permission answer delivery failed"));
         processEntry.responses.clear();

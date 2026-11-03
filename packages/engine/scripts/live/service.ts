@@ -26,6 +26,8 @@ export interface LiveService {
   // to be killed because they ignored the first signal.
   readonly stop: () => Promise<ReadonlyArray<number>>;
   readonly remove: () => void;
+  // SIGKILL only the service child; recovery owns its recorded adapters.
+  readonly restart?: (signal?: AbortSignal) => Promise<LiveService>;
 }
 
 // What the adapters need to find their own sign-in, and nothing else of the
@@ -120,35 +122,37 @@ const until = async (done: () => boolean, milliseconds: number): Promise<boolean
 
 const signal = (pid: number, name: NodeJS.Signals): void => { try { process.kill(pid, name); } catch { /* gone; a process that stays is found by the liveness check */ } };
 
-export const startLiveService = (parent: Readonly<Record<string, string | undefined>>): LiveService => {
-  const root = realpathSync(mkdtempSync("/tmp/shephrd-live-"));
+export const startLiveService = (parent: Readonly<Record<string, string | undefined>>, reuse?: { readonly root: string; readonly output: string; readonly known: Map<number, string> }): LiveService => {
+  const root = reuse?.root ?? realpathSync(mkdtempSync("/tmp/shephrd-live-"));
   chmodSync(root, 0o700);
   const state = join(root, "state");
   const work = join(root, "work");
-  mkdirSync(work, { mode: 0o700 });
+  if (reuse === undefined) mkdirSync(work, { mode: 0o700 });
   const logFile = join(root, "service.log");
-  const log = createWriteStream(logFile, { mode: 0o600 });
+  const log = createWriteStream(logFile, { mode: 0o600, flags: "a" });
   const child: ChildProcess = spawn(process.execPath, [servicePath], { env: serviceEnvironment(parent, state), stdio: ["ignore", "pipe", "pipe"] });
-  const both: Array<string> = [];
+  const both: Array<string> = reuse === undefined ? [] : [reuse.output];
+  const known = reuse?.known ?? new Map<number, string>();
+  const remember = (): void => {
+    for (const pid of processesNaming(root, [], [child.pid!])) {
+      const start = statOf(pid)?.start;
+      if (start !== undefined) known.set(pid, start);
+    }
+  };
   for (const stream of [child.stdout!, child.stderr!]) {
     stream.setEncoding("utf8").on("data", (chunk: string) => { both.push(chunk); log.write(chunk); });
   }
   let done = false;
+  let stopping = false;
+  let restarting = false;
   const closed = new Promise<void>((resolve) => { child.once("close", () => { done = true; log.end(); resolve(); }); });
   return {
     root, state, work, logFile, pid: child.pid!,
     output: () => both.join(""),
     exited: () => done,
     stop: async () => {
+      stopping = true;
       const killed: Array<number> = [];
-      // pid -> start time, recorded the first time the run finds the process.
-      const known = new Map<number, string>();
-      const remember = (): void => {
-        for (const pid of processesNaming(root, [], [child.pid!])) {
-          const start = statOf(pid)?.start;
-          if (start !== undefined && !known.has(pid)) known.set(pid, start);
-        }
-      };
       const mine = (pid: number): boolean => statOf(pid)?.start === known.get(pid);
       const survivors = (): ReadonlyArray<number> => [...known.keys()].filter((pid) => mine(pid) && alive(pid));
       const sweep = (name: NodeJS.Signals): void => {
@@ -169,6 +173,17 @@ export const startLiveService = (parent: Readonly<Record<string, string | undefi
       const left = survivors();
       if (left.length > 0) throw new Error(`cleanup was not confirmed: ${left.join(", ")} still running`);
       return killed;
+    },
+    restart: async (abort) => {
+      if (abort?.aborted || stopping || restarting) throw new Error("restart cancelled or already requested");
+      restarting = true;
+      if (done) throw new Error("the service exited before the restart probe");
+      remember();
+      // ChildProcess.kill addresses our unreaped child, never an arbitrary pid.
+      if (!child.kill("SIGKILL")) throw new Error("SIGKILL was not delivered to the service child");
+      await closed;
+      if (abort?.aborted || stopping) throw new Error("restart cancelled before a replacement was started");
+      return startLiveService(parent, { root, output: both.join(""), known });
     },
     remove: () => { rmSync(root, { recursive: true, force: true }); },
   };

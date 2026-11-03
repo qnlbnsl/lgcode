@@ -12,6 +12,8 @@ import { resolveHarnessDefaults } from "../../src/runner/harnesses.ts";
 import { agentText, envelope } from "../../src/routing/envelope.ts";
 import { routedDelivery } from "../../src/routing/holders.ts";
 import { liveConfig, liveDriver, liveFolders, LIVE_VARIABLES, registerAccounts, renderedPrompts, REPRESENTATIVE_ROOT, type LiveConfig } from "./driver.ts";
+import { liveProbeDriver } from "./liveProbes.ts";
+import type { ProbeDriver } from "./probes.ts";
 import { flow, makeStepRunner, StepFailed } from "./flow.ts";
 import { PROMPTS, placeholdersOf, WORKER_PROMPT } from "./prompts.ts";
 import { realRecord, recordLive, type RecordingDeps } from "./recording.ts";
@@ -106,6 +108,15 @@ export const dryRunText = (config: LiveConfig = liveConfig({})): string => {
     "The re-record step (scripts/live/recording.ts, scripts/recorder.ts) then starts more model sessions, each sent the RECORDER_PROMPT above:",
     "- one Claude Code recording and one Codex recording, each in a new temporary folder;",
     "- after a recording succeeds, one signed-out probe for that harness: the adapter is started with an empty temporary home and no account variables, and is expected to be refused for authentication.",
+    "Only startup-hook, service, setup, lead and worker-start are hard stops because later work needs the service and both agents. Other journey failures are recorded and independent steps still run. With no worker permission request, routed, pass-up, owner-answer and wake are skipped with that named precondition (issue 272). The probes sandbox-mcp through token-scan continue after a journey or probe failure when their own preconditions hold: the service answers and prompt-producing probes have their needed agents alive and idle, with no pending permission of their own, open waits or queued deliveries. The read-only permission-kinds and token-scan probes do not need idle agents. A probe with unavailable preconditions is skipped with its reason; final still runs after a journey or probe failure; recording requires every earlier step to pass. Any failure keeps the overall exit nonzero.",
+    `After a journey failure, preparation denies leftover permission requests without approving work and waits at most 30 seconds for the same agents and queued wakes to settle. Before a probe that sends turns, its agents get at most 30 seconds to be idle with nothing held or queued, and otherwise that probe is skipped with the reason.`,
+    `The configured whole-run limit is ${config.totalTimeout / 1000} seconds, followed by at most 30 seconds of cancellation grace and up to 20 seconds of service cleanup with the standard wrapper. Agent event waits are bounded by ${config.agentTimeout / 1000} seconds; readiness is bounded separately.`,
+    "The probe prompts above add turns to the same two sessions. The reload step restarts the service twice: one working-turn carry-on, then one pending-envelope replay. Each uses SIGKILL on this run's service child only.",
+    "The worker account sets CODEX_CONFIG to shell_environment_policy.inherit=core for SEC-PB-8. Shell permissions are answered only for the exact printed command; always allow is used only in its named step.",
+    "PB-A10 already has real evidence in packages/testing/fixtures/{claude,codex}.ndjson. The sandbox-mcp log cites the adapter versions, negotiated ACP versions and config categories; no separate probe is added.",
+    "Slash evidence is direction-specific: SEC-PB-2 observes only the Claude parent receiver, and SEC-PB-7 only the Codex child receiver. The other row is explicitly not applicable. PB-A7 old-token refusal is checked for both agents at each restart.",
+    "Core inheritance requires the shell's name-only environment listing to omit both identity variables before env -u removes them. Token-scan requires each agent's own tokens, nonempty session files, arguments and environment snapshots.",
+    "Persistent permission options with no verifiable localSettings/session destination are denied as no safe persistent option offered. Today's public permission contract omits that destination, so SEC-PB-4 may remain unproven.",
     "In all a full run starts at most 6 model sessions: 2 in the journey (the lead and the worker), 2 recordings, and up to 2 signed-out probes.", "",
     "Steps the run would take, in order:",
   );
@@ -131,6 +142,8 @@ export interface RunDeps {
   readonly serveTimeout: number;
   // After the total limit, how long to wait for the cancelled work to end.
   readonly cancelGrace?: number;
+  // Tests replace only the external adapter boundary, never the flow or gates.
+  readonly probes?: ProbeDriver;
 }
 
 const fixturesFolder = fileURLToPath(new URL("../../../testing/fixtures", import.meta.url));
@@ -155,9 +168,10 @@ export const realDeps = (environment: Readonly<Record<string, string | undefined
 // groups) before it gives up and says the cleanup was not confirmed.
 const DEFAULT_CANCEL_GRACE = 30_000;
 
-// Runs the check and returns the exit code. A step that fails stops the run:
-// the steps after it are printed as skipped, so the owner reads the first
-// cause, and a failed run spends no more of their usage than it must.
+// Service setup and agent startup are hard preconditions. Other journey
+// failures are recorded while independent steps and probes continue. Final
+// still checks the views and secrets. Recording requires every earlier step
+// to pass. Any failure keeps the overall exit nonzero.
 //
 // One AbortController owns the whole body (the startup-hook probe, the
 // journey and the recording). The total limit aborts it, then the run waits
@@ -179,11 +193,13 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
   // The run's secret list. The owner credential joins it the first time it can
   // be read and stays on it; every printed line is redacted with the list.
   let credential: ReadonlyArray<string> = [];
+  const agentSecrets = new Set<string>();
+  const probeOutputs: Array<{ label: string; text: string }> = [];
   const registered = (): ReadonlyArray<string> => {
     if (credential.length === 0 && service !== undefined) {
       try { credential = readOwnerCredentialFrom(service.state); } catch { /* The final step reports an unreadable credential. */ }
     }
-    return credential;
+    return [...credential, ...agentSecrets];
   };
   const reporter = createReporter(
     (line) => { if (open) deps.write(line); }, deps.clock,
@@ -245,15 +261,35 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
         mkdirSync(workerFolder, { mode: 0o700 });
         yield* registerAccounts(owner, config, yield* Effect.promise(() => deps.harnessSettings()), deps.environment);
       }), () => `${config.leadHarness} (${config.leadModel}, ${config.leadEffort}) and ${config.workerHarness} (${config.workerModel}, ${config.workerEffort})`);
+      const checkRestart = () => Effect.gen(function* () {
+        if (service?.restart === undefined) return yield* Effect.fail(new Error("not attempted: service wrapper cannot restart"));
+        service = yield* Effect.tryPromise((signal) => service!.restart!(signal));
+        const deadline = deps.clock() + deps.serveTimeout;
+        for (;;) {
+          if (service.exited()) return yield* Effect.fail(new Error("restarted service exited before listening"));
+          const connected = yield* Effect.exit(Effect.scoped(deps.connectOwner(service.state)));
+          if (Exit.isSuccess(connected)) return;
+          if (deps.clock() > deadline) return yield* Effect.fail(new Error("restarted service did not listen within the limit"));
+          yield* Effect.sleep(100);
+        }
+      });
       return yield* flow({
         owner, openOwner: () => deps.connectOwner(live.state).pipe(Effect.map((client) => recordReplies(client, replies))),
         driver: liveDriver(owner, config, leadFolder, workerFolder), step,
+        probes: deps.probes ?? liveProbeDriver({
+          service: () => service!, openOwner: () => deps.connectOwner(live.state), environment: deps.environment,
+          agentTimeout: config.agentTimeout, engineTimeout: deps.engineTimeout, secrets: agentSecrets,
+          captureOutput: (source) => { probeOutputs.push(source); },
+          restart: checkRestart,
+        }),
+        probeNote: reporter.note,
         leadHarness: config.leadHarness, workerHarness: config.workerHarness, workerFolder,
         agentTimeout: config.agentTimeout, engineTimeout: deps.engineTimeout, settle: deps.settle,
         // Fails when the credential cannot be read, and the final step names that.
-        secrets: () => readOwnerCredentialFrom(live.state),
+        secrets: () => [...readOwnerCredentialFrom(live.state), ...agentSecrets],
         outputs: () => [
-          { label: "the output of the service process", text: live.output() },
+          ...probeOutputs,
+          { label: "the output of the service process", text: service!.output() },
           { label: "the lines the script printed", text: reporter.printed() },
         ],
         replies: () => replies,
@@ -329,7 +365,13 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
 
   if (reporter.failed()) {
     const ran = new Set(reporter.results().map((result) => result.id));
-    for (const spec of ALL_STEPS) if (!ran.has(spec.id)) reporter.skip(spec, "an earlier step failed");
+    const hardStop = reporter.results().find((row) => !row.passed && ["startup-hook", "service", "setup", "lead", "worker-start"].includes(row.id));
+    const unavailable = hardStop === undefined
+      ? `the run ended before this step could be evaluated; failed: ${reporter.results().filter((row) => !row.passed).map((row) => row.id).join(", ")}`
+      : `precondition unavailable: ${hardStop.id} failed; ${["startup-hook", "service"].includes(hardStop.id) ? "the run has no ready service" : hardStop.id === "setup" ? "the run's accounts and folders were not prepared" : "the required agents were not started"}`;
+    for (const spec of ALL_STEPS) if (!ran.has(spec.id)) reporter.skip(spec, spec.id === "recording"
+      ? `requires every earlier step to pass; failed: ${reporter.results().filter((row) => !row.passed && row.id !== "recording").map((row) => row.id).join(", ")}`
+      : unavailable);
     if (service !== undefined) {
       reporter.note(`The run's folder is kept at ${service.root}; the service's log is ${service.logFile}. The real service was not touched.`);
       if (cleanupUnconfirmed) reporter.note("Cleanup was not confirmed: a process this run started may still be running. Check the folder above before you remove it.");

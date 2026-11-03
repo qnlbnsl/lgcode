@@ -68,6 +68,6 @@ describe("the reporter", () => {
     expect(ids[0]).toBe("startup-hook");
     expect(ids[ids.length - 1]).toBe("recording");
     for (const step of FLOW_STEPS) expect(ids).toContain(step.id);
-    expect(ids.indexOf("final")).toBe(ids.indexOf("wake") + 1);
+    expect(ids.slice(ids.indexOf("wake") + 1, ids.indexOf("final"))).toEqual(["sandbox-mcp", "permission-kinds", "removed-variables", "state-read", "slash-up", "slash-down", "always-allow", "reload", "token-scan"]);
   });
 });

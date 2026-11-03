@@ -3273,6 +3273,255 @@ the loop.
 Fix, if wanted: give the recheck a floor of one millisecond, or state in the
 file's header comment that the timer assumes the clock does not move back.
 
+## 212. The live check omitted post-build restart and security evidence
+
+Found: 2026-11-02, in post-build review finding L-1.
+
+Status: the probe implementation is written and covered locally with fake
+adapters. Real-adapter evidence remains pending the lead's reviewed live run.
+
+The original fourteen steps did not inspect the adapters' session files or
+process arguments. They did not try a state-folder canary read, slash-command
+escaping, saved permission scopes, removed identity variables, or a real
+adapter reload. A passing journey therefore did not establish PB-A3, PB-A4,
+PB-A7, PB-A11, PB-A12, or SEC-PB-1 through SEC-PB-8.
+
+The live harness now records explicit outcomes for those criteria. It cites
+existing fixture evidence for PB-A10 and exercises service reconnection for
+PB-A8 during the restart probes. A missing attempt fails. The state-folder
+probe uses only a non-secret canary in the run's temporary state folder. A
+successful read is recorded as having no mechanism, as SECURITY.md requires.
+The token scan reports paths and counts, and never reports matched text.
+Persistent permission answers are restricted to the named command in the
+run's work folder. Only the service child started by the run receives the
+restart signal. No production permission or authentication code was changed.
+
+The restart probe uses two kills. One interrupts working turns to observe
+actual carry-on tool calls. The other interrupts sent envelope deliveries to
+observe recovery accepting their replayed identifiers or re-sending them.
+A receipt from an ordinary post-restart response is not counted as replay.
+A delivery already accepted before the kill is not counted as a replay test.
+
+Local checks cover both directions of received slash escaping, the real
+command-line entry point's ancestry refusal with both variables removed,
+old-token refusal after a real service restart with a fake adapter, planted
+tokens in session files and arguments, and each probe's failure outcomes.
+These checks do not establish real-adapter behavior or close the live gate.
+
+Fix round 1 makes the evidence limits explicit. The two-agent tree proves
+the upward slash receive path only for the first harness, and the downward
+path only for the second. Its other rows are direction-specific and not
+applicable. The core-inheritance check now requires a name-only listing from
+the shell before explicit variable removal. Each token-scan row requires its
+own agent token, nonempty session files, arguments and environment snapshots.
+
+The saved-permission criterion remains unproven when a destination cannot be
+verified before answering. The public permission-option contract carries an
+identifier, name, kind, level and persistence, but no destination. The
+installed first adapter's wire request omits its provider suggestions too.
+The probe therefore rejects every persistent option without a verified
+local-settings or session destination. It records "no safe persistent option
+offered" and fails. It never infers the destination from a label and never
+answers persistently before checking that the owner holds the request.
+No production contract change was made for this limitation.
+
+The replay probe asks a pending turn to sleep, then requests the second kill
+as soon as the deliveries are sent. A content update may still accept a
+delivery before the kill. The probe checks the whole interval again after
+reload, and records that race as a failed attempt. It never counts the same
+delivery being accepted early and then re-sent as successful replay evidence.
+
+Fix round 2 addresses review findings m-7 and m-8. After the second restart,
+the permission handler previously denied even the exact pending sleep
+command. A replay that requested that permission could fail despite correct
+recovery. The handler now permits that command at most once per agent, using
+only a nonpersistent approval. It still denies a repeat or a different
+command and fails the probe. The pending prompt explicitly forbids running
+the command again after a restart, including when the prompt is re-sent.
+
+The added regression tests isolate missing shell listings, a wrong harness
+for an inapplicable outcome, missing environment snapshots with tokens and
+arguments still present, and a stale token snapshot after the first restart.
+They cover each guard separately without weakening the existing evidence
+requirements. These remain local tests, not real-adapter evidence.
+
+Fix round 4 distinguishes a command that ran without any permission request
+from a request without a safe persistent destination. In live-check-2 run 2,
+events 322-325 show the exact printf command completing, with no
+PermissionRequested or PermissionAnswered for that call. No option or
+destination was selected. The probe now reports
+`no persistent permission request observed`, which fails. It does not claim
+that an always-allow answer was sent or that a settings write failed after
+one. It still requires the owner-held request, verified destination and
+saved scope before it can pass SEC-PB-4.
+
+Fix round 6 addresses the cause observed again in live-check-2 run 3 at
+`b4154fa7c12ed47116493b7b209c63a355075c7b`, log lines 34-36. The command
+`printf 'lcp-persistent-permission-probe\n'` was read-only, so Claude Code
+completed it without a permission request. It could not exercise the
+persistent-permission choices. The implementation commit is
+`fix: exercise persistent permission with a local write`.
+
+The new exact command uses the absolute Node.js executable to create
+`lcp-persistent-permission-probe.txt` at an absolute path in the run's work
+folder. The file contains one non-secret marker line. Exclusive creation
+refuses to overwrite an existing file or follow an existing file symlink.
+The installed Agent Software Development Kit, version 0.3.312,
+sdk.d.ts:2033-2044 documents manual approval in default mode for dangerous
+operations. The installed claude-agent-acp 0.99.1, dist/acp-agent.js:7962
+and 8001-8050, forwards the kit's permission asks.
+dist/permissions/options/shell.js:89-96 builds the Bash choices from the
+kit's suggestions. Creating a file gives the probe a filesystem mutation
+instead of a read-only print. Real permission behavior still needs an
+observed request; a command that completes without one keeps the same
+`no persistent permission request observed` failure.
+
+The destination guard from m-3 is unchanged. An owner-held request can
+receive always allow only for the exact command in the work folder and a
+verified localSettings or session destination. An absent or unsafe
+destination is denied and records `no safe persistent option offered`.
+The existing settings.local.json containment and saved-scope checks remain.
+The command itself writes no harness settings or user settings. Local
+regressions run the marker command after a synthetic safe approval and
+check its file, the sent prompt, the saved scope, rejection of printf and
+other commands, the no-request failure and the unsafe-destination failures.
+
+Live run 5 at `9751bda` gives the permission probe its first real result.
+The round-6 write command made Claude Code ask for permission.
+The request offered a persistent option, `allow-with-updates`.
+The probe rejected the request before answering always, and it recorded
+`no safe persistent option offered`, because the public permission contract does
+not expose where a persistent option would save its rule.
+Criterion SEC-PB-4 therefore stays failed: the option is routed to the owner,
+but its scope cannot be recorded and no settings file was inspected after an answer.
+Exposing the destination in the contract is the open work for this criterion.
+The log is `.scratch/foundry-runs/engine-build-1/live-check-2/live-check-run5.log`.
+
+## 218. The state-read probe records the owner's own rejection as a deny rule
+
+Found: 2026-11-02, by the L-1 probe test writer.
+
+Status: fixed in commit `5c726da6d4d8bf0885afeb73a8edcdeb48b867a6` (fix round 1).
+
+A regression test guards it:
+`packages/engine/test/live-check/probe-adversarial.test.ts`, "issue 218".
+
+The state-read probe (SEC-PB-6, Security Post-Build check 6) records
+"refused" when the exact canary command's output contains "denied",
+"not permitted", "permission" or "refused"
+(`packages/engine/scripts/live/liveProbes.ts:240`). The probe's own
+permission answer is not taken into account. When a harness offers no
+allow-once option, the probe correctly declines to answer "always" outside
+its step and rejects the request instead (`liveProbes.ts:165-171`). The
+harness then reports the rejection, and the probe records "refused", which
+passes. The owner's rejection is not a deny rule, so this is false evidence
+for SEC-PB-6.
+
+Fix, if wanted: record "refused" only when the probe allowed the request and
+the read still failed; record "not attempted" when the probe itself rejected.
+
+## 219. The slash probes miss a raw copy of /compact delivered as its own message
+
+Found: 2026-11-02, by the L-1 probe test writer.
+
+Status: fixed in commit `5c726da6d4d8bf0885afeb73a8edcdeb48b867a6` (fix round 1).
+
+Regression tests guard it:
+`packages/engine/test/live-check/probe-adversarial.test.ts`, "issue 219",
+for both slash-up and slash-down.
+
+The slash probes (SEC-PB-2 and SEC-PB-7) look only at received user text
+that contains the delivery identifier
+(`packages/engine/scripts/live/probeEvidence.ts:51-56`). If the receiver
+gets the escaped envelope and also gets the raw text `/compact ...` as a
+separate message, the probe still records "escaped; no command". It passes
+unless a compaction boundary or a compact turn is also recorded. The raw
+copy is an unescaped arrival, so the criterion "arrives escaped" is not
+proved.
+
+Fix, if wanted: fail when any received user text of the receiver, after the
+delivery was sent, begins with the payload itself.
+
+Fix round 2 also rejects a raw payload preceded by invisible Unicode format
+characters, such as U+200B and U+FEFF, even alongside an escaped receipt.
+The raw-payload check removes leading whitespace and Unicode category Cf
+characters before comparing. The new issue 219 cases in
+`packages/engine/test/live-check/probe-fix-round-2.test.ts` guard this gap.
+
+## 220. The always-allow probe sends a persistent answer for a request an agent holds
+
+Found: 2026-11-02, by the L-1 probe test writer.
+
+Status: fixed in commit `5c726da6d4d8bf0885afeb73a8edcdeb48b867a6` (fix round 1).
+
+A regression test guards it:
+`packages/engine/test/live-check/probe-adversarial.test.ts`, "issue 220".
+
+In the always-allow step (SEC-PB-4), the probe chooses the "allow always"
+option before it checks who holds the request
+(`packages/engine/scripts/live/liveProbes.ts:165-171`). When the holder is
+an agent, the probe records "persistent option held by agent", so the step
+fails. It still sends the "allow always" answer first. The step therefore
+fails correctly, but the probe itself has answered a persistent option that
+was not routed to the owner, which the probe's safety rule forbids.
+
+Fix, if wanted: answer only with a reject option when the holder is not the
+owner.
+
+## 221. The token scan passes a harness without that harness's evidence
+
+Found: 2026-11-02, by the L-1 probe test writer.
+
+Status: fixed in commit `5c726da6d4d8bf0885afeb73a8edcdeb48b867a6` (fix round 1).
+
+Regression tests guard it:
+`packages/engine/test/live-check/probe-adversarial.test.ts`, the three
+tests named "issue 221".
+
+The token scan (PB-A4 and SEC-PB-1) has two gaps.
+
+- `scanTokens` accepts a session file that has no content
+  (`packages/engine/scripts/live/probeEvidence.ts:28-33`). An adapter that
+  has not yet flushed its session file therefore gives "not found".
+- Each harness's row searches for every token the run captured, and does not
+  require that harness's own agent token
+  (`packages/engine/scripts/live/liveProbes.ts:430-431`). If the Codex
+  worker's process was never seen, its token is never searched for. The Codex
+  row still records "not found". The process-argument count is shared too,
+  so the service's and the command-line tool's arguments satisfy it.
+
+Fix, if wanted: require a nonempty session file per harness, and require
+that harness's own captured token before its row can record "not found".
+
+## 222. The reload probe's second restart can pass on evidence from the first
+
+Found: 2026-11-02, by the L-1 probe test writer.
+
+Status: fixed in commit `5c726da6d4d8bf0885afeb73a8edcdeb48b867a6` (fix round 1).
+
+Regression tests guard it:
+`packages/engine/test/live-check/probe-reload.test.ts`, the two tests
+named "issue 222".
+
+The reload probe (PB-A7, PB-A8, PB-A11 and PB-A12) has two gaps in its
+second restart.
+
+- The probe checks that the pending deliveries were not yet accepted on a
+  copy of the log read before the restart call
+  (`packages/engine/scripts/live/liveProbes.ts:375-377`). An acceptance
+  recorded after that read and before SIGKILL is not checked again. If
+  recovery then re-queues the delivery, the probe records
+  "re-send on restart" and passes. The delivery was in fact handled twice.
+- The second restart's "old token refused" re-tests the tokens captured
+  before the first restart (`liveProbes.ts:299` and `404-407`). Those were
+  already refused after the first restart. The tokens issued at the first
+  reload are never tested after the second restart, so a reload-issued token
+  that survived a restart would still record "old token refused".
+
+Fix, if wanted: before deciding the replay outcome, fail when any
+acceptance of the pending delivery precedes the new session; and capture the
+tokens again just before the second SIGKILL.
+
 ## 223. A harness adapter can copy its own login token into the event log, the board and a client
 
 Found: 2026-11-02, by the owner's whole-engine hostile review, finding B1.
@@ -3501,6 +3750,23 @@ least logged.
 Why it matters: the last output before a crash, often the most useful for
 diagnosis, can be missing from the thread.
 
+Additional evidence from the issue 242 focused review, finding E, on
+2026-11-03: stopping an agent also loses the redactor's held tail for both
+ordinary text and terminal output.
+The two `E diagnostic` regressions in
+`packages/engine/test/runner/terminal-lifecycle-round-7.test.ts` start a fake
+adapter through the real command handler, wait for a notification behind
+the held tail, and stop the agent through the owner command.
+Both tails appear in the runner's delivery updates during stop.
+Neither appears in a stored thread item.
+This is a separate loss point from the queued-notification race above.
+`packages/engine/src/commands/stop.ts:19-20` revokes the token in the stop
+transaction before calling the runner.
+`packages/engine/src/commands/CommandHandler.ts:142-147` ignores runner
+events after the agent leaves a live state or its token is revoked.
+The terminal path flushes its carry in `AcpRunner.ts` during close.
+The issue 242 round-7 scope leaves this shared stop-state path unchanged.
+
 ## 232. A token encoded twice, such as base64 of its JSON-escaped form, is not redacted
 
 Found: 2026-11-02, by the security review of the issue 223 fix (commit
@@ -3582,6 +3848,518 @@ A possible fix is an iterative maximum, with the forms cached until the set
 of secrets changes.
 Why it matters: an exception in redaction stops that output path, and the
 per-call cost grows with every secret.
+
+## 235. Several acceptance and runner tests fail when `pnpm check` runs at high machine load
+
+Found: 2026-11-03, by the test runner (`pnpm check` at 8830d8b, posts #1319,
+and at ebe060f, post #1321).
+State: open. No test or production code has been changed for it.
+
+What happens: two batches of `pnpm check` runs failed only on tests that the
+branches under check did not touch, and the failing tests differed between
+runs.
+
+- At 8830d8b, runs 2 and 3 started at a load average of about 21, beside
+  another branch's checks. Both failed the same test,
+  `packages/engine/test/api/subscribe-visibility.test.ts`, "7.3 issue 41: a
+  subscriber that stops acknowledging is disconnected while the writer runs
+  on". Its client failed with `SocketOpenError: timeout waiting for "open"`.
+- At ebe060f, three runs started at a load average of 92.9, above the test
+  runner's limit of 24. Run 1 failed
+  `packages/engine/test/acceptance/failure-1-crash.test.ts` ("1 crash: a
+  parent that waits on the crashing child is woken once"), with the parent's
+  echo not yet holding the crash notice. It also failed
+  `packages/engine/test/runner/classify-turn-text.test.ts` (6.9 A3) and
+  `packages/engine/test/runner/reset-time.test.ts` (6.10 F-4), each with
+  "Test timed out in 30000ms". Run 2 failed
+  `packages/engine/test/recovery/orphans.test.ts` (6.8 sweep, Linux), with an
+  unexpected extra process group in the sweep result. Run 3 failed
+  `reset-time.test.ts` (6.10 F-4) again, by the same timeout.
+
+Each failing file passed when run alone: `subscribe-visibility.test.ts` three
+times at load 47, and the four files from ebe060f together once at load 81.
+Both heads then passed `pnpm check` when the runs were repeated one at a time
+below the load limit (8830d8b in post #1325).
+At 9340f71 (post #1329), run 2 of 3 failed `classify-turn-text.test.ts`
+(6.9 A3) and `reset-time.test.ts` (6.10 F-4) again, each by the 30-second
+timeout, although the load was below 24. Runs 1 and 3 passed. Run alone at
+load 26, the slowest case in each file took 19.6 seconds (6.9 A3, "a
+successful turn whose text says 'authentication required'") and 17.4 seconds
+(6.10 F-4, the list of bad reset values). Both cases start a fake adapter for
+each harness or each value in turn, so their fixed 30-second limit leaves
+little margin when the full suite runs in parallel. These two failures are
+therefore test sizing, not load alone, and they predate the B1 merge (they
+also failed at ebe060f).
+Why it matters: a test that fails only under load hides real failures behind
+noise, and a check run at high load costs a full repeat. The orphan sweep
+failure may be a real race, because the sweep found a process group it did
+not expect; it has not been reproduced.
+What should happen: the test runner keeps waiting for load below its limit
+and runs one check at a time. If a test from this list fails again at normal
+load, the wait or timeout in that test is examined, as in issue 196: the wait
+should name the thing the next assertion is about, and fixed 30-second
+timeouts should be checked against the work the test does.
+
+## 236. A Codex agent's call to a Shephrd tool is cancelled before Shephrd sees it
+
+Found: 2026-11-03, by the live check at 9340f71 (live-check-2, run 1, step
+`sandbox-mcp`, criterion PB-A3), against the real Codex adapter
+(`@agentclientprotocol/codex-acp` 2.5.0, `@openai/codex` 0.165.0).
+State: fixed locally by owner option (b), in commit
+`7c2039ff9c31b986675d8793f75dc6304802fc24`.
+Real-adapter validation remains pending the lead's next run.
+
+What happens: the Codex worker, started with the permission "ask", was told
+to call the Shephrd MCP (Model Context Protocol) tool `ask` once. It did call
+`mcp.shephrd.ask` with the right arguments (event 112), but the call failed
+with `{"error":{"message":"user cancelled MCP tool call"}}` (event 113), and
+the agent reported "The ask call was cancelled by the user." No
+`PermissionRequested` event was written between the two, so neither the lead
+nor the owner was asked. The Claude lead's call to the same tool in the same
+run asked for permission, was allowed, and wrote its `QuestionAsked` event.
+Root cause, read from the adapter's code: Codex asks for approval of an MCP
+tool call as an elicitation. `codex-acp` forwards a form elicitation only when
+the client advertises form elicitation, and it falls back to an ordinary
+permission request only for a URL elicitation or a form with no fields
+(`dist/index.js:38997-39011`, `:39129-39149`). In every other case it answers
+"cancel" itself. Shephrd's runner initializes every adapter with
+`clientCapabilities: {}` (`packages/engine/src/runner/AcpRunner.ts:510`), so
+the approval is cancelled inside the adapter. The exact elicitation was not
+captured, because the protocol log was off for this run.
+Why it matters: a Codex agent that asks before changes may be unable to use
+any Shephrd tool (ask, post, wait and the others) unless Codex skips approval
+for it. A Codex worker then cannot report back or ask its lead through
+Shephrd, and the live check's PB-A3 row for Codex fails.
+The owner chose option (b) on 2026-11-03. The original options were:
+- Advertise form elicitation in the runner and route a tool-approval
+  elicitation through Shephrd's permission flow, like any other permission
+  request. This changes the runner and may need a contract for the answer.
+- Or start Codex with Shephrd's own MCP server marked as not needing approval.
+  This is smaller, but it removes a prompt, so it is a permission decision for
+  the owner.
+Evidence: `.scratch/foundry-runs/engine-build-1/live-check-2/live-check-run1.log`
+and `run1-sandbox-mcp-events.txt` beside it.
+
+The runner now configures only the Codex Shephrd server with
+`default_tools_approval_mode: "approve"` through the adapter's `CODEX_CONFIG`.
+It passes an empty ACP server list for start, load and resume, because the
+adapter replaces the configured server map when that list is populated.
+The configuration names `SHEPHRD_SOCKET` and `SHEPHRD_TOKEN` in `env_vars`;
+it contains neither variable's value. Other account keys and servers retain
+their settings. Invalid account JSON and a pre-existing Shephrd server refuse
+the launch before spawning, with a fixed reason that exposes no value.
+
+This departs from plan row 6.1 and decision 21 for Codex only: its server is
+configured through `CODEX_CONFIG`, rather than `session/new`. Every other
+harness keeps the existing ACP server entry. No other server receives a new
+approval setting. The option (a) work remains open as issue 237.
+
+The Codex 0.165.0 source confirms that `approve` requires no tool approval in
+[`requires_mcp_tool_approval_for_mode`](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/core/src/mcp_tool_call.rs#L2440-L2450).
+Its [`create_env_for_mcp_server`](https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/rmcp-client/src/utils.rs#L14-L56)
+reads the named variables from Codex's own environment independently of the
+shell policy, so `shell_environment_policy.inherit=core` does not remove them
+from this MCP environment. These source facts were checked on 2026-11-03.
+The fake-agent tests in `runner/shephrd-server.test.ts` cover all three
+session methods, preservation, refusal before spawning and unchanged Claude
+behavior. The actual adapter and server journey awaits the lead's run.
+
+## 237. Approval-gated tool servers need form elicitation routed through Shephrd
+
+Found: 2026-11-03, while the owner decided issue 236.
+
+Status: open. This is option (a), reserved as a follow-up by the owner.
+
+The runner advertises no form elicitation capability. A Codex adapter can
+therefore cancel a tool-approval elicitation before Shephrd sees a permission
+request. Issue 236 configures Shephrd's own server to need no such approval,
+but other tool servers retain their approval settings.
+
+Advertise form elicitation and route a tool-approval elicitation through
+Shephrd's permission flow. This is needed once agents use other tool servers
+that require approval. The work must preserve the server's requested approval
+and carry its answer through the adapter, rather than cancel it internally.
+
+## 238. A failed live probe prevents independent evidence collection
+
+Found: 2026-11-03, in live-check-2 run 1 at 9340f71, after the
+`sandbox-mcp` failure described in issue 236.
+
+Status: fixed locally in fix round 3 of the live-check probes.
+Real-adapter validation remains pending the lead's next run.
+
+The shared step runner stopped the flow on every failure. Consequently, a
+failed sandbox probe skipped all eight later probes and the final views and
+secret check, even when the service and agents remained usable.
+
+Probe failures now remain recorded while the other probes continue. Each
+probe closes its subscriptions before the next one starts. Before a live
+probe runs, the harness checks that its service answers. A probe that sends
+turns also requires its needed agents to have live processes in the run and
+an idle lifecycle in the existing event projection. The persistent-scope
+probe needs only the lead. The permission-metadata probe reads existing
+events, so it needs no live agent. Unavailable preconditions produce a skip
+with the reason and any preceding failed probe named.
+
+The startup-hook through wake journey stays fail-fast. The final check runs
+after probe failures, including an attempt to reconnect after a restart.
+Recording still requires every earlier step to pass. Its skip names the
+failed dependencies. Any failure or skip keeps the overall exit code at 1.
+No failed observation becomes passing evidence.
+
+Regression tests in `probe-fix-round-3.test.ts` exercise the real main flow
+with a scripted public client, a failed sandbox probe, later passing probes,
+failed final secret checks, final reconnect failure, unavailable preconditions,
+and resource cleanup between probes. A separate case checks the live
+precondition logic against real test-owned processes under `/tmp`.
+
+## 239. The live probes call a failed observed attempt not attempted
+
+Found: 2026-11-03, in live-check-2 run 1 at 9340f71, events 112 and 113.
+
+Status: fixed locally in fix round 3 of the live-check probes.
+Issue 236 is addressed separately by the owner-approved runner change below.
+
+The worker made the exact Model Context Protocol (MCP) ask call with the
+sandbox probe's marker. Its adapter reported `user cancelled MCP tool call`
+and no permission request or question was recorded. The probe nevertheless
+reported `not attempted`, obscuring the attempted call and its failure.
+
+The sandbox probe now reports that adapter cancellation when the exact call
+failed with that error and neither a permission request for the call nor a
+question with the marker was recorded. Other exact calls without an
+authenticated successful question report `attempted; failed`. The detail
+contains bounded tool output, redacted for the run's known secret forms and
+credential shapes before it is truncated. Both outcomes fail the closed gate.
+
+The sibling check found the same ambiguity in observed invalid or empty
+permission options, an exact shell command without the required evidence,
+a sent slash payload without its escaped receipt, a persistent command that
+wrote no verifiable scope, and a completed restart without replay evidence.
+These now report failed attempts. A declined command, missing token-scan
+preconditions, or a restart phase whose prerequisites prevented it from
+running still reports no attempt. Security failures such as acting as owner,
+unescaped slash text, accepted old tokens and found tokens keep their
+specific failing outcomes.
+
+`probe-fix-round-3.test.ts` checks the failed-call outcomes, bounded redaction,
+permission and no-permission paths, other adapter errors, each affected
+sibling observation, and the no-command control. The reload regression in
+`probe-reload.test.ts` requires a failed-attempt result when recovery neither
+accepts nor requeues the already-sent delivery.
+
+## 240. A Claude Code agent's token is visible in a process's command line
+
+Found: 2026-11-03, by the token scan in live-check-2 run 2 at 9e10ed6.
+
+Status: open, deferred by the owner to the hostile pass (2026-11-03).
+The tokens are per spawn and short-lived, and on a single-user machine the
+owner treats this as ordinary exposure.
+
+The owner's decision, relayed through the manager on 2026-11-03:
+
+> do not fix it now. The tokens are per spawn and short-lived, and on a single-user machine this is ordinary exposure, the same as any tool that puts a token on its command line. Leave issue 240 open and deferred to the hostile pass.
+
+The runner gives every adapter except Codex the Shephrd tool server through
+the Agent Client Protocol (ACP) `mcpServers` list, with the agent's token as
+the value of the `SHEPHRD_TOKEN` environment entry
+(`packages/engine/src/runner/AcpRunner.ts:517-518`). The Claude Code adapter
+hands that list to the Claude Agent SDK. SDK version 0.3.312 starts the
+`claude` program with `--mcp-config` followed by the whole list as JSON, so
+the token's value is part of that process's arguments. On Linux any process
+of the same user can read them from `/proc/<pid>/cmdline`, and tools such as
+`ps` show them. This breaks PB-A4 and SEC-PB-1, which require that no agent
+token appears in process arguments.
+
+Evidence: the live check found the Claude lead's own token, raw, in the
+arguments of its run process 1501141 (an agent process whose working folder
+is the run's work folder). The Codex row of the same step reports the same
+process, because the scan checks every token of the run against every
+argument snapshot. Codex itself receives only the variable names through
+`CODEX_CONFIG` (issue 236, option (b)), so its token is not in any argument.
+The run's folder is kept at `/tmp/shephrd-live-Twd6bJ`.
+
+Possible fixes, not chosen: pass only the variable's name and let the tool
+server inherit the value from the adapter's environment, which already holds
+it (`AcpRunner.ts:307`), if the Claude Agent SDK and Claude Code keep the
+parent environment for stdio tool servers; or use Claude Code's `${VAR}`
+expansion in the server's `env` entry, if `--mcp-config` expands it. Either
+must be checked against the pinned versions before it is relied on. The same
+path is used for every other non-Codex harness, so each needs the same check.
+
+## 241. A real adapter shell obtains owner access after removing both identity variables
+
+Found: 2026-11-03, while diagnosing live-check-2 run 2 at 9e10ed6.
+
+Status: open, deferred to the hostile pass by the fix-round-5 addendum
+(2026-11-03). This is a real security finding for SEC-PB-5. The round-5
+terminal-output fix does not change the ancestry guard.
+
+The Claude lead ran the exact removed-variable command. Events 157-158
+record its input, event 159 requests permission, event 161 selects allow-once,
+and event 162 marks the call completed. The call id is
+toolu_01H5T2W8rk4qpNBxZNMddW4r. The command removes SHEPHRD_SOCKET and
+SHEPHRD_TOKEN with env -u, sets SHEPHRD_HOME to the run's state folder and
+starts the real command-line interface's accounts list command. Its actual
+tool result, line 102 of the lead's session file, contains the accounts list
+and LCP_EXIT=0. The engine's thread lost that output, as recorded in issue 242.
+
+This is owner access, rather than the required HTTP 403 ancestry refusal.
+The guard in packages/engine/src/api/ancestry.ts did not prevent this real
+adapter shell's request. The exact reason it missed the caller's ancestry
+remains to be established. Passing fake-adapter tests do not refute this
+observed real-adapter result.
+
+Evidence: /tmp/shephrd-live-Twd6bJ/state/events.sqlite, opened read-only, and
+/home/qnlbnsl/.claude/projects/-tmp-shephrd-live-Twd6bJ-work/e04b371b-45ed-4430-a3a0-483cbb74acd7.jsonl,
+lines 101-102. The exact command is recorded in the worker's round-4 result.
+It contains no token value.
+
+## 242. The runner loses version 2 terminal output and exit updates
+
+Found: 2026-11-03, while diagnosing live-check-2 run 2 at 9e10ed6.
+
+Status: fixed locally by fix round 5 in the implementation commit
+`fix: retain redacted terminal output in tool updates`. Real-adapter
+confirmation and engine review remain for the lead. The manager authorized
+this engine fix in the round-5 addendum.
+
+The Claude canary call, toolu_01TVjd63cUyrVjoXchJwiCSx, appears at events
+239-245. The Codex call, exec-9c103f2b-ee5f-498f-b122-f94a49f6c20b, appears
+at events 262-263. Both completed the exact canary command. Their thread
+items contain a terminal reference and empty content, rather than stdout or
+an exit code. The actual tool results in the two named session files contain
+the run's random canary and LCP_EXIT=0. Both reads succeeded, so the observed
+SEC-PB-6 result is no mechanism. There is no observed deny-read refusal.
+The automated probe correctly fails when its public evidence lacks output,
+rather than trusting the model's prose.
+
+The installed adapters explain the carrier. Their version 2 terminal
+converters split terminal metadata into terminal_update and
+terminal_output_chunk notifications. Claude's converter is dist/v2/terminal.js;
+Codex has the corresponding converter in dist/index.js. Before conversion,
+the metadata contains terminal output and exit fields. Version 2 selects
+this path even with empty clientCapabilities. The output travels in later
+notifications, rather than rawOutput on the completed tool call.
+
+At the failing run, packages/engine/src/runner/translate.ts handled only
+message, plan and tool-call updates. It ignored terminal notifications and
+did not retain their metadata. This source path explains the missing output.
+The run did not retain raw Agent Client Protocol frames, so its exact wire
+notifications cannot be replayed. The round-5 fix preserves terminal output and exits,
+correlates them with their tool call and retains the existing secret redaction
+before persistence. The probes use these tool updates for shell evidence.
+
+This also hides the owner-access result in issue 241 and the Codex refusal
+in issue 243. The session evidence is Claude lines 101-102 and 110-111, and
+Codex lines 44-47 and 59-62, in the paths named by live-check-run2.log.
+
+Fix round 5 handles both the terminal metadata and the version 2 snapshot
+and chunk notifications. It associates output only through an explicit
+terminal reference or terminal_info, including reports that arrive after
+their output. A later status-only report retains the associated output
+snapshot. Unknown terminals never borrow another call's id. The existing
+serialized tool-output field holds the terminalId, redacted output,
+truncated flag and numeric exitCode, when the adapter supplies one. A signal
+is retained when supplied. No contract or client terminal capability changes.
+
+Decoded output uses the runner's streaming redactors before serialization,
+including the decoded-field redaction from issue 223. The carry joins secret
+fragments across chunks. Only the last 16,384 redacted characters of each
+terminal are retained, matching the runner's stderr line bound. Each process
+tracks at most 256 terminals in a turn. A completed turn or replay drains its
+carry and clears those correlations. Encoded or partial terminal payloads
+are withheld from gated protocol logs, whose separate frames cannot safely
+release a split secret. Other structured fields keep their existing redaction.
+
+Regressions in runner/terminal-output.test.ts use both pinned harness shapes,
+with real handler, log and view entry points. They cover snapshots, chunks,
+terminal metadata, nonzero exits, unknown ids, the retention bound, and raw
+and split registered secrets and agent tokens. The secret frames are built
+inside the fake child after spawn, so setup redaction cannot sanitize the
+attack before the runner receives it. Live-check probes decode these tool
+snapshots directly, including their exit codes; they do not read sessions or
+model claims for shell evidence. Missing output still fails.
+
+The round-7 review follow-up is recorded in issues 249, 270 and 271.
+A zero exit now preserves a failed status reported by the adapter.
+A new truncation-edge regression splits a registered secret across chunks
+and cuts the retained tail through that secret's original position.
+Removing the chunk redaction calls makes this regression fail on the
+remaining raw secret fragment, even with publication-time redaction enabled.
+The restored implementation passes that regression.
+The shared stop-path tail loss remains open under issue 231.
+
+## 243. The real Codex shell stops at socket ownership before the ancestry check
+
+Found: 2026-11-03, while diagnosing live-check-2 run 2 at 9e10ed6.
+
+Status: open. The live harness path remains unproven for SEC-PB-8. No client,
+engine or sandbox rule was changed.
+
+Events 233-234 show the exact removed-variable command and its failed
+completion for Codex. Its session tool output at line 47 contains a complete
+LCP_ENV_BEGIN and LCP_ENV_END listing. Neither SHEPHRD_SOCKET nor
+SHEPHRD_TOKEN appears in it. Core inheritance did remove both names. The
+probe printed absent=false because issue 242 hid the output, rather than
+because either name was observed. The probe now distinguishes an unobserved
+listing from observed absent or present names, without weakening its gate.
+
+The actual command-line interface printed `shephrd: the folder /tmp above
+the socket is owned by another user`, followed by LCP_EXIT=1. This is the
+local check in packages/client/src/socketCheck.ts, before authentication.
+It is not the HTTP 403 ancestry refusal required by SEC-PB-8. The original
+sandbox's ownership view was not captured, so its namespace or filesystem
+cause has not been established. The guard must not be weakened to force a pass.
+
+Evidence: the kept events.sqlite and lines 44-47 of
+/home/qnlbnsl/.codex/sessions/2026/11/03/rollout-2026-11-03T13-35-25-01a1a2e8-be04-7a62-86d6-6820e17dcee2.jsonl.
+
+Fix round 5 reports `not observable (issue 243)` in the Codex ancestry row
+when this exact socket ownership rejection is observed in the tool output.
+That outcome remains failing. It does not count as an HTTP 403 ancestry
+refusal and does not change the socket ownership check.
+
+## 244. The sandbox probe rejects the exact lookup needed for a deferred tool
+
+Found: 2026-11-03, in live-check-2 run 2 at 9e10ed6, events 118-129.
+
+Status: fixed locally in live-check probe fix round 4. Real-adapter
+confirmation remains for the lead's next run.
+
+Claude used ToolSearch with exactly
+`{"query":"select:mcp__shephrd__ask","max_results":1}`. Its result named only
+mcp__shephrd__ask. It then called that tool with the exact marker and wrote
+its authenticated QuestionAsked at event 127. The probe rejected the lookup
+after the turn ended, so it never sent Codex its sandbox prompt. Codex's
+later authenticated ask at event 270 was issued by the probe's agent client
+for the slash test, rather than by a model tool call. It proves socket
+authentication, but is not evidence of Codex's Model Context Protocol tool
+route or its sandbox marker.
+
+The probe permits one exact, completed Claude lookup returning only that
+tool reference. An unrelated query, reference, failure or tool remains
+rejected. Discovery never counts as an ask. Both agents must still make
+their exact ask and produce their own authenticated QuestionAsked. The
+printed prompt names this optional discovery explicitly. Regressions are
+in probe-fix-round-4.test.ts.
+
+## 245. The restart hold fails when the harness blocks sleep or the model substitutes a timer
+
+Found: 2026-11-03, in live-check-2 run 2 at 9e10ed6.
+
+Status: open for real-adapter restart evidence. The prompt and missing-hold
+diagnostic are tightened locally in probe fix round 4. No restart criterion
+is marked passed.
+
+Claude received its active prompt at events 341-343 and called exactly
+sleep 120 at events 345 and 348-349. The tool failed at event 350. Its actual
+session result at line 149 says the harness blocks standalone sleep and
+forbids chaining smaller sleeps as a workaround. The model did not decline
+or substitute another command. That standalone hold could not establish a working turn on that harness.
+
+Codex received its active prompt at events 346-347 and accepted it at 391.
+Its session lines 104 and 107 show clock.sleep with duration_ms=120000 and
+Sleep completed. No shell hold was sent through the adapter. Its turn ended
+at event 392, so the exact-command condition never matched. This is model
+behavior, rather than a lost prompt or a shell command that ran.
+
+The prepare prompt no longer says to reject later shell work. The active
+prompt explicitly requires shell execution and forbids a clock or timer.
+An ended turn without the exact shell hold now fails immediately with a
+named missing attempt instead of waiting for the whole timeout. No service
+kill occurs on that path. Regressions are in probe-fix-round-4.test.ts.
+Fix round 5 replaces the standalone sleep in both restart phases with the
+absolute Node.js executable running a two-minute setTimeout command. The implementation commit is
+`138197a7d719fb5d7ba65ec48caf856536e798b1`
+(`fix: run restart holds as exact foreground commands`).
+Both prompts require foreground shell execution and explain the two-minute
+wait. The exact command is shared with the printed dry run and approval
+gates. A standalone sleep, a clock call or background execution is rejected.
+The historical harness block above remains the recorded reason for the
+failed run. The restart criteria remain unproven until an authorized real
+run establishes them.
+
+## 246. Generic tool output has no runner retention bound
+
+Found: 2026-11-03, while selecting the retention bound for issue 242.
+
+Status: open. The round-5 scope adds a terminal-output bound and does not
+change other tools' output behavior.
+
+packages/engine/src/runner/translate.ts serializes rawOutput or the whole
+content array without truncation. AcpRunner.ts then redacts and emits the
+whole translated tool update. There is no generic retained-output bound in
+those paths. The existing bounded diagnostic path is recovery/crash.ts,
+which keeps 30 stderr lines of at most 16,384 characters each. The new
+terminal-output path reuses that character bound for each terminal rather
+than claiming a generic tool bound already existed. Broader retention policy
+for other tools needs a separate decision and change.
+Issue 270 records the separate, fixed amplification of bounded terminal
+snapshots. Its fix does not bound generic tool output.
+
+## 247. The live readiness regression can observe a killed child after its fixed wait
+
+Found: 2026-11-03, during fix round 5, at 138197a with the terminal-output
+changes uncommitted.
+
+Status: open test reliability finding. No readiness behavior or frozen test
+was changed for this round.
+
+The live-check folder failed once in probe-fix-round-3.test.ts:151. The test
+kills its worker, waits 20 milliseconds and expects the readiness check to
+report no live process. The check instead returned undefined. The same
+folder had passed earlier in the round. The failed run overlapped a runner
+folder run. A scheduling race is suspected, but the process state at the
+failed assertion was not captured, so the cause is not established. Future
+diagnosis should observe the child exit rather than assume the fixed wait
+establishes it. This finding does not authorize weakening the readiness gate.
+
+## 248. The API subscription regression had a transient WebSocket open timeout
+
+Found: 2026-11-03, during fix round 5, at 138197a with the terminal-output
+changes uncommitted.
+
+Status: open test reliability finding. No API code or test was changed.
+
+The security and API folder run failed in subscribe-visibility.test.ts,
+in the stalled-subscription regression for issue 41. Its healthy client
+timed out waiting for the WebSocket open event. Two cleanup errors said the
+WebSocket was closed before the connection was established. The file then
+passed alone, and the combined security and API folders passed on rerun.
+The failed run overlapped other test folders. This test uses a fake runner,
+so it does not exercise AcpRunner's new terminal path. The connection state
+was not captured, and the source of the timeout remains unconfirmed.
+
+## 249. Lost credential coverage with pending terminal output hangs turn completion
+
+Found: 2026-11-03, in the focused review of issue 242, finding A.
+Status: fixed in the round-7 terminal fix on `worker/engine-lcpb`.
+Fix commit: `6b3af638f2d071c8ee7363d4774b7cd6ee549fe3`.
+
+At commit `34af123`, `packages/engine/src/runner/AcpRunner.ts:251` marks the
+turn ended before draining its terminal output.
+The terminal publication at lines 234-235 redacts every string key and leaf
+before schema decoding.
+If the credential file becomes unreadable while the terminal holds its tail,
+the coverage guard replaces those schema keys with the fixed withheld text.
+The schema decoder rejects that shape.
+The completion fiber never emits its prompt reply or turn-ended event.
+The ended flag prevents a later completion attempt.
+A fixed diagnostic at that decoder confirmed this failure in both new
+coverage-loss regressions.
+The streaming decoder itself did not fail.
+
+The fix latches coverage loss during each terminal publication and substitutes
+one fixed withheld-text item instead of decoding the damaged shape.
+The turn completes without storing the pending output.
+Once the credential store is repaired, the next turn can run and its terminal
+output is redacted normally.
+The `249` regressions in
+`packages/engine/test/runner/terminal-lifecycle-round-7.test.ts` exercise both
+journeys through a real command handler and a fake adapter.
+They corrupt only a credential file in the test's temporary home.
+
 ## 250. A fresh service has no harness settings, so its first start is refused
 
 Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding N-1.
@@ -4279,3 +5057,243 @@ Score: not assigned, because this is a residual after the last fix round.
 The re-review labels the finding MAJOR.
 Why it matters: a matching login-folder configuration can fail after
 persisting its secret and leave later account commands refused.
+
+
+## 270. Every terminal chunk persisted another whole retained snapshot
+
+Found: 2026-11-03, in the focused review of issue 242, finding B.
+Status: fixed in the round-7 terminal fix on `worker/engine-lcpb`.
+Fix commit: `6b3af638f2d071c8ee7363d4774b7cd6ee549fe3`.
+
+At commit `34af123`, `packages/engine/src/runner/terminal.ts:153` reports every
+changed terminal immediately.
+Two thousand chunks of 100 characters produce 2,002 tool-call events in the
+new version 2 regression against that code.
+The review measured about 32 megabytes of event payload for that journey.
+The 16,384-character retention limit bounds a snapshot, but not its repeated
+publication cost.
+Version 1 metadata-only deltas also produce empty generic tool reports after
+the terminal metadata is stripped.
+
+The fix uses the Effect clock and a 500-millisecond window per terminal.
+Two output snapshots per second preserve interactive progress without
+persisting the whole retained tail for every small chunk.
+Binding and exit publish immediately.
+Turn end and stop flush any unpublished output or status.
+Metadata-only terminal deltas no longer emit empty generic tool reports.
+The final snapshot retains the same last 16,384 redacted characters.
+A repeated, unchanged tool status also marks the snapshot unpublished, so
+its empty generic report cannot hide the retained output at turn end.
+The tests use the Effect test clock to check the window boundaries and the
+independence of two terminals without real timing sleeps.
+
+The `270` regressions in `terminal-output-round-7.test.ts` bound the helper's
+2,000-chunk journey to three snapshots and less than 40 kibibytes of payload.
+The version 1 and version 2 journeys in `terminal-lifecycle-round-7.test.ts`
+use the real command handler and bound stored tool-call events to fewer than
+ten and their serialized payload to less than 100 kibibytes.
+Both require the complete retained tail at turn end.
+These files are under `packages/engine/test/runner/`.
+Issue 246 remains open for generic tool-output retention.
+
+## 271. The terminal cap silently refused later terminals and unclaimed ids consumed its slots
+
+Found: 2026-11-03, in the focused review of issue 242, finding C.
+Status: fixed in the round-7 terminal fix on `worker/engine-lcpb`.
+Fix commit: `6b3af638f2d071c8ee7363d4774b7cd6ee549fe3`.
+
+At commit `34af123`, `packages/engine/src/runner/terminal.ts:58` returns nothing
+for a new terminal after the map reaches 256 entries.
+Completed terminals remain in the map until the turn ends.
+Unclaimed ids use the same slots as terminals associated with real calls.
+The new regressions against that code retain only 256 of 300 completed
+terminals and refuse a real call after 256 unclaimed ids.
+
+The fix logs one fixed warning per overflowing turn without including
+terminal output or ids.
+It evicts the oldest ended or unclaimed terminal before refusing a new one.
+It flushes an ended terminal's unpublished status before eviction and
+discards an unclaimed terminal's redactor carry.
+An active terminal associated with a call is never evicted.
+The 256-entry state bound remains in place.
+Discarding terminal carry on a temporary coverage loss keeps the warning
+latch until the actual turn ends.
+The `271` regressions in
+`packages/engine/test/runner/terminal-output-round-7.test.ts` cover both
+starvation cases and the unpublished-status flush.
+The logger regression in `terminal-lifecycle-round-7.test.ts` verifies one
+warning in each of two overflowing turns and checks that it contains no
+output text.
+
+
+## 272. Codex's ask mode can refuse a write without requesting permission
+
+Found: 2026-11-03, in live-check run 4 at commit
+`f94dd9996a93cf658ddf3ee52cdbbf7fb5fc1ab9`.
+Status: open, recorded; the engine is not changed in fix round 8.
+
+`packages/engine/src/runner/harnesses.ts:60` maps Shephrd's `ask` level to
+Codex's `read-only` mode.
+In `@agentclientprotocol/codex-acp` version 2.5.0, the installed source at
+`dist/index.js:40424-40449` gives that mode an `on-request` approval policy
+and a read-only sandbox.
+The adapter passes the selected mode's approval policy into each turn at
+`dist/index.js:42079`.
+The policy relies on the model choosing to request approval for a write.
+It does not require a permission question before every attempted change.
+
+The lead's event-log inspection reports that run 3 requested approval for
+a Python write at event 81, and the live-view criterion passed.
+In run 4, event 78 attempted `touch hello.txt`.
+Event 80 reported a read-only file-system refusal and exit code 1.
+The worker then said it could not create the file because the workspace
+was read-only, and event 98 ended its turn without a PermissionRequested.
+The person sees a worker that could not write and no permission question.
+The failure direction is safe: the sandbox refuses the write.
+The original live-view step then waited 300 seconds for a request that
+could no longer arrive from that turn.
+These observations come from the lead's round-8 task and the run-4 log at
+`.scratch/foundry-runs/engine-build-1/live-check-2/live-check-run4.log`.
+They are not a new real-adapter run by this worker.
+
+One option to weigh is an approval policy that always asks before a write,
+if the adapter can expose that behavior while preserving the sandbox.
+The four session presets exposed by version 2.5.0 at
+`dist/index.js:40424-40494` and `dist/index.js:40528-40547` offer read-only,
+workspace-write, agent, and full-access modes.
+Their approval policies are `on-request` or `never`.
+None is an always-ask preset.
+A future adapter integration change would need separate verification.
+Widening the sandbox merely to obtain a passing probe would not establish
+ask-before-write behavior.
+
+Fix round 8 changes the live-check prompt to request approval explicitly,
+including one retry after a read-only refusal, with an honest failure path.
+It makes live-view fail as soon as a worker's turn ends without a request,
+and continues collecting independent probe evidence after journey failures.
+It still requires a real permission request and a preceding thread item
+on the second connection to pass live-view.
+These probe changes do not fix the engine's ask-mode semantics or close
+this issue.
+
+## 273. Three limits remain in the bounded terminal output
+
+Found: 2026-11-03, in the verification of the round-7 terminal fix.
+Status: open, recorded, not fixed.
+The review is `.scratch/foundry-runs/engine-build-1/reviews/lcp-242-verify.md`.
+It rated each limit minor, and it found no redaction leak.
+
+The first limit is a silent gap during a coverage loss.
+Terminal updates that arrive while the login store cannot be read are discarded,
+and the terminal map is cleared.
+That interval leaves no marker in the thread.
+If coverage returns before the turn ends, the rest of that command's output is
+absent, and nothing says so.
+The failure is in the safe direction, because nothing raw is stored.
+
+The second limit is the bound on version 1 reports.
+A version 1 delta report that carries any other field, such as `status`, is not
+skipped as a data-only report.
+In the review's run, 2,000 such reports stored 2,008 items and 559 KB.
+That is 57 times smaller than before the fix, but the bound is the report count.
+The regression in `terminal-output-round-7.test.ts` uses delta-only reports,
+so it does not show this case.
+
+The third limit is the lack of a trailing publish.
+A burst of output inside the 500-millisecond window stays unpublished until the
+next update, the command's exit or the end of the turn.
+No output is lost, but the view can lag for as long as a command stays quiet.
+One suggested fix is one delayed publish for each terminal with unpublished output.
+
+## 274. A terminal chunk containing a secret from the launch is dropped without a marker
+
+Found: 2026-11-03, in the verification of the round-7 terminal fix.
+Status: open, recorded, not fixed. The fault is older than the fix.
+The review saw the same result at `34af123`.
+It ran 12 times, and the chunk never reached `packages/engine/src/runner/terminal.ts`.
+
+A version 2 terminal chunk that contains a secret passed to the adapter at launch,
+such as a login token, is lost whole.
+The same text from a login store is redacted and shown.
+A person who runs `env | grep TOKEN` therefore sees nothing, not a redacted line.
+
+The review infers the cause, and it did not find the exact line.
+The redactor matches base64 runs of a secret
+(`packages/engine/src/identity/redactor.ts:25-58`), and a version 2 chunk's data
+is base64, so a match on the whole frame may discard the chunk.
+The failure is in the safe direction, because no secret is stored.
+The gap is that the thread gives no sign that output was withheld.
+
+## 275. A real model can decline a live-check probe's command
+
+Found: 2026-11-03, in the final live run at `a105465`.
+Status: open, recorded, not fixed. The outcomes are recorded as they happened.
+The log is `.scratch/foundry-runs/engine-build-1/live-check-2/live-check-run6.log`.
+
+The Codex worker runs on `gpt-6-luna` at low effort.
+In the final run, this model declined two exact commands from a probe.
+It declined the removed-variables command, because that command removes both
+Shephrd variables before it asks for account data.
+It also declined the restart hold, because the prompt says that the hold is part
+of a restart probe.
+The same prompts ran on Codex in earlier runs: the restart hold passed in live
+runs 3 and 5, and the removed-variables command ran in live run 3.
+
+This has two effects on that run's evidence.
+SEC-PB-8 has no observation from the run, and its row reads `not attempted`.
+The `reload` step fails before its first restart, so PB-A7, PB-A8, PB-A11 and
+PB-A12 have no result from the run for either harness.
+Their evidence is live run 5, at `9751bda`.
+The only source changes from `9751bda` to `a105465` are the probe's readiness
+wait and the documents.
+
+A model's refusal is an honest outcome, and the probes do not count it as a pass.
+A later change could reword these prompts, or could run the probes on a stronger
+model. Either would need another real run.
+
+## 276. The atomic-write acceptance test can fail on a later, unrelated request
+
+Found: 2026-11-03, by the test runner (`pnpm check` at `f5e002c`, post #1343).
+Status: open, recorded, not fixed. The fault is in the test, not in the engine.
+No test or production code has been changed for it.
+
+The test is the third scenario in
+`packages/engine/test/acceptance/failure-3-atomic.test.ts`.
+It plants a database fault, so that a pass-up command cannot write its last
+event.
+It then restarts the service and asserts that the child has no "permission
+moved" event in the whole log.
+That assertion fails with this message: "part of the failed command is in the
+log after the restart".
+Run 1 of 3 at `f5e002c` failed this way, and runs 2 and 3 passed.
+Run 2 at `bd38b78` failed with the same message (test-run log
+`review-13-run2-bd38b78-check.log`).
+The earlier failure was not reproduced at that older head.
+
+The message is misleading, because the event comes from a later request.
+A restart cancels the open request, and the reloaded child then asks again under
+a new request id.
+The holder's turn ends without an answer, so the engine moves the new request to
+the owner.
+That move is ordinary behaviour.
+The assertion matches on the child's agent id, not on the failed request's id.
+It therefore fails whenever the log read happens after that move.
+
+A temporary copy of the test showed this, and the copy has been deleted.
+With a six-second wait before the read, the copy failed every time it ran (one
+run), at sequence 38, the same sequence as the failed check.
+Its log showed the failed request `f8bb32df` with a cancel at sequence 20 and no
+move.
+The move at sequence 38 belonged to the new request `61fc71d8`.
+With the assertion narrowed to the failed request's id, the same delayed copy
+passed.
+Without the wait, 24 runs of the unchanged assertion passed, so the failure
+depends on read timing.
+
+Atomicity itself is not in doubt in these runs.
+The check before the restart, which looks for a partial write of the failed
+command, passed in every run.
+
+The fix is to filter both post-restart assertions by the failed request's id.
+"Permission moved" carries that id as `permissionRequestId`, and "owner needed"
+carries it as `subject.id`.

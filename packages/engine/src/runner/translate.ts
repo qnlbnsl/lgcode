@@ -10,6 +10,8 @@ export interface Translated {
 }
 const record = (value: unknown): Record<string, any> | undefined => typeof value === "object" && value !== null ? value as Record<string, any> : undefined;
 
+// Terminal output and exits are correlated and streamed through the redactor
+// by terminal.ts before this stateless translator handles the tool report.
 // ACP has open unions. Unknown variants are data to ignore; known variants
 // are checked again at the event boundary before they reach the writer.
 export const translate = (value: unknown, replay: boolean): ReadonlyArray<Translated> => {

@@ -13,14 +13,18 @@ const fixtures: Array<ReturnType<typeof scriptedApi>> = [];
 afterEach(() => { for (const fixture of fixtures.splice(0)) fixture.dispose(); });
 
 describe("the live-view step", () => {
-  it("fails when no worker thread item reached the second connection before the permission request, and no permission is answered (breaks if the step passes on the request alone; finding F5)", async () => {
+  it("fails when no worker thread item reached the second connection before the permission request, while later steps still answer the real permission (breaks if the step passes on the request alone; finding F5)", async () => {
     const fixture = scriptedApi({ noThreadItem: true });
     fixtures.push(fixture);
     expect(await main([], fixture.deps)).toBe(1);
     const failure = fixture.lines.find((line) => line.startsWith("FAIL live-view:"));
     expect(failure, fixture.lines.join("\n")).toBeDefined();
     expect(failure).toMatch(/thread item/i);
-    expect(fixture.answers).toEqual([]);
+    expect(fixture.answers).toEqual([
+      { connection: 2, input: expect.objectContaining({ kind: "permission", id: "permission", optionId: "allow-once" }) },
+      { connection: 2, input: expect.objectContaining({ kind: "permission", id: "permission", optionId: "allow-once" }) },
+    ]);
+    expect(fixture.lines.some((line) => line.startsWith("PASS final:"))).toBe(true);
     expect(fixture.lines.filter((line) => line.startsWith("SKIP ")).length).toBeGreaterThan(0);
   });
 
