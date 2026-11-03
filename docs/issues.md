@@ -3386,6 +3386,17 @@ regressions run the marker command after a synthetic safe approval and
 check its file, the sent prompt, the saved scope, rejection of printf and
 other commands, the no-request failure and the unsafe-destination failures.
 
+Live run 5 at `9751bda` gives the permission probe its first real result.
+The round-6 write command made Claude Code ask for permission.
+The request offered a persistent option, `allow-with-updates`.
+The probe rejected the request before answering always, and it recorded
+`no safe persistent option offered`, because the public permission contract does
+not expose where a persistent option would save its rule.
+Criterion SEC-PB-4 therefore stays failed: the option is routed to the owner,
+but its scope cannot be recorded and no settings file was inspected after an answer.
+Exposing the destination in the contract is the open work for this criterion.
+The log is `.scratch/foundry-runs/engine-build-1/live-check-2/live-check-run5.log`.
+
 ## 218. The state-read probe records the owner's own rejection as a deny rule
 
 Found: 2026-11-02, by the L-1 probe test writer.
@@ -5164,3 +5175,51 @@ It still requires a real permission request and a preceding thread item
 on the second connection to pass live-view.
 These probe changes do not fix the engine's ask-mode semantics or close
 this issue.
+
+## 273. Three limits remain in the bounded terminal output
+
+Found: 2026-11-03, in the verification of the round-7 terminal fix.
+Status: open, recorded, not fixed.
+The review is `.scratch/foundry-runs/engine-build-1/reviews/lcp-242-verify.md`.
+It rated each limit minor, and it found no redaction leak.
+
+The first limit is a silent gap during a coverage loss.
+Terminal updates that arrive while the login store cannot be read are discarded,
+and the terminal map is cleared.
+That interval leaves no marker in the thread.
+If coverage returns before the turn ends, the rest of that command's output is
+absent, and nothing says so.
+The failure is in the safe direction, because nothing raw is stored.
+
+The second limit is the bound on version 1 reports.
+A version 1 delta report that carries any other field, such as `status`, is not
+skipped as a data-only report.
+In the review's run, 2,000 such reports stored 2,008 items and 559 KB.
+That is 57 times smaller than before the fix, but the bound is the report count.
+The regression in `terminal-output-round-7.test.ts` uses delta-only reports,
+so it does not show this case.
+
+The third limit is the lack of a trailing publish.
+A burst of output inside the 500-millisecond window stays unpublished until the
+next update, the command's exit or the end of the turn.
+No output is lost, but the view can lag for as long as a command stays quiet.
+One suggested fix is one delayed publish for each terminal with unpublished output.
+
+## 274. A terminal chunk containing a secret from the launch is dropped without a marker
+
+Found: 2026-11-03, in the verification of the round-7 terminal fix.
+Status: open, recorded, not fixed. The fault is older than the fix.
+The review saw the same result at `34af123`.
+It ran 12 times, and the chunk never reached `packages/engine/src/runner/terminal.ts`.
+
+A version 2 terminal chunk that contains a secret passed to the adapter at launch,
+such as a login token, is lost whole.
+The same text from a login store is redacted and shown.
+A person who runs `env | grep TOKEN` therefore sees nothing, not a redacted line.
+
+The review infers the cause, and it did not find the exact line.
+The redactor matches base64 runs of a secret
+(`packages/engine/src/identity/redactor.ts:25-58`), and a version 2 chunk's data
+is base64, so a match on the whole frame may discard the chunk.
+The failure is in the safe direction, because no secret is stored.
+The gap is that the thread gives no sign that output was withheld.
