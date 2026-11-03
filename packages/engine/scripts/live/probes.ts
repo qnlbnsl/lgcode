@@ -9,6 +9,9 @@ export type ProbeId = (typeof PROBE_STEPS)[number]["id"];
 export interface ProbeAgents { readonly lead: AgentRef; readonly worker: AgentRef }
 export interface Observation { readonly harness: string; readonly outcome: string; readonly detail: string }
 export interface ProbeDriver {
+  // After a failed journey, deny leftover holds and wait within a bound for
+  // these same agents to settle. This never approves work or changes a result.
+  readonly prepare?: (agents: ProbeAgents) => Effect.Effect<void, unknown, Scope.Scope>;
   // Returns a reason when this probe cannot safely run. Read-only probes
   // may need fewer agents than a turn-producing probe.
   readonly unavailable?: (id: ProbeId, agents: ProbeAgents) => Effect.Effect<string | undefined, unknown, Scope.Scope>;

@@ -226,6 +226,39 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
     catch { /* Synthetic boundaries have no owner credential; final checks it in a real run. */ }
     return oneLine(redactShapes(redactSecrets(calls.map((tool) => `${tool.status}: ${tool.output || "no error output"}`).join("; "), secrets)), 300);
   };
+  // Recovery changes no journey result and grants no permission. A held
+  // write is rejected, then the original agents and their queued wake settle.
+  const prepare: NonNullable<ProbeDriver["prepare"]> = (given) => Effect.gen(function* () {
+    agents = given;
+    const owner = yield* options.openOwner();
+    const ids = new Set([given.lead.agentId, given.worker.agentId]);
+    for (;;) {
+      const state = (yield* since(owner, 0)).reduce(apply, emptyViews());
+      const pending = Object.values(state.requests).find((row) => row.status === "open" && ids.has(row.agentId));
+      if (pending !== undefined) {
+        const denied = pending.options.find((option) => option.kind === "reject_once" && !option.persistent);
+        yield* check(denied !== undefined, "leftover journey permission has no safe reject-once option");
+        if (pending.holder._tag === "agent") {
+          yield* check(ids.has(pending.holder.agentId), "leftover journey permission is held outside this run's agents");
+          const holder = yield* agentClient({ agentId: pending.holder.agentId });
+          // The real lead may have passed it up concurrently. Re-read the
+          // authoritative state on the next iteration in either case.
+          yield* holder["pass-up"]({ requestId: requestId(), subject: { _tag: "permission", id: pending.permissionRequestId } } as never).pipe(Effect.ignore);
+        } else {
+          yield* owner.answer({ requestId: requestId(), kind: "permission", id: pending.permissionRequestId, optionId: denied!.id } as never);
+        }
+      } else {
+        const idle = [...ids].every((id) => state.agents[id]?.state._tag === "idle");
+        const held = Object.values(state.questions).some((row) => row.status === "open" && (ids.has(row.agentId) || (row.holder._tag === "agent" && ids.has(row.holder.agentId))));
+        const waiting = Object.values(state.waits).some((row) => row.status === "open" && ids.has(row.agentId));
+        const queued = Object.values(state.deliveries).some((row) => ids.has(row.target) && ["queued", "sent"].includes(row.status));
+        if (idle && !held && !waiting && !queued) return;
+      }
+      yield* Effect.sleep(25);
+    }
+  }).pipe(Effect.timeoutOrElse({ duration: options.engineTimeout,
+    orElse: () => Effect.fail(new Error(`journey agents did not settle within ${options.engineTimeout} ms; a leftover hold may remain`)) }));
+
   const unavailable: NonNullable<ProbeDriver["unavailable"]> = (id, given) => Effect.gen(function* () {
     agents = given;
     if (options.service().exited()) return "the run's service is not up";
@@ -237,7 +270,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
     })).pipe(Effect.timeoutOrElse({ duration: options.engineTimeout, orElse: () => Effect.fail(new Error("readiness timed out")) })));
     if (Exit.isFailure(reached)) return "the run's service did not answer the readiness check";
     const history = reached.value;
-    if (id === "permission-kinds") return undefined; // Reads existing log evidence only.
+    if (id === "permission-kinds" || id === "token-scan") return undefined; // Reads existing evidence; sends no turns.
     const live = snapshot();
     const state = history.reduce(apply, emptyViews());
     const needed = id === "always-allow" ? [given.lead] : [given.lead, given.worker];
@@ -245,6 +278,11 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       if (!live.has(agent.agentId)) return `agent ${agent.agentId} has no live process in this run`;
       const lifecycle = state.agents[agent.agentId]?.state._tag;
       if (lifecycle !== "idle") return `agent ${agent.agentId} is ${lifecycle ?? "unknown"}, not idle`;
+      // An unanswered question does not block delivery to an idle agent.
+      // In particular, sandbox-mcp intentionally leaves its ask recorded.
+      if (Object.values(state.requests).some((row) => row.status === "open" && row.agentId === agent.agentId)
+        || Object.values(state.waits).some((row) => row.status === "open" && row.agentId === agent.agentId)) return `agent ${agent.agentId} has an unresolved journey hold or wait`;
+      if (Object.values(state.deliveries).some((row) => row.target === agent.agentId && ["queued", "sent"].includes(row.status))) return `agent ${agent.agentId} has a queued journey delivery`;
     }
     return undefined;
   });
@@ -541,5 +579,5 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
         detail: `session files=${scan.files}, own agent tokens=${ownTokens.size}, process argument snapshots=${ownArguments.length}, environment snapshots=${environments.length}; additional run argument snapshots=${arguments_.size}; environment variable names inspected privately, identity values retained only for scanning; paths=${scan.paths.join(",")}${scan.leaks.length > 0 ? `; ${scan.leaks.join("; ")}` : ""}` };
     });
   });
-  return { observe, unavailable };
+  return { observe, unavailable, prepare };
 };

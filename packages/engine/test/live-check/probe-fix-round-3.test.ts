@@ -51,11 +51,12 @@ it("issue 238: final still detects a secret after a probe failed", async () => {
   expect(a.calls).not.toContain("record");
 });
 
-it("the dry run explains the fail-fast journey, independent probes, final and recording dependency", () => {
+it("the dry run explains the startup hard stops, independent probes, final and recording dependency", () => {
   const text = dryRunText();
-  expect(text).toContain("startup-hook through wake remain fail-fast");
-  expect(text).toContain("sandbox-mcp through token-scan continue after a probe failure");
-  expect(text).toContain("final still runs after a probe failure");
+  expect(text).toContain("Only startup-hook, service, setup, lead and worker-start are hard stops");
+  expect(text).toContain("Other journey failures are recorded and independent steps still run");
+  expect(text).toContain("sandbox-mcp through token-scan continue after a journey or probe failure");
+  expect(text).toContain("final still runs after a journey or probe failure");
   expect(text).toContain("recording requires every earlier step to pass");
 });
 

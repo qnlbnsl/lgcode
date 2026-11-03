@@ -22,6 +22,7 @@ export interface Faults {
   hangAnswer?: boolean;
   // The worker's thread shows nothing before the permission is asked for.
   noThreadItem?: boolean;
+  workerEndsWithoutPermission?: boolean;
 }
 
 export const cleanRecordings = (): RecordResults => ["claude", "codex"].map((harness) => ({
@@ -77,6 +78,11 @@ export const scriptedApi = (fault: Faults = {}) => {
       } }, lead);
     emit({ _tag: "SessionOpened", agentId: "worker", session: { _tag: "acp", sessionId: "session" }, protocolVersion: 1, reloadable: false });
     emit({ _tag: "DeliveryAccepted", agentId: "worker", deliveryId: "first" });
+    if (fault.workerEndsWithoutPermission) {
+      emit({ _tag: "ThreadItem", agentId: "worker", itemId: "refused", replay: false, content: { _tag: "text", text: "the workspace is read-only" } });
+      emit({ _tag: "TurnEnded", agentId: "worker", compact: false });
+      return;
+    }
     if (fault.step === "live-view") emit({ _tag: "TurnEnded", agentId: "worker", compact: false });
     if (!fault.noThreadItem) emit({ _tag: "ThreadItem", agentId: "worker", itemId: "progress", replay: false, content: { _tag: "text", text: "writing hello.txt" } });
     emit({ _tag: "PermissionRequested", agentId: "worker", permissionRequestId: "permission", holder: fault.step === "routed" ? owner : lead,

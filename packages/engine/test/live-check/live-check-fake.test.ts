@@ -119,7 +119,7 @@ scenario("live-check routine with the fake driver: all nine flow steps and the f
   expect(tagged(all, "OwnerNeeded", worker.agentId)).toHaveLength(1);
 }));
 
-scenario("live-check routine with the fake driver: a driver that never makes the wide start fails that step by name within its bound, prints FAIL, skips the rest, and the exit code is 1 (breaks if a missing link passes, or a wait is unbounded)", (w) => Effect.gen(function* () {
+scenario("live-check routine with the fake driver: a driver that never makes the wide start fails that step by name within its bound, prints FAIL, continues every evaluable step, and the exit code is 1 (breaks if a missing link passes, or a wait is unbounded)", (w) => Effect.gen(function* () {
   const state: FakeState = { folder: join(realpathSync(w.root.work), "project") };
   const gate = join(w.root.root, "gate-lead");
   const lines: Array<string> = [];
@@ -128,6 +128,6 @@ scenario("live-check routine with the fake driver: a driver that never makes the
   expect(failure).toBeInstanceOf(StepFailed);
   expect(failure.stepId).toBe("wide-start");
   expect(failure.message).toContain("the refusal of the lead's start with a wider mode");
-  expect(lines.map((line) => line.split(":")[0])).toEqual(["PASS lead", "FAIL wide-start"]);
+  expect(lines.map((line) => line.split(":")[0])).toEqual([...FLOW_STEPS, FINAL_STEP].map((spec) => `${spec.id === "wide-start" ? "FAIL" : "PASS"} ${spec.id}`));
   expect(reporter.exitCode([...FLOW_STEPS, FINAL_STEP])).toBe(1);
 }), { timeout: 60_000 });

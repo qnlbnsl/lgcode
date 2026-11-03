@@ -36,9 +36,9 @@ Do not answer the request yourself. Then end your turn with the single word: pas
 Rule B. TEXT starts with "Wait", for example "Wait WAIT_ID finished." and then a list of agents. End your turn with the single word: done`;
 
 // Sent through the lead's "start" call, as the worker's first prompt, to a real
-// Codex agent that runs in the mode that asks before every change. Writing a
-// file is the change that makes the adapter ask for permission.
-export const WORKER_PROMPT = `Create a file named hello.txt in your working folder, with the single line: hello. Use your file editing tool, not a shell command. If you are asked for permission, wait for the answer. When the file exists, reply with the single word: created`;
+// Codex agent in read-only mode with on-request approval (issue 272). A
+// refused write alone is not a permission request; the model must ask for it.
+export const WORKER_PROMPT = `Create a file named hello.txt in your working folder, with the single line: hello. Your folder is read-only until you receive approval for this write. Use a tool that can request approval for the write, and request that approval explicitly. Wait for the permission answer. If a write is refused because the file system is read-only, request approval for the same write and retry once after approval. Do not end your turn before making that approval request and observing its answer or reporting that approval is unavailable. Do not change settings or permissions yourself. If approval is denied or unavailable, report the refusal honestly and end your turn; do not claim the file was created. When the file exists, reply with the single word: created`;
 
 // Sent by the re-recording step to each of the two real adapters, in a
 // temporary folder, to record its protocol frames. It is the same prompt that

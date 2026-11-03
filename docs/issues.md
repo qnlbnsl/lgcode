@@ -5113,3 +5113,54 @@ starvation cases and the unpublished-status flush.
 The logger regression in `terminal-lifecycle-round-7.test.ts` verifies one
 warning in each of two overflowing turns and checks that it contains no
 output text.
+
+
+## 272. Codex's ask mode can refuse a write without requesting permission
+
+Found: 2026-11-03, in live-check run 4 at commit
+`f94dd9996a93cf658ddf3ee52cdbbf7fb5fc1ab9`.
+Status: open, recorded; the engine is not changed in fix round 8.
+
+`packages/engine/src/runner/harnesses.ts:60` maps Shephrd's `ask` level to
+Codex's `read-only` mode.
+In `@agentclientprotocol/codex-acp` version 2.5.0, the installed source at
+`dist/index.js:40424-40449` gives that mode an `on-request` approval policy
+and a read-only sandbox.
+The adapter passes the selected mode's approval policy into each turn at
+`dist/index.js:42079`.
+The policy relies on the model choosing to request approval for a write.
+It does not require a permission question before every attempted change.
+
+The lead's event-log inspection reports that run 3 requested approval for
+a Python write at event 81, and the live-view criterion passed.
+In run 4, event 78 attempted `touch hello.txt`.
+Event 80 reported a read-only file-system refusal and exit code 1.
+The worker then said it could not create the file because the workspace
+was read-only, and event 98 ended its turn without a PermissionRequested.
+The person sees a worker that could not write and no permission question.
+The failure direction is safe: the sandbox refuses the write.
+The original live-view step then waited 300 seconds for a request that
+could no longer arrive from that turn.
+These observations come from the lead's round-8 task and the run-4 log at
+`.scratch/foundry-runs/engine-build-1/live-check-2/live-check-run4.log`.
+They are not a new real-adapter run by this worker.
+
+One option to weigh is an approval policy that always asks before a write,
+if the adapter can expose that behavior while preserving the sandbox.
+The four session presets exposed by version 2.5.0 at
+`dist/index.js:40424-40494` and `dist/index.js:40528-40547` offer read-only,
+workspace-write, agent, and full-access modes.
+Their approval policies are `on-request` or `never`.
+None is an always-ask preset.
+A future adapter integration change would need separate verification.
+Widening the sandbox merely to obtain a passing probe would not establish
+ask-before-write behavior.
+
+Fix round 8 changes the live-check prompt to request approval explicitly,
+including one retry after a read-only refusal, with an honest failure path.
+It makes live-view fail as soon as a worker's turn ends without a request,
+and continues collecting independent probe evidence after journey failures.
+It still requires a real permission request and a preceding thread item
+on the second connection to pass live-view.
+These probe changes do not fix the engine's ask-mode semantics or close
+this issue.

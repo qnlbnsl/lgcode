@@ -108,7 +108,9 @@ export const dryRunText = (config: LiveConfig = liveConfig({})): string => {
     "The re-record step (scripts/live/recording.ts, scripts/recorder.ts) then starts more model sessions, each sent the RECORDER_PROMPT above:",
     "- one Claude Code recording and one Codex recording, each in a new temporary folder;",
     "- after a recording succeeds, one signed-out probe for that harness: the adapter is started with an empty temporary home and no account variables, and is expected to be refused for authentication.",
-    "The journey steps startup-hook through wake remain fail-fast. The probes sandbox-mcp through token-scan continue after a probe failure when their own preconditions hold: the service answers and their needed agents are alive and idle. A probe with unavailable preconditions is skipped with its reason; final still runs after a probe failure; recording requires every earlier step to pass. Any failure keeps the overall exit nonzero.",
+    "Only startup-hook, service, setup, lead and worker-start are hard stops because later work needs the service and both agents. Other journey failures are recorded and independent steps still run. With no worker permission request, routed, pass-up, owner-answer and wake are skipped with that named precondition (issue 272). The probes sandbox-mcp through token-scan continue after a journey or probe failure when their own preconditions hold: the service answers and prompt-producing probes have their needed agents alive and idle, with no pending permission of their own, open waits or queued deliveries. The read-only permission-kinds and token-scan probes do not need idle agents. A probe with unavailable preconditions is skipped with its reason; final still runs after a journey or probe failure; recording requires every earlier step to pass. Any failure keeps the overall exit nonzero.",
+    `After a journey failure, preparation denies leftover permission requests without approving work and waits at most 30 seconds for the same agents and queued wakes to settle. Each probe then checks its own readiness.`,
+    `The configured whole-run limit is ${config.totalTimeout / 1000} seconds, followed by at most 30 seconds of cancellation grace and up to 20 seconds of service cleanup with the standard wrapper. Agent event waits are bounded by ${config.agentTimeout / 1000} seconds; readiness is bounded separately.`,
     "The probe prompts above add turns to the same two sessions. The reload step restarts the service twice: one working-turn carry-on, then one pending-envelope replay. Each uses SIGKILL on this run's service child only.",
     "The worker account sets CODEX_CONFIG to shell_environment_policy.inherit=core for SEC-PB-8. Shell permissions are answered only for the exact printed command; always allow is used only in its named step.",
     "PB-A10 already has real evidence in packages/testing/fixtures/{claude,codex}.ndjson. The sandbox-mcp log cites the adapter versions, negotiated ACP versions and config categories; no separate probe is added.",
@@ -166,9 +168,10 @@ export const realDeps = (environment: Readonly<Record<string, string | undefined
 // groups) before it gives up and says the cleanup was not confirmed.
 const DEFAULT_CANCEL_GRACE = 30_000;
 
-// The journey is fail-fast. Probes collect independent evidence after a
-// failure, then final still checks the views and secrets. Recording requires
-// every earlier step to pass. Any failure keeps the overall exit nonzero.
+// Service setup and agent startup are hard preconditions. Other journey
+// failures are recorded while independent steps and probes continue. Final
+// still checks the views and secrets. Recording requires every earlier step
+// to pass. Any failure keeps the overall exit nonzero.
 //
 // One AbortController owns the whole body (the startup-hook probe, the
 // journey and the recording). The total limit aborts it, then the run waits
@@ -362,9 +365,13 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
 
   if (reporter.failed()) {
     const ran = new Set(reporter.results().map((result) => result.id));
+    const hardStop = reporter.results().find((row) => !row.passed && ["startup-hook", "service", "setup", "lead", "worker-start"].includes(row.id));
+    const unavailable = hardStop === undefined
+      ? `the run ended before this step could be evaluated; failed: ${reporter.results().filter((row) => !row.passed).map((row) => row.id).join(", ")}`
+      : `precondition unavailable: ${hardStop.id} failed; ${["startup-hook", "service"].includes(hardStop.id) ? "the run has no ready service" : hardStop.id === "setup" ? "the run's accounts and folders were not prepared" : "the required agents were not started"}`;
     for (const spec of ALL_STEPS) if (!ran.has(spec.id)) reporter.skip(spec, spec.id === "recording"
       ? `requires every earlier step to pass; failed: ${reporter.results().filter((row) => !row.passed && row.id !== "recording").map((row) => row.id).join(", ")}`
-      : `depends on ${reporter.results().find((row) => !row.passed)?.id ?? "an earlier step"}`);
+      : unavailable);
     if (service !== undefined) {
       reporter.note(`The run's folder is kept at ${service.root}; the service's log is ${service.logFile}. The real service was not touched.`);
       if (cleanupUnconfirmed) reporter.note("Cleanup was not confirmed: a process this run started may still be running. Check the folder above before you remove it.");
