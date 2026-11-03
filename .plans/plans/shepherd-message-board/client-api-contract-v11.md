@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v10, review round 2 folded
-version: 10
+status: v11, review round 3 folded
+version: 11
 updated: 2026-11-03
 ---
 
@@ -229,6 +229,43 @@ piece's batch against its state table, as it checks its own.
     event text, and the reactor restarts from its recorded position after a
     pause. It never dies silently.
 
+### Every call into a piece's table is guarded
+
+A piece's pure functions run inside the engine's core: in nearly every write,
+in recovery, in the send transaction, and in the fold after a commit. So one
+throw in one of them must not stop the engine (row 161). The rule covers every
+table that holds a function per piece:
+
+- **One wrapper.** Every call goes through one function, `guardPiece`. Edit E30
+  gives it. A piece's plan adds no wrapper of its own, and a boundary test finds
+  no direct call.
+- **It logs no event text.** It logs the namespace, the table's name and the
+  error's class name at error level. It never logs the error's message, because a
+  message can hold event text.
+- **It returns the stated fallback.** The fallback is the refusing form:
+
+| Table | The fallback when the function throws |
+| --- | --- |
+| Reach check (E18) | Refuse. At send time, the delivery is withdrawn and the queue goes on. |
+| Hold-unsettled (E19) | Holds, so the agent is not settled. |
+| Request-held (E20) | Does not hold. |
+| Source rule (E16) | Withdraw. |
+| Secret keep list (E27) | Skip collection at this start, so nothing is deleted. |
+| `snapshotFor` (E9) | The section is left out, and the snapshot marks it as failed. |
+| Alert source, `openMatters` (section 4) | Nothing is raised. |
+| View reducer (E6) | The piece's view stays as it was. |
+
+- **A reducer's fallback is deterministic.** A reducer reads the event and the
+  sequence, and nothing else from the envelope, because the engine's projection
+  passes placeholders for the rest (`routing/waits.ts:28-31`). So the same event on
+  the same view throws the same way in a live fold, a projection and a rebuild, and
+  they still agree.
+- **A piece-decided visibility rule and a piece's read are outside the table.** A
+  thrown visibility rule hides the event. A thrown read fails that read alone.
+- **It is not a write failure.** An alert source that throws costs that event's
+  alert, and the error log shows it. The reactor still stops at an event only for
+  `LogWriteFailed`.
+
 ### Paged reads
 
 A piece may offer read commands whose reply is a page of records, such as
@@ -449,7 +486,9 @@ fixed rights: the foundry roles' sheepdog and their standing-rule answerer
    the engine's snapshot section table (edit E9), which may leave the
    section out (lead ruling L15). The board's section is a
    bounded summary with no post text for the owner, devices and services,
-   and absent for an agent (lead ruling L23). For the owner, devices and
+   and absent for an agent (lead ruling L23). An agent's snapshot holds no
+   account, device or alert section, and its request and question rows are
+   identity rows alone (row 166). For the owner, devices and
    services, the snapshot also holds an engine wait-state section: the open
    deliveries (id, target, status and source kind, with no text) and the
    open non-blocking waits (the waiter and the wait id). Each agent entry
@@ -474,8 +513,17 @@ hold, not by a fixture:
   questions.** It holds a preview of at most 512 bytes, at most 8 options, each
   with its id, kind, persistent flag and a name cut to 128 bytes, the count of
   all the options, `settingsWrite`, `toolKind`, and the whole event's encoded
-  size. So a display part is at most 4 KiB, and all of them together at most
-  about 2 MiB. A count says how many rows have no display part.
+  size. An owner, a device and a service get it, and an agent does not (row 166).
+- **The 4 KiB is a budget, not a sum** (row 171). The builder measures the display
+  part as encoded, escaping included, and it never passes 4 KiB. So all the parts
+  together are at most about 2 MiB, by construction. Three rules keep it honest:
+  - A `kind` or `toolKind` outside the known list is shown as "unknown".
+  - An option id is never cut, because a cut id is a different answer. An option
+    whose id is over 128 bytes is left out and counted as not shown, and so is any
+    option that does not fit the budget.
+  - If the fixed fields and the preview still do not fit, the display part is left
+    out. The identity row stays, and a count says how many rows have no display
+    part.
 - **The preview is never what the owner approves.** To show or answer a
   request, a client reads its event whole with `client.event`, by the source
   sequence. `toolInput` is never in the snapshot (edit E29).
@@ -521,7 +569,8 @@ kind list narrows the result:
 
 The transport closes a subscription that falls 2,048 events behind, or that
 leaves a chunk unacknowledged for five seconds (issue 41). The client
-reconnects from its cursor. The web server also sends a heartbeat,
+reconnects from its cursor. The web server also sends a heartbeat on each
+connection,
 more often than a reverse proxy's idle timeout, which is set in piece 2's
 settings.
 
@@ -637,6 +686,13 @@ the next page. It follows the paged-read shape in section 1. Access is
 To an agent caller, a page goes inside the data envelope of edit E15, with a
 fresh marker and an escaped leading slash, so the longest text an agent reads
 has the same protection as a delivery (row 140, SECURITY.md rule 7).
+**The server does the wrapping** (row 166). An agent's reply is
+`{ requestId, data }`. `data` is one string: the envelope around the one-line
+JSON encoding of the reply that any other caller gets. The MCP tool returns
+`data` unchanged, and the command-line tool prints it unchanged, so an agent
+that runs `shephrd client thread` gets the envelope too. Only the client
+library opens it, and only for a stream's recovery: the envelope's first and
+last lines are the engine's, and the line between them is JSON.
 Which events belong to a thread is the rule of edit E21, so an owner's page
 agrees with the engine's `threads` view, including a queued delivery.
 Exporting a thread
@@ -648,7 +704,21 @@ remote caller must not be able to choose a path on the host.
 **`client.event`** (row 137) reads one event whole by its sequence, under the
 same visibility rule. It is how a client recovers an event that the filtered
 stream replaced with a marker, including one that belongs to no thread, such
-as `HarnessChanged`. Its access is `owner`, `device` and `service`.
+as `HarnessChanged`. Its access is `owner`, `device`, `service` and `agent`.
+
+An agent reads under the read rule its stream obeys, so an agent can recover
+every marker its stream shows it, and nothing more (row 158). The reply comes in
+the same data envelope as an agent's thread page. An `owner-only` event, including
+every piece's owner-only event, and an event with no `agentId` stay unavailable to
+an agent. A refusal says the same thing for a hidden sequence and a missing one,
+so it reveals no tag and no size. If the read rule changes between the marker and
+the read, the read is refused, the client reconnects, and the stream's own filter
+then leaves that event out.
+
+**`client.sequence`** (row 159) returns `{ requestId, sequence }`, the sequence of
+the current views value, and nothing else. Views publish whole batches, so the
+sequence is always at a batch's end. It is the wait helper's small read. Its access
+is `owner`, `device` and `service`. An agent has the engine's own `wait`.
 
 ### Events a client does not know
 
@@ -700,14 +770,37 @@ in the same section and read that hold its other lists, under the name
 `ownerHeld`. For the board, those are agents with an open post that needs the
 owner's reply. This is the owner's form of edit E20.
 
-The engine's rows reach the helper through the snapshot and the stream, so the
-helper applies its part of this rule after every batch it applies. A piece's
+The engine's rows reach the helper through the snapshot and the stream. A piece's
 `ownerHeld` list is read with its other lists. The helper reads those lists at
 open, when the engine's part says settled, and when the stream shows an event
-that the piece names as able to change its `ownerHeld`. So the helper acts on it
-at open and at each such read, and never on a result older than the stream it
-has applied. No timer and no polling are added. This amends lead ruling L31's
-point 3 (row 135).
+that the piece names as able to change its `ownerHeld`. This amends lead ruling
+L31's point 3 (row 135).
+
+**One gate before any end** (row 159). The stream shows no batch. A chunk or a
+catch-up page can end in the middle of one, so the helper can hold a state that the
+engine never judged. The engine judges a wait on a batch's whole result
+(`routing/waits.ts:110-120`). So before the helper ends a wait for any reason,
+which means settled, resolved or owner-held, it does this:
+
+1. It has applied the stream up to a sequence S, and the state there says "end".
+2. It makes one read that returns a sequence L at a batch's end. The read is the
+   piece's lists when a piece has them, otherwise `client.sequence`.
+3. If L is below S, the commit has not yet reached the views. That gap lasts only
+   from a commit to its publication, in one step of the writer
+   (`log/EventLog.ts:136-140`), and a catch-up page can show it. So the helper
+   reads again.
+4. If L is above S, it applies the stream up to L, and no further.
+5. It decides again on the state at L. It ends the wait only on a state at a
+   sequence that such a read returned, and otherwise it goes on waiting.
+
+The snapshot at open needs no read, because its sequence is a views value's own. If
+a read fails, the helper does not end the wait. It reconnects and decides again. It
+subscribes with no filter, so every sequence up to L reaches it. A read happens only
+at a candidate result, so no timer and no polling are added. This widens lead ruling
+6 of round 2, which covered only the settled result, to exit 2 and to every other
+end. It also makes good the roles' promise that a rule-answered request never counts
+as held: the rule's `PermissionRequested` and `PermissionAnswered` are one batch, so
+the state at L shows no open row.
 
 | Piece | Events that can change its `ownerHeld` |
 | --- | --- |
@@ -844,6 +937,16 @@ hiding it (row 139):
   the same schedule, and the old token's value is removed only after they end.
   This is a best effort: a restart may remove the old value first, and on a
   deny-all server the send then fails.
+- **A token clear warns with the cleared value** (row 164). The alert about
+  `client.AlertCarrierTokenCleared` is sent with the cleared value, up to five
+  attempts, and the value is removed only after they end. Otherwise one clear would
+  silence the phone on the deny-all server that the setup document recommends. A
+  restart has the same limit as above.
+- **A device caller's dismiss does not stop the first send** (row 165). For this
+  kind, a dismiss from a device caller closes the alert on the page only. It does not
+  cancel the send: the alert keeps its attempts, up to five in all, until one
+  succeeds. It does not call `clear`. It does not stop the warning attempts above. A
+  dismiss from the owner's terminal works as it does for any kind.
 - **The terminal shows dismissed records.** `shephrd client alerts list --all`
   shows every such alert, open or dismissed, with the device that dismissed it.
   So dismissing one from the web does not hide it from the computer.
@@ -891,7 +994,7 @@ reactor runs after each batch that touches the subject (row 107):
 
 | Kind and key | Closes when |
 | --- | --- |
-| `approval` | The request's row is no longer open, or its agent is stopped or crashed. `stop` writes no `PermissionCancelled` (`commands/stop.ts:10-16`). |
+| `approval` | The request's row is no longer open. A stop and a crash both write `PermissionCancelled` (edit E31). A row left open by an older log counts as closed when its agent is stopped or crashed. |
 | `question` | The question's row is no longer open, or its asker is stopped or crashed. |
 | `failure` | The agent is stopped, or next reaches idle or working. A failed reload keeps it open. |
 | `account:<id>:sign-in` | The account's row is gone, or its status is no longer `needs-sign-in`. |
@@ -913,8 +1016,8 @@ An alert can return (row 144). When an agent leaves crashed or stopped, the
 reactor runs the raise test for each open question that it asked and the owner
 holds, and raises a new alert with the same key. The first-start scan applies
 the same test. A request does not return this way: a permission request's hold
-belongs to the process that asked, so a resumed session makes that row
-meaningless, and the stale row is part of the same engine gap.
+belongs to the process that asked, so `stop` closes it (edit E31, row 163), and a
+resumed session has no stale row.
 
 ### The delivery guarantee
 
@@ -934,7 +1037,9 @@ and it can arrive twice (rows 106, 83).
   for alerts not yet delivered: the view carries an alert's delivered mark into
   the new generation. So a repaired token recovers a waiting alert, and a
   delivered one is not sent again.
-- **Pending is derived from the log.** An alert is pending when it is open,
+- **Pending is derived from the log.** An alert is pending when it is open, or
+  is a `client.lasting-setting` alert that a device caller dismissed and that still
+  has attempts left (row 165), when it
   is not `baseline`, its kind is pushed by the setting read at send time, a
   carrier is set, and it has no delivered mark in the current generation. So a
   restart finds its work from the views after `recovery.whenReady`.
@@ -954,7 +1059,8 @@ and it can arrive twice (rows 106, 83).
   delays another's raise, clear or send, and no send runs inside the writer
   transaction.
 - **A cleared alert is not sent.** An alert that clears during backoff is
-  skipped.
+  skipped. The one exception is a device caller's dismiss of a
+  `client.lasting-setting` alert (row 165).
 - **Still failing.** The fifth failure in a generation, and each one after
   it, is recorded with `final: true`. This is only a mark: the clients show the
   alert as still failing, and the retries go on. A failed send never stops the
@@ -1023,9 +1129,13 @@ rules (rows 93, 94):
   (`service.ts:81-85`). Each value in it has a fresh name,
   `secret:client.alerts.carrier.<generation>`, built only by one function in
   `packages/contracts`, and the `client.AlertCarrierTokenSet` event selects the
-  active one (row 138). The carrier resolves only that name, and a boundary test
-  checks that nothing in the client folder resolves any other. So an account's
-  key can never be sent as the token.
+  active one (row 138). The carrier resolves only that name, with one exception,
+  and a boundary test checks that nothing in the client folder resolves any other.
+  So an account's key can never be sent as the token.
+- **The one exception** (row 164). For the warning about a carrier change or a token
+  clear, and for no other alert, the carrier may resolve the name just cleared. It
+  sends that value only to the origin in that value's own
+  `client.AlertCarrierTokenSet`. The boundary test allows exactly this one path.
 - **The other direction is closed too** (row 138). An account's planner refuses
   an environment value under the reserved prefix `secret:client.`, and the runner
   refuses to resolve one (`runner/AcpRunner.ts:219-227`). So an agent can never
@@ -1045,10 +1155,16 @@ rules (rows 93, 94):
   unselected value.
 - **Bound to its server.** `client.AlertCarrierTokenSet { origin, generation }`
   records the origin the token was set for. Changing the server to another origin
-  clears the token in the same batch, with `client.AlertCarrierTokenCleared`. The
+  clears the token in the same batch, with `client.AlertCarrierTokenCleared`. So
+  does clearing the server with "none", so a later `client.alerts.settings` never
+  says that a token is set when collection has removed it (row 168). The
   carrier sends the token only when the recorded origin equals the current
-  server's.
-- **Removing a value** (row 130). After a clear or a rotation commits, the alert
+  server's, apart from the exception above.
+- **A missing value is a failed attempt** (row 168). An active reference with no
+  value in the store is never a send with no token. It is a failed attempt, and the
+  clients show it as "token missing".
+- **Removing a value** (row 130). After a clear or a rotation commits, and after
+  any warning attempts that need the value have ended, the alert
   worker calls the engine's dedicated `removeCarrierValue(generation)`. It removes
   that one name and nothing else, so it cannot touch an account's secret, or a
   newer token, which has its own name. A crash before it runs is covered by
@@ -1134,6 +1250,10 @@ and publish to it, including a fake alert with a lookalike link.
     with a `client.Oversized { sequence, tag, agentId?, bytes }` marker. Like
     a checkpoint, the marker is not an event in the log. The engine's
     `subscribe` is unchanged. The web page uses `client.subscribe`.
+  - **A live chunk closes at 256 KiB** (row 160). `client.subscribe` closes a live
+    chunk at 256 KiB of encoded events, and a chunk holds at least one event. An
+    event over 256 KiB is already a marker. So at 500 kilobits per second, a chunk
+    fits inside its five seconds.
   - **A marker never costs a client its state** (row 137). A list in
     `packages/contracts` names the content-only tags: `ThreadItem` and any
     other tag that changes nothing but a thread's text. For a marker over a
@@ -1145,8 +1265,23 @@ and publish to it, including a fake alert with a lookalike link.
     cursor moves past the marker only after that. If the read fails, it
     reconnects from before the marker. A tag added later is state-bearing until
     it is added to the list. A marker over an unknown tag moves the cursor, as an
-    unknown event does. A reply to `client.event` is one item, sent whole, and
-    is not a stream chunk.
+    unknown event does. A reply to `client.event` is one item, sent whole. It
+    travels on the read connection, so it needs no acknowledgement and cannot delay
+    a stream's.
+  - **Two connections** (row 160). A client that subscribes uses two WebSocket
+    connections: one for `client.subscribe`, and one for every other command. So a
+    large reply cannot hold back a chunk's acknowledgement behind its own bytes, and
+    a read cannot stall behind a stream queue that has stopped being drained
+    (Effect 4.0.5, `rpc/RpcClient.ts:350`, l.577-581: the 16-item queue is offered to
+    before the chunk is acknowledged, on one receive loop). Plain HTTP reads were not
+    chosen, because the later pairing plan's credential is carried on the WebSocket.
+    Edit E32 gives the shape.
+  - **The stream connection may close during a recovery.** A slow `client.event`
+    can outlast the stream queue. The stream connection then misses its five seconds
+    and closes. That costs a reconnect and never the read. The client finishes the
+    read, applies the event, and then reconnects from the marker's sequence. So a 1
+    MiB event at 500 kilobits per second converges. A cancelled recovery leaves the
+    cursor before the marker.
   - **A snapshot.** A snapshot is one reply, with no thread text. Its request
     and question rows are bounded by construction (section 3). Its other rows
     hold no agent text beyond the cut names and labels. A test still measures
@@ -1176,7 +1311,8 @@ change, and `client.alerts.dismiss` is never an MCP tool.
 | `client.roster` | read | owner, device, agent, service | The agents (section 3). |
 | `client.thread` | read | owner, device, agent, service | One agent's thread (section 3). |
 | `client.subscribe` | read, stream | owner, device, agent, service | The filtered stream (section 3). A stream is never an MCP tool. |
-| `client.event` | read | owner, device, service | One event whole, by sequence (section 3). |
+| `client.event` | read | owner, device, agent, service | One event whole, by sequence (section 3). To an agent, in the data envelope. |
+| `client.sequence` | read | owner, device, service | The current views value's sequence (section 3). The wait helper's small read. |
 | `client.alerts.list` | read | owner, device | Open and cleared alerts, paged. |
 | `client.alerts.dismiss` | planner | owner, device | Clears one alert. |
 | `client.alerts.settings` | read | owner, device | Each kind's push setting, the carrier's server and topic, and whether a token is set. Never the token. |
@@ -1235,8 +1371,13 @@ and the loopback rows never apply to it (row 133).
 | On | Public | Outside the allowed networks | Any | Refused |
 | On | Public | Inside the allowed networks | Not `https` | Refused |
 | On | Public, and names neither the public address in `Host` nor in `Origin` | Inside the allowed networks | `https` | Refused |
-| On | Public, and names the public address in `Host` or `Origin` | Inside the allowed networks | `https` | Accepted, after the guard |
+| On | Public, with an `Origin` that is not the public address | Inside the allowed networks | `https` | Refused |
+| On | Public, names the public address in `Host` or `Origin`, and any `Origin` is the public address | Inside the allowed networks | `https` | Accepted, after the guard |
 | On | Same user, names loopback, with no forwarded header | None | None | Accepted, after the guard, as a local browser |
+
+The "or" exists for a proxy that rewrites `Host`, and that case needs only a public
+`Origin`. So a public request with `Host` set to the public address and a loopback
+`Origin` is refused (row 170).
 
 The forwarded headers are `X-Forwarded-For`, `X-Forwarded-Proto`,
 `X-Forwarded-Host` and `Forwarded`. A local program that forges one outside proxy
@@ -1264,10 +1405,12 @@ client's view shows no open outage, so a port taken for days writes one event
 across restarts. That event raises the `client.web-down` alert. `enabled` off
 closes the outage and its alert.
 
-Connections are capped at 32 in total. A new connection at the cap closes the
-oldest one, so the owner is not locked out by stale connections. A refused
-connection never counts, and a connection that misses two heartbeats is closed
-(row 119).
+Connections are capped at 32 in total. A client's stream connection and its read
+connection each count, so the cap serves 16 subscribing pages (row 160). A new
+connection at the cap closes the oldest one, so the owner is not locked out by stale
+connections. A refused connection never counts, and a connection that misses two
+heartbeats is closed (row 119). Each of a client's two connections has its own
+heartbeat.
 
 ### Stored copies
 
@@ -1379,7 +1522,9 @@ does not compile.
   whose entry includes `agent`, less every stream and the secret-setting
   commands (row 97). The derived list is pinned as an exact list in
   `commands.test.ts`, so a new tool shows up as a changed test, and each piece's
-  plan updates the pin in its own unit (row 140).
+  plan updates the pin in its own unit (row 140). The client group's entries in the
+  pin are `client.snapshot`, `client.roster`, `client.thread` and `client.event`
+  (row 158).
 - Behaviour change: none for the engine's commands, except that a device's
   access refusal has no receipt, and no engine command refuses a device today.
 - Tests updated: in `commands.test.ts`, "tags every command agent-callable
@@ -1513,6 +1658,8 @@ more code, and "the log is the whole truth" holds for every piece.
   event it could not write (row 108). A new test, with a fixture reactor,
   holds recovery open and checks that no piece batch is written before
   `whenReady`.
+- A piece's reducer is called through `guardPiece` (edit E30). It reads the event
+  and the sequence, and nothing else from the envelope.
 - Behaviour change: the views state gains fields, and `debug.compare-views`
   reports differences in them.
 - Tests updated: `packages/engine/test/views/apply.test.ts`,
@@ -1797,17 +1944,21 @@ is `piece` with the piece's own namespace, and only while that delivery is
 still queued (lead rulings L11, L15). The piece batch path (edit E23)
 checks both inside the transaction and refuses the whole batch otherwise. So a piece
 can never withdraw a sent or accepted delivery, another piece's delivery,
-or the engine's. The engine's own withdrawals, for moved and cancelled
-requests, are unchanged.
+or the engine's.
 
 A withdrawal can strand an agent. After a reload, `reloadedEvents` writes
 `StateChanged working` ahead of a requeued delivery (`recovery/reload.ts:73-74,
-86, 98`), and only a sent delivery and a later turn end clear it. So when a
-withdrawal, by a piece or by the dispatcher of edit E18, leaves its target in that
+86, 98`), and only a sent delivery and a later turn end clear it. So when any batch
+holds a `DeliveryWithdrawn` that leaves its target in that
 reloaded state with nothing queued or sent, the same batch writes `StateChanged
 idle` before the wait checks. It reuses the `reloaded` test at
-`routing/deliveries.ts:222-227` (row 143).
+`routing/deliveries.ts:222-227` (row 143). The rule covers a piece, the dispatcher of
+edit E18 and the engine's own withdrawals, such as an answered question's
+(`routing/questions.ts:27`). It lives in one place, the first step of
+`withWaitChecks` (`routing/waits.ts:110`), so a later plan inherits it (row 173).
 
+- Behaviour change: the engine's own withdrawal now clears this state. Today it
+  leaves the agent working with nothing to send.
 - Tests updated: `routing/move-withdrawal.test.ts` keeps its expectations.
   A new test, `packages/engine/test/routing/piece-withdrawal.test.ts`,
   covers each refusal.
@@ -1880,7 +2031,8 @@ passes. The board's plan writes the board's entry, a function of both,
 because its third clause asks whether a queued or sent board wake
 carries a post (board contract, "Settled and waiting"). The client
 helper `waitForAgents` applies the engine's part of the test itself, and
-each piece's part through that piece's results (section 3).
+each piece's part through that piece's results, and it passes the gate in section 3
+before it ends a wait (row 159).
 
 - Behaviour change: none in unit 1. The settled test changes for agents
   that use the board once the board's plan writes its entry.
@@ -2017,7 +2169,8 @@ reconnects, and takes its cursor from an event, a `client.Checkpoint` or a
 - Behaviour change: none for `subscribe`.
 - Tests updated: the client's existing subscribe tests keep their
   expectations. A new test drives both streams through the public client
-  connection, with a filter, a checkpoint and a dropped connection.
+  connection, against a fixture server in unit 2, with a filter, a checkpoint and a
+  dropped connection. Unit 3's handlers repeat it for real.
 
 **E25. A tolerant wire form at the client's RPC boundary** (row 109). In
 `packages/contracts`, a client group mirrors `CommandsRpcGroup`, with every
@@ -2116,29 +2269,129 @@ stays in edit E12, because row 139 also uses it.
   expectations and gains a case for each option kind, for a device caller and
   for the owner.
 
-**E29. A permission request carries its action** (row 132). The owner approves
-the action, not a title. Today `event.description` is `redactText(tool.title ??
-"Permission requested")` (`runner/AcpRunner.ts:411`), and the event holds no input
-(l.416). So `permissionRequested` and `PermissionRequested` (`events.ts:121`) gain
-optional fields from the request's own tool call, for every tool kind:
+**E29. A permission request carries its action** (rows 132, 162, 174). The owner and
+every other approver approve the action, not a title. Today `event.description` is
+`redactText(tool.title ?? "Permission requested")` (`runner/AcpRunner.ts:411`), and
+the event holds no input (l.416). So `permissionRequested` and `PermissionRequested`
+(`events.ts:121`) gain optional fields from the request's own tool call, for every
+tool kind:
 
 - `toolKind`, the protocol's `kind`;
-- `toolInput`, its `rawInput` after the engine's redaction, at most 8 KiB encoded;
+- `toolInput`, its `rawInput` after the engine's redaction, at most 8 KiB encoded. The
+  redaction runs before the cut, so a secret across the boundary cannot survive it;
+- `locations`, its file paths and lines after the same redaction, at most 16 entries
+  and 2 KiB encoded;
 - `inputRedacted`, true when redaction changed it;
 - `inputTruncated`, true when the 8 KiB cap cut it.
 
-They are absent when the adapter omits them. `toolInput` is kept out of the
-requests view and of `client.snapshot`, so a client reads it from the event. The
-page shows the input unfolded before "Allow" can be tapped. When the input is
-absent, redacted or cut, the page shows a fixed warning, in Shephrd's own styling,
-that the action's input is not visible. An alert still carries only its five
+They are absent when the adapter omits them. An alert still carries only its five
 fields. The roles plan's standing-rule matcher reads these fields, and matches only
 when `toolKind` is `execute`.
 
-- Behaviour change: a new request's event holds more, and old logs rebuild
-  unchanged.
+**What the holder receives** (row 162). When the holder is an agent, `routedDelivery`
+(`routing/holders.ts:45-55`) builds this text inside the existing envelope, with the
+engine's lines first and the asker's title last:
+
+```text
+Permission request <id> from agent <asker>:
+Tool kind: <known kind, or "unknown">
+Locations: <one-line JSON, when there are any>
+Input: <one-line JSON, when there is any>
+<the fixed warning, when one applies>
+Title: <the redacted title, with a leading slash escaped>
+```
+
+The JSON has no raw line break, and the title comes last, so a title cannot forge a
+line above it. The fixed warnings are "The action's input is not visible." when
+`toolInput` is absent, "Part of the action's input is hidden, because redaction
+changed it." when `inputRedacted` is true, and "The action's input is cut at 8 KiB."
+when `inputTruncated` is true. They say so in fixed words, and none of them is built
+from the asker's text.
+
+**A moved request gets the same text** (row 162). `move` builds its delivery from the
+row (`routing/holders.ts:88`). So the requests view keeps these fields on an open
+row, in one optional part named `action`, and drops it when the row closes. A row is
+at most about 10 KiB larger while it is open. `client.snapshot` builds its rows field
+by field, never from the row, and no engine read returns a row, apart from the owner's
+`debug.compare-views`, so `action` reaches no other client through the view. A fixed sentence telling the new holder to go and read a
+thread would rely on the agent obeying it, so it was not chosen.
+
+**What each approver sees.** A client reads the fields from the event with
+`client.event`, because `toolInput` and `locations` are never in `client.snapshot`.
+
+- The page shows the input unfolded before "Allow" can be tapped.
+- The pane viewer shows the input or the warning before an answer (row 162).
+- When the event has no input, the page and the viewer show the thread items with the
+  same `toolCallId`, unfolded, above "Allow" (row 174). A harness such as Codex sends
+  its file edit that way, with a fixed title and only `locations` on the request.
+- When the input is redacted or cut, or when neither the input nor such an item
+  exists, they show the fixed warning, in Shephrd's own styling. So a warning does not
+  appear on every edit and teach the owner to tap past it.
+
+- Behaviour change: a new request's event holds more, the requests view keeps it while
+  the row is open, the holder's delivered text changes, and old logs rebuild unchanged.
+  An old row has no `action`, so a moved old request gets the "not visible" warning.
+- Tests updated: `packages/engine/test/routing/text-is-data.test.ts`,
+  `routing/permissions.test.ts` and `routing/moving-requests.test.ts` change where they
+  read a request's delivered text. `live-check/rendered-prompts.test.ts` keeps its
+  first-line pattern and gains the new lines. `packages/testing/src/fakeAgent.ts`
+  (l.293-294) gains the new fields on its permission step.
 - Tests: `packages/engine/test/runner/permission-fields.test.ts` covers each tool
-  kind, a redacted input, a cut input, an absent input and an old log.
+  kind, a redacted input, a cut input, an absent input, a secret across the 8 KiB
+  boundary, an old log, and a Codex-shaped request with `locations` and no input.
+
+### Edits added by review round 3
+
+**E30. One guard for every call into a piece's table** (row 161). A new module,
+`packages/engine/src/pieces/guardPiece.ts`, holds one synchronous function that takes
+the table's name, the namespace, the function and the fallback. It is synchronous
+because the tables run inside pure folds (`views/apply.ts:336-337`). It reports to a
+small sink that the service drains to the error log, at most once a minute for one
+namespace and table, because a rebuild can meet the same throw many times. Section 1
+states the rule and the fallbacks. The edits E6, E9, E16, E18, E19, E20 and E27 call
+their tables through it, and the alert reactor calls its two tables through it.
+
+- Behaviour change: none, while the tables hold only unit 1's entries. A later throw
+  no longer stops the engine.
+- Tests: a fixture piece that throws from each table, in
+  `packages/engine/test/pieces/throwing-piece.test.ts`. The engine still runs commands
+  and `stop`, a request from an adapter is still recorded, a restart finishes, and the
+  rebuild check passes after a throwing reducer. A boundary test finds no direct call.
+
+**E31. `stop` cancels the asker's open requests** (row 163). In `commands/stop.ts`,
+the batch writes `PermissionCancelled` with the reason "agent stopped", and a
+withdrawal of its queued delivery, for each open request the stopped agent asked, as
+`crashEvents` does (`recovery/crash.ts:58-63`). It then moves what the agent held, on
+the state projected with those events, as `crashEvents` does. Questions stay open, as
+they do for a crash. This closes the stop part of `docs/issues.md` issue 74.
+
+- Behaviour change: `stop` closes the stopped agent's own open requests. A stale row
+  no longer ends every owner's wait after a resume, or hangs a parent's wait.
+- Tests updated: none. Reading every stop in the test files that raise a request found
+  none that stops an asker with an open request.
+  `acceptance/failure-4-no-answerer.test.ts` stops holders, and its "a stop closed the
+  request" check still holds. A new test,
+  `packages/engine/test/commands/stop-cancels-requests.test.ts`, covers the asker, the
+  withdrawal, a resume with no stale row, and a parent's wait that closes.
+
+### The client library's two connections
+
+**E32. Two connections from a client that subscribes** (row 160). In
+`packages/client/src/index.ts` (`connect`, l.142-174, and the `subscribe` helper,
+l.190-212), which `core.ts` holds after edit E26, a connection holds two of today's
+connection records. `reads` carries every command that is not a stream, as today. The
+`stream` record opens with the first stream and closes with the last. Each reconnects
+on its own, and a dropped read connection does not restart the stream. This holds on
+the Unix socket and in the browser, because the queue that stalls a read is the RPC
+client's. A client that never subscribes opens one connection, as today.
+
+The library does not reconnect a stream while a recovery read is running.
+
+- Behaviour change: a client that subscribes opens one more connection.
+- Tests updated: `packages/client/test/concurrent-reconnect.test.ts` and its peer keep
+  their expectations for unary calls, and count the stream's connection where a test
+  subscribes. `packages/client/test/oversized-state.test.ts` gains the cases in
+  criterion 3.9.
 
 ### What the later plans then add
 
@@ -2156,14 +2409,18 @@ when `toolKind` is `execute`.
 The plan builds these edits as two engine units of high complexity, each
 with an attack pass, before any piece unit:
 
-- **Unit 1a, the lists:** edits E1 to E10, E21 and E22.
+- **Unit 1a, the lists:** edits E1 to E10, E21, E22 and E30. The guard comes first,
+  and each later table's edit calls it.
 - **Unit 1b, the callers and the delivery and wait rules:** edits E11 to
-  E20, E23, E27, E28 and E29. It changes the prompt renderer and the dispatcher, which carry the
+  E20, E23, E27, E28, E29 and E31. It changes the prompt renderer and the dispatcher, which carry the
   security properties, so its attack pass covers lead rulings L13 and L16
   to L25 by name.
 
-Edits E24, E25 and E26 change the client library, not the engine, and are part
-of unit 2.
+Edits E24, E25, E26 and E32 change the client library, not the engine, and are part
+of unit 2. Unit 2 defines the client group's schemas, and it installs the group's
+events. It does not install the group's commands into `CommandsRpcGroup`, because
+every command there must have its handler (edit E3). Each unit installs the commands
+it handles, so the exact handler check stays true with no stub (row 172).
 
 ## 7. What the other pieces asked for, and where each is answered
 

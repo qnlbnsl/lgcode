@@ -1,8 +1,8 @@
 # Known gaps: shepherd-message-board
 
 Gaps the planner could not close before the freeze. Reviewers: these are
-already known; look for new problems. Updated for plan version 8, after
-the client API version 10 fold. That fold was not a review round.
+already known; look for new problems. Updated for plan version 9, after
+the client API version 11 fold. That fold was not a review round.
 
 1. **Vendor limits.** The planner cannot read each vendor's remaining
    weekly allowance. The lead checks it before launching any unit.

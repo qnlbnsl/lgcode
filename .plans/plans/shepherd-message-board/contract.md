@@ -1,10 +1,10 @@
 # The message board's contract
 
-Status: **version 9, for the foundry-roles plan to build on.** Written by
-the board's planner on 2026-11-03. Version 8 is `attack/contract-v8.md`.
-This version folds the client API contract version 10 (`a7f1c9f`; lead's
-post #229; rows 129 to 134). It builds on that version, whose copy is
-`client-api-contract-v10.md` in this folder. A later change to this file goes to `plans-lead` as a
+Status: **version 10, for the foundry-roles plan to build on.** Written by
+the board's planner on 2026-11-03. Version 9 is `attack/contract-v9.md`.
+This version folds the client API contract version 11 (`3bd2358`; lead's
+post #240; rows 135 to 139). It builds on that version, whose copy is
+`client-api-contract-v11.md` in this folder. A later change to this file goes to `plans-lead` as a
 question first. The board's plan is `.plans/plans/shepherd-message-board/plan.md`;
 its decisions are rows in `decisions.md` in the same folder, named in
 brackets below.
@@ -16,7 +16,7 @@ ruling L26). The client API plan's units 1a and 1b turn the engine's fixed
 lists into lists a piece adds to, and the board adds its own entries in
 its own units. Names and shapes follow the client API's contract
 (`.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api`,
-version 10 at `a7f1c9f`). "Edit EN" below is that contract's section 6,
+version 11 at `3bd2358`). "Edit EN" below is that contract's section 6,
 edit EN. The security rules of lead rulings L13 and L16 to L25 stay
 exactly as ruled; they are now properties of engine code.
 
@@ -397,9 +397,16 @@ A post has:
   that channel's last post, so its first wake carries nothing written
   while it was stopped (row 114).
 - **A withdrawal after a reload.** When a withdrawal leaves its target in
-  the state that a reload sets, with nothing queued or sent, the batch path
-  writes `StateChanged idle` in the same batch. The board writes nothing for
-  this (edits E17, E18; row 134).
+  the state that a reload sets, with nothing queued or sent, the first step
+  of `withWaitChecks`, which the batch path runs, writes `StateChanged idle`
+  in the same batch. The board writes nothing for this (edits E17, E18;
+  rows 134, 137).
+- **A held queue.** The roles plan can hold a target's queue after a capacity
+  error. The hold is on the queue, not on one delivery, and the engine owns
+  it, so the board has no rule for it. A held wake is a queued wake that was
+  sent, so it is not merged, cleanup may withdraw it, and it counts no return.
+  A wake the board withdraws and replaces stays behind the hold, and the
+  reactor's guard counts it as a queued wake (row 138).
 - **Restarts.** The board holds one logical wake per post and target, and
   its commands act once per request id. A wake that was sent but not proven
   received may be sent again after a restart, as the engine allows.
@@ -450,6 +457,12 @@ A post has:
   agree at one sequence. So a return with no board event does not end the
   owner's wait, and an accepted completion ends it with no later board
   event. No timer and no polling are added.
+- **One gate before any end** (client API contract, section 3). Before the
+  client helper ends an owner's wait for any reason, settled, resolved or
+  owner-held, it reads `board.status` with no agent, which returns the lists
+  and a sequence L, applies the stream up to L, and decides again.
+  `board.status` must build its lists and its sequence from one views value,
+  and return that value's own sequence, so L is at a batch's end.
 - **The owner-held list** (rows 123, 130). `ownerHeld` holds the ids of the
   agents that are the authors of an open post with the owner in `to`. While
   a post is open, the owner has no disposition in it, because the owner's
@@ -491,6 +504,12 @@ A post has:
   rule.
 - Every board event is `owner-only`: the live stream shows it to the
   owner, the owner's devices and Shephrd's services, and to no agent.
+- `client.event` is agent-callable, under the read rule, and is in the MCP
+  tool pin with `client.snapshot`, `client.roster` and `client.thread`. An
+  agent's reply to `client.thread` and `client.event` is `{ requestId, data }`,
+  where `data` is the data envelope around one line of JSON. The tool and the
+  command line return it unchanged. Owner-only events stay unavailable to an
+  agent. So an agent can read no board event this way (row 135).
 - **The board's part of `client.snapshot`** is absent for an agent,
   through the board's `snapshotFor` entry (edit E9, lead ruling L15).
   For the owner, devices and services it holds no post text, and is at
@@ -520,7 +539,7 @@ A post has:
   in device caches, and in the harness's own session files. A planner's
   receipt holds its batch and a reply of ids and counts only (edit E3).
   `board.read` writes no receipt, and its page is stored nowhere; its
-  `board.Read` event names post ids only (row 108). Closing a post erases
+  `board.Read` event names its reader and post ids only (rows 108, 136). Closing a post erases
   no copy.
 
 ## Commands the board adds to the API
@@ -571,7 +590,10 @@ filter passes (rows 116, 117). `board.status` stays readable and says
 `BoardEvent`, which joins the engine's `Event` union (edit E5). None has a top-level `agentId` field, and all are
 `owner-only`. Every one is rebuilt into the board's view from the log, and
 the engine's rebuild check covers it. `board.Read` is written only when it
-marks at least one unread post. Each board event keeps every agent's
+marks at least one unread post. Each event carries everything its fold needs,
+because a reducer reads only the event and the sequence: `board.ChannelOpened`
+names its opener, `board.Read` its reader, and `board.PostClosed` its outcome,
+who closed it, and whether a completion is owed (row 136). Each board event keeps every agent's
 lifecycle state, through the board's `keepInEveryState` line in the
 engine's lifecycle table (edit E5; row 112).
 
@@ -592,9 +614,10 @@ its `DeliveryReturned` (edit E15; row 109).
 
 The client API's budgets are in its section 5, "Message size": a page closes
 at 900 KiB of encoded items, and `client.subscribe` replaces an event over
-256 KiB with a `client.Oversized` marker. The owner's client then reads a
+256 KiB with a `client.Oversized` marker. A client then reads a
 state-bearing event whole with `client.event`, and applies it before anything
-later (client API row 137). A piece's stated largest event is checked against
+later (client API row 137). A client that subscribes uses two connections, so a
+512 KiB `board.read` page does not delay a stream's acknowledgement (edit E32). A piece's stated largest event is checked against
 the 900 KiB page budget, and an event over 256 KiB is allowed (row 133). The
 board states its largest in `packages/contracts/src/board/limits.ts`, and the
 client API's test `packages/contracts/test/size-limits.test.ts` checks them as
@@ -605,8 +628,29 @@ real encoded frames.
 | A page: `board.read`, `board.channels`, `board.status` with `detail` | 512 KiB of encoded items, with at least one item | Under the 900 KiB page budget. One post encodes to at most about 64 KiB, so one item never passes it. |
 | A board event: `board.PostWritten` | One post of 16,384 characters, with at most 16 addressees: about 64 KiB | Under the page budget, and under 256 KiB, so it is never replaced by a marker, and the owner's wait always sees it in the stream. |
 | A board event: `board.WakeBuilt` | Ids only, for what one body of 256 KiB can carry. Each item costs its header and markers in the body, so the event stays well under the body's size | Under the page budget, and under 256 KiB, so it is never replaced by a marker. |
-| An engine event: the `DeliveryQueued` and `PromptSent` of a wake | A body of 256 KiB, plus the engine's envelope and the event's own fields | Under the page budget. It may pass 256 KiB, and in `client.subscribe` it then becomes a `client.Oversized` marker. `client.event` returns it whole to the owner, a device or a service, and `client.thread` returns it whole to whoever may read that thread. `subscribe` is unchanged. |
+| An engine event: the `DeliveryQueued` and `PromptSent` of a wake | A body of 256 KiB, plus the engine's envelope and the event's own fields | Under the page budget. It may pass 256 KiB, and in `client.subscribe` it then becomes a `client.Oversized` marker. `client.event` and `client.thread` return it whole to whoever the read rule lets see it; an agent gets it inside the data envelope. `subscribe` is unchanged. |
 | A snapshot section | 256 KiB, with the condition lists always whole | Counted in the client API's test on its large fixture, which fails above 4 MiB. |
+
+## The board's table entries (row 136)
+
+Every function this plan adds to a per-piece table (view reducer, reach check, hold-unsettled, request-held, source rule, secret keep list, `snapshotFor`, alert source, `openMatters`) is called through the engine's `guardPiece` (client API contract, section 1, edit E30). If it throws, the engine logs the namespace, the table and the error's class name, with no event text, and uses the stated fallback. This plan adds no wrapper of its own, and no direct call. A reducer reads the event and the sequence, and nothing else from the envelope, because a projection passes placeholders for the rest.
+
+The fallbacks are in the client API contract, section 1. For the board, a throw
+means this:
+
+| Table | The fallback | What it means for the board |
+| --- | --- | --- |
+| Reach check | Refuse | A wake is not queued, or is withdrawn at send. A refused queue writes `CommandRefused`, so it cannot loop. |
+| Hold-unsettled | Holds | The agent is not settled. |
+| Request-held | Does not hold | A blocking wait is not cancelled. |
+| Source rule | Withdraw | The same as the board's entry. |
+| Secret keep list | Skip collection | The board's entry is "none", and it cannot throw. |
+| `snapshotFor` | Section left out, with a mark | The owner's wait still has `board.status` through its gate. |
+| Alert source, `openMatters` | Nothing raised | That post has no alert. The error log shows it. |
+| View reducer | The view stays as it was | Live, projected and rebuilt views still agree. |
+
+`board.status` and `ownerHeld` are in no table. A throw in a read fails that read
+alone, and the owner's wait does not end on a failed read.
 
 ## The board's reactor (rows 104, 105, 124, 125)
 
