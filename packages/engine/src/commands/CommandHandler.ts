@@ -192,12 +192,15 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
     // that agent whose setup is still running (lanes.ts), so the lane frees at
     // once. The signal is sent only for a stop this caller could commit: the
     // credential, the payload, the agent's state and the holder are checked
-    // here as the transaction checks them. A caller who fails any check
-    // signals nothing, and the command then fails in its own transaction.
+    // here as the transaction checks them. The checks cannot see every refusal
+    // (a reused request id, a writer failure), so the signal is not trusted
+    // to mean the stop commits: the result is the step that tells the start
+    // how the stop ended, and the start finishes the agent itself when the
+    // stop did not (lanes.ts, round 2 F-1).
     const preemptStart = (credential: Credential, name: string, rawPayload: unknown) => Effect.gen(function* () {
       const agentId = name === "stop" ? laneFor(name, rawPayload) : undefined;
       const rpc = CommandsRpcGroup.requests.get("stop");
-      if (agentId === undefined || rpc === undefined) return;
+      if (agentId === undefined || rpc === undefined) return Effect.void;
       yield* Effect.try({
         try: () => Schema.decodeUnknownSync(Schema.toType(rpc.payloadSchema))(rawPayload),
         catch: () => refused(),
@@ -212,15 +215,16 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
       }
       const snapshot = yield* views.snapshot;
       const target = snapshot.agents[agentId];
-      if (target === undefined || commandOutcome(target.state._tag, "stop") === "refused") return;
+      if (target === undefined || (target.state._tag !== "starting" && target.state._tag !== "paused")
+        || commandOutcome(target.state._tag, "stop") === "refused") return Effect.void;
       if (caller._tag === "agent") {
         const current = snapshot.agents[caller.agentId];
         const holder = holderAbove(snapshot, agentId);
         if (current === undefined || current.state._tag === "stopped" || current.state._tag === "crashed"
-          || holder._tag !== "agent" || holder.agentId !== caller.agentId) return;
+          || holder._tag !== "agent" || holder.agentId !== caller.agentId) return Effect.void;
       }
-      yield* preempt(log, agentId);
-    }).pipe(Effect.ignore, Effect.provideService(SqlClient.SqlClient, sql));
+      return yield* preempt(log, agentId);
+    }).pipe(Effect.orElseSucceed((): Effect.Effect<void> => Effect.void), Effect.provideService(SqlClient.SqlClient, sql));
     // Issue 77: a blocking wait commits its opening and registers its
     // cancellation in one uninterruptible step (waits.ts, `block`). Every
     // other command stays interruptible throughout, as before.
@@ -228,7 +232,7 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
       && rawPayload !== null && (rawPayload as { readonly block?: unknown }).block === true;
 
     return CommandHandler.of({
-      execute: (credential, name, rawPayload) => preemptStart(credential, name, rawPayload).pipe(Effect.andThen(Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
+      execute: (credential, name, rawPayload) => Effect.acquireUseRelease(preemptStart(credential, name, rawPayload), () => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
         if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
         const step = isBlockingWait(name, rawPayload) ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : restore;
         const outcome = yield* step(log.transact((append) => Effect.gen(function* () {
@@ -318,6 +322,6 @@ export const layer = (configuration: { readonly home: string; readonly stateFold
         Effect.provideService(SqlClient.SqlClient, sql),
         Effect.catchTag("RequestIdReused", () => Effect.fail(refused("request id reused"))),
         Effect.catchTag("SqlError", () => Effect.fail(new LogWriteFailed({ reason: "database read failed" }))),
-      ))),
+      ), (settle) => settle),
     });
   }));

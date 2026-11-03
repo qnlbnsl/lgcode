@@ -42,42 +42,81 @@ export const withLane = (log: Log, agentId: string) =>
     }),
   );
 
-// Fix round 1, A3: `stop` pre-empts a start whose adapter setup is still
-// running, instead of queueing behind it for the lane. The start registers a
-// cancel signal for its agent before it asks for the lane and drops it when
-// its post-commit step ends. `preempt` completes the signal; the start's
-// `cancellable` step then gives up its setup, which interrupts the runner
-// call, and returns `none`. Only a start registers one, so `preempt` of any
-// other lane holder (a stalled send, flow3 F-5) does nothing.
-const cancels = new WeakMap<Log, Map<string, Deferred.Deferred<void>>>();
+// Fix round 1, A3, and round 2 (F-1, F-2): `stop` pre-empts a start whose
+// adapter setup is still running, instead of queueing behind it for the lane.
+//
+// Each agent has at most one record, shared by its start and by the stops
+// that pre-empt it. A stop calls `preempt` before it queues for the lane. The
+// call completes the record's cancel signal and returns the stop's `settle`
+// step, which the stop runs when its command ends in any way: committed,
+// refused, failed or interrupted. The start's `cancellable` step gives up its
+// setup on the signal, which interrupts the runner call, and returns `none`.
+// The start then leaves the lane and waits for `settled`, so it can see how
+// the stop ended; if the agent is still starting it writes the failure
+// itself (start.ts). A stop that is refused after it cancelled a setup
+// therefore cannot leave the agent without a terminal outcome (round 2, F-1).
+//
+// Either side may create the record. A stop that signals before the start has
+// registered leaves the signal in the record, and the start reads it at
+// registration (F-2). A record the start never registered is dropped when its
+// last stop settles. Only a start registers one, so `preempt` of any other
+// lane holder (a stalled send, flow3 F-5) does nothing.
+interface StartRecord {
+  readonly cancel: Deferred.Deferred<void>;
+  readonly stops: Array<Deferred.Deferred<void>>;
+  registered: boolean;
+}
+
+const records = new WeakMap<Log, Map<string, StartRecord>>();
+
+const recordFor = (log: Log, agentId: string): StartRecord => {
+  let byAgent = records.get(log);
+  if (byAgent === undefined) records.set(log, byAgent = new Map());
+  let record = byAgent.get(agentId);
+  if (record === undefined) byAgent.set(agentId, record = { cancel: Deferred.makeUnsafe<void>(), stops: [], registered: false });
+  return record;
+};
+
+const forget = (log: Log, agentId: string, record: StartRecord) => {
+  const byAgent = records.get(log);
+  if (byAgent?.get(agentId) === record) byAgent.delete(agentId);
+};
 
 export interface Preemptible {
   // Runs `effect` unless the signal arrives first; `none` means it was
   // cancelled, before or during the run.
   readonly cancellable: <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<Option.Option<A>, E, R>;
+  // Waits until every stop that signalled has ended, but at most
+  // `timeoutMillis`, so a stop that never ends cannot hold the start.
+  readonly settled: (timeoutMillis: number) => Effect.Effect<void>;
 }
 
 export const withPreemption = (log: Log, agentId: string) =>
   <A, E, R>(use: (handle: Preemptible) => Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => Effect.acquireUseRelease(
     Effect.sync(() => {
-      let signals = cancels.get(log);
-      if (signals === undefined) cancels.set(log, signals = new Map());
-      const signal = Deferred.makeUnsafe<void>();
-      signals.set(agentId, signal);
-      return signal;
+      const record = recordFor(log, agentId);
+      record.registered = true;
+      return record;
     }),
-    (signal) => use({
-      cancellable: (effect) => Deferred.isDone(signal).pipe(Effect.flatMap((done) => done
+    (record) => use({
+      cancellable: (effect) => Deferred.isDone(record.cancel).pipe(Effect.flatMap((done) => done
         ? Effect.succeed(Option.none())
-        : Effect.raceFirst(Effect.map(effect, Option.some), Deferred.await(signal).pipe(Effect.as(Option.none()))))),
+        : Effect.raceFirst(Effect.map(effect, Option.some), Deferred.await(record.cancel).pipe(Effect.as(Option.none()))))),
+      settled: (timeoutMillis) => Effect.suspend(() => Effect.forEach(record.stops.slice(), (stop) => Deferred.await(stop), { discard: true })).pipe(
+        Effect.timeoutOption(timeoutMillis), Effect.asVoid),
     }),
-    (signal) => Effect.sync(() => {
-      const signals = cancels.get(log);
-      if (signals?.get(agentId) === signal) signals.delete(agentId);
-    }),
+    (record) => Effect.sync(() => forget(log, agentId, record)),
   );
 
-export const preempt = (log: Log, agentId: string): Effect.Effect<void> => Effect.suspend(() => {
-  const signal = cancels.get(log)?.get(agentId);
-  return signal === undefined ? Effect.void : Deferred.succeed(signal, undefined).pipe(Effect.asVoid);
+// Signals the agent's start, if any. The result is the `settle` step: run it
+// when the stop command ends, whatever the way (it is idempotent).
+export const preempt = (log: Log, agentId: string): Effect.Effect<Effect.Effect<void>> => Effect.sync(() => {
+  const record = recordFor(log, agentId);
+  const stop = Deferred.makeUnsafe<void>();
+  record.stops.push(stop);
+  Deferred.doneUnsafe(record.cancel, Effect.void);
+  return Effect.sync(() => {
+    Deferred.doneUnsafe(stop, Effect.void);
+    if (!record.registered && record.stops.every((other) => Deferred.isDoneUnsafe(other))) forget(log, agentId, record);
+  });
 });
