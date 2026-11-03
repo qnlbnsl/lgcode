@@ -142,3 +142,35 @@ path `effect/rpc/*` (not `@effect/rpc`); platform imports
   piece 2 or the lead; issue 75 (no owner waiter) is answered by owner choice
   A10 and lead ruling L1; issue 164 (agent-less events hidden from agents)
   stands.
+
+## Planner's checks for the full plan (2026-11-03)
+
+Effect 4.0.5 source, `node_modules/.pnpm/effect@4.0.5/node_modules/effect/src/`:
+
+- `http/HttpStaticServer.ts`: `make` (l.72) and `layer` (l.242) serve
+  static files.
+- `http/HttpServerResponse.ts`: `setCookie` (l.732), `file` (l.529),
+  `redirect` (l.153).
+- `http/HttpServerRequest.ts`: requests carry parsed cookies (doc comment,
+  l.6-8, l.74).
+- `socket/Socket.ts`: `layerWebSocketConstructorGlobal` (l.877) gives a
+  browser's global `WebSocket`; `makeWebSocket` (l.896).
+- `rpc/RpcClient.ts`: `make` (l.643), `makeProtocolSocket` (l.1062),
+  `layerProtocolSocket` (l.1293), so the web page can use the same RPC
+  client over a browser WebSocket.
+- `ws` 8.22.0 (`node_modules/.pnpm/ws@8.22.0`): `maxPayload` defaults to
+  100 MiB (`lib/websocket-server.js:50,74`). Whether Effect's Node server
+  uses `ws` for the engine socket was not checked; the engine and client
+  source set no explicit limit (grep for `maxPayload`, `maxMessage`: none).
+
+Repository:
+
+- `herdr-plugin.toml`: one `[[startup]]` (`./bin/shephrd serve --detach`)
+  and one `[[actions]]` entry (`serve`). Plugin platforms: `linux`. How an
+  action opens a new Herdr pane was not checked; it is post-build check
+  PB-3.
+- No React, Ink or Playwright dependency exists in any `packages/*/package.json`.
+- Design round inputs: `.foundry/design-shepherd-client-api-1-task.md` in
+  the area worktree `foundry-plans` (the four questions and their
+  recommended options); `.foundry/owner-q1b-engine-seam.md` (the seam
+  question to the owner, recommendation (a)).
