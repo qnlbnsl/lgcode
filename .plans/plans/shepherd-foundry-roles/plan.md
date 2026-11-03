@@ -53,7 +53,12 @@ folder could change the tests; the owner is told this when adding a rule.
 Only the owner adds or removes a rule, and the owner's phone is told the
 first time each rule is used. Standing rules need the first of the engine
 changes described below. Without it, the owner can write rules, but nothing
-is answered by them.
+is answered by them. On today's evidence, no harness the owner uses meets
+every one of these conditions yet. Claude Code's shell request names no
+folder, and Codex runs an approved command outside its sandbox. So the
+owner is asked whether to build standing rules in this version, and the
+recommendation is to record each harness first and build them only if one
+qualifies (question 4).
 
 The third addition is the sheepdog. It is a small part of the Shephrd
 service that watches the record of events and keeps every agent moving
@@ -82,7 +87,7 @@ lets an agent list its own team. The message board lets the sheepdog post
 a notice that no agent can forge, and deliver an agent's waiting messages
 at a chosen moment.
 
-One owner decision is open. The lead sent the owner one question on
+Two owner decisions are open. The lead sent the owner one question on
 2026-11-03, with an amendment after the first review round: the client API
 plan's extension point, plus three small engine changes for this plan. The
 first change records which tool asked for a permission and exactly what it
@@ -98,6 +103,15 @@ changes, the other workstreams still work, but standing rules answer
 nothing, capacity errors go back to their sender as they do today, and some
 wakes remain. If the owner declines the extension point itself, both
 contracts and this plan are rewritten first.
+
+The second open decision is question 4, sent through the lead on
+2026-11-03 after the third review round. Standing rules are in the owner's
+epic, but on today's evidence no harness can be matched safely. The
+recommendation is to record each harness's permission requests first, and
+to build the rule matcher and the first engine change's rule check only if
+a harness qualifies. Otherwise standing rules wait for a later version,
+and the lead keeps answering each request. The rest of this plan is the
+same under either answer.
 
 ## Key decisions
 
@@ -116,8 +130,9 @@ contracts and this plan are rewritten first.
   own folder, inside the harness's sandbox. A rule may allow more words
   after its own only when the owner marks it so. Any character outside a
   short safe list, any request to leave the sandbox, and anything the
-  matcher cannot read means no match. The cost is that the owner writes a
-  rule per command, and that rules need the first engine change.
+  matcher cannot read means no match. The cost is that the owner writes a rule per command, and that rules need
+  the first engine change. Whether they are built in this version is
+  question 4.
 - **The sheepdog tells the parent; the parent acts.** It wakes an agent,
   retries a held capacity error and resumes a crash once by itself.
   Replacing a worker or giving up is reported to the nearest ancestor that
@@ -138,6 +153,9 @@ contracts and this plan are rewritten first.
 - **Open: the extension point and three engine changes.** Pending the
   owner. The three changes sit in one workstream that is dropped if the
   owner declines them.
+- **Open: standing rules now, or after a harness qualifies.** Pending the
+  owner (question 4). The recommendation is a recording run first, which
+  decides whether the rule matcher and its engine check are built.
 
 Full log → `decisions.md`
 
@@ -167,7 +185,8 @@ not plainly a sandboxed run, settings files, persistent answers, and
 anything above the asker's mode or outside its folder. A dedicated attack
 review checks it. Done when a worker's matching request is answered by the
 rule, and requests for `pnpm test & rm -rf ~` and `pnpm test -- --config x`
-are not.
+are not. If the owner defers standing rules (question 4), this workstream
+waits for a later version.
 
 ### A sheepdog keeps every agent moving
 
@@ -248,10 +267,11 @@ uses no `herdr agent` command, `collect.sh` or `board-waker.sh`.
    first unit, once the owner agrees. Until then, the parts with no
    connection to the engine can be built: the role names, the role file
    format, the rule matcher and the hand-off builder. The owner also
-   records short shell-permission samples for each harness, which the
-   matcher is checked against.
-2. **Build the roles' commands and events,** then `orient` and the
-   standing-rule commands, once the extension point and the client API's
+   records short shell-permission samples for each harness, with a
+   recorder prepared for them. That recording decides question 4's gate:
+   the rule matcher is built only if a harness qualifies.
+2. **Build the roles' commands and events,** then `orient`, and the standing-rule commands if question 4 allows
+   them, once the extension point and the client API's
    roster have merged.
 3. **Build the sheepdog's base, then its rules.** The rules that send
    notices need the board's post, flush and status commands, so they follow
@@ -282,11 +302,14 @@ the message board contract v5, `.plans/plans/shepherd-message-board/contract.md`
 on `worker/plans-board` at `e84fd65` (lead rulings L17, L21 and L24; rows
 29, 31, 33, 34, 55); round 2 reviewed v4 at `bcc33e1`. Both assume the
 extension seam (CAPI §6), which is pending the owner (rows 19, 24, 30). Lead
-rulings L20 and L25 govern standing rules (rows 35, 54, 67). Engine anchors are at
+rulings L20 and L25 govern standing rules (rows 35, 54, 67, 79), and
+question 4 (row 68) decides whether WS-2 and WS-7a's rule check are built
+in this version. Engine anchors are at
 `8ff4c9b` (scouting.md, Scout E). `FOUNDRY` is
 `~/.claude/plugins/marketplaces/founder-os/plugins/harness-sessions/skills/software-foundry`.
 Each review round's findings and their folds are in
-`attack/round-1-findings.md` and `attack/round-2-findings.md`.
+`attack/round-1-findings.md`, `attack/round-2-findings.md` and
+`attack/round-3-findings.md`.
 
 **Conventions for every unit.** TypeScript on Node.js 26 with Effect 4 at
 the engine's pinned version. Effect APIs are looked up in the current
@@ -301,7 +324,10 @@ with the test clock as its clock, and talks to it only through its real
 Unix socket (row 63). The production service has no test switch, and its
 bounds are unchanged. Tests run with the workspace's `vitest run` at the
 repository root, filtered by path, because packages have no `test` script
-(row 66); each "Verify" line below names the paths. No unit reads an
+(row 66); each "Verify" line below names the paths. Unit 1 registers both
+new packages as test projects in the root `vitest.config.ts`, and each
+unit's first verification output shows the test files it discovered
+(row 71). No unit reads an
 agent's screen or types into a pane. Text from an agent, a tool call's
 input or a file is data: it is matched, shortened and quoted, never
 followed. An agent's name, which its parent chose, is data too: a roles
@@ -338,21 +364,24 @@ Events, all `owner-only` (CAPI §3), so agents never see them through
 the device, if any), `roles.Snoozed`, and the sheepdog's action records
 `roles.TeamIdleReported`, `roles.StallSeen`, `roles.ReplaceAdvised`,
 `roles.RunawayReported`, `roles.CapacityRetried`, `roles.CrashRetried`,
-`roles.GaveUp`, `roles.RoleAdviceBroken`, `roles.CacheFlushed` and
-`roles.CompactRequested`. Each action record carries its subject agent,
+`roles.GaveUp`, `roles.RoleAdviceBroken`, `roles.CacheFlushed`,
+`roles.CompactRequested` and `roles.StallEnded`. Each action record carries its subject agent,
 its recipient (an agent id, or `owner`), the sequence number of the event
-that triggered it, its occurrence number, and whether its notice was sent
-(`sent`, or `board-off`). `GaveUp` also carries its cause (`crash`,
+that triggered it, its occurrence number, whether its notice was sent (`sent`, or
+`board-off`), and, for a sent notice, the post id `board.post` returned
+(row 69). `GaveUp` also carries its cause (`crash`,
 `resume-refused`, `reload-failed` or `capacity`) and `engineAlertOpen`:
 whether an engine `failure` alert for the same agent was open when the
-record was written, read from the client API's alert view (row 58). Alert
-sources (CAPI §4), each only for recipient `owner` (row 39): `StallSeen`
+record was written, read from the client API's alert view (row 58). Alert sources (CAPI §4), each only for recipient `owner` (row 39),
+except a `GaveUp` whose notice is `board-off` (row 72): `StallSeen`
 and `TeamIdleReported` raise `roles.stall`; `GaveUp` raises `roles.stall`
 unless `engineAlertOpen` is true; `ReplaceAdvised` raises `roles.replace`;
 `RunawayReported` raises `roles.runaway`; `RuleFirstUsed` raises
 `roles.rule-first-use` for every rule. `RoleAdviceBroken` raises no alert;
-the clients show it. Alert ends (row 40): `roles.stall` ends when its agent
-next starts a turn that is not a sheepdog turn, or is stopped;
+the clients show it. Alert ends (row 40): `roles.stall` ends on `roles.StallEnded`,
+which the sheepdog writes when its agent next starts a turn that is not a
+sheepdog turn, or is stopped, because an alert source sees one event and
+cannot tell the two kinds of turn apart (row 76);
 `roles.replace` ends when its agent is stopped; `roles.runaway` ends when
 the turn ends or the agent is stopped; `roles.rule-first-use` ends when the
 rule is disabled or removed. Every alert also ends when the owner
@@ -370,13 +399,19 @@ agents first. Every list has a stated maximum, and a list cut short sets
 `roles.rules.list` and `roles.actions.list`. Stated maxima, which
 `packages/api`'s size test checks against the 1 MiB message limit
 (CAPI §5): a role file of at most 64 KiB, so `roles.RoleFileSet` stays
-under 72 KiB; a rule of at most 2 KiB encoded, because its fields are
-bounded to fit (2a), and at most 500 rules, so a `roles.rules.list` page of
-200 rules stays under 400 KiB; a `roles.actions.list` page of at most 500
+under 72 KiB; a rule of at most 2 KiB, measured on its encoded form and
+checked as a whole, because its fields at their separate maxima do not fit
+together (2a, row 70), and at most 500 rules, so a `roles.rules.list` page
+of at most 200 rules stays under 400 KiB; a `roles.actions.list` page of at most 500
 records, under 256 KiB; a `roles.handoff` reply of at most 64 KiB, encoded,
 envelope included; and the roles' snapshot section at most 128 KiB, with
 the rules' summary at most 500 entries, the snoozes at most 200, and the
-agents' latest records at most 256 agents.
+agents' latest records at most 256 agents. The section is filled in a
+stated order until it reaches 128 KiB, measured encoded, as the board's
+section is: the role file, the settings and switches, the open alerts'
+matters, then the rules' summary, the snoozes, and the agents' latest
+records, newest agents first. Whatever does not fit is cut, and its list is
+marked `truncated` (row 70).
 
 Services (CAPI §2, "Services"): `roles.standing-rules` and
 `roles.sheepdog`. The standing-rules service does not call the engine's
@@ -401,8 +436,9 @@ notice that asks for a decision or wakes a stuck agent is followed by
 recipient's next wake. A **nudge** is such a notice, to the stalled or idle
 agent itself, followed by `board.flush`. A **sheepdog turn** is a turn
 started by a delivery that the sheepdog alone caused: a board wake whose
-`board.WakeBuilt` lists only posts by `service roles.sheepdog`, or the
-sheepdog's carry-on prompt. A wake that also carries any other post is not
+`board.WakeBuilt` lists only posts by `service roles.sheepdog`, the
+sheepdog's carry-on prompt, or a compaction the sheepdog requested
+(row 76). A wake that also carries any other post is not
 a sheepdog turn. There is no engine-prompt fallback for notices.
 
 The board switched off (rows 34, 59). While the board is switched off,
@@ -413,7 +449,8 @@ restarts their clocks from zero when the board is switched on. Compaction,
 crash retries and capacity releases carry on. A notice to an agent is not
 sent: its action record says `board-off`, the clients show it, and a
 `GaveUp` is also raised to the owner as its alert, under the same
-`engineAlertOpen` test, so a give-up never waits on a switched-off board.
+`engineAlertOpen` test and the alert-source exception above (row 72), so
+a give-up never waits on a switched-off board.
 
 Recipient of every notice (row 38). A notice about an agent goes to that
 agent's holder at the moment the action is recorded: the nearest ancestor
@@ -422,8 +459,12 @@ that is idle or working, which is the engine's `holderAbove`
 none. A paused parent is skipped, as the engine and the board skip it;
 `docs/foundry.md` says so. The action record names both the subject agent
 and the recipient. If the recipient crashes or is stopped while the notice
-is still unread (`board.status`), the sheepdog sends the notice once more,
-to the new holder.
+is still unread, the sheepdog sends the notice once more, to the new
+holder. `board.status` cannot say whether one post is read, and a service
+cannot use `board.read`, so the roles view tracks each notice itself: the
+action record keeps the post id, and the view folds the board's
+`board.Read` and `board.WakeBuilt` events and the engine's
+`DeliveryAccepted` for that recipient to mark the notice read (row 69).
 
 Request ids (row 41). Each action's request id is
 `roles:<rule>:<subject>:<trigger sequence>:<action kind>:<recipient>:<occurrence>`,
@@ -446,7 +487,7 @@ package, the role file, and `orient`. Role names are parsed from the free
 | 1.1 | `parseRole("worker:builder")` gives kind `worker` and name `builder`; `parseRole("")` and `parseRole("chef")` give kind `worker` with an `unknown-kind` flag | `packages/roles-contracts/test/role.test.ts` R01-R03 |
 | 1.2 | `RolesRpcGroup` is prefixed `roles.`, every payload has `requestId`, and the composed API's uniqueness test passes with it | `packages/roles-contracts/test/group.test.ts` G01; CAPI §1's uniqueness test in `packages/api` |
 | 1.3 | `rolesAccess` equals the command table above, every event in `RolesEvent` is `owner-only` in `rolesVisibility`, and `snapshotFor` returns nothing for an agent caller | `group.test.ts` G02-G04 |
-| 1.3a | A role file over 64 KiB is refused; a rule whose fields are each at their maximum encodes under 2 KiB; a snapshot section built from 500 such rules, 200 snoozes and 256 agents with a year of action records stays under 128 KiB, marks each cut list `truncated`, and the client rebuilds the full rule set and the omitted records through `roles.rules.list` and `roles.actions.list`; the roles' maxima pass the composed API's size test | `roleFile.test.ts` F06; `packages/roles/test/snapshot.test.ts` SN01-SN03; `packages/api` size test (CAPI §5) |
+| 1.3a | A role file over 64 KiB is refused; a rule just under 2 KiB encoded is accepted, and a rule whose fields are each within their own maxima but whose encoded total, with multibyte text, passes 2 KiB is refused; a snapshot section built from 500 rules, 200 snoozes and 256 agents, each with records of all ten action kinds, stays under 128 KiB, is filled in the stated order, marks each cut list `truncated`, and the client rebuilds the full rule set and the omitted records through `roles.rules.list` and `roles.actions.list`; the roles' maxima pass the composed API's size test | `roleFile.test.ts` F06; `packages/roles/test/snapshot.test.ts` SN01-SN03; `packages/api` size test (CAPI §5) |
 | 1.4 | A role file that fails the schema is refused with the failing path, and the previous file stays loaded | `packages/roles/test/roleFile.test.ts` F01-F04 |
 | 1.5 | A role file with a key outside the schema, such as `permission` or `rules`, is refused; so is a limit outside its bounds (row 48) | `roleFile.test.ts` F05, F07 |
 | 1.6 | `shephrd roles orient` and the MCP tool, called by an agent, return its name, kind and role name, its parent's id and name, its children with their states, its open-request and open-question counts, and its role's advice; called by the owner, it is refused | `packages/roles/test/orient.test.ts` O01-O04 |
@@ -457,7 +498,7 @@ package, the role file, and `orient`. Role names are parsed from the free
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
 | 1a | `parseRole` and the three kinds, with generic advice for each: an orchestrator talks to leads; a lead starts, waits on and answers for its own workers; a worker reports to its lead, does not start agents and does not ask the owner | target `packages/roles-contracts/src/role.ts:parseRole`; pattern `packages/contracts/src/permission.ts:permissionLevels` |
-| 1b | `packages/roles-contracts`: `RolesRpcGroup`, `RolesEvent`, `rolesAccess`, `rolesVisibility`, `rolesAlertSources`, and the stated maxima above | CAPI §1, "Where the schemas live"; §5 (stated maxima); pattern `packages/contracts/src/commands.ts:CommandsRpcGroup`, `packages/contracts/src/events.ts:Event` |
+| 1b | `packages/roles-contracts`: `RolesRpcGroup`, `RolesEvent`, `rolesAccess`, `rolesVisibility`, `rolesAlertSources`, and the stated maxima above; registers `packages/roles-contracts` and `packages/roles` as test projects in the root `vitest.config.ts` (row 71) | CAPI §1, "Where the schemas live"; §5 (stated maxima); pattern `packages/contracts/src/commands.ts:CommandsRpcGroup`, `packages/contracts/src/events.ts:Event` |
 | 1c | Role-file schema (role name to advice text and limits, each limit within row 48's bounds), loader from content, `roles.role-file.set` and `get` handlers | target `packages/roles/src/roleFile.ts:loadRoleFile`; pattern `packages/contracts/src/harnesses.ts` |
 | 1d | The roles view (role file, rules, settings, switches, snoozes, the sheepdog's action records, the stall and retry counters, each agent's highest permission mode since it started, the reactors' cursors), its bounded `snapshotFor` hook, `roles.actions.list`, and its registration on the seam | target `packages/roles/src/view.ts:apply`; pattern `packages/engine/src/views/apply.ts:apply`, `emptyViews`; CAPI §1, "Views and reactors"; Board's bounded snapshot section as the pattern |
 | 1e | `roles.orient` handler over `client.roster` entries (CAPI §3) and the role file | target `packages/roles/src/orient.ts`; envelope rule `packages/engine/src/routing/envelope.ts` |
@@ -475,6 +516,11 @@ package, the role file, and `orient`. Role names are parsed from the free
 
 **WS-2: Routine permission requests are answered by owner-approved rules**
 
+This workstream is built only if the owner's answer to question 4 allows
+it (row 68). If standing rules are deferred, nothing in WS-2 is built
+except the recordings (2g, 2h), the acceptance test's standing-rule step
+is dropped, and WS-7a is dropped with it.
+
 This work adds standing rules: a schema, a parser, a pure matcher, the
 owner's commands, and the pre-check that WS-7a registers. The matcher
 follows lead ruling L20 (rows 35, 67). It reads only the permission request
@@ -489,15 +535,22 @@ sandbox. A rule matches only when every one of these holds:
 
 - the harness has a pinned shape, so it is not `unsupported`;
 - the tool kind is `execute`, and the request carries the harness's shell
-  discriminator: a field value or title form that only the harness's own
-  shell tool produces (row 54, lead ruling L25);
+  discriminator: a field the adapter sets, whose value the model's input
+  cannot choose, and which only the harness's own shell tool produces. A
+  title never counts, because adapters build titles from the model's
+  input (row 54, lead ruling L25; row 79);
 - every field of the input is in the harness's known-field list, the
   harness's sandboxed-run marker is present with its sandboxed value, and
   no field asks to leave or widen the sandbox: for Claude Code,
-  `dangerouslyDisableSandbox` absent or false; for Codex,
-  `sandbox_permissions` absent or `use_default`, and no
+  `dangerouslyDisableSandbox` absent or false; for Codex, no
   `additional_permissions`, `with_escalated_permissions`, `prefix_rule` or
-  `reason`; a harness whose recordings show no field that tells a
+  `reason`, and `sandbox_permissions` absent or `use_default`. These Codex
+  fields describe what the model asked for, not how an approved command
+  runs, so none of them is the sandboxed-run marker. Under Codex's
+  on-request approval policy an approved command runs outside the sandbox,
+  so Codex is expected to be `unsupported`, unless the adapter's approval
+  event itself says the approved command will run inside the sandbox
+  (row 79). A harness whose recordings show no field that tells a
   sandboxed run from each kind of escalation is `unsupported`;
 - the input was neither redacted nor cut;
 - the command, in the harness's pinned form, contains only ASCII letters,
@@ -510,20 +563,32 @@ sandbox. A rule matches only when every one of these holds:
   marked `prefix`, the rule's words are the first words and every further
   word passes the same character check (ruling L20: "Prefix matching
   applies only on whole argv words, and only where the rule says so");
-- no word contains, anywhere in it, the name of a protected settings
-  folder or file: the names in the engine's protected paths
-  (`packages/engine/src/identity/ceiling.ts:317`), such as `.claude`,
-  `.codex` and `settings.json`, and each harness's configured settings
-  folder. This catches `of=.claude/settings.json` and
-  `--config=.codex/x` as well as a plain path, even when `settingsWrite`
-  is false;
+- no word contains, anywhere in it and compared without case, the name
+  of a protected settings folder or file: the engine's protected names,
+  imported from the engine's own function rather than copied
+  (`packages/engine/src/identity/ceiling.ts:314-321`; today `.claude`,
+  `.codex`, `.gemini`, `.cursor` and `.mcp.json`), and each harness's
+  configured settings folder. This catches `of=.claude/settings.json`,
+  `of=.Claude/x` and `--config=.codex/x` as well as a plain path, even
+  when `settingsWrite` is false;
+- no word, and no part of a word after an `=`, names a path that resolves
+  into a protected settings location. WS-7a resolves each such path
+  against the request's working folder before the request's transaction,
+  following symbolic links with the engine's own resolver, as the
+  permission ceiling does, and passes the result to the matcher. So
+  `cp template.json active-config` does not match when `active-config`
+  links to `.claude/settings.json`. A path that cannot be resolved for any
+  reason except that it does not exist counts as protected (row 79);
 - the input names a working folder, and it equals the asker's folder; an
   input with no working-folder field never matches, so Claude Code's shell
   gets no matches in this version (known gap 14);
 - the harness, role and group the rule lists all match: every listed
   dimension must match, and an empty or missing list matches nothing;
 - the highest permission mode the asker has held since it started is at or
-  below the rule's highest asker mode, which defaults to `ask`;
+  below the rule's highest asker mode, which defaults to `ask`. An asker
+  with any `ModeRefused` in its history counts as above every rule's
+  limit, because it ran in the refused mode until the engine set it back
+  (row 79);
 - the request offers an `allow_once` option at or below the asker's mode,
   `settingsWrite` is false, and the rule is enabled, unexpired at the
   transaction's time, and not added by a device since revoked.
@@ -543,7 +608,9 @@ fixed text. It also warns that another agent whose folder contains the
 asker's folder, such as a lead in `edit` mode, can change what the command
 runs; that a rule wider than `ask` lets the asker do so itself; and, for a
 `prefix` rule, that test runners and package managers accept further
-arguments that run code.
+arguments that run code. A symbolic link created after WS-7a's
+resolution and before the command runs is not caught; known gap 20 states
+it.
 
 **Done when:**
 
@@ -552,17 +619,17 @@ arguments that run code.
 | 2.1 | A request of kind `execute` with the harness's shell discriminator and sandboxed-run marker, whose own input is the command `pnpm test` with the asker's folder, from a harness, role and group the rule names, by an asker that has only ever been in `ask` mode, matches, and the matcher returns the request's `allow_once` option id | `packages/roles/test/rules.test.ts` M01 |
 | 2.2 | A command containing any character outside the allowed set matches no rule: tested with `&`, `;`, `\|`, a backquote, `$`, `(`, `>`, `<`, `~`, `*`, `?`, `[`, `{`, `%`, a single and a double quote, a backslash, a newline, a tab, a carriage return, a non-ASCII space, and `[REDACTED]` | `rules.test.ts` M02-M22 |
 | 2.3 | Words that differ from an exact rule's list do not match: an extra trailing word (`pnpm test -- --config x`), a missing word, a reordered word, and a doubled space; a `prefix` rule matches extra plain words and refuses an extra word with a refused character | `rules.test.ts` M23-M28 |
-| 2.4 | A request whose kind is not `execute` or is absent does not match; nor does a request of kind `execute` without the shell discriminator, including a recorded or synthetic non-shell tool with the same input shape | `rules.test.ts` M29-M31 |
-| 2.5 | A request with an unknown input field, without the sandboxed-run marker, with `dangerouslyDisableSandbox: true`, with `sandbox_permissions` other than `use_default`, with `additional_permissions`, `with_escalated_permissions`, `prefix_rule` or `reason`, or from an `unsupported` harness, does not match | `rules.test.ts` M32-M39 |
-| 2.6 | A request with no input, with input that was redacted or cut, with no working folder, or with a working folder other than the asker's does not match; nor does a word naming or containing a protected settings name, such as `.claude/settings.json`, `of=.claude/settings.json` or `--config=.codex/config.toml`, with an empty locations list | `rules.test.ts` M40-M46 |
+| 2.4 | A request whose kind is not `execute` or is absent does not match; nor does a request of kind `execute` without the shell discriminator, including a recorded or synthetic non-shell tool with the same input shape, and a non-shell `execute` tool whose title copies the shell's title | `rules.test.ts` M29-M31, M63 |
+| 2.5 | A request with an unknown input field, without the sandboxed-run marker, with `dangerouslyDisableSandbox: true`, with `sandbox_permissions` other than `use_default`, with `additional_permissions`, `with_escalated_permissions`, `prefix_rule` or `reason`, or from an `unsupported` harness, does not match; nor does a Codex request whose only sandbox evidence is `sandbox_permissions: use_default`, including a recorded retry-without-sandbox approval with and without `reason` | `rules.test.ts` M32-M39, M64-M65 |
+| 2.6 | A request with no input, with input that was redacted or cut, with no working folder, or with a working folder other than the asker's does not match; nor does a word naming or containing a protected settings name, such as `.claude/settings.json`, `of=.claude/settings.json` or `--config=.codex/config.toml`, an upper-case spelling such as `of=.Claude/settings.json`, or a word naming an existing symbolic link to a protected settings file, each with an empty locations list; a word whose resolution fails for a reason other than "does not exist" counts as protected | `rules.test.ts` M40-M46, M66-M68 |
 | 2.7 | A command written as a list matches item by item; a list item containing a space, a wrapper not in the pinned form, and a list whose items joined with spaces equal the rule but whose items differ do not match | `rules.test.ts` M47-M49 |
-| 2.8 | A request with `settingsWrite: true`, one offering no `allow_once` option, one whose `allow_once` level is above the asker's mode, and one whose asker is now in `ask` but was in `edit` earlier never match | `rules.test.ts` M50-M53 |
+| 2.8 | A request with `settingsWrite: true`, one offering no `allow_once` option, one whose `allow_once` level is above the asker's mode, one whose asker is now in `ask` but was in `edit` earlier, and one whose asker has a `ModeRefused` in its history never match | `rules.test.ts` M50-M53, M69 |
 | 2.9 | A rule listing a role and a group does not match an agent with only one of them; an empty list matches nothing; a disabled rule, a rule expired at the time passed in, and a rule added by a revoked device do not match; the lowest numeric rule id wins when two match | `rules.test.ts` M54-M59 |
 | 2.10 | `roles.rules.add`, `disable` and `remove` are refused for agents and services and accepted for the owner; rule ids are numeric and never reused; a rule over its field bounds is refused; the reply carries the fixed warnings above | `packages/roles/test/rulesCommands.test.ts` C01-C05 |
 | 2.11 | With WS-7a, a matching request is answered in the request's own transaction, and the `PermissionAnswered` envelope's caller is the service with the rule's id; no delivery to the holder is queued; a disable committed before the request wins; with no match, the request goes to its holder | `packages/roles/test/precheck.test.ts` P01-P03 |
 | 2.12 | A rule's first use writes `roles.RuleFirstUsed` once, which raises one `roles.rule-first-use` alert; the alert ends only when the owner dismisses it or the rule is disabled or removed | `precheck.test.ts` P04-P05 |
 | 2.13 | Without WS-7a, the rule commands work, `roles.rules.list` marks every rule `inactive: engine addition missing`, and no request is answered by a rule | `precheck.test.ts` P06 |
-| 2.14 | Each harness's recordings (2g) parse into the matcher's inputs and pin its shape; a harness whose recordings show no shell discriminator, or no field that separates a sandboxed run from each recorded escalation, is `unsupported` | `packages/roles/test/fixtures.test.ts` X01-X03 |
+| 2.14 | Each harness's recordings (2g) parse into the matcher's inputs and pin its shape; a harness whose recordings show no shell discriminator, or no field that separates a sandboxed run from each recorded escalation, is `unsupported`; a shell discriminator that is only a title is refused | `packages/roles/test/fixtures.test.ts` X01-X04 |
 | 2.15 | A matcher given deeply nested, very large or wrongly typed input returns "no match" and never throws | `rules.test.ts` M60-M62 |
 
 **Tasks:**
@@ -571,28 +638,30 @@ arguments that run code.
 |---|---|---|
 | 2a | Rule schema: numeric id, harnesses, roles and groups (each at most 8 entries of at most 64 characters), the word list (at most 16 words of at most 64 characters), the `prefix` flag (default off), highest asker mode (default `ask`), folder scope (`own-folder` only in this version), optional expiry, enabled flag, the adding device, owner note (at most 256 characters); the bounds keep a rule under 2 KiB encoded | target `packages/roles-contracts/src/rules.ts:StandingRule`; pattern `packages/contracts/src/permission.ts` |
 | 2b | Command parser: refuses any character outside the allowed set, then splits a string on single spaces, or checks a list item by item; nothing is stripped or rewritten | target `packages/roles/src/commandWords.ts:splitCommand`; new code (the CLI's `sanitize.ts` strips characters, which is the opposite, so it is not the pattern) |
-| 2c | `matchRule(request, asker, rules, now)`: pure and total; returns an option id or a reason; uses the engine's option kinds and levels and the protected settings names | target `packages/roles/src/rules.ts:matchRule`; `packages/contracts/src/permission.ts:acpPermissionOptionKinds`, `permissionForOptionKind`; `packages/engine/src/identity/ceiling.ts` l.239-244, l.317 |
+| 2c | `matchRule(request, asker, rules, now)`: pure and total; returns an option id or a reason; uses the engine's option kinds and levels, the protected settings names compared without case, and WS-7a's resolved-path results | target `packages/roles/src/rules.ts:matchRule`; `packages/contracts/src/permission.ts:acpPermissionOptionKinds`, `permissionForOptionKind`; `packages/engine/src/identity/ceiling.ts` l.239-244, l.317 |
 | 2d | Rule commands' handlers and their events; a rule whose adding device is revoked is shown as `suspended` | target `packages/roles/src/rulesCommands.ts`; CAPI §1, "How a piece's command runs"; CAPI §2, the envelope's `device` field |
 | 2e | Register `matchRule` as WS-7a's permission pre-check; a reactor on `PermissionAnswered` with a rule caller writes `RuleFirstUsed` through `roles.record` | target `packages/roles/src/precheck.ts`; CAPI §1, "Views and reactors"; WS-7a |
 | 2f | Per-harness shapes from 2g's recordings: shell discriminator, known-field list, command form (string, list or pinned wrapper), working-folder field, sandboxed-run marker | target `packages/roles/src/harnessInputs.ts` |
-| 2g | Record scrubbed shell-permission samples for each harness (Claude Code through `claude-agent-acp`, Codex through `codex-acp`): one plain sandboxed command; one with each sandbox-escape field the harness supports; for Codex, a `require_escalated` request and Codex's own retry-without-sandbox approval; one request from any other tool of kind `execute` the harness has; and the tool-call frames around each. A short live run on the owner's accounts, approved by the owner | targets `packages/testing/fixtures/claude-shell-permission.ndjson`, `codex-shell-permission.ndjson`; pattern `packages/engine/scripts/live/prompts.ts` and the existing recorder (`pnpm record-fixtures`) |
+| 2g | Record scrubbed shell-permission samples for each harness (Claude Code through `claude-agent-acp`, Codex through `codex-acp`): one plain sandboxed command; one with each sandbox-escape field the harness supports; for Codex, a `require_escalated` request and Codex's own retry-without-sandbox approval, with and without `reason`, in its `read-only` and `workspace-write` modes, and under any approval policy question 4's option (b) tries; one request from any other tool of kind `execute` the harness has; and the tool-call frames around each. A short live run on the owner's accounts, approved by the owner | targets `packages/testing/fixtures/claude-shell-permission.ndjson`, `codex-shell-permission.ndjson`; the recorder as prepared by 2h |
+| 2h | Prepare the recorder for 2g: a scenario, permission mode, harness and output path chosen per run, keeping the greeting fixtures and their paths unchanged, and the scrubbing the greeting recordings already get | targets `packages/engine/scripts/record-fixtures.ts`, `packages/engine/scripts/recorder.ts` (today fixed to read-only mode, l.217-225, and to `<harness>.ndjson`, l.293-296); pattern `packages/engine/scripts/live/prompts.ts` |
 
 **Risks:**
 
 | Risk | Severity | Mitigation |
 |---|---|---|
 | A rule is stretched by a crafted command (compound shell, extra arguments, quoting, expansion, argument lists) | blocker | The allowed character set, the exact word list, the opt-in `prefix` with its warning, item-by-item lists (2.2, 2.3, 2.7); attack pass on units 3 and 11a. |
-| A rule approves a run outside the harness's sandbox, including an escalation that carries no named field | blocker | A positive sandboxed-run marker, the escape fields and `reason`, and `unsupported` when recordings cannot tell them apart (2.5, 2.14). |
+| A rule approves a run outside the harness's sandbox, including an escalation that carries no named field | blocker | A positive sandboxed-run marker set by the adapter's approval event, never the model's own fields; Codex expected `unsupported`; `unsupported` whenever recordings cannot tell them apart (2.5, 2.14, row 79). |
+| Standing rules ship into the engine's permission path, but no harness qualifies | major | Question 4: the recording run comes first, and the matcher and WS-7a's rule check are built only if a harness qualifies (row 68). |
 | A rule meant for the shell approves another tool | major | Kind `execute` plus the pinned shell discriminator (2.4); lead ruling L25 (row 54). |
 | The matcher approves an input other than the one that runs | major | It reads only the request's own input, and refuses a redacted or cut one (2.6). |
-| A rule writes a harness settings file through an argument | major | The protected-name check inside every word (2.6). |
+| A rule writes a harness settings file through an argument or a link | major | The protected-name check inside every word, without case, and WS-7a's resolved paths (2.6); a link made after the check is known gap 20. |
 | A rule for a test command lets an agent run what it or another agent wrote | major | The highest mode since start defaults to `ask` (2.8); the fixed warnings name other agents' folders (2.10). The guard cannot see edits by an agent whose folder contains the asker's; that is stated, not fixed. |
 | A matcher defect loses a permission request | major | WS-7a treats any matcher error as no match (2.15, 7.2). |
 | Claude Code's shell input names no working folder, so Claude agents get no matches | minor | Fail closed by design (2.6); known gap 14; a launch setting is a feature idea. |
 | A rule outlives its purpose | minor | Optional expiry; the first-use alert (2.12); the owner lists rules from any client. |
 | A stolen phone adds a rule | major | A rule records its adding device and stops matching when that device is revoked (2.9); CAPI's question Q2 may also make `roles.rules.add` host-only. |
 
-**Verify:** `pnpm vitest run packages/roles` at the repository root; the output lists the test files it ran. Device or environment QA: the owner's recording run for 2g.
+**Verify:** `pnpm vitest run packages/roles` at the repository root; the output lists the test files it ran. Device or environment QA: the owner's recording run for 2g, which comes before units 3, 4 and 11a and decides question 4's gate.
 
 **WS-3: A sheepdog keeps every agent moving**
 
@@ -610,20 +679,20 @@ into it.
 | 3.3 | Request ids follow the rule above: an hourly repeat and a stall's later episode get new ids; a retry of one action reuses its id and body; two recipients of one trigger get two ids | `fold.test.ts` S04-S06 |
 | 3.4 | The two services call only the commands listed under "Services" above; `roles.record` refuses every event kind outside the calling service's own action kinds, including `RuleAdded` and `SettingsChanged`; a test lists the calls and compares | `packages/roles/test/sheepdog/calls.test.ts` K01-K02 |
 | 3.5 | A notice to an agent is a `board.post` by `service roles.sheepdog` with a `direct` target and `reply: none`, followed by `board.flush` for exactly the kinds listed above; its body is fixed text plus sanitized names; a notice to the owner is a roles event that raises its alert | `packages/roles/test/sheepdog/notices.test.ts` N01-N03, N07 |
-| 3.6 | With the board switched off, no notice is sent, its action record says `board-off`, the stall, team-idle and flush rules are suspended with their counts kept and their clocks restarted from zero when it is switched on, and a `GaveUp` raises its owner alert unless an engine `failure` alert covers it, including after a crash of a worker whose holder is a lead | `notices.test.ts` N06, N11-N12 |
-| 3.7 | A notice goes to the subject's nearest idle or working ancestor, or to the owner when there is none; a notice still unread when its recipient crashes is sent once to the new holder | `notices.test.ts` N08-N09 |
+| 3.6 | With the board switched off, no notice is sent, its action record says `board-off`, the stall, team-idle and flush rules are suspended with their counts kept and their clocks restarted from zero when it is switched on, and a `GaveUp` raises its owner alert unless an engine `failure` alert covers it, including after a crash of a worker whose recorded recipient is a live lead | `notices.test.ts` N06, N11-N12 |
+| 3.7 | A notice goes to the subject's nearest idle or working ancestor, or to the owner when there is none; a notice still unread when its recipient crashes is sent once to the new holder; read state comes from the roles view's fold of the notice's post id, so a notice the recipient read or accepted is not re-sent, after a restart too | `notices.test.ts` N08-N09, N15-N16 |
 | 3.8 | `roles.snooze` silences team-idle notices for that group until the time passes; `roles.settings.set` changes a limit and the next check uses it; a value outside its bounds is refused with its path | `notices.test.ts` N04-N05, N10 |
 | 3.9 | Timers are re-armed from the view at start-up; a stall, team-idle or capacity deadline that passed while the service was down is re-checked and fires once, one step only; a cache deadline that passed is dropped | `packages/roles/test/sheepdog/timers.test.ts` T01-T03 (`TestClock.adjust`) |
-| 3.10 | With `sheepdog: off`, the sheepdog sends nothing, cancels its timers and keeps folding events; with WS-7b it first releases each held delivery once, and the engine holds no new delivery while it is off, so a released delivery that meets capacity again is returned to its sender as today; with `standing-rules: off`, the pre-check matches nothing; switching back on re-arms the timers under 3.9's rules | `packages/roles/test/sheepdog/switch.test.ts` W01-W06 |
-| 3.11 | A turn started by a wake that lists only the sheepdog's posts, or by its carry-on prompt, is a sheepdog turn; a turn started by a wake that also carries another author's post is not | `notices.test.ts` N13-N14 |
+| 3.10 | With `sheepdog: off`, the sheepdog sends nothing, cancels its timers and keeps folding events; with WS-7b it first releases each held delivery once, and the engine holds no new delivery while it is off, so a released delivery that meets capacity again is returned to its sender as today; with `standing-rules: off`, the pre-check matches nothing; switching back on re-arms the timers under 3.9's rules; at start-up with the sheepdog off, every hold still open is released once | `packages/roles/test/sheepdog/switch.test.ts` W01-W07 |
+| 3.11 | A turn started by a wake that lists only the sheepdog's posts, or by its carry-on prompt, is a sheepdog turn; a turn started by a wake that also carries another author's post is not; a compaction the sheepdog requested is a sheepdog turn; `roles.StallEnded` is written at the first turn that is not a sheepdog turn, and the alert ends through the client API's alert reactor, for a sheepdog-only wake followed by a mixed wake | `notices.test.ts` N13-N14, N17-N18 |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
 | 3a | Register `roles.sheepdog` and `roles.standing-rules` on the seam; the reactors' cursors in the roles view; the `roles.record` command with its closed list of kinds per service | CAPI §2, "Services"; §1, "Views and reactors" |
-| 3b | Settings shape, bounds and defaults (rows 16, 25, 48), the two switches (row 46), with per-role overrides from the role file | target `packages/roles/src/sheepdog/settings.ts` |
-| 3c | Notices through `board.post` and `board.flush`, the recipient rule, the flush list, the `board-off` record and suspension, owner notices as roles events, and the sheepdog-turn test | target `packages/roles/src/sheepdog/notices.ts`; Board, "For Shephrd's own services", `board.WakeBuilt`; `packages/engine/src/routing/holders.ts:holderAbove` |
+| 3b | Settings shape, bounds and defaults (rows 16, 25, 48, 73), the two switches (row 46), with per-role overrides from the role file | target `packages/roles/src/sheepdog/settings.ts` |
+| 3c | Notices through `board.post` and `board.flush`, the recipient rule, the flush list, the `board-off` record and suspension, owner notices as roles events, the notices' read state (row 69), the sheepdog-turn test and `roles.StallEnded` (row 76) | target `packages/roles/src/sheepdog/notices.ts`; Board, "For Shephrd's own services", `board.WakeBuilt`; `packages/engine/src/routing/holders.ts:holderAbove` |
 | 3d | Timers on Effect's clock, re-armed from the view; each rule declares whether a missed deadline is re-checked or dropped | pattern `packages/engine/src/accounts/timers.ts:startAccountTimers` (and its re-check of deadlines crossed during a tick, issue 210) |
 | 3e | Action request ids (row 41) | CAPI §5, "Request ids" |
 | 3f | The on/off switches and their effect on timers, held deliveries, the capacity-hold condition (7.3) and the pre-check | target `packages/roles/src/sheepdog/switch.ts` |
@@ -648,16 +717,23 @@ board's status (its fixed-size summary, and its `incoming` and `own`
 detail lists, Board v5) and the clock to a list of actions, so each is
 tested alone.
 
-An agent is **busy** when it is starting or working, or has a delivery
-queued or sent. An agent A **waits on** another party through: a child of
+An agent is **busy** when it is starting or working, has a delivery
+queued or sent, or is paused for a usage limit with a known reset, because
+the engine will resume it (row 74). An agent signed out of its account
+counts as the owner for these tests, because the owner already has the
+account alert. An agent A **waits on** another party through: a child of
 A; an open engine wait of A, on its members; an open request or question of
 A, on its holder; and an open post of A's own that needs a reply, on each
-addressee with no disposition yet. A is **waiting on others** when at least
-one party it waits on is busy, is the owner, or holds A's open request or
-question (row 56). When every agent A waits on is idle with nothing
-pending, A is not waiting on others, so a chain or a cycle of agents that
-each wait on the next, with none busy, is stalled at every link that owes
-a reply.
+addressee with no disposition yet. A is **waiting on others** when some party
+reachable from A through "waits on" links is busy, is the owner, or holds
+an open request or question of the agent that waits on it (rows 56, 74).
+The search keeps a visited set, so a cycle of idle agents ends as "not
+waiting". When nothing reachable is busy, A is not waiting on others, so a
+chain or a cycle of agents that each wait on the next, with none busy, is
+stalled at every link that owes a reply. A chain that ends at a busy agent
+is stalled nowhere. A reply owed inside such a chain therefore waits until
+that agent finishes; the idle agents that remain then form a chain with
+none busy, and stall.
 
 The stall rule is a small state machine for each pair of an open post P and
 one addressee A (row 37). Its clock runs only while A is idle, no delivery
@@ -675,8 +751,10 @@ lead or orchestrator), an episode begins:
   `roles.handoff`, and the sheepdog stops nudging A about P.
 
 The episode count resets to zero when A makes progress (a thread item that
-records a file change, or a board post by A), when P closes, or when A's
-part of P is resolved. Tool calls alone are not progress. The count lives in
+records a file change, a reply to P, or a board post by A made outside a
+sheepdog turn), when P closes, or when A's part of P is resolved. Tool
+calls alone are not progress, and nor is a post A writes in a turn a nudge
+started (row 78). The count lives in
 the roles view as `StallSeen` records, so a restart continues it. Each
 episode needs the clock to run its full limit again, so a stall never steps
 twice at once.
@@ -690,12 +768,12 @@ ordinary work.
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 4.1 | Team idle: a group with at least one live, unpaused member, none of whose members is busy, for 60 minutes, gets one nudge to each of its top agents (each member whose parent is outside the group) and one notice to each distinct holder of those; then hourly; sheepdog turns do not restart the hour; a group whose members are all stopped or paused gets nothing; a snoozed group gets nothing | `packages/roles/test/sheepdog/rules/teamIdle.test.ts` TI01-TI08 |
-| 4.2 | Stall: the state machine above, through three episodes on a simulated clock: nudge, nudge and holder notice, `ReplaceAdvised`; a file change or a post resets the count; tool calls alone do not; P closing resets it; the count survives a restart | `rules/stall.test.ts` ST01-ST08 |
-| 4.3 | A lead that holds an open `all` post to its working workers, and a worker with an open wait on a working agent, are not stalled; a lead that posted H to a worker and a worker that posted question Q back, both idle with nothing pending, both stall; the same with an engine wait in place of a post; a group whose only activity is such a cycle counts as idle | `rules/stall.test.ts` ST09-ST13; `rules/teamIdle.test.ts` TI09 |
-| 4.4 | Runaway: a turn longer than the role's turn limit (default 120 minutes from its `DeliverySent`, not counting time paused or holding an open permission request) tells the holder once per turn; a worker older than the worker age limit (default 120 minutes from `AgentStarted`, the Foundry's worker cap) tells the holder once, suggesting a hand-off; a lead or orchestrator has no age limit unless its role file sets one | `rules/runaway.test.ts` RW01-RW05 |
-| 4.5 | Capacity, with WS-7b: a held delivery is released after 5 minutes, at most 12 times in one outage; after the last release, the hold condition says no, so the next capacity error returns the delivery to its sender as today, and `GaveUp { cause: capacity }` tells the holder, flushed, to move the work to another model; an outage ends, and the count resets, when a turn ends with no capacity error; without WS-7b, the sheepdog does nothing on a capacity error, and the returned delivery wakes its sender as today | `rules/capacity.test.ts` CP01-CP06 |
-| 4.6 | Crash: on the first `AgentCrashed` for an agent within an hour, the sheepdog checks that the crash is still current, calls `resume` once, and after `SessionOpened`, if the engine queued no carry-on, sends one `prompt` with fixed carry-on text; it then tells the holder (`CrashRetried`) that the agent was resumed, that the holder's posts to it resolved as `gone` and must be posted again if still needed, and not to replace it unless told the sheepdog gave up; a refused `resume`, an `AgentReloadFailed`, or a second crash within the hour writes `GaveUp` with its cause and tells the holder at once | `rules/crash.test.ts` CR01-CR06 |
+| 4.1 | Team idle: a group with at least one live, unpaused member, none of whose members is busy, for 60 minutes, gets one nudge to each of its top agents (each member whose parent is outside the group) and one notice to each distinct holder of those; then hourly; sheepdog turns do not restart the hour; a group whose members are all stopped or paused gets nothing; a group of an idle lead and a worker paused for a usage limit, mid-turn or not, gets nothing; a snoozed group gets nothing | `packages/roles/test/sheepdog/rules/teamIdle.test.ts` TI01-TI08, TI10-TI11 |
+| 4.2 | Stall: the state machine above, through three episodes on a simulated clock: nudge, nudge and holder notice, `ReplaceAdvised`; a file change, a reply to P or a post outside a sheepdog turn resets the count; tool calls alone do not, and nor does a post written in a nudge's turn; P closing resets it; the count survives a restart | `rules/stall.test.ts` ST01-ST08, ST18 |
+| 4.3 | A lead that holds an open `all` post to its working workers, and a worker with an open wait on a working agent, are not stalled; a lead that posted H to a worker and a worker that posted question Q back, both idle with nothing pending, both stall; the same with an engine wait in place of a post; a group whose only activity is such a cycle counts as idle; a worker that posted a question to its idle lead while a sibling works is not stalled, and nor is the lead; an orchestrator over idle leads whose workers work is not stalled; a chain that ends at an idle agent stalls; a lead whose only child is paused for a usage limit is not stalled | `rules/stall.test.ts` ST09-ST13, ST15-ST17, ST19; `rules/teamIdle.test.ts` TI09 |
+| 4.4 | Runaway: a turn longer than the role's turn limit (default 120 minutes from its `DeliverySent`, not counting time paused, holding an open permission request, or inside an open blocking `wait` (row 77)) tells the holder once per turn; a worker older than the worker age limit (default 120 minutes from `AgentStarted`, the Foundry's worker cap) tells the holder once, suggesting a hand-off; a lead or orchestrator has no age limit unless its role file sets one; a lead in a blocking `wait` on working workers for three hours is not reported | `rules/runaway.test.ts` RW01-RW06 |
+| 4.5 | Capacity, with WS-7b: a held delivery is released after 5 minutes, at most 12 times in one outage; after the last release, the hold condition says no, so the next capacity error returns the delivery to its sender as today, and `GaveUp { cause: capacity }` tells the holder, flushed, to move the work to another model; the count is the engine's own, per agent and outage (7.3), so a release by the owner or the holder counts too; an outage ends, and the count resets, when a turn ends with no capacity error; without WS-7b, the sheepdog does nothing on a capacity error, and the returned delivery wakes its sender as today | `rules/capacity.test.ts` CP01-CP07 |
+| 4.6 | Crash: on the first `AgentCrashed` for an agent within an hour, the sheepdog checks that the crash is still current, calls `resume` once, and after `SessionOpened`, if the engine queued no carry-on, sends one `prompt` with fixed carry-on text; it then tells the holder (`CrashRetried`) that the agent was resumed, that the holder's posts to it resolved as `gone` and must be posted again if still needed, and not to replace it unless told the sheepdog gave up; a refused `resume`, an `AgentReloadFailed`, or a second crash within the hour writes `GaveUp` with its cause and tells the holder at once; with the crash-retry setting at 0, the first crash writes `GaveUp` at once (row 73) | `rules/crash.test.ts` CR01-CR07 |
 | 4.7 | Usage-limit and sign-in pauses are never nudged and never counted as stalls or team idleness | `rules/stall.test.ts` ST14; `rules/teamIdle.test.ts` TI04 |
 | 4.8 | Role advice: a worker that itself starts an agent, posts to the owner, or passes a question up is reported to its holder once per kind of break; a question moved by an ancestor's `pass-up` or by the holder chain is not reported | `rules/roleAdvice.test.ts` RA01-RA04 |
 | 4.9 | A notice whose recipient is the owner raises the alert in the table above instead of a post: one test per action kind; `GaveUp` raises `roles.stall` for each cause unless an engine `failure` alert for that agent is open, so an owner-held agent whose reload failed after the sheepdog's resume raises one, and one whose `resume` was refused while the engine's alert stood raises none; role advice raises none | `rules/ownerAlerts.test.ts` OA01-OA09 |
@@ -704,10 +782,10 @@ ordinary work.
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 4a | Team idle rule over engine groups, per top agent and per holder, with the "busy" test | target `packages/roles/src/sheepdog/rules/teamIdle.ts`; groups from `AgentStarted.groups` and `AgentGrouped` (`packages/contracts/src/events.ts:Event`); `FOUNDRY/scripts/team-idle-watch.sh` l.13-14 ("Only 'working' counts as busy") |
-| 4b | Stall state machine, with its counter per post and addressee (row 37), and the "waits on" and "waiting on others" tests (row 56) | target `rules/stall.ts`; Board v5, `board.status` with `detail` `incoming` and `own`, and its pure-function export from `packages/board`; pattern `packages/engine/src/routing/waits.ts:settled` |
-| 4c | Runaway rule from `DeliverySent`, `TurnEnded`, pauses and permission requests; worker age rule from `AgentStarted` | target `rules/runaway.ts`; `packages/engine/src/routing/deliveries.ts` l.248 (`DeliverySent`); `FOUNDRY/scripts/context-keeper.sh` (`WORKER_MAX_MIN`) |
-| 4d | Capacity rule over `DeliveryHeld`: release timer, outage count, the hold condition's input, and the give-up | target `rules/capacity.ts`; WS-7b's `DeliveryHeld` and `DeliveryReleased`; `FOUNDRY/scripts/capacity-retry.sh` (5-minute backoff, 12 retries) |
+| 4a | Team idle rule over engine groups, per top agent and per holder, with the "busy" test, which counts a usage-limit pause as busy (row 74) | target `packages/roles/src/sheepdog/rules/teamIdle.ts`; groups from `AgentStarted.groups` and `AgentGrouped` (`packages/contracts/src/events.ts:Event`); `FOUNDRY/scripts/team-idle-watch.sh` l.13-14 ("Only 'working' counts as busy") |
+| 4b | Stall state machine, with its counter per post and addressee (row 37), and the transitive "waits on" and "waiting on others" tests (rows 56, 74) | target `rules/stall.ts`; Board v5, `board.status` with `detail` `incoming` and `own`, and its pure-function export from `packages/board`; pattern `packages/engine/src/routing/waits.ts:settled` |
+| 4c | Runaway rule from `DeliverySent`, `TurnEnded`, pauses, permission requests and blocking waits (`packages/engine/src/routing/waits.ts` l.162-170); worker age rule from `AgentStarted` | target `rules/runaway.ts`; `packages/engine/src/routing/deliveries.ts` l.248 (`DeliverySent`); `FOUNDRY/scripts/context-keeper.sh` (`WORKER_MAX_MIN`) |
+| 4d | Capacity rule over `DeliveryHeld`: release timer and the give-up; the hold condition reads the engine's own count (7.3, row 75) | target `rules/capacity.ts`; WS-7b's `DeliveryHeld` and `DeliveryReleased`; `FOUNDRY/scripts/capacity-retry.sh` (5-minute backoff, 12 retries) |
 | 4e | Crash rule: re-check, one `resume`, the carry-on prompt, then give up, with `engineAlertOpen` | target `rules/crash.ts`; `AgentCrashed` from `packages/engine/src/recovery/crash.ts:64`; `packages/engine/src/commands/resume.ts` l.26, l.51-54; `packages/engine/src/recovery/reload.ts:reloadedEvents`; CAPI §4 (the engine's `failure` alert and when it clears) |
 | 4f | Role-advice rule over the envelope's caller | target `rules/roleAdvice.ts`; `parseRole` (WS-1); `AgentStarted.parent`, `QuestionMoved` and its caller |
 
@@ -717,7 +795,8 @@ ordinary work.
 |---|---|---|
 | Notices wake leads so often that they cost more than they save | major | One notice per event; hourly repeats at most; only decision notices are flushed; snooze. The acceptance test counts lead wakes (8.3). |
 | A lead or worker rightly waiting on a busy agent is treated as stalled | major | The "waiting on others" test (4.3). |
-| Two idle agents wait on each other and nothing fires | major | Waiting counts only while an awaited agent is busy (4.3). |
+| Two idle agents wait on each other and nothing fires | major | Waiting counts only while an agent reachable through the waits is busy (4.3). |
+| A usage-limit pause makes a team look idle | major | A paused agent with a known reset counts as busy (4.1, row 74). |
 | Without WS-7b, capacity errors wake their senders as today | minor | Known gap 6; the owner question's 7b removes it. |
 | A crash loop on resume | major | One retry per hour per agent (row 17). |
 | The engine's own crash notice wakes the holder before the sheepdog's notice, and the holder starts a replacement anyway | minor | The sheepdog's notice says what it did; known gap 15. |
@@ -840,8 +919,12 @@ replacement (row 62).
 Rows 11, 19, 24, 30 and 53: pending the owner. Round 1 changed 7a and 7b,
 and the lead sent the owner the amended version (row 53). Round 2 narrowed
 both without adding any capability (row 57): 7a records its input only for
-`execute` requests, bounded; 7b holds only while the roles say so. If
-declined, this workstream is dropped. Each change follows CAPI §6's
+`execute` requests, bounded; 7b holds only while the roles say so. Round 3
+moved 7b's hold from one delivery to the target agent's queue, and gave
+7a's rule check resolved paths (rows 75, 79); the lead is asked to send
+both to the owner with question 4. If the owner defers standing rules
+(question 4), 7a is dropped and WS-7 is 7b and 7c. If the owner declines
+the three changes, this workstream is dropped. Each change follows CAPI §6's
 additive rule, "No existing command, event, state, reply, rule or test
 changes", and every existing engine test, the acceptance suite and the
 rebuild check pass unchanged.
@@ -851,17 +934,17 @@ rebuild check pass unchanged.
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
 | 7.1 | 7a, fields: `PermissionRequested` gains optional fields from the request's own tool call: `toolKind` (the protocol's `kind`), and, only when the kind is `execute`, `toolInput` (its `rawInput`, after the engine's redaction, at most 8 KiB encoded), `inputRedacted` (true when redaction changed it) and `inputTruncated` (true when the 8 KiB cap cut it); they are absent when the adapter omits them; `toolInput` is kept out of the requests view and of `client.snapshot`; old logs rebuild unchanged | `packages/engine/test/runner/permission-fields.test.ts` PF01-PF05; the rebuild check |
-| 7.2 | 7a, pre-check: a registered pure pre-check receives the request, the asker, the views of the same transaction and the transaction's time; the engine calls it as a total function, so an error or a malformed result is logged without request content and treated as no match; when it returns an option, the engine applies its own checks, whatever the pre-check said: the option is a one-time allow, not persistent, of a known kind, within the asker's mode by `canAnswerOption`, and `settingsWrite` is false; if they pass, `PermissionAnswered` is appended in the same transaction as `PermissionRequested`, as a second write whose envelope caller is the service with the rule id, with `answeredBy` the same service, no delivery to the holder is queued, and the runner's `answerPermission` is called after commit; if they fail, the request is routed as today; with nothing registered, routing is unchanged | `packages/engine/test/routing/permission-precheck.test.ts` PC01-PC07 (with stub pre-checks that always answer, and one that throws); `packages/engine/test/acceptance/capability-07-permissions.test.ts` unchanged and passing |
-| 7.3 | 7b, hold: a piece may register a capacity-hold condition, a pure function of the delivery and the views of the same transaction; the roles' says yes only while the sheepdog is on and the delivery's outage count is below its limit; on a capacity error with the condition saying yes, a delivery that was sent but not accepted is held (`DeliveryHeld { deliveryId, reason: "capacity" }`), staying queued at the front, while for an accepted delivery the engine leaves it accepted and queues its usual carry-on delivery, held; the dispatcher skips a held delivery, and the agent becomes idle; no `DeliveryReturned` and no pause is written; a wait on that agent does not end; a crash or stop handles a held delivery as it handles any queued one; with nothing registered, or the condition saying no, the error returns the delivery exactly as today; usage-limit and sign-in pauses are unchanged | `packages/engine/test/runner/classify-capacity.test.ts` K01-K08 |
-| 7.4 | 7b, release: a new command `release { deliveryId }`, allowed for the owner, the delivery's target's holder and a service, writes `DeliveryReleased`, and the delivery is dispatched as usual; it is refused for a delivery that is not held | `packages/engine/test/commands/release.test.ts` RL01-RL03 |
+| 7.2 | 7a, pre-check: a registered pure pre-check receives the request, the asker, the views of the same transaction and the transaction's time; the engine calls it as a total function, so an error or a malformed result is logged without request content and treated as no match; when it returns an option, the engine applies its own checks, whatever the pre-check said: the option is a one-time allow, not persistent, of a known kind, within the asker's mode by `canAnswerOption`, and `settingsWrite` is false; if they pass, `PermissionAnswered` is appended in the same transaction as `PermissionRequested`, as a second write whose envelope caller is the service with the rule id, with `answeredBy` the same service, no delivery to the holder is queued, and the runner's `answerPermission` is called after commit; if they fail, the request is routed as today; with nothing registered, routing is unchanged. Before the transaction, for an `execute` request, the engine resolves each path-like word, and each part of a word after an `=`, against the request's working folder with the ceiling's resolver, following symbolic links, and passes the pre-check, for each, whether it lands in a protected settings location; a resolution error other than "does not exist" counts as protected | `packages/engine/test/routing/permission-precheck.test.ts` PC01-PC08 (with stub pre-checks that always answer, and one that throws); `packages/engine/test/acceptance/capability-07-permissions.test.ts` unchanged and passing |
+| 7.3 | 7b, hold (rows 57, 75): a piece may register a capacity-hold condition, a pure function of the target agent and the views of the same transaction. The engine counts each agent's capacity holds itself, as its `DeliveryHeld` and `DeliveryReleased` events since the agent's last `TurnEnded` without a capacity error, so the count is per agent and outage, every release counts whoever made it, and no roles record can lag behind it. The roles' condition says yes only while the sheepdog is on and that count is below its limit. On a capacity error with the condition saying yes, the engine writes `DeliveryHeld { agentId, deliveryId, reason: "capacity" }` and holds the agent's queue: a delivery that was sent but not accepted stays queued at the front, and for an accepted delivery the engine leaves it accepted and queues its usual carry-on. While the hold is open, the dispatcher sends nothing to that agent, whatever is at the head, so a board wake that the board withdraws and replaces (seam item 13) stays behind the hold. The agent becomes idle; no `DeliveryReturned` and no pause is written; a wait on that agent does not end. A restart's reload and an account's return leave an agent with an open hold idle, with its queue still held: a held queue counts as neither "requeued" nor "carried" for `reloadedEvents`, so no agent is left working with nothing sent. A crash or stop handles the queued deliveries as today and ends the hold. With nothing registered, or the condition saying no, the error returns the delivery exactly as today; usage-limit and sign-in pauses are unchanged | `packages/engine/test/runner/classify-capacity.test.ts` K01-K12 (K09 a replaced board wake during a hold, K10 a release by the owner, K11 a restart with a held unaccepted delivery and with a held carry-on, K12 a sign-out return during a hold) |
+| 7.4 | 7b, release: a new command `release { agentId }`, allowed for the owner, the agent's holder and a service, writes `DeliveryReleased` and ends the agent's open hold, and its queue is dispatched as usual; it is refused for an agent with no open hold | `packages/engine/test/commands/release.test.ts` RL01-RL03 |
 | 7.5 | 7c: `TurnEnded` carries optional usage for the turn's last model request, when the adapter reports it: its start time, input tokens, cache-read tokens, and cache-write tokens split by lifetime when given; old logs rebuild unchanged | `packages/engine/test/runner/usage.test.ts` U01-U02; the rebuild check |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 7a | Permission fields and pre-check registration on the seam (rows 24, 35, 67) | `packages/engine/src/runner/AcpRunner.ts` l.400-417 (where the request's tool call is read and the answer awaited), `packages/engine/src/commands/CommandHandler.ts` l.138-176 (the runner-event transaction, its fixed `owner` caller and its failure path), `packages/engine/src/routing/permissions.ts` (`answer`'s agent checks and `answerPermission` as the pattern), `routing/holders.ts:holderAbove`; CAPI §6 item 12 as the pattern |
-| 7b | Capacity class, the hold condition's registration, `DeliveryHeld`, `DeliveryReleased` and `release` (rows 36, 57) | `packages/engine/src/runner/classify.ts:classifyError`; `routing/deliveries.ts` (dispatch, `failed`, l.109-116 acceptance, l.136-156 the pause's carry-on); `packages/engine/src/recovery/reload.ts` l.95-97 (carry-on text); `packages/contracts/src/commands.ts`, `packages/contracts/src/events.ts` |
+| 7a | Permission fields and pre-check registration on the seam (rows 24, 35, 67) | `packages/engine/src/runner/AcpRunner.ts` l.400-417 (where the request's tool call is read and the answer awaited), `packages/engine/src/commands/CommandHandler.ts` l.138-176 (the runner-event transaction, its fixed `owner` caller and its failure path), `packages/engine/src/routing/permissions.ts` (`answer`'s agent checks and `answerPermission` as the pattern), `routing/holders.ts:holderAbove`; the ceiling's resolver, `packages/engine/src/identity/ceiling.ts` l.341 and l.396; CAPI §6 item 12 as the pattern |
+| 7b | Capacity class, the hold condition's registration, `DeliveryHeld`, `DeliveryReleased` and `release` (rows 36, 57) | `packages/engine/src/runner/classify.ts:classifyError`; `routing/deliveries.ts` (dispatch, `failed`, l.109-116 acceptance, l.136-156 the pause's carry-on); `packages/engine/src/recovery/reload.ts` l.84-98 (requeued and carried rows, carry-on text); `packages/engine/src/recovery/restart.ts` l.184-209, l.276-296 (account return and recovered dispatch); `packages/contracts/src/commands.ts`, `packages/contracts/src/events.ts` |
 | 7c | Optional usage fields on `TurnEnded` | `packages/engine/src/runner/translate.ts`; `packages/contracts/src/events.ts` `TurnEnded`; the Claude fixture's `usage_update` and `state_update` frames (`packages/testing/fixtures/claude.ndjson` l.17-20) |
 
 **Risks:**
@@ -870,7 +953,8 @@ rebuild check pass unchanged.
 |---|---|---|
 | 7a puts the matcher inside the engine's most sensitive path | major | The matcher is WS-2's pure function, called as a total function; the engine checks every answer itself (7.2); attack pass on 7a; the permission acceptance test stays unchanged. |
 | 7a's input field makes events or snapshots too large | major | Only for `execute`, capped at 8 KiB, kept out of views and snapshots (7.1). |
-| 7b holds a message with nothing to release it | major | The hold needs the roles' condition, which says no when the sheepdog is off or the retries are spent; the delivery then returns as today (7.3, 3.10). |
+| 7b holds a message with nothing to release it | major | The hold needs the roles' condition, which says no when the sheepdog is off or the engine's own count is spent; the delivery then returns as today; a restart leaves the agent idle and held, and the sheepdog re-arms or, when off, releases it (7.3, 3.9, 3.10). |
+| A board wake replaced during a hold skips the backoff | major | The hold is on the agent's queue, not one delivery (7.3, row 75). |
 | 7b repeats a prompt the agent already took | major | An accepted delivery is never re-sent; a carry-on is held instead (7.3). |
 | 7c's fields are missing in older logs | minor | Optional fields; the rebuild check. |
 
@@ -886,8 +970,8 @@ use it is in the Founder OS repository and is changed after this plan.
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
 | 8.1 | `docs/foundry.md` maps every action of the Foundry skill's Steps 3, 4, 5 and 8 to a Shephrd command, setting or sheepdog rule, or marks it as team workflow that stays in the skill; it states that the roles are stopped by their switches, never by downgrading the engine; that notices skip a paused parent; and how a replacement gets a cut part of its hand-off through its lead | Read against `FOUNDRY/SKILL.md` by the unit's reviewer; `grep -n 'herdr agent\|collect.sh\|board-waker.sh' docs/foundry.md` hits only its "What this replaces" table |
-| 8.2 | The acceptance test runs the composed service in the test process with the test clock, and drives it only through its Unix socket, with the settings at their production defaults: an orchestrator, two leads and two workers each, with fake agents; roles and groups at start; `roles.orient` for each; a group channel per team; a standing rule answers a worker's test run; a lead's hand-off post in `all` mode wakes it once when both workers reply, and the lead is not reported as stalled while they work; a worker that posts a question back to its idle lead makes both stall; a worker stalls through three episodes and is reported; a capacity error is held and released; a worker crashes, is resumed and carries on with a new working turn, crashes again and is reported; a team idles and its lead's holder is told; a replacement started with a cut hand-off asks its lead and receives the cut part; the wrap-up reads `client.roster` for an attribution table and exports each thread | `packages/roles/test/acceptance/foundry-run.test.ts` FR01-FR12 |
-| 8.3 | The same test counts lead wakes: none from a matched standing rule or a capacity error with WS-7 | `foundry-run.test.ts` FR13 |
+| 8.2 | The acceptance test runs the composed service in the test process with the test clock, and drives it only through its Unix socket, with the settings at their production defaults: an orchestrator, two leads and two workers each, with fake agents; roles and groups at start; `roles.orient` for each; a group channel per team; a standing rule answers a worker's test run, if question 4 builds standing rules; a lead's hand-off post in `all` mode wakes it once when both workers reply, and the lead is not reported as stalled while they work; a worker that posts a question back to its idle lead makes both stall; a worker stalls through three episodes and is reported; a capacity error is held and released; a worker crashes, is resumed and carries on with a new working turn, crashes again and is reported; a team idles and its lead's holder is told; a replacement started with a cut hand-off asks its lead and receives the cut part; the wrap-up reads `client.roster` for an attribution table and exports each thread | `packages/roles/test/acceptance/foundry-run.test.ts` FR01-FR12 |
+| 8.3 | The same test counts lead wakes: none from a matched standing rule, if built, or from a capacity error with WS-7 | `foundry-run.test.ts` FR13 |
 | 8.4 | Live check by hand: the same flow on a real Claude Code lead and a real Codex worker on the owner's accounts, with one standing rule (if Codex is supported after 2g) and one timed compaction or flush | `pnpm live-check:roles`, run by the owner; its report saved under `.scratch/` |
 
 **Tasks:**
@@ -925,7 +1009,10 @@ each; (6) a capacity error before and after a delivery's first content
 update, for each harness: the first is held and re-sent, the second gets
 only a carry-on; (7) one roles scenario, a stall through its first
 episode, run against the real child-process service with production
-minutes, so the in-process acceptance service is not the only proof.
+minutes, so the in-process acceptance service is not the only proof;
+(8) for a supported harness, how long a symbolic link created between
+WS-7a's resolution and the command's run can go unseen (known gap 20),
+measured, not prevented.
 
 </details>
 
@@ -943,7 +1030,7 @@ seven needs; (H) decisions.md; (I) lead rulings L17 and L19 to L25.
 | Source item | Workstream | Status |
 |---|---|---|
 | A: orchestrator, team leads, workers | WS-1 | mapped |
-| A: standing permission rules | WS-2, WS-7a | mapped; matching needs WS-7a (row 35) |
+| A: standing permission rules | WS-2, WS-7a | mapped; matching needs WS-7a (row 35); whether it is built in this version is question 4, for the owner (row 68) |
 | A: the sheepdog | WS-3, WS-4, WS-5 | mapped |
 | A: Done when 1 (Steps 3-5 and 8 through Shephrd alone) | WS-8 | mapped; the skill rewrite is rollout step 6 |
 | A: Done when 2 (phone pairing and answers) | — | piece 2 |
@@ -977,10 +1064,10 @@ seven needs; (H) decisions.md; (I) lead rulings L17 and L19 to L25.
 | E: capacity-retry.sh | WS-4d, WS-7b | mapped with WS-7b; without it, today's behaviour (row 57) |
 | F: items 1 to 6 | WS-1, WS-6, WS-3, WS-2 and WS-3, WS-4, — | roster, thread, service caller, `roles.` commands and alert kinds used as given; subscribe filters not needed in-process |
 | G: needs 1, 3, 4, 5, 6, 7 accepted; 2 refused | WS-3, WS-4, WS-5 | accepted needs used as given, with v5's `board.status` detail lists; work state derived (rows 25, 55) |
-| H: rows 1 to 67 | all | each row names its workstream in its own text |
+| H: rows 1 to 79 | all | each row names its workstream in its own text |
 | I: L17 (service direct pair; no engine-prompt fallback) | WS-3 | mapped (row 34) |
 | I: L19, L22, L23 (reach check at queue and send, with the delivery) | — | the roles register no reach check; the sheepdog's notices pass the board's (rows 52, 55) |
-| I: L20 (standing-rule matching, including opt-in prefix) | WS-2, WS-7a | mapped (rows 35, 67) |
+| I: L20 (standing-rule matching, including opt-in prefix) | WS-2, WS-7a | mapped (rows 35, 67, 79) |
 | I: L25 (the shell tool is kind `execute` plus the harness's pinned shell discriminator) | WS-2 (2.4, 2.14) | mapped (row 54) |
 | I: L21, L24 (board v4 and v5) | WS-3, WS-4 | mapped (row 55) |
 
@@ -993,14 +1080,14 @@ seven needs; (H) decisions.md; (I) lead rulings L17 and L19 to L25.
 | `AGENTS.md` rule 1: never push to `vitalysim/herdr-synapse` | Units push only to `qnlbnsl/sheprd`. |
 | `AGENTS.md` rule 2: credit copied code | No code is planned as copied; T3 Code's idle compaction and hand-off are read as designs (5a, 6a). A builder who copies code follows rule 2, and the unit's review checks it. |
 | `AGENTS.md` rule 3: keep the lists current | The result file's "For docs/issues.md" and "For docs/features.md"; the conventions paragraph; WS-8 risk row 1. |
-| `AGENTS.md` rule 4 and SECURITY.md rule 7 | Rows 15, 22, 35 and 67; criteria 1.5, 1.7, 2.2 to 2.15, 3.4, 6.4, 6.5 and 7.2; attack passes on units 3, 4 and 11a. |
+| `AGENTS.md` rule 4 and SECURITY.md rule 7 | Rows 15, 22, 35 and 67; criteria 1.5, 1.7, 2.2 to 2.15, 3.4, 6.4, 6.5 and 7.2; row 79; attack passes on units 3, 4 and 11a. |
 | SECURITY.md rule 6: secrets never reach a client | The hand-off reads only redacted log text (6.4); the matcher refuses redacted input (2.6); 7a's input is redacted and kept out of snapshots (7.1); the transcript reader keeps only numbers (5.7); notice bodies are fixed text; roles events pass the engine's redactor (CAPI §1). |
 | `AGENTS.md` rule 5: the client API is the product's surface | Every owner action, including the switches and the action history, is a `roles.` command with owner and device access. |
 | `AGENTS.md` rule 6: team shapes do not belong here | Role files and team definitions live outside the repository (rows 5, 14, 22); the recipe marks what stays in the skill. |
 | `AGENTS.md` "How agents are run": one delivery interface | Every nudge and notice is an engine delivery (Board, "How a wake reaches an agent"); nothing reads the run mode. |
 | `AGENTS.md` "Language" | Conventions paragraph. |
 | `AGENTS.md` rule 7 and team rules 2 to 6 | Planners commit their own branch only. |
-| Epic, 2026-10-30: built on the engine without changing it | Rows 6, 19, 24, 30, 53 and 57; WS-7 waits on the owner. |
+| Epic, 2026-10-30: built on the engine without changing it | Rows 6, 19, 24, 30, 53, 57, 68, 75 and 79; WS-7 waits on the owner, and question 4 may remove 7a. |
 
 </details>
 
@@ -1014,33 +1101,34 @@ before the first launch. WS-7 uses the existing `engine/backend`.
 
 | Unit | Work area | Scope | Complexity | Why this complexity | Attack pass | Depends on |
 |---|---|---|---|---|---|---|
-| 1 Role names, contracts package, role-file schema (1a to 1c) | contracts | roles/contracts | medium | New schemas on the contract's fixed five-export shape. | no | CAPI seam unit |
+| 1 Role names, contracts package, role-file schema (1a to 1c) | contracts | roles/contracts | medium | New schemas on the contract's fixed five-export shape, plus the two packages' test-project registration. | no | CAPI seam unit |
 | 2 Roles view, snapshot, action list and `orient` (1d, 1e) | backend | roles/backend | medium | A fold on the engine's view pattern, a bounded snapshot and two reads. | no | 1, CAPI roster |
-| 3 Rule schema, parser, matcher, harness shapes (2a to 2c, 2f) | backend | roles/backend | high | Decides permissions without a human. | yes | 2g's recordings |
-| 4 Rule commands and pre-check registration (2d, 2e) | backend | roles/backend | medium | Wires the matcher to fixed contracts. | yes | 2, 3, 11a |
+| 3p Recorder scenarios (2h) | backend | roles/backend | low | Adds scenario, mode, harness and output choices to the existing recorder. | no | none |
+| 3 Rule schema, parser, matcher, harness shapes (2a to 2c, 2f) | backend | roles/backend | high | Decides permissions without a human. | yes | 3p, the 2g recordings, question 4 |
+| 4 Rule commands and pre-check registration (2d, 2e) | backend | roles/backend | medium | Wires the matcher to fixed contracts. | yes | 2, 3, 11a, question 4 |
 | 5 Sheepdog base and switches (3a to 3f) | backend | roles/backend | medium | Reactor, timers, notices and request ids on the engine's patterns. | no | 2, the board's first units |
 | 6 Idle, runaway, crash and role-advice rules (4a, 4c, 4e, 4f) | backend | roles/backend | medium | Pure rules, one test file each. | no | 5 |
 | 7 Stall state machine (4b) | backend | roles/backend | medium | One state machine over the board's status, with the waiting tests. | no | 5 |
 | 8 Capacity rule (4d) | backend | roles/backend | low | A timer and a count over a fixed event. | no | 5, 11b |
 | 9 Cache timing (5a to 5c) | backend | roles/backend | medium | One schedule with known guards and a hardened reader. | no | 5 |
 | 10 Hand-off (6a, 6b) | backend | roles/backend | medium | Budgeted selection over fixed event shapes. | no | 2 |
-| 11a Permission fields and pre-check (7a) | backend | engine/backend | high | Inside the engine's permission path, in one transaction. | yes | 3, owner |
-| 11b Capacity hold and release (7b) | backend | engine/backend | medium | One error class, one registration, two events and one command on existing patterns. | no | owner |
+| 11a Permission fields and pre-check (7a) | backend | engine/backend | high | Inside the engine's permission path, in one transaction, with resolved paths. | yes | 3, owner, question 4 |
+| 11b Capacity hold and release (7b) | backend | engine/backend | medium | One error class, one registration, a queue hold, two events and one command on existing patterns, plus the reload rule. | no | owner |
 | 11c Usage on `TurnEnded` (7c) | contracts | engine/backend | medium | An optional event field plus the runner's translation. | no | owner |
 | 12 Recipe (8a) | docs-research | roles/docs-research | medium | Checked step by step against the skill. | no | 2, 4, 5 |
 | 13 Acceptance test (8b) | backend | roles/backend | high | One scenario with an in-process service on the test clock over a real socket. | no | 4, 6 to 10 |
 | 14 Live check (8c) | backend | roles/backend | low | One script, run by the owner. | no | 13 |
 
-The recording run for 2g is not a build unit: the owner runs the existing
-recorder (`pnpm record-fixtures`) once per harness, with the prompt changed
-to ask for the shell commands 2g lists, before unit 3's matcher is called
-finished. Unit 8 is built only if the owner allows WS-7b; without it the
+The recording run for 2g is not a build unit: the owner runs the recorder
+prepared by unit 3p once per harness, before units 3, 4 and 11a start,
+because its result decides question 4's gate (row 71). Unit 8 is built only if the owner allows WS-7b; without it the
 capacity rule has nothing to do.
 
-Load: 16 build units (12 if the owner declines WS-7, which also drops unit
-8). At about three launches a unit (builder, test writer, focused review),
-plus two for each of the three attack-pass units, that is about 54 launches
-(42 without WS-7). From the sheet's tables, most backend builds land on the
+Load: 17 build units (13 if the owner declines WS-7, which also drops unit
+8; 14 if standing rules are deferred under question 4, which drops units 3,
+4 and 11a). At about three launches a unit (builder, test writer, focused
+review), plus two for each of the three attack-pass units, that is about 57
+launches (43 without WS-7, 42 with standing rules deferred). From the sheet's tables, most backend builds land on the
 OpenAI vendor, and the Anthropic vendor carries the test writers for those
 builds, the high units' alternates and the attack verifiers. The planner
 cannot read either vendor's remaining weekly allowance. The lead checks
@@ -1056,5 +1144,6 @@ either would run out (known gap 1).
 | — | — | Frozen for round 1 on 2026-11-03 (`attack/plan-v1.md`). The lead runs the four lenses. |
 | 1 | 2 / 37 / 21 | All 60 folded (`attack/round-1-findings.md`): lead ruling L20 rewrote the matcher; L17's fallback dropped; 7a and 7b reshaped, sent to the lead as question 2 (row 53); stall state machine, holder routing, owner alerts, request ids, hand-off overflow, switches, bounds. Frozen for round 2 as `attack/plan-v2.md`. |
 | 2 | 0 / 23 / 18 | All 41 folded (`attack/round-2-findings.md`): bounded snapshot summary with paged reads; hand-off markers addressed to the lead; acceptance test in-process on the test clock; capacity hold only while the sheepdog is on, accepted prompts never re-sent, and the no-7b re-send dropped; give-up alerts tested against the engine's open alert; deadlocks stall; board-off suspension; turn start from `DeliverySent`; worker-only age cap; matcher gains a positive sandbox marker, opt-in prefix (L20), embedded settings names, argument lists and a total pre-check; lead ruling L25 on the shell's identity (row 54). Frozen for round 3 as `attack/plan-v3.md`. |
+| 3 | 0 / 11 / 16 | All 27 folded (`attack/round-3-findings.md`), with threat-model R3-2 sent to the owner as question 4 (row 68) and the plan written for both answers: notices' read state tracked by the roles view; rule size checked as a whole and the snapshot filled by encoded size; transitive waiting, usage-limit pauses as busy; capacity hold on the agent's queue, counted by the engine, safe across restarts; `roles.StallEnded` for the stall alert; Codex expected `unsupported`; protected names without case and through resolved links; `ModeRefused` blocks matching; recorder preparation and test registration. Frozen for round 4 as `attack/plan-v4.md`. |
 
 </details>
