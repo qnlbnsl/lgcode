@@ -1,0 +1,108 @@
+# Questions and requests sent to plans-lead
+
+Each entry is posted to `plans-lead` on the board, one question at a time.
+Its answer is logged in `decisions.md` before the next question is sent.
+
+## Q1 (decision row 9): may the board add to the engine's code?
+
+**The question.** The engine's design says the other pieces are "built on
+top of the engine without changing it". The board cannot be built without
+editing some engine files. May the board's plan add to the engine, if it
+changes no existing behaviour?
+
+**Why it cannot be avoided.** Scouting at `8ff4c9b` found three closed
+lists (see `scouting.md`):
+
+1. The command handler serves a fixed set of commands
+   (`CommandHandler.ts:supported` and the `planCommand` switch). A board
+   command such as "post" needs an entry there to reach the engine's caller
+   identity, receipts and log transaction.
+2. The log's event list is a closed union (`contracts/src/events.ts:Event`),
+   and the log writer decodes each written event against it
+   (`EventLog.ts`, about line 182). A "post written" event needs a new tag.
+3. Only the owner or an agent's parent may `prompt` an agent. A worker's
+   question to its lead's sibling, or a lead's reply to its parent, needs
+   the board to queue a delivery itself, in the same transaction as the
+   post. The delivery's `source` list (permission, question, wait) needs a
+   `post` case so a wake for a stopped agent is withdrawn, not bounced.
+
+**The alternative, and why it fails.** A separate board process that talks
+to the engine as a client would need the owner's credential to prompt
+arbitrary agents. It would then act as the owner (the impersonation that
+Synapse's `synapse-owner.sh` was criticised for), its prompts would skip the
+engine's agent-text envelope, and it could not check which agent is calling
+it, because the engine has no "verify this token" command.
+
+**Recommendation.** Allow additive changes only, defined as: no existing
+command, event, state, reply, rule or test changes; new commands, event
+tags, a new delivery source and one new follower are added; every existing
+engine test, including the acceptance suite and the rebuild check, passes
+unchanged. The board's own code lives in a new folder,
+`packages/engine/src/board/`, with its own reducer, so the engine's eight
+views and their reducers are untouched. The client API plan likely meets
+the same question for pairing commands, so one ruling could cover both.
+
+**If the answer is no.** The board cannot be built as one plan. The engine
+would first need a general extension seam (registered command planners,
+event schemas and reducers), planned and reviewed as an engine change.
+
+## R1: what the board needs from the client API's contract
+
+Sent as a request so it lands in `.plans/plans/shepherd-client-api/contract.md`.
+
+1. **Board commands on every client transport.** The transport that the web
+   page and the phone use carries every command in the service's RPC group,
+   generically, so the board's commands need no per-command transport code.
+   The engine's socket already works this way (`api/server.ts:application`).
+2. **Board events in the owner's live stream.** Board events reach owner
+   devices through `subscribe` like any other event. Board events carry no
+   top-level `agentId`, so the engine's existing agent filter hides them
+   from agents; the client API must not widen that filter for board events.
+3. **Alerts for posts addressed to the owner.** A post that needs a reply
+   from the owner produces the engine's existing `OwnerNeeded` event, with
+   the author's `agentId`, a reason, and no `subject`, because the subject
+   list is permission or question only. The client API's alert rule must
+   alert on an `OwnerNeeded` with no subject, and should let the alert open
+   the post: either the contract adds a `post` subject, or the alert reads
+   the newest open owner-addressed post from the board's read command.
+   The board plan's recommendation is a `post` subject, added by the board.
+4. **Paged reads, not only the stream.** A phone opening a channel reads a
+   page of posts with a cursor (`board read`, with `after` and `limit`),
+   instead of replaying the whole log through `subscribe`. The contract's
+   read calls should allow a command whose reply is a page of records.
+5. **The owner posts from any device as the owner.** A post from a paired
+   device is recorded with the owner as its author, as the engine does for
+   every device command today. If the client API records which device
+   acted, the board reuses that field rather than adding its own.
+6. **Size limits at the transport.** The transport's message size limit
+   must be at least the board's post limit (planned at 16,384 characters of
+   text) plus its envelope.
+
+## Q2 (not yet sent; waits for Q1's answer): does an open board question keep its author "not settled"?
+
+**The question.** A lead posts a question to another lead, with a reply
+needed, and ends its turn to wait for the answer. In the engine's terms the
+lead is now settled: it is idle and holds no engine request or question.
+So an orchestrator waiting on that lead is woken as if the lead had
+finished, although the lead is still waiting. Should an agent with an open
+post of its own that needs a reply count as not settled?
+
+**Options.**
+
+1. **Yes (recommended).** Add one condition to the engine's settled rule
+   (`routing/waits.ts:settled`): the agent has no open board post of its
+   own that needs a reply. This matches the engine's existing rule that an
+   agent with an open `ask` question, or an open wait, is not settled. It
+   changes nothing for an agent that does not use the board, so every
+   existing engine test passes unchanged. It is an edit to an existing
+   engine rule, which is why it is asked separately from Q1.
+2. **No.** The settled rule stays as it is. The orchestrator is woken
+   early, spends a turn finding the lead still waiting, and waits again.
+   The roles plan would have to tell leads to use the engine's `ask` for
+   anything they wait on.
+
+**Consequence of yes.** A question nobody answers keeps its author
+unsettled until the post closes. The board already closes a post whose
+addressees all stopped or crashed (row 21), so this cannot hang forever on
+a dead addressee; it can hang on a live addressee that never replies,
+which is the sheepdog's case to catch.
