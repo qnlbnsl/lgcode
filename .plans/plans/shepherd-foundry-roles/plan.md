@@ -290,9 +290,10 @@ fixes S1 to S6 under lead ruling L29, v5's waiting and reactor changes
 under lead ruling L30, and v6's service rights without `answer`; the
 shared engine edits E1 to E23 in its section 6, and lead rulings L15, L16,
 L19, L22 and L23; decision rows 21, 32, 33, 52, 55, 80, 95 to 101). "Board" is
-the message board contract v6, `.plans/plans/shepherd-message-board/contract.md`
-on `worker/plans-board` at `2331098`, reworked under L26 (lead rulings L17, L21, L24 and L28; rows
-29, 31, 33, 34, 55); round 2 reviewed v4 at `bcc33e1`. Both build on the
+the message board contract v7, `.plans/plans/shepherd-message-board/contract.md`
+on `worker/plans-board` at `49d541b`, v6's rework under L26 with the
+board's round 4 fold, approved as lead ruling L30 (lead rulings L17, L21,
+L24, L28 and L30; rows 29, 31, 33, 34, 55, 94, 102); round 2 reviewed v4 at `bcc33e1`. Both build on the
 shared engine edits of CAPI §6, which the client API plan's first unit
 makes directly in the engine, under the owner's answer of 2026-11-03 and
 lead ruling L26 (row 80). Lead rulings L20 and L25 govern standing rules
@@ -468,9 +469,12 @@ sheepdog's carry-on prompt, or a compaction the sheepdog requested
 completion, is not a sheepdog turn, because a completion carries ordinary
 work (row 90). There is no engine-prompt fallback for notices.
 
-The board switched off (rows 34, 59). While the board is switched off,
-every board command is refused and the board's conditions stop (Board,
-"When the board is switched off"). The sheepdog then suspends the stall
+The board switched off (rows 34, 59, 102). While the board is switched
+off, every board command but `board.status` is refused with "board
+disabled", and the board's reactor and conditions stop (Board, "When the
+board is switched off"). `board.status` stays readable, says `disabled`,
+and returns empty condition lists, so the stall rule's waiting test gets
+no board part. The sheepdog then suspends the stall
 rule, the team-idle rule and the cache flush, keeping their counts, and
 restarts their clocks from zero when the board is switched on. Compaction,
 crash retries and capacity releases carry on. A notice to an agent is not
@@ -708,7 +712,7 @@ into it.
 | 3.3 | Request ids follow the rule above: an hourly repeat and a stall's later episode get new ids; a retry of one action reuses its id and body; two recipients of one trigger get two ids | `fold.test.ts` S04-S06 |
 | 3.4 | Each service has its own command list in the engine's service list (`packages/engine/src/commands/services.ts`, CAPI E13): `roles.sheepdog` may call `subscribe`, `prompt`, `compact`, `resume`, `release`, `roles.record`, `board.post`, `board.flush` and `board.status`; `roles.standing-rules` may call nothing; a test calls the real service entry point under each name and checks that every other command, including `answer`, `board.close`, `start` and `stop`, is refused; `roles.record` refuses every event kind outside the sheepdog's own action kinds, including `RuleAdded`, `RuleFirstUsed` and `SettingsChanged`; an import-boundary test fails if any file in `packages/engine/src/roles/sheepdog/` or the services' files imports `log/EventLog`, `runner/*`, `effect/sql` or `commands/CommandHandler`, so roles code reaches the engine only through the service entry point, the views, the piece batch path and the helpers of CAPI E22 (rows 92, 99); CAPI E23's own boundary test covers every file under `packages/engine/src/roles/` | `packages/engine/test/roles/sheepdog/calls.test.ts` K01-K04; `packages/engine/test/roles/imports.test.ts` B01 |
 | 3.5 | A notice to an agent is a `board.post` by `service roles.sheepdog` with a `direct` target and `reply: none`, followed by `board.flush` for exactly the kinds listed above; its body is fixed text plus sanitized names; a notice to the owner is a roles event that raises its alert | `packages/engine/test/roles/sheepdog/notices.test.ts` N01-N03, N07 |
-| 3.6 | With the board switched off, no notice is sent, its action record says `board-off`, the stall, team-idle and flush rules are suspended with their counts kept and their clocks restarted from zero when it is switched on, and a `GaveUp` raises its owner alert unless an engine `failure` alert covers it, including after a crash of a worker whose recorded recipient is a live lead | `notices.test.ts` N06, N11-N12 |
+| 3.6 | With the board switched off, no notice is sent, the sheepdog's `board.status` reads still succeed and say `disabled` with empty condition lists (row 102), its action record says `board-off`, the stall, team-idle and flush rules are suspended with their counts kept and their clocks restarted from zero when it is switched on, and a `GaveUp` raises its owner alert unless an engine `failure` alert covers it, including after a crash of a worker whose recorded recipient is a live lead | `notices.test.ts` N06, N11-N12, N20 |
 | 3.7 | A notice goes to the subject's nearest idle or working ancestor, or to the owner when there is none; a notice still unread when its recipient crashes is sent once to the new holder; read state comes from the roles view's fold of the notice's post id, so a notice the recipient read or accepted is not re-sent, after a restart too | `notices.test.ts` N08-N09, N15-N16 |
 | 3.8 | `roles.snooze` silences team-idle notices for that group until the time passes; `roles.settings.set` changes a limit and the next check uses it; a value outside its bounds is refused with its path | `notices.test.ts` N04-N05, N10 |
 | 3.9 | Timers are re-armed from the view at start-up; a stall, team-idle or capacity deadline that passed while the service was down is re-checked and fires once, one step only; a cache deadline that passed is dropped | `packages/engine/test/roles/sheepdog/timers.test.ts` T01-T03 (`TestClock.adjust`) |
@@ -743,7 +747,9 @@ into it.
 
 Each rule is a pure function from the roles view, the engine's views, the
 board's status (its fixed-size summary, and its `incoming` and `own`
-detail lists, Board v6) and the clock to a list of actions, so each is
+detail lists, and, with no agent, the ids of the agents for which each
+board condition holds and the sequence they were computed at, Board v7)
+and the clock to a list of actions, so each is
 tested alone.
 
 An agent is **busy** when it is starting or working, has a delivery
@@ -818,7 +824,7 @@ ordinary work.
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
 | 4a | Team idle rule over engine groups, per top agent and per holder, with the "busy" test, which counts a usage-limit pause as busy (row 74) | target `packages/engine/src/roles/sheepdog/rules/teamIdle.ts`; groups from `AgentStarted.groups` and `AgentGrouped` (`packages/contracts/src/events.ts:Event`); `FOUNDRY/scripts/team-idle-watch.sh` l.13-14 ("Only 'working' counts as busy") |
-| 4b | Stall state machine, with its counter per post and addressee (row 37), and the transitive "waits on" and "waiting on others" tests (rows 56, 74) | target `rules/stall.ts`; Board v6, `board.status` with `detail` `incoming` and `own`, and its pure-function export from `packages/engine/src/board/` ("For Shephrd's own services"); the shared settled test in `packages/contracts/src/settled.ts` (CAPI E19), which replaced `routing/waits.ts:settled`: the sheepdog applies its engine part itself, from the engine's deliveries with their status, and the board's part through `board.status`'s lists, which carry the sequence they were computed at; it decides only when both agree at one sequence, as the client wait helper does (CAPI §3, lead ruling L30; row 100) |
+| 4b | Stall state machine, with its counter per post and addressee (row 37), and the transitive "waits on" and "waiting on others" tests (rows 56, 74) | target `rules/stall.ts`; Board v7, `board.status` with `detail` `incoming` and `own`, and with no agent for the condition lists (Board row 103), and its pure-function export from `packages/engine/src/board/` ("For Shephrd's own services"); the shared settled test in `packages/contracts/src/settled.ts` (CAPI E19), which replaced `routing/waits.ts:settled`: the sheepdog applies its engine part itself, from the engine's deliveries with their status, and the board's part through `board.status` with no agent, whose lists carry the sequence they were computed at; it decides only when both agree at one sequence, as the client wait helper does (CAPI §3, lead ruling L30; row 100) |
 | 4c | Runaway rule from `DeliverySent`, `TurnEnded`, pauses, permission requests and blocking waits (`packages/engine/src/routing/waits.ts` l.162-170); worker age rule from `AgentStarted` | target `rules/runaway.ts`; `packages/engine/src/routing/deliveries.ts` l.248 (`DeliverySent`); `FOUNDRY/scripts/context-keeper.sh` (`WORKER_MAX_MIN`) |
 | 4d | Capacity rule over `DeliveryHeld`: release timer, and the give-up triggered by `DeliveryReturned` with `cause: "capacity"`; the hold condition reads the engine's own count (7.3, rows 75, 89) | target `rules/capacity.ts`; WS-7b's `DeliveryHeld` and `DeliveryReleased`; `FOUNDRY/scripts/capacity-retry.sh` (5-minute backoff, 12 retries) |
 | 4e | Crash rule: re-check, one `resume`, the carry-on prompt, then give up, with `engineAlertOpen` | target `rules/crash.ts`; `AgentCrashed` from `packages/engine/src/recovery/crash.ts:64`; `packages/engine/src/commands/resume.ts` l.26, l.51-54; `packages/engine/src/recovery/reload.ts:reloadedEvents`; CAPI §4 (the engine's `failure` alert and when it clears) |
@@ -1184,15 +1190,15 @@ seven needs; (H) decisions.md; (I) lead rulings L17 and L19 to L27.
 | E: context-keeper.sh | WS-5, WS-4c | compaction and the two-hour worker cap (the worker age rule, row 65); the advisor check is team workflow |
 | E: capacity-retry.sh | WS-4d, WS-7b | mapped (rows 57, 75) |
 | F: items 1 to 6 | WS-1, WS-6, WS-3, WS-2 and WS-3, WS-4, — | roster, thread, service caller, `roles.` commands and alert kinds used as given; subscribe filters not needed in-process |
-| G: needs 1, 3, 4, 5, 6, 7 accepted; 2 refused | WS-3, WS-4, WS-5 | accepted needs used as given, with v6's `board.status` detail lists; work state derived (rows 25, 55) |
-| H: rows 1 to 101 | all | each row names its workstream in its own text |
+| G: needs 1, 3, 4, 5, 6, 7 accepted; 2 refused | WS-3, WS-4, WS-5 | accepted needs used as given, with v7's `board.status` detail lists and its condition lists with no agent; work state derived (rows 25, 55) |
+| H: rows 1 to 102 | all | each row names its workstream in its own text |
 | I: L17 (service direct pair; no engine-prompt fallback) | WS-3 | mapped (row 34) |
 | I: L19, L22, L23 (reach check at queue and send, with the delivery) | — | the roles register no reach check; the sheepdog's notices pass the board's (rows 52, 55) |
 | I: L20 (standing-rule matching, including opt-in prefix) | WS-2, WS-7a | mapped (rows 35, 67, 79) |
 | I: L25 (the shell tool is kind `execute` plus the harness's pinned shell discriminator) | WS-2 (2.4, 2.14) | mapped (row 54) |
 | I: L26 (direct engine edits; security properties kept as engine code) | all, WS-7 | mapped (row 80) |
 | I: L27 (standing rules only for a qualifying harness) | WS-2, WS-7a | mapped (row 81) |
-| I: L21, L24, L28 (board v4, v5 and v6) | WS-3, WS-4 | mapped (rows 55, 94) |
+| I: L21, L24, L28, L30 (board v4 to v7) | WS-3, WS-4 | mapped (rows 55, 94, 102) |
 
 </details>
 
@@ -1270,5 +1276,6 @@ either would run out (known gap 1).
 | L26 | — | Reworked under the owner's answer of 2026-11-03 and lead rulings L26 and L27, on client API contract v3 at `876bf4f`: the roles live in the engine's own packages and add themselves to its lists (CAPI E1 to E13); WS-7 is no longer pending and names each change to existing engine behaviour with the tests it updates; standing rules are built only for a qualifying harness; question 4 withdrawn (rows 80, 81). Frozen for the full review round as `attack/plan-v5.md`. |
 | 4 | 0 / 13 / 19 | Grades 6 to 8, no refusals (`attack/round-4-findings.md`). The roles' own seven majors (six issues) and 17 minors are folded, with the WS-7 half of an eighteenth: a rule-answered request is one projected batch with no routing events; a pause with no known reset counts as the owner; the cache rule skips only an agent with its own pending work; worktrees under `.claude/` fail closed; usage reaches the log from the idle frame; capacity is its own runner outcome, with a defined outage end and a `cause` on the return; sheepdog work is not busy; `release` uses the engine's rights helper; per-service command lists and an import boundary; board v6 cited (rows 82 to 94). The six shared majors, one shared minor and the shared half of R4-A3 wait for client API contract v4. Frozen as `attack/plan-v6.md`. |
 | 4, shared | — | Folded on client API contract v6 at `4a7e352` (lead rulings L29 and L30; board #178, #184): every roles command classed as a planner or a read; `orient` and the hand-off follow the read rule; roles events kept in every lifecycle state; the caller survives a log read; every roles batch through the piece batch path, with the first-use reactor a level rule and `roles.standing-rules` calling nothing; the stall rule's waiting test agrees with the board at one sequence (rows 95 to 101). Frozen as `attack/plan-v7.md`. |
+| board v7 | — | Cited board contract v7 at `49d541b` (lead ruling L30; board #187). The roles' uses were checked against it: `board.status` with no agent for the condition lists, readable while the board is off; the manager seat moving only on a stop, which the roles do not use; `board.read` as a read with marks, which a service cannot call, while `board.Read` still names post ids for the notices' read state; the board's level-rule reactor (row 102). |
 
 </details>
