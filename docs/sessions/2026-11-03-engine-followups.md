@@ -9,7 +9,7 @@
 
 This report follows `docs/sessions/2026-11-01-engine-build.md`, which stops at pull request 4. It covers what the team built after that: three flaky-test fixes, the account reset timer fix, the login-token fix, the live-check probes, and a last test-only reliability change.
 
-Pull requests 4, 5, 6, 7 and 13 are merged into `engine`. Pull request 15 is open at this report's writing, and the manager merges it. Nothing in this report is deployed.
+Pull requests 4, 5, 6, 7, 13 and 15 are merged into `engine`, which stands at `25ad003` before this report. The manager then merged `engine` into `master` through pull request 16. Nothing in this report is deployed.
 
 ## Session metrics
 
@@ -22,7 +22,7 @@ Pull requests 4, 5, 6, 7 and 13 are merged into `engine`. Pull request 15 is ope
 | Stop the account reset timer dropping a deadline (issue 210) | Merged in pull request 6 |
 | Keep login-store tokens out of the event log (issue 223) | Merged in pull request 7; independent verification of the fixes is deferred to the hostile pass |
 | Give each live acceptance criterion honest evidence (L-1) | Merged in pull request 13; final live run passed 18 of 23 steps, and each failure has an issue |
-| Remove three false failures from `pnpm check` (issues 276, 235, 248) | Built, pull request 15 open |
+| Remove three false failures from `pnpm check` (issues 276, 235, 248) | Merged in pull request 15 as `25ad003` |
 
 ### Raw metrics
 
@@ -43,7 +43,7 @@ Session ids are from `herdr agent get`. Claude Code transcripts are at `~/.claud
 | `31625d5` | `worker/engine-rpfx` | engine-rpfx | Codex | gpt-6.1-sol | high | Lead checked the files and scanned the fixtures | 01a19da6-abd6-7582-962a-520b901c36bb |
 | `f4d79a6`, `5662a5f` | `worker/engine-acfl` | engine-acfl | Codex | gpt-6.1-sol | high | engine-acflrv, session e1383838-b6e1-4999-a4c5-18dfa64270a0 | 01a19dc4-22d2-7ad2-bcef-2bc477d77ad5 |
 | `b88b876` and earlier, `8830d8b` | `worker/engine-shb` | engine-shb | Claude Code | Opus 5.5 | high | engine-shbv, session 01a19ef7-842e-7f12-99e8-1ad89d80e0b3 | 39edbe51-1e29-44f0-b210-999c973affa8 |
-| `d91b67b` | engine-sht's worker branch | engine-sht | Codex | gpt-6.1-sol | high | engine-shbv | 01a19e9c-506f-79e3-87a2-6ed29643810c |
+| `d91b67b` | `worker/engine-sht` | engine-sht | Codex | gpt-6.1-sol | high | engine-shbv | 01a19e9c-506f-79e3-87a2-6ed29643810c |
 | `1e64487` to `9751bda` | `worker/engine-lcpb` | engine-lcpb | Codex | gpt-6.1-sol | high | engine-lcpv, session d40fb295-5b77-4024-8105-cc4b2084a38a; engine-lcp242r, session 2c00dc21-5d50-4be5-9cb6-3116f5444b74 | 01a19e96-5b10-7523-89cc-7ee334a1d235 |
 | `2e7d96f` | `worker/engine-lcpt` | engine-lcpt | Claude Code | Opus 5.5 | high | engine-lcpv | 171ba7fa-b9e4-4cf7-927c-a9496f2f8457 |
 | `a105465`, `f5e002c`, `05b366c` | `worker/engine-lcpb` | engine-lead | Claude Code | Opus 5.5 | medium | None; disclosed in pull request 13 | 3e452ab1-41e4-4183-ad6c-dc41e3c8c8a2 |
@@ -83,9 +83,8 @@ None.
 
 ## Open items
 
-- **Merge pull request 15.** This is the manager's step.
 - **The hostile pass.** It owes the verification of issue 223's fixes and takes issue 241. Issues 224, 225, 231, 232, 233 and 234 are open for it.
 - **Live-check records:** issues 212, 237, 246, 272, 273, 274 and 275.
 - **Remaining flakes:** issue 235's `failure-1-crash` and `recovery/orphans`, and issue 247. Issue 248's cause stays unconfirmed.
 - **Questions for the owner, through the manager:** issues 75, 113, 134, 150, 152 and 37.
-- **Worktree cleanup:** the run's worker worktrees under `.claude/worktrees/foundry-engine-*` can be removed after pull request 15 merges.
+- **Worktree cleanup:** the run's worker worktrees under `.claude/worktrees/foundry-engine-*` can now be removed, because pull request 15 has merged. The one that pull request 15 used, `foundry-engine-lcp`, is already removed, and the others are left for the run's teardown.
