@@ -97,6 +97,31 @@ live("every resolved harness decodes with the contracts schema, in acp run mode 
     }
   }))
 
+live("every resolved harness records its modes with a level, so a mode change is checked against the ceiling (breaks if the defaults leave reportedModes empty, which refuses every mode change; fix round 1, A16)", () =>
+  Effect.gen(function*() {
+    for (const name of ["claude-agent-acp", "codex-acp"]) yield* Effect.promise(() => program(binDirectory, name))
+    for (const name of ["gemini", "agent"]) yield* Effect.promise(() => program(pathDirectory, name))
+    const result = yield* resolve(pathDirectory)
+    for (const harness of result.harnesses) {
+      const ids = harness.reportedModes.map((mode) => mode.id)
+      assert.equal(new Set(ids).size, ids.length, `${harness.id} lists a mode twice`)
+      // Every mode Shephrd asks for is a mode the harness reports, at the level that asks for it or below.
+      const levels = ["read-only", "ask", "edit", "full"] as const
+      for (const [index, level] of levels.entries()) {
+        const reported = harness.reportedModes.find((mode) => mode.id === harness.permissionMapping[level])
+        assert.isDefined(reported, `${harness.id} does not report its ${level} mode`)
+        assert.isTrue(levels.indexOf(reported!.level) <= index, `${harness.id} reports ${level} above its level`)
+      }
+    }
+    assert.deepEqual(byId(result, "codex").reportedModes, [
+      { id: "read-only", level: "read-only" }, { id: "workspace-write", level: "edit" }, { id: "agent-full-access", level: "full" }
+    ])
+    assert.deepEqual(byId(result, "claude").reportedModes, [
+      { id: "plan", level: "read-only" }, { id: "default", level: "ask" }, { id: "acceptEdits", level: "edit" }, { id: "bypassPermissions", level: "full" }
+    ])
+    assert.deepEqual(byId(result, "cursor").reportedModes, [{ id: "ask", level: "read-only" }, { id: "agent", level: "edit" }])
+  }))
+
 live("a missing harness is reported with its command and a reason, and is not guessed (breaks if a missing program is silently dropped, listed with an invented path, or fails the whole resolution)", () =>
   Effect.gen(function*() {
     yield* Effect.promise(() => program(binDirectory, "claude-agent-acp"))

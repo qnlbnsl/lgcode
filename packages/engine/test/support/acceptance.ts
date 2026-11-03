@@ -253,7 +253,10 @@ export const scenario = (
         const adapter = join(root.bin, "fake-adapter");
         if (!existsSync(adapter)) writeFakeAdapter(root);
         yield* world.owner.harnesses({ requestId: requestId(), operation: "list" } as never).pipe(
-          Effect.flatMap((listing) => (listing as { harnesses: ReadonlyArray<{ id: string }> }).harnesses.some((harness) => harness.id === harnessId)
+          // Fix round 1, N-1: a fresh service already lists the real "claude"
+          // and "codex"; the fake adapter takes the name only when it is not
+          // the one listed.
+          Effect.flatMap((listing) => (listing as { harnesses: ReadonlyArray<{ id: string; adapterPath: string }> }).harnesses.some((harness) => harness.id === harnessId && harness.adapterPath === adapter)
             ? Effect.void
             : world.owner.harnesses({
               requestId: requestId(), operation: "set",

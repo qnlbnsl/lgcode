@@ -4,6 +4,7 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 
 import { Redactor } from "../log/Redactor.ts";
+import { eventStructure, fieldStructure, type RedactionStructure } from "../log/redactionStructure.ts";
 import { credentialLength, hasValidChecksum, sha256Hex } from "./credential.ts";
 
 const replacement = "[REDACTED]";
@@ -205,17 +206,19 @@ const render = (
   return { output, covered: Math.max(at, from) };
 };
 
-// Copies a value with every string, and every object key, redacted. The
-// input is never changed.
-const redactValue = (value: unknown, redactText: (text: string) => string): unknown => {
-  if (typeof value === "string") return redactText(value);
-  if (Array.isArray(value)) return value.map((item) => redactValue(item, redactText));
+// Copy string values, preserving keys, tags and schema-typed identities.
+// An explicit secret still wins in every other string, in every encoding.
+const redactValue = (
+  value: unknown, redactText: (text: string) => string, structure?: RedactionStructure,
+): unknown => {
+  if (typeof value === "string") return structure?.identity === true ? value : redactText(value);
+  if (Array.isArray(value)) return value.map((item) => redactValue(item, redactText, structure?.elements));
   if (typeof value === "object" && value !== null) {
     const copy: Record<string, unknown> = {};
     for (const [key, item] of Object.entries(value)) {
       // Defined, not assigned, so a `__proto__` key stays an ordinary field.
-      Object.defineProperty(copy, redactText(key), {
-        value: redactValue(item, redactText), enumerable: true, writable: true, configurable: true,
+      Object.defineProperty(copy, key, {
+        value: redactValue(item, redactText, fieldStructure(structure, key)), enumerable: true, writable: true, configurable: true,
       });
     }
     return copy;
@@ -289,7 +292,7 @@ export const makeRedactor = (registry: {
     redactChunk: (itemId: string, text: string, final: boolean) => Effect.sync(() => redactChunk(itemId, text, final)),
     redactText: (text: string) => Effect.sync(() => redactText(text)),
     redact: (event: Event) => Effect.sync(() =>
-      redactValue(event, redactWith(currentForms(), registry.tokenHashes())) as Event),
+      redactValue(event, redactWith(currentForms(), registry.tokenHashes()), eventStructure) as Event),
   });
 
   return { layer, redactText, redactChunk };

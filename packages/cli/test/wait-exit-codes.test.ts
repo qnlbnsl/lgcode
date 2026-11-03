@@ -193,7 +193,7 @@ it("W03 catches SIGTERM leaving the blocking wait open, hiding 'wait cancelled',
   noWaitDelivery(yield* finishWindow(context.owner, before, context.parent));
 })), 60_000);
 
-it("W04 catches owner wait silently succeeding or hanging instead of reporting the engine's current refusal (issue 75)", async () => run(Effect.gen(function* () {
+it("W04 enforces agents-only blocking wait under decision row 26 by refusing an owner without opening a wait", async () => run(Effect.gen(function* () {
   const context = yield* setup();
   const member = yield* memberIn(context, "settled");
   const before = yield* head(context.owner);

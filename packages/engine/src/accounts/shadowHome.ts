@@ -42,14 +42,19 @@ const insideState = (stateFolder: string, shadow: string) => Effect.gen(function
 const decodeInstance = Schema.decodeUnknownOption(ProviderInstanceId);
 
 // The account's variables with CODEX_HOME set when the layout names an
-// explicit home. No path or cause leaves this function.
+// explicit home. The account's own `homePath` is the shared home the layout
+// is built on; without one, an explicit CODEX_HOME is. No path or cause leaves
+// this function.
 export const withCodexHome = (
-  input: { readonly stateFolder: string; readonly home: string; readonly accountId: string; readonly variables: Readonly<Record<string, string>> },
+  input: {
+    readonly stateFolder: string; readonly home: string; readonly accountId: string;
+    readonly variables: Readonly<Record<string, string>>; readonly homePath?: string;
+  },
 ): Effect.Effect<Record<string, string>, ShadowHomeFailed, FileSystem.FileSystem | Path.Path> => Effect.gen(function* () {
   const instance = decodeInstance(input.accountId);
   if (instance._tag === "None") return yield* Effect.fail(new ShadowHomeFailed());
   const layout = yield* resolveManagedCodexHomeLayout(input.stateFolder, instance.value, {
-    homePath: input.variables.CODEX_HOME ?? "", shadowHomePath: "",
+    homePath: input.homePath ?? input.variables.CODEX_HOME ?? "", shadowHomePath: "",
   });
   const confined = layout.mode !== "authOverlay" || layout.effectiveHomePath === undefined
     || (yield* insideState(input.stateFolder, layout.effectiveHomePath));
