@@ -39,9 +39,10 @@ close it. "Rows" are rows of `decisions.md` in this folder.
 - **A caller of the open web server can change the alert carrier's server
   and topic,** and so redirect or silence alerts. Such a caller could already
   answer requests, so this adds no new power (row 88). The token does not
-  follow a change of server (row 93). The alert about the change also goes to
-  the old carrier as a best effort, and a restart can remove the old token
-  first, so on a deny-all server that send can fail (row 139).
+  follow a change of server (row 93). The alert about a carrier change also goes
+  to the old carrier, and the alert about a token clear goes out with the cleared
+  value. Each has up to five attempts, as a best effort: a restart can remove the
+  value first, and on a deny-all server the send then fails (rows 139, 164).
 
 ## Gaps the plan names and leaves open
 
@@ -51,8 +52,11 @@ close it. "Rows" are rows of `decisions.md` in this folder.
   caller, and they outlast the moment's access. None grants more than the open
   server already gives, so none moved to the computer-only list. A change
   raises a `client.lasting-setting` alert, whose push a device caller cannot
-  switch off, and nothing prevents the change. A web caller can still dismiss
-  the alert, and the computer's list still shows it (rows 98, 139).
+  switch off, and nothing prevents the change. A device caller's dismiss closes
+  the alert on the page only: it does not stop the first send, and it does not
+  delete the notification from the phone. The computer's list still shows it. A
+  send still needs a working carrier, so a caller who breaks the carrier first can
+  delay the warning (rows 98, 139, 165).
 - **A same-user proxy can look like a local browser.** With proxy mode on, a
   proxy running as the owner's user that adds no forwarded address and rewrites
   `Host` cannot be told from a browser on the host. The setup document requires
@@ -83,7 +87,38 @@ close it. "Rows" are rows of `decisions.md` in this folder.
 - **A question from a stopped asker stays open in the engine.** Answering it
   queues a reply to a stopped agent. The alert closes, by the level table, but
   the question row remains. The wanted issue is in the planner's result file
-  (row 107).
+  (row 107). A permission request no longer has this gap, because `stop` closes it
+  (row 163). A row left open by an older log stays until a restart closes it.
+- **A very large reply cannot reach a very slow link.** Two connections stop a
+  large reply from costing the stream its acknowledgement. But a WebSocket sends a
+  message whole, and a heartbeat waits behind it. So an event or a snapshot large
+  enough to miss two heartbeats on the read connection is still unreadable on that
+  link. With a 25-second heartbeat, at 500 kilobits per second, that is about 3
+  mebibytes. The reconnect retries with a growing pause, and PB-15 measures it on the
+  owner's phone (row 160).
+- **The connection cap serves 16 subscribing pages.** Each page holds two connections
+  out of 32. With more than 16 pages open, each new connection closes the oldest, so
+  the pages keep displacing one another (row 160).
+- **A slow recovery can cost one reconnect.** A recovery read that outlasts the
+  stream's queue lets the stream connection close. That costs a reconnect, and never
+  the read (row 160).
+- **The wait helper's gate costs a read at each candidate result.** On a busy log
+  with several pieces, the lists may keep arriving at different sequences, so a wait
+  can take several reads to agree. It never ends wrongly (row 159).
+- **A throwing alert source loses that event's alert.** The engine keeps running, and
+  the error log shows it, with no text. A level scan finds an open matter only at the
+  first start (row 161).
+- **An agent's command-line stream is not wrapped.** A stream is never an MCP tool,
+  and the wrapping covers `client.thread`, `client.event` and the tools. An agent that
+  runs `shephrd client subscribe` reads the events as the engine's own `subscribe`
+  gives them today (row 166).
+- **A squatter on the loopback port.** While the web server is down, another local
+  user can bind `127.0.0.1` at its port. In proxy mode, it then serves the phone a page
+  with a long cache lifetime under the real public address, and the cached page later
+  passes every check against the real server. SECURITY.md states this, and the setup
+  document says that a `client.web-down` alert means the page must not be opened.
+  Authentication closes it, and the later pairing plan considers a proxy upstream that
+  is a Unix socket with a group permission. **The lead tells the owner** (row 167).
 
 ## Where the same-machine guard fails
 

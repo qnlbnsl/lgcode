@@ -107,8 +107,14 @@ These rules apply to every change. A change that breaks one is a security bug.
    user's process, unless proxy mode is on and it is the proxy's user, which
    the owner names at the computer. In proxy mode, it refuses a public request
    whose forwarded client address is missing or outside the networks the owner
-   allowed at the computer. Authentication, with pairing, ends this
-   suspension.
+   allowed at the computer. The loopback port has a limit of its own. While the
+   web server is down, another local user can bind `127.0.0.1` at its port,
+   because that needs no rights. In proxy mode, the proxy then sends the phone's
+   requests to that program, which can serve a page with a long cache lifetime
+   under the real public address. The cached page later runs against the real
+   server and passes these checks. `docs/remote-access.md` says that a
+   `client.web-down` alert means the page must not be opened. Authentication,
+   with pairing, ends this suspension.
 3. **A new device is paired with a short-lived, single-use pairing code.**
    A pairing code is never reusable and never stored in plain text.
 4. **Each device gets its own credential, and each credential can be revoked

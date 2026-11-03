@@ -64,8 +64,8 @@ three commands work only at the computer, the web server refuses a
 connection from an agent's process, other websites cannot use the page,
 the proxy path accepts only the owner's own networks, and phone alerts carry
 no thread text, only an agent's name and team, cut short. The engine units,
-the reads, the web server, the thread view and remote access each get an
-attack pass.
+the reads, the web server, the alert carrier, the thread view and remote access
+each get an attack pass.
 
 ## Key decisions
 
@@ -117,6 +117,15 @@ attack pass.
   server for now. "Allow once" and "Deny" work from the phone. The owner's
   question 6 decides it, and the other answer removes one engine edit and one
   check.
+- **A holder approves the action too.** An agent that holds a request receives
+  the same redacted input, or a fixed warning, and so does a holder that it moves
+  to. This is the lead's ruling, from the third review.
+- **A client that subscribes uses two connections.** One carries the stream and
+  one carries every other command, so a large reply cannot cost the stream its
+  acknowledgement. This is the lead's ruling, from the third review.
+- **One piece's mistake cannot stop the engine.** Every call into a piece's table
+  goes through one guard, with a stated fallback. This is the lead's ruling, from
+  the third review.
 - **React for the web page, Ink for the pane viewer.** Both use React, so
   they share state code; Ink is React for terminals.
 - **The engine's own `wait` stays agents-only.** The owner's terminal waits
@@ -125,7 +134,7 @@ attack pass.
 
 Full log → `decisions.md`. The design decisions →
 `docs/specs/2026-11-03-client-api-design.md`. The contract the other two
-plans build on is `contract.md`, version 10.
+plans build on is `contract.md`, version 11.
 
 ## Workstreams
 
@@ -245,7 +254,8 @@ permission request, and reads the thread.
 5. **Reads and the alert reactor** (units 3 and 6a), which can be built
    side by side.
 6. **The web server** (unit 5), then **the web page** (units 7a to 7c) and
-   **the pane viewer** (unit 8). The page and the viewer wait on the
+   **the pane viewer** (unit 8). The page's situation view needs unit 3's reads,
+   so unit 3 comes first. The page and the viewer wait on the
    owner's mock session.
 7. **The alert channel** (unit 6b). The owner sets the ntfy server and
    topic.
@@ -277,7 +287,7 @@ Conventions for every unit. Paths are relative to the Shephrd repository
 root. Anchors are at engine commit `8ff4c9b` (`scouting.md`). "Rows" are
 rows of this plan's `decisions.md`; "engine rows" are rows of
 `.plans/plans/shepherd-engine/decisions.md`. "The contract" is
-`contract.md` in this folder, version 10; where a
+`contract.md` in this folder, version 11; where a
 unit and the contract disagree, the unit reports it to the lead. A test id
 is a Vitest file path, run from the repository root with
 `pnpm vitest run <path>`; Playwright tests run with
@@ -292,7 +302,7 @@ Security Policy, a header that tells the browser which scripts may run),
 TTL (time to live), QA (a manual check on a real host or device).
 
 Engine edits (rows 63, 64, 67): units 1a and 1b edit the engine directly,
-as contract section 6 lists, edits E1 to E23 and E27 to E29. Existing engine behaviour
+as contract section 6 lists, edits E1 to E23 and E27 to E31. Existing engine behaviour
 changes only where section 6 names the change. An existing test changes
 only where section 6 names it, and then only as section 6 says. The check,
 for every unit that touches `packages/engine`, `packages/contracts`,
@@ -307,7 +317,7 @@ Purpose: make the engine's closed lists into lists that pieces 2 to 4 edit
 directly, and build once the caller, delivery and wait rules that carry the
 security properties, so the record always names the real actor. Units: 1a
 the lists; 1b the callers and the delivery and wait rules. Contract
-section 6, edits E1 to E23 and E27 to E29.
+section 6, edits E1 to E23 and E27 to E31.
 
 **Done when:**
 
@@ -354,8 +364,10 @@ section 6, edits E1 to E23 and E27 to E29.
 | 1.39 | Secret collection runs only at start-up and keeps a piece's slot: a token used by no account survives a restart; an unselected or cleared value is removed; removing an account leaves the token; abandoned and replaced account secrets are still removed. With `accounts set-secret` held after its store and before its commit, clearing the token leaves the account's secret resolvable; clearing and at once setting a token leaves the new value; `removeCarrierValue` can name only a carrier value; an account's environment value under `secret:client.` is refused, the runner refuses to resolve one, and collection does not keep one | Test id: `packages/engine/test/recovery/restart.test.ts` (6.7 R22, extended); `packages/engine/test/accounts/carrier-value-removal.test.ts` (real writer and file-backed store, with barriers) |
 | 1.40 | A secret-setting command from the `secretCommands` table keeps its value out of its receipt, its events and its body hash, as `accounts set-secret` does | Test id: `packages/engine/test/commands/secret-commands.test.ts` |
 | 1.41 | Pending the owner's question 6 (row 95): for a device caller, `answer` refuses a persistent, always-allow or unknown-kind option, and on a settings-write request accepts only a non-persistent reject; the request stays open; the owner's terminal and agents are unchanged; the refusal's reason, "option not allowed from the web", reaches the client | Test id: `packages/engine/test/routing/permissions.test.ts` (new cases) |
-| 1.42 | A permission request carries its action: for each tool kind, `PermissionRequested` holds `toolKind` and the redacted `toolInput`, at most 8 KiB encoded, with `inputRedacted` and `inputTruncated` true when they apply; the fields are absent when the adapter omits them; `toolInput` is not in the requests view or the snapshot; old logs rebuild unchanged | Test id: `packages/engine/test/runner/permission-fields.test.ts`; the rebuild check |
-| 1.43 | A withdrawal that leaves its target in the reloaded state, with nothing queued or sent, writes `StateChanged idle` in the same batch before the wait checks, and a wait on it closes; it holds for a dispatcher's withdrawal and a reactor's | Test id: `packages/engine/test/routing/withdraw-reloaded.test.ts` (real recovery events) |
+| 1.42 | A permission request carries its action: for each tool kind, `PermissionRequested` holds `toolKind` and the redacted `toolInput`, at most 8 KiB encoded, with `inputRedacted` and `inputTruncated` true when they apply; the fields are absent when the adapter omits them; `toolInput` is not in the snapshot; old logs rebuild unchanged; the holder's delivery holds the fields inside the envelope, with the engine's lines first and the title last, one-line JSON that a title cannot forge a line above, and the fixed words when the input is absent, redacted or cut; a moved request delivers the same text, the row's `action` part is dropped when the row closes, and a planted input appears in no snapshot or other client read; a secret across the 8 KiB boundary does not survive the cut; `locations` are bounded and redacted; a Codex-shaped request with `locations` and no input is recorded | Test id: `packages/engine/test/runner/permission-fields.test.ts`; the rebuild check; `routing/text-is-data.test.ts`, `routing/permissions.test.ts`, `routing/moving-requests.test.ts` (changed where they read the delivered text); `live-check/rendered-prompts.test.ts` (new lines); `packages/testing/src/fakeAgent.ts` gains the fields |
+| 1.43 | A withdrawal that leaves its target in the reloaded state, with nothing queued or sent, writes `StateChanged idle` in the same batch before the wait checks, and a wait on it closes; it holds for a dispatcher's withdrawal and a reactor's; it holds for any batch with a `DeliveryWithdrawn`, including the engine's own, such as an answered question's delivery to a reloaded holder | Test id: `packages/engine/test/routing/withdraw-reloaded.test.ts` (real recovery events) |
+| 1.44 | One piece's throw cannot stop the engine: a fixture piece throws from its reducer, its reach check, hold-unsettled, request-held, source rule, secret keep list and `snapshotFor`, and each gives contract section 1's fallback; the log holds no event text from the failure; commands and `stop` still run, an adapter's request is still recorded, a queue behind a throwing reach check goes on, a restart finishes, nothing is deleted by a throwing keep list, and the rebuild check passes after a throwing reducer; a boundary test finds no direct call into a table | Test id: `packages/engine/test/pieces/throwing-piece.test.ts`; boundary test in the same file; the rebuild check |
+| 1.45 | `stop` writes `PermissionCancelled` with the reason "agent stopped", and a withdrawal, for each open request the stopped agent asked; questions stay open; it moves what the agent held; after a resume no stale row remains, an owner's wait is not ended by one, and a parent's wait closes; `failure-4-no-answerer` keeps its expectations | Test id: `packages/engine/test/commands/stop-cancels-requests.test.ts`; `packages/engine/test/acceptance/failure-4-no-answerer.test.ts` (unchanged expectations) |
 
 **Tasks:**
 
@@ -370,6 +382,7 @@ section 6, edits E1 to E23 and E27 to E29.
 | 1a.6 | E8: the visibility function with the read rule (lead ruling L29), and the class table | `server.ts:155-159` (inline `Stream.filterEffect`); targets `packages/engine/src/api/visibility.ts`, `packages/contracts/src/visibility.ts` |
 | 1a.7 | E9 and E21: the snapshot from one views value with its section table and wait-state section, and the paged read of one agent's events with the `thread_agent_id` column and its migration | `packages/engine/src/views/Views.ts:41-44`; `views/apply.ts:342`; `packages/engine/src/log/subscribe.ts:58` (`subscribe`, `PAGE_SIZE`); `EventLog.ts:175`; targets `packages/engine/src/api/snapshot.ts`, `packages/engine/src/log/agentRead.ts` |
 | 1a.8 | E22, and the service builder taking the lists as arguments with the engine's own as the default, so tests run a fixture piece | `packages/engine/src/routing/holders.ts` (`holderAbove`); `packages/engine/src/service.ts`; target `packages/engine/test/support/fixturePiece.ts` |
+| 1a.9 | E30: `guardPiece` and its sink, first, so that each later table's edit calls it | Target `packages/engine/src/pieces/guardPiece.ts`; `views/apply.ts:336-338`; precedent: the roles plan's matcher, its criterion 7.2 |
 | 1b.1 | E11 and E12's durable form: `Caller` with `service` and `piece`, the open web credential shape and reserved id, the receipts key, the `caller_rule` and `device_id` columns, `append` taking the full caller, and one row decoder | `events.ts:8` (`Actor`), l.184 (`EventEnvelope`); `EventLog.ts:116` (`callerKey`), l.145 (`commit`), l.182; `log/subscribe.ts:36-38` (`decodeRow`); `views/rebuild.ts:26`; `migrations.ts:15-16` |
 | 1b.2 | E12: the optional `device` field, `Input.callerKind`, and the reserved id's checks | `events.ts:184`; `CommandHandler.ts:207`; `EventLog.ts:202-205`; `commands/internal.ts:36-40` |
 | 1b.3 | E13 and E14: the service list, the in-process path with its `subscribe`, `reload`'s caller, the service rights, and `PermissionAnswered.answeredBy` | Target `packages/engine/src/commands/services.ts`; `server.ts:87` (`authenticate`); `commands/resume.ts:47`; `recovery/reload.ts:104`; `events.ts:132`; `views/apply.ts:45`; `routing/permissions.ts:47` |
@@ -381,6 +394,8 @@ section 6, edits E1 to E23 and E27 to E29.
 | 1b.9 | E27: `collectSecrets` moved and kept at start-up only, each piece's keep entry, `removeCarrierValue`, the reserved prefix, and the `secretCommands` table | `recovery/restart.ts:139-147`; `accounts/SecretStore.ts:51`; `CommandHandler.ts` (the two `accounts set-secret` cases); `commands/accounts.ts:38-50`; target `packages/engine/src/accounts/collectSecrets.ts` |
 | 1b.10 | E28, pending the owner: the answer's refusal for a device caller and its named reason | `commands/internal.ts:36-40`; `CommandHandler.ts:205-207`; `routing/permissions.ts:35-44`; `identity/ceiling.ts:387-394`; `packages/contracts/src/permission.ts:12` |
 | 1b.11 | E29: the permission request's tool fields, for every tool kind | `runner/AcpRunner.ts:411-416`; `runner/Runner.ts:58`; `events.ts:121`; `views/apply.ts:216` |
+| 1b.12 | E29's delivery: the holder's text, the fixed words, the row's `action` part for a move, and the fake agent's new fields | `routing/holders.ts` (`routedDelivery` l.45-55, `move` l.88); `routing/permissions.ts:22-30`; `views/apply.ts:216-230`; `packages/testing/src/fakeAgent.ts:293-294` |
+| 1b.13 | E31: `stop` cancels the asker's open requests. E17's reloaded-state rule moves into `withWaitChecks`' first step | `commands/stop.ts:10-18`; `recovery/crash.ts:58-63`; `routing/waits.ts:110` |
 
 **Design artifact:** none.
 
@@ -388,6 +403,7 @@ section 6, edits E1 to E23 and E27 to E29.
 
 | Risk | Severity | Mitigation |
 |---|---|---|
+| One piece's mistake stops every command, or poisons the log | High | One guard with stated fallbacks (criterion 1.44, row 161). |
 | An edit changes engine behaviour that contract section 6 does not name | High | Criterion 1.1 on every commit, with each changed existing test matched to its edit; attack pass on 1a and 1b. |
 | A piece gains rights the engine would refuse | High | Criteria 1.4, 1.5, 1.6, 1.12; the engine checks every engine event a piece returns; attack pass on 1a and 1b. |
 | A piece's or a service's text reaches an agent unwrapped | High | Criteria 1.14 and 1.18; the renderer wraps every sender but the owner. |
@@ -402,7 +418,7 @@ section 6, edits E1 to E23 and E27 to E29.
 | A piece's view drifts from the log | Medium | Pieces' views join the rebuild check (criterion 1.2). |
 | The unit is too big for one build | Medium | Split into 1a and 1b, each with its own criteria. |
 
-**Verify:** criteria 1.1-1.43; environment QA: none.
+**Verify:** criteria 1.1-1.45; environment QA: none.
 
 **Rollout detail:** rollout step 3. Unit 1a merges before 1b starts. The
 board and roles plans start their engine-facing units only after 1b merges.
@@ -411,31 +427,33 @@ board and roles plans start their engine-facing units only after 1b merges.
 
 Purpose: put the client API's own commands and events into the engine's
 lists, make clashes and unknown events safe for every client, and give the
-client library its browser entry. Contract edits E24, E25 and E26. Unit 2.
+client library its browser entry. Contract edits E24, E25, E26 and E32. Unit 2. It defines the group's schemas and
+installs its events. Each later unit installs the commands it handles (row 172).
 
 **Done when:**
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 2.1 | With the `client` group and events added, every command name and every event tag in `CommandsRpcGroup` and `Event` is still unique | Test id: `packages/contracts/test/unique.test.ts` (from unit 1a) |
+| 2.1 | With the `client` group defined and its events added, every command name and every event tag, across `CommandsRpcGroup`, the client group and `Event`, is unique | Test id: `packages/contracts/test/unique.test.ts` (from unit 1a) |
 | 2.2 | Every `client` command and event tag starts with `client.`; no engine name contains a dot except `debug.compare-views` | Test id: `packages/contracts/test/unique.test.ts` |
 | 2.3 | Every `client` command's payload, reply and error carries a non-empty `requestId` | Test id: `packages/contracts/test/client/request-id.test.ts` |
 | 2.4 | Real encoded frames from a newer server reach an older client: an event tag it does not know becomes an unknown event, its cursor moves past it, the next known event and a reconnect both work, and a known tag that fails to decode is an error; the engine's log validation stays strict | Test id: `packages/client/test/unknown-event.test.ts` (real RPC frames, not a decoded object) |
-| 2.5 | Every command in `CommandsRpcGroup` is a `shephrd` subcommand, and the MCP server offers exactly the commands whose access includes `agent`, less every stream and every secret-setting command, and that list is pinned as an exact list in `commands.test.ts`; `client.alerts.dismiss` is not a tool | Test id: `packages/cli/test/parity.test.ts` and `command-inventory.test.ts` (updated per E2 and E10) |
-| 2.6 | Each piece's stated largest event and page, as real encoded RPC messages with chunk wrappers and escaping, fit the page budget in contract section 5; a stated event over 256 KiB reaches a filtered stream as a marker; a snapshot on the large fixture team stays under 4 MiB | Test id: `packages/contracts/test/size-limits.test.ts`; `packages/engine/test/client/snapshot-size.test.ts` |
-| 2.7 | Through the public client connection, `subscribe` and `client.subscribe` each call their own RPC; a filter survives a dropped connection; the cursor advances on an event, a checkpoint and an oversized marker | Test id: `packages/client/test/stream-dispatch.test.ts` |
+| 2.5 | Every command in `CommandsRpcGroup` is a `shephrd` subcommand, and the MCP server offers exactly the commands whose access includes `agent`, less every stream and every secret-setting command, and that list is pinned as an exact list in `commands.test.ts`; `client.alerts.dismiss` is not a tool; each unit that installs commands updates the pin, and the client group's entries are `client.snapshot`, `client.roster`, `client.thread` and `client.event` | Test id: `packages/cli/test/parity.test.ts` and `command-inventory.test.ts` (updated per E2 and E10) |
+| 2.6 | Each piece's stated largest event and page, as real encoded RPC messages with chunk wrappers and escaping, fit the page budget in contract section 5; a stated event over 256 KiB reaches a filtered stream as a marker | Test id: `packages/contracts/test/size-limits.test.ts` |
+| 2.7 | Through the public client connection, against a fixture server, `subscribe` and `client.subscribe` each call their own RPC; a filter survives a dropped connection; the cursor advances on an event, a checkpoint and an oversized marker; a client that subscribes opens two connections, carries every other command on the read connection and reconnects each on its own, and a client that never subscribes opens one, on the Unix socket and in the browser | Test id: `packages/client/test/stream-dispatch.test.ts`; `packages/client/test/two-connections.test.ts`; `packages/client/test/concurrent-reconnect.test.ts` (unary expectations unchanged) |
 | 2.8 | `core.ts` and `browser.ts` reach no `node:` import; the root entry still gives the command-line tool, the MCP server and the pane viewer today's behaviour | Test id: `packages/client/test/entry-boundaries.test.ts`; existing client tests with unchanged expectations |
-| 2.9 | Every `client` command has the access in contract section 5, and every `client` event is `owner-only`; an agent caller is refused `client.alerts.dismiss` and never sees an alert | Test id: `packages/contracts/test/client/access-table.test.ts`; `packages/engine/test/client/client-visibility.test.ts` |
+| 2.9 | Every `client` command's definition has the access in contract section 5, and every `client` event is `owner-only`; through the visibility function, an agent caller never sees an alert | Test id: `packages/contracts/test/client/access-table.test.ts`; `packages/engine/test/client/client-visibility.test.ts` |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 2.1 | `packages/contracts/src/client/`: `ClientRpcGroup` (prefixed `client.`), the client events, their access and visibility entries, the alert types | Target `packages/contracts/src/client/`; pattern `packages/contracts/src/commands.ts`, `events.ts` |
-| 2.2 | Merge `ClientRpcGroup` into `CommandsRpcGroup` and the client events into `Event` | `commands.ts` (`.merge`, l.135); `events.ts:88` |
+| 2.1 | `packages/contracts/src/client/`: `ClientRpcGroup`'s definitions (prefixed `client.`), in parts by the unit that installs them, the client events, their access and visibility entries, the alert types | Target `packages/contracts/src/client/`; pattern `packages/contracts/src/commands.ts`, `events.ts` |
+| 2.2 | Merge the client events into `Event`. No command joins `CommandsRpcGroup` here | `commands.ts` (`.merge`, l.135); `events.ts:88` |
 | 2.3 | E24 and E25: stream dispatch by tag, and the tolerant wire group at the RPC boundary | `packages/client/src/index.ts` (`RpcClient.make` l.97, `subscribe` helper l.190-212, `CommandsRpcGroup.requests` l.218); Effect `rpc/RpcClient.ts:733-755`, l.811-818; target `packages/contracts/src/wire.ts` |
 | 2.5 | E26: the client library's three modules, with the root re-exporting Node's | `packages/client/src/index.ts` (l.1-3, l.19-22, l.32, l.120-138); targets `packages/client/src/core.ts`, `node.ts`, `browser.ts` |
 | 2.4 | The size-limit test over each piece's stated maxima | Target `packages/contracts/test/size-limits.test.ts` |
+| 2.6 | E32: two connections from a client that subscribes | `packages/client/src/index.ts` (`connect` l.142-174, `subscribe` helper l.190-212); Effect `rpc/RpcClient.ts:350`, l.577-581 |
 
 **Design artifact:** none.
 
@@ -448,6 +466,7 @@ client library its browser entry. Contract edits E24, E25 and E26. Unit 2.
 | An owner-only piece command is offered to agents as a tool | High | Criterion 2.5. |
 | An alert or a setting leaks to an agent | High | Criterion 2.9. |
 | A browser build pulls in Node code | Medium | Criterion 2.8, and unit 7a's production build. |
+| A unit merges commands with no handlers, so the exact handler check fails or invites a stub | Medium | Unit 2 installs no command, and each later unit installs its own (row 172). |
 
 **Verify:** criteria 2.1-2.9; environment QA: none.
 
@@ -463,21 +482,23 @@ Contract section 3. Unit 3.
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 3.1 | `client.snapshot` then `subscribe` from its sequence gives the same views as a full replay, for the owner, a device and an agent; all of it comes from one views value and that value's sequence; the wait-state section holds open deliveries and non-blocking waits, and each agent's `reloadable` flag, for the owner, a device and a service, and an agent's snapshot leaves it out; a request's and a question's identity row is present for all of them, and the newest 256 have a display part of at most 4 KiB, filled to its limits in the test; the account section holds names and flags, and a plain value under a name that does not look secret appears in no snapshot; an agent entry's name and team are cut | Test id: `packages/engine/test/client/snapshot.test.ts` |
+| 3.1 | `client.snapshot` then `subscribe` from its sequence gives the same views as a full replay, for the owner, a device and an agent; all of it comes from one views value and that value's sequence; the wait-state section holds open deliveries and non-blocking waits, and each agent's `reloadable` flag, for the owner, a device and a service, and an agent's snapshot leaves it out; a request's and a question's identity row is present for all of them, and the newest 256 have a display part of at most 4 KiB, filled to its limits in the test; the account section holds names and flags, and a plain value under a name that does not look secret appears in no snapshot; an agent entry's name and team are cut; an agent's snapshot holds identity rows and no display part, and no account, device, alert or wait-state section; a display part is measured as encoded, with a long option id, a long kind, escaped and multibyte text: it never passes 4 KiB, an option id is never cut, an unknown kind shows as "unknown", and an option or part left out is counted; a snapshot on the large fixture team stays under 4 MiB | Test id: `packages/engine/test/client/snapshot.test.ts`; `packages/engine/test/client/snapshot-size.test.ts` |
 | 3.2 | `client.roster` returns the contract's fields, filters by group, role and parent, shows an agent itself and its children, shows its grandchildren only while their parent is unavailable and it is their effective holder, and names its parent | Test id: `packages/engine/test/client/roster.test.ts` |
-| 3.3 | `client.thread` pages one agent's thread, at most 500 events and 900 KiB a page, always at least one event, with `next` absent on the last page, under the visibility rule; a 2 MiB event arrives whole in its own page; to an agent caller, a page is inside the data envelope with a fresh marker and an escaped leading slash | Test id: `packages/engine/test/client/thread.test.ts` |
+| 3.3 | `client.thread` pages one agent's thread, at most 500 events and 900 KiB a page, always at least one event, with `next` absent on the last page, under the visibility rule; a 2 MiB event arrives whole in its own page; to an agent caller, a page is inside the data envelope with a fresh marker and an escaped leading slash; the reply to an agent is `{ requestId, data }`, and the MCP tool and the command line return `data` unchanged | Test id: `packages/engine/test/client/thread.test.ts` |
 | 3.4 | `client.subscribe` filters by agent, group and event kind; a group filter uses the current views, live and on catch-up; an agent filter includes a queued delivery by its target; a checkpoint carrying the last scanned sequence arrives at least every 30 seconds while events are skipped (test clock), and a reconnect from it skips nothing unscanned; an event over 256 KiB arrives as a `client.Oversized` marker, and the cursor moves past it; each row of the contract's filter table holds, live and on catch-up; an empty list is refused; a phone that filters by agent still receives an account's alert | Test id: `packages/engine/test/client/filtered-subscribe.test.ts` |
-| 3.5 | `waitForAgents` with "any" and "all" gives the result in the contract's member table for every row, against the engine's own function, applying every piece's hold-unsettled entry; a delivery, a non-blocking wait and a roles capacity hold opened before the snapshot still count; a member that goes back to working stops counting; the client's fold of the wait inputs, replayed against the engine's `apply`, is equal at every sequence | Test id: `packages/client/test/wait-for-agents.test.ts`; `packages/contracts/test/wait-input-fold.test.ts` (property test) |
-| 3.6 | `shephrd client wait --block` exits with engine row 26's codes: exit 1 with a stopped or crashed member, exit 2 with a paused member, and exit 2 at once when a waited member's request, question or piece condition is held by the owner, with no hang; the engine's `shephrd wait` keeps its behaviour and its tests; each row of the contract's held-rule table holds; opened while a member is working, a board post to the owner written afterwards ends the wait with exit 2 while the member never becomes idle; a descendant's owner-held request does not end it | Test id: `packages/cli/test/client-wait.test.ts`; `packages/cli/test/wait-exit-codes.test.ts`; `packages/client/test/owner-held-event.test.ts` |
+| 3.5 | `waitForAgents` with "any" and "all" gives the result in the contract's member table for every row, against the engine's own function, applying every piece's hold-unsettled entry; a delivery, a non-blocking wait and a roles capacity hold opened before the snapshot still count; a member that goes back to working stops counting; the client's fold of the wait inputs, replayed against the engine's `apply`, is equal at every sequence; the helper's completion, not only its fold, agrees with the engine at a batch's end (criterion 3.10) | Test id: `packages/client/test/wait-for-agents.test.ts`; `packages/contracts/test/wait-input-fold.test.ts` (property test) |
+| 3.6 | `shephrd client wait --block` exits with engine row 26's codes: exit 1 with a stopped or crashed member, exit 2 with a paused member, and exit 2 at once when a waited member's request, question or piece condition is held by the owner, with no hang; the engine's `shephrd wait` keeps its behaviour and its tests; each row of the contract's held-rule table holds; opened while a member is working, a board post to the owner written afterwards ends the wait with exit 2 while the member never becomes idle; a descendant's owner-held request does not end it; each exit passes the gate (criterion 3.10) | Test id: `packages/cli/test/client-wait.test.ts`; `packages/cli/test/wait-exit-codes.test.ts`; `packages/client/test/owner-held-event.test.ts` |
 | 3.7 | `shephrd thread export <agent> --out <file>` writes the caller's file from paged reads, with mode 0600; the service writes no file | Test id: `packages/cli/test/thread-export.test.ts` |
-| 3.8 | `client.event` returns one event whole by sequence, under the visibility rule, including an event in no thread; through the client library, a marker over `AgentStarted`, `PermissionRequested`, `QuestionAsked`, `DeliveryQueued`, `HarnessChanged` or `AccountChanged` is read and applied before anything later, and the cursor passes it only then; a failed read reconnects from before the marker; a marker over a content-only tag moves the cursor at once; a tag not on the list is treated as state-bearing | Test id: `packages/engine/test/client/event-read.test.ts`; `packages/client/test/oversized-state.test.ts` (real RPC frames) |
+| 3.8 | `client.event` returns one event whole by sequence, under the visibility rule, including an event in no thread; through the client library, a marker over `AgentStarted`, `PermissionRequested`, `QuestionAsked`, `DeliveryQueued`, `HarnessChanged` or `AccountChanged` is read and applied before anything later, and the cursor passes it only then; a failed read reconnects from before the marker; a marker over a content-only tag moves the cursor at once; a tag not on the list is treated as state-bearing; an agent caller recovers a visible child's start and request over `client.event`, under the read rule and in the data envelope, and then later events apply in order; a sibling's event, an event with no `agentId` and an owner-only piece event stay unavailable, with one refusal for a hidden and a missing sequence; a read rule that changes mid-recovery ends with no loop | Test id: `packages/engine/test/client/event-read.test.ts`; `packages/client/test/oversized-state.test.ts` (real RPC frames) |
+| 3.9 | A read never stalls behind its own paused stream: with a state event over 256 KiB, a stream backlog beyond the client's queue and a delayed reply, in real encoded frames, the event is recovered and applied before later state, and the cursor advances only then; the same holds for the wait helper's nested read of a piece's lists; a recovery that outlasts the stream connection's five seconds costs a reconnect and not the read, with no repeated loop; a cancelled recovery leaves the cursor before the marker; a live chunk closes at 256 KiB, with at least one event | Test id: `packages/client/test/oversized-state.test.ts` (new cases, real RPC frames); `packages/engine/test/client/subscribe-chunks.test.ts` |
+| 3.10 | The gate: real encoded frames split one committed batch, live and on a catch-up page, at each of these places, and the helper never ends the wait on the prefix: a reload's `SessionOpened`, `DeliveryQueued` and `StateChanged working` (no exit 0 while mid-turn); `WaitSatisfied` then `DeliveryQueued` (no exit 0 on a waiter about to work); a standing rule's `PermissionRequested` then `PermissionAnswered` (no exit 2 with nothing to answer); and, with a lead as holder and no board or roles sections, `QuestionAnswered` then `DeliveryQueued` (no exit 0), for "any" and "all". With no piece, the read is `client.sequence`, and with a piece, its lists. A read below S is repeated, a read above S is applied up to L and no further, and a failed read ends nothing. `client.sequence` returns the views value's own sequence, and an agent is refused it | Test id: `packages/client/test/wait-gate.test.ts` (real RPC frames); `packages/engine/test/client/sequence-read.test.ts`; `packages/engine/test/routing/waits.test.ts` and `packages/engine/test/acceptance/capability-05-wait.test.ts` (unchanged expectations) |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 3.1 | `client.snapshot` with its rows, `client.roster`, `client.thread`, `client.event` and `client.subscribe` handlers, and the content-only tag list | Target `packages/engine/src/client/reads/`; the engine's snapshot and agent read (1a.7) |
-| 3.2 | `waitForAgents` helper, with `ownerHeld` | Target `packages/client/src/waitForAgents.ts`; member rule from `packages/contracts` (1b.7) |
+| 3.1 | Install the read commands into `CommandsRpcGroup`. `client.snapshot` with its rows and encoded budget, `client.roster`, `client.thread`, `client.event` with the agent reply, `client.sequence` and `client.subscribe` handlers with the chunk limit, and the content-only tag list | Target `packages/engine/src/client/reads/`; the engine's snapshot and agent read (1a.7) |
+| 3.2 | `waitForAgents` helper, with `ownerHeld` and the one gate | Target `packages/client/src/waitForAgents.ts`; member rule from `packages/contracts` (1b.7) |
 | 3.3 | `shephrd client wait`, `shephrd thread export` | Target `packages/cli/src/commands/`; pattern `packages/cli/src/commands/wait.ts:reportWait` |
 
 **Design artifact:** none.
@@ -494,7 +515,7 @@ Contract section 3. Unit 3.
 | An agent reads injected text through a thread page | Medium | The data envelope for an agent caller (criterion 3.3). |
 | The owner's wait hangs on a crashed member or on the owner's own answer | Medium | Criteria 3.5, 3.6. |
 
-**Verify:** criteria 3.1-3.8, and unit 3's attack pass; environment QA: none.
+**Verify:** criteria 3.1-3.10, and unit 3's attack pass; environment QA: none.
 
 **Rollout detail:** rollout step 5.
 
@@ -539,7 +560,7 @@ SECURITY.md rule 1, and rule 2 as the owner suspended it. Rows 36, 76, 80,
 | 5.8 | An inbound message over 1 MiB closes the connection; the limit does not apply to what the server sends | Test id: `packages/engine/test/client/web-size.test.ts` |
 | 5.9 | A heartbeat is sent at the configured interval, 25 seconds by default | Test id: `packages/engine/test/client/web-heartbeat.test.ts` |
 | 5.10 | Static files are served with `Content-Security-Policy: default-src 'self'; script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'` and no inline script; a request using `..`, an encoded path or a symbolic link gets nothing outside the page's build folder | Test id: `packages/engine/test/client/web-static.test.ts` |
-| 5.11 | Connections are capped at 32 in total; a new connection at the cap closes the oldest; a refused connection does not count; a connection that misses two heartbeats closes | Test id: `packages/engine/test/client/web-limits.test.ts` |
+| 5.11 | Connections are capped at 32 in total; a new connection at the cap closes the oldest; a refused connection does not count; a connection that misses two heartbeats closes; a client's stream connection and read connection each count, and each has its own heartbeat | Test id: `packages/engine/test/client/web-limits.test.ts` |
 | 5.12 | A test piece's command works over the web server with no web server code of its own | Test id: `packages/engine/test/client/web-generic.test.ts` |
 | 5.13 | The engine's Unix socket keeps its authentication: its existing tests pass with their expectations, and it still refuses a connection with no credential | Test id: `packages/engine/test/api/auth.test.ts` (one new case, per E12 and E13) |
 | 5.14 | During recovery the web server answers HTTP 503 and serves no command or stream | Test id: `packages/engine/test/client/web-recovery.test.ts` |
@@ -553,7 +574,7 @@ SECURITY.md rule 1, and rule 2 as the owner suspended it. Rows 36, 76, 80,
 | 5.1 | The HTTP server: static files and the WebSocket RPC on one loopback port | Target `packages/engine/src/client/web/`; pattern `packages/engine/src/api/server.ts` (`listen`, l.52; `makeProtocolWithHttpEffectWebsocket`, l.128; `boundedProtocol`, l.130); Effect `http/HttpStaticServer.ts:layer` (l.242) |
 | 5.2 | `webCaller`: the one caller function, the refusal of host credentials, and the guard | Target `packages/engine/src/client/web/webCaller.ts`; pattern `server.ts:authenticate` (l.87); the ancestry rule `packages/engine/src/api/ancestry.ts`; peer lookup target `packages/engine/src/client/web/peer.ts` (`/proc/net/tcp`, `/proc/net/tcp6`, `/proc/<pid>/fd`), taking the `/proc` root as an argument so tests use a fixture tree |
 | 5.3 | The computer-only list, `Origin` and `Host` allow-lists, inbound size limit, heartbeat, connection cap, HTTP 503 during recovery and the failed-bind path | Target `packages/contracts/src/client/hostOnly.ts`; `packages/engine/src/client/web/guards.ts` |
-| 5.4 | `client.web.settings` and `client.web.settings.set`, the record in contract section 5, with `set` at access `owner` only | Target `packages/engine/src/client/settings.ts`; access table `packages/contracts/src/commands.ts` (`commandAccess`, l.20) |
+| 5.4 | Install the web settings commands. `client.web.settings` and `client.web.settings.set`, the record in contract section 5, with `set` at access `owner` only | Target `packages/engine/src/client/settings.ts`; access table `packages/contracts/src/commands.ts` (`commandAccess`, l.20) |
 
 **Design artifact:** none.
 
@@ -588,9 +609,9 @@ carrier.
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
 | 6.1 | Each of the engine's three `OwnerNeeded` producers, provoked in a test service, raises an alert of the contract's kind; an account alert is raised from the event that names the account, and from `OwnerNeeded` only when the agent's account has no row; an unknown reason raises kind `other`; on a rescan after a restart, an event whose subject has closed raises nothing | Test id: `packages/engine/test/client/alert-sources.test.ts` |
-| 6.2 | One alert is open per key; every row of the contract's closing table holds, including a stop with an owner-held request, a stopped asker, a failed reload, a removed account, and a sign-out after a usage limit, which gives two alerts with the right remedies; dismissing clears one in the planner's batch; dismissing a closed alert succeeds with no event; a dismiss racing a close writes one clear; when a stopped or crashed asker resumes, its open owner-held question raises a new alert with the same key, and a request does not; a dismiss writes no source sequence and moves no position | Test id: `packages/engine/test/client/alert-life.test.ts` |
+| 6.2 | One alert is open per key; every row of the contract's closing table holds, including a stop with an owner-held request, a stopped asker, a failed reload, a removed account, and a sign-out after a usage limit, which gives two alerts with the right remedies; dismissing clears one in the planner's batch; dismissing a closed alert succeeds with no event; a dismiss racing a close writes one clear; when a stopped or crashed asker resumes, its open owner-held question raises a new alert with the same key, and a request does not; a dismiss writes no source sequence and moves no position; a stopped asker's request closes by `PermissionCancelled`, and an old log's row counts as closed when its agent is stopped or crashed | Test id: `packages/engine/test/client/alert-life.test.ts` |
 | 6.3 | Killing the service between an event and its alert gives exactly one alert after restart | Test id: `packages/engine/test/client/alert-reactor-restart.test.ts` |
-| 6.4 | A test piece's alert source raises and ends its own kind; its result can name no title | Test id: `packages/engine/test/client/alert-piece-source.test.ts`; command: `pnpm -r typecheck` on a fixture source with a title fails |
+| 6.4 | A test piece's alert source raises and ends its own kind; its result can name no title; a piece's alert source or `openMatters` that throws raises nothing, and the reactor goes on (row 161) | Test id: `packages/engine/test/client/alert-piece-source.test.ts`; command: `pnpm -r typecheck` on a fixture source with a title fails |
 | 6.5 | An agent string planted in a request, a question, a crash and a piece's event appears in no `AlertRaised` event and no sent payload; the agent's name and its group labels each travel in their own field under a fixed label, with control and formatting characters and line breaks removed; a name is cut to 64 characters, and a team to 8 labels and 128 characters; neither is ever inside the title | Test id: `packages/engine/test/client/alert-no-agent-text.test.ts` |
 | 6.6 | Each kind's push setting has the contract's default and can be changed by the owner and the web caller; the setting is read at send time | Test id: `packages/engine/test/client/alert-settings.test.ts` |
 | 6.7 | The alert rules call only `AlertSender`: with a fake sender, every raised alert that is pushed by its kind's setting reaches the fake, with its kind, name, team, title and link; a clear calls `clear` once; no alert module imports a carrier | Test id: `packages/engine/test/client/alert-sender.test.ts`; boundary test `packages/engine/test/client/alert-sender-imports.test.ts` |
@@ -599,19 +620,20 @@ carrier.
 | 6.10 | The link opens the agent's thread at the public address setting, carries no credential and no command; the alert has a link only with proxy mode on and a public address set | Test id: `packages/engine/test/client/alert-link.test.ts` |
 | 6.11 | Delivery is at least once: killing the service before a send, after the carrier's acceptance and before the local record, and during backoff gives one alert record and one or two sends, never none; attempts and waits survive the restart; a timeout and a lost response are failed attempts; an alert cleared in backoff is not sent; one alert's backoff delays no other; a failed send never stops the reactor. A carrier that is down for an hour and then returns gets the open alert, with `final` shown as still failing and retries at the 10-minute cap. Generations: delivered to topic A, then a change to topic B, makes it pending for B; a result from A that arrives after the change settles nothing; five authorization failures and then a new token on the same server recover the alert; a new token does not resend a delivered one; all of this holds across a restart | Test id: `packages/engine/test/client/alert-delivery.test.ts`; `packages/engine/test/client/alert-generation.test.ts` (a fake carrier with fault injection and a test clock) |
 | 6.12 | The ntfy token appears in no event, no receipt, no reply and no service log | Test id: `packages/engine/test/client/alert-ntfy-secret.test.ts` |
-| 6.13 | The carrier resolves only the active slot name: a payload that names an account's reference, or a value equal to one, sends no account key; a boundary test finds no other `resolve` call in the client folder; no read returns the token; an account's environment that names the slot cannot read it or keep it (criterion 1.39) | Test id: `packages/engine/test/client/alert-carrier-token.test.ts`; boundary test in the same file |
-| 6.14 | The token is bound to its server: changing to another origin clears it in the same batch, and the old value is removed; the carrier sends a token only for its recorded origin; `set-token` has access `owner` alone, rotates, and reads its value from standard input; `clear-token` removes it; `set-token` names the origin, and a mismatch or no server is refused; its terminal form shows the current server first; a failed log write after the store leaves the earlier token active and working, for both a first token and a rotation; the worker removes only the old generation's value | Test id: `packages/engine/test/client/alert-carrier-token.test.ts`; `packages/cli/test/carrier-token.test.ts` |
+| 6.13 | The carrier resolves only the active slot name: a payload that names an account's reference, or a value equal to one, sends no account key; a boundary test finds no other `resolve` call in the client folder; no read returns the token; an account's environment that names the slot cannot read it or keep it (criterion 1.39); the one exception, tested exactly: for the warning about a carrier change or a token clear, the carrier may resolve the name just cleared, and sends it only to the origin in that value's own `client.AlertCarrierTokenSet`; the boundary test allows this path and no other | Test id: `packages/engine/test/client/alert-carrier-token.test.ts`; boundary test in the same file |
+| 6.14 | The token is bound to its server: changing to another origin clears it in the same batch, and the old value is removed; the carrier sends a token only for its recorded origin; `set-token` has access `owner` alone, rotates, and reads its value from standard input; `clear-token` removes it; `set-token` names the origin, and a mismatch or no server is refused; its terminal form shows the current server first; a failed log write after the store leaves the earlier token active and working, for both a first token and a rotation; the worker removes only the old generation's value; "none" clears the token in the same batch, so a restart and a later set of the same server do not report a token that is gone; an active reference with no value is a failed attempt, shown as "token missing", and is never a send with no token | Test id: `packages/engine/test/client/alert-carrier-token.test.ts`; `packages/cli/test/carrier-token.test.ts` |
 | 6.15 | The carrier's transport: an `http` server is refused unless its host is a private address literal; a redirect is never followed and is a failed attempt, so no token crosses an origin or falls to plain text; at most 64 KiB of a response is read; the server is parsed by the URL standard's parser, so user information, a path, a query and a fragment are refused, forms such as `http://127.1` and `http://[::ffff:192.168.1.1]` are judged on the parsed host, and the canonical origin is what is stored; a topic outside `[-_A-Za-z0-9]` or over 64 characters is refused; `client.alerts.carrier.set` takes "none" | Test id: `packages/engine/test/client/alert-carrier-transport.test.ts` |
 | 6.16 | The first start on a log with history and a set carrier pushes nothing; an alert is raised, marked `baseline`, for each matter still open; a later matter is pushed; an open board and an open roles matter, from a fixture `openMatters`, get `baseline` alerts and closed ones do not; a close committed after the scan closes its alert; a kill inside the first start leaves all or none | Test id: `packages/engine/test/client/alert-first-start.test.ts` |
-| 6.17 | A change to a lasting setting with `device: open-web` raises a `client.lasting-setting` alert, pushed by default, which ends only when dismissed; the same change from the owner's terminal raises none; `client.AlertSettingsChanged` and `client.AlertCarrierTokenCleared` are sources; a device caller cannot switch off this kind's push; the alert about a carrier change also reaches the old carrier, before the old token's value goes; `shephrd client alerts list --all` shows a record dismissed from the web | Test id: `packages/engine/test/client/alert-lasting-setting.test.ts` |
+| 6.17 | A change to a lasting setting with `device: open-web` raises a `client.lasting-setting` alert, pushed by default, which ends only when dismissed; the same change from the owner's terminal raises none; `client.AlertSettingsChanged` and `client.AlertCarrierTokenCleared` are sources; a device caller cannot switch off this kind's push; the alert about a carrier change also reaches the old carrier, before the old token's value goes; `shephrd client alerts list --all` shows a record dismissed from the web; against a deny-all fake server, the alert about `client.AlertCarrierTokenCleared` reaches the server with the cleared value, up to five attempts, and the value is removed only after they end, with the cleanup worker raced against the retries; a device caller's dismiss of this kind before the send does not cancel it, a dismiss after it does not call `clear`, and neither stops the warning attempts; a terminal dismiss works as for any kind | Test id: `packages/engine/test/client/alert-lasting-setting.test.ts` |
+| 6.18 | Once the alert commands are installed, an agent caller is refused `client.alerts.dismiss`, and it is not an MCP tool | Test id: `packages/engine/test/client/client-visibility.test.ts`; `packages/cli/test/parity.test.ts` |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 6a.1 | The alert reactor under section 1's reactor rules, alert events, the keys and level closing table, the return of a question's alert, the first-start scan with each piece's `openMatters`, dismiss in its planner, the title table, the lasting-setting source, push settings | Target `packages/engine/src/client/alerts/`; producers `packages/engine/src/routing/holders.ts:49`, `recovery/crash.ts:69`, `routing/deliveries.ts:194` |
+| 6a.1 | Install the alert commands. The alert reactor, with its two tables called through `guardPiece`, under section 1's reactor rules, alert events, the keys and level closing table, the return of a question's alert, the first-start scan with each piece's `openMatters`, dismiss in its planner, the title table, the lasting-setting source, push settings | Target `packages/engine/src/client/alerts/`; producers `packages/engine/src/routing/holders.ts:49`, `recovery/crash.ts:69`, `routing/deliveries.ts:194` |
 | 6b.1 | `AlertSender` with `send` and `clear`, delivery derived from the log by generation, the carrier settings with no default, the link builder, and the ntfy carrier with its transport rules | Target `packages/engine/src/client/alerts/AlertSender.ts`, `packages/engine/src/client/alerts/delivery.ts`, `packages/engine/src/client/alerts/carriers/ntfy.ts`; ntfy publishing documentation (sequence id, delete); post-build check TM-PB-4 |
-| 6b.2 | The token slot: `client.alerts.carrier.set-token` and `clear-token`, the `shephrd` form, and the client's keep entry | Target `packages/engine/src/client/alerts/token.ts`; `accounts/SecretStore.ts`; E27 (1b.9); pattern `commands/accounts.ts:38-50` |
+| 6b.2 | Install the carrier commands. The token slot, with the warning's one exception: `client.alerts.carrier.set-token` and `clear-token`, the `shephrd` form, and the client's keep entry | Target `packages/engine/src/client/alerts/token.ts`; `accounts/SecretStore.ts`; E27 (1b.9); pattern `commands/accounts.ts:38-50` |
 
 **Design artifact:** none.
 
@@ -630,9 +652,11 @@ carrier.
 | Agent text in a notification steers the owner | High | Criterion 6.5; titles come from a fixed table; name and team are short and under fixed labels. |
 | The owner's server address is written into the code | Medium | Criterion 6.8. |
 | A later carrier needs the alert rules changed | Low | Criterion 6.7's boundary test. |
+| One call silences the phone, or a dismiss erases the warning | High | The warning uses the cleared value, and a device caller's dismiss does not cancel it (criterion 6.17, rows 164, 165). |
+| A parsing or redirect mistake sends the token to the wrong place | High | Criteria 6.12 to 6.15, and unit 6b's attack pass (row 169). |
 | A caller of the open web server redirects alerts | Medium | Accepted while the server is open (row 88); such a caller could already answer requests, and the token does not follow (criterion 6.14). The change raises an alert (criterion 6.17). Recorded as a known gap. |
 
-**Verify:** criteria 6.1-6.17; environment QA: on the owner's phone, an alert arrives (unit 11).
+**Verify:** criteria 6.1-6.18; environment QA: on the owner's phone, an alert arrives (unit 11).
 
 **Rollout detail:** 6a at rollout step 5; 6b at step 7, when the owner sets the ntfy server and topic.
 
@@ -658,9 +682,9 @@ settings.
 | 7.9 | An alert's thread link opens that thread and sends no command | Test id: `packages/web/test/thread-link.test.tsx` |
 | 7.10 | An unknown event does not break any page | Test id: `packages/web/test/unknown-event.test.tsx` |
 | 7.11 | The production bundle builds with no Node import and no shim, runs in a real browser, and carries one command through `device: open-web`; the page keeps no thread data in `localStorage`, `sessionStorage` or IndexedDB | Command: `pnpm --filter web build`; test id: `packages/web/e2e/production.spec.ts` (Playwright, the production artifact) |
-| 7.12 | The owner approves the action: a permission request's full text and its tool input are visible, unfolded, before "Allow" can be tapped, and agent text looks different from Shephrd's controls. A request whose title and input disagree shows both. When the input is absent, redacted or cut, the page shows Shephrd's fixed warning that the input is not visible. A request whose options are all refused for the web says so, with no button that cannot work | Test id: `packages/web/test/request-whole.test.tsx`, with a title-and-input case, an absent-input case and an all-refused case |
+| 7.12 | The owner approves the action: a permission request's full text and its tool input are visible, unfolded, before "Allow" can be tapped, and agent text looks different from Shephrd's controls. A request whose title and input disagree shows both. When the input is absent, redacted or cut, the page shows Shephrd's fixed warning that the input is not visible. A request whose options are all refused for the web says so, with no button that cannot work; a Codex-shaped request, with `locations` and no input, shows the locations and the thread items with the same `toolCallId` unfolded above "Allow", with no warning, and the warning appears only when neither exists; `toolInput` with bidirectional controls or long whitespace cannot hide its meaning on a 360-pixel screen, which unit 7b's attack pass also tries | Test id: `packages/web/test/request-whole.test.tsx`, with a title-and-input case, an absent-input case and an all-refused case |
 | 7.13 | The thread page's subject panel shows a table entry for a known namespace, and for any other shows the fallback that names the subject; opening a link runs no state-changing command | Test id: `packages/web/test/subject-panel.test.tsx` |
-| 7.14 | A page never loses control state to a marker: with the page subscribed, another client starts an agent with a 300 KiB prompt, then opens a request over 256 KiB, and a `HarnessChanged` over 256 KiB follows; the roster, the request list and the counts converge with no tap and no reload, the request can be answered, and a reconnect loses nothing | Test id: `packages/web/e2e/oversized-state.spec.ts` (Playwright, the production artifact, real encoded frames) |
+| 7.14 | A page never loses control state to a marker: with the page subscribed, another client starts an agent with a 300 KiB prompt, then opens a request over 256 KiB, and a `HarnessChanged` over 256 KiB follows; the roster, the request list and the counts converge with no tap and no reload, the request can be answered, and a reconnect loses nothing; on a link throttled to 500 kilobits per second, with a 1 MiB state event and live events flowing, the page converges, with no reconnect loop of the same read, and the request can still be answered | Test id: `packages/web/e2e/oversized-state.spec.ts` (Playwright, the production artifact, real encoded frames) |
 
 **Tasks:**
 
@@ -690,6 +714,7 @@ No unit of WS-7 starts before the owner approves the mock.
 | A double tap answers twice | Medium | Criterion 7.5. |
 | A link in an alert acts without the owner | Medium | Criterion 7.9. |
 | The page is unusable on a phone | Medium | Criterion 7.3; the mock gate. |
+| A slow link makes the page lose its stream for ever | High | Two connections and the chunk limit (criteria 7.14, 3.9). The remaining limit is in the known gaps. |
 
 **Verify:** criteria 7.1-7.14, and unit 7b's attack pass; environment QA: the owner's real phone in unit 11.
 
@@ -705,7 +730,7 @@ L4, row 46). Unit 8.
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
 | 8.1 | `shephrd view` lists agents, opens a thread, and updates live | Test id: `packages/viewer/test/view.test.tsx` (Ink's test renderer) |
-| 8.2 | The owner can answer a request and prompt an agent from the viewer; terminal control characters in agent text are stripped | Test id: `packages/viewer/test/actions.test.tsx` |
+| 8.2 | The owner can answer a request and prompt an agent from the viewer; terminal control characters in agent text are stripped; before an answer, the viewer reads the request with `client.event` and shows its input, the thread items with the same `toolCallId` when it has no input, or the fixed warning | Test id: `packages/viewer/test/actions.test.tsx`; `packages/viewer/test/request-action.test.tsx` |
 | 8.3 | The viewer uses the owner credential over the Unix socket, and is refused when run inside an agent's process tree | Test id: `packages/viewer/test/identity.test.ts` |
 | 8.4 | A Herdr plugin action opens the viewer in a pane | On-host step: `herdr plugin action list --plugin shephrd` lists `view`; running it opens a pane showing the agent list |
 
@@ -718,7 +743,8 @@ L4, row 46). Unit 8.
 
 **Design artifact:** mock gate: owner session, in the same session as
 WS-7. The mock must decide the pane's layout at Herdr's usual pane sizes
-and its keys for moving, answering and prompting.
+its keys for moving, answering and prompting, and how a request's input or its
+warning shows before an answer.
 
 **Risks:**
 
@@ -749,9 +775,9 @@ proxy over WireGuard, with the encryption at the proxy. Rows 76, 84, 89, 91,
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 10.1 | In proxy mode, the web server accepts the public address setting's `Host` and `Origin` as well as the loopback ones, whatever the proxy does with `Host`, and still binds only loopback; outside proxy mode the public address is refused | Test id: `packages/engine/test/client/web-proxy.test.ts` |
-| 10.2 | Every row of contract section 5's proxy table holds: with proxy mode off, a request with any forwarded header is refused; a peer matching the proxy user id is always public, so it never reaches a loopback row; a public request with a missing last `X-Forwarded-For`, or one that is the host's own or outside the allowed networks, or whose `X-Forwarded-Proto` is not `https`, or that names no public address, is refused; addresses are compared in normal form, including IPv4-mapped IPv6; a direct connection that forges a header still meets the guard first; a settings change closes open connections | Test id: `packages/engine/test/client/web-proxy-table.test.ts` |
-| 10.3 | `docs/remote-access.md` describes the setup: WireGuard to the host; an example Caddyfile whose site uses `bind` on the WireGuard address and a `remote_ip` matcher for the WireGuard network, and proxies to the loopback port; the web server's four proxy settings; that the proxy must set both `X-Forwarded-For` and `X-Forwarded-Proto` and should run as its own user; that the page is at `127.0.0.1`; the warning to store a secret with `accounts set-secret`; the ntfy server's deny-all setup; the guard's limits; and a "lost phone" section | Command: `grep -q 'bind ' docs/remote-access.md && grep -q remote_ip docs/remote-access.md && grep -q reverse_proxy docs/remote-access.md && grep -qi 'lost phone' docs/remote-access.md && grep -qi deny-all docs/remote-access.md && grep -q X-Forwarded-Proto docs/remote-access.md && grep -q 127.0.0.1 docs/remote-access.md && grep -q 'accounts set-secret' docs/remote-access.md` |
+| 10.1 | In proxy mode, the web server accepts the public address setting's `Host` and `Origin` whatever the proxy does with `Host`, and a request that is not public keeps the loopback names, and still binds only loopback; outside proxy mode the public address is refused | Test id: `packages/engine/test/client/web-proxy.test.ts` |
+| 10.2 | Every row of contract section 5's proxy table holds: with proxy mode off, a request with any forwarded header is refused; a peer matching the proxy user id is always public, so it never reaches a loopback row; a public request with a missing last `X-Forwarded-For`, or one that is the host's own or outside the allowed networks, or whose `X-Forwarded-Proto` is not `https`, or that names no public address, is refused; addresses are compared in normal form, including IPv4-mapped IPv6; a direct connection that forges a header still meets the guard first; a settings change closes open connections; a public request with `Host` set to the public address and a loopback `Origin` is refused, and the pair for a proxy that rewrites `Host` is accepted | Test id: `packages/engine/test/client/web-proxy-table.test.ts` |
+| 10.3 | `docs/remote-access.md` describes the setup: WireGuard to the host; an example Caddyfile whose site uses `bind` on the WireGuard address and a `remote_ip` matcher for the WireGuard network, and proxies to the loopback port; the web server's four proxy settings; that the proxy must set both `X-Forwarded-For` and `X-Forwarded-Proto` and should run as its own user; that the page is at `127.0.0.1`; the warning to store a secret with `accounts set-secret`; the ntfy server's deny-all setup; the guard's limits; and a "lost phone" section; that a `client.web-down` alert means the page must not be opened; and the limit of a squatter on the loopback port | Command: `grep -q 'bind ' docs/remote-access.md && grep -q remote_ip docs/remote-access.md && grep -q reverse_proxy docs/remote-access.md && grep -qi 'lost phone' docs/remote-access.md && grep -qi deny-all docs/remote-access.md && grep -q X-Forwarded-Proto docs/remote-access.md && grep -q 127.0.0.1 docs/remote-access.md && grep -q 'accounts set-secret' docs/remote-access.md && grep -q 'client.web-down' docs/remote-access.md` |
 | 10.4 | From a phone on mobile data with WireGuard on, through the owner's proxy, the page opens and shows the situation view. With WireGuard off on mobile data, and from another device on the home network, the upgrade fails | On-device step: the owner's phone and a second device, rollout step 8 |
 
 **Tasks:**
@@ -848,6 +874,23 @@ Post-build checks (code-level worries a plan cannot settle):
   pass. The first is withdrawn, the second is sent, and the third stays queued.
 - PB-13: run the delivery worker with the log writer latched, after the carrier
   accepted a send. It stops with no tight resend loop.
+- PB-14: record real permission requests, per harness and per tool kind, with their
+  `kind`, `rawInput`, `locations` and `content`. Report how often the fixed warning
+  would appear, because a warning on every request teaches the owner to tap past it.
+- PB-15: from a real phone on a link throttled to 500 kilobits per second, with
+  agents writing, open a 900 KiB thread page and meet a 1 MiB state event. Both finish
+  with no reconnect loop. Keep a browser trace and the server's connection log.
+- PB-16: reconnect a page after an hour asleep on a busy log. It catches up, or it
+  takes a new snapshot. Catch-up costs one round trip per event, and the 2,048 backlog
+  rule may close it repeatedly, so record the time and the count of reconnects.
+- PB-17: change the carrier with 500 open alerts. Retries converge at the cap, with no
+  event burst beyond one per attempt.
+- PB-18: run the fixture piece that throws from each table on a copy of a real log.
+  Commands, restart and the rebuild check all pass.
+- PB-19: bring WireGuard up after the service has started. The host's own addresses
+  must not be stale, so the table's "one of the host's own addresses" row still refuses.
+- PB-20: send an inbound frame that inflates past 1 mebibyte under WebSocket
+  compression. It closes the connection, and the server's memory stays bounded.
 - TM-PB-4: against a fake carrier that answers with a huge body or a slow
   stream, confirm that reads stay bounded and that the reactor keeps running.
 - TM-PB-6, for the interactive mode plan: interactive agents do not descend
@@ -866,7 +909,8 @@ owner already works") and section 4; `docs/research/t3-code.md` items 9 to
 L1 to L4, L10, L11, L13, L15, L16, L19, L22, L23, L26, L28, L29 and L30;
 the owner's answer on engine edits (2026-11-03); the owner's decisions in
 design talk 1 (2026-11-03, `docs/specs/2026-11-03-client-api-design.md`);
-the lead's rulings on review round 1 (`attack/round-1-findings.md`);
+the lead's rulings on review rounds 1, 2 and 3 (`attack/round-1-findings.md`,
+`attack/round-2-findings.md`, `attack/round-3-findings.md`);
 the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
 6; SECURITY.md security rules 1 to 7.
 
@@ -929,6 +973,7 @@ the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
 | Lead L30 (board Q6 changes 1 to 4) | WS-1, WS-3 (3.5) | planned (contract v5) |
 | Lead's rulings on round 1, 1 to 7 | WS-1, WS-2, WS-3, WS-5, WS-6, WS-7, WS-10 | planned (rows 91 to 128; `attack/round-1-findings.md`) |
 | Lead's rulings on round 2, 1 to 14 | WS-1, WS-2, WS-3, WS-5, WS-6, WS-7, WS-10 | planned (rows 130 to 157; `attack/round-2-findings.md`) |
+| Lead's rulings on round 3, 1 to 8 | WS-1, WS-2, WS-3, WS-5, WS-6, WS-7, WS-8, WS-10 | planned (rows 158 to 175; `attack/round-3-findings.md`) |
 | Owner question 6 | WS-1 (1.41, E28) | pending the owner (row 95) |
 | Roles requests 1-6 | WS-1, WS-3, WS-6; contract section 7 | planned |
 | Board R1 items 1-6 | WS-1, WS-2, WS-5, WS-6; contract section 7 | planned |
@@ -950,7 +995,7 @@ the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
 | AGENTS.md, "Language": TypeScript, Effect 4, Node.js 26 | All code is TypeScript with Effect 4.0.5; Effect claims checked against the installed source (rows 24, scouting). |
 | AGENTS.md, "How agents are run": one delivery interface | The client API reads events and roster fields that do not depend on run mode; piece deliveries go through the engine's delivery path (contract edit E16). |
 | Owner answer, 2026-11-03: edit the engine directly (row 63); lead ruling L26 (row 64) | Units 1a and 1b make contract section 6's edits; each change to existing behaviour is named with its tests (rows 64, 67; criterion 1.1). |
-| Owner decisions, design talk 1 (2026-11-03) | Folded as rows 76 to 90; contract v8 carries them; the owner's words are quoted in `docs/specs/2026-11-03-client-api-design.md`. |
+| Owner decisions, design talk 1 (2026-11-03) | Folded as rows 76 to 90; the contract carries them; the owner's words are quoted in `docs/specs/2026-11-03-client-api-design.md`. |
 | Run team rule 6: scope | This planning run writes the plan folder, the design note, and the SECURITY.md and AGENTS.md text the owner approved (row 85). |
 
 </details>
@@ -964,12 +1009,12 @@ at launch; this section names none (owner, 2026-10-16).
 |---|---|---|---|---|---|---|
 | 1a Engine lists: commands, access, planners, reads, events, views, migrations, visibility, snapshot | backend | engine/backend | high | Changes the engine's only entry point, its access check and its log. | yes | rollout step 2 |
 | 1b Engine callers and rules: caller schema, device field, service caller, sender wrapping, piece source, withdrawal, reach check, wait conditions, secret collection, the question 6 refusal, the permission request's tool fields | backend | engine/backend | high | Adds a caller kind and authorization rules, and changes the prompt renderer and the dispatcher. | yes | 1a |
-| 2 Client contracts, client parity, stream dispatch, tolerant wire form, browser entry | contracts | client-api/contracts | medium | New schemas on the contracts package's pattern, and a refactor of the client library behind its existing tests. | no | 1b |
+| 2 Client contracts, stream dispatch, tolerant wire form, browser entry, two connections | contracts | client-api/contracts | medium | New schemas on the contracts package's pattern, and a refactor of the client library behind its existing tests. | no | 1b |
 | 3 Reads, filtered stream, client wait | backend | client-api/backend | medium | Handlers over the engine's snapshot and read, with a shared visibility function. | yes | 2 |
 | 5 Loopback web server, `webCaller`, the guard and its settings | backend | client-api/backend | high | A new network entry point with no authentication, a process lookup and the browser checks. | yes | 2 |
 | 6a Alert reactor and alert events | backend | client-api/backend | medium | A reactor on the engine's reactor pattern, with fixed tables and a first-start scan. | no | 2 |
-| 6b `AlertSender`, delivery and the ntfy carrier with its token slot | backend | client-api/backend | medium | One interface and one outbound HTTP carrier, with durable retries and one secret slot. | no | 6a |
-| 7a Web page: shell, credential module, situation view | mobile-ui | client-api/mobile-ui | medium | A new screen set from an approved mock, on the client's browser entry. | no | 2, 5, mock session |
+| 6b `AlertSender`, delivery and the ntfy carrier with its token slot | backend | client-api/backend | medium | One interface and one outbound HTTP carrier, with durable retries and one secret slot. | yes | 6a |
+| 7a Web page: shell, credential module, situation view | mobile-ui | client-api/mobile-ui | medium | A new screen set from an approved mock, on the client's browser entry. | no | 2, 3, 5, mock session |
 | 7b Web page: thread view, links, answer, prompt, subject panel | mobile-ui | client-api/mobile-ui | medium | Screens from the mock, rendering untrusted text as text. | yes | 7a |
 | 7c Web page: alerts and settings | mobile-ui | client-api/mobile-ui | medium | Screens from the mock over existing commands. | no | 7a, 6a |
 | 8 Pane viewer | mobile-ui | client-api/mobile-ui | medium | A terminal screen set over the client library. | no | 3, mock session |
@@ -977,16 +1022,16 @@ at launch; this section names none (owner, 2026-10-16).
 | 11 Phone flow and owner check | backend | client-api/backend | medium | One end-to-end test plus an owner step. | no | 6b, 7b, 10 |
 
 Load: 13 build units. At the sheet's builder, test writer and focused
-reviewer for each unit, that is 39 launches, plus 12 for the six attack
-passes on units 1a, 1b, 3, 5, 7b and 10 (one attacker and one verifier each),
-51 in all. From the sheet's
+reviewer for each unit, that is 39 launches, plus 14 for the seven attack
+passes on units 1a, 1b, 3, 5, 6b, 7b and 10 (one attacker and one verifier each),
+53 in all. Unit 6b's pass has criteria 6.12 to 6.15 as its scope (row 169). From the sheet's
 tables: the medium backend and contracts units (2, 3, 6a, 6b, 10, 11) build
 on the OpenAI vendor; the medium `mobile-ui` units (7a, 7b, 7c, 8) build on
 the Anthropic vendor; the provisional high backend units (1a, 1b, 5)
 alternate between the two. That is roughly 7 to 8 builds on OpenAI and 5
 to 6 on Anthropic, with test writers and reviewers on the other vendor,
-and the attackers on the sheet's attack tier: about 24 to 25 OpenAI and 26
-to 27 Anthropic launches. The planner cannot read the remaining weekly
+and the attackers on the sheet's attack tier: about 25 to 26 OpenAI and 27
+to 28 Anthropic launches. The planner cannot read the remaining weekly
 allowance; the lead checks each vendor's limit before launching (known
 gap).
 
@@ -998,5 +1043,6 @@ gap).
 |---|---|---|
 | 1 | 1 / 39 / 34 | Six reviews of `ae967bf`, grades 5 to 6, no refusals. All folded as contract v8 and rows 91 to 128. Every finding, its fix and its criterion are in `attack/round-1-findings.md`. One item is pending the owner (row 95). |
 | 2 | 1 / 18 / 30 | Six reviews of `04e1f83`, grades 5 to 7, no refusals. All folded as contract v10 and rows 130 to 157. Every finding, its fix and its criterion are in `attack/round-2-findings.md`. |
+| 3 | 0 / 9 / 18 | Six reviews of `a7f1c9f`, grades 6 to 7, no refusals. The nine majors are five distinct ones. All folded as contract v11 and rows 158 to 175. Every finding, its fix and its criterion are in `attack/round-3-findings.md`, whose first section puts each major's fold plainly for the owner. The owner decides whether another round runs. |
 
 </details>
