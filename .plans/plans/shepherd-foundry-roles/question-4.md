@@ -1,6 +1,8 @@
 # Question 4 for the owner: build standing rules now, or after a harness qualifies?
 
-This question goes to the owner through plans-lead. It is decision row 68.
+This question went to the owner through plans-lead. It is decision row 68.
+
+**Withdrawn on 2026-11-03.** The owner's standing rule withdrew it, and lead ruling L27 settled it as option (b) (row 81). The two engine changes at the end need no owner answer.
 
 ## What the epic asks for
 
