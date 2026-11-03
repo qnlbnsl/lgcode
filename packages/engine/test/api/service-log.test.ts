@@ -10,6 +10,9 @@
 // stderr for each secret in its raw, base64, base64url, hex and URL-encoded
 // forms. The service is a real child process.
 import { randomBytes } from "node:crypto";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
 import { afterEach, expect, it } from "@effect/vitest";
 import type { EventEnvelope } from "@shephrd/contracts";
@@ -21,7 +24,7 @@ import { mintAgentToken } from "../../src/identity/tokens.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { ownerBearer } from "../support/socketClient.ts";
 import {
-  agentToken, makeServiceRoot, ownerClient, requestId, startFakeAgent, startService, stopAllServices, waitServing,
+  agentToken, makeServiceRoot, ownerClient, peekEcho, promptTexts, requestId, startFakeAgent, startService, stopAllServices, turnEnded, waitFor, waitServing,
 } from "../support/serviceProcess.ts";
 
 registerRebuildCheck({ noLog: true });
@@ -116,3 +119,55 @@ live("7.11 no planted secret, token or credential appears in the service's stdou
       "service SHEPHRD_TOKEN": serviceToken, "inherited ANTHROPIC_API_KEY": providerKey, "inherited OPENAI_API_KEY": otherKey,
     })).toEqual([]);
   }), 120_000);
+
+live("A4 inherited flags preserve stored and delivered prompts while a long provider key stays redacted", () =>
+  Effect.scoped(Effect.gen(function* () {
+    const root = makeServiceRoot();
+    const providerKey = `sk-ant-api03-${randomBytes(16).toString("hex")}`;
+    const ignored = ["false", "true", "32000", "123456789", "-123456789", "123456.789", "1.2345e12", "short"];
+    const service = startService(root, { env: {
+      TOKENIZERS_PARALLELISM: "false", CLAUDE_CODE_MAX_OUTPUT_TOKENS: "32000", ANTHROPIC_API_KEY: providerKey,
+      ...Object.fromEntries(ignored.map((value, index) => [`PLANTED_TOKEN_${index}`, value])),
+    } });
+    yield* waitServing(root, service);
+    const owner = yield* ownerClient(root);
+    const agent = yield* startFakeAgent(root, owner, owner, { script: { turns: [[], []] } });
+    const safe = `Set TOKENIZERS_PARALLELISM=false and max tokens to 32000. ${ignored.join("; ")}`;
+    yield* owner.prompt({ requestId: requestId(), agentId: agent.agentId, text: safe } as never);
+    yield* turnEnded(owner, agent.agentId);
+    yield* owner.prompt({ requestId: requestId(), agentId: agent.agentId, text: `key ${providerKey}` } as never);
+    const texts = yield* waitFor("both delivered prompts", () => {
+      const echo = peekEcho(agent.echo);
+      const texts = echo === undefined ? [] : promptTexts(echo);
+      return texts.length === 2 ? texts : undefined;
+    });
+    expect.soft(texts).toEqual([safe, "key [REDACTED]"]);
+    const database = new DatabaseSync(join(root.state, "events.sqlite"), { readOnly: true });
+    try {
+      const events = database.prepare("SELECT payload_json FROM events WHERE event_type = 'DeliveryQueued' ORDER BY sequence").all()
+        .map((row) => JSON.parse(row.payload_json as string));
+      expect(events.map((event) => event.delivery.content.text)).toEqual([safe, "key [REDACTED]"]);
+    } finally { database.close(); }
+  })), 60_000);
+
+live("A4 an explicit three-character secrets.json value stays redacted in every encoded string value", () =>
+  Effect.scoped(Effect.gen(function* () {
+    const root = makeServiceRoot();
+    const service = startService(root);
+    yield* waitServing(root, service);
+    // Write after recovery so its secret collection cannot remove the test value.
+    const secret = "q!z";
+    writeFileSync(join(root.state, "secrets.json"), JSON.stringify({ "secret:short": secret }), { mode: 0o600 });
+    const owner = yield* ownerClient(root);
+    const agent = yield* startFakeAgent(root, owner, owner, {
+      script: { turns: [[]] }, environment: { SHORT_VALUE: "secret:short" },
+    });
+    const text = Object.values(forms(secret)).join(" | ");
+    yield* owner.prompt({ requestId: requestId(), agentId: agent.agentId, text } as never);
+    const texts = yield* waitFor("the explicit short-secret prompt", () => {
+      const echo = peekEcho(agent.echo);
+      const texts = echo === undefined ? [] : promptTexts(echo);
+      return texts.length === 1 ? texts : undefined;
+    });
+    expect(texts).toEqual([Object.values(forms(secret)).map(() => "[REDACTED]").join(" | ")]);
+  })), 60_000);
