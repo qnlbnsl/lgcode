@@ -3232,3 +3232,112 @@ command-line entry point's ancestry refusal with both variables removed,
 old-token refusal after a real service restart with a fake adapter, planted
 tokens in session files and arguments, and each probe's failure outcomes.
 These checks do not establish real-adapter behavior or close the live gate.
+
+## 218. The state-read probe records the owner's own rejection as a deny rule
+
+Found: 2026-11-02, by the L-1 probe test writer.
+
+Status: open. A failing test guards it:
+`packages/engine/test/live-check/probe-adversarial.test.ts`, "issue 218".
+
+The state-read probe (SEC-PB-6, Security Post-Build check 6) records
+"refused" when the exact canary command's output contains "denied",
+"not permitted", "permission" or "refused"
+(`packages/engine/scripts/live/liveProbes.ts:240`). The probe's own
+permission answer is not taken into account. When a harness offers no
+allow-once option, the probe correctly declines to answer "always" outside
+its step and rejects the request instead (`liveProbes.ts:165-171`). The
+harness then reports the rejection, and the probe records "refused", which
+passes. The owner's rejection is not a deny rule, so this is false evidence
+for SEC-PB-6.
+
+Fix, if wanted: record "refused" only when the probe allowed the request and
+the read still failed; record "not attempted" when the probe itself rejected.
+
+## 219. The slash probes miss a raw copy of /compact delivered as its own message
+
+Found: 2026-11-02, by the L-1 probe test writer.
+
+Status: open. Failing tests guard it:
+`packages/engine/test/live-check/probe-adversarial.test.ts`, "issue 219",
+for both slash-up and slash-down.
+
+The slash probes (SEC-PB-2 and SEC-PB-7) look only at received user text
+that contains the delivery identifier
+(`packages/engine/scripts/live/probeEvidence.ts:51-56`). If the receiver
+gets the escaped envelope and also gets the raw text `/compact ...` as a
+separate message, the probe still records "escaped; no command". It passes
+unless a compaction boundary or a compact turn is also recorded. The raw
+copy is an unescaped arrival, so the criterion "arrives escaped" is not
+proved.
+
+Fix, if wanted: fail when any received user text of the receiver, after the
+delivery was sent, begins with the payload itself.
+
+## 220. The always-allow probe sends a persistent answer for a request an agent holds
+
+Found: 2026-11-02, by the L-1 probe test writer.
+
+Status: open. A failing test guards it:
+`packages/engine/test/live-check/probe-adversarial.test.ts`, "issue 220".
+
+In the always-allow step (SEC-PB-4), the probe chooses the "allow always"
+option before it checks who holds the request
+(`packages/engine/scripts/live/liveProbes.ts:165-171`). When the holder is
+an agent, the probe records "persistent option held by agent", so the step
+fails. It still sends the "allow always" answer first. The step therefore
+fails correctly, but the probe itself has answered a persistent option that
+was not routed to the owner, which the probe's safety rule forbids.
+
+Fix, if wanted: answer only with a reject option when the holder is not the
+owner.
+
+## 221. The token scan passes a harness without that harness's evidence
+
+Found: 2026-11-02, by the L-1 probe test writer.
+
+Status: open. Failing tests guard it:
+`packages/engine/test/live-check/probe-adversarial.test.ts`, the three
+tests named "issue 221".
+
+The token scan (PB-A4 and SEC-PB-1) has two gaps.
+
+- `scanTokens` accepts a session file that has no content
+  (`packages/engine/scripts/live/probeEvidence.ts:28-33`). An adapter that
+  has not yet flushed its session file therefore gives "not found".
+- Each harness's row searches for every token the run captured, and does not
+  require that harness's own agent token
+  (`packages/engine/scripts/live/liveProbes.ts:430-431`). If the Codex
+  worker's process was never seen, its token is never searched for. The Codex
+  row still records "not found". The process-argument count is shared too,
+  so the service's and the command-line tool's arguments satisfy it.
+
+Fix, if wanted: require a nonempty session file per harness, and require
+that harness's own captured token before its row can record "not found".
+
+## 222. The reload probe's second restart can pass on evidence from the first
+
+Found: 2026-11-02, by the L-1 probe test writer.
+
+Status: open. Failing tests guard it:
+`packages/engine/test/live-check/probe-reload.test.ts`, the two tests
+named "issue 222".
+
+The reload probe (PB-A7, PB-A8, PB-A11 and PB-A12) has two gaps in its
+second restart.
+
+- The probe checks that the pending deliveries were not yet accepted on a
+  copy of the log read before the restart call
+  (`packages/engine/scripts/live/liveProbes.ts:375-377`). An acceptance
+  recorded after that read and before SIGKILL is not checked again. If
+  recovery then re-queues the delivery, the probe records
+  "re-send on restart" and passes. The delivery was in fact handled twice.
+- The second restart's "old token refused" re-tests the tokens captured
+  before the first restart (`liveProbes.ts:299` and `404-407`). Those were
+  already refused after the first restart. The tokens issued at the first
+  reload are never tested after the second restart, so a reload-issued token
+  that survived a restart would still record "old token refused".
+
+Fix, if wanted: before deciding the replay outcome, fail when any
+acceptance of the pending delivery precedes the new session; and capture the
+tokens again just before the second SIGKILL.
