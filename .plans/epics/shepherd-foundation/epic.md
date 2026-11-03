@@ -3,7 +3,7 @@ topic: shepherd-foundation
 kind: epic
 status: active
 parked: false
-updated: 2026-11-01
+updated: 2026-11-03
 ---
 
 # Shephrd runs the Foundry's teams on its own
@@ -48,6 +48,16 @@ scripts to start, watch, approve or wake its agents.
 - 2026-10-30: the owner split Shephrd into four pieces and chose to build the
   engine first, then the client API, the message board and the foundry roles.
   The engine comes first because the other three are built on its
-  capabilities without changing it.
+  capabilities.
 - 2026-11-01: the client API needs its own short design round, because the
   first design session designed only the engine.
+- 2026-11-03: the three later plans edit the engine directly wherever they
+  need to. The owner's words: "dude. change it. that is the whole point of a
+  phased build. why do we want to work around something when we can edit
+  it." This replaces the line of 2026-10-30 that the later pieces are built
+  on the engine "without changing it". There is no extension-seam layer and
+  no rule that existing behaviour stays the same. A plan may add commands,
+  event kinds and a caller kind for services, and may change existing
+  behaviour when it needs to. Each such change is recorded in that plan's
+  decisions log, its tests are updated, and it is reviewed like an engine
+  unit.
