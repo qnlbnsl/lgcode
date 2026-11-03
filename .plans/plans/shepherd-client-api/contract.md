@@ -593,6 +593,20 @@ optional field to an existing schema; no existing value changes meaning.
     own that needs a reply is not settled. The condition is a pure
     function of the agent and the views, like a visibility rule. With
     nothing registered, the settled test behaves exactly as today.
+13. **A piece may withdraw its own queued delivery** (lead ruling L11,
+    from the board's request, board post #37). A piece's handler may
+    return the engine's existing `DeliveryWithdrawn` event for a delivery
+    that the same piece queued, and only while that delivery is still
+    queued. The engine checks both conditions inside the transaction and
+    refuses the whole command otherwise. A delivery that was sent or
+    accepted cannot be withdrawn this way, and a piece can never withdraw
+    another piece's or the engine's delivery.
+14. **The delivery helper takes a piece's body and sender label**
+    (lead ruling L11). A piece queues a delivery through the seam's helper
+    with its text body and a sender label, such as "board". The label is
+    shown as the piece, never as the owner or an agent. The engine always
+    wraps the body in its agent-text envelope, with a fresh random marker,
+    and escapes a leading `/`. A piece can never send a raw prompt.
 
 The planner estimates this as one engine unit of high complexity, built
 before any piece unit, with an attack pass, because it changes the engine's
