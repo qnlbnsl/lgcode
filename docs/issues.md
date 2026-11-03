@@ -3903,3 +3903,37 @@ permission and no-permission paths, other adapter errors, each affected
 sibling observation, and the no-command control. The reload regression in
 `probe-reload.test.ts` requires a failed-attempt result when recovery neither
 accepts nor requeues the already-sent delivery.
+
+## 240. A Claude Code agent's token is visible in a process's command line
+
+Found: 2026-11-03, by the token scan in live-check-2 run 2 at 9e10ed6.
+
+Status: open. This is a security finding, recorded for the owner's hostile
+pass; the owner decides the fix.
+
+The runner gives every adapter except Codex the Shephrd tool server through
+the Agent Client Protocol (ACP) `mcpServers` list, with the agent's token as
+the value of the `SHEPHRD_TOKEN` environment entry
+(`packages/engine/src/runner/AcpRunner.ts:517-518`). The Claude Code adapter
+hands that list to the Claude Agent SDK. SDK version 0.3.312 starts the
+`claude` program with `--mcp-config` followed by the whole list as JSON, so
+the token's value is part of that process's arguments. On Linux any process
+of the same user can read them from `/proc/<pid>/cmdline`, and tools such as
+`ps` show them. This breaks PB-A4 and SEC-PB-1, which require that no agent
+token appears in process arguments.
+
+Evidence: the live check found the Claude lead's own token, raw, in the
+arguments of its run process 1501141 (an agent process whose working folder
+is the run's work folder). The Codex row of the same step reports the same
+process, because the scan checks every token of the run against every
+argument snapshot. Codex itself receives only the variable names through
+`CODEX_CONFIG` (issue 236, option (b)), so its token is not in any argument.
+The run's folder is kept at `/tmp/shephrd-live-Twd6bJ`.
+
+Possible fixes, not chosen: pass only the variable's name and let the tool
+server inherit the value from the adapter's environment, which already holds
+it (`AcpRunner.ts:307`), if the Claude Agent SDK and Claude Code keep the
+parent environment for stdio tool servers; or use Claude Code's `${VAR}`
+expansion in the server's `env` entry, if `--mcp-config` expands it. Either
+must be checked against the pinned versions before it is relied on. The same
+path is used for every other non-Codex harness, so each needs the same check.
