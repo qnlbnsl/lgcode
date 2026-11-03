@@ -3853,7 +3853,14 @@ per-call cost grows with every secret.
 
 Found: 2026-11-03, by the test runner (`pnpm check` at 8830d8b, posts #1319,
 and at ebe060f, post #1321).
-State: open. No test or production code has been changed for it.
+State: partially addressed by the test-only reliability fix. The local limits
+in `classify-turn-text.test.ts` (6.9 A3) and `reset-time.test.ts` (6.10 F-4)
+are now 120 seconds because each case starts several fake adapters in turn.
+The 7.3 WebSocket open limit in the test helper is now 30 seconds (issue
+248). The failure-1-crash and recovery/orphans findings stay open. The 6.9
+and 6.10 findings are addressed only as far as their test limits go. Wider
+limits reduce these failures but do not prove the absence of other load
+failures.
 
 What happens: two batches of `pnpm check` runs failed only on tests that the
 branches under check did not touch, and the failing tests differed between
@@ -4320,7 +4327,12 @@ establishes it. This finding does not authorize weakening the readiness gate.
 Found: 2026-11-03, during fix round 5, at 138197a with the terminal-output
 changes uncommitted.
 
-Status: open test reliability finding. No API code or test was changed.
+Status: fixed by raising the WebSocket open limit in
+`packages/engine/test/support/socketClient.ts` from 5 to 30 seconds.
+The helper's callers do not rely on a fast open timeout. The production
+client's limit is unchanged. No subscription assertion was changed.
+A wider limit reduces these failures but does not prove the absence of
+other load failures.
 
 The security and API folder run failed in subscribe-visibility.test.ts,
 in the stalled-subscription regression for issue 41. Its healthy client
@@ -4329,7 +4341,9 @@ WebSocket was closed before the connection was established. The file then
 passed alone, and the combined security and API folders passed on rerun.
 The failed run overlapped other test folders. This test uses a fake runner,
 so it does not exercise AcpRunner's new terminal path. The connection state
-was not captured, and the source of the timeout remains unconfirmed.
+was not captured. The healthy client used the test helper's five-second
+open limit, which left little margin under load; the failed handshake's
+connection state remains unconfirmed.
 
 ## 249. Lost credential coverage with pending terminal output hangs turn completion
 
@@ -5254,8 +5268,11 @@ model. Either would need another real run.
 ## 276. The atomic-write acceptance test can fail on a later, unrelated request
 
 Found: 2026-11-03, by the test runner (`pnpm check` at `f5e002c`, post #1343).
-Status: open, recorded, not fixed. The fault is in the test, not in the engine.
-No test or production code has been changed for it.
+Status: fixed in `packages/engine/test/acceptance/failure-3-atomic.test.ts`.
+Both post-restart assertions now match the failed request's id, using
+`permissionRequestId` for `PermissionMoved` and `subject.id` for
+`OwnerNeeded`. The checks before the restart are unchanged.
+The fault was in the test, not in the engine.
 
 The test is the third scenario in
 `packages/engine/test/acceptance/failure-3-atomic.test.ts`.

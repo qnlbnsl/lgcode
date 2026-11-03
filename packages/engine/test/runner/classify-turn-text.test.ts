@@ -26,8 +26,9 @@ beforeEach(() => {
   vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
 });
 afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig); });
+// Each case starts a fresh fake adapter per harness or value; allow for serial startups under suite load.
 const live = (name: string, body: () => Effect.Effect<unknown, unknown, any>) =>
-  it.live(name, () => body() as Effect.Effect<unknown, unknown, never>, 30_000);
+  it.live(name, () => body() as Effect.Effect<unknown, unknown, never>, 120_000);
 
 const turnReply = (context: { readonly runner: any; readonly events: ReadonlyArray<any>; readonly waitFor: any }, spawn: { readonly agentId: any; readonly incarnation: string }, text: string): Effect.Effect<unknown, unknown, never> =>
   Effect.gen(function* () {
