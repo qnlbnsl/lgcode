@@ -135,12 +135,58 @@ live("A9 secret: an explicit environment variable with the key's name is not rep
     expect((yield* readEcho(echo)).env.ANTHROPIC_API_KEY).toBe("explicit-environment-key-0123456789");
   })));
 
-live("A9 other harnesses: an account on a harness with no mapping starts as before, with its `home` and `secret` unused (pins the scope: the fake harness id \"first\" has no login variables)", () =>
-  withAcpRunner(rig, { secrets: { "secret:login-key": plantedKey } }, ({ runner }) => Effect.gen(function* () {
-    const echo = echoFile(rig);
-    const account = { ...accountFor("first", { turns: [] }, echo), home: join(rig.root, "somewhere"), secret: "secret:login-key" as const };
-    yield* runner.start((yield* spawnFor(rig, harnessFor("first", writeFakeAdapter(rig)), account)).input);
-    const seen = yield* readEcho(echo);
-    expect(seen.env.CLAUDE_CONFIG_DIR).toBeUndefined();
-    expect(Object.values(seen.env).includes(plantedKey)).toBe(false);
-  })));
+// Fix round 2, F-1: a field the harness has no variable for is refused, never
+// dropped, so the agent cannot run on another login than the account names.
+const refusedStart = (harnessId: string, account: ReturnType<typeof accountFor>, secrets: Record<string, string> = {}) =>
+  withAcpRunner(rig, { secrets }, ({ runner }) => Effect.gen(function* () {
+    const result = yield* runner.start((yield* spawnFor(rig, harnessFor(harnessId, writeFakeAdapter(rig)), account)).input).pipe(Effect.result);
+    return result._tag === "Failure" ? { tag: result.failure._tag, reason: result.failure.reason } : undefined;
+  }));
+
+live("A9 F-1 unmapped home: an account `home` on a harness with no home variable (the test harness, gemini, cursor, a custom id that runs a Claude adapter) refuses the start with a fixed reason naming the field and the harness, and spawns nothing (catches a runner that drops the field and runs on another login)", () =>
+  Effect.gen(function* () {
+    for (const id of ["first", "gemini", "cursor", "custom-claude"]) {
+      const echo = echoFile(rig);
+      const outcome = yield* refusedStart(id, { ...accountFor(id, { turns: [] }, echo), home: join(rig.root, "somewhere") });
+      expect(outcome, `${id} was started with an account home it cannot apply`).toEqual({ tag: "RunnerRejected", reason: `account home is not supported by harness ${id}` });
+      expect(peekEcho(echo), `${id} was spawned`).toBeUndefined();
+    }
+  }));
+
+live("A9 F-1 unmapped secret: an account `secret` on a harness with no key variable refuses the start with a fixed reason that holds no secret, and spawns nothing, while gemini and cursor map theirs (catches a runner that drops the secret)", () =>
+  Effect.gen(function* () {
+    for (const id of ["first", "custom-claude"]) {
+      const echo = echoFile(rig);
+      const outcome = yield* refusedStart(id, { ...accountFor(id, { turns: [] }, echo), secret: "secret:login-key" as const }, { "secret:login-key": plantedKey });
+      expect(outcome).toEqual({ tag: "RunnerRejected", reason: `account secret is not supported by harness ${id}` });
+      expect(JSON.stringify(outcome).includes(plantedKey)).toBe(false);
+      expect(peekEcho(echo), `${id} was spawned`).toBeUndefined();
+    }
+    for (const [id, variable] of [["gemini", "GEMINI_API_KEY"], ["cursor", "CURSOR_API_KEY"]] as const) {
+      const echo = echoFile(rig);
+      const started = yield* refusedStart(id, { ...accountFor(id, { turns: [] }, echo), secret: "secret:login-key" as const }, { "secret:login-key": plantedKey });
+      expect(started).toBeUndefined();
+      expect((yield* readEcho(echo)).env[variable]).toBe(plantedKey);
+    }
+  }));
+
+// Fix round 2, F-3: the conflict check compares the values the child would
+// get, so a reference to the same folder is no conflict and a reference to
+// another folder is one.
+live("A9 F-3 spawn: a CLAUDE_CONFIG_DIR given as a secret reference is compared by the folder it resolves to, so the same folder starts, another folder and an unresolvable reference are refused with the fixed text and no resolved value (catches a comparison of the unresolved reference)", () =>
+  Effect.gen(function* () {
+    const home = join(rig.root, "claude-second");
+    const other = join(rig.root, "claude-planted-other-folder");
+    const secrets = { "secret:same-home": home, "secret:other-home": other };
+    const same = echoFile(rig);
+    expect(yield* refusedStart("claude", { ...accountFor("claude", { turns: [] }, same, { CLAUDE_CONFIG_DIR: "secret:same-home" }), home }, secrets)).toBeUndefined();
+    expect((yield* readEcho(same)).env.CLAUDE_CONFIG_DIR).toBe(home);
+    // An unresolvable reference is refused earlier, as an unavailable secret.
+    for (const [reference, reason] of [["secret:other-home", "account home differs from CLAUDE_CONFIG_DIR"], ["secret:nowhere", "account secret is unavailable"]] as const) {
+      const echo = echoFile(rig);
+      const outcome = yield* refusedStart("claude", { ...accountFor("claude", { turns: [] }, echo, { CLAUDE_CONFIG_DIR: reference }), home }, secrets);
+      expect(outcome, reference).toEqual({ tag: "RunnerRejected", reason });
+      expect(JSON.stringify(outcome).includes(other)).toBe(false);
+      expect(peekEcho(echo)).toBeUndefined();
+    }
+  }));

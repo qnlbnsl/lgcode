@@ -26,15 +26,28 @@ const harnessLogins: Readonly<Record<string, HarnessLogin>> = {
 export const harnessLogin = (harnessId: string): HarnessLogin =>
   Object.hasOwn(harnessLogins, harnessId) ? harnessLogins[harnessId]! : {}
 
+// Fix round 2, F-1: the fixed reason for an account field the harness has no
+// variable for, or undefined when every field the account holds can be applied.
+// The mapping is keyed on the harness id, because harness settings record no
+// adapter kind, so a custom id has no mapping and its fields are refused. The
+// reason names the field and the harness and never holds a value.
+export const loginRefusal = (harnessId: string, account: Pick<Account, "home" | "secret">): string | undefined => {
+  const login = harnessLogin(harnessId)
+  if (account.home !== undefined && login.homeVariable === undefined) return `account home is not supported by harness ${harnessId}`
+  if (account.secret !== undefined && login.keyVariable === undefined) return `account secret is not supported by harness ${harnessId}`
+  return undefined
+}
+
 // The name of the login variable that disagrees with the account's `home`, if
-// any. Both being set to the same folder is not a conflict. A value that is
-// not an absolute path cannot be the same folder as an absolute `home`.
-export const homeConflict = (harnessId: string, account: Pick<Account, "home" | "environment">): string | undefined => {
+// any. `explicit` is the value the child would get for the harness's home
+// variable, after any `secret:` reference is resolved, or undefined when the
+// account sets none. An unresolvable reference is passed as an empty string.
+// Both naming the same folder is not a conflict. A value that is not an
+// absolute path cannot be the same folder as an absolute `home`.
+export const homeConflict = (harnessId: string, home: string | undefined, explicit: string | undefined): string | undefined => {
   const variable = harnessLogin(harnessId).homeVariable
-  if (variable === undefined || account.home === undefined) return undefined
-  const explicit = account.environment?.[variable]
-  if (explicit === undefined) return undefined
-  return isAbsolute(explicit) && resolve(explicit) === resolve(account.home) ? undefined : variable
+  if (variable === undefined || home === undefined || explicit === undefined) return undefined
+  return isAbsolute(explicit) && resolve(explicit) === resolve(home) ? undefined : variable
 }
 
 export const resolveHarnessDefaults = (options: { readonly binDirectory: string; readonly path: string }) =>
