@@ -39,7 +39,9 @@ close it. "Rows" are rows of `decisions.md` in this folder.
 - **A caller of the open web server can change the alert carrier's server
   and topic,** and so redirect or silence alerts. Such a caller could already
   answer requests, so this adds no new power (row 88). The token does not
-  follow a change of server (row 93).
+  follow a change of server (row 93). The alert about the change also goes to
+  the old carrier as a best effort, and a restart can remove the old token
+  first, so on a deny-all server that send can fail (row 139).
 
 ## Gaps the plan names and leaves open
 
@@ -48,7 +50,26 @@ close it. "Rows" are rows of `decisions.md` in this folder.
   topic, and the roles' role file and settings can all be changed by a web
   caller, and they outlast the moment's access. None grants more than the open
   server already gives, so none moved to the computer-only list. A change
-  raises a `client.lasting-setting` alert, and nothing prevents it (row 98).
+  raises a `client.lasting-setting` alert, whose push a device caller cannot
+  switch off, and nothing prevents the change. A web caller can still dismiss
+  the alert, and the computer's list still shows it (rows 98, 139).
+- **A same-user proxy can look like a local browser.** With proxy mode on, a
+  proxy running as the owner's user that adds no forwarded address and rewrites
+  `Host` cannot be told from a browser on the host. The setup document requires
+  both forwarded headers and recommends the proxy's own user, and PB-2 fails on
+  a missing header. Nothing stops an owner running such a proxy (row 133).
+- **A failing alert writes to the log.** An open alert keeps retrying at the
+  10-minute cap for as long as it stays open, so it adds one small event every 10
+  minutes while the carrier is down (row 131).
+- **A plain account value reaches every web client.** A value under a name that
+  does not look like a secret is stored in `AccountChanged`, and the stream and
+  the `accounts` read carry it. The snapshot does not, and the setup document
+  warns the owner (row 141).
+- **The number of agents in a snapshot is not capped.** Its request and question
+  rows are bounded by construction, and a fixture test covers the rest (row 137).
+- **The owner still reads the input.** The page shows a tool's input before
+  "Allow", and a prompt injection can still shape an input that looks ordinary
+  (row 132).
 - **A phone can get an alert twice.** Delivery is at least once. A crash
   after the carrier accepts and before the local record sends it again. ntfy's
   sequence id replaces the earlier one where the server honours it (row 106).

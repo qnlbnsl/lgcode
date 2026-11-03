@@ -86,7 +86,11 @@ ACP agent and an interactive agent can sit on the same team.
    changing the web server's settings, and adding a standing permission
    rule. They work only at the computer, over the engine's Unix socket with
    the owner credential, never through the web server or a phone. Each
-   outlives a moment's access.
+   outlives a moment's access. While the web server is open, this is also a
+   guard and not a boundary, because a web caller can start a program that
+   reads the owner credential. The client API contract, section 2, lists every
+   exception in one place, including the ones the lead added for the owner to
+   review.
 6. **Team shapes and workflows do not belong here.** Shephrd provides roles,
    the board, and the API. The definitions of particular teams live outside
    this repository.

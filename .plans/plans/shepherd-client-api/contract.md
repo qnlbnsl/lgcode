@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v9, lead ruling L31
-version: 9
+status: v10, review round 2 folded
+version: 10
 updated: 2026-11-03
 ---
 
@@ -208,14 +208,18 @@ piece's batch against its state table, as it checks its own.
     batch path refuses a reactor's batch before then.
   - **Its position.** A reactor with a position records, in its own view,
     the highest source sequence named on its own events and on its refusal
-    records. After a restart it resumes from there. A reactor whose rules
+    records. After a restart it resumes from there. Only a reactor's own
+    write moves the position, so a planner's event that names no source, such
+    as a dismiss, never does (row 145). A reactor whose rules
     are all level rules over the current views, such as the board's, keeps
     no position instead: it runs over what each batch touches, and over the
     whole state at start-up.
   - **Its first start.** A reactor with a position writes one event of its
     own at its first start, recording the log's head as its first position.
     It never replays history. A matter that is already open at that moment
-    is found by a level scan over the current views.
+    is found by a level scan over the current views. The first-start event and
+    what the scan finds are one batch, built in the transaction, so they
+    describe one sequence, and a kill cannot leave half of them (row 136).
   - **A failed write.** On `LogWriteFailed`, the reactor stops at the
     unhandled event and does not advance. The writer has latched by then
     (`EventLog.ts:141-143`), so every later write fails too. A restart
@@ -277,6 +281,20 @@ These rules apply to the four kinds:
   `owner` alone, by lead ruling (rows 93, 94). It is not on the web server's
   named list, and it is listed for the owner because it narrows AGENTS.md
   rule 5 further.
+- **Every exception to AGENTS.md rule 5, in one place** (row 142). A web or
+  phone client cannot do these:
+  1. Create a pairing code, by the owner's choice (row 82).
+  2. Change the web server's settings, by the owner's choice (row 82).
+  3. Add a standing permission rule, by the owner's choice (row 82).
+  4. Write the alert carrier's token, by the lead's ruling (row 94).
+  5. Run `debug.compare-views`, as today (row 99).
+  6. Switch off the push of `client.lasting-setting`, by the lead's ruling
+     (row 139).
+  7. Give a persistent answer, only if the owner chooses edit E28 (row 95).
+
+  While the web server is open, "computer-only" is also a guard and not a
+  boundary. A web caller can start an agent or set a harness's adapter, and
+  that program can read the owner credential.
 - **The answers a web caller may not give, pending the owner** (row 95, edit
   E28). The engine refuses `answer` from a device caller for a persistent or
   always-allow option. On a settings-write request, it accepts from a device
@@ -310,8 +328,11 @@ These rules apply to the four kinds:
 - **Only Shephrd's own page may drive the web server** (row 90). A
   request is accepted only when its `Host` names the web server, and, for
   anything but a `GET` or `HEAD` of a static file, its `Origin` names the
-  page. The allowed names are `127.0.0.1` and `localhost` at the web
-  server's port, plus, in proxy mode only, the public address setting. A
+  page. The allowed name is `127.0.0.1` at the web server's port, plus, in
+  proxy mode only, the public address setting. `localhost` is not allowed,
+  because the web server binds only `127.0.0.1`, and another local program
+  can hold `[::1]` at the same port and serve a page with that origin
+  (row 134). Shephrd prints and links only `http://127.0.0.1:<port>`. A
   WebSocket upgrade, or any
   other request that changes state, with no `Origin` is refused. This
   stops a web page in the owner's browser and DNS rebinding. It does not
@@ -320,8 +341,9 @@ These rules apply to the four kinds:
   loopback only, also in proxy mode (row 76). Proxy mode has four
   computer-only settings: the public address, the allowed client networks,
   the proxy user id, and whether it is on (rows 91, 92). Section 5,
-  "The web server's settings", gives the full table. Outside proxy mode the
-  web server ignores forwarded headers (row 89).
+  "The web server's settings", gives the full table. Outside proxy mode, a
+  request that carries a forwarded header is refused, and a peer that matches
+  the proxy user id is always judged as public (row 133).
 - **`debug.compare-views` is the owner's terminal only.** Its access is
   `owner`. It stays behind the engine's debug flag, and the web server
   refuses it by name (row 99).
@@ -358,8 +380,9 @@ These rules apply to the four kinds:
   set-secret`, `accounts mark-available` and `harnesses` stay owner-only,
   which includes devices. `debug.compare-views` stays with the owner
   credential alone, as `server.ts:163-165` has it today. `ask`,
-  `wait` and `pass-up` stay agent-only. Owner choice A10 makes `wait`
-  agents-only (row 4).
+  and `wait` stay agent-only, and owner choice A10 makes `wait` agents-only
+  (row 4). `pass-up` stays open to the owner and a device for an agent-held
+  row, as `routing/holders.ts:108-114` has it (row 149).
 - **A device acts as the owner, and the log also says which device.**
   Today a device's command is recorded with the caller "owner" (scout 1,
   item 4), and that stays by choice: the envelope's `caller` is still
@@ -418,8 +441,9 @@ fixed rights: the foundry roles' sheepdog and their standing-rule answerer
 
 1. **Snapshot.** The client calls `client.snapshot`. It returns the current
    picture and the sequence number it was taken at: agents and their
-   displayed states, open permission requests and questions, open alerts,
-   accounts without secrets, devices without credentials, and each piece's
+   displayed states, open permission requests and questions in the rows
+   below, open alerts, accounts as names and flags with no values, devices
+   without credentials, and each piece's
    own snapshot section under its namespace (row 15). A piece supplies its
    section through a per-caller function, `snapshotFor(caller, view)`, in
    the engine's snapshot section table (edit E9), which may leave the
@@ -440,6 +464,31 @@ fixed rights: the foundry roles' sheepdog and their standing-rule answerer
    this. If the engine answers that the cursor is ahead of the log's head,
    the client takes a new snapshot.
 
+**The snapshot's rows** (rows 137, 141). The rows are bounded by what they
+hold, not by a fixture:
+
+- **An identity row, for every open request and question.** It holds the id,
+  the agent, the holder and the source sequence, with no text. The wait helper
+  needs all of them, so none is ever left out.
+- **A display part, for the newest 256 open requests and the newest 256 open
+  questions.** It holds a preview of at most 512 bytes, at most 8 options, each
+  with its id, kind, persistent flag and a name cut to 128 bytes, the count of
+  all the options, `settingsWrite`, `toolKind`, and the whole event's encoded
+  size. So a display part is at most 4 KiB, and all of them together at most
+  about 2 MiB. A count says how many rows have no display part.
+- **The preview is never what the owner approves.** To show or answer a
+  request, a client reads its event whole with `client.event`, by the source
+  sequence. `toolInput` is never in the snapshot (edit E29).
+- **Agent entries** hold a name cut to 64 bytes and a team of at most 8 labels
+  and 128 bytes, as an alert does, with the fixed fields of `client.roster`.
+- **The account section** holds each account's id, status and flags, and, for
+  its environment, each variable's name and whether its value is a secret
+  reference. It holds no value. The stream's `AccountChanged` and the
+  `accounts` read still carry what was entered. So a plain value under a name
+  that does not look like a secret reaches every web client, and any proxy log
+  of that traffic. `docs/remote-access.md` warns the owner to use `accounts
+  set-secret`, and the engine gap goes to `docs/issues.md`.
+
 A client that cannot use the whole stream, such as a phone on a mobile
 network, calls `client.subscribe` instead (row 16). It takes the same `after`
 cursor plus a filter: a list of agents, a list of group labels, and a list
@@ -455,6 +504,20 @@ both the visibility rule and the filter. While it skips events, it sends a
 log's head, at least every 30 seconds. So the client's cursor keeps moving,
 and a reconnect neither re-scans what was skipped nor skips what was not
 scanned.
+
+The filter's lists combine by one rule (row 148). An unset list has no limit,
+and an empty list is refused. The agent and group lists are a union, and the
+kind list narrows the result:
+
+| Event | Agent list | Group list | Kind list | Result |
+| --- | --- | --- | --- | --- |
+| In a named agent's thread | Set | Any | Unset or matches | Sent |
+| In a named group's agent's thread | Any | Set | Unset or matches | Sent |
+| In neither | Set | Set or unset | Any | Not sent |
+| In neither | Set or unset | Set | Any | Not sent |
+| In no thread, such as `AccountChanged` or an account's alert | Any | Any | Unset or matches | Sent, if the caller may see it |
+| Any | Unset | Unset | Unset or matches | Sent, if the caller may see it |
+| Any | Any | Any | Set and does not match | Not sent |
 
 The transport closes a subscription that falls 2,048 events behind, or that
 leaves a chunk unacknowledged for five seconds (issue 41). The client
@@ -571,6 +634,9 @@ from a sequence number, one page at a time. A page holds at most 500
 events, closes at the byte budget in section 5, and returns the cursor for
 the next page. It follows the paged-read shape in section 1. Access is
 `owner`, `device`, `agent` and `service`, with the same visibility rule.
+To an agent caller, a page goes inside the data envelope of edit E15, with a
+fresh marker and an escaped leading slash, so the longest text an agent reads
+has the same protection as a delivery (row 140, SECURITY.md rule 7).
 Which events belong to a thread is the rule of edit E21, so an owner's page
 agrees with the engine's `threads` view, including a queued delivery.
 Exporting a thread
@@ -578,6 +644,11 @@ to a file is a client-side feature: `shephrd thread export <agent> --out
 <file>` pages through `client.thread` and writes the file on the caller's
 side, with file mode 0600. The service never writes a file on a caller's behalf, because a
 remote caller must not be able to choose a path on the host.
+
+**`client.event`** (row 137) reads one event whole by its sequence, under the
+same visibility rule. It is how a client recovers an event that the filtered
+stream replaced with a marker, including one that belongs to no thread, such
+as `HarnessChanged`. Its access is `owner`, `device` and `service`.
 
 ### Events a client does not know
 
@@ -623,14 +694,39 @@ engine's rule says (`routing/waits.ts:92`). The exit codes are engine row
 
 **The owner's own "request held".** A blocking wait must not wait for an
 answer only its caller can give. So the helper ends early, with exit 2, when
-a waited member has an open request or question whose holder is the owner.
-A piece whose condition can wait on the owner lists those agents too, in the
-same section and read that hold its other lists, under the name `ownerHeld`.
-For the board, those are agents with an open post that needs the owner's
-reply. This is the owner's form of edit E20, and it is checked at open and
-after every batch the helper applies. A piece's `ownerHeld` list is read with
-its other lists. So the helper acts on it at open and at each such read, and
-never on a result older than the stream it has applied.
+a live waited member has an open request or question whose holder is the
+owner. A piece whose condition can wait on the owner lists those agents too,
+in the same section and read that hold its other lists, under the name
+`ownerHeld`. For the board, those are agents with an open post that needs the
+owner's reply. This is the owner's form of edit E20.
+
+The engine's rows reach the helper through the snapshot and the stream, so the
+helper applies its part of this rule after every batch it applies. A piece's
+`ownerHeld` list is read with its other lists. The helper reads those lists at
+open, when the engine's part says settled, and when the stream shows an event
+that the piece names as able to change its `ownerHeld`. So the helper acts on it
+at open and at each such read, and never on a result older than the stream it
+has applied. No timer and no polling are added. This amends lead ruling L31's
+point 3 (row 135).
+
+| Piece | Events that can change its `ownerHeld` |
+| --- | --- |
+| `board` | `board.PostWritten`, `board.AddresseeResolved` and `board.PostClosed`. The board's plan adds any other tag that can change the list. |
+| `roles` | None. The roles have no `ownerHeld` list, because the roles reach the owner through their own alert kinds. |
+
+The rule and the member table combine like this (row 146):
+
+| Member | Open owner-held row or list entry | Result |
+| --- | --- | --- |
+| Live, which means starting, working or idle | Yes | Exit 2 at once |
+| Paused | Yes | Exit 2 at once |
+| Interrupted, reloadable or not | Yes | Exit 2 at once |
+| Stopped or crashed | Yes | The member table: exit 1 when the wait closes |
+| Any | No | The member table |
+
+A request from a descendant of a waited member does not end the owner's wait,
+even when the owner holds it. The owner gets its alert, and the wait goes on
+until the member's own state changes.
 
 The test applies
 every piece's hold-unsettled condition, so the owner's wait and an agent's
@@ -679,7 +775,9 @@ raised from the event that does name one, `AccountNeedsSignIn` or
 account reason only when the agent's account has no row, which the engine
 allows (`routing/deliveries.ts:176-196`) (row 107). The engine's own sources
 are part of the reactor, and they read the envelope and the current views.
-A piece's source stays a pure function of one envelope.
+On a rescan after a restart, an engine source skips an event whose subject has
+already closed in the current views, so an old event cannot raise a false alert
+(row 153). A piece's source stays a pure function of one envelope.
 
 Other pieces raise alerts by declaring an alert source. A source is a pure
 function that takes one envelope and returns either nothing, a request to
@@ -727,15 +825,30 @@ default: `client.lasting-setting` (row 98) and `client.web-down` (row 113).
 Some settings outlast a moment's access but stay open to the web server,
 because they grant no access and widen no exposure beyond what a caller who
 reaches the server already has: a harness's adapter path and arguments, an
-account's environment and secrets, the alert carrier's server and topic, and
-the roles' role file and settings (row 98). A caller who changes one can
-make later agent starts run other code, and the change stays after that
-caller is gone. So none moves to the computer-only list, and a change that
-arrives with `device: open-web` raises a `client.lasting-setting` alert. It
-is a pure source over `HarnessChanged`, `AccountChanged`,
-`client.AlertCarrierChanged` and the roles' two events, keyed by sequence,
-and it ends only when dismissed. The later pairing plan reviews every such
-record when the server closes.
+account's environment and secrets, the alert carrier's server, topic and token
+removal, each kind's push setting, and the roles' role file and settings
+(row 98). A caller who changes one can make later agent starts run other code,
+and the change stays after that caller is gone. So none moves to the
+computer-only list, and a change that arrives with `device: open-web` raises a
+`client.lasting-setting` alert. It is a pure source over `HarnessChanged`,
+`AccountChanged`, `client.AlertCarrierChanged`, `client.AlertSettingsChanged`,
+`client.AlertCarrierTokenCleared` and the roles' two events, keyed by sequence,
+and it ends only when dismissed. Three rules keep the caller it watches from
+hiding it (row 139):
+
+- **A device caller cannot switch off its push.** `client.alerts.settings.set`
+  refuses a change to this kind's setting from a device caller.
+- **A carrier change also goes through the old carrier.** The alert about
+  `client.AlertCarrierChanged` is also sent once to the previous server and
+  topic, with the previous token when one was set. It has up to five attempts on
+  the same schedule, and the old token's value is removed only after they end.
+  This is a best effort: a restart may remove the old value first, and on a
+  deny-all server the send then fails.
+- **The terminal shows dismissed records.** `shephrd client alerts list --all`
+  shows every such alert, open or dismissed, with the device that dismissed it.
+  So dismissing one from the web does not hide it from the computer.
+
+The later pairing plan reviews every such record when the server closes.
 
 ### The alert's life
 
@@ -743,6 +856,15 @@ Piece 2's alert reactor reads committed events in order (row 18). It follows
 section 1's reactor rules. Its first-start event is
 `client.AlertBaseline { position }`, and its scan raises an alert for each
 matter already open then, marked `baseline`, which is never pushed (row 108).
+
+The scan covers the engine's matters and each piece's. A table typed over
+`PieceNamespace` holds each piece's `openMatters(views)`, a pure function over
+the rebuilt views, not over a bounded snapshot section. It returns the same
+`{ key, kind, agentId?, subject? }` that the piece's source would have raised,
+for each matter open in those views. Only this scan calls it, and unit 1 writes
+each entry as "none". The board and the roles supply theirs (row 136). A close
+that commits after the scan is a later event in the stream, so it closes the
+baseline alert as usual.
 
 1. **Raise.** When a source asks for an alert, the reactor writes
    `client.AlertRaised { alertId, key, kind, agentId?, subject?, title,
@@ -754,13 +876,13 @@ matter already open then, marked `baseline`, which is never pushed (row 108).
    interface, `AlertSender`, so the push carrier can change later without
    changing these rules (row 83). ntfy is the only carrier this plan
    builds. Each attempt is recorded as `client.AlertDelivered` or
-   `client.AlertDeliveryFailed`, with the carrier's name and the attempt
-   number, never the carrier's credentials. "The delivery guarantee" below
-   gives the rules.
+   `client.AlertDeliveryFailed`, with the carrier's name, the delivery
+   generation and the attempt number, never the carrier's credentials. "The
+   delivery guarantee" below gives the rules.
 3. **Clear.** The reactor writes `client.AlertCleared { alertId, cause,
-   sourceSequence }` when the alert's subject closes. The planner of
-   `client.alerts.dismiss` writes the clear itself, in its own batch. The
-   reactor checks the alert view inside the writer transaction, so a dismiss
+   sourceSequence? }` when the alert's subject closes. The planner of
+   `client.alerts.dismiss` writes the clear itself, in its own batch, with no
+   source sequence (row 145). The reactor checks the alert view inside the writer transaction, so a dismiss
    and a close cannot both write a clear. Dismissing an alert that is
    already closed succeeds and writes nothing (row 107).
 
@@ -777,7 +899,7 @@ reactor runs after each batch that touches the subject (row 107):
 | `agent-account:<agentId>` | The agent is stopped, or next reaches idle or working. |
 | A piece's kind | The end its own source declares. |
 | `client.lasting-setting` | Only when dismissed. |
-| `client.web-down` | The web server binds. |
+| `client.web-down` | The web server binds, or `enabled` is turned off. |
 
 This answers issue 65 without an engine change: an alert ends when its
 subject closes, and the client API writes that end into the log. A request
@@ -787,17 +909,35 @@ and answering one queues a delivery to a dead agent. The closing rule stops
 the alert asking for that answer, and the engine gap goes to
 `docs/issues.md`.
 
+An alert can return (row 144). When an agent leaves crashed or stopped, the
+reactor runs the raise test for each open question that it asked and the owner
+holds, and raises a new alert with the same key. The first-start scan applies
+the same test. A request does not return this way: a permission request's hold
+belongs to the process that asked, so a resumed session makes that row
+meaningless, and the stale row is part of the same engine gap.
+
 ### The delivery guarantee
 
 A push to a network server and a log commit cannot be one atomic step. So
 delivery is **at least once**: a notification is never lost to a restart,
 and it can arrive twice (rows 106, 83).
 
+- **A delivery generation** (row 131). The generation is the sequence of the
+  last committed `client.AlertCarrierChanged`, `client.AlertCarrierTokenSet` or
+  `client.AlertCarrierTokenCleared`. A send captures the generation, the
+  destination and the token's reference first, from one views value. Its result
+  is recorded with that generation. A result from an older generation is kept
+  in the log and never settles the current one.
+- **What a change does.** A carrier change makes every open alert that is not
+  `baseline` pending in the new generation, including one already delivered,
+  because the new destination has not had it. A token change does the same only
+  for alerts not yet delivered: the view carries an alert's delivered mark into
+  the new generation. So a repaired token recovers a waiting alert, and a
+  delivered one is not sent again.
 - **Pending is derived from the log.** An alert is pending when it is open,
   is not `baseline`, its kind is pushed by the setting read at send time, a
-  carrier is set, it has no `client.AlertDelivered`, and it has fewer than
-  five attempts since the carrier last changed. So a restart finds its work
-  from the views after `recovery.whenReady`.
+  carrier is set, and it has no delivered mark in the current generation. So a
+  restart finds its work from the views after `recovery.whenReady`.
 - **A stable identity.** Each send carries the alert's id as the carrier's
   message identity. On ntfy, this is the sequence id, and a second publish
   with the same id replaces the first on the phone (ntfy's publishing
@@ -807,18 +947,19 @@ and it can arrive twice (rows 106, 83).
   response, a redirect or an error status is a failed attempt. A crash
   between the carrier's acceptance and the local record causes one more
   send, never none.
-- **Retry.** Attempts wait 5 seconds, 30 seconds, 2 minutes and 10 minutes,
-  counted from the last failure's recorded time, so the wait survives a
-  restart. Each alert retries on its own path. One alert's backoff never
+- **Retry.** Attempts wait 5 seconds, 30 seconds, 2 minutes and then 10
+  minutes each, counted from the last failure's recorded time in the current
+  generation, so the wait survives a restart. An open pushed alert keeps
+  retrying at the 10-minute cap for as long as it stays open. Each alert retries on its own path. One alert's backoff never
   delays another's raise, clear or send, and no send runs inside the writer
   transaction.
 - **A cleared alert is not sent.** An alert that clears during backoff is
   skipped.
-- **Exhaustion.** The fifth failure is recorded with `final: true`. The
-  clients show that alert as not delivered. A failed send never stops the
-  reactor.
-- **A carrier set later.** Setting the carrier makes every open alert that
-  is not `baseline` pending, once.
+- **Still failing.** The fifth failure in a generation, and each one after
+  it, is recorded with `final: true`. This is only a mark: the clients show the
+  alert as still failing, and the retries go on. A failed send never stops the
+  reactor. At the cap, a failing alert adds one small event every 10 minutes,
+  which is accepted (known gaps).
 - **Clearing on the phone.** `AlertSender` has two operations, `send` and
   `clear`. `clear` runs once when an alert clears, as a best effort, and a
   failure is logged with no text. On ntfy it deletes the notification by its
@@ -877,32 +1018,55 @@ code (row 77). The owner and the web caller may change them (row 88). The
 owner's server address is a value the owner sets. The token works by these
 rules (rows 93, 94):
 
-- **One fixed slot.** No setting holds a secret reference. The carrier has
-  one token slot, at the fixed reference `secret:client.alerts.carrier`, in
-  the engine's `secrets.json`, so the redactor knows the value
-  (`service.ts:81-85`). The carrier resolves only that reference, and a
-  boundary test checks that nothing in the client folder resolves any other.
-  So an account's key can never be sent as the token.
+- **One logical slot.** No setting holds a secret reference. The carrier has
+  one token slot in the engine's `secrets.json`, so the redactor knows the value
+  (`service.ts:81-85`). Each value in it has a fresh name,
+  `secret:client.alerts.carrier.<generation>`, built only by one function in
+  `packages/contracts`, and the `client.AlertCarrierTokenSet` event selects the
+  active one (row 138). The carrier resolves only that name, and a boundary test
+  checks that nothing in the client folder resolves any other. So an account's
+  key can never be sent as the token.
+- **The other direction is closed too** (row 138). An account's planner refuses
+  an environment value under the reserved prefix `secret:client.`, and the runner
+  refuses to resolve one (`runner/AcpRunner.ts:219-227`). So an agent can never
+  read the token through its environment, and an account can never keep a cleared
+  token alive.
 - **Written, never read back.** `client.alerts.carrier.set-token` writes the
-  slot, at the computer, with access `owner` alone. It takes a redacted value
-  and a nonce, as `accounts set-secret` does, and replaces any earlier value.
-  The command-line form is `shephrd client alerts carrier set-token`, which
-  reads the value from standard input. No read returns the value. A client
-  sees only whether a token is set.
-- **Bound to its server.** `client.AlertCarrierTokenSet { origin }` records
-  the origin the token was set for. Changing the server to another origin
-  clears the token in the same batch, with
-  `client.AlertCarrierTokenCleared`. The carrier sends the token only when
-  the recorded origin equals the current server's. The stored value is then
-  removed by the secret collection of edit E27.
+  slot, at the computer, with access `owner` alone. It takes a redacted value, a
+  nonce, and the origin the owner means. The planner refuses it when that origin
+  is not the current server's, or when no server is set. The command-line form is
+  `shephrd client alerts carrier set-token`, which prints the current server,
+  asks the owner to confirm it, and reads the value from standard input. No read
+  returns the value. A client sees only whether a token is set.
+- **The write order** (row 138). The planner stores the new value under its fresh
+  name, then commits the event, as `setSecret` does
+  (`commands/accounts.ts:38-50`). A failed log write leaves an unselected value,
+  and the earlier token stays active and working. Start-up collection removes the
+  unselected value.
+- **Bound to its server.** `client.AlertCarrierTokenSet { origin, generation }`
+  records the origin the token was set for. Changing the server to another origin
+  clears the token in the same batch, with `client.AlertCarrierTokenCleared`. The
+  carrier sends the token only when the recorded origin equals the current
+  server's.
+- **Removing a value** (row 130). After a clear or a rotation commits, the alert
+  worker calls the engine's dedicated `removeCarrierValue(generation)`. It removes
+  that one name and nothing else, so it cannot touch an account's secret, or a
+  newer token, which has its own name. A crash before it runs is covered by
+  start-up collection, which is the only collection there is (edit E27).
 - **Rotation and revocation.** Running `set-token` again rotates the token.
-  `client.alerts.carrier.clear-token`, with access `owner` and `device`,
-  removes it. Revoking it at the ntfy server is the owner's step, and a
-  revoked token only makes attempts fail. Neither path puts a value in a log.
-- **It survives restarts.** Edit E27 keeps the slot through the engine's
-  secret collection while a token is set.
-- **Encrypted, or private.** The server must be `https`, unless its host is a
-  private address literal: loopback, link-local, RFC 1918 or an IPv6 unique
+  `client.alerts.carrier.clear-token`, with access `owner` and `device`, removes
+  it. Revoking it at the ntfy server is the owner's step, and a revoked token only
+  makes attempts fail until a new one is set. Neither path puts a value in a log.
+- **It survives restarts.** Edit E27 keeps the active value through start-up
+  collection while a token is set.
+- **One spelling of a server** (row 138). The server is parsed with the URL
+  standard's parser. User information, a path, a query and a fragment are refused,
+  and the canonical origin is what is stored and compared. `client.alerts.carrier.set`
+  also takes "none", which clears the server and topic. A topic must match ntfy's
+  rule, `[-_A-Za-z0-9]` and at most 64 characters (ntfy's publishing documentation,
+  read 2026-11-03).
+- **Encrypted, or private.** The server must be `https`, unless its parsed host
+  is a private address literal: loopback, link-local, RFC 1918 or an IPv6 unique
   local address. The owner's home server may use this exception.
 - **No redirects.** The carrier never follows a redirect, so a credential
   cannot cross origins or fall to plain text. A redirect is a failed attempt.
@@ -968,15 +1132,31 @@ and publish to it, including a fake alert with a lookalike link.
     the same event would then close the stream on every reconnect. So
     `client.subscribe` replaces an event whose encoded size is over 256 KiB
     with a `client.Oversized { sequence, tag, agentId?, bytes }` marker. Like
-    a checkpoint, the marker is not an event in the log. The cursor moves
-    past it, and the client reads the event whole with `client.thread`. The
-    engine's `subscribe` is unchanged. The web page uses `client.subscribe`.
-  - **A snapshot.** A snapshot is one reply, with no thread text. A test
-    measures its encoded size on a large fixture team, 200 agents and 100
-    open requests with every piece's largest section, and fails above 4 MiB.
+    a checkpoint, the marker is not an event in the log. The engine's
+    `subscribe` is unchanged. The web page uses `client.subscribe`.
+  - **A marker never costs a client its state** (row 137). A list in
+    `packages/contracts` names the content-only tags: `ThreadItem` and any
+    other tag that changes nothing but a thread's text. For a marker over a
+    content-only tag, the cursor moves past it, and the page shows a placeholder
+    that loads the event on a tap. For a marker over any other known tag, such
+    as `AgentStarted`, `PermissionRequested`, `QuestionAsked`, `DeliveryQueued`,
+    `HarnessChanged` or `AccountChanged`, the client library reads the event
+    with `client.event` and applies it, before it applies anything later. Its
+    cursor moves past the marker only after that. If the read fails, it
+    reconnects from before the marker. A tag added later is state-bearing until
+    it is added to the list. A marker over an unknown tag moves the cursor, as an
+    unknown event does. A reply to `client.event` is one item, sent whole, and
+    is not a stream chunk.
+  - **A snapshot.** A snapshot is one reply, with no thread text. Its request
+    and question rows are bounded by construction (section 3). Its other rows
+    hold no agent text beyond the cut names and labels. A test still measures
+    its encoded size on a large fixture team, 200 agents and 100 open requests
+    with every piece's largest section, and fails above 4 MiB, because the
+    number of agents is not capped.
   - **A piece's stated maxima.** Each piece states its largest event and its
     largest page, and a test in `packages/contracts` checks them against the
-    budgets above. The board caps a wake body at 256 KiB and a `board.read`
+    page budget. A piece's event over 256 KiB is allowed, and it reaches a
+    filtered stream as a marker. The board caps a wake body at 256 KiB and a `board.read`
     page at 512 KiB of encoded text (lead ruling L15).
   - **The tests measure real frames.** They encode actual RPC messages,
     including chunk wrappers and escaping, and do not add up constants.
@@ -996,12 +1176,13 @@ change, and `client.alerts.dismiss` is never an MCP tool.
 | `client.roster` | read | owner, device, agent, service | The agents (section 3). |
 | `client.thread` | read | owner, device, agent, service | One agent's thread (section 3). |
 | `client.subscribe` | read, stream | owner, device, agent, service | The filtered stream (section 3). A stream is never an MCP tool. |
+| `client.event` | read | owner, device, service | One event whole, by sequence (section 3). |
 | `client.alerts.list` | read | owner, device | Open and cleared alerts, paged. |
 | `client.alerts.dismiss` | planner | owner, device | Clears one alert. |
 | `client.alerts.settings` | read | owner, device | Each kind's push setting, the carrier's server and topic, and whether a token is set. Never the token. |
-| `client.alerts.settings.set` | planner | owner, device | Changes one kind's push setting. |
-| `client.alerts.carrier.set` | planner | owner, device | Changes the carrier's server and topic. |
-| `client.alerts.carrier.set-token` | planner, secret-setting | owner | Writes the token slot. Lead ruling, rows 93 and 94. |
+| `client.alerts.settings.set` | planner | owner, device | Changes one kind's push setting. A device caller is refused for `client.lasting-setting` (row 139). |
+| `client.alerts.carrier.set` | planner | owner, device | Changes the carrier's server and topic, or clears them with "none". |
+| `client.alerts.carrier.set-token` | planner, secret-setting | owner | Writes the token slot, for the origin it names. Lead ruling, rows 93, 94 and 138. |
 | `client.alerts.carrier.clear-token` | planner | owner, device | Removes the token. |
 | `client.web.settings` | read | owner, device | The web server's settings. |
 | `client.web.settings.set` | planner | owner, **computer-only** | Changes the web server's settings. |
@@ -1022,7 +1203,8 @@ value outside the log, in its slot (section 4).
 ### The web server's settings
 
 The settings are one record, changed only by `client.web.settings.set`
-(rows 82, 88, 91, 92, 113):
+(rows 82, 88, 91, 92, 113). Any change closes every web connection, so each
+client is judged again under the new settings when it reconnects (row 140):
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
@@ -1038,17 +1220,32 @@ The command refuses proxy mode on without a public address and at least one
 allowed client network. So a request reaches these rows only with all of them
 set:
 
-| Proxy mode | The request names | Last `X-Forwarded-For` entry | `X-Forwarded-Proto` | Result |
+A peer is **public** when proxy mode is on and either its user id matches
+`proxyUserId`, or its request names the public address or carries a forwarded
+header. A peer that matches `proxyUserId` under another user id is always public,
+and the loopback rows never apply to it (row 133).
+
+| Proxy mode | Peer and request | Last `X-Forwarded-For` entry | `X-Forwarded-Proto` | Result |
 | --- | --- | --- | --- | --- |
-| Off | Loopback | Ignored | Ignored | Accepted, after the guard |
-| Off | The public address | Ignored | Ignored | Refused, HTTP 403 |
-| On | The public address, in `Host` or `Origin` | Missing | Any | Refused |
-| On | The public address | One of the host's own addresses | Any | Refused |
-| On | The public address | Outside the allowed networks | Any | Refused |
-| On | The public address | Inside the allowed networks | Not `https` | Refused |
-| On | The public address | Inside the allowed networks | `https` | Accepted, after the guard |
-| On | Loopback | Missing | Any | Accepted, after the guard, as a local browser |
-| On | Loopback | Present | Any | Judged by the same address rows, so a proxy that rewrites `Host` gains nothing |
+| Off | Any request with a forwarded header | Any | Any | Refused, HTTP 403 |
+| Off | Names loopback, with no forwarded header | None | None | Accepted, after the guard |
+| Off | Names the public address | None | None | Refused, HTTP 403 |
+| On | Public | Missing | Any | Refused |
+| On | Public | One of the host's own addresses | Any | Refused |
+| On | Public | Outside the allowed networks | Any | Refused |
+| On | Public | Inside the allowed networks | Not `https` | Refused |
+| On | Public, and names neither the public address in `Host` nor in `Origin` | Inside the allowed networks | `https` | Refused |
+| On | Public, and names the public address in `Host` or `Origin` | Inside the allowed networks | `https` | Accepted, after the guard |
+| On | Same user, names loopback, with no forwarded header | None | None | Accepted, after the guard, as a local browser |
+
+The forwarded headers are `X-Forwarded-For`, `X-Forwarded-Proto`,
+`X-Forwarded-Host` and `Forwarded`. A local program that forges one outside proxy
+mode only refuses itself. `docs/remote-access.md` requires the proxy to set both
+`X-Forwarded-For` and `X-Forwarded-Proto`, and recommends that it run as its own
+user. One limit remains, in the known gaps: with proxy mode on, a same-user proxy
+that adds no forwarded address and rewrites `Host` cannot be told from a local
+browser. Post-build check PB-2 treats a missing header on the owner's proxy as a
+failed check.
 
 Addresses are compared in a normal form, with IPv4-mapped IPv6 forms and zone
 suffixes removed. The last entry is the one the proxy adds. Caddy's
@@ -1058,10 +1255,14 @@ check PB-2 tests this on the owner's own proxy.
 
 The web server answers HTTP 503 during recovery, as the engine's socket does
 (`server.ts:99`). If its port cannot be bound, the engine keeps running without
-it, and the Unix socket keeps working. The web server writes one
-`client.WebServerDown` with a fixed reason, raises a `client.web-down` alert,
-retries every 30 seconds, and writes `client.WebServerUp` when it binds
-(row 113).
+it, and the Unix socket keeps working. The web server's own supervisor retries
+every 30 seconds, and it writes `client.WebServerUp` when it binds (row 113). It
+records the outage through the piece batch path, as a reactor does, and the path
+is closed before `recovery.whenReady`. So it holds its first record until then
+(row 151). It writes `client.WebServerDown`, with a fixed reason, only when the
+client's view shows no open outage, so a port taken for days writes one event
+across restarts. That event raises the `client.web-down` alert. `enabled` off
+closes the outage and its alert.
 
 Connections are capped at 32 in total. A new connection at the cap closes the
 oldest one, so the owner is not locked out by stale connections. A refused
@@ -1077,13 +1278,15 @@ touches (row 116):
 | --- | --- | --- |
 | The event log, its write-ahead log, the receipts and side tables | Everything written, after redaction | It is kept. Nothing here deletes history. |
 | The views, in memory | What the log folds to | They are rebuilt at each start. |
-| `secrets.json`, mode 0600 | Account keys and the carrier token, not encrypted | By secret collection (edit E27). |
+| `secrets.json`, mode 0600 | Account keys and the carrier token, not encrypted | An account's by start-up collection, and the token by its own removal (edit E27). |
 | The ntfy server's cache | An alert's five fields | By the server's own retention, 12 hours by ntfy's default, and by the carrier's best-effort `clear`. |
 | The phone's notifications | An alert's five fields | By the carrier's best-effort `clear`, or the owner. |
 | The browser's memory | The snapshot and the threads it read | When the page closes. The page keeps no thread data in browser storage. |
 | The browser's file cache | The page's static files only | By the browser. |
 | A thread export file, mode 0600 | One agent's thread | By the owner. |
 | The harness's own session files | The agent's conversation | Outside this plan. |
+| The service's log and the adapter protocol log | Diagnostics, after redaction | By the owner. |
+| The proxy's access log | Each request's address, path and time | By the owner, in the proxy's settings. Shephrd cannot reach it. |
 
 `docs/remote-access.md` has a "lost phone" section: remove the phone's
 WireGuard peer, and rotate the ntfy token. While the server is open, there is
@@ -1134,9 +1337,13 @@ and adds one `.merge` line here in its own unit. `ServiceRpcGroup` stays
   exactly the sixteen commands" checks `engineCommandNames`. The checks of
   the group sizes (15, 16 and 1) and of "exactly ten commands for the MCP
   server" become checks that the engine's commands are present with their
-  current shape. A new test, `packages/contracts/test/unique.test.ts`,
-  asserts that every command name and every event tag is unique and that
-  every piece name starts with its namespace and a dot.
+  current shape, and the MCP check becomes a pinned exact list (edit E2). A new
+  test, `packages/contracts/test/unique.test.ts`, asserts that every command
+  name and every event tag is unique and that every piece name starts with its
+  namespace and a dot. It compares the constituent groups' declarations before
+  they merge, because the merged group is unique by construction (Effect 4.0.5,
+  `rpc/RpcGroup.ts:269-276`). A negative fixture shows that a duplicate fails
+  (row 155).
 
 **E2. Access by caller kind, checked before the receipts.** In `commands.ts`, `ownerOnlyCommands` (l.16)
 and `commandAccess` (l.20), whose values are "agent-callable" or
@@ -1147,8 +1354,9 @@ does not compile.
 
 - The engine's commands keep today's access exactly. An owner-only command
   gets `owner` and `device`. An agent-callable command gets `owner`,
-  `device` and `agent`. The planners of `ask`, `wait` and `pass-up` keep
-  refusing the owner as they do today. Edit E13 adds `service` to
+  `device` and `agent`. The planners of `ask` and `wait` keep refusing the
+  owner as they do today. The planner of `pass-up` refuses only when the holder
+  is already the owner, as today (row 149). Edit E13 adds `service` to
   `subscribe`, `prompt`, `compact` and `resume`. `answer` gets no
   `service` (row 75).
 - A device is checked as a device. The command handler reads the caller
@@ -1169,7 +1377,9 @@ does not compile.
   it can never be replayed to the owner.
 - The MCP tool list (`packages/mcp/src/tools.ts:7`) offers the commands
   whose entry includes `agent`, less every stream and the secret-setting
-  commands (row 97).
+  commands (row 97). The derived list is pinned as an exact list in
+  `commands.test.ts`, so a new tool shows up as a changed test, and each piece's
+  plan updates the pin in its own unit (row 140).
 - Behaviour change: none for the engine's commands, except that a device's
   access refusal has no receipt, and no engine command refuses a device today.
 - Tests updated: in `commands.test.ts`, "tags every command agent-callable
@@ -1424,9 +1634,14 @@ edit of its own (row 66).
   never produce it. `execute` treats it as access kind `device`, verifies
   nothing, maps it to the owner actor, and sets `device: open-web`. The
   per-connection credential recheck (`server.ts:119-127`) does not apply to it.
-- **The reserved id.** `open-web` is refused as the id of a real device, in
-  `mintDeviceCredential` (`identity/devices.ts:12`) and by `DeviceAdded`'s
-  planner. So no real credential can ever be recorded under it.
+- **The reserved id** (row 154). `open-web` is refused as the id of a real
+  device, by `DeviceAdded`'s event schema and by the `sideRows.devices` insert
+  (`EventLog.ts:202-205`). So no real credential can ever be recorded under it,
+  and a test does not need the later pairing plan. The envelope's `device` field
+  still accepts it.
+- **The caller's kind reaches a planner** (rows 95, 139). `Input`
+  (`commands/internal.ts:36-40`) gains `callerKind`, which `execute` sets before
+  it maps a device to the owner actor (`CommandHandler.ts:205-207`).
 - Behaviour change: an envelope written for a device carries `device`.
 - Tests updated: `packages/engine/test/commands/handler.test.ts` gains a
   device case and an open-web case. `packages/engine/test/api/auth.test.ts`
@@ -1484,8 +1699,10 @@ code:
   handler command (row 126);
 - `resume` passes its caller to `reload`, whose later writes run after the
   commit (`commands/resume.ts:47`, `recovery/reload.ts:104`, l.134, l.138).
-  `reload`'s parameter changes from `Actor` to `Caller`, so a service's resume
-  records the service on those writes too (row 126);
+  `reload`'s parameter changes from `Actor` to `Caller`, with the optional acting
+  device beside it, so a service's resume records the service on those writes,
+  and a device's resume records the device, on both success and a failed reload
+  (rows 126, 152);
 - `answer` is refused for every service (row 75), because no service calls
   it: a standing rule's answer is written inside the engine's permission
   transaction instead (edit E14);
@@ -1565,8 +1782,8 @@ fixed wording that names it (row 126).
 **E16. A piece's delivery source.** In `events.ts:30`, `Delivery.source`
 gains a fourth variant, `piece { namespace, id }`. `routing/deliveries.ts:62`
 asks the piece's source rule, in a table typed over `PieceNamespace`, one
-question: when the delivery's target stops or crashes while it is queued, is
-the delivery withdrawn or returned? Unit 1 writes each entry as "withdraw". A
+question: when the delivery's target stops or crashes while it is queued or
+sent, is the delivery withdrawn or returned (row 149)? Unit 1 writes each entry as "withdraw". A
 delivery that is returned is already finished, so no rule applies to it. The
 engine writes `DeliveryReturned`, and the piece's reactor acts on that event
 (row 126). The permission, question and wait sources keep their rules.
@@ -1582,6 +1799,14 @@ checks both inside the transaction and refuses the whole batch otherwise. So a p
 can never withdraw a sent or accepted delivery, another piece's delivery,
 or the engine's. The engine's own withdrawals, for moved and cancelled
 requests, are unchanged.
+
+A withdrawal can strand an agent. After a reload, `reloadedEvents` writes
+`StateChanged working` ahead of a requeued delivery (`recovery/reload.ts:73-74,
+86, 98`), and only a sent delivery and a later turn end clear it. So when a
+withdrawal, by a piece or by the dispatcher of edit E18, leaves its target in that
+reloaded state with nothing queued or sent, the same batch writes `StateChanged
+idle` before the wait checks. It reuses the `reloaded` test at
+`routing/deliveries.ts:222-227` (row 143).
 
 - Tests updated: `routing/move-withdrawal.test.ts` keeps its expectations.
   A new test, `packages/engine/test/routing/piece-withdrawal.test.ts`,
@@ -1616,7 +1841,7 @@ writes the board's (lead rulings L13, L15, L19, L22, L23).
   wait checks (`withWaitChecks`, `routing/waits.ts:110`), as the
   failed-send batch does
   (`routing/deliveries.ts:259`), so a wait on the target is judged again
-  in the same batch.
+  in the same batch. Edit E17's reloaded-state rule applies first.
 - **Purity.** The check is a pure function of its inputs. It reads no clock
   and no file.
 - **No other right.** An allow lets the delivery through and nothing else.
@@ -1624,7 +1849,9 @@ writes the board's (lead rulings L13, L15, L19, L22, L23).
   target stay under the engine's rights helper.
 - The dispatcher's functions take the tables as arguments, so unit 1's
   tests use their own checks without a built piece.
-- Behaviour change: none for deliveries without a `piece` source.
+- Behaviour change: none for deliveries without a `piece` source. A piece
+  delivery's withdrawal is a new way into edit E17's reloaded state, which that
+  rule closes (row 143).
 - Tests updated: `routing/deliveries.test.ts` and
   `packages/engine/test/accounts/carry-on-dispatch.test.ts` keep their
   expectations. New tests cover each bullet above.
@@ -1639,7 +1866,10 @@ over a small input type defined there, which the engine builds from its
 views and the client library builds from `client.snapshot` and the stream.
 The input includes the agents' states with `reloadable`, the open requests and
 questions with their holders, the open deliveries and the open non-blocking
-waits, all of which the snapshot holds (section 3).
+waits, all of which the snapshot holds (section 3). The client's fold of those
+inputs from the stream also lives in `settled.ts`, as a pure function, and a
+property test replays a log through it and through the engine's `apply`, and
+compares them at every sequence (row 150).
 `waits.ts` imports them, with no re-export at the old place. A
 hold-unsettled table, typed over `PieceNamespace`, holds each piece's
 condition: while it holds for an agent, that agent is not settled (lead
@@ -1716,7 +1946,10 @@ read (row 122). The path refuses a reactor's batch before `recovery.whenReady`
    returning a delivery request: a target, a text body and its own source
    id. The batch path itself turns each request into a `DeliveryQueued`
    through the piece delivery helper (edit E15), with the piece as sender
-   and the body in the agent-text envelope. A raw `DeliveryQueued`, or any
+   and the body in the agent-text envelope. Requests become events after the
+   planner's own events, so a reach check sees those events. A piece's event
+   that refers to a delivery in the same batch names its source id, because the
+   delivery id does not exist yet (row 147). A raw `DeliveryQueued`, or any
    other engine event, in a piece's batch is refused. A later plan that
    needs another engine event adds it to this list in its own unit, with a
    decision row. A piece never writes `OwnerNeeded` (section 4).
@@ -1740,6 +1973,10 @@ Each batch is written under one caller and one request id:
 | A planner's | The calling caller | The command's own | The envelopes and the reply (edit E3) |
 | A read's marks | The calling caller | A fresh internal id | None |
 | A reactor's | `piece { namespace }` | A fresh internal id | None |
+
+A read's marks carry the acting device too, as a planner's events do (row 152).
+A piece's background worker, such as the alert delivery worker or the web server's
+outage record, writes through the reactor's row (row 151).
 
 A refused batch commits none of its piece events, deliveries, marks or side
 rows. What each refusal does write is fixed (row 122):
@@ -1825,40 +2062,83 @@ it would delete the carrier token. It moves to
 `packages/engine/src/accounts/collectSecrets.ts`, and its keep set also takes
 each piece's entry in a table typed over `PieceNamespace`, a pure function from
 the views to references. Unit 1 writes each entry as "none". The client's
-entry returns the fixed slot while a token is set for the current origin. The
-alert worker calls it after a token is cleared, so a cleared value goes at once.
+entry returns the active token's name while a token is set for the current origin.
+
+Collection stays at start-up only, where `commands/SecretStore.ts:13-15` places it,
+because `setSecret` stores a value before its reference commits, and collection
+at run time could delete it (row 130). `SecretStore` gains one narrow operation,
+`removeCarrierValue(generation)`, which removes one name built by the slot's
+function and can name nothing else. The alert worker calls it after a token is
+cleared or rotated.
+
+Accounts cannot name the slot: an account's planner refuses an environment value
+under `secret:client.`, the runner refuses to resolve one, and collection does not
+count one as kept (row 138).
 
 The handler's two special cases for `accounts set-secret`
 (`CommandHandler.ts`, the label and the body hash) become a lookup in a
 `secretCommands` table, so `client.alerts.carrier.set-token` gets the same
-treatment. Its planner stores the value before committing, as `setSecret`
-does (`commands/accounts.ts:38-50`).
+treatment. Its planner stores the value under a fresh name before committing, as
+`setSecret` does (`commands/accounts.ts:38-50`), so a failed write leaves the
+earlier token active.
 
-- Behaviour change: none for accounts.
+- Behaviour change: an account's environment value under `secret:client.` is
+  refused, and no account has one. Nothing else changes for accounts.
 - Tests updated: `packages/engine/test/recovery/restart.test.ts`, test `6.7 R22
   issue 119` (l.606-626), keeps its abandoned and replaced secret checks and
   gains: a token used by no account survives a restart, an authenticated push
-  works after it, a cleared token is removed, and removing an account leaves
-  the token.
+  works after it, an unselected or cleared value is removed, and removing an
+  account leaves the token. A new test,
+  `packages/engine/test/accounts/carrier-value-removal.test.ts`, holds `accounts
+  set-secret` after its store and before its commit, clears the token, and shows
+  that the account's secret survives and resolves. It also clears and at once
+  sets a token, and shows that the new value survives.
 
 **E28. The web caller's answers. Pending the owner's question 6** (row 95).
 Fold as the recommended answer. If the owner chooses the other answer, this edit
-and criterion 1.41 are removed, and nothing else depends on them.
+and criterion 1.41 are removed, and nothing else depends on them. `callerKind`
+stays in edit E12, because row 139 also uses it.
 
-- `Input` (`commands/internal.ts:36-40`) gains `callerKind`, which `execute`
-  sets before it maps a device to the owner actor (`CommandHandler.ts:205-207`).
 - `answer` (`routing/permissions.ts:35-44`) refuses, for `callerKind: device`,
   an option that is persistent by its flag or its kind (`ceiling.ts:387-394`,
   `permissionForOptionKind`), and an option of an unknown kind. On a request
   with `settingsWrite`, it accepts from that caller only a non-persistent
   reject option.
 - The refused request stays open, so the owner can finish it at the computer.
+- The refusal's reason is "option not allowed from the web". It joins the list at
+  `api/server.ts:41-45`, so the page can explain it, and the page has a state for
+  a request whose options are all refused for it (row 153).
+- `pass-up` is not a persistent answer, so this edit leaves it open to a device.
 - The later pairing plan decides whether a paired device keeps this rule.
 - Behaviour change: a device caller loses those answers. The owner's terminal
   and agents are unchanged.
 - Tests updated: `packages/engine/test/routing/permissions.test.ts` keeps its
   expectations and gains a case for each option kind, for a device caller and
   for the owner.
+
+**E29. A permission request carries its action** (row 132). The owner approves
+the action, not a title. Today `event.description` is `redactText(tool.title ??
+"Permission requested")` (`runner/AcpRunner.ts:411`), and the event holds no input
+(l.416). So `permissionRequested` and `PermissionRequested` (`events.ts:121`) gain
+optional fields from the request's own tool call, for every tool kind:
+
+- `toolKind`, the protocol's `kind`;
+- `toolInput`, its `rawInput` after the engine's redaction, at most 8 KiB encoded;
+- `inputRedacted`, true when redaction changed it;
+- `inputTruncated`, true when the 8 KiB cap cut it.
+
+They are absent when the adapter omits them. `toolInput` is kept out of the
+requests view and of `client.snapshot`, so a client reads it from the event. The
+page shows the input unfolded before "Allow" can be tapped. When the input is
+absent, redacted or cut, the page shows a fixed warning, in Shephrd's own styling,
+that the action's input is not visible. An alert still carries only its five
+fields. The roles plan's standing-rule matcher reads these fields, and matches only
+when `toolKind` is `execute`.
+
+- Behaviour change: a new request's event holds more, and old logs rebuild
+  unchanged.
+- Tests: `packages/engine/test/runner/permission-fields.test.ts` covers each tool
+  kind, a redacted input, a cut input, an absent input and an old log.
 
 ### What the later plans then add
 
@@ -1878,7 +2158,7 @@ with an attack pass, before any piece unit:
 
 - **Unit 1a, the lists:** edits E1 to E10, E21 and E22.
 - **Unit 1b, the callers and the delivery and wait rules:** edits E11 to
-  E20, E23, E27 and E28. It changes the prompt renderer and the dispatcher, which carry the
+  E20, E23, E27, E28 and E29. It changes the prompt renderer and the dispatcher, which carry the
   security properties, so its attack pass covers lead rulings L13 and L16
   to L25 by name.
 

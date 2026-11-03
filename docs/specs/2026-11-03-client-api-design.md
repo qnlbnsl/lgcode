@@ -150,10 +150,14 @@ refuses them, whatever the caller (row 82).
 
 **Why.** Each of the three outlives a moment's access: new devices, wider
 exposure, or an automatic allow. While the web server is open, this also
-stops an agent that reaches the page from granting itself a standing allow.
+stops an agent that reaches the page from granting itself a standing allow
+through the page. It is a guard and not a boundary while the server is open:
+a web caller can start a program that reads the owner credential (row 142).
 
 **What it changes.** AGENTS.md rule 5, "a web or mobile client is never a
-second-class citizen", is narrowed for these three commands only.
+second-class citizen", is narrowed for these three commands by the owner's
+choice. Contract section 2 lists every other exception, each of which came
+from a lead's ruling for the owner to review (row 142).
 
 **What it rules out.** Running those three commands from the web page or a
 phone.
@@ -175,9 +179,9 @@ engine's existing rule for agents' processes to it.
 2. If that user id is not Shephrd's own user id, the connection is refused,
    unless proxy mode is on and the user id matches the "proxy user id"
    setting, which the owner sets at the computer. A reverse proxy that runs
-   as its own user, such as `caddy`, passes only this way. The first draft let
-   every other user id through; the lead's review ruling replaced that
-   (row 92).
+   as its own user, such as `caddy`, passes only this way, and its requests
+   are always judged as public. The first draft let every other user id
+   through; the lead's review ruling replaced that (rows 92, 133).
 3. If the user id is Shephrd's own, Shephrd finds the process that holds the
    socket's inode, by reading the `/proc/<pid>/fd` links of the owner's
    processes. It then walks that process's parents and applies the engine's
@@ -192,8 +196,8 @@ engine's existing rule for agents' processes to it.
    host's own addresses, or is outside the "allowed client networks" setting,
    which the owner sets at the computer and which has no default. An agent
    that connects to the proxy's public address on the same machine arrives
-   with the host's own address. Outside proxy mode, forwarded headers are
-   ignored (rows 89, 91, 113).
+   with the host's own address. Outside proxy mode, a request that carries a
+   forwarded header is refused (rows 89, 91, 113, 133).
 
 **Whether it holds.** It holds against an agent, or a program an agent
 starts, that connects to the web server directly. That is the easy case the

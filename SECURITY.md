@@ -96,7 +96,10 @@ These rules apply to every change. A change that breaks one is a security bug.
    check. Two limits stay in force while it is open. First, three commands
    work only over the engine's Unix socket with the owner credential, never
    through the web server: creating a pairing code, changing the web
-   server's settings, and adding a standing permission rule. Second, the web
+   server's settings, and adding a standing permission rule. This first limit
+   is also a guard and not a boundary while the server is open, because a web
+   caller can start an agent or set an adapter, and that program can read the
+   owner credential. Second, the web
    server refuses a connection from a process that descends from an agent.
    That second check stops accidents and simple misuse, not a hostile agent:
    an agent can start a process outside its own process tree, or ask
