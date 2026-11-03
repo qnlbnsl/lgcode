@@ -1646,6 +1646,7 @@ log's redaction boundary.
 Found: 2026-11-01, in unit 6a's focused review, finding F-8.
 State: open, fix on branch worker/review-2, commit `c9ff320`.
 The plain `start` remainder is being fixed as post-build A3 on branch `worker/review-2`, with a two-minute setup bound and stop pre-emption.
+The post-build A3 correction at `8596f63` has a residual cleanup race in issue 229.
 
 What happens: initialization, session creation, session load and initial
 configuration have no deadline. An adapter that never responds can keep a
@@ -4130,3 +4131,45 @@ Score: not assigned, because the re-review supplied no numerical risk score.
 The re-review labels the finding MINOR.
 Why it matters: the timeout records a start failure without reaching the
 stopped state checked by the ordinary setup-timeout test.
+
+## 229. A cancelled start's fallback cleanup races with a later stop or resume
+
+Found: 2026-11-03, in the re-review of the post-build A3 correction at `8596f63`.
+State: open, recorded at the review lead's request in board post 23.
+
+Evidence: finding F-1 is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/rresult-2b.md` (not tracked).
+The re-reviewer confirmed the path by source inspection and supplemental
+integration probes with a delayed writer.
+The probes observed a duplicate terminal event after a successful stop and
+revocation of the new token after a successful resume.
+They did not establish that the fallback killed a real operating-system process.
+
+What happens: in `packages/engine/src/commands/start.ts`, a cancelled start
+releases its agent's lane before waiting for the stops that cancelled it to settle.
+It then checks the lifecycle outside the writer transaction and runs fallback cleanup.
+The cleanup stops a runner by agent identifier and unconditionally appends
+`AgentStartFailed` while revoking every token for that agent.
+It does not recheck the current state or original token incarnation inside
+the writer transaction.
+The settlement helper in `packages/engine/src/routing/lanes.ts` waits only
+for a snapshot of the stops already registered.
+A later valid stop can therefore commit `AgentStopped` before the old
+fallback appends `AgentStartFailed`.
+A subsequent `resume --fresh` in `packages/engine/src/commands/resume.ts`
+can open a new incarnation whose token the old fallback then revokes.
+The view can stay idle while its new token is unusable.
+The runner stop in `packages/engine/src/runner/AcpRunner.ts` also selects
+only by agent identifier, so stale cleanup could target a later process.
+The review directly proved the event and token consequences, rather than that kill.
+
+What should happen: keep fallback cleanup inside the agent's lane and
+validate the current state and the original token inside the failure transaction.
+Cleanup from one incarnation must not stop or revoke a later incarnation.
+This remains part of the post-build A3 follow-up linked from issue 103.
+No implementation change is made by this record.
+
+Score: not assigned, because the re-review supplied no numerical risk score.
+The re-review labels the finding MAJOR.
+Why it matters: overlapping commands or a delayed writer can let cleanup
+from a cancelled start corrupt a later successful stop or resume.
