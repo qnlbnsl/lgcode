@@ -4324,6 +4324,7 @@ was not captured, and the source of the timeout remains unconfirmed.
 
 Found: 2026-11-03, in the focused review of issue 242, finding A.
 Status: fixed in the round-7 terminal fix on `worker/engine-lcpb`.
+Fix commit: `6b3af638f2d071c8ee7363d4774b7cd6ee549fe3`.
 
 At commit `34af123`, `packages/engine/src/runner/AcpRunner.ts:251` marks the
 turn ended before draining its terminal output.
@@ -5051,6 +5052,7 @@ persisting its secret and leave later account commands refused.
 
 Found: 2026-11-03, in the focused review of issue 242, finding B.
 Status: fixed in the round-7 terminal fix on `worker/engine-lcpb`.
+Fix commit: `6b3af638f2d071c8ee7363d4774b7cd6ee549fe3`.
 
 At commit `34af123`, `packages/engine/src/runner/terminal.ts:153` reports every
 changed terminal immediately.
@@ -5087,6 +5089,7 @@ Issue 246 remains open for generic tool-output retention.
 
 Found: 2026-11-03, in the focused review of issue 242, finding C.
 Status: fixed in the round-7 terminal fix on `worker/engine-lcpb`.
+Fix commit: `6b3af638f2d071c8ee7363d4774b7cd6ee549fe3`.
 
 At commit `34af123`, `packages/engine/src/runner/terminal.ts:58` returns nothing
 for a new terminal after the map reaches 256 entries.
