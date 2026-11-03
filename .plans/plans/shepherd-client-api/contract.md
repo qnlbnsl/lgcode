@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v3, reworked under lead ruling L26 (direct engine edits)
-version: 3
+status: v4, round 4 shared fixes S1 to S6 (lead ruling L29 for S2)
+version: 4
 updated: 2026-11-03
 ---
 
@@ -142,22 +142,45 @@ more code:
 
 ### How a piece's command runs
 
-A piece's handler never writes to the database itself. It is a planner in
-the engine's planner table, and it runs inside the engine's command
+Every command is exactly one of two kinds, and the kind decides how it
+runs (lead's round 4, S1; row 68):
+
+- **A planner** writes events and returns a small reply: identifiers, counts
+  and fixed values taken from its own batch, such as a new channel's id or
+  a new post's id. Its reply never holds post text, thread text or any
+  other record read from the views. It is deduplicated by its request id.
+- **A read** returns records, such as a page of posts, a roster or a
+  snapshot. It is never deduplicated. It is checked against the caller's
+  current access on every request, including a resent one. A read may also
+  write marks of its own namespace, such as the board's read marks, but it
+  never stores its reply (edit E4).
+
+A command that must both return records and write events is a read with
+marks. So `board.read` is a read with marks. `board.open` and `board.post`
+are planners. The board's and roles' plans classify their other commands
+by this rule, and a test in `packages/engine` checks that every command is
+in exactly one of the two tables (edit E3).
+
+A piece's handler never writes to the database itself. A planner is in the
+engine's planner table, and it runs inside the engine's command
 transaction, as the engine's own planners do:
 
 1. The engine identifies the caller and checks the piece's access table.
 2. The engine checks the request id against the receipts.
-3. The piece's handler reads a consistent snapshot of the views, the
-   engine's and its own, and returns the events to write.
-4. The engine writes those events, the receipt and any side rows in one
-   transaction, after redaction.
+3. The piece's planner reads a consistent snapshot of the views, the
+   engine's and its own, and returns the events to write and its reply
+   function (edit E3).
+4. The engine runs the batch checks of edit E23, then writes those events,
+   the receipt and any side rows in one transaction, after redaction. The
+   receipt holds the batch's envelopes and the redacted reply, and a resent
+   request gets that same reply.
 
-A piece's events may include engine events that the engine already knows
-how to produce, such as queuing a delivery to an agent, through the
-engine's planning helpers (section 6). A piece cannot write an engine event that the
-engine's own rules would refuse. The engine checks every engine event a
-piece returns against its state table, as it checks its own.
+A piece may ask for a delivery to an agent by returning a delivery
+request, which the engine turns into its own `DeliveryQueued` (edit E23).
+The only engine event a piece returns itself is the withdrawal of its own
+queued delivery (edit E17). A piece cannot write an engine event that the
+engine's own rules would refuse. The engine checks every engine event in a
+piece's batch against its state table, as it checks its own.
 
 ### Views and reactors
 
@@ -170,8 +193,10 @@ piece returns against its state table, as it checks its own.
   created by its own migrations, which it adds to the engine's migration
   list.
 - **Reactors.** A piece may react to committed events, for example piece
-  2's alert reactor. A reactor reads events in sequence order and writes its
-  own events through the same transaction path. It records the last
+  2's alert reactor. A reactor reads events in sequence order. It writes
+  only through the engine's piece batch path (edit E23), recorded with the
+  caller `piece { namespace }`, so its batch passes the same checks as a
+  planner's. It never appends to the log directly. It records the last
   sequence it handled in its own view, so after a restart it resumes from
   there. It must be safe to run twice on the same event, because a crash
   can come between reading and writing.
@@ -190,8 +215,9 @@ paged read follows one shape:
   or its own record id inside it.
 - `limit` has a maximum that the piece states. A larger `limit` is reduced
   to the maximum, not refused.
-- A paged read applies the same visibility rule as `subscribe` and is not
-  deduplicated.
+- A paged read applies the same visibility rule as `subscribe`, is checked
+  against the caller's current access on every request, and is not
+  deduplicated. A resent request computes a fresh page.
 
 ## 2. The four kinds of caller
 
@@ -201,6 +227,11 @@ paged read follows one shape:
 | Paired device | Its own device credential, prefix `shp_d_` | The network listener (piece 2), or the Unix socket | Every command whose access includes `device` |
 | Agent | Its own agent token, prefix `shp_a_` | The engine's Unix socket only, through MCP or the CLI | Every command whose access includes `agent`, under the engine's tree rules |
 | Service | None. A service exists only inside Shephrd's own process | The engine's in-process command path only | The fixed list under "Services" below, and any piece command whose access includes `service` |
+
+The log also names a fifth caller, `piece { namespace }`, on the batches a
+piece's own reactors write (edits E11 and E23). It is not a kind of caller
+in the sense of this table: it has no credential, no access entry, and
+calls no command.
 
 These rules apply to the four kinds:
 
@@ -219,11 +250,15 @@ These rules apply to the four kinds:
 - **The pane viewer is the owner.** The thread viewer in a Herdr pane uses
   the owner credential over the Unix socket, exactly as the owner's terminal
   does (lead ruling L4, row 7).
-- **An agent's rights over other agents are the engine's.** A piece's
-  agent-callable command that acts on another agent checks the engine's
-  rights rule (the agent itself, or an agent it holds a parent's rights
-  over), through the engine's rights helper (section 6). A piece does not
-  invent its own tree rule, with one exception below.
+- **An agent's rights over other agents are the engine's.** An agent may
+  manage agent X when it is X's effective holder: X's nearest available
+  ancestor, as `holderAbove` finds it (`routing/holders.ts:21`), where an
+  available agent is one that is idle or working (l.14). This is the
+  management rule, and it is unchanged. A piece's agent-callable command
+  that acts on another agent checks it through the engine's rights helper
+  (section 6). A piece does not invent its own tree rule, with one
+  exception below. What an agent may read is a separate rule (section 3,
+  "The read rule and the management rule").
 - **One exception: a piece's delivery may reach outside the caller's tree**
   (lead ruling L13). A delivery that a piece queues with its own
   `{ namespace, id }` source (section 6, edit E16) may reach a target
@@ -334,13 +369,47 @@ reconnects from its cursor. The network listener also sends a heartbeat,
 more often than a reverse proxy's idle timeout, which is set in piece 2's
 settings.
 
+### The read rule and the management rule
+
+These are two different rules (lead ruling L29, row 69):
+
+- **The management rule** says which agent may stop, prompt, compact,
+  resume, group or answer for agent X. It is X's effective holder, as in
+  section 2. It is unchanged.
+- **The read rule** says which agent may see X's events and records. An
+  agent may read X when X is the agent itself, when the agent is X's
+  structural parent, or when the agent is X's effective holder because X's
+  parent is unavailable.
+
+So reads always cover management rights. A caller can always see an agent
+it may act on, and reading grants no right to act. Three cases show the
+rule, for an orchestrator O, its lead L, and L's worker W:
+
+- **While L is available,** O reads L but not W, and L reads W, as today.
+- **While L is paused, crashed or stopped,** O is W's effective holder, so
+  O reads W and manages W. L keeps its structural read of W, so it can
+  catch up when it resumes. L's management of W passes to O, as today.
+- **When L recovers,** O's read of W ends. The filter is evaluated against
+  the current views, so O's live stream stops carrying W's events, and a
+  catch-up from an earlier cursor no longer returns them.
+
+This gives O no new capability. O may stop L today, and then holds the
+management rights over W that the read rule follows. A sibling or a
+stranger never reads X under this rule.
+
+The read rule is a pure function of the caller, the envelope's `agentId`
+and the current views. One function applies it (edit E8), and every
+agent read uses that function: `subscribe`, `client.subscribe`,
+`client.snapshot`, `client.roster`, `client.thread`, and the roles' orient
+and hand-off reads, which are built on the roster and the thread.
+
 ### What each caller sees
 
 Every event has one visibility class, set by the piece that owns it:
 
 | Class | Who sees it |
 | --- | --- |
-| `agent-scoped` | The owner, every device and every service. An agent sees it only when the envelope's `agentId` is the agent itself or an agent it holds a parent's rights over. This is the engine's existing rule. |
+| `agent-scoped` | The owner, every device and every service. An agent sees it only when the envelope's `agentId` names an agent it may read, by the read rule above. |
 | `owner-only` | The owner, every device and every service. Never an agent. |
 | `piece-decided` | The owner, every device and every service. An agent sees it when the owning piece's pure rule says so, given the caller, the envelope and the views. |
 
@@ -386,15 +455,14 @@ The request may filter by group, by role, and by parent. Access is
 `owner`, `device`, `agent` and `service`:
 
 - The owner, every device and every service see every agent.
-- An agent sees itself and every agent it holds a parent's rights over,
-  which is the engine's own visibility rule. Its own entry names its
-  parent, so `orient` can answer "who is my parent" without seeing the
-  parent's record.
-- An agent does not see its grandchildren. The roles planner asked for a
-  whole subtree. That is wider than what the engine lets an agent
-  subscribe to, and a roster that shows more than `subscribe` would let
-  the two disagree. A lead that needs its workers' workers asks its
-  workers, as the engine's design says.
+- An agent sees every agent it may read, by the read rule. Its own entry
+  names its parent, so `orient` can answer "who is my parent" without
+  seeing the parent's record.
+- An agent does not see its grandchildren while their parent is available.
+  The roles planner asked for a whole subtree. That is wider than what the
+  engine lets an agent subscribe to, and a roster that shows more than
+  `subscribe` would let the two disagree. A lead that needs its workers'
+  workers asks its workers, as the engine's design says.
 
 **`client.thread`** (row 26) reads one agent's thread events, in order,
 from a sequence number, one page at a time. A page holds at most 500
@@ -675,26 +743,59 @@ table of planners by command name, in
 `packages/engine/src/commands/planners.ts`. A piece adds its planners,
 written in `packages/engine/src/<namespace>/`, to this table. Every command
 in the group is in exactly one of this table and the read table (edit E4),
-and a test asserts this.
+and a test asserts this. Section 1, "How a piece's command runs", gives the
+rule for which table a command belongs to.
 
-- Behaviour change: none. The engine's fourteen transactional commands map
-  to the same planners as today.
-- Tests updated: `packages/engine/test/commands/handler.test.ts` and
-  `authorization.test.ts` keep their expectations.
+- **The reply.** `Plan` (`packages/engine/src/commands/internal.ts:41`)
+  gains one field, `reply`, a function from the committed, redacted batch
+  of envelopes to the command's reply. The handler passes it to the
+  receipt writer in place of `replyFor` (`CommandHandler.ts:269`), so the
+  receipt stores that reply. The handler then decodes the stored reply
+  against the command's success schema, as it does today (l.249). A resent
+  request returns the stored reply (l.254), with no second write. A piece's
+  planner must set `reply`. An engine planner leaves it unset, and the
+  handler keeps using `replyFor` (l.97) for it. `afterCommit` stays for the
+  blocking `wait` only; a piece's planner never sets it.
+- **What a reply may hold.** Identifiers, counts and fixed values taken from
+  the planner's own batch. Never text from an event, and never a record
+  read from the views. The receipt writer already redacts the reply
+  (`EventLog.ts:210-220`).
+- Behaviour change: none for the engine's commands. The engine's fourteen
+  transactional commands map to the same planners and the same replies as
+  today.
+- Tests updated: `packages/engine/test/commands/handler.test.ts`,
+  `authorization.test.ts` and `transaction-receipts.test.ts` keep their
+  expectations. `transaction-receipts.test.ts` gains fixture-piece cases:
+  the first reply and every resent reply are equal, and one logical change
+  is written. `packages/engine/test/log/receipts.test.ts` gains a case that
+  a piece's receipt holds its reply.
 
 **E4. A read table at the server.** `packages/engine/src/api/server.ts`
 handles `subscribe` and `debug.compare-views` inline (l.153 to 168). Both
 move into `packages/engine/src/api/reads.ts`, a table of read handlers by
 command name. A piece adds its reads there, such as `client.snapshot`,
-`client.thread`, `client.subscribe` and `board.read`. A read checks the
-caller's access and applies the visibility rule (edit E8). It holds no
-writer permit and writes no receipt. The server's hard-wired group
-(l.85) and handler type (l.38) follow `CommandsRpcGroup`, which now
-includes every piece.
+`client.thread`, `client.subscribe`, `board.read` and `board.status`. A
+read checks the caller's access and applies the visibility rule (edit E8)
+on every request, including a resent one, so a caller that lost access
+since its first try is refused. It holds no writer permit while it builds
+its reply, and it is never deduplicated.
 
-- Behaviour change: none.
+- **Reads with marks.** A read entry may also return mark events of its own
+  namespace, such as `board.Read`. The read builds its reply from one views
+  snapshot, then writes the marks through the piece batch path (edit E23),
+  as the calling caller, under a fresh internal request id, with no receipt
+  (the writer's existing `receiptResult: false`, `EventLog.ts:205`). The
+  reply is returned to the caller and stored nowhere. A resent request
+  computes a fresh page and writes its marks again, so marks must be safe
+  to write twice, such as a read watermark that only moves forward.
+- The server's hard-wired group (l.85) and handler type (l.38) follow
+  `CommandsRpcGroup`, which now includes every piece.
+- Behaviour change: none for the engine's commands.
 - Tests updated: `packages/engine/test/api/compare-views-rpc.test.ts` and
-  `subscribe-visibility.test.ts` keep their expectations.
+  `subscribe-visibility.test.ts` keep their expectations. A new test,
+  `packages/engine/test/api/read-marks.test.ts`, covers a lost reply
+  followed by a loss of access and a resend of the same request id, which
+  is refused, and checks that the receipts table holds no page text.
 
 **E5. One event union.** In `packages/contracts/src/events.ts`, the
 `Event` union (l.88) becomes the engine's events plus each piece's union,
@@ -703,9 +804,28 @@ stays one schema, `EventEnvelope` (l.184). The log writer's decode
 (`EventLog.ts`, near l.182) needs no edit of its own. Every engine view
 ignores a piece's tags.
 
+- **The lifecycle table.** `eventTable` in
+  `packages/contracts/src/stateMachine.ts:79` is typed over every event
+  tag, so a new event without a row does not compile. Each piece's events
+  enter it through one spread per piece, `...keepInEveryState(<namespace>
+  event tags)`, which gives every piece event the effect `keep` in all
+  seven states. A piece event never changes an agent's lifecycle state. A
+  new engine event, such as the roles plan's `DeliveryHeld` and
+  `DeliveryReleased`, gets its own explicit row, decided cell by cell by
+  the plan that adds it. No fallback for unknown tags is added, and
+  `eventEffect` (l.122) is unchanged.
+- **The tests that list every tag.**
+  `packages/contracts/test/state-machine.test.ts` (l.285, l.333) already
+  enumerates the whole union and keeps its expectations.
+  `packages/engine/test/api/subscribe-visibility.test.ts` checks at l.149
+  that its samples cover every tag, so each piece adds one sample per
+  event, and test 7.3 (l.154) chooses its expected rows by each tag's
+  visibility class (edit E8), keeping its expectations for the engine's
+  tags.
 - Behaviour change: none. Every existing event still decodes.
 - Tests updated: `packages/contracts/test/events-roundtrip.test.ts` gains
-  each piece's events.
+  each piece's events; `state-machine.test.ts` and
+  `subscribe-visibility.test.ts` as above.
 
 **E6. Piece views inside the engine's views.** In
 `packages/engine/src/views/apply.ts`, the views `State` gains one field per
@@ -717,7 +837,8 @@ more code, and "the log is the whole truth" holds for every piece.
 
 - A piece's reactors join the engine's followers of committed events,
   started in `packages/engine/src/service.ts`. A reactor reads events in
-  sequence order, writes through the same transaction path, and records
+  sequence order, writes only through the piece batch path (edit E23), and
+  records
   the last sequence it handled in its own view (section 1, "Views and
   reactors").
 - Behaviour change: the views state gains fields, and `debug.compare-views`
@@ -746,15 +867,34 @@ pure function of the caller, the envelope and the views. A class table in
 `packages/contracts/src/visibility.ts` gives every event tag its class
 (section 3). It is typed over the whole union, so an event without a class
 does not compile. Every engine tag is `agent-scoped`, and an
-`agent-scoped` envelope with no `agentId` is hidden from agents, which
-reproduces today's filter exactly. A piece's `piece-decided` rules sit in
-a table keyed by tag, in its engine folder. `subscribe`,
-`client.subscribe`, `client.snapshot`, `client.roster`, `client.thread`
-and every paged read call this one function.
+`agent-scoped` envelope with no `agentId` is hidden from agents. A piece's
+`piece-decided` rules sit in a table keyed by tag, in its engine folder.
+`subscribe`, `client.subscribe`, `client.snapshot`, `client.roster`,
+`client.thread` and every paged read call this one function.
 
-- Behaviour change: none for the engine's events.
+- **The read rule** (section 3, lead ruling L29). Today's filter
+  (`server.ts:155-159`) lets an agent see only itself and its structural
+  children. The function adds one case: the agent is the envelope agent's
+  effective holder, by `holderAbove` (`routing/holders.ts:21`), because
+  that agent's parent is unavailable. It is evaluated against the current
+  views, as today's filter is.
+- Behaviour change: an agent now also sees the events of an agent whose
+  parent is unavailable and whose effective holder it is. Everything else
+  is filtered as today.
 - Tests updated: `packages/engine/test/api/subscribe-visibility.test.ts`
-  keeps its expectations and gains a service case.
+  changes. Test 7.3 (l.154) says an agent's `subscribe` "never" returns a
+  grandchild's events. Its sample events change the child's and the
+  subscriber's lifecycle states (l.60, l.81, l.84), so under the read rule
+  its expected rows are computed from the read rule against the views at
+  each delivery, not fixed. 7.3 becomes "a grandchild's events only while
+  the child is unavailable and the subscriber is its effective holder", in
+  catch-up and live. The engine design's sentence on what `subscribe`
+  shows an agent (`docs/specs/2026-11-01-engine-design.md`, section 3) is
+  updated to match. New cases
+  cover three generations through a pause, a crash and a recovery, and
+  check that the read ends when the child recovers, both live and on
+  catch-up. 7.3 also chooses its expected rows by each tag's visibility
+  class (edit E5), and gains a service case.
 
 **E9. The snapshot and its sections.** A new module,
 `packages/engine/src/api/snapshot.ts`, serves `client.snapshot`. It reads
@@ -783,16 +923,20 @@ form.
 **E11. The caller schema.** `Actor` (`events.ts:8`) stays `owner` or
 `agent`, because it also types a request's holder and an agent's parent,
 and a service is never either. A new union, `Caller`, is `owner`, `agent`,
-or `service { service, rule? }`. It types the envelope's `caller`
-(`events.ts:184`). The receipts key (`callerKey`, `EventLog.ts:116`) gains
-`service:<name>`, without the rule. The log reader's caller check
-(`log/subscribe.ts:38`) accepts it, and the comment at `migrations.ts:15`
-says so.
+`service { service, rule? }`, or `piece { namespace }`. It types the
+envelope's `caller` (`events.ts:184`). The `piece` variant is written only
+by a piece's own reactors and its reads' marks, through the piece batch
+path (edit E23). It has no credential, no access entry, and calls no
+command.
 
+- **The receipts key.** `callerKey` (`EventLog.ts:116`) gains
+  `service:<name>` and `piece:<namespace>`, without the rule. The handler's
+  own copy of the key (`CommandHandler.ts:236`) is replaced by a call to
+  `callerKey`.
 - Behaviour change: the envelope's `caller` schema widens. Every existing
   envelope still decodes.
 - Tests updated: `events-roundtrip.test.ts` and
-  `packages/engine/test/log/receipts.test.ts` gain service cases.
+  `packages/engine/test/log/receipts.test.ts` gain service and piece cases.
 
 **E12. The acting device.** `EventEnvelope` gains one optional field,
 `device`, holding a `DeviceId`. The command handler sets it from the device
@@ -804,6 +948,38 @@ edit of its own (row 66).
 - Tests updated: `packages/engine/test/commands/handler.test.ts` gains a
   device case. `packages/engine/test/api/per-request-credential.test.ts`
   keeps its expectations.
+
+**E11 and E12 together: one durable form of the caller and the device**
+(lead's round 4, S4; row 71). Today the `events` table stores only the
+receipts key in `events.caller` (`migrations.ts:16`), and the log reader
+rebuilds the caller from that string alone (`log/subscribe.ts:36-38`). So
+a service's rule and a device's id would be lost on every read of the log.
+The edits are:
+
+- **The migration.** A new engine migration adds two nullable columns to
+  `events`: `caller_rule` (a standing rule's id) and `device_id`. Old rows
+  have neither, and decode as today. `events.caller` keeps the receipts key
+  form: `owner`, `agent:<id>`, `service:<name>` or `piece:<namespace>`.
+- **The append path.** `append` (`EventLog.ts`, the `commit` function,
+  l.145) takes the full `Caller` and the optional device, in place of an
+  `Actor`. It writes `caller`, `caller_rule` and `device_id` for every
+  event of the batch, and builds the live envelope (l.182) from the same
+  values.
+- **One row decoder.** `decodeRow` (`log/subscribe.ts:36`) reads the three
+  columns and rebuilds the full caller and the device. It accepts each of
+  the four key forms and refuses any other. Catch-up (`log/subscribe.ts`),
+  the rebuild (`views/rebuild.ts:26`) and the paged agent read (edit E21)
+  all select the three columns and call this one decoder.
+- **Equality.** For every caller kind, with and without a rule and a
+  device, the live envelope, the catch-up envelope and the rebuilt envelope
+  are equal.
+- Behaviour change: the `events` table gains two columns. Every existing
+  row still decodes, with no rule and no device.
+- Tests updated: `packages/engine/test/log/append.test.ts`,
+  `log/subscribe-gapless.test.ts`, `log/receipts.test.ts` and
+  `packages/engine/test/views/rebuild.test.ts` gain service, rule, piece
+  and device cases. A new test, `packages/engine/test/log/caller-durable.test.ts`,
+  compares live, catch-up and rebuilt envelopes, including after a restart.
 
 **E13. The in-process service path and its rights.** A new module,
 `packages/engine/src/commands/services.ts`, holds the service list, a fixed
@@ -842,19 +1018,30 @@ stays `Actor`, because a service never answers a question.
 ### Deliveries from a piece
 
 **E15. Who a delivery is from, and the envelope for every sender but the
-owner.** In `events.ts`, `Delivery.sender` (l.23) and `PromptSent.sender`
-(l.112) change from `Actor` to `Sender`, which is `owner`, `agent`,
-`service { service }` or `piece { namespace }`. The prompt renderer,
-`routing/envelope.ts:23`, today wraps only an agent's text
-(`sender._tag === "agent"`). It changes to wrap every sender except the
-owner: an agent, a service and a piece. The wrapping is the engine's
+owner.** In `events.ts`, every field that carries a delivery's sender
+changes from `Actor` to `Sender`, which is `owner`, `agent`,
+`service { service }` or `piece { namespace }`. There are three such
+fields, and no others (lead's round 4, S5; row 72):
+
+- `Delivery.sender` (l.23), which `DeliveryQueued` carries;
+- `PromptSent.sender` (l.112);
+- `DeliveryReturned.sender` (l.162), which the return builder copies from
+  the delivery (`routing/deliveries.ts:46`).
+
+The planners that set a sender from the caller (`commands/prompt.ts:10`,
+`commands/compact.ts:8`, `commands/start.ts:44`, `routing/questions.ts:30`)
+map a service caller to `service { service }`. The prompt text function,
+`agentText` (`routing/envelope.ts:22-23`), today wraps only an agent's
+text (`sender._tag === "agent"`). It changes to wrap every sender except
+the owner: an agent, a service and a piece. The wrapping is the engine's
 agent-text envelope, with a fresh random marker, and a leading `/` is
 escaped (lead ruling L11).
 
-- A piece queues a delivery only through one helper,
-  `packages/engine/src/routing/pieceDelivery.ts`. It takes a text body and
-  the piece's own namespace, never a sender, a raw prompt or a content
-  kind. So a piece can never send unwrapped text.
+- A piece queues a delivery only by returning a delivery request, which
+  the piece batch path (edit E23) passes to one helper,
+  `packages/engine/src/routing/pieceDelivery.ts`. The helper takes a text
+  body and the piece's own namespace, never a sender, a raw prompt or a
+  content kind. So a piece can never send unwrapped text.
 - The delivery is shown as from the piece, by its namespace in fixed text,
   such as "board", never "owner" (lead ruling L16).
 - The piece names each item's true author in a header built only from
@@ -862,13 +1049,18 @@ escaped (lead ruling L11).
   text. This holds also for a wake the piece builds with no caller (lead
   ruling L16).
 - A returned delivery (`routing/deliveries.ts:46-52`) whose sender is a
-  service or a piece follows the piece's source rule (edit E16), not the
-  branch for an agent sender.
+  service or a piece gets only its `DeliveryReturned`, as an owner's does
+  today (l.47). No "not delivered" notice to an agent sender is built. For
+  a delivery with a piece source, the piece's source rule (edit E16) and
+  its reactor then act on that `DeliveryReturned`.
 - Behaviour change: none for the owner's and agents' deliveries.
-- Tests updated: `packages/engine/test/routing/text-is-data.test.ts`,
+- Tests updated: `packages/contracts/test/events-roundtrip.test.ts` gains
+  service and piece senders on all three events, and keeps the owner and
+  agent encodings. `packages/engine/test/routing/text-is-data.test.ts`,
   `packages/engine/test/live-check/rendered-prompts.test.ts` and
   `routing/deliveries.test.ts` keep their expectations and gain service and
-  piece cases.
+  piece cases. `deliveries.test.ts` returns a piece delivery through the
+  real failed-send path (l.130), before and after acceptance.
 
 **E16. A piece's delivery source.** In `events.ts:30`, `Delivery.source`
 gains a fourth variant, `piece { namespace, id }`. `routing/deliveries.ts:62`
@@ -883,8 +1075,8 @@ and wait sources keep their rules.
 **E17. A piece withdraws only its own queued delivery.** A piece's planner
 or reactor may return `DeliveryWithdrawn` only for a delivery whose source
 is `piece` with the piece's own namespace, and only while that delivery is
-still queued (lead rulings L11, L15). The command handler checks both
-inside the transaction and refuses the whole batch otherwise. So a piece
+still queued (lead rulings L11, L15). The piece batch path (edit E23)
+checks both inside the transaction and refuses the whole batch otherwise. So a piece
 can never withdraw a sent or accepted delivery, another piece's delivery,
 or the engine's. The engine's own withdrawals, for moved and cancelled
 requests, are unchanged.
@@ -911,7 +1103,8 @@ writes the board's (lead rulings L13, L15, L19, L22, L23).
   batch of events, as the engine's `withWaitChecks` does
   (`packages/engine/src/routing/waits.ts:110`). So the check sees the
   effect of the same command's earlier events. A delivery that fails is
-  never queued, and the command handler refuses the batch that carries it.
+  never queued, and the piece batch path (edit E23) refuses the batch that
+  carries it, whether a planner, a read's marks or a reactor built it.
 - **At send time,** the delivery dispatcher in `routing/deliveries.ts`
   runs the check again inside the send transaction, against the views
   snapshot at send time. A delivery that fails is withdrawn with
@@ -967,15 +1160,72 @@ that needs its reply and has no disposition for it (lead ruling L22).
 
 **E21. A paged read of one agent's events,** from a sequence number, for
 `client.thread`. It is a new function in `packages/engine/src/log/`, using
-the log's existing per-event agent column. Nothing existing changes.
+the log's existing per-event agent column. It selects the caller and
+device columns and decodes each row with the one row decoder of edits E11
+and E12. Nothing existing changes.
 
-**E22. The helpers a piece calls.** The engine's rights helper (the agent
-itself, or an agent it holds a parent's rights over) and its planning
-helpers, such as queuing an engine delivery, are exported from
-`packages/engine/src/routing/` for the pieces' planners. A piece cannot
-return an engine event that the engine's own rules would refuse: the
-command handler checks every engine event a piece returns against the
-state table, as it checks its own. Nothing existing changes.
+**E22. The helpers a piece calls.** The engine's rights helper (the
+management rule: the target's effective holder, `mayActForHolder` and
+`holderAbove` in `routing/holders.ts`) and the read rule of edit E8 are
+exported from `packages/engine/src/routing/` for the pieces' planners and
+reads. They compute and never write. A piece gets an engine delivery only
+by returning a delivery request (edit E23). A piece cannot return an
+engine event that the engine's own rules would refuse: the piece batch
+path (edit E23) checks every engine event a piece returns against the
+state table, as the handler checks the engine's own. Nothing existing
+changes.
+
+**E23. The piece batch path** (lead's round 4, S6; row 73). One function,
+in a new module `packages/engine/src/commands/pieceBatch.ts`, checks every
+batch that a piece's code produces, inside the writer transaction and
+before `append`. There are three such batches: a planner's batch, a read's
+marks, and a reactor's batch. A piece's code has no other way to write to
+the log. The checks run in this order:
+
+1. **Own events only.** Every piece event in the batch has the piece's own
+   namespace. The only engine event a piece may return is
+   `DeliveryWithdrawn`, under edit E17. A piece asks for a delivery by
+   returning a delivery request: a target, a text body and its own source
+   id. The batch path itself turns each request into a `DeliveryQueued`
+   through the piece delivery helper (edit E15), with the piece as sender
+   and the body in the agent-text envelope. A raw `DeliveryQueued`, or any
+   other engine event, in a piece's batch is refused. A later plan that
+   needs another engine event adds it to this list in its own unit, with a
+   decision row. A piece never writes `OwnerNeeded` (section 4).
+2. **The state table.** Each engine event is checked against the lifecycle
+   table (edit E5), as the handler checks the engine's own (edit E22).
+3. **Withdrawal.** Edit E17's own-namespace and still-queued check.
+4. **Reach at queue time.** Edit E18's check, on the views snapshot
+   projected with the batch.
+5. **Wait checks.** `withWaitChecks` (`routing/waits.ts:110`) is applied to
+   the batch, as it is for the engine's planners today
+   (`CommandHandler.ts:269`).
+
+Each batch is written under one caller and one request id:
+
+| Batch | Caller | Request id | Receipt |
+| --- | --- | --- | --- |
+| A planner's | The calling caller | The command's own | The envelopes and the reply (edit E3) |
+| A read's marks | The calling caller | A fresh internal id | None |
+| A reactor's | `piece { namespace }` | A fresh internal id | None |
+
+A refused planner batch refuses the command and writes `CommandRefused`,
+as today. A refused read's marks refuse the read, and its reply is not
+returned. A refused reactor batch is not written. The engine instead
+writes one `CommandRefused { command: "<namespace>.reactor", reason }`
+under the caller `piece { namespace }`, and the reactor counts that event
+as handled, so a restart does not retry it forever. Each piece's tests show
+that its reactor never builds a refused batch.
+
+- Behaviour change: none for the engine's commands and the engine's own
+  followers, which keep writing as they do today.
+- Tests updated: none existing. A new test,
+  `packages/engine/test/pieces/piece-batch.test.ts`, gives a fixture
+  planner, a fixture read and a fixture reactor each a batch that breaks
+  each of the five checks, and checks that nothing is written. A boundary
+  test checks that no file under `packages/engine/src/<namespace>/` imports
+  the log writer (`log/EventLog.ts`) or the delivery helper's internals, so
+  the batch path is the only way in.
 
 ### What the later plans then add
 
@@ -995,7 +1245,7 @@ with an attack pass, before any piece unit:
 
 - **Unit 1a, the lists:** edits E1 to E10, E21 and E22.
 - **Unit 1b, the callers and the delivery and wait rules:** edits E11 to
-  E20. It changes the prompt renderer and the dispatcher, which carry the
+  E20 and E23. It changes the prompt renderer and the dispatcher, which carry the
   security properties, so its attack pass covers lead rulings L13 and L16
   to L25 by name.
 
@@ -1012,7 +1262,7 @@ The foundry roles planner listed six needs, in
 
 | # | Need | Answer |
 | --- | --- | --- |
-| 1 | A roster query | Taken in as `client.roster` (section 3, row 25). Refused in part: an agent sees itself and the agents it holds a parent's rights over, not its whole subtree, so the roster never shows more than `subscribe` does. |
+| 1 | A roster query | Taken in as `client.roster` (section 3, row 25). Refused in part: an agent sees only the agents it may read by the read rule (section 3, lead ruling L29), not its whole subtree, so the roster never shows more than `subscribe` does. |
 | 2 | A thread read, and an export to a file | Taken in as `client.thread`, a paged read (section 3, row 26). The export is a client-side command that writes the caller's own file. The service never writes a file for a caller. |
 | 3 | A narrow caller kind for Shephrd's own services (the sheepdog, the standing-rule answerer) | Taken in as the service caller, in-process only, with the lead's narrow rights (section 2, "Services", row 27). Unit 1 edits the engine to add it (section 6, edits E11, E13 and E14). A scoped device credential was not used: it would put a token for an in-process service on disk for no gain. |
 | 4 | Owner commands for the roles' settings: standing rules, the sheepdog's thresholds, snoozing one group | Taken in as a rule, not as commands: piece 4 defines them in its own `roles.` group with access `owner` and `device` (section 1). Adding a standing rule creates an automatic allow that outlives a stolen phone's revocation, so it is a candidate for the host-only list in question Q2 (row 29). |
