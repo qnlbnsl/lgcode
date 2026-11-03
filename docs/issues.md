@@ -4092,7 +4092,7 @@ the owner intervenes outside the command path.
 ## 228. A setup timeout after account sign-out records an invalid start-failure event
 
 Found: 2026-11-03, in the re-review of the post-build A3 fix at commit `c9ff320`.
-State: record only, as instructed in fix-round-2 task 3b.
+State: record only, as decided by the review lead on 2026-11-03.
 
 Evidence: finding F-3 is in
 `.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/rresult-2.md` (not tracked).
@@ -4130,7 +4130,8 @@ No implementation change is part of this record-only entry.
 Score: not assigned, because the re-review supplied no numerical risk score.
 The re-review labels the finding MINOR.
 Why it matters: the timeout records a start failure without reaching the
-stopped state checked by the ordinary setup-timeout test.
+stopped state checked by `packages/engine/test/commands/start-setup.test.ts`
+on branch `worker/review-2`.
 
 ## 229. A cancelled start's fallback cleanup races with a later stop or resume
 
@@ -4145,8 +4146,9 @@ The probes observed a duplicate terminal event after a successful stop and
 revocation of the new token after a successful resume.
 They did not establish that the fallback killed a real operating-system process.
 
-What happens: in `packages/engine/src/commands/start.ts`, a cancelled start
-releases its agent's lane before waiting for the stops that cancelled it to settle.
+What happens: on branch `worker/review-2`, a cancelled start in
+`packages/engine/src/commands/start.ts` releases its agent's lane before
+waiting for the stops that cancelled it to settle.
 It then checks the lifecycle outside the writer transaction and runs fallback cleanup.
 The cleanup stops a runner by agent identifier and unconditionally appends
 `AgentStartFailed` while revoking every token for that agent.
@@ -4188,8 +4190,8 @@ Another injected `LogWriteFailed` inside the real transaction to exercise
 the production refusal latch without inducing a physical disk fault.
 These are the re-reviewer's observations, not runtime tests run in this worktree.
 
-What happens: the two-minute timeout in `packages/engine/src/routing/lanes.ts`
-bounds only the wait for stop settlement.
+What happens: on branch `worker/review-2`, the two-minute timeout in
+`packages/engine/src/routing/lanes.ts` bounds only the wait for stop settlement.
 The fallback append in `packages/engine/src/commands/start.ts` runs afterward.
 If a stop still holds the writer indefinitely, the cancelled start can wait
 indefinitely for that writer even after its settlement deadline has expired.
@@ -4222,3 +4224,58 @@ Score: not assigned, because the re-review supplied no numerical risk score.
 The re-review labels the finding MINOR.
 Why it matters: the claimed terminal-outcome guarantee and its time bound
 are stronger than the persistence path and the test establish.
+
+## 231. An account home that equals a stored secret value is redacted, so the account event fails its schema and later account commands are refused
+
+Found: 2026-11-03, in the re-review of the post-build A9 fix at `1f2602a`.
+State: open, residual after the last fix round; code on branch
+`worker/review-1` at `1f2602a`.
+
+Evidence: finding F-1 is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/rresult-1b.md` (not tracked).
+The re-reviewer reproduced the failure through the real service with a
+Claude account and a planted login-folder value.
+The same path applies to Codex by source inspection.
+These are the re-reviewer's observations, not runtime tests run in this worktree.
+
+What happens: add or set a Claude or Codex account whose home equals the
+value stored under `CLAUDE_CONFIG_DIR` or `CODEX_HOME`.
+The value can be stored through `accounts set-secret` or supplied through
+a `secret:` reference.
+The redactor registers that stored value in `packages/engine/src/service.ts`.
+`packages/engine/src/log/EventLog.ts:250` redacts the account event before
+the schema check at `packages/engine/src/log/EventLog.ts:182`.
+The redacted home no longer meets the absolute-path requirement at
+`packages/contracts/src/accounts.ts:22`.
+The command fails with a `SchemaError`.
+The secret file has already been written at
+`packages/engine/src/commands/accounts.ts:78` and cannot be rolled back
+with the database transaction.
+Receipt redaction at `packages/engine/src/log/EventLog.ts:221` also replaces
+the home in the stored account result.
+Receipt decoding at `packages/engine/src/commands/CommandHandler.ts:252`
+then refuses `accounts list` on every connection.
+
+The command tests use a pass-through redactor at
+`packages/engine/test/support/handlerRig.ts:117`,
+`packages/engine/test/commands/account-login.test.ts:120`, and
+`packages/engine/test/commands/account-login.test.ts:142`.
+They therefore do not exercise the real service's redaction boundary.
+This is not a regression against the base, which never compared the
+effective secret-reference value with the account home.
+The fix now accepts the matching input instead of refusing it.
+The matching-folder acceptance promise at
+`docs/specs/2026-11-01-engine-design.md:276` remains unmet through the real service.
+
+What should happen: refuse an account whose home equals one of its own
+stored secret values, with a fixed reason, or keep the login folder out of
+the redactor registry.
+Do not exempt secrets from redaction.
+The registry in `packages/engine/src/service.ts` also belongs to owner
+finding B1 and post-build A4, which is recorded in issue 212.
+The post-build A4 fixer must account for this residual when changing that registry.
+
+Score: not assigned, because this is a residual after the last fix round.
+The re-review labels the finding MAJOR.
+Why it matters: a matching login-folder configuration can fail after
+persisting its secret and leave later account commands refused.
