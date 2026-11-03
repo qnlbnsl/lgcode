@@ -3321,3 +3321,40 @@ What should happen: the Gemini path, and any variable that moves it, is
 confirmed from Gemini's own documentation or source code.
 Why it matters: a wrong path leaves Gemini login tokens unredacted, because
 a missing store is treated as signed out.
+
+## 227. The login-token regression observes thought output and live threads through limited service interfaces
+
+Found: 2026-11-02, while writing the permanent regression for finding B1
+against commit `8ff4c9b`.
+
+Status: the observation limits are documented and covered at the nearest
+existing boundary. The login-token fix is tracked separately by issue 223.
+
+The translator in `packages/engine/src/runner/translate.ts` ignores
+`agent_thought_chunk` updates.
+An emitted thought therefore has no durable thread item whose non-secret
+prefix the regression can assert.
+The regression emits each encoded token in a thought and checks the real
+service's protocol log, with the temporary-folder test flag enabled.
+It also asserts that the non-secret thought prefix reaches that output.
+The text, split-text and tool-output prefixes must reach the event table,
+the thread projection and the live owner subscription.
+Those positive controls are taken from actual thread items, rather than
+from the account event that contains the fake adapter's script.
+
+The service has no command that returns its in-memory thread snapshot.
+The regression reads the committed rows and scans their thread projection.
+It calls the existing `debug.compare-views` remote procedure call and
+requires equality at that same durable sequence.
+That call compares every live field with a rebuild under the writer's
+permit, so equality connects the scanned projection to the live thread.
+The test does not read the live snapshot directly.
+
+The service's structured log goes to standard output, and it has no separate
+log-file sink in `packages/engine/src/service.ts`.
+The regression captures standard output and standard error, checks the
+decoded log messages as well as their serialized bytes, and checks them
+again after service shutdown.
+It saves those captured bytes to a test-owned log inside its temporary
+folder and scans that file as well.
+It does not claim to exercise a separate production file sink.
