@@ -230,9 +230,9 @@ These rules apply to the four kinds:
   outside the calling agent's tree, but only when that piece's registered
   reach check allows it. For the board, the reach check is channel
   membership, so a worker can message a sibling in the same channel. The
-  reach check is a pure function of the caller, the target and the views
-  snapshot taken in the same transaction as the delivery, like a
-  visibility rule (lead ruling L15). The exception grants no lifecycle right: it never
+  reach check is a pure function of the caller, the target, the delivery
+  being judged and the views snapshot taken in the same transaction as
+  the delivery, like a visibility rule (lead rulings L15, L23). The exception grants no lifecycle right: it never
   allows `stop`, `answer`, `compact`, `resume` or an engine `prompt` on the
   target. A piece's delivery carries the piece's label as its sender (section 6,
   item 14), never "owner". The piece must name each item's true author in
@@ -302,9 +302,9 @@ fixed rights: the foundry roles' sheepdog and their standing-rule answerer
    accounts without secrets, devices without credentials, and each piece's
    own snapshot section under its namespace (row 15). A piece supplies its
    section through a per-caller hook, `snapshotFor(caller, view)`, which
-   may leave the section out (lead ruling L15). The board's section is its
-   whole view for the owner, devices and services, and absent for an
-   agent.
+   may leave the section out (lead ruling L15). The board's section is a
+   bounded summary with no post text for the owner, devices and services,
+   and absent for an agent (lead ruling L23).
 2. **Subscribe.** The client calls the engine's `subscribe` with
    `after` set to that sequence number. It receives every later event it
    may see, in order, with no gaps, then each new event as it is written.
@@ -653,14 +653,22 @@ optional field to an existing schema; no existing value changes meaning.
     calling agent's tree" (section 2) limits only what the check may
     allow: it is the one case where the check can let a delivery through
     that the engine's tree rule alone would not. Its inputs are the caller,
-    when there is one, the target and the views snapshot of the same
-    transaction, never an earlier read (lead ruling L15). It grants no other right.
+    when there is one, the target, the delivery being judged (its delivery
+    id and its piece source `{ namespace, id }`), and the views snapshot of
+    the same transaction, never an earlier read (lead rulings L15, L23).
+    At queue time, that snapshot is projected with the command's own batch
+    of events, as the engine's `withWaitChecks` does
+    (`packages/engine/src/routing/waits.ts:110`), so the check sees the
+    effect of the same command's earlier events. It grants no other right.
     The engine checks it twice (lead ruling L19). It checks it first when
     the piece queues any delivery, as above. The delivery dispatcher checks it again
     inside the send transaction, against the views snapshot at send time.
     A delivery that fails the second check is withdrawn with
-    `DeliveryWithdrawn` and never sent. With nothing registered, dispatch
-    is unchanged, and every existing engine test passes unchanged.
+    `DeliveryWithdrawn` and never sent. The dispatcher then goes on to the
+    target's next queued delivery in the same pass, so one withdrawn
+    delivery never holds up the ones behind it (lead ruling L23). With
+    nothing registered, dispatch is unchanged, and every existing engine
+    test passes unchanged.
 16. **A registered "request held" condition** (lead ruling L15), the
     incoming twin of item 12. The engine already ends a blocking `wait`
     with "request held" when the waiter holds an engine request or
