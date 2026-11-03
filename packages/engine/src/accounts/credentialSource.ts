@@ -24,11 +24,18 @@ export interface CredentialSource {
 // refused rather than parsed on every redaction.
 const largestStore = 1024 * 1024;
 
-// Keys whose values are not credentials but are common, short words that
-// would blank ordinary output if they were redacted. The whole value under
-// such a key is skipped. Every other string, at any depth, is a leaf: an
-// unknown field is treated as a secret, because over-redaction is the safe
-// error and a missed field is a leak.
+// A store holds a handful of tokens. More distinct leaves than this is not
+// a login store, and every leaf adds several matched forms to each
+// redaction, so a larger count fails closed rather than slowing or breaking
+// the redactor (fix round 1, F7).
+const mostLeaves = 256;
+
+// Metadata fields whose ordinary values are common words or times that would
+// blank normal output if they were redacted. A value is skipped only when it
+// has the field's expected shape; anything else under the same name, such as
+// an unfamiliar string or a nested object, is walked like any other value
+// (fix round 1, F2). Over-redaction is the safe error; a missed field is a
+// leak.
 // - `auth_mode`, `last_refresh`: Codex `auth.json` sign-in kind ("chatgpt",
 //   "apikey") and refresh time.
 // - `scopes`, `subscriptionType`, `rateLimitTier`, `expiresAt`: Claude Code
@@ -37,16 +44,30 @@ const largestStore = 1024 * 1024;
 // - `scope`, `token_type`, `expiry_date`, `expiry`, `expires_at`: the OAuth
 //   2.0 token response fields Gemini's `oauth_creds.json` stores (scope
 //   URLs, "Bearer", expiry time), and the same names in other stores.
-const nonSecretKeys: ReadonlySet<string> = new Set([
-  "auth_mode", "last_refresh",
-  "scopes", "subscriptionType", "rateLimitTier", "expiresAt",
-  "scope", "token_type", "expiry_date", "expiry", "expires_at",
+// A word is at most 32 characters: the longest known value,
+// "default_claude_max_20x", has 22, and a credential is longer.
+const word = (value: unknown): boolean => typeof value === "string" && /^[A-Za-z0-9_.:-]{1,32}$/.test(value);
+// A time is a number or an ISO 8601 date, with an optional time and zone.
+const time = (value: unknown): boolean => typeof value === "number"
+  || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/.test(value));
+// A scope list is a space-separated string or an array, of words or short
+// `https` URLs made of path segments.
+const scopeWord = (value: unknown): boolean => word(value)
+  || (typeof value === "string" && value.length <= 100 && /^https:\/\/[A-Za-z0-9.-]+(?:\/[A-Za-z0-9._-]+)*\/?$/.test(value));
+const scopes = (value: unknown): boolean => {
+  const items = typeof value === "string" ? value.split(" ") : Array.isArray(value) ? value : undefined;
+  return items !== undefined && items.length > 0 && items.every(scopeWord);
+};
+const metadataShapes: ReadonlyMap<string, (value: unknown) => boolean> = new Map([
+  ["auth_mode", word], ["subscriptionType", word], ["rateLimitTier", word], ["token_type", word],
+  ["last_refresh", time], ["expiresAt", time], ["expiry_date", time], ["expiry", time], ["expires_at", time],
+  ["scopes", scopes], ["scope", scopes],
 ]);
 
-// Every non-empty string leaf of a parsed store, at any depth, except the
-// values under `nonSecretKeys`. Never the whole document as one string:
-// output carries individual token fields. Walked without recursion, so a
-// deeply nested document cannot exhaust the stack.
+// Every non-empty string leaf of a parsed store, at any depth, except
+// metadata values of their expected shape. Never the whole document as one
+// string: output carries individual token fields. Walked without recursion,
+// so a deeply nested document cannot exhaust the stack.
 export const secretLeaves = (document: unknown): ReadonlyArray<string> => {
   const leaves = new Set<string>();
   const pending: Array<unknown> = [document];
@@ -57,7 +78,7 @@ export const secretLeaves = (document: unknown): ReadonlyArray<string> => {
     } else if (Array.isArray(value)) {
       for (const item of value) pending.push(item);
     } else if (value !== null && typeof value === "object") {
-      for (const [key, item] of Object.entries(value)) if (!nonSecretKeys.has(key)) pending.push(item);
+      for (const [key, item] of Object.entries(value)) if (metadataShapes.get(key)?.(item) !== true) pending.push(item);
     }
   }
   return [...leaves];
@@ -109,8 +130,9 @@ const readStore = (path: string, previous: Snapshot | undefined): Snapshot => {
         if (length > largestStore) return { identity, leaves: [], failed: true };
       }
       const text = new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, length));
-      const leaves = secretLeaves(JSON.parse(text)).map((leaf) => Redacted.make(leaf));
-      return { identity: identityOf(opened), leaves, failed: false };
+      const found = secretLeaves(JSON.parse(text));
+      if (found.length > mostLeaves) return { identity, leaves: [], failed: true };
+      return { identity: identityOf(opened), leaves: found.map((leaf) => Redacted.make(leaf)), failed: false };
     } finally {
       closeSync(descriptor);
     }
@@ -160,8 +182,12 @@ const directory = (configured: string | undefined, fallback: string): string =>
 //   The config folder follows third_party/t3code/provider-instance/src/
 //   ClaudeHome.ts:21-27; the file name is from the lead's design for issue
 //   223, not from a source in this repository.
-// - Gemini: `HOME/.gemini/oauth_creds.json`, from the lead's design for
-//   issue 223, not from a source in this repository.
+// - Gemini: `<GEMINI_CLI_HOME or HOME>/.gemini/oauth_creds.json`. Upstream
+//   `homedir()` returns `GEMINI_CLI_HOME` when it is non-empty
+//   (google-gemini/gemini-cli packages/core/src/utils/paths.ts), and
+//   `Storage.getOAuthCredsPath()` joins that home, `.gemini` and
+//   `oauth_creds.json` (packages/core/src/config/storage.ts); both read
+//   2026-11-02 on the main branch. A relative home fails closed, as above.
 // - Cursor, and any other harness: no file store is established in this
 //   repository (.plans/plans/shepherd-engine/scouting.md:89 names only
 //   `CURSOR_API_KEY` and `agent login`), so the source has no paths.
@@ -176,7 +202,8 @@ export const credentialSourceFor = (input: {
     case "claude":
       return fileSource([join(directory(input.variables.CLAUDE_CONFIG_DIR, join(input.home, ".claude")), ".credentials.json")]);
     case "gemini":
-      return fileSource([join(input.home, ".gemini", "oauth_creds.json")]);
+      return fileSource([join(input.variables.GEMINI_CLI_HOME !== undefined && input.variables.GEMINI_CLI_HOME !== ""
+        ? input.variables.GEMINI_CLI_HOME : input.home, ".gemini", "oauth_creds.json")]);
     default:
       return fileSource([]);
   }
@@ -195,6 +222,10 @@ export interface CredentialRegistry {
   // Every leaf ever read, after re-reading each source. A source whose
   // re-read fails keeps its earlier leaves.
   readonly secrets: () => ReadonlyArray<Redacted.Redacted<string>>;
+  // Re-reads one source now and reports whether its store could be
+  // inspected. While it cannot, a token written there is unknown to the
+  // redactor, so its process's output must be withheld (fix round 1, F3).
+  readonly healthy: (source: CredentialSource) => boolean;
 }
 
 export const makeCredentialRegistry = (): CredentialRegistry => {
@@ -217,6 +248,11 @@ export const makeCredentialRegistry = (): CredentialRegistry => {
       sources.set(key, kept);
       return kept.read.pipe(Effect.map(remember));
     }),
+    healthy: (source) => {
+      const exit = Effect.runSyncExit((sources.get(JSON.stringify(source.paths)) ?? source).read);
+      if (Exit.isSuccess(exit)) remember(exit.value);
+      return Exit.isSuccess(exit);
+    },
     secrets: () => {
       for (const source of sources.values()) {
         const exit = Effect.runSyncExit(source.read);

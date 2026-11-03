@@ -177,3 +177,63 @@ it("B1 CS8: re-reads a replaced store through the original source instead of fre
   // Lifetime retention belongs to the service registry, not this interface.
   // harness-login-token.test.ts prints the original token after refresh/exit.
 });
+
+// Fix round 1 of issue 223 (security review of b88b876). The token is the
+// review's synthetic counterexample.
+const reviewToken = 'review-SYNTHETIC-+/"\\ space-漢࿿-login-credential-987654321';
+const metadataNames = ["auth_mode", "last_refresh", "scopes", "subscriptionType", "rateLimitTier", "expiresAt",
+  "scope", "token_type", "expiry_date", "expiry", "expires_at"] as const;
+
+for (const name of metadataNames) {
+  it(`B1 F2 ${name}: a token under the metadata name, as the value or nested below it, is still a leaf`, async () => {
+    const { secretLeaves } = await sourceModule();
+    expect(secretLeaves({ [name]: reviewToken })).toEqual([reviewToken]);
+    expect(secretLeaves({ [name]: { access_token: reviewToken } })).toEqual([reviewToken]);
+    expect(secretLeaves({ [name]: { nested: { token: reviewToken } } })).toEqual([reviewToken]);
+    expect(secretLeaves({ [name]: [reviewToken] })).toEqual([reviewToken]);
+  });
+}
+
+it("B1 F2: metadata of its expected shape is still skipped, so ordinary words are not redacted", async () => {
+  const { secretLeaves } = await sourceModule();
+  expect(secretLeaves({
+    auth_mode: "chatgpt", last_refresh: "2026-11-02T19:20:43.105467Z",
+    claudeAiOauth: { scopes: ["user:inference", "user:profile"], subscriptionType: "max", rateLimitTier: "default_claude_max_20x", expiresAt: 1793648397166 },
+    scope: "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.email openid",
+    token_type: "Bearer", expiry_date: 1793648397166, expiry: "2026-11-02T20:00:00-07:00", expires_at: "2026-11-02",
+    tokens: { access_token: "kept-access-leaf" },
+  })).toEqual(["kept-access-leaf"]);
+  // A long single word, such as a JSON Web Token, is not a scope word.
+  const jwtLike = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJzeW50aGV0aWMifQ.c2lnbmF0dXJl";
+  expect(secretLeaves({ scope: jwtLike, token_type: jwtLike })).toEqual([jwtLike]);
+});
+
+it("B1 F5: GEMINI_CLI_HOME moves the Gemini store, and a relative one fails closed", async () => {
+  const { credentialSourceFor } = await sourceModule();
+  plant(join(home, ".gemini/oauth_creds.json"), { access_token: "inactive-default-gemini-token" });
+  const moved = join(root, "gemini-home");
+  plant(join(moved, ".gemini/oauth_creds.json"), { access_token: "active-moved-gemini-token" });
+  const source = credentialSourceFor({ harnessId: "gemini", home, variables: { GEMINI_CLI_HOME: moved } });
+  expect(source.paths).toEqual([join(moved, ".gemini/oauth_creds.json")]);
+  expect((await Effect.runPromise(source.read)).map((leaf) => Redacted.value(leaf))).toEqual(["active-moved-gemini-token"]);
+  const relative = credentialSourceFor({ harnessId: "gemini", home, variables: { GEMINI_CLI_HOME: "relative-gemini-home" } });
+  expect(Exit.isFailure(await Effect.runPromiseExit(relative.read))).toBe(true);
+});
+
+it("B1 F7: a store with more than 256 distinct leaves fails closed, and the review's 24,000-leaf store is refused at open", async () => {
+  const { credentialSourceFor } = await sourceModule();
+  const { makeCredentialRegistry } = await import("../../src/accounts/credentialSource.ts");
+  const path = join(home, ".codex/auth.json");
+  const leaves = (count: number) => Array.from({ length: count }, (_, index) => `synthetic-secret-${String(index).padStart(5, "0")}-XY`);
+  plant(path, { tokens: leaves(256) });
+  const source = credentialSourceFor({ harnessId: "codex", home, variables: {} });
+  expect(await Effect.runPromise(source.read)).toHaveLength(256);
+  plant(path, { tokens: leaves(257) });
+  expect(Exit.isFailure(await Effect.runPromiseExit(source.read))).toBe(true);
+  const document = JSON.stringify({ tokens: leaves(24_000) });
+  expect(Buffer.byteLength(document)).toBeLessThan(1024 * 1024);
+  writeFileSync(path, document);
+  const registry = makeCredentialRegistry();
+  expect(Exit.isFailure(Effect.runSyncExit(registry.open(credentialSourceFor({ harnessId: "codex", home, variables: {} }))))).toBe(true);
+  expect(registry.secrets()).toEqual([]);
+});
