@@ -3394,3 +3394,313 @@ second restart.
 Fix, if wanted: before deciding the replay outcome, fail when any
 acceptance of the pending delivery precedes the new session; and capture the
 tokens again just before the second SIGKILL.
+
+## 223. A harness adapter can copy its own login token into the event log, the board and a client
+
+Found: 2026-11-02, by the owner's whole-engine hostile review, finding B1.
+State: fixed in branch `worker/engine-shb`, pending review.
+
+What happened at 8ff4c9b: a Codex adapter running for an ordinary account
+read its own `HOME/.codex/auth.json`.
+It printed `tokens.access_token` as an ordinary Agent Client Protocol (ACP)
+message chunk.
+The exact token was stored in `events.payload_json`.
+Committed events are applied to the live views and published to
+subscribers, so the token also reached the board and owner clients.
+This breaks security rule 6 in `SECURITY.md`, which names "the agent
+harnesses' own login tokens".
+The documented same-user limit does not cover it: that limit lets the local
+process read the token, and rule 6 separately promises that the token is not
+copied into logs, the board or a client.
+
+Root cause: the redactor removes only the values it is given, and no code
+gave it a harness login token.
+The service's registry in `packages/engine/src/service.ts`, lines 77 to 87,
+held the owner credential, the inherited agent token, selected environment
+values, the values in `secrets.json` and stored token hashes.
+The runner in `packages/engine/src/runner/AcpRunner.ts`, lines 217 to 225,
+registered only the agent token and the account's `secret:` values.
+The Codex home step in `packages/engine/src/accounts/shadowHome.ts`, lines
+46 to 64, chose the home but registered nothing from its `auth.json`.
+
+What changed: a new module, `packages/engine/src/accounts/credentialSource.ts`,
+names the login store of each file-backed harness.
+Codex uses `auth.json` in `CODEX_HOME`, or in `HOME/.codex`.
+Claude Code uses `.credentials.json` in `CLAUDE_CONFIG_DIR`, or in
+`HOME/.claude`.
+Gemini uses `.gemini/oauth_creds.json` in `GEMINI_CLI_HOME`, or in `HOME`.
+The module registers every string value in the store as its own secret,
+never the whole document as one string.
+A short named list of fields that hold ordinary words, such as `auth_mode`
+and `scopes`, is skipped, but only when the value has that field's expected
+shape, such as a short word or a time.
+The runner reads the store after the Codex home step and before the adapter
+is spawned.
+A store that exists but is not a regular file, is larger than one mebibyte,
+cannot be read or is not JSON refuses the launch, and nothing is spawned.
+A missing store has no values, because the account is not signed in yet.
+The service's redactor and the runner's own redactor re-read every opened
+store on each redaction, at the cost of one `stat` call per store while it
+is unchanged.
+A value seen once stays registered for the service's whole life, so a
+refreshed token and an adapter's final output are both still covered.
+The redactor already matched the raw, JSON-escaped, base64, base64url,
+hexadecimal and URL-encoded forms of each value, so it was not changed.
+
+The test writer's regression found a second path for the JSON-escaped form.
+The translator in `packages/engine/src/runner/translate.ts` stores a tool
+call's output, input and whole update, and a plan's entries, as JSON text.
+A token that the adapter sent in its JSON-escaped form was escaped a second
+time by that step.
+The redactor does not match a twice-escaped form, and a client that decodes
+the stored JSON gets the once-escaped token back.
+The gated protocol log, which writes whole frames in test mode, had the same
+problem.
+The runner now redacts every decoded string and key of a non-message update
+before the translator serializes it, in one redaction pass per update.
+The protocol log decodes each frame line and redacts it the same way; a line
+that is not a whole frame is withheld.
+
+Verification: the review's attack test, inverted, is
+`packages/engine/test/security/codex-auth-home-leak.test.ts`.
+It passed against 8ff4c9b, proving the leak, and its inverted form fails
+there.
+`packages/engine/test/security/login-store-launch.test.ts` checks that a
+broken store refuses the launch before any adapter exists, and that a token
+written to the store while the adapter runs is redacted.
+
+Fix round 1, after a security review of commit b88b876, changed four more
+things.
+A metadata field name no longer hides a value of an unexpected shape, so a
+token stored under `scopes`, or nested below it, is still redacted.
+While the login store of a running agent cannot be inspected, every output
+of that agent is replaced by the fixed text "[output withheld: account
+credentials cannot be inspected]".
+Output flows again, redacted, after the store can be read again.
+The separator used to redact a whole update in one pass now holds a random
+value, so a secret can no longer match across it and move fields.
+A store with more than 256 distinct values is refused, because each value
+adds several matched forms to every redaction.
+The review's other findings are recorded as issues 232, 233 and 234.
+
+Not done: events stored before this fix are not rewritten.
+A log written by an earlier build can still hold a token that an adapter
+printed.
+
+Why it matters: a printed provider token became durable event history and
+reached clients that could not read the harness's home.
+
+## 224. A login store is covered only after a launch has opened it in this service's life
+
+Found: 2026-11-02, while fixing issue 223.
+State: open.
+
+What happens: the redactor learns a login store's tokens when the runner
+launches an account that uses that store.
+Every adapter runs as the same user, so it can read every other harness's
+and every other account's store.
+A Claude Code adapter that prints the token in `HOME/.codex/auth.json`
+before any Codex account has launched in this service's life is not
+redacted.
+After a restart, a token that was refreshed away before the restart is no
+longer known, although it may still be valid until it expires.
+What should happen: every enabled account's store, and the default store of
+every harness, is opened when the service starts and when an account
+changes, so coverage does not depend on launch order.
+Why it matters: it is a narrower form of the rule 6 break in issue 223.
+
+## 225. Cursor's login store is not established, so a Cursor login token in a file is not redacted
+
+Found: 2026-11-02, while fixing issue 223.
+State: open; the owner decides.
+
+What happens: the repository names no file where Cursor's command-line
+agent keeps its login.
+`.plans/plans/shepherd-engine/scouting.md`, line 89, names only
+`CURSOR_API_KEY` and `agent login`.
+So `credentialSourceFor` gives Cursor no store, and Cursor launches are not
+refused.
+A Cursor adapter that prints a token from a login file is not redacted.
+A Cursor key passed through a `secret:` reference is already redacted.
+A third-party analysis, not an official source, reports the file as
+`$XDG_CONFIG_HOME/cursor/auth.json`, or `~/.config/cursor/auth.json`
+(https://seanthegeek.net/doubleagent/research/cursor.html, read 2026-11-02).
+What should happen: the owner chooses between establishing the path from an
+official source and refusing Cursor launches until it is established.
+Why it matters: it leaves a rule 6 gap for one harness.
+
+## 226. The Gemini login store's path is taken from the design, not from a source
+
+Found: 2026-11-02, while fixing issue 223.
+State: fixed in branch `worker/engine-shb`, fix round 1 of issue 223.
+
+What happens: `credentialSourceFor` reads Gemini's tokens from
+`HOME/.gemini/oauth_creds.json`.
+That path comes from the lead's design for issue 223.
+No source in this repository confirms it, and a web search on 2026-11-02
+did not confirm it either.
+It is also not confirmed whether a variable such as `GEMINI_CLI_HOME` moves
+the `.gemini` folder; if one does, an account that sets it is not covered.
+The Claude Code path was confirmed by its documentation
+(https://code.claude.com/docs/en/claude-directory, read 2026-11-02).
+What should happen: the Gemini path, and any variable that moves it, is
+confirmed from Gemini's own documentation or source code.
+Why it matters: a wrong path leaves Gemini login tokens unredacted, because
+a missing store is treated as signed out.
+
+How it was settled: Gemini's own source confirms the default path and the
+override.
+`homedir()` in `packages/core/src/utils/paths.ts` returns `GEMINI_CLI_HOME`
+when it is not empty, and the user's home folder otherwise.
+`Storage.getOAuthCredsPath()` in `packages/core/src/config/storage.ts` joins
+that home, `.gemini` and `oauth_creds.json`.
+Both files were read on 2026-11-02 from the main branch of
+`google-gemini/gemini-cli`.
+The security review of issue 223 also showed the gap: an account that set
+`GEMINI_CLI_HOME` had its token published (finding F5).
+`credentialSourceFor` now reads `<GEMINI_CLI_HOME or HOME>/.gemini/oauth_creds.json`,
+and a relative `GEMINI_CLI_HOME` refuses the launch.
+
+## 227. The login-token regression observes thought output and live threads through limited service interfaces
+
+Found: 2026-11-02, while writing the permanent regression for finding B1
+against commit `8ff4c9b`.
+
+Status: the observation limits are documented and covered at the nearest
+existing boundary. The login-token fix is tracked separately by issue 223.
+
+The translator in `packages/engine/src/runner/translate.ts` ignores
+`agent_thought_chunk` updates.
+An emitted thought therefore has no durable thread item whose non-secret
+prefix the regression can assert.
+The regression emits each encoded token in a thought and checks the real
+service's protocol log, with the temporary-folder test flag enabled.
+It also asserts that the non-secret thought prefix reaches that output.
+The text, split-text and tool-output prefixes must reach the event table,
+the thread projection and the live owner subscription.
+Those positive controls are taken from actual thread items, rather than
+from the account event that contains the fake adapter's script.
+
+The service has no command that returns its in-memory thread snapshot.
+The regression reads the committed rows and scans their thread projection.
+It calls the existing `debug.compare-views` remote procedure call and
+requires equality at that same durable sequence.
+That call compares every live field with a rebuild under the writer's
+permit, so equality connects the scanned projection to the live thread.
+The test does not read the live snapshot directly.
+
+The service's structured log goes to standard output, and it has no separate
+log-file sink in `packages/engine/src/service.ts`.
+The regression captures standard output and standard error, checks the
+decoded log messages as well as their serialized bytes, and checks them
+again after service shutdown.
+It saves those captured bytes to a test-owned log inside its temporary
+folder and scans that file as well.
+It does not claim to exercise a separate production file sink.
+
+## 231. Adapter updates still queued when the adapter exits are dropped without a trace
+
+Found: 2026-11-02, while fixing issue 223 on branch `worker/engine-shb`.
+State: open. It is older than the issue 223 fix.
+
+What happens: when the adapter process exits, the exit watcher in
+`packages/engine/src/runner/AcpRunner.ts` sets `processEntry.dead = true`
+at once (line 507 at commit `6882768`).
+The session update handler returns without doing anything for a dead
+process (line 396 at the same commit).
+An update the adapter wrote before it exited, but which the handler had not
+yet reached, is therefore dropped.
+No warning is logged and no event is written for it.
+The drop depends on timing.
+A first version of the issue 223 fix made each update slower to handle, and
+the refresh regression test then lost tool output written just before a
+crash.
+The final fix handles each update in one redaction pass, and that test
+passed eight runs in a row, but the race remains.
+What should happen: every update the adapter wrote before it exited is
+handled before the process is treated as dead, or a dropped update is at
+least logged.
+Why it matters: the last output before a crash, often the most useful for
+diagnosis, can be missing from the thread.
+
+## 232. A token encoded twice, such as base64 of its JSON-escaped form, is not redacted
+
+Found: 2026-11-02, by the security review of the issue 223 fix (commit
+b88b876, finding F1).
+State: open, for the owner's hostile pass.
+
+What happens: the redactor matches a fixed list of forms of each secret,
+built by `addForms` in `packages/engine/src/identity/redactor.ts`, line 49.
+The list holds the raw value, one JSON escape, base64, base64url, partial
+base64 runs, URL encoding and hexadecimal.
+It holds no composition of two encodings.
+The review's adapter printed its login token JSON-escaped twice, and as
+base64 of the JSON-escaped token.
+Both forms reached the event table, the live thread, the owner subscription
+and the decoded protocol log, in text, tool input keys and values, plans,
+permission text, final text and stderr.
+A client can reverse either form to recover the token.
+This limit applies to every registered secret, not only to login tokens.
+What should happen: the requested compositions are matched, with a bound on
+how many forms each secret adds.
+A possible fix is to add the JSON-escaped forms of the base64, URL and
+hexadecimal forms, and the base64 and hexadecimal forms of the JSON-escaped
+value, to `addForms`, with regressions for each channel the review used.
+Why it matters: an adapter, by mistake or on purpose, can publish a login
+token in a form a client can decode.
+
+## 233. A token split around a tool update is published in two pieces
+
+Found: 2026-11-02, by the security review of the issue 223 fix (commit
+b88b876, finding F4).
+State: open, for the owner's hostile pass. It is older than the issue 223
+fix.
+
+What happens: streamed message text is held back by the chunk redactor, so
+a secret split across chunks is still matched.
+Every non-message update ends that hold: the session update handler in
+`packages/engine/src/runner/AcpRunner.ts` calls `drainMessages(current,
+true)` (line 470 at fix round 1).
+That call flushes the held text (line 213) and deletes the message buffer
+(line 225).
+The redactor deletes its carry on a final call
+(`packages/engine/src/identity/redactor.ts`, line 273).
+A token whose first part comes before a tool update and whose rest comes
+after it is checked as two unrelated pieces.
+The review's adapter sent a third of a registered token, an ordinary
+completed tool update, then the rest of the token.
+The text items, joined in event order, held the whole token in the event
+table, the live thread and the owner subscription.
+What should happen: a fragment that could be the start of a secret is not
+released across a content boundary.
+A possible fix is to keep one security carry per agent across message,
+tool, plan and permission boundaries, or to withhold an undecided suffix
+until the next message text decides it.
+Why it matters: any registered secret can be published in pieces that a
+reader can join.
+
+## 234. Enough registered secrets make the chunk redactor throw
+
+Found: 2026-11-02, by the security review of the issue 223 fix (commit
+b88b876, finding F7).
+State: open, for the owner's hostile pass.
+
+What happens: `redactChunk` in `packages/engine/src/identity/redactor.ts`
+computes its window with one `Math.max` call that spreads the length of
+every matched form of every registered secret (line 276).
+Each secret adds several forms.
+With enough secrets, the argument list passes the runtime's limit, and the
+call throws `RangeError: Maximum call stack size exceeded`.
+The review reached that with one valid login store of 672,012 bytes holding
+24,000 distinct values.
+Fix round 1 of issue 223 caps a login store at 256 values, so one store can
+no longer do this.
+The same limit can still be reached by many stores, many `secret:` values,
+or both.
+The redactor also rebuilds every form of every secret on each call.
+What should happen: the redactor handles any number of registered secrets
+without an exception, and does not rebuild unchanged forms on each call.
+A possible fix is an iterative maximum, with the forms cached until the set
+of secrets changes.
+Why it matters: an exception in redaction stops that output path, and the
+per-call cost grows with every secret.

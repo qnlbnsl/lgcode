@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { comparePermission, DeliveryId, Event, type PermissionLevel, type SessionReference } from "@shephrd/contracts";
@@ -26,6 +27,7 @@ import * as Stream from "effect/Stream";
 import * as SqlClient from "effect/sql/SqlClient";
 import * as ChildProcess from "effect/process/ChildProcess";
 import { ChildProcessSpawner, makeHandle, type ChildProcessHandle } from "effect/process/ChildProcessSpawner";
+import { credentialSourceFor, makeCredentialRegistry, type CredentialRegistry } from "../accounts/credentialSource.ts";
 import { withCodexHome } from "../accounts/shadowHome.ts";
 import { SecretStore } from "../commands/SecretStore.ts";
 import { folderForSpawn } from "../identity/ceiling.ts";
@@ -51,6 +53,10 @@ export interface AcpRunnerOptions {
   readonly environment: Record<string, string | undefined>;
   // Enabled only by the service after row 74's real temporary-folder check.
   readonly protocolLog?: boolean;
+  // Issue 223: the harness login stores opened by launches. The service
+  // shares one registry with its own redactor; without one the runner keeps
+  // its own, so its redaction still covers them.
+  readonly credentials?: CredentialRegistry;
   readonly classifyError?: (input: { harness: string; text: string }) => "out-of-usage" | "signed-out" | undefined;
 }
 type Spawn = Parameters<Runner["Service"]["start"]>[0];
@@ -72,6 +78,8 @@ interface Process {
   readonly child: ChildProcessHandle;
   readonly client: AcpClient["Service"];
   readonly secrets: Array<Redacted.Redacted<string>>;
+  // Fix round 1, F3: whether this spawn's login store can be inspected now.
+  readonly covered: () => boolean;
   readonly holds: Map<string, Hold>;
   readonly responses: Map<string, Deferred.Deferred<void, RunnerRejected>>;
   // Issue 154: the redacted replay of this spawn's load, returned with it.
@@ -112,11 +120,74 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   const suppliedRedactor = yield* Effect.serviceOption(Redactor);
   const processDatabase = yield* Effect.serviceOption(SqlClient.SqlClient);
   const processes = new Map<string, Process>();
-  const fallback = makeRedactor({ secrets: () => [...processes.values()].flatMap((entry) => entry.secrets), tokenHashes: () => new Set() });
-  const redactText = (text: string) => Option.isSome(suppliedRedactor)
-    ? suppliedRedactor.value.redactText(fallback.redactText(text)) : Effect.sync(() => fallback.redactText(text));
+  const credentials = configuration.credentials ?? makeCredentialRegistry();
+  // Login-store leaves are not per-process: they stay registered for the
+  // runner's whole life, so no release of a process's secrets can drop one
+  // before that process's last output is redacted (issue 223).
+  const fallback = makeRedactor({ secrets: () => [...processes.values()].flatMap((entry) => entry.secrets).concat(credentials.secrets()), tokenHashes: () => new Set() });
+  // Fix round 1, F3: while a process's login store cannot be inspected, a
+  // token written there is unknown to the redactor. Every redaction for that
+  // process checks the store first and, if it cannot be read, returns this
+  // fixed text in place of anything it would release. Coverage is checked
+  // before redacting, so text decided while it was lost is never released
+  // later as if it had been covered.
+  const withheldText = "[output withheld: account credentials cannot be inspected]";
+  const always = () => true;
+  const guarded = (covered: () => boolean, redact: Effect.Effect<string>) => Effect.suspend(() => {
+    const ok = covered();
+    return redact.pipe(Effect.map((clean) => ok || clean === "" ? clean : withheldText));
+  });
+  const redactText = (text: string, covered: () => boolean = always) => guarded(covered, Option.isSome(suppliedRedactor)
+    ? Effect.suspend(() => suppliedRedactor.value.redactText(fallback.redactText(text))) : Effect.sync(() => fallback.redactText(text)));
+  // Issue 223: decoded adapter data can hold a secret in its JSON-escaped
+  // form. Serializing that data again escapes it a second time, a form the
+  // redactor does not match, and a client decoding the result gets the
+  // secret back. So structured adapter data is redacted at its decoded
+  // string leaves and keys before anything serializes it.
+  // One redaction pass per value: every key and string leaf, in walk order,
+  // joined by a separator holding a fresh random nonce (fix round 1, F6).
+  // Neither adapter data nor a registered secret can contain a nonce chosen
+  // after both exist, so no input adds a separator and no match spans a
+  // whole one. A match that eats part of one only lowers the count, which
+  // falls back to one pass per string.
+  const strings = (value: unknown, found: Array<string>): void => {
+    if (typeof value === "string") found.push(value);
+    else if (Array.isArray(value)) for (const item of value) strings(item, found);
+    else if (value !== null && typeof value === "object") for (const [key, item] of Object.entries(value)) { found.push(key); strings(item, found); }
+  };
+  const rebuild = (value: unknown, next: () => string): unknown => {
+    if (typeof value === "string") return next();
+    if (Array.isArray(value)) return value.map((item) => rebuild(item, next));
+    if (value === null || typeof value !== "object") return value;
+    const copy: Record<string, unknown> = {};
+    for (const [, item] of Object.entries(value)) {
+      // Defined, not assigned, so a `__proto__` key stays an ordinary field.
+      const key = next();
+      Object.defineProperty(copy, key, { value: rebuild(item, next), enumerable: true, writable: true, configurable: true });
+    }
+    return copy;
+  };
+  const cleanStructure = (value: unknown, covered: () => boolean = always): Effect.Effect<unknown> => Effect.gen(function* () {
+    const found: Array<string> = [];
+    strings(value, found);
+    if (found.length === 0) return value;
+    const separator = `\n\u0000${randomUUID()}\u0000\n`;
+    let clean = found.some((text) => text.includes(separator)) ? []
+      : (yield* redactText(found.join(separator), covered)).split(separator);
+    if (clean.length !== found.length) clean = yield* Effect.forEach(found, (text) => redactText(text, covered));
+    let at = 0;
+    return rebuild(value, () => clean[at++]!);
+  });
+  // The gated protocol log writes whole frames. Each line is decoded and
+  // cleaned as structure; a line that is not a whole frame is withheld.
+  const protocolPayload = (payload: unknown, covered: () => boolean): Effect.Effect<unknown> => typeof payload !== "string" ? cleanStructure(payload, covered)
+    : Effect.forEach(payload.split("\n").filter((line) => line.trim() !== ""), (line) => {
+      let frame: unknown;
+      try { frame = JSON.parse(line); } catch { return Effect.succeed("adapter frame withheld: not a whole frame"); }
+      return cleanStructure(frame, covered).pipe(Effect.map((clean) => JSON.stringify(clean)));
+    }).pipe(Effect.map((lines) => lines.join("\n")));
   const events = yield* Queue.unbounded<RunnerEvent>();
-  const redactChunk = (itemId: string, text: string, final: boolean) => Effect.gen(function* () {
+  const redactChunk = (itemId: string, text: string, final: boolean, covered: () => boolean = always) => guarded(covered, Effect.gen(function* () {
     // Resolved spawn credentials are covered even before the service's
     // registry sees them. Each redactor retains its own bounded carry.
     let clean = fallback.redactChunk(itemId, text, final);
@@ -124,7 +195,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       clean = yield* suppliedRedactor.value.redactChunk(itemId, clean, final);
     }
     return yield* redactText(clean);
-  });
+  }));
   const threadContent = Event.pipe(Schema.toTaggedUnion("_tag")).cases.ThreadItem.fields.content;
   const emit = (event: RunnerEvent) => Queue.offer(events, event).pipe(Effect.asVoid);
   // Records one replayed update for the load's result. Breaks in a row are
@@ -139,7 +210,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   const drainMessages = (entry: Process, final: boolean) => Effect.gen(function* () {
     const buffer = entry.message;
     if (buffer === undefined) return;
-    if (final) buffer.released += yield* redactChunk(buffer.id, "", true);
+    if (final) buffer.released += yield* redactChunk(buffer.id, "", true, entry.covered);
     while (buffer.pending.length > 0) {
       const first = buffer.pending[0]!;
       if (!final && buffer.released.length < first.length && buffer.pending.length <= 1024) break;
@@ -163,7 +234,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     if (turn.ended || !turn.replied || !turn.idle || entry.stopped || entry.dead) return;
     turn.ended = true;
     yield* drainMessages(entry, true);
-    const clean = yield* redactText(turn.error ?? turn.text);
+    const clean = yield* redactText(turn.error ?? turn.text, entry.covered);
     const harness = entry.input.harness.id;
     // Only the recorded cursor adapter reports usage exhaustion as a
     // successful text reply. Agent prose cannot establish a signed-out error.
@@ -237,6 +308,13 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     const environment = yield* mergeProviderInstanceEnvironment(Object.entries(variables).map(([name, value]) => ({ name, value, sensitive: input.account.environment?.[name]?.startsWith("secret:") ?? false })), base).pipe(
       Effect.provideService(HomeDirectory, configuration.environment.HOME ?? input.folder),
     );
+    // Issue 223: the adapter can read its own login store and print a token
+    // from it. Every token in that store is registered before the process
+    // exists, and a store that cannot be inspected refuses the launch.
+    const spawnEnvironment = Object.fromEntries(Object.entries(environment).filter((pair): pair is [string, string] => pair[1] !== undefined));
+    const credentialSource = credentialSourceFor({ harnessId: harness.id, home: spawnEnvironment.HOME ?? homedir(), variables: spawnEnvironment });
+    yield* credentials.open(credentialSource).pipe(Effect.mapError(() => rejected("account credentials cannot be inspected")));
+    const covered = () => credentials.healthy(credentialSource);
     const args = yield* Effect.try({ try: () => [...harness.adapterArguments, ...denyArguments(harness, input.folder, configuration.stateFolder, environment)], catch: () => rejected("deny rule cannot be resolved") });
     const scope = yield* Scope.fork(lifetime);
     let entry: Process | undefined;
@@ -272,9 +350,9 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       yield* checkChildFolder;
       // Stderr is consumed continuously and never forwarded to service stdio.
       // The local carry covers spawn credentials even before registration.
-      const stderrRedactor = makeRedactor({ secrets: () => resolvedSecrets, tokenHashes: () => new Set() });
+      const stderrRedactor = makeRedactor({ secrets: () => resolvedSecrets.concat(credentials.secrets()), tokenHashes: () => new Set() });
       const stderrTail = yield* makeStderrTail({ maxLines: stderrTailLines,
-        redactChunk: (id, text, final) => redactChunk(id, stderrRedactor.redactChunk(id, text, final), final),
+        redactChunk: (id, text, final) => redactChunk(id, stderrRedactor.redactChunk(id, text, final), final, covered),
       });
       yield* Scope.addFinalizer(scope, stderrTail.finish().pipe(Effect.asVoid));
       const stderrReader = yield* child.stderr.pipe(Stream.decodeText, Stream.runForEach(stderrTail.push), Effect.catch(() => Effect.void), Effect.forkIn(scope));
@@ -296,7 +374,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         // Outside gated protocol test mode this callback emits only the
         // fixed diagnostic, without frame payloads, methods or request ids.
         logger: (event) => event.stage === "decode_failed" ? Effect.logWarning("adapter frame dropped: malformed")
-          : configuration.protocolLog === true ? Effect.logInfo(event.payload) : Effect.void,
+          : configuration.protocolLog === true ? protocolPayload(event.payload, covered).pipe(Effect.flatMap((payload) => Effect.logInfo(payload))) : Effect.void,
         onIncomingRequest: (_id, method) => method === "session/request_permission" ? Effect.void : Effect.logWarning("adapter request refused: unsupported"),
         onOutgoingResponse: (id) => Effect.gen(function* () {
           const delivered = entry?.responses.get(id);
@@ -316,7 +394,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         }),
       })).pipe(Scope.provide(scope));
       const client = Context.get(context, AcpClient);
-      const processEntry: Process = { input, incarnation: sha256Hex(Redacted.value(input.token)), scope, child, client, secrets: resolvedSecrets,
+      const processEntry: Process = { input, incarnation: sha256Hex(Redacted.value(input.token)), scope, child, client, secrets: resolvedSecrets, covered,
         holds: new Map(), responses: new Map(), replay: [], sessionId: session?._tag === "acp" ? session.sessionId : "", version: 0,
         loading: session !== undefined, ready: false, stopped: false, dead: false, mode: startingMode, options: [], commands: [] };
       entry = processEntry;
@@ -346,7 +424,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           if (current.ready && !current.loading && typeof mode === "string" && mode !== current.mode) {
             const level = reportedLevel(harness, mode, input.permission);
             if (level !== undefined) current.mode = mode;
-            const safeMode = yield* redactText(mode);
+            const safeMode = yield* redactText(mode, current.covered);
             yield* emit({ _tag: "modeReported", ...identity(current), mode: safeMode, ...(level === undefined ? {} : { level }), ceiling: input.permission });
           }
           return;
@@ -362,7 +440,14 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           }
           return;
         }
-        const translatedUpdates = translate(update, current.loading);
+        // Message chunks stay raw for the streaming redactor; every other
+        // update is serialized by the translator, so it is cleaned first.
+        const chunk = update.sessionUpdate === "agent_message_chunk" || update.sessionUpdate === "user_message_chunk";
+        // Fix round 1, F3: while the login store cannot be inspected, a
+        // non-message update becomes one fixed withheld item. It is
+        // translated raw only to learn its items; none of its data is used.
+        const lost = !chunk && !current.covered();
+        const translatedUpdates = translate(chunk || lost ? update : yield* cleanStructure(update, current.covered), current.loading);
         if (current.turn === undefined && !current.loading) {
           if (translatedUpdates.length > 0) yield* Effect.logWarning("adapter content dropped: no active turn");
           return;
@@ -378,14 +463,20 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
               _tag: "deliveryUpdate", ...identity(current), deliveryId, kind: "message", replay: current.loading,
               ...(translated.role === undefined ? {} : { role: translated.role }), text: "",
             } });
-            current.message.released += yield* redactChunk(current.message.id, translated.text, false);
+            current.message.released += yield* redactChunk(current.message.id, translated.text, false, current.covered);
             yield* drainMessages(current, false);
             continue;
           }
           yield* drainMessages(current, true);
-          const text = yield* redactText(translated.text);
+          if (lost) {
+            if (current.loading) noteReplay(current, { _tag: "break" });
+            yield* emit({ _tag: "deliveryUpdate", ...identity(current), deliveryId, kind: "message", replay: current.loading,
+              role: "agent", text: withheldText, content: { _tag: "text", text: withheldText } });
+            continue;
+          }
+          const text = yield* redactText(translated.text, current.covered);
           // Redact string leaves, including JSON unicode escapes decoded by ACP.
-          const clean = (value: unknown): Effect.Effect<unknown> => typeof value === "string" ? redactText(value)
+          const clean = (value: unknown): Effect.Effect<unknown> => typeof value === "string" ? redactText(value, current.covered)
             : Array.isArray(value) ? Effect.forEach(value, clean)
             : value !== null && typeof value === "object" ? Effect.forEach(Object.entries(value), ([key, value]) => clean(value).pipe(Effect.map((value) => [key, value] as const))).pipe(Effect.map(Object.fromEntries))
             : Effect.succeed(value);
@@ -401,16 +492,16 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         yield* drainMessages(processEntry, true);
         const tool = request.toolCall;
         if ((processEntry.sessionId !== "" && request.sessionId !== processEntry.sessionId)
-          || (yield* redactText(tool.toolCallId)) !== tool.toolCallId) return yield* AcpRequestError.invalidParams("Permission request refused");
+          || (yield* redactText(tool.toolCallId, processEntry.covered)) !== tool.toolCallId) return yield* AcpRequestError.invalidParams("Permission request refused");
         for (const option of request.options) {
-          if ((yield* redactText(option.optionId)) !== option.optionId) return yield* AcpRequestError.invalidParams("Permission option refused");
+          if ((yield* redactText(option.optionId, processEntry.covered)) !== option.optionId) return yield* AcpRequestError.invalidParams("Permission option refused");
         }
         const hold = yield* makePermissionHold(request.options);
         processEntry.holds.set(hold.id, hold);
         processEntry.responses.set(context.requestId, hold.delivered);
-        const description = yield* redactText(tool.title ?? "Permission requested");
+        const description = yield* redactText(tool.title ?? "Permission requested", processEntry.covered);
         const mapped = yield* Effect.forEach(request.options, (option) => Effect.gen(function* () {
-          return mapPermissionOption(harness.id, { ...option, name: yield* redactText(option.name), kind: yield* redactText(option.kind) });
+          return mapPermissionOption(harness.id, { ...option, name: yield* redactText(option.name, processEntry.covered), kind: yield* redactText(option.kind, processEntry.covered) });
         }));
         yield* emit({ _tag: "permissionRequested", ...identity(processEntry), permissionRequestId: hold.id,
           toolCallId: tool.toolCallId, description, options: mapped, settingsWrite: settingsWrite((tool.locations ?? []).map((location) => location.path), folder, environment.CLAUDE_CONFIG_DIR) });
@@ -430,7 +521,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         : loads ? client.agent.loadSession({ sessionId: session.sessionId, cwd: folder, mcpServers })
         : client.agent.resumeSession({ sessionId: session.sessionId, cwd: folder, mcpServers })).pipe(Effect.mapError(() => rejected("adapter session failed")));
       if ("sessionId" in opened && typeof opened.sessionId === "string") processEntry.sessionId = opened.sessionId;
-      if (processEntry.sessionId === "" || (yield* redactText(processEntry.sessionId)) !== processEntry.sessionId) return yield* rejected("adapter session identifier refused");
+      if (processEntry.sessionId === "" || (yield* redactText(processEntry.sessionId, processEntry.covered)) !== processEntry.sessionId) return yield* rejected("adapter session identifier refused");
       yield* checkChildFolder;
       yield* drainMessages(processEntry, true);
       processEntry.loading = false;

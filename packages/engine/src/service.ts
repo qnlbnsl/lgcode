@@ -13,6 +13,7 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as SqlClient from "effect/sql/SqlClient";
 
+import { makeCredentialRegistry } from "./accounts/credentialSource.ts";
 import * as SecretStore from "./accounts/SecretStore.ts";
 import { application, listen } from "./api/server.ts";
 import { serviceLog } from "./api/serviceLog.ts";
@@ -77,18 +78,21 @@ const program = Effect.scoped(Effect.gen(function* () {
     const inheritedSecrets = [ownerCredential, ...[inheritedToken, ...Object.entries(process.env)
       .filter(([name]) => /(?:KEY|TOKEN|SECRET|PASSWORD)/i.test(name)).map(([, value]) => value)]
       .filter((value): value is string => value !== undefined && value.length > 0).map((value) => Redacted.make(value))];
+    // Issue 223: the harness login stores the runner opens, re-read live.
+    const credentials = makeCredentialRegistry();
     const redactor = makeRedactor({
       secrets: () => {
+        const known = [...inheritedSecrets, ...credentials.secrets()];
         try {
           const values: unknown = JSON.parse(readFileSync(join(folder, "secrets.json"), "utf8"));
-          return [...inheritedSecrets, ...Object.values(values as Record<string, unknown>).filter((value): value is string => typeof value === "string").map((value) => Redacted.make(value))];
-        } catch { return inheritedSecrets; }
+          return [...known, ...Object.values(values as Record<string, unknown>).filter((value): value is string => typeof value === "string").map((value) => Redacted.make(value))];
+        } catch { return known; }
       },
       tokenHashes: () => new Set((registry.prepare("SELECT token_hash FROM agent_tokens UNION SELECT token_hash FROM devices").all() as Array<{ token_hash: string }>).map((row) => row.token_hash)),
     });
     const configuration = { home: process.env.HOME ?? folder, stateFolder: folder, pluginRoot: fileURLToPath(new URL("../../..", import.meta.url)) };
     const base = EventLog.layer.pipe(Layer.provideMerge(Views.layer));
-    const runner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: { ...process.env }, protocolLog }).pipe(
+    const runner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: { ...process.env }, protocolLog, credentials }).pipe(
       Layer.provideMerge(SecretStore.layer({ stateFolder: folder })),
     );
     const recovery = Restart.layer(configuration).pipe(Layer.provideMerge(Layer.merge(base, runner)));
