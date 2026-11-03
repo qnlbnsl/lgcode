@@ -19,6 +19,7 @@ import { application, listen } from "./api/server.ts";
 import { serviceLog } from "./api/serviceLog.ts";
 import { prepareStateFolder, stateFolder } from "./api/stateFolder.ts";
 import * as CommandHandler from "./commands/CommandHandler.ts";
+import { isInferredSecretValue } from "./identity/inferredSecret.ts";
 import { redactingLoggerLayer } from "./identity/logger.ts";
 import { loadOwnerCredential } from "./identity/ownerCredential.ts";
 import { makeRedactor } from "./identity/redactor.ts";
@@ -76,14 +77,20 @@ const program = Effect.scoped(Effect.gen(function* () {
   return yield* Effect.gen(function* () {
     yield* migrate;
     const registry = yield* Effect.acquireRelease(Effect.sync(() => new DatabaseSync(databasePath, { readOnly: true })), (database) => Effect.sync(() => database.close()));
-    const inheritedSecrets = [ownerCredential, ...[inheritedToken, ...Object.entries(process.env)
-      .filter(([name]) => /(?:KEY|TOKEN|SECRET|PASSWORD)/i.test(name)).map(([, value]) => value)]
+    // Explicit credentials keep every nonempty value. Only values inferred
+    // from inherited variable names need A4's length and scalar-value gate.
+    const explicitSecrets = [ownerCredential, ...[inheritedToken]
       .filter((value): value is string => value !== undefined && value.length > 0).map((value) => Redacted.make(value))];
+    const inheritedSecrets = Object.entries(process.env)
+      .filter(([name]) => /(?:KEY|TOKEN|SECRET|PASSWORD)/i.test(name))
+      .map(([, value]) => value)
+      .filter(isInferredSecretValue)
+      .map((value) => Redacted.make(value));
     // Issue 223: the harness login stores the runner opens, re-read live.
     const credentials = makeCredentialRegistry();
     const redactor = makeRedactor({
       secrets: () => {
-        const known = [...inheritedSecrets, ...credentials.secrets()];
+        const known = [...explicitSecrets, ...inheritedSecrets, ...credentials.secrets()];
         try {
           const values: unknown = JSON.parse(readFileSync(join(folder, "secrets.json"), "utf8"));
           return [...known, ...Object.values(values as Record<string, unknown>).filter((value): value is string => typeof value === "string").map((value) => Redacted.make(value))];

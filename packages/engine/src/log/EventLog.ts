@@ -17,6 +17,7 @@ import { isSqlError, type SqlError } from "effect/sql/SqlError";
 
 import * as Views from "../views/Views.ts";
 import * as Redactor from "./Redactor.ts";
+import { fieldStructure, receiptStructure, type RedactionStructure } from "./redactionStructure.ts";
 
 // The reason names the failure and never carries data. It is built from a
 // fixed category and nothing else, because SQLite's own message can quote a
@@ -209,21 +210,21 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
       }
       if (receiptResult !== false) {
         const result = receiptResult === undefined ? envelopes
-          : { envelopes, reply: yield* redactReceipt(receiptResult(envelopes)) };
+          : { envelopes, reply: yield* redactReceipt(receiptResult(envelopes), receiptStructure) };
         yield* sql`INSERT INTO receipts (caller, request_id, body_hash, result_json, first_sequence)
           VALUES (${caller}, ${requestId}, ${bodyHash}, ${JSON.stringify(result)}, ${envelopes[0]?.sequence ?? null})`;
       }
       return { envelopes, isNew: true };
     }));
 
-  // Replies may contain list data as well as identifiers. Keep receipt text
-  // behind the same redactor, including nested strings and record keys.
-  const redactReceipt = (value: unknown): Effect.Effect<unknown> => Effect.gen(function* () {
-    if (typeof value === "string") return yield* redactor.redactText(value);
-    if (Array.isArray(value)) return yield* Effect.forEach(value, redactReceipt);
+  // Replies share the event rule: preserve keys, tags and typed identities,
+  // and redact all other string values, including values in free-text records.
+  const redactReceipt = (value: unknown, structure: RedactionStructure | undefined): Effect.Effect<unknown> => Effect.gen(function* () {
+    if (typeof value === "string") return structure?.identity === true ? value : yield* redactor.redactText(value);
+    if (Array.isArray(value)) return yield* Effect.forEach(value, (item) => redactReceipt(item, structure?.elements));
     if (typeof value === "object" && value !== null) {
       const entries = yield* Effect.forEach(Object.entries(value), ([key, item]) => Effect.gen(function* () {
-        return [yield* redactor.redactText(key), yield* redactReceipt(item)] as const;
+        return [key, yield* redactReceipt(item, fieldStructure(structure, key))] as const;
       }));
       return Object.fromEntries(entries);
     }
