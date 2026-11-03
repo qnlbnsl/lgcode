@@ -1644,9 +1644,9 @@ log's redaction boundary.
 ## 103. Adapter setup has no timeout, and spawn registration is not atomic
 
 Found: 2026-11-01, in unit 6a's focused review, finding F-8.
-State: open, fix on branch worker/review-2, commit `c9ff320`.
-The plain `start` remainder is being fixed as post-build A3 on branch `worker/review-2`, with a two-minute setup bound and stop pre-emption.
-The post-build A3 correction at `8596f63` has residual cleanup and writer limits in issues 267 and 268.
+State: fixed in pull request #9 (post-build A3, commits `ddbb1d4` and `4014f7e`), merged on 2026-11-03. Residual limits are recorded in issues 266, 267 and 268. Issue 266 is record only. Issues 267 and 268 remain open.
+The plain `start` remainder was fixed as post-build A3, with a two-minute setup bound and stop pre-emption.
+The post-build A3 corrections leave residual cleanup and writer limits in issues 267 and 268.
 
 What happens: initialization, session creation, session load and initial
 configuration have no deadline. An adapter that never responds can keep a
@@ -1670,11 +1670,11 @@ advertised `loadSession`, otherwise `session/resume` when it advertised
 resume, and otherwise it is refused with "adapter cannot reload". The plain
 `start` command was not bounded at the reviewed commit `8ff4c9b`.
 
-What changed on branch `worker/review-2`: commit `c9ff320` applies the same
-two-minute setup bound to a plain start and lets an authorized stop pre-empt
+What changed in pull request #9: commits `ddbb1d4` and `4014f7e` apply the same
+two-minute setup bound to a plain start and let an authorized stop pre-empt
 that setup.
 The post-build result for task 2 reports passing setup tests and a clean
-engine type check on that branch.
+engine type check at commit `4014f7e`.
 The stalled-send stop path remains open in issue 265.
 
 ## 104. Three harnesses have no verified deny-read or deny-write rule
@@ -3585,7 +3585,7 @@ per-call cost grows with every secret.
 ## 250. A fresh service has no harness settings, so its first start is refused
 
 Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding N-1.
-State: open, fix on branch worker/review-1.
+State: fixed in pull request #8 (post-build N-1 with A16, commit `79d0421`), merged on 2026-11-03.
 
 Evidence: source inspection confirms the missing defaults in
 `.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-1.md` (not tracked).
@@ -3607,7 +3607,7 @@ refuses every harness until the owner supplies its full settings by hand.
 What should happen: the owner chose automatic loading on the service's first
 start when no harness settings exist.
 The owner also requested a `harnesses reset` command to reload the defaults.
-This is being fixed in this round together with post-build A16 on branch `worker/review-1`.
+This was fixed together with post-build A16 in pull request #8.
 An empty model or effort list means that the value is not checked.
 
 Score: MAJOR, severity 6 × fallout 3 × probability 10 = 180, band fix before release.
@@ -4105,7 +4105,7 @@ What happens: a plain start can still be setting up when another agent on
 its account reports a sign-out.
 In `packages/engine/src/routing/deliveries.ts`, account-wide sign-out pauses
 the starting agent.
-The two-minute setup bound on branch `worker/review-2` then stops its runner
+The two-minute setup bound added by pull request #9 then stops its runner
 when setup times out.
 The existing failure branch in `packages/engine/src/commands/start.ts`
 writes `AgentStartFailed` and revokes the agent's token.
@@ -4130,7 +4130,7 @@ Score: not assigned, because the re-review supplied no numerical risk score.
 The re-review labels the finding MINOR.
 Why it matters: the timeout records a start failure without reaching the
 stopped state checked by `packages/engine/test/commands/start-setup.test.ts`
-on branch `worker/review-2`.
+added by pull request #9.
 
 ## 267. A cancelled start's fallback cleanup races with a later stop or resume
 
@@ -4145,7 +4145,7 @@ The probes observed a duplicate terminal event after a successful stop and
 revocation of the new token after a successful resume.
 They did not establish that the fallback killed a real operating-system process.
 
-What happens: on branch `worker/review-2`, a cancelled start in
+What happens: in the merged A3 implementation, a cancelled start in
 `packages/engine/src/commands/start.ts` releases its agent's lane before
 waiting for the stops that cancelled it to settle.
 It then checks the lifecycle outside the writer transaction and runs fallback cleanup.
@@ -4189,7 +4189,7 @@ Another injected `LogWriteFailed` inside the real transaction to exercise
 the production refusal latch without inducing a physical disk fault.
 These are the re-reviewer's observations, not runtime tests run in this worktree.
 
-What happens: on branch `worker/review-2`, the two-minute timeout in
+What happens: in the merged A3 implementation, the two-minute timeout in
 `packages/engine/src/routing/lanes.ts` bounds only the wait for stop settlement.
 The fallback append in `packages/engine/src/commands/start.ts` runs afterward.
 If a stop still holds the writer indefinitely, the cancelled start can wait
@@ -4227,8 +4227,8 @@ are stronger than the persistence path and the test establish.
 ## 269. An account home that equals a stored secret value is redacted, so the account event fails its schema and later account commands are refused
 
 Found: 2026-11-03, in the re-review of the post-build A9 fix at `1f2602a`.
-State: open, residual after the last fix round; code on branch
-`worker/review-1` at `1f2602a`.
+State: open, residual after the last fix round; the code reviewed at
+`1f2602a` is merged in pull request #8.
 
 Evidence: finding F-1 is in
 `.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/rresult-1b.md` (not tracked).
@@ -4254,6 +4254,7 @@ Receipt redaction at `packages/engine/src/log/EventLog.ts:221` also replaces
 the home in the stored account result.
 Receipt decoding at `packages/engine/src/commands/CommandHandler.ts:252`
 then refuses `accounts list` on a fresh connection.
+These source line numbers are from the reviewed commit `1f2602a`, and the files have changed since.
 
 The command tests use a pass-through redactor at
 `packages/engine/test/support/handlerRig.ts:117`,
@@ -4270,9 +4271,9 @@ matching setting while preserving secret removal.
 Do not exempt secrets from redaction.
 The registry in `packages/engine/src/service.ts` is also involved in
 owner finding B1, recorded in issue 223.
-Post-build A4 is being fixed on branch `worker/review-4`.
-It has no issue entry.
-The post-build A4 fixer must account for this residual when changing that registry.
+Post-build A4 was fixed in pull request #11 and has no issue entry.
+The A4 fix leaves this failure open: `home` is still free text, so it is still redacted
+(`rresult-4.md`, question 4, in the same run folder).
 
 Score: not assigned, because this is a residual after the last fix round.
 The re-review labels the finding MAJOR.
