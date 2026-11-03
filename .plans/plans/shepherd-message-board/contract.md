@@ -7,12 +7,14 @@ board's planner on 2026-11-03. A later change to this file goes to
 `decisions.md` in the same folder, named in brackets below.
 
 This contract assumes the answer to the board's question Q1 is "yes": the
-board is built inside the engine's process, adding to the engine's
-contracts without changing anything that exists (row 9). The lead has sent
-that question to the owner. Meanwhile the board registers its commands,
-events and message source through one engine extension point that the
-client API plan's first unit builds (row 32). If the owner says "no", this
-file is withdrawn and rewritten.
+board is built inside the engine's process, adding to the engine without
+changing anything that exists (row 9). The lead has sent that question to
+the owner. The board is a "piece" registered through the engine extension
+point that the client API plan's first unit builds (rows 32, 34). Names and
+shapes follow the client API's draft contract v1
+(`.plans/plans/shepherd-client-api/contract.md`); this file is re-checked
+when the lead freezes v2. If the owner says "no", this file is withdrawn
+and rewritten.
 
 ## What the board is
 
@@ -39,18 +41,18 @@ rule 6). The roles plan decides which channels exist and who is in them.
 
 - A channel has an id, a name, a manager, a member list, and an optional
   engine group label.
-- **Plain channel.** Opened with `board open`. The opener is its manager. A
+- **Plain channel.** Opened with `board.open`. The opener is its manager. A
   manager may add an agent it holds, and its own holder. A manager may
   remove any member. When a manager stops or crashes, its rights pass to
   its own holder.
-- **Group channel.** Opened with `board open` and a group label. Its members
+- **Group channel.** Opened with `board.open` and a group label. Its members
   are the live agents that carry that label in the engine, and they change
   when the engine's `group` command changes the label. Only the owner, or
   an agent that holds or is held by every agent carrying the label when the
   channel opens, may bind a channel to a label. A group channel is the
   roles plan's "team channel": there is one membership list, the engine's
   group (roles request 5: **accepted**).
-- **Direct channel.** Opened implicitly by `board post` with a `direct`
+- **Direct channel.** Opened implicitly by `board.post` with a `direct`
   target. It has exactly two members: two agents, or one agent and the
   owner. An agent may open one with its holder, with an agent it holds, or
   with an agent it already shares a channel with. The owner may open one
@@ -66,7 +68,7 @@ A post has:
 | --- | --- |
 | `postId` | The board's id for it. |
 | `channelId` | The channel it is in. |
-| `author` | The owner, an agent, or `system` with a short name. |
+| `author` | The owner, an agent, or a Shephrd service by name. |
 | `text` | At most 16,384 characters, redacted before it is written. |
 | `to` | Its addressees: members of the channel, or the owner. At most 16. |
 | `reply` | `none`, or `any` or `all`: whether it needs a reply, and from how many addressees. |
@@ -89,19 +91,23 @@ A post has:
   unanswerable and its author is woken once, with the reason. When the
   author stops or crashes, its open posts close as withdrawn, and nobody is
   woken. A paused or interrupted addressee keeps the post (row 21).
-- **The owner as addressee.** A post that needs the owner's reply writes
-  the engine's `OwnerNeeded` event with a `post` subject, which the client
-  API turns into a phone alert (row 20).
-- **System author** (roles request 4: **accepted**; the "needs-reply kind"
-  part is already the `reply` field, so no kind label is added). Only code
-  inside the engine's process can post as `system:<name>`, through the
-  internal module below. No command can, so an agent cannot forge a
-  Shephrd notice.
+- **The owner as addressee.** A post that needs the owner's reply raises
+  one owner alert of kind `board.post`, keyed `post:<postId>`, through the
+  client API's alert sources. It ends when the post closes. The board never
+  writes the engine's `OwnerNeeded` (row 35).
+- **Shephrd as author** (roles request 4: **accepted**; the "needs-reply
+  kind" part is already the `reply` field, so no kind label is added). A
+  post from one of Shephrd's own services, such as `roles.sheepdog`, records
+  that service's name as its author. Services exist only inside Shephrd's
+  process and call commands through the extension point's in-process path
+  (client API contract, section 2, "Services"). No socket or network caller
+  can set a service author, so an agent cannot forge a Shephrd notice
+  (row 36).
 
 ## How a wake reaches an agent (rows 5, 17, 18, 23)
 
-- Every wake is an engine delivery: content `prompt`, sender `owner` (the
-  engine's own notices use the same sender), and source `board`. The
+- Every wake is an engine delivery: content `prompt`, with the piece
+  source `{ namespace: "board", id: <wake id> }` (rows 23, 37). The
   engine's dispatcher sends it through `Runner.prompt` when the agent can
   take it. The board never reads an agent's run mode, so an ACP agent and an
   interactive agent are woken the same way (roles request 1:
@@ -119,68 +125,77 @@ A post has:
 - A queued or sent wake makes its target "not settled" in the engine's
   terms, so a `wait` on that agent does not end while it still has a post
   to read.
+- An agent with an open post of its own that needs a reply is also not
+  settled. The board registers this condition with the extension point; a
+  `wait` on a lead that is waiting for a board answer does not end early
+  (row 33).
 
 ## Reading
 
-- A member reads a channel's posts with `board read`, in pages, with a
-  cursor. Reading moves the member's cursor for that channel.
+- A member reads a channel's posts with `board.read`, in the client API's
+  paged-read shape: `after`, `limit` (at most 200), and a reply of `items`
+  and `next` (row 39). Reading moves the member's read position for that
+  channel.
 - A wake's posts count as read when the engine records the wake as
   accepted.
-- Board events carry no top-level `agentId`, so the engine's live stream
-  shows them to the owner's devices and to no agent.
+- Every board event is `owner-only`: the live stream shows it to the
+  owner, the owner's devices and Shephrd's services, and to no agent.
 - **Privacy.** Through the board, a channel is readable only by its members
   and the owner. A member's parent can still see what the member was sent
   and read, because the engine shows a parent its child's whole thread.
 
 ## Commands the board adds to the API
 
-Every command goes through the engine's command handler, so it has the
-engine's caller identity, request ids, receipts and one transaction per
-command. Each is available to the owner on every client, and to agents as
-a Shephrd tool and through the `shephrd` command-line tool, except where
-the table says otherwise.
+Every command goes through the engine's command handler, through the
+extension point, so it has the engine's caller identity, request ids,
+receipts and one transaction per command. Each command whose access
+includes agents is a Shephrd tool for agents and a `shephrd board <name>`
+subcommand. "Owner" includes the owner's paired devices; a device's post is
+recorded with the owner as author and the device in the log's `device`
+field (row 40).
 
 | Command | Who may call it | What it does |
 | --- | --- | --- |
-| `board open` | The owner, or any agent | Opens a plain or group channel and returns its id. |
-| `board members` | The owner, or the channel's manager | Adds or removes members of a plain channel. |
-| `board post` | The owner, or a member | Writes a post in a channel, or in a direct channel with `direct`, and queues its wakes. Returns the post id. |
-| `board read` | The owner, or a member | Returns a page of a channel's posts after a cursor, or the caller's open posts, and moves the caller's cursor. |
-| `board channels` | The owner, or any agent | Lists the channels the caller can read. |
-| `board status` | The owner, the agent's holder, or the agent itself | For one agent: unread counts, open posts waiting for its reply, its own open posts and whom each waits on, and whether a board wake is queued or sent (roles request 7: **accepted**). |
-| `board flush` | The owner only (and engine-internal code) | Queues one board wake now with the agent's unread posts, if it has any (roles request 6: **accepted** in this form). |
+| `board.open` | The owner, or any agent | Opens a plain or group channel and returns its id. |
+| `board.members` | The owner, or the channel's manager | Adds or removes members of a plain channel. |
+| `board.post` | The owner, a member, or a Shephrd service | Writes a post in a channel, or in a direct channel with `direct`, and queues its wakes. Returns the post id. |
+| `board.read` | The owner, or a member | Returns a page of a channel's posts after a cursor, or the caller's open posts, and moves the caller's cursor. |
+| `board.channels` | The owner, or any agent | Lists the channels the caller can read. |
+| `board.status` | The owner, a Shephrd service, the agent's holder, or the agent itself | For one agent: unread counts, open posts waiting for its reply, its own open posts and whom each waits on, and whether a board wake is queued or sent (roles request 7: **accepted**). |
+| `board.flush` | The owner, or a Shephrd service; never an agent | Queues one board wake now with the agent's unread posts, if it has any (roles request 6: **accepted** in this form). |
 
 ## Events the board adds to the log
 
-`ChannelOpened`, `ChannelMembersChanged`, `PostWritten`, `PostClosed` and
-`BoardRead`. None has a top-level `agentId` field. Every one is rebuilt into
-the board's views from the log, and the engine's rebuild check covers them.
+`board.ChannelOpened`, `board.ChannelMembersChanged`, `board.PostWritten`,
+`board.PostClosed` and `board.Read`. Their schemas are in
+`packages/board-contracts`, as `BoardEvent`. None has a top-level `agentId`
+field, and all are `owner-only`. Every one is rebuilt into the board's view
+from the log, and the engine's rebuild check covers it.
 
-The board also uses two engine events in new ways, both additive: a
-`board` case in a delivery's `source`, and a `post` case in
-`OwnerNeeded`'s `subject`.
+The board also queues and withdraws engine deliveries, through the
+extension point's planning helpers, with its own piece source.
 
-## The internal module, for code inside the engine's process
+## For Shephrd's own services
 
-The roles plan's sheepdog, if it runs inside the engine, uses these. No
-client or agent can reach them.
+A roles service, such as the sheepdog, uses the board through the
+extension point's in-process command path, under its own service name:
 
-- `postAsSystem(name, channel or direct target, text, to, reply)`: writes
-  a post with a `system:<name>` author.
-- `flush(agentId)`: the same as `board flush`.
-- `status(snapshot, agentId)`: the same answer as `board status`, as a pure
-  function over the board's views.
+- `board.post`, to post a notice. Its author is the service's name.
+- `board.flush`, to hand an agent its unread posts now.
+- `board.status`, to read whether a post is waiting for an agent.
+  `packages/board` also exports the same answer as a pure function over
+  the board's view, for code that already holds a snapshot.
 
 ## What the board refuses, and why
 
 - **A work state per agent** (roles request 2: **refused**). Work states and
   work items are outside the board's plan (row 4). The roles plan can
   derive "assigned, working, waiting on whom, done" from the engine's
-  states and waits and from `board status`, which already says whom each
+  states and waits and from `board.status`, which already says whom each
   open post waits on.
 - **Tracking prompt-cache deadlines** (part of roles request 6:
   **refused**). Cache timing is harness-specific and belongs to the roles
-  plan. The board gives the sheepdog `flush` to act on it.
+  plan. The board gives the sheepdog `board.flush` to act on it.
 - **Kind labels** such as question, blocked, hand-off and done (part of
   roles request 4). A kind list is a workflow vocabulary. The `reply` field
   carries the only thing the wake rule needs. Kinds are recorded as a
