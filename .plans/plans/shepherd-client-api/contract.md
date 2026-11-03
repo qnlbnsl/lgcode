@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v2, awaiting the lead's freeze; the extension seam is pending the owner
-version: 2
+status: v3, reworked under lead ruling L26 (direct engine edits)
+version: 3
 updated: 2026-11-03
 ---
 
@@ -18,7 +18,7 @@ foundry roles (piece 4) build on. It covers seven things:
 3. How a client subscribes, reads, and what it sees.
 4. How an "owner needed" event becomes an alert.
 5. Request ids, cursors and the transports.
-6. What the engine must offer for all of this to work.
+6. The shared engine edits that the client API plan's first unit makes.
 7. What the other two pieces asked for, and where each is answered.
 
 It does not depend on the four open design questions: how the phone reaches
@@ -35,7 +35,7 @@ Abbreviations: RPC means remote procedure call, one request and its reply.
 MCP means the Model Context Protocol, the way agents get Shephrd's tools. CLI
 means the `shephrd` command-line tool.
 
-## One part depends on an answer from the owner
+## The pieces edit the engine directly
 
 The engine, as built at commit `8ff4c9b`, has no way for another piece to add
 a command or an event. Its server, client library, command-line tool and
@@ -44,21 +44,23 @@ event union is closed (scouting, scout 1, items 1 and 2). The engine also
 knows only two callers, the owner and agents, so it cannot record a
 Shephrd service under its own name.
 
-The engine's design says the other pieces are built "on top of the engine
-without changing it" (owner-approved design, 2026-11-01). So this contract
-assumes one engine unit, **the extension seam**, built first, as the first
-unit of the client API plan. The lead sent the seam, the service caller and
-the board's matching question to the owner as one question, on 2026-11-03,
-recommending it under this rule (row 31):
+The owner answered this on 2026-11-03, as relayed by the manager (row 63):
 
-> No existing command, event, state, reply, rule or test changes.
+> "dude. change it. that is the whole point of a phased build. why do we
+> want to work around something when we can edit it."
 
-The seam keeps that rule. Where it adds a variant to an existing schema,
-section 6 says so, and every existing test still passes unchanged.
+Lead ruling L26 follows from that answer (row 64). There is no extension
+seam and no rule that existing behaviour stays the same. The client API
+plan's first unit makes the shared engine edits in section 6, directly in
+the engine's own code. The board and roles plans then add their own
+commands, events, views and conditions to the engine's lists directly, in
+their own units. Where an edit changes something the engine already does,
+section 6 names the change, its file, the existing tests it updates, and
+its decision row.
 
-This contract is written on the assumption that the owner agrees. If the
-owner refuses, sections 1, 2 and 6 change, and the lead receives a revised
-contract before anyone builds on it.
+The security properties of lead rulings L13 and L16 to L25 stay exactly as
+ruled. They are now properties of engine code. Section 6 states each one
+next to the edit that carries it.
 
 ## 1. How a piece adds its own commands and events
 
@@ -84,52 +86,48 @@ namespace.
 - An engine name never contains a dot, except the existing
   `debug.compare-views`.
 - Effect's `RpcGroup.merge` silently replaces a command whose name is
-  already present (Effect 4.0.5, `RpcGroup.ts:269`). So a test in the
-  composition package asserts that every command name and every event tag in
-  the full API is unique.
+  already present (Effect 4.0.5, `RpcGroup.ts:269`). So a test in
+  `packages/contracts` asserts that every command name and every event tag
+  in the full API is unique.
 
-### Where the schemas live
+### Where a piece's code lives
 
-Each piece has one contracts package (row 12):
+A piece's code lives in a folder named after its namespace, inside the
+engine's two existing packages (row 65):
 
-| Package | Owner | Depends on |
-| --- | --- | --- |
-| `packages/contracts` | The engine (exists) | Effect only |
-| `packages/client-contracts` | Piece 2 | `packages/contracts` |
-| `packages/board-contracts` | Piece 3 | `packages/contracts`, and `packages/client-contracts` only for its alert types |
-| `packages/roles-contracts` | Piece 4 | `packages/contracts`, and the board's or client's contracts where it needs their types |
-| `packages/api` | Piece 2 | All four contracts packages |
+| Folder | Holds |
+| --- | --- |
+| `packages/contracts/src/<namespace>/` | The piece's command group, event structs, access entries, visibility entries and alert sources. It imports only `effect` and the rest of `packages/contracts`. |
+| `packages/engine/src/<namespace>/` | The piece's command planners, view, reactors, migrations, reach check and conditions. It may import any engine module. |
 
-A piece's contracts package exports exactly these five things:
+The web page (`packages/web`) and the pane viewer (`packages/viewer`) stay
+packages of their own, because the web page is built for a browser (row
+44). No separate contracts package and no composition package exist.
 
-1. **`<Namespace>RpcGroup`**: its commands, already prefixed. Every payload
-   has a `requestId` field, and every reply and error carries it back, as
-   the engine's commands do (`packages/contracts/src/commands.ts:24`).
-2. **`<Namespace>Event`**: one Effect Schema union of its event structs, each
-   with a namespaced `_tag`.
-3. **`<namespace>Access`**: for every command, the set of caller kinds that
-   may call it, out of `owner`, `device`, `agent` and `service` (section 2).
-4. **`<namespace>Visibility`**: for every event tag, its visibility class
-   (section 3).
-5. **`<namespace>AlertSources`**: the events that raise or end an owner
-   alert, if any (section 4). This is optional.
+A piece adds itself to the engine's own lists, which section 6 makes:
 
-`packages/api` is the composition package. It exports these four things:
-
-- **`ApiRpcGroup`**: the engine's served group merged with every piece's
-  group.
-- **`ApiEvent`**: the union of the engine's `Event` and every piece's event
-  union.
-- **`ApiEventEnvelope`**: the engine's envelope with `event: ApiEvent`.
-- **`apiAccess`**: the merged access table.
+1. **Its commands** join `CommandsRpcGroup` in
+   `packages/contracts/src/commands.ts`, already prefixed. Every payload has
+   a `requestId` field, and every reply and error carries it back, as the
+   engine's commands do (`packages/contracts/src/commands.ts:24`).
+2. **Its events** join the `Event` union in
+   `packages/contracts/src/events.ts`, each with a namespaced `_tag`. The
+   envelope stays one schema, `EventEnvelope`.
+3. **Its access entries** join the access table: for every command, the set
+   of caller kinds that may call it, out of `owner`, `device`, `agent` and
+   `service` (section 2).
+4. **Its visibility entries** join the visibility table: for every event
+   tag, its visibility class (section 3).
+5. **Its alert sources** join the alert source list, if it has any
+   (section 4).
 
 The client library, the command-line tool, the MCP tool server, the web page
-and the pane viewer import `packages/api`, not the separate packages.
+and the pane viewer import `packages/contracts`, as they do today.
 
 ### What a piece gets for free
 
-Once a piece's group is in `ApiRpcGroup`, it gets four things without more
-code:
+Once a piece's group is in `CommandsRpcGroup`, it gets four things without
+more code:
 
 - **A command-line subcommand.** Each command becomes
   `shephrd <namespace> <name>`. The engine's existing parity test is
@@ -144,8 +142,9 @@ code:
 
 ### How a piece's command runs
 
-A piece's handler never writes to the database itself. It runs inside the
-engine's command transaction through the seam:
+A piece's handler never writes to the database itself. It is a planner in
+the engine's planner table, and it runs inside the engine's command
+transaction, as the engine's own planners do:
 
 1. The engine identifies the caller and checks the piece's access table.
 2. The engine checks the request id against the receipts.
@@ -155,8 +154,8 @@ engine's command transaction through the seam:
    transaction, after redaction.
 
 A piece's events may include engine events that the engine already knows
-how to produce, such as queuing a delivery to an agent, through planning
-helpers the seam exports. A piece cannot write an engine event that the
+how to produce, such as queuing a delivery to an agent, through the
+engine's planning helpers (section 6). A piece cannot write an engine event that the
 engine's own rules would refuse. The engine checks every engine event a
 piece returns against its state table, as it checks its own.
 
@@ -168,7 +167,8 @@ piece returns against its state table, as it checks its own.
   whole truth" holds for every piece.
 - **Side tables.** A piece that must keep a value outside the log, such as
   a hashed pairing code, keeps it in its own tables, named `<namespace>_*`,
-  created by its own migrations, which the seam runs.
+  created by its own migrations, which it adds to the engine's migration
+  list.
 - **Reactors.** A piece may react to committed events, for example piece
   2's alert reactor. A reactor reads events in sequence order and writes its
   own events through the same transaction path. It records the last
@@ -200,7 +200,7 @@ paged read follows one shape:
 | Owner | The owner credential file in the state folder | The engine's Unix socket only, with the engine's ancestry check | Every command whose access includes `owner` |
 | Paired device | Its own device credential, prefix `shp_d_` | The network listener (piece 2), or the Unix socket | Every command whose access includes `device` |
 | Agent | Its own agent token, prefix `shp_a_` | The engine's Unix socket only, through MCP or the CLI | Every command whose access includes `agent`, under the engine's tree rules |
-| Service (pending the owner) | None. A service exists only inside Shephrd's own process | The seam's in-process command path only | The fixed list under "Services" below, and any piece command whose access includes `service` |
+| Service | None. A service exists only inside Shephrd's own process | The engine's in-process command path only | The fixed list under "Services" below, and any piece command whose access includes `service` |
 
 These rules apply to the four kinds:
 
@@ -222,38 +222,40 @@ These rules apply to the four kinds:
 - **An agent's rights over other agents are the engine's.** A piece's
   agent-callable command that acts on another agent checks the engine's
   rights rule (the agent itself, or an agent it holds a parent's rights
-  over), through a helper the seam exports. A piece does not invent its own
-  tree rule, with one exception below.
+  over), through the engine's rights helper (section 6). A piece does not
+  invent its own tree rule, with one exception below.
 - **One exception: a piece's delivery may reach outside the caller's tree**
   (lead ruling L13). A delivery that a piece queues with its own
-  `{ namespace, id }` source (section 6, item 11) may reach a target
-  outside the calling agent's tree, but only when that piece's registered
-  reach check allows it. For the board, the reach check is channel
+  `{ namespace, id }` source (section 6, edit E16) may reach a target
+  outside the calling agent's tree, but only when that piece's reach check
+  allows it (edit E18). For the board, the reach check is channel
   membership, so a worker can message a sibling in the same channel. The
   reach check is a pure function of the caller, the target, the delivery
   being judged and the views snapshot taken in the same transaction as
   the delivery, like a visibility rule (lead rulings L15, L23). The exception grants no lifecycle right: it never
   allows `stop`, `answer`, `compact`, `resume` or an engine `prompt` on the
-  target. A piece's delivery carries the piece's label as its sender (section 6,
-  item 14), never "owner". The piece must name each item's true author in
+  target. A piece's delivery carries the piece as its sender (section 6,
+  edit E15), never "owner". The piece must name each item's true author in
   a header built only from fixed words and the engine-authenticated caller
   id, never from agent text. This holds also for wakes the piece builds
   with no caller, such as one wake that merges several posts (lead ruling
   L16). The text is still wrapped as data
-  (section 6, item 14).
-- **The engine's own access is unchanged.** `accounts`, `accounts
+  (section 6, edit E15).
+- **The engine's own commands keep their access.** `accounts`, `accounts
   set-secret`, `accounts mark-available`, `harnesses` and
   `debug.compare-views` stay owner-only, which includes devices. `ask`,
   `wait` and `pass-up` stay agent-only. Owner choice A10 makes `wait`
   agents-only (row 4).
 - **A device acts as the owner, and the log also says which device.**
   Today a device's command is recorded with the caller "owner" (scout 1,
-  item 4), and that stays: the envelope's `caller` is still `owner`, and a
-  device's receipts stay in the owner's scope. The seam adds one optional
-  envelope field, `device`, holding the device's id, so the owner can see
-  which phone answered a request (row 33). This is additive: no existing
-  value changes, and an envelope written by the owner's terminal has no
-  `device` field. A piece that records an author, such as the board's
+  item 4), and that stays by choice: the envelope's `caller` is still
+  `owner`, and a device's receipts stay in the owner's scope. Every engine
+  rule that tests for the owner, such as who holds a request and who may
+  answer it, then treats a device exactly as the owner with no edit of its
+  own. Edit E12 adds one optional envelope field, `device`, holding the
+  device's id, so the owner can see which phone answered a request (rows
+  33, 66). An envelope written by the owner's terminal has no `device`
+  field. A piece that records an author, such as the board's
   post author, records the owner and reuses this field for the device; it
   adds no field of its own.
 
@@ -261,18 +263,19 @@ These rules apply to the four kinds:
 
 A service is Shephrd's own code acting on the owner's behalf with narrow,
 fixed rights: the foundry roles' sheepdog and their standing-rule answerer
-(lead ruling, row 27). These rules are pending the owner, with the seam:
+(lead ruling, row 27). Edits E11, E13 and E14 build these rules:
 
-- **It is in-process only.** A piece registers its services by name when
-  the service starts, such as `roles.sheepdog` or `roles.standing-rules`.
-  A service calls the command path directly through the seam. No service
-  credential exists on the wire or on disk, so there is nothing to steal.
-  The Unix socket and the network listener never accept one.
+- **It is in-process only.** A piece adds each of its services by name to
+  the engine's service list, such as `roles.sheepdog` or
+  `roles.standing-rules`. A service calls the engine's in-process command
+  path directly. No service credential exists on the wire or on disk, so
+  there is nothing to steal. The Unix socket and the network listener
+  never accept one.
 - **The log records it under its own name.** The envelope's `caller` gains
   one new variant, `service { service, rule? }`. For example, an answer
   from standing rule 4 is recorded with the caller
-  `{ service: "roles.standing-rules", rule: "4" }`. `PermissionAnswered`
-  itself does not change.
+  `{ service: "roles.standing-rules", rule: "4" }`. `PermissionAnswered`'s
+  own `answeredBy` field names the same service and rule (edit E14).
 - **Its receipts are its own.** They are kept under the key
   `service:<name>`.
 - **It may call exactly these engine commands:**
@@ -301,8 +304,9 @@ fixed rights: the foundry roles' sheepdog and their standing-rule answerer
    displayed states, open permission requests and questions, open alerts,
    accounts without secrets, devices without credentials, and each piece's
    own snapshot section under its namespace (row 15). A piece supplies its
-   section through a per-caller hook, `snapshotFor(caller, view)`, which
-   may leave the section out (lead ruling L15). The board's section is a
+   section through a per-caller function, `snapshotFor(caller, view)`, in
+   the engine's snapshot section table (edit E9), which may leave the
+   section out (lead ruling L15). The board's section is a
    bounded summary with no post text for the owner, devices and services,
    and absent for an agent (lead ruling L23).
 2. **Subscribe.** The client calls the engine's `subscribe` with
@@ -340,12 +344,15 @@ Every event has one visibility class, set by the piece that owns it:
 | `owner-only` | The owner, every device and every service. Never an agent. |
 | `piece-decided` | The owner, every device and every service. An agent sees it when the owning piece's pure rule says so, given the caller, the envelope and the views. |
 
-The engine's own events keep their current behaviour. An engine event with
-an `agentId` is `agent-scoped`. An engine event without one is `owner-only`
-(issue 164 stands).
+The engine's own events keep their current behaviour. Every engine event is
+`agent-scoped`. An `agent-scoped` envelope with no `agentId` is hidden from
+agents, so an engine event without one is seen only by the owner, devices
+and services, as today (issue 164 stands, edit E8).
 
-An event with no visibility class declared is `owner-only`. The board's
-events are `owner-only` (row 34): owner devices see them in their live
+Every event tag has a declared class. The visibility table is typed over
+the whole event union, so an event added without a class does not compile
+(edit E8). A piece that has no reason to choose writes `owner-only`. The
+board's events are `owner-only` (row 34): owner devices see them in their live
 stream, and agents read the board through the board's own commands, not
 through `subscribe`. The client API never widens the engine's agent filter
 for another piece's events. `piece-decided` stays available to any piece
@@ -412,17 +419,17 @@ working once the board writes events.
 There is no `wait` command for the owner or a device (row 4, lead ruling L1).
 The client library offers a helper, `waitForAgents`, that takes a set of
 agents and "any" or "all". It takes a snapshot, subscribes, and finishes when
-the agents meet the same "settled" test the engine uses for agent waits. The
-seam moves that test from the engine into the engine's contracts package,
-so the helper and the engine share one copy and cannot disagree. The helper
-also applies every registered hold-unsettled condition (section 6, item
-12), so the owner's wait and an agent's wait agree (lead ruling L15). Each
-piece exports its condition from its contracts package as a pure function
-over its own snapshot section. So the helper needs a caller whose snapshot
-holds those sections: the owner, a device or a service. The owner's
-terminal waits with a new subcommand, `shephrd client wait`, which runs
-this helper over `subscribe`. The engine's own `shephrd wait` and its
-owner-choice A10 test stay as they are.
+the agents meet the same "settled" test the engine uses for agent waits.
+Edit E19 moves that test from the engine into `packages/contracts`, so the
+helper and the engine share one copy and cannot disagree. The test applies
+every piece's hold-unsettled condition, so the owner's wait and an agent's
+wait agree (lead ruling L15). Each piece writes its condition in its
+folder in `packages/contracts` as a pure function over its own snapshot
+section. So the helper needs a caller whose snapshot holds those sections:
+the owner, a device or a service. The owner's terminal waits with a new
+subcommand, `shephrd client wait`, which runs this helper over
+`subscribe`. The engine's own `shephrd wait` stays agents-only, by owner
+choice A10, and its A10 test keeps its expectations.
 
 ## 4. From "owner needed" to an alert
 
@@ -457,10 +464,10 @@ the board's own event for a post that needs a reply from the owner, with
 the key `post:<postId>`, and it ends when the board records that post as
 answered or closed. Its alert carries the post's id as its subject, so a
 tap opens the post. The board asked instead for a `post` subject on the
-engine's `OwnerNeeded`. That is refused, because it would change an
-existing engine event, which the additive rule forbids, and because the
-alert source gives the same result. `board.post` is pushed to the phone by
-default.
+engine's `OwnerNeeded`. That is refused, because the alert source gives
+the same result, and because `OwnerNeeded` stays the engine's own signal,
+so one matter raises one alert (row 35). `board.post` is pushed to the
+phone by default.
 
 A piece raises an owner alert only for a matter that has reached the
 owner. A notice meant for an agent, such as a lead, goes through the board,
@@ -541,7 +548,8 @@ design questions. This contract leaves a named slot for it,
 - The same caller sending the same id with the same body gets the first
   reply again, and nothing acts twice. The same id with a different body is
   refused with "request id reused".
-- A piece's commands use the same receipts, through the seam.
+- A piece's commands use the same receipts, through the engine's command
+  handler.
 - `subscribe`, `client.subscribe` and `client.snapshot` are reads, and are
   not deduplicated.
 - A command's reply carries its `requestId`. It does not carry the
@@ -563,7 +571,8 @@ design questions. This contract leaves a named slot for it,
 **Transports** (row 36):
 
 - **Every command on every transport.** The engine's Unix socket and piece
-  2's network listener both serve the whole `ApiRpcGroup`, generically. A
+  2's network listener both serve the whole `CommandsRpcGroup`,
+  generically. A
   piece's command needs no transport code of its own. The engine's socket
   already dispatches every command in its group this way
   (`api/server.ts`, `application`).
@@ -573,120 +582,411 @@ design questions. This contract leaves a named slot for it,
   post's text (lead ruling L15). Each piece states its largest event and
   its largest page. The board caps a wake body at 256 KiB and a
   `board.read` page at 512 KiB of encoded text, so its largest message,
-  with its envelope, stays under 1 MiB. A test in `packages/api` checks
-  every piece's stated maxima, plus the envelope, against the limit. The
-  engine's socket sets no explicit limit today (scouting, planner's
-  checks) and the seam does not add one there.
+  with its envelope, stays under 1 MiB. A test in `packages/contracts`
+  checks every piece's stated maxima, plus the envelope, against the limit.
+  The engine's socket sets no explicit limit today (scouting, planner's
+  checks). This plan does not add one there, because only the owner's
+  terminal, the pane viewer and the host's own agents reach that socket.
 
-## 6. What the engine must offer (the extension seam, pending the owner)
+## 6. The shared engine edits (the client API plan's first unit)
 
-These are the engine changes the contract assumes. They follow the
-additive rule: no existing command, event, state, reply, rule or test
-changes, and every existing engine test, the acceptance suite and the
-rebuild check pass unchanged. Items 6, 10 and 11 add a variant or an
-optional field to an existing schema; no existing value changes meaning.
+The client API plan's first unit edits the engine directly (lead ruling
+L26, row 64). It does two things. It turns the engine's closed lists into
+lists that a later plan extends by editing them, and it builds once the
+delivery and caller rules that carry the security properties. The board
+and roles plans then add their own entries to these lists, in their own
+units. Engine edits are reviewed like engine units, with an attack pass
+(row 63).
 
-1. **A registry of pieces at service start-up.** The service is built from
-   the engine plus a list of pieces. Each piece supplies its group, events,
-   access table, visibility table, handlers, view, migrations, reactors and
-   alert sources.
-2. **The composed group served.** The server, the command handler's
-   supported list, the client library, the CLI and the MCP tool list read
-   the composed group instead of the engine's group alone.
-3. **Transactions for pieces.** A piece's handler runs inside the engine's
-   transaction, with the snapshot, the receipts and the redactor, as in
-   section 1.
-4. **Events from pieces in the log.** The log accepts and stores a piece's
-   namespaced events. The engine's own views ignore tags they do not own,
-   and each piece's view is folded and included in the rebuild check.
-5. **Visibility from pieces.** The subscription filter uses each event's
-   visibility class (section 3).
-6. **The acting device.** The envelope gains an optional `device` field.
-   The `caller` stays `owner`, and a device's receipts stay in the owner's
-   scope (section 2).
-7. **A view snapshot at a sequence number,** consistent with the log, for
-   `client.snapshot`.
-8. **Exported helpers:** the rights rule and the engine planners a piece
-   may call, such as queuing a delivery. The settled test moves into
-   `packages/contracts`, so the client library can use it without
-   importing the engine.
-   The settled test keeps a re-export at its old place, so existing tests
-   are unchanged.
-9. **A paged read of one agent's events** from a sequence number, for
-   `client.thread`, using the log's existing per-event agent column.
-10. **The service caller.** The `caller` union gains a `service { service,
-    rule? }` variant, the command handler gains the service rights in
-    section 2, and the seam's in-process command path accepts registered
-    services only.
-11. **A delivery source from a piece.** A delivery a piece queues names
-    its source as `{ namespace, id }`, a new variant of the delivery's
-    `source`, so the piece's rule decides what happens to it when its
-    target stops. The board needs this for posts. Existing sources
-    (permission, question, wait) keep their rules.
-12. **A registered "hold unsettled" condition** (lead ruling L10, from the
-    board's question Q2, added at the freeze of v2). A piece may register
-    a condition that the engine's settled test in `routing/waits.ts`
-    consults: while the condition holds for an agent, that agent is not
-    settled. The board registers one: an agent with an open post of its
-    own that needs a reply is not settled. The condition is a pure
-    function of the agent and the views, like a visibility rule. With
-    nothing registered, the settled test behaves exactly as today.
-13. **A piece may withdraw its own queued delivery** (lead ruling L11,
-    from the board's request, board post #37). A piece's handler may
-    return the engine's existing `DeliveryWithdrawn` event for a delivery
-    whose source is the piece's own namespace, and only while that
-    delivery is still queued (narrowed by lead ruling L15). The engine checks both conditions inside the transaction and
-    refuses the whole command otherwise. A delivery that was sent or
-    accepted cannot be withdrawn this way, and a piece can never withdraw
-    another piece's or the engine's delivery.
-14. **The delivery helper takes a piece's body and sender label**
-    (lead ruling L11). A piece queues a delivery through the seam's helper
-    with its text body and a sender label, such as "board". The label is
-    shown as the piece, never as the owner or an agent. The engine always
-    wraps the body in its agent-text envelope, with a fresh random marker,
-    and escapes a leading `/`. A piece can never send a raw prompt.
-15. **A piece's reach check** (lead ruling L13). A piece may register one
-    reach check. Once registered, the engine consults it on every delivery
-    the piece queues with its own source (lead ruling L22): for a target
-    inside the calling agent's tree as well as outside it, and for a
-    delivery the piece builds with no caller. The clause "outside the
-    calling agent's tree" (section 2) limits only what the check may
-    allow: it is the one case where the check can let a delivery through
-    that the engine's tree rule alone would not. Its inputs are the caller,
-    when there is one, the target, the delivery being judged (its delivery
-    id and its piece source `{ namespace, id }`), and the views snapshot of
-    the same transaction, never an earlier read (lead rulings L15, L23).
-    At queue time, that snapshot is projected with the command's own batch
-    of events, as the engine's `withWaitChecks` does
-    (`packages/engine/src/routing/waits.ts:110`), so the check sees the
-    effect of the same command's earlier events. It grants no other right.
-    The engine checks it twice (lead ruling L19). It checks it first when
-    the piece queues any delivery, as above. The delivery dispatcher checks it again
-    inside the send transaction, against the views snapshot at send time.
-    A delivery that fails the second check is withdrawn with
-    `DeliveryWithdrawn` and never sent. The dispatcher then goes on to the
-    target's next queued delivery in the same pass, so one withdrawn
-    delivery never holds up the ones behind it (lead ruling L23). With
-    nothing registered, dispatch is unchanged, and every existing engine
-    test passes unchanged.
-16. **A registered "request held" condition** (lead ruling L15), the
-    incoming twin of item 12. The engine already ends a blocking `wait`
-    with "request held" when the waiter holds an engine request or
-    question (`routing/waits.ts`, `holds`). A piece may register a matching
-    condition; the board's is "the waiter is an addressee of an open post
-    that needs its reply and has no disposition for it". The engine checks it
-    when the wait opens and after every batch, as it checks `holds`. With
-    nothing registered, behaviour is unchanged.
-17. **A per-caller snapshot hook** (lead ruling L15). Each piece supplies
-    its `client.snapshot` section through `snapshotFor(caller, view)`,
-    which may return nothing for a caller (section 3).
+Each edit below names its files, what it changes in the engine's current
+behaviour, and the existing tests it updates. "Existing tests" means the
+tests at engine commit `8ff4c9b`. A test "keeps its expectations" when only
+its imports, fixtures or setup change.
 
-The planner estimates this as one engine unit of high complexity, built
-before any piece unit, with an attack pass, because it changes the engine's
-only entry point. If the attack pass or the lead finds it too large, it
-splits into two medium units: the registry, served group, transactions,
-events, views and visibility (items 1 to 5, 7 and 9), then the callers and
-helpers (items 6, 8, 10 and 11).
+The piece namespaces are one fixed list, `PieceNamespace`, which is
+`client`, `board` or `roles`, in `packages/contracts/src/namespaces.ts`.
+Every per-piece table below is typed over that list, so a table without an
+entry for some piece does not compile. Unit 1 writes each piece's entry in
+its most refusing form, and each piece's plan replaces its own entry. So no
+table ever has a missing entry, and no rule depends on whether a piece has
+been built.
+
+### The engine's lists that a piece adds itself to
+
+**E1. One command group.** In `packages/contracts/src/commands.ts`,
+`CommandsRpcGroup` becomes the engine's sixteen commands merged with each
+piece's prefixed group, in a fixed order: `client`, `board`, `roles`. Each
+piece defines its group in `packages/contracts/src/<namespace>/commands.ts`
+and adds one `.merge` line here in its own unit. `ServiceRpcGroup` stays
+`CommandsRpcGroup.omit("debug.compare-views")`. `commandNames` is renamed
+`engineCommandNames` and keeps the sixteen engine names.
+
+- Behaviour change: none in unit 1. The group grows as the pieces add
+  commands.
+- Tests updated: in `packages/contracts/test/commands.test.ts`, "lists
+  exactly the sixteen commands" checks `engineCommandNames`. The checks of
+  the group sizes (15, 16 and 1) and of "exactly ten commands for the MCP
+  server" become checks that the engine's commands are present with their
+  current shape. A new test, `packages/contracts/test/unique.test.ts`,
+  asserts that every command name and every event tag is unique and that
+  every piece name starts with its namespace and a dot.
+
+**E2. Access by caller kind.** In `commands.ts`, `ownerOnlyCommands` (l.16)
+and `commandAccess` (l.20), whose values are "agent-callable" or
+"owner-only", become one table. It maps every command in the group to the
+caller kinds that may call it, out of `owner`, `device`, `agent` and
+`service`. It is typed over the whole group, so a command without an entry
+does not compile.
+
+- The engine's commands keep today's access exactly. An owner-only command
+  gets `owner` and `device`. An agent-callable command gets `owner`,
+  `device` and `agent`. The planners of `ask`, `wait` and `pass-up` keep
+  refusing the owner as they do today. Edit E13 adds `service` to
+  `subscribe`, `prompt`, `compact`, `resume` and `answer`.
+- A device is checked as a device. The command handler reads the caller
+  kind from the wire credential (`CommandHandler.ts:45`) before it maps a
+  device to the owner actor (`CommandHandler.ts:207`). The host-only list
+  (row 55) is then a matter of leaving `device` out of a command's entry.
+  Today every engine command that the owner may call, a device may call
+  too, so no engine command changes.
+- The access check at `CommandHandler.ts:70` (`owners.has(name) &&
+  actor._tag !== "owner"`) becomes a lookup of the caller kind in the
+  table.
+- The MCP tool list (`packages/mcp/src/tools.ts:7`) offers the commands
+  whose entry includes `agent`, less `subscribe` and the secret-setting
+  commands, as today.
+- Behaviour change: none for the engine's commands.
+- Tests updated: in `commands.test.ts`, "tags every command agent-callable
+  or owner-only" is rewritten for the caller-kind table.
+  `packages/cli/test/parity.test.ts` (P02) reads the new table.
+  `packages/engine/test/commands/authorization.test.ts` keeps its
+  expectations and gains device and service cases.
+
+**E3. A planner table instead of the `supported` set.** In
+`packages/engine/src/commands/CommandHandler.ts`, the hard-coded
+`supported` set (l.54) and the `planCommand` switch (l.67) become one
+table of planners by command name, in
+`packages/engine/src/commands/planners.ts`. A piece adds its planners,
+written in `packages/engine/src/<namespace>/`, to this table. Every command
+in the group is in exactly one of this table and the read table (edit E4),
+and a test asserts this.
+
+- Behaviour change: none. The engine's fourteen transactional commands map
+  to the same planners as today.
+- Tests updated: `packages/engine/test/commands/handler.test.ts` and
+  `authorization.test.ts` keep their expectations.
+
+**E4. A read table at the server.** `packages/engine/src/api/server.ts`
+handles `subscribe` and `debug.compare-views` inline (l.153 to 168). Both
+move into `packages/engine/src/api/reads.ts`, a table of read handlers by
+command name. A piece adds its reads there, such as `client.snapshot`,
+`client.thread`, `client.subscribe` and `board.read`. A read checks the
+caller's access and applies the visibility rule (edit E8). It holds no
+writer permit and writes no receipt. The server's hard-wired group
+(l.85) and handler type (l.38) follow `CommandsRpcGroup`, which now
+includes every piece.
+
+- Behaviour change: none.
+- Tests updated: `packages/engine/test/api/compare-views-rpc.test.ts` and
+  `subscribe-visibility.test.ts` keep their expectations.
+
+**E5. One event union.** In `packages/contracts/src/events.ts`, the
+`Event` union (l.88) becomes the engine's events plus each piece's union,
+defined in `packages/contracts/src/<namespace>/events.ts`. The envelope
+stays one schema, `EventEnvelope` (l.184). The log writer's decode
+(`EventLog.ts`, near l.182) needs no edit of its own. Every engine view
+ignores a piece's tags.
+
+- Behaviour change: none. Every existing event still decodes.
+- Tests updated: `packages/contracts/test/events-roundtrip.test.ts` gains
+  each piece's events.
+
+**E6. Piece views inside the engine's views.** In
+`packages/engine/src/views/apply.ts`, the views `State` gains one field per
+piece, named after its namespace. `emptyViews` (l.114) starts each piece's
+view, and `apply` (l.338) calls each piece's reducer after the engine's
+own. So start-up rebuild, `debug.compare-views` and the rebuild check
+(`packages/engine/test/support/rebuildCheck.ts`) cover every piece with no
+more code, and "the log is the whole truth" holds for every piece.
+
+- Behaviour change: the views state gains fields, and `debug.compare-views`
+  reports differences in them.
+- Tests updated: `packages/engine/test/views/apply.test.ts`,
+  `rebuild.test.ts`, `compare-views.test.ts` and
+  `test/support/viewFixtures.ts` gain the new fields. Their expectations
+  for the engine's own fields stay.
+  `test/support/every-file-registers-rebuild.test.ts` covers the piece
+  folders.
+
+**E7. Piece migrations and side rows.** In
+`packages/engine/src/log/migrations.ts`, the migration list runs each
+piece's migrations after the engine's. A piece's migrations create only
+tables named `<namespace>_*`, and a test asserts this. Side rows that a
+piece writes in the command transaction go through `sideRows`
+(`EventLog.ts:199-204`), which gains one entry per piece table.
+
+- Behaviour change: none for the engine's tables.
+- Tests updated: `packages/engine/test/log/append.test.ts` and
+  `receipts.test.ts` keep their expectations.
+
+**E8. One visibility function.** The subscription filter written inline at
+`server.ts:155-159` moves to `packages/engine/src/api/visibility.ts`, as a
+pure function of the caller, the envelope and the views. A class table in
+`packages/contracts/src/visibility.ts` gives every event tag its class
+(section 3). It is typed over the whole union, so an event without a class
+does not compile. Every engine tag is `agent-scoped`, and an
+`agent-scoped` envelope with no `agentId` is hidden from agents, which
+reproduces today's filter exactly. A piece's `piece-decided` rules sit in
+a table keyed by tag, in its engine folder. `subscribe`,
+`client.subscribe`, `client.snapshot`, `client.roster`, `client.thread`
+and every paged read call this one function.
+
+- Behaviour change: none for the engine's events.
+- Tests updated: `packages/engine/test/api/subscribe-visibility.test.ts`
+  keeps its expectations and gains a service case.
+
+**E9. The snapshot and its sections.** A new module,
+`packages/engine/src/api/snapshot.ts`, serves `client.snapshot`. It reads
+the views and the log's head in one read transaction, so the snapshot and
+its sequence number agree. A section table, typed over `PieceNamespace`,
+holds each piece's `snapshotFor(caller, view)`, which returns the piece's
+section or nothing (lead ruling L15). Unit 1 writes each entry as "no
+section". The board's plan writes its bounded summary with no post text,
+and nothing for an agent (lead ruling L23).
+
+- Behaviour change: none. This is a new read.
+
+**E10. Command-line names.** `packages/cli/src/commands/registry.ts:10`
+already lists every command in the group. It maps `<namespace>.<name>` to
+`shephrd <namespace> <name>`, and splits a dotted name, such as
+`client.pair.complete`, into words. `debug.compare-views` keeps its present
+form.
+
+- Behaviour change: none for the engine's commands.
+- Tests updated: `packages/cli/test/command-inventory.test.ts` and
+  `parity.test.ts` keep their expectations for the engine's commands and
+  cover the whole group.
+
+### Callers
+
+**E11. The caller schema.** `Actor` (`events.ts:8`) stays `owner` or
+`agent`, because it also types a request's holder and an agent's parent,
+and a service is never either. A new union, `Caller`, is `owner`, `agent`,
+or `service { service, rule? }`. It types the envelope's `caller`
+(`events.ts:184`). The receipts key (`callerKey`, `EventLog.ts:116`) gains
+`service:<name>`, without the rule. The log reader's caller check
+(`log/subscribe.ts:38`) accepts it, and the comment at `migrations.ts:15`
+says so.
+
+- Behaviour change: the envelope's `caller` schema widens. Every existing
+  envelope still decodes.
+- Tests updated: `events-roundtrip.test.ts` and
+  `packages/engine/test/log/receipts.test.ts` gain service cases.
+
+**E12. The acting device.** `EventEnvelope` gains one optional field,
+`device`, holding a `DeviceId`. The command handler sets it from the device
+credential and keeps `caller: owner` (`CommandHandler.ts:207`). This keeps
+every engine rule that tests for the owner working for a device with no
+edit of its own (row 66).
+
+- Behaviour change: an envelope written for a device carries `device`.
+- Tests updated: `packages/engine/test/commands/handler.test.ts` gains a
+  device case. `packages/engine/test/api/per-request-credential.test.ts`
+  keeps its expectations.
+
+**E13. The in-process service path and its rights.** A new module,
+`packages/engine/src/commands/services.ts`, holds the service list, a fixed
+list of names in code, which the roles plan edits. Its entry point runs a
+command as a named service and is reachable only from inside the process.
+It refuses a name that is not on the list. The server's `authenticate`
+(`server.ts:87`) gains no service branch, so no wire credential can ever
+become a service. The service's rights are those of section 2, enforced in
+code:
+
+- the command's access entry must include `service` (edit E2);
+- the engine's rights helper lets a service `prompt`, `compact` and
+  `resume` any agent, under the engine's state table;
+- `answer` is accepted only with an option whose `persistent` field is
+  false, at a level no higher than the asking agent's own permission mode;
+- everything else is refused.
+
+- Behaviour change: none for the owner, devices and agents.
+- Tests updated: `packages/engine/test/api/auth.test.ts` keeps its
+  expectations and gains a case that no credential maps to a service. A new
+  test, `packages/engine/test/commands/service-caller.test.ts`, covers each
+  right and each refusal.
+
+**E14. A service's answer names its rule.** In `events.ts:132`,
+`PermissionAnswered.answeredBy` changes from `Actor` to `Caller`. The
+permission view (`views/apply.ts:45`) follows, and the answer planner
+(`routing/permissions.ts:47`) sets it from the caller. So the event itself
+records "standing rule 4", not the owner. `QuestionAnswered.answeredBy`
+stays `Actor`, because a service never answers a question.
+
+- Behaviour change: an existing event field widens. Every existing event
+  still decodes.
+- Tests updated: `packages/engine/test/routing/permissions.test.ts` and
+  `events-roundtrip.test.ts` gain a service case.
+
+### Deliveries from a piece
+
+**E15. Who a delivery is from, and the envelope for every sender but the
+owner.** In `events.ts`, `Delivery.sender` (l.23) and `PromptSent.sender`
+(l.112) change from `Actor` to `Sender`, which is `owner`, `agent`,
+`service { service }` or `piece { namespace }`. The prompt renderer,
+`routing/envelope.ts:23`, today wraps only an agent's text
+(`sender._tag === "agent"`). It changes to wrap every sender except the
+owner: an agent, a service and a piece. The wrapping is the engine's
+agent-text envelope, with a fresh random marker, and a leading `/` is
+escaped (lead ruling L11).
+
+- A piece queues a delivery only through one helper,
+  `packages/engine/src/routing/pieceDelivery.ts`. It takes a text body and
+  the piece's own namespace, never a sender, a raw prompt or a content
+  kind. So a piece can never send unwrapped text.
+- The delivery is shown as from the piece, by its namespace in fixed text,
+  such as "board", never "owner" (lead ruling L16).
+- The piece names each item's true author in a header built only from
+  fixed words and the engine-authenticated caller id, never from agent
+  text. This holds also for a wake the piece builds with no caller (lead
+  ruling L16).
+- A returned delivery (`routing/deliveries.ts:46-52`) whose sender is a
+  service or a piece follows the piece's source rule (edit E16), not the
+  branch for an agent sender.
+- Behaviour change: none for the owner's and agents' deliveries.
+- Tests updated: `packages/engine/test/routing/text-is-data.test.ts`,
+  `packages/engine/test/live-check/rendered-prompts.test.ts` and
+  `routing/deliveries.test.ts` keep their expectations and gain service and
+  piece cases.
+
+**E16. A piece's delivery source.** In `events.ts:30`, `Delivery.source`
+gains a fourth variant, `piece { namespace, id }`. `routing/deliveries.ts:62`
+asks the piece's source rule, in a table typed over `PieceNamespace`, what
+happens to the delivery when its target stops or crashes, or when it is
+returned. Unit 1 writes each entry as "withdraw". The permission, question
+and wait sources keep their rules.
+
+- Behaviour change: none for the existing sources.
+- Tests updated: `routing/deliveries.test.ts` keeps its expectations.
+
+**E17. A piece withdraws only its own queued delivery.** A piece's planner
+or reactor may return `DeliveryWithdrawn` only for a delivery whose source
+is `piece` with the piece's own namespace, and only while that delivery is
+still queued (lead rulings L11, L15). The command handler checks both
+inside the transaction and refuses the whole batch otherwise. So a piece
+can never withdraw a sent or accepted delivery, another piece's delivery,
+or the engine's. The engine's own withdrawals, for moved and cancelled
+requests, are unchanged.
+
+- Tests updated: `routing/move-withdrawal.test.ts` keeps its expectations.
+  A new test, `packages/engine/test/routing/piece-withdrawal.test.ts`,
+  covers each refusal.
+
+**E18. The reach check, at queue time and at send time.** A table typed
+over `PieceNamespace`, in `packages/engine/src/routing/reach.ts`, holds
+each piece's reach check. Unit 1 writes each entry as "refuse", so no
+piece can deliver until its own plan writes its check. The board's plan
+writes the board's (lead rulings L13, L15, L19, L22, L23).
+
+- **Which deliveries.** Every delivery with a `piece` source is judged: to
+  a target inside the calling agent's tree or outside it, and one the
+  piece builds with no caller. "Outside the calling agent's tree" limits
+  only what the check may allow. It is the one case where the check lets
+  through a delivery that the engine's tree rule alone would not.
+- **Inputs.** The caller, when there is one; the target; the delivery
+  being judged, as its delivery id and its source `{ namespace, id }`; and
+  the views snapshot of the same transaction, never an earlier read.
+- **At queue time,** that snapshot is projected with the command's own
+  batch of events, as the engine's `withWaitChecks` does
+  (`packages/engine/src/routing/waits.ts:110`). So the check sees the
+  effect of the same command's earlier events. A delivery that fails is
+  never queued, and the command handler refuses the batch that carries it.
+- **At send time,** the delivery dispatcher in `routing/deliveries.ts`
+  runs the check again inside the send transaction, against the views
+  snapshot at send time. A delivery that fails is withdrawn with
+  `DeliveryWithdrawn` and never sent. The dispatcher then goes on to the
+  target's next queued delivery in the same pass, so one withdrawn delivery
+  never holds up the ones behind it.
+- **Purity.** The check is a pure function of its inputs. It reads no clock
+  and no file.
+- **No other right.** An allow lets the delivery through and nothing else.
+  `stop`, `answer`, `compact`, `resume` and an engine `prompt` on the
+  target stay under the engine's rights helper.
+- The dispatcher's functions take the tables as arguments, so unit 1's
+  tests use their own checks without a built piece.
+- Behaviour change: none for deliveries without a `piece` source.
+- Tests updated: `routing/deliveries.test.ts` and
+  `packages/engine/test/accounts/carry-on-dispatch.test.ts` keep their
+  expectations. New tests cover each bullet above.
+
+### Waiting
+
+**E19. The settled test moves to `packages/contracts`, with each piece's
+hold condition.** `settled` (`routing/waits.ts:39`) and `holds` (l.33)
+move to `packages/contracts/src/settled.ts`. They become pure functions
+over a small input type defined there, which the engine builds from its
+views and the client library builds from `client.snapshot` and the stream.
+`waits.ts` imports them, with no re-export at the old place. A
+hold-unsettled table, typed over `PieceNamespace`, holds each piece's
+condition: while it holds for an agent, that agent is not settled (lead
+ruling L10). Unit 1 writes each entry as "never". The board's plan writes
+the board's: an agent with an open post of its own that needs a reply is
+not settled. The client helper `waitForAgents` applies the same table
+(section 3).
+
+- Behaviour change: none in unit 1. The settled test changes for agents
+  that use the board once the board's plan writes its entry.
+- Tests updated: `packages/engine/test/routing/waits.test.ts` and
+  `packages/engine/test/acceptance/capability-05-wait.test.ts` keep their
+  expectations. Their imports change where they import `settled`.
+
+**E20. "Request held" for blocking waits, with each piece's condition.**
+The engine ends a blocking `wait` with "request held" when the waiter holds
+an engine request or question (`routing/waits.ts:83`). A request-held
+table, typed over `PieceNamespace`, holds each piece's matching condition
+(lead ruling L15). The engine checks it when the wait opens and after every
+batch, as it checks `holds`. Unit 1 writes each entry as "never". The
+board's plan writes the board's: the waiter is an addressee of an open post
+that needs its reply and has no disposition for it (lead ruling L22).
+
+- Behaviour change: none in unit 1.
+- Tests updated: `routing/waits.test.ts` keeps its expectations.
+
+### Reads and helpers
+
+**E21. A paged read of one agent's events,** from a sequence number, for
+`client.thread`. It is a new function in `packages/engine/src/log/`, using
+the log's existing per-event agent column. Nothing existing changes.
+
+**E22. The helpers a piece calls.** The engine's rights helper (the agent
+itself, or an agent it holds a parent's rights over) and its planning
+helpers, such as queuing an engine delivery, are exported from
+`packages/engine/src/routing/` for the pieces' planners. A piece cannot
+return an engine event that the engine's own rules would refuse: the
+command handler checks every engine event a piece returns against the
+state table, as it checks its own. Nothing existing changes.
+
+### What the later plans then add
+
+- **The client API's later units** add the `client` group, events, reads,
+  snapshot entries and alert reactor (section 4).
+- **The board's plan** adds the `board` group, events, view, migrations,
+  reads, alert source, and its entries in the reach-check, source-rule,
+  hold-unsettled, request-held and snapshot-section tables.
+- **The roles' plan** adds the `roles` group, events, view, alert sources,
+  snapshot entry, and its two services on the service list. Its
+  standing-rule matcher stays as ruled.
+
+### Size, and the order of the two units
+
+The plan builds these edits as two engine units of high complexity, each
+with an attack pass, before any piece unit:
+
+- **Unit 1a, the lists:** edits E1 to E10, E21 and E22.
+- **Unit 1b, the callers and the delivery and wait rules:** edits E11 to
+  E20. It changes the prompt renderer and the dispatcher, which carry the
+  security properties, so its attack pass covers lead rulings L13 and L16
+  to L25 by name.
 
 ## 7. What the other pieces asked for, and where each is answered
 
@@ -703,7 +1003,7 @@ The foundry roles planner listed six needs, in
 | --- | --- | --- |
 | 1 | A roster query | Taken in as `client.roster` (section 3, row 25). Refused in part: an agent sees itself and the agents it holds a parent's rights over, not its whole subtree, so the roster never shows more than `subscribe` does. |
 | 2 | A thread read, and an export to a file | Taken in as `client.thread`, a paged read (section 3, row 26). The export is a client-side command that writes the caller's own file. The service never writes a file for a caller. |
-| 3 | A narrow caller kind for Shephrd's own services (the sheepdog, the standing-rule answerer) | Taken in as the service caller, in-process only, with the lead's narrow rights (section 2, "Services", row 27). It needs an engine change, which is in the extension seam and pending the owner (section 6, item 10). A scoped device credential was not used: it would put a token for an in-process service on disk for no gain. |
+| 3 | A narrow caller kind for Shephrd's own services (the sheepdog, the standing-rule answerer) | Taken in as the service caller, in-process only, with the lead's narrow rights (section 2, "Services", row 27). Unit 1 edits the engine to add it (section 6, edits E11, E13 and E14). A scoped device credential was not used: it would put a token for an in-process service on disk for no gain. |
 | 4 | Owner commands for the roles' settings: standing rules, the sheepdog's thresholds, snoozing one group | Taken in as a rule, not as commands: piece 4 defines them in its own `roles.` group with access `owner` and `device` (section 1). Adding a standing rule creates an automatic allow that outlives a stolen phone's revocation, so it is a candidate for the host-only list in question Q2 (row 29). |
 | 5 | Alert kinds the roles raise | Taken in: four namespaced kinds with default phone settings (section 4, row 28). A notice for a lead stays on the board. |
 | 6 | Subscribe filters by group and by event kind | Taken in: `client.subscribe` filters by agent, group and event kind (section 3, row 30). |
@@ -715,15 +1015,15 @@ The message board planner listed six needs, in section R1 of
 
 | # | Need | Answer |
 | --- | --- | --- |
-| 1 | Board commands on every client transport, generically | Taken in: both transports serve the whole `ApiRpcGroup` with no per-command code (section 5, "Transports", row 36). |
+| 1 | Board commands on every client transport, generically | Taken in: both transports serve the whole `CommandsRpcGroup` with no per-command code (section 5, "Transports", row 36). |
 | 2 | Board events in the owner's live stream, not widened for agents | Taken in: board events are `owner-only`; the client API never widens the agent filter for them (section 3, row 34). |
-| 3 | An alert for a post addressed to the owner, ideally with a `post` subject on `OwnerNeeded` | Taken in through an alert source, kind `board.post`, keyed by the post, opening the post (section 4, row 35). Refused in part: no `post` subject on `OwnerNeeded`, because that changes an existing engine event, and the board does not write `OwnerNeeded` at all, so one matter raises one alert. |
+| 3 | An alert for a post addressed to the owner, ideally with a `post` subject on `OwnerNeeded` | Taken in through an alert source, kind `board.post`, keyed by the post, opening the post (section 4, row 35). Refused in part: no `post` subject on `OwnerNeeded`, because the alert source gives the same result, and the board does not write `OwnerNeeded` at all, so one matter raises one alert. |
 | 4 | Paged reads with a cursor | Taken in: one paged-read shape for every piece (section 1, "Paged reads", row 32). |
 | 5 | The owner posts from any device as the owner, reusing any device field | Taken in: the caller stays `owner`; the envelope's optional `device` field records the device, and the board adds no field of its own (section 2, row 33). |
 | 6 | A transport message limit of at least a 16,384-character post plus its envelope | Taken in: the network listener's limit is 1 mebibyte, sized against each piece's largest event and page (lead ruling L15); the engine's socket keeps its current behaviour (section 5, rows 36, 58). |
 
 The board's delivery source for posts, from its question Q1, is section 6,
-item 11.
+edit E16.
 
 ## What this contract does not settle
 
