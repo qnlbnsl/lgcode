@@ -75,7 +75,7 @@ export interface FakeEngine {
 
 // `at` places the run on a real live service's folders (the reload probe's
 // command-line reconnect is a real child process that needs a real socket).
-export const fakeEngine = (setup: { codexCore?: boolean; agents?: ReadonlyArray<string>; at?: Pick<LiveService, "root" | "state" | "work" | "pid"> } = {}): FakeEngine => {
+export const fakeEngine = (setup: { codexCore?: boolean; shellListing?: boolean; agents?: ReadonlyArray<string>; at?: Pick<LiveService, "root" | "state" | "work" | "pid"> } = {}): FakeEngine => {
   const own = realpathSync(mkdtempSync("/tmp/lcpt-"));
   const root = setup.at?.root ?? own;
   const state = setup.at?.state ?? join(root, "state"); const work = setup.at?.work ?? join(root, "work");
@@ -145,7 +145,7 @@ export const fakeEngine = (setup: { codexCore?: boolean; agents?: ReadonlyArray<
       // Models of the shell boundary must now supply the name-only listing
       // requested by the exact command, before its explicit env -u. Preserve
       // caller-supplied listings so adversarial names/empty evidence survive.
-      if (input.includes("LCP_ENV_BEGIN") && !output.includes("LCP_ENV_BEGIN")) {
+      if (setup.shellListing !== false && input.includes("LCP_ENV_BEGIN") && !output.includes("LCP_ENV_BEGIN")) {
         output = `LCP_ENV_BEGIN\n${agentId === WORKER && setup.codexCore !== false ? "PATH" : "PATH\nSHEPHRD_SOCKET\nSHEPHRD_TOKEN"}\nLCP_ENV_END\n${output}`;
       }
       emit(agentId, { _tag: "ThreadItem", content: { _tag: "tool-call", callId, title: "", status, output } });

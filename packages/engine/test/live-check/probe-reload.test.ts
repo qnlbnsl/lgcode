@@ -15,7 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { RESTART_ACTIVE_PROMPT, RESTART_PENDING_PROMPT, RESTART_PREPARE_PROMPT } from "../../scripts/live/prompts.ts";
 import { startLiveService, type LiveService } from "../../scripts/live/service.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
-import { fakeEngine, LEAD, markerIn, runProbe, WORKER, type FakeEngine, type Script } from "./probe-fake-engine.ts";
+import { ALWAYS, ONCE, REJECT, fakeEngine, LEAD, markerIn, runProbe, WORKER, type FakeEngine, type Script } from "./probe-fake-engine.ts";
 
 vi.mock("@shephrd/client", async (importOriginal) => {
   const original = await importOriginal<typeof import("@shephrd/client")>();
@@ -32,6 +32,7 @@ afterEach(async () => {
   for (const engine of engines.splice(0)) engine.cleanup();
   for (const service of services.splice(0)) { await service.stop(); service.remove(); }
   for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true });
+  vi.restoreAllMocks();
 });
 
 const serving = async (service: LiveService) => {
@@ -190,6 +191,75 @@ describe("reload (PB-A7, PB-A8, PB-A11, PB-A12) on a scripted engine and a real 
     expect(run.passed).toBe(false);
   }, 60_000);
 });
+
+// Only the second-phase permission stream changes in these scripts. Recovery
+// receipts, token rotation and the first carry-on stay identical to the control.
+describe("m-7: permissions for a replayed pending hold", () => {
+  it.each([
+    { name: "one exact re-request per agent passes with allow-once", commands: ["sleep 120"], passed: true, answers: [ONCE.id, ONCE.id] },
+    { name: "a second exact re-request per agent is denied and fails", commands: ["sleep 120", "sleep 120"], passed: false, answers: [ONCE.id, REJECT.id, ONCE.id, REJECT.id] },
+    { name: "a different command is denied and fails", commands: ["sleep 120; id"], passed: false, answers: [REJECT.id, REJECT.id] },
+  ])("$name", async ({ commands, passed, answers }) => {
+    const engine = await onRealService();
+    const waiting = new Map<string, { agent: string; call: string; next: number }>();
+    const request = (e: FakeEngine, agent: string, next: number) => {
+      const call = `replay-hold-${agent}-${next}`;
+      e.tool(agent, call, { command: commands[next] });
+      const id = e.permission(agent, call, [ALWAYS, ONCE, REJECT]);
+      waiting.set(id, { agent, call, next: next + 1 });
+    };
+    const script = reload({ second: (e, agent, pending) => {
+      const transaction = `reload-2-${agent}`;
+      e.emit(agent, { _tag: "SessionOpened", session: { sessionId: `s2-${agent}` } }, { requestId: transaction });
+      e.emit(agent, { _tag: "DeliveryAccepted", deliveryId: pending }, { requestId: transaction });
+      e.emit(agent, { _tag: "DeliverySent", deliveryId: `carry-${agent}` });
+      request(e, agent, 0);
+    } });
+    engine.script = { ...script, onAnswer: (e, answer) => {
+      const item = waiting.get(answer.id)!;
+      e.finish(item.agent, item.call, answer.optionId === ONCE.id ? "completed" : "failed", "");
+      if (item.next < commands.length) request(e, item.agent, item.next);
+      else e.turnEnded(item.agent);
+    } };
+    const result = await runProbe(engine, "reload");
+    expect(result.passed).toBe(passed);
+    // Requests are consumed serially, but the two agents can interleave.
+    expect(engine.answers.map((a) => a.optionId).sort()).toEqual([...answers].sort());
+    for (const agent of [LEAD, WORKER]) {
+      const own = engine.answers.filter((a) => waiting.get(a.id)?.agent === agent).map((a) => a.optionId);
+      expect(own).toEqual(commands.length === 2 ? [ONCE.id, REJECT.id] : [passed ? ONCE.id : REJECT.id]);
+    }
+    if (!passed) expect(result.reason).toContain("denied unexpected restart request");
+  }, 60_000);
+});
+
+it("m-8: a stale first-reload token snapshot fails the distinct-generation guard before a second restart", async () => {
+  const engine = await onRealService();
+  const originalTokens = new Map(engine.tokenOf);
+  const fromEntries = Object.fromEntries;
+  let firstRestart = false;
+  let restarts = 0;
+  // Only the /proc environment decoder is stale. The actual token registry,
+  // auth refusals, arguments and all carry-on events are unchanged.
+  vi.spyOn(Object, "fromEntries").mockImplementation((entries) => {
+    const environment = fromEntries(entries);
+    if (firstRestart && environment.SHEPHRD_SOCKET === join(engine.state, "engine.sock")) {
+      const agent = [...engine.tokenOf].find(([, token]) => token === environment.SHEPHRD_TOKEN)?.[0];
+      if (agent !== undefined) environment.SHEPHRD_TOKEN = originalTokens.get(agent);
+    }
+    return environment;
+  });
+  const script = reload();
+  engine.script = { ...script, onRestart: (e, count) => {
+    restarts = count;
+    script.onRestart!(e, count);
+    firstRestart = true;
+  } };
+  const result = await runProbe(engine, "reload");
+  expect(result.passed).toBe(false);
+  expect(result.reason).toContain("first-reload tokens were not captured before the second restart");
+  expect(restarts).toBe(1);
+}, 60_000);
 
 describe("safety: the restart's SIGKILL reaches only the service the wrapper started", () => {
   it("a process this test started inside the run's folder survives the restart, and only the old service exits", async () => {

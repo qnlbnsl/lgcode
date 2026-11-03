@@ -51,7 +51,7 @@ export const compactions = (ndjson: string): number => records(ndjson).filter((r
 // assistant's claim or a quoted tool result. Both directions use this rule.
 export const slashReceipt = (received: ReadonlyArray<string>, id: string, payload: string, compacted: boolean): string => {
   if (compacted) return "command ran";
-  if (received.some((text) => text.trimStart().startsWith(payload))) return "unescaped";
+  if (received.some((text) => text.replace(/^[\s\p{Cf}]*/u, "").startsWith(payload))) return "unescaped";
   const matching = received.filter((text) => text.includes(`(delivery ${id}):`));
   if (matching.some((text) => text.includes(`\n${payload}\n`))) return "unescaped";
   return matching.some((text) => text.includes(`\n\\${payload}\nEnd data [`)) ? "escaped; no command" : "not attempted";

@@ -417,8 +417,9 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       yield* check([...pending.values()].every((id) => !atCrash.some((row) => row.event._tag === "DeliveryAccepted" && event<{ deliveryId: string }>(row).deliveryId === id)), "not attempted: restart deliveries were already accepted before SIGKILL");
       yield* restartAndConnectCli();
       const fresh = yield* options.openOwner();
-      // No broad permission subscription survives a restart. Only the known
-      // ask tool may be approved for each carry-on turn.
+      // Only the known ask tool and one exact replayed hold per agent may
+      // be approved after the second restart. Never persist an approval.
+      const replayedHolds = new Set<string>();
       const scope = yield* Scope.Scope;
       const approval = yield* (fresh.subscribe({ requestId: requestId(), after: atCrash.at(-1)!.sequence } as never) as Stream.Stream<EventEnvelope, unknown>).pipe(
         Stream.filter((row) => row.event._tag === "PermissionRequested"),
@@ -428,13 +429,17 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
           const request = event<Permission>(row);
           const history = yield* since(fresh, mark);
           const tool = mergedTools(history, agent).find((candidate) => candidate.callId === request.toolCallId);
-          const ok = tool !== undefined && askInput(agent, markers.get(agent.agentId)!)(tool);
+          const hold = tool !== undefined && exactCommand(tool.input, SHELL_COMMANDS.restartHold);
+          const once = allowOnce(request.options.filter((option) => !option.persistent));
+          const ok = once !== undefined && tool !== undefined && (askInput(agent, markers.get(agent.agentId)!)(tool)
+            || (hold && !replayedHolds.has(agent.agentId)));
+          if (ok && hold) replayedHolds.add(agent.agentId);
           if (request.holder._tag !== "owner" && agent.agentId === agents.worker.agentId) {
             const parent = yield* agentClient(agents.lead);
             yield* parent["pass-up"]({ requestId: requestId(), subject: { _tag: "permission", id: request.permissionRequestId } } as never);
           }
           if (!ok) restartUnexpected.push(`denied unexpected restart request ${request.permissionRequestId}`);
-          const optionId = ok ? allowOnce(request.options) : request.options.find((option) => option.kind.startsWith("reject"))?.id;
+          const optionId = ok ? once : request.options.find((option) => option.kind.startsWith("reject"))?.id;
           yield* check(optionId !== undefined, "carry-on permission has no safe answer");
           yield* fresh.answer({ requestId: requestId(), kind: "permission", id: request.permissionRequestId, optionId: optionId! } as never);
         })), Effect.forkIn(scope),

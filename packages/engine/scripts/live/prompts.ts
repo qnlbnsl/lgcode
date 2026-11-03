@@ -66,7 +66,7 @@ export const RESTART_ACTIVE_PROMPT = `For the restart probe, run exactly this sh
 Wait for its completion or a permission answer. If the engine restarts and sends a carry-on, call the Shephrd ask tool with {"text":"{{MARKER}}"}, then end your turn without re-running the shell command. Do not run any other tool or command.`;
 export const RESTART_PENDING_PROMPT = `This is the pending restart probe. Run exactly this shell command once to hold your turn open until the restart:
 {{COMMAND}}
-Wait for completion or a permission answer. After the engine restarts, follow your stored test rule and call the Shephrd ask tool, then end your turn without re-running the command. Do not reply before the restart, compact, or run any other command.`;
+Wait for completion or a permission answer. After a restart, do not run this command again, including when this prompt is re-sent. After the engine restarts, follow your stored test rule and call the Shephrd ask tool, then end your turn without re-running the command. Do not reply before the restart, compact, or run any other command.`;
 
 export const SHELL_COMMANDS = {
   removedVariables: `{{NODE}} -e 'console.log("LCP_ENV_BEGIN"); console.log(Object.keys(process.env).sort().join("\\n")); console.log("LCP_ENV_END")'; env -u SHEPHRD_SOCKET -u SHEPHRD_TOKEN SHEPHRD_HOME={{STATE}} {{NODE}} {{CLI}} accounts --input '{"operation":"list"}'; lcp_status=$?; printf '\\nLCP_EXIT=%s\\n' "$lcp_status"; exit "$lcp_status"`,

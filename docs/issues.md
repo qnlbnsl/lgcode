@@ -3256,6 +3256,20 @@ delivery before the kill. The probe checks the whole interval again after
 reload, and records that race as not attempted. It never counts the same
 delivery being accepted early and then re-sent as successful replay evidence.
 
+Fix round 2 addresses review findings m-7 and m-8. After the second restart,
+the permission handler previously denied even the exact pending sleep
+command. A replay that requested that permission could fail despite correct
+recovery. The handler now permits that command at most once per agent, using
+only a nonpersistent approval. It still denies a repeat or a different
+command and fails the probe. The pending prompt explicitly forbids running
+the command again after a restart, including when the prompt is re-sent.
+
+The added regression tests isolate missing shell listings, a wrong harness
+for an inapplicable outcome, missing environment snapshots with tokens and
+arguments still present, and a stale token snapshot after the first restart.
+They cover each guard separately without weakening the existing evidence
+requirements. These remain local tests, not real-adapter evidence.
+
 ## 218. The state-read probe records the owner's own rejection as a deny rule
 
 Found: 2026-11-02, by the L-1 probe test writer.
@@ -3300,6 +3314,12 @@ proved.
 
 Fix, if wanted: fail when any received user text of the receiver, after the
 delivery was sent, begins with the payload itself.
+
+Fix round 2 also rejects a raw payload preceded by invisible Unicode format
+characters, such as U+200B and U+FEFF, even alongside an escaped receipt.
+The raw-payload check removes leading whitespace and Unicode category Cf
+characters before comparing. The new issue 219 cases in
+`packages/engine/test/live-check/probe-fix-round-2.test.ts` guard this gap.
 
 ## 220. The always-allow probe sends a persistent answer for a request an agent holds
 
