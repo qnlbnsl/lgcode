@@ -1646,7 +1646,7 @@ log's redaction boundary.
 Found: 2026-11-01, in unit 6a's focused review, finding F-8.
 State: open, fix on branch worker/review-2, commit `c9ff320`.
 The plain `start` remainder is being fixed as post-build A3 on branch `worker/review-2`, with a two-minute setup bound and stop pre-emption.
-The post-build A3 correction at `8596f63` has a residual cleanup race in issue 229.
+The post-build A3 correction at `8596f63` has residual cleanup and writer limits in issues 229 and 230.
 
 What happens: initialization, session creation, session load and initial
 configuration have no deadline. An adapter that never responds can keep a
@@ -4173,3 +4173,52 @@ Score: not assigned, because the re-review supplied no numerical risk score.
 The re-review labels the finding MAJOR.
 Why it matters: overlapping commands or a delayed writer can let cleanup
 from a cancelled start corrupt a later successful stop or resume.
+
+## 230. A cancelled start can outwait its settlement deadline at the event writer
+
+Found: 2026-11-03, in the re-review of the post-build A3 correction at `8596f63`.
+State: open, recorded at the review lead's request in board post 23.
+
+Evidence: finding F-2 is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/rresult-2b.md` (not tracked).
+The re-reviewer checked the source and ran supplemental integration probes
+through the real writer boundary.
+One probe held the writer beyond the settlement deadline.
+Another injected `LogWriteFailed` inside the real transaction to exercise
+the production refusal latch without inducing a physical disk fault.
+These are the re-reviewer's observations, not runtime tests run in this worktree.
+
+What happens: the two-minute timeout in `packages/engine/src/routing/lanes.ts`
+bounds only the wait for stop settlement.
+The fallback append in `packages/engine/src/commands/start.ts` runs afterward.
+If a stop still holds the writer indefinitely, the cancelled start can wait
+indefinitely for that writer even after its settlement deadline has expired.
+The timed probe progressed only after the writer was released.
+
+A real writer failure has a different remaining limit.
+In `packages/engine/src/log/EventLog.ts`, `LogWriteFailed` latches refusal
+for the lifetime of the writer.
+The fallback uses that same writer, so it cannot append its terminal event
+or revoke the original token after the latch is set.
+The probe observed an agent still starting with an unrevoked token and
+no `AgentStartFailed`, although the runner stop was called.
+The new writer-failure case in
+`packages/engine/test/commands/start-setup.test.ts` instead injects a
+one-shot failure outside the real writer.
+Its following fallback transaction can succeed because that synthetic
+failure never exercises the refusal latch.
+It does not prove terminal completion under the production latched failure.
+
+What should happen: qualify the completion guarantee on a usable writer
+or define a separate recovery policy for failed persistence.
+Distinguish the recoverable synthetic failure from the real latched failure
+in the test evidence.
+Do not bypass the storage-failure latch to force a terminal append.
+The settlement deadline must not be described as a bound on later writer work.
+This remains part of the post-build A3 follow-up linked from issue 103.
+No implementation change is made by this record.
+
+Score: not assigned, because the re-review supplied no numerical risk score.
+The re-review labels the finding MINOR.
+Why it matters: the claimed terminal-outcome guarantee and its time bound
+are stronger than the persistence path and the test establish.
