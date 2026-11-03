@@ -1644,7 +1644,7 @@ log's redaction boundary.
 ## 103. Adapter setup has no timeout, and spawn registration is not atomic
 
 Found: 2026-11-01, in unit 6a's focused review, finding F-8.
-State: fixed in pull request #9 (post-build A3, commits `ddbb1d4` and `4014f7e`), merged on 2026-11-03. Residual limits stay open in issues 266, 267 and 268.
+State: fixed in pull request #9 (post-build A3, commits `ddbb1d4` and `4014f7e`), merged on 2026-11-03. Residual limits are recorded in issues 266, 267 and 268. Issue 266 is record only. Issues 267 and 268 remain open.
 The plain `start` remainder was fixed as post-build A3, with a two-minute setup bound and stop pre-emption.
 The post-build A3 corrections leave residual cleanup and writer limits in issues 267 and 268.
 
@@ -1674,7 +1674,7 @@ What changed in pull request #9: commits `ddbb1d4` and `4014f7e` apply the same
 two-minute setup bound to a plain start and let an authorized stop pre-empt
 that setup.
 The post-build result for task 2 reports passing setup tests and a clean
-engine type check on that branch.
+engine type check at commit `4014f7e`.
 The stalled-send stop path remains open in issue 265.
 
 ## 104. Three harnesses have no verified deny-read or deny-write rule
@@ -4105,7 +4105,7 @@ What happens: a plain start can still be setting up when another agent on
 its account reports a sign-out.
 In `packages/engine/src/routing/deliveries.ts`, account-wide sign-out pauses
 the starting agent.
-The two-minute setup bound on branch `worker/review-2` then stops its runner
+The two-minute setup bound added by pull request #9 then stops its runner
 when setup times out.
 The existing failure branch in `packages/engine/src/commands/start.ts`
 writes `AgentStartFailed` and revokes the agent's token.
@@ -4130,7 +4130,7 @@ Score: not assigned, because the re-review supplied no numerical risk score.
 The re-review labels the finding MINOR.
 Why it matters: the timeout records a start failure without reaching the
 stopped state checked by `packages/engine/test/commands/start-setup.test.ts`
-on branch `worker/review-2`.
+added by pull request #9.
 
 ## 267. A cancelled start's fallback cleanup races with a later stop or resume
 
@@ -4145,7 +4145,7 @@ The probes observed a duplicate terminal event after a successful stop and
 revocation of the new token after a successful resume.
 They did not establish that the fallback killed a real operating-system process.
 
-What happens: on branch `worker/review-2`, a cancelled start in
+What happens: in the merged A3 implementation, a cancelled start in
 `packages/engine/src/commands/start.ts` releases its agent's lane before
 waiting for the stops that cancelled it to settle.
 It then checks the lifecycle outside the writer transaction and runs fallback cleanup.
@@ -4189,7 +4189,7 @@ Another injected `LogWriteFailed` inside the real transaction to exercise
 the production refusal latch without inducing a physical disk fault.
 These are the re-reviewer's observations, not runtime tests run in this worktree.
 
-What happens: on branch `worker/review-2`, the two-minute timeout in
+What happens: in the merged A3 implementation, the two-minute timeout in
 `packages/engine/src/routing/lanes.ts` bounds only the wait for stop settlement.
 The fallback append in `packages/engine/src/commands/start.ts` runs afterward.
 If a stop still holds the writer indefinitely, the cancelled start can wait
@@ -4254,6 +4254,7 @@ Receipt redaction at `packages/engine/src/log/EventLog.ts:221` also replaces
 the home in the stored account result.
 Receipt decoding at `packages/engine/src/commands/CommandHandler.ts:252`
 then refuses `accounts list` on a fresh connection.
+These source line numbers are from the reviewed commit `1f2602a`, and the files have changed since.
 
 The command tests use a pass-through redactor at
 `packages/engine/test/support/handlerRig.ts:117`,
