@@ -235,9 +235,9 @@ uses no `herdr agent` command, `collect.sh` or `board-waker.sh`.
 
 **Sources this plan builds on.** "CAPI §n" is the client API contract v2,
 `.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api` at
-`75ab185` (frozen 2026-11-03, decision row 21). "Board" is the message
+`75ab185` with its addendum `cd1d836` (frozen 2026-11-03, decision row 21). "Board" is the message
 board contract, `.plans/plans/shepherd-message-board/contract.md` on
-`worker/plans-board` at `aaef08f` (frozen 2026-11-03, row 29). Both assume
+`worker/plans-board` at `44cd371` (frozen 2026-11-03, rows 29 and 31). Both assume
 the extension seam (CAPI §6), which is pending the owner (rows 19, 24, 30).
 Engine anchors are at `8ff4c9b` (scouting.md, Scout E). `FOUNDRY` is
 `~/.claude/plugins/marketplaces/founder-os/plugins/harness-sessions/skills/software-foundry`.
