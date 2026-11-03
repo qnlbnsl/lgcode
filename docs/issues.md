@@ -3355,6 +3355,37 @@ that an always-allow answer was sent or that a settings write failed after
 one. It still requires the owner-held request, verified destination and
 saved scope before it can pass SEC-PB-4.
 
+Fix round 6 addresses the cause observed again in live-check-2 run 3 at
+`b4154fa7c12ed47116493b7b209c63a355075c7b`, log lines 34-36. The command
+`printf 'lcp-persistent-permission-probe\n'` was read-only, so Claude Code
+completed it without a permission request. It could not exercise the
+persistent-permission choices. The implementation commit is
+`fix: exercise persistent permission with a local write`.
+
+The new exact command uses the absolute Node.js executable to create
+`lcp-persistent-permission-probe.txt` at an absolute path in the run's work
+folder. The file contains one non-secret marker line. Exclusive creation
+refuses to overwrite an existing file or follow an existing file symlink.
+The installed Agent Software Development Kit, version 0.3.312,
+sdk.d.ts:2033-2044 documents manual approval in default mode for dangerous
+operations. The installed claude-agent-acp 0.99.1, dist/acp-agent.js:7962
+and 8001-8050, forwards the kit's permission asks.
+dist/permissions/options/shell.js:89-96 builds the Bash choices from the
+kit's suggestions. Creating a file gives the probe a filesystem mutation
+instead of a read-only print. Real permission behavior still needs an
+observed request; a command that completes without one keeps the same
+`no persistent permission request observed` failure.
+
+The destination guard from m-3 is unchanged. An owner-held request can
+receive always allow only for the exact command in the work folder and a
+verified localSettings or session destination. An absent or unsafe
+destination is denied and records `no safe persistent option offered`.
+The existing settings.local.json containment and saved-scope checks remain.
+The command itself writes no harness settings or user settings. Local
+regressions run the marker command after a synthetic safe approval and
+check its file, the sent prompt, the saved scope, rejection of printf and
+other commands, the no-request failure and the unsafe-destination failures.
+
 ## 218. The state-read probe records the owner's own rejection as a deny rule
 
 Found: 2026-11-02, by the L-1 probe test writer.

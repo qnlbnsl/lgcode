@@ -25,7 +25,7 @@ export const probeCommands = (state: string, node = process.execPath, cli = file
   removedVariables: fill(SHELL_COMMANDS.removedVariables, { STATE: shellQuote(state), NODE: shellQuote(node), CLI: shellQuote(cli) }),
   restartHold: fill(SHELL_COMMANDS.restartHold, { NODE: shellQuote(node) }),
   stateRead: fill(SHELL_COMMANDS.stateRead, { CANARY: shellQuote(join(state, "live-canary")) }),
-  alwaysAllow: SHELL_COMMANDS.alwaysAllow,
+  alwaysAllow: fill(SHELL_COMMANDS.alwaysAllow, { NODE: shellQuote(node), FILE: shellQuote(join(state, "../work/lcp-persistent-permission-probe.txt")) }),
 });
 
 interface Tool { _tag: string; callId: string; title: string; status: string; input?: string; output?: string }
