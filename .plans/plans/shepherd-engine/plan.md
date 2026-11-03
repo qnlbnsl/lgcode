@@ -17,8 +17,10 @@ is a background program that the Herdr plugin starts. It runs coding agents
 (ACP), the shared protocol that lets one program drive many different coding
 agents. It keeps a complete, numbered record of everything the agents do,
 and it offers one authenticated connection through which agents and the
-owner start, prompt, watch, approve, wait on, stop and resume agents. Today
-none of this exists: the Shephrd repository holds only documents, one file
+owner start, prompt, watch, approve, stop and resume agents.
+Agents can also wait on other agents.
+The owner watches their progress by subscribing to events.
+Today none of this exists: the Shephrd repository holds only documents, one file
 copied from T3 Code, and the approved design in
 `docs/specs/2026-11-01-engine-design.md`.
 

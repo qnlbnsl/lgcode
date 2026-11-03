@@ -179,7 +179,7 @@ const block = (runtime: Runtime, requestId: string, waitId: WaitId) => Effect.in
 // Called only inside CommandHandler's writer transaction, which adds the
 // checks that may satisfy the wait at once.
 export const wait = ({ actor, snapshot, runtime }: Input, payload: Payload<"wait">): Effect.Effect<Plan, ReturnType<typeof refused>> => {
-  // The waiter is an agent: the contracts have no owner waiter yet (issue 75).
+  // A blocking wait is for agents only, by decision row 26.
   if (actor._tag !== "agent") return Effect.fail(refused());
   const members = [...new Set(payload.members)];
   if (members.some((member) => member === actor.agentId || snapshot.agents[member] === undefined)) return Effect.fail(refused());

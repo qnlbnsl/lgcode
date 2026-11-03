@@ -1272,11 +1272,18 @@ The stop closure remains open under this issue.
 ## 75. The wait contract has no owner waiter
 
 Found: 2026-11-01, while building unit 5d.
-State: open for the contracts scope and unit 7.
+State: closed by the owner's decision on 2026-11-03.
 
 What happens: `WaitOpened` requires the waiter's agent identifier, and `Delivery.target` must be an agent. The engine therefore refuses a `wait` from the owner with "command refused".
-Why it matters: decision row 26 gives the owner's terminal `shephrd wait --block`. `AGENTS.md` rule 5 requires that what the owner can do from the terminal is also possible through the API.
-What should happen: the contracts give a wait an owner waiter, at least for blocking waits, which create no delivery.
+Why it mattered: the original decision row 26 gave the owner's terminal `shephrd wait --block`. `AGENTS.md` rule 5 requires that what the owner can do from the terminal is also possible through the API.
+The original proposal was for the contracts to give a wait an owner waiter, at least for blocking waits, which create no delivery.
+
+Closing decision: row 26 of `.plans/plans/shepherd-engine/decisions.md`,
+as amended on 2026-11-03, restricts blocking waits to agents.
+The owner waiter is declined for this engine plan.
+Owner clients get the same result by subscribing to events.
+Revisit this restriction when the client application programming interface
+(API) is planned.
 
 ## 76. Engine notices name the owner as their sender
 
