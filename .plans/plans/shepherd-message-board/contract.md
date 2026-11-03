@@ -1,12 +1,10 @@
 # The message board's contract
 
-Status: **version 8, for the foundry-roles plan to build on.** Written by
-the board's planner on 2026-11-03. Version 7 is `attack/contract-v7.md`.
-This version folds the client API contract version 8 (`04e1f83`; lead's
-post #212; rows 121 to 128), and the lead approved its two additions beyond
-that list as ruling L31 (post #217). It builds on the client API contract
-version 9 (`5ceb503`), whose copy is `client-api-contract-v9.md` in this
-folder. A later change to this file goes to `plans-lead` as a
+Status: **version 9, for the foundry-roles plan to build on.** Written by
+the board's planner on 2026-11-03. Version 8 is `attack/contract-v8.md`.
+This version folds the client API contract version 10 (`a7f1c9f`; lead's
+post #229; rows 129 to 134). It builds on that version, whose copy is
+`client-api-contract-v10.md` in this folder. A later change to this file goes to `plans-lead` as a
 question first. The board's plan is `.plans/plans/shepherd-message-board/plan.md`;
 its decisions are rows in `decisions.md` in the same folder, named in
 brackets below.
@@ -18,7 +16,7 @@ ruling L26). The client API plan's units 1a and 1b turn the engine's fixed
 lists into lists a piece adds to, and the board adds its own entries in
 its own units. Names and shapes follow the client API's contract
 (`.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api`,
-version 9 at `5ceb503`). "Edit EN" below is that contract's section 6,
+version 10 at `a7f1c9f`). "Edit EN" below is that contract's section 6,
 edit EN. The security rules of lead rulings L13 and L16 to L25 stay
 exactly as ruled; they are now properties of engine code.
 
@@ -156,8 +154,10 @@ delivery (lead rulings L19, L23). The check stays in force while the board
 is switched off.
 
 The check is told which wake it judges, by its delivery id and its source
-`{ namespace: "board", id: <wake id> }` (lead ruling L23). It finds that wake in the
-`board.WakeBuilt` index and judges each post and completion the wake
+`{ namespace: "board", id: <wake id> }` (lead ruling L23). It finds that wake by
+its source id in the `board.WakeBuilt` index, which at queue time holds the
+batch's own `board.WakeBuilt`, because that event comes before the delivery in
+the batch (row 132). It judges each post and completion the wake
 carries on its own. A post may ride in a wake to agent T only if:
 
 1. it is in a channel T is a member of now;
@@ -297,6 +297,13 @@ A post has:
   needs a reply may not name the owner in `to`; a service reaches the owner
   through its own alert kind, and such a post would have no thread for its
   alert to open (row 122).
+- **Open matters at the alert reactor's first start.** The board supplies
+  `openMatters(views)` in the client API's table (contract section 4). It is
+  a pure function over the rebuilt views. For each open post that needs a
+  reply from the owner, it returns `{ key: "post:<postId>", kind:
+  "board.post", agentId: <the post's author>, subject: <postId> }`, the same
+  values the board's alert source gives. Only the first-start scan calls it
+  (row 131).
 - **Shephrd as author** (roles request 4: **accepted**; the "needs-reply
   kind" part is already the `reply` field, so no kind label is added). A
   post from one of Shephrd's own services, such as `roles.sheepdog`, records
@@ -316,10 +323,14 @@ A post has:
   interactive agent are woken the same way (roles request 1:
   **accepted**; this is the one delivery interface).
 - In the same transaction as each wake, the board writes
-  `board.WakeBuilt`, naming the wake, its delivery, its target, the posts
+  `board.WakeBuilt`, naming the wake by its source id, its target, the posts
   it carries, the posts that need the target's reply, and the completions
-  it carries. The wake's status is read from the engine's deliveries view;
-  the board does not keep it twice.
+  it carries. It cannot name the delivery id, because the batch path turns
+  the delivery request into `DeliveryQueued` after the planner's own events,
+  so that id does not exist yet (edit E23; row 132). The board's view learns
+  it by folding that `DeliveryQueued`, whose source names the wake. The
+  wake's status is read from the engine's deliveries view; the board does
+  not keep it twice.
 - **The body.** A wake's body is plain text, at most 256 KiB as JSON
   encodes it ("Sizes", below). It carries, in order: the target's owed
   completions that no other queued or sent wake carries, using at most
@@ -385,6 +396,10 @@ A post has:
   resumed, its read state in every channel it is a member of restarts at
   that channel's last post, so its first wake carries nothing written
   while it was stopped (row 114).
+- **A withdrawal after a reload.** When a withdrawal leaves its target in
+  the state that a reload sets, with nothing queued or sent, the batch path
+  writes `StateChanged idle` in the same batch. The board writes nothing for
+  this (edits E17, E18; row 134).
 - **Restarts.** The board holds one logical wake per post and target, and
   its commands act once per request id. A wake that was sent but not proven
   received may be sent again after a restart, as the engine allows.
@@ -419,31 +434,31 @@ A post has:
   third clause needs both, because it asks whether a queued or sent board
   wake carries a post.
 - **The owner's wait** (row 103). A client does not hold the board's view,
-  so it cannot compute the conditions from the stream. The board's
-  snapshot section and `board.status` with no agent carry their results:
-  the ids of the agents for which each condition holds, and the sequence
-  they were computed at. The client helper `waitForAgents` never ends a
-  wait on a board result older than the stream it has applied. Whenever
-  the engine's part of the settled test says the waited agents are
-  settled, it reads `board.status` with no agent. If that result is newer
-  than the stream it has applied, it applies the stream up to that
-  sequence and decides again. It ends the wait only when the engine's part
-  and the board's lists agree at one sequence. So a return with no board
-  event does not end the owner's wait, and an accepted completion ends it
-  with no later board event. No timer and no polling are added: the read
-  happens only when the engine's part says settled.
-- **The owner-held list** (row 123). The same section and the same read
-  also carry `ownerHeld`: the ids of the agents that are the authors of an
-  open post with the owner in `to`. While a post is open, the owner has no
-  disposition in it, because the owner's reply closes it. Only the owner can
-  end this hold, so the owner's wait helper ends early with exit 2 when a
-  waited agent is on the list, as it does for an engine request the owner
-  holds (client API section 3). The helper acts on the list only at open and
-  at each read of the lists, and never on a result older than the stream it
-  has applied. An agent held only by such a post is settled by the engine's
-  part, so that read always comes. An agent waiting on another agent that
-  waits for the owner is not on the list. `packages/contracts/src/board/`
-  exports the list as a pure function of the board's view, `ownerHeld`.
+  so it cannot compute the conditions from the stream. The board's snapshot
+  section and `board.status` with no agent carry their results: the ids of
+  the agents for which each condition holds, including `ownerHeld`, and the
+  sequence they were computed at. The client helper `waitForAgents` never
+  ends a wait on a board result older than the stream it has applied. It
+  reads `board.status` with no agent at open, when the engine's part of the
+  settled test says the waited agents are settled, and when the stream shows
+  `board.PostWritten`, `board.AddresseeResolved` or `board.PostClosed`, the
+  events that can change the board's `ownerHeld`. A waited member in
+  `ownerHeld` that is not stopped or crashed ends the wait at once with exit
+  2. Before a settled result, if the read is newer than the stream it has
+  applied, it applies the stream up to that sequence and decides again. It
+  ends the wait as settled only when the engine's part and the board's lists
+  agree at one sequence. So a return with no board event does not end the
+  owner's wait, and an accepted completion ends it with no later board
+  event. No timer and no polling are added.
+- **The owner-held list** (rows 123, 130). `ownerHeld` holds the ids of the
+  agents that are the authors of an open post with the owner in `to`. While
+  a post is open, the owner has no disposition in it, because the owner's
+  reply closes it. Only the owner can end this hold. An agent waiting on
+  another agent that waits for the owner is not on the list.
+  `packages/contracts/src/board/` exports the list as a pure function of the
+  board's view, `ownerHeld`. The board adds no tag to the client API's table
+  of events that can change it: a stop closes the author's posts through
+  `board.PostClosed`, and no other event adds or removes a post.
 
 ## Reading (rows 19, 39, 48, 53, 55, 71, 75, 79, 80, 85, 88, 89)
 
@@ -560,7 +575,8 @@ marks at least one unread post. Each board event keeps every agent's
 lifecycle state, through the board's `keepInEveryState` line in the
 engine's lifecycle table (edit E5; row 112).
 
-The board's view also folds these engine events: `DeliveryAccepted` and
+The board's view also folds these engine events: `DeliveryQueued` with a
+board source (to learn the wake's delivery id, row 132), `DeliveryAccepted` and
 `DeliveryReturned` for board wakes, `AgentStarted`, `AgentGrouped`,
 `AgentStopped` (to drop owed completions), and the `StateChanged` out of
 `stopped` (to restart read state) (row 114).
@@ -576,18 +592,20 @@ its `DeliveryReturned` (edit E15; row 109).
 
 The client API's budgets are in its section 5, "Message size": a page closes
 at 900 KiB of encoded items, and `client.subscribe` replaces an event over
-256 KiB with a `client.Oversized` marker, which the client reads whole with
-`client.thread`. The board states its largest in
-`packages/contracts/src/board/limits.ts`, and the client API's test
-`packages/contracts/test/size-limits.test.ts` checks them as real encoded
-frames.
+256 KiB with a `client.Oversized` marker. The owner's client then reads a
+state-bearing event whole with `client.event`, and applies it before anything
+later (client API row 137). A piece's stated largest event is checked against
+the 900 KiB page budget, and an event over 256 KiB is allowed (row 133). The
+board states its largest in `packages/contracts/src/board/limits.ts`, and the
+client API's test `packages/contracts/test/size-limits.test.ts` checks them as
+real encoded frames.
 
 | What | The board's largest | Against the budget |
 | --- | --- | --- |
 | A page: `board.read`, `board.channels`, `board.status` with `detail` | 512 KiB of encoded items, with at least one item | Under the 900 KiB page budget. One post encodes to at most about 64 KiB, so one item never passes it. |
-| A board event: `board.PostWritten` | One post of 16,384 characters, with at most 16 addressees: about 64 KiB | Under 256 KiB, so it is never replaced by a marker. |
-| A board event: `board.WakeBuilt` | Ids only, for what one body of 256 KiB can carry. Each item costs its header and markers in the body, so the event stays well under the body's size | Under 256 KiB, so it is never replaced by a marker. |
-| An engine event: the `DeliveryQueued` and `PromptSent` of a wake | A body of 256 KiB, plus the engine's envelope and the event's own fields | May pass 256 KiB. In `client.subscribe` it then becomes a `client.Oversized` marker, and `client.thread` returns it whole, to whoever may read it. `subscribe` is unchanged. |
+| A board event: `board.PostWritten` | One post of 16,384 characters, with at most 16 addressees: about 64 KiB | Under the page budget, and under 256 KiB, so it is never replaced by a marker, and the owner's wait always sees it in the stream. |
+| A board event: `board.WakeBuilt` | Ids only, for what one body of 256 KiB can carry. Each item costs its header and markers in the body, so the event stays well under the body's size | Under the page budget, and under 256 KiB, so it is never replaced by a marker. |
+| An engine event: the `DeliveryQueued` and `PromptSent` of a wake | A body of 256 KiB, plus the engine's envelope and the event's own fields | Under the page budget. It may pass 256 KiB, and in `client.subscribe` it then becomes a `client.Oversized` marker. `client.event` returns it whole to the owner, a device or a service, and `client.thread` returns it whole to whoever may read that thread. `subscribe` is unchanged. |
 | A snapshot section | 256 KiB, with the condition lists always whole | Counted in the client API's test on its large fixture, which fails above 4 MiB. |
 
 ## The board's reactor (rows 104, 105, 124, 125)
