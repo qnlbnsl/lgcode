@@ -99,7 +99,7 @@ that outsiders can reach.
   choice A10 asked.
 
 Full log → `decisions.md`. The contract the other two plans build on is
-`contract.md`, frozen at `75ab185` with addendum `cd1d836`.
+`contract.md`, frozen at `75ab185` with addenda `cd1d836` and `a8fcea5`.
 
 ## Workstreams
 
@@ -223,7 +223,7 @@ Conventions for every unit. Paths are relative to the Shephrd repository
 root. Anchors are at engine commit `8ff4c9b` (`scouting.md`). "Rows" are
 rows of this plan's `decisions.md`; "engine rows" are rows of
 `.plans/plans/shepherd-engine/decisions.md`. "The contract" is
-`contract.md` in this folder, frozen at `75ab185` plus `cd1d836`; where a
+`contract.md` in this folder, frozen at `75ab185` plus `cd1d836` and `a8fcea5`; where a
 unit and the contract disagree, the unit reports it to the lead. A test id
 is a Vitest file path, run with `pnpm vitest run <path>`; Playwright tests
 run with `pnpm playwright test <path>`. Effect code is written from Effect
@@ -248,7 +248,7 @@ Purpose: give pieces 2 to 4 one registered way into the engine's commands,
 log, views and callers, so none of them edits the engine's server or
 command handler, and the record always names the real actor. Units: 1a the
 registry and pieces' data; 1b callers and helpers. Contract section 6,
-items 1 to 12.
+items 1 to 14.
 
 **Done when:**
 
@@ -270,6 +270,8 @@ items 1 to 12.
 | 1.14 | A piece's delivery source: a delivery queued by a piece to a target that stops follows the piece's rule; existing sources behave as before | Test id: `packages/engine/test/extension/delivery-source.test.ts` |
 | 1.15 | A registered hold-unsettled condition keeps a wait open while it holds and lets it close when it ends; with none registered, every existing wait test passes | Test id: `packages/engine/test/extension/hold-unsettled.test.ts`, plus criterion 1.1 |
 | 1.16 | The settled test lives in `packages/contracts` and is re-exported from its old place | Command: `pnpm -r typecheck` exits 0; test id: `packages/contracts/test/settled.test.ts` |
+| 1.17 | A piece may write `DeliveryWithdrawn` only for a delivery it queued and only while it is still queued; withdrawing a sent, accepted, engine-queued or other piece's delivery refuses the whole command | Test id: `packages/engine/test/extension/piece-withdraw.test.ts` |
+| 1.18 | A piece's delivery is always wrapped in the engine's agent-text envelope with a fresh marker, its leading `/` escaped, and its sender shown as the piece's label; no helper sends a raw prompt | Test id: `packages/engine/test/extension/piece-delivery-text.test.ts` |
 
 **Tasks:**
 
@@ -287,7 +289,7 @@ items 1 to 12.
 | 1b.2 | `Actor` gains `service { service, rule? }`; the service rights table; receipts key `service:<name>`; the in-process command path | `packages/contracts/src/events.ts:8` (`Actor`); `CommandHandler.ts:45` (`Credential`), :70 (owner-only check) |
 | 1b.3 | A piece's delivery source variant | `packages/contracts/src/events.ts:30` (`Delivery.source`); `packages/engine/src/routing/deliveries.ts` |
 | 1b.4 | Hold-unsettled conditions; move the settled test to contracts with a re-export | `packages/engine/src/routing/waits.ts` (`settled`) |
-| 1b.5 | Export the rights rule and the delivery planner for pieces | `packages/engine/src/routing/holders.ts` (`holderAbove`); `packages/engine/src/routing/deliveries.ts` |
+| 1b.5 | Export the rights rule and the delivery planner for pieces, with the piece's body and sender label always enveloped (contract item 14), and the own-delivery withdrawal check (item 13) | `packages/engine/src/routing/holders.ts` (`holderAbove`); `packages/engine/src/routing/deliveries.ts` |
 
 **Design artifact:** none.
 
@@ -301,7 +303,7 @@ items 1 to 12.
 | A piece's view drifts from the log | Medium | Pieces' views join the rebuild check (criterion 1.2). |
 | The unit is too big for one build | Medium | Split into 1a and 1b, each with its own criteria. |
 
-**Verify:** criteria 1.1-1.16; environment QA: none.
+**Verify:** criteria 1.1-1.18; environment QA: none.
 
 **Rollout detail:** rollout step 3. Unit 1a merges before 1b starts. The
 board and roles plans start their engine-facing units only after 1b merges.
@@ -708,7 +710,7 @@ when"; the engine design's capabilities 6, 8 and 9 and "What this spec
 leaves open" (client API); `docs/features.md` section 3 ("Threads where the
 owner already works") and section 4; `docs/research/t3-code.md` items 9 to
 12; `docs/issues.md` issues 65, 75 and 164; owner choice A10; lead rulings
-L1 to L4 and L10; the roles planner's requests 1 to 6 and the board
+L1 to L4, L10 and L11; the roles planner's requests 1 to 6 and the board
 planner's R1 items 1 to 6; SECURITY.md security rules 1 to 7.
 
 | Source item | Workstream | Status |
@@ -747,6 +749,7 @@ planner's R1 items 1 to 6; SECURITY.md security rules 1 to 7.
 | Lead L3 | WS-7 (phone uses the page) | planned |
 | Lead L4 | WS-8 | planned |
 | Lead L10 | WS-1 (criterion 1.15) | planned |
+| Lead L11 | WS-1 (criteria 1.17, 1.18) | planned |
 | Roles requests 1-6 | WS-1, WS-3, WS-6; contract section 7 | planned |
 | Board R1 items 1-6 | WS-1, WS-2, WS-5, WS-6; contract section 7 | planned |
 | SECURITY.md rules 1-7 | Guardrails fold | planned |
