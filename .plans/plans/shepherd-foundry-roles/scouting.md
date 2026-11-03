@@ -111,3 +111,13 @@ Source A: `/home/qnlbnsl/projects/personal/herdr-synapse/docs/message-board/feat
 - "Sheepdog", "standing permission" and "always allow": no match.
 
 Source B: `docs/issues.md`. Highest issue number 211 (l.3169). No issue about roles, piece 4, the sheepdog, prompt cache, context size or standing permission rules. Relevant: #75 (l.1237, open) owner cannot wait; #80 (l.1290, fixed) waits limited to the caller's agents; #113 (l.1704, open) nothing closes a crashed agent's open questions; #114 (l.1719, open); #65 (l.1056, open) no event withdraws an owner alert; #76 (l.1246, open) engine notices name the owner as sender; #90 (l.1392, fixed) and #73 (l.1189) option-kind safety; #91 (l.1403, open), #104 (l.1625, open) deny rules; #134 (l.2040, open) out-of-usage account still sends work to idle siblings; #152 (l.2124, open) paused agent that cannot reload; #162 (l.2246, open) ancestry check rests on the caller's claim; #194 (l.2716) unaccepted prompt sent twice after restart.
+
+## Planner's check: Effect test clock (2026-11-03)
+
+context7, library `/effect-ts/effect/effect_4.0.4`, `packages/vitest/README.md`: `it.effect` provides the test services, including `TestClock`, which starts at 0; `TestClock` is imported from `effect/testing` and advanced with `TestClock.adjust("1000 millis")`; `it.live` uses the real clock. The engine pins 4.0.5; 4.0.4 was the nearest documented version.
+
+## Planner's check: frozen contracts (2026-11-03)
+
+- Client API contract v2: `/home/qnlbnsl/projects/personal/herdr-synapse/sheprd/.claude/worktrees/foundry-plans-api/.plans/plans/shepherd-client-api/contract.md` at `75ab185`. Sections used: 1 (namespaces, five exports, views and reactors, paged reads), 2 (service caller and its allowed commands), 3 (`client.roster`, `client.thread`, visibility classes), 4 (alert sources, the four `roles.` kinds), 5 (request ids), 6 (seam items 8, 9, 10, 12), 7 (answers to requests.md).
+- Board contract: `/home/qnlbnsl/projects/personal/herdr-synapse/sheprd/.claude/worktrees/foundry-plans-board/.plans/plans/shepherd-message-board/contract.md` at `aaef08f`. Sections used: "Channels" (group channel), "Posts" (`reply` modes, a collection is a post in `all` mode, service authors), "How a wake reaches an agent", "Commands the board adds to the API" (`board.status`, `board.flush`), "For Shephrd's own services", "What the board refuses".
+- Engine anchors spot-checked on disk: `packages/cli/src/commands/sanitize.ts`, `packages/engine/src/routing/envelope.ts`, `packages/engine/test/support/rebuildCheck.ts`, `packages/engine/scripts/live/flow.ts`, `packages/engine/src/recovery/crash.ts`, `packages/engine/src/accounts/timers.ts:startAccountTimers`.
