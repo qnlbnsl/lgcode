@@ -112,3 +112,22 @@ it("a completed MCP ask leaves an open question but does not prevent the next pr
   const driver = liveProbeDriver(e.options());
   expect(await Effect.runPromise(Effect.scoped(driver.unavailable!("removed-variables", given)))).toBeUndefined();
 });
+
+it("a probe waits for a busy agent to settle before it calls itself unavailable (live run 5)", async () => {
+  const e = make();
+  e.emit(LEAD, { _tag: "StateChanged", agentId: LEAD, state: { _tag: "idle" } });
+  e.emit(WORKER, { _tag: "StateChanged", agentId: WORKER, state: { _tag: "idle" } });
+  e.emit(LEAD, { _tag: "StateChanged", agentId: LEAD, state: { _tag: "working" } });
+  const driver = liveProbeDriver(e.options());
+  setTimeout(() => e.emit(LEAD, { _tag: "StateChanged", agentId: LEAD, state: { _tag: "idle" } }), 150);
+  expect(await Effect.runPromise(Effect.scoped(driver.unavailable!("removed-variables", given)))).toBeUndefined();
+});
+
+it("an agent that stays busy still skips the probe with its reason once the bound passes", async () => {
+  const e = make();
+  e.emit(WORKER, { _tag: "StateChanged", agentId: WORKER, state: { _tag: "idle" } });
+  e.emit(LEAD, { _tag: "StateChanged", agentId: LEAD, state: { _tag: "working" } });
+  const driver = liveProbeDriver({ ...e.options(), engineTimeout: 100 });
+  const reason = await Effect.runPromise(Effect.scoped(driver.unavailable!("removed-variables", given)));
+  expect(reason).toContain(`${LEAD} is working, not idle`);
+});

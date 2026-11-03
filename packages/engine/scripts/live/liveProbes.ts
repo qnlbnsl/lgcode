@@ -259,18 +259,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
   }).pipe(Effect.timeoutOrElse({ duration: options.engineTimeout,
     orElse: () => Effect.fail(new Error(`journey agents did not settle within ${options.engineTimeout} ms; a leftover hold may remain`)) }));
 
-  const unavailable: NonNullable<ProbeDriver["unavailable"]> = (id, given) => Effect.gen(function* () {
-    agents = given;
-    if (options.service().exited()) return "the run's service is not up";
-    // A bounded real socket round-trip, not just a PID check. An unavailable
-    // service prevents this probe; it is not evidence of an adapter failure.
-    const reached = yield* Effect.exit(Effect.scoped(Effect.gen(function* () {
-      const owner = yield* options.openOwner();
-      return yield* since(owner, 0);
-    })).pipe(Effect.timeoutOrElse({ duration: options.engineTimeout, orElse: () => Effect.fail(new Error("readiness timed out")) })));
-    if (Exit.isFailure(reached)) return "the run's service did not answer the readiness check";
-    const history = reached.value;
-    if (id === "permission-kinds" || id === "token-scan") return undefined; // Reads existing evidence; sends no turns.
+  const readiness = (id: ProbeId, given: ProbeAgents, history: ReadonlyArray<Parameters<typeof apply>[1]>): string | undefined => {
     const live = snapshot();
     const state = history.reduce(apply, emptyViews());
     const needed = id === "always-allow" ? [given.lead] : [given.lead, given.worker];
@@ -285,6 +274,32 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       if (Object.values(state.deliveries).some((row) => row.target === agent.agentId && ["queued", "sent"].includes(row.status))) return `agent ${agent.agentId} has a queued journey delivery`;
     }
     return undefined;
+  };
+
+  const unavailable: NonNullable<ProbeDriver["unavailable"]> = (id, given) => Effect.gen(function* () {
+    agents = given;
+    if (options.service().exited()) return "the run's service is not up";
+    // A bounded real socket round-trip, not just a PID check. An unavailable
+    // service prevents this probe; it is not evidence of an adapter failure.
+    const read = Effect.scoped(Effect.gen(function* () {
+      const owner = yield* options.openOwner();
+      return yield* since(owner, 0);
+    })).pipe(Effect.timeoutOrElse({ duration: options.engineTimeout, orElse: () => Effect.fail(new Error("readiness timed out")) }));
+    const reached = yield* Effect.exit(read);
+    if (Exit.isFailure(reached)) return "the run's service did not answer the readiness check";
+    if (id === "permission-kinds" || id === "token-scan") return undefined; // Reads existing evidence; sends no turns.
+    // An agent can be busy for an ordinary reason: the lead handles its wake,
+    // or the notice of a question an earlier probe asked. Wait for it, within
+    // the same bound as every engine read, before calling the probe unavailable.
+    const deadline = Date.now() + options.engineTimeout;
+    let reason = readiness(id, given, reached.value);
+    while (reason !== undefined && !reason.endsWith("no live process in this run") && Date.now() < deadline) {
+      yield* Effect.sleep(25);
+      const again = yield* Effect.exit(read);
+      if (Exit.isFailure(again)) return "the run's service did not answer the readiness check";
+      reason = readiness(id, given, again.value);
+    }
+    return reason;
   });
 
   const observe = (id: ProbeId, given: ProbeAgents): Effect.Effect<ReadonlyArray<Observation>, unknown, Scope.Scope> => Effect.gen(function* () {
