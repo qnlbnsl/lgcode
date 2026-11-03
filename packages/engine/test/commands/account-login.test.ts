@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 
+import { SecretStore } from "../../src/commands/SecretStore.ts";
 import { makeFakeRunner } from "../support/fakeRunner.ts";
 import {
   appendSetup, call, eventOf, failureOf, makeFakeSecrets, makeRig, ownerCredential, provideRig, readLog, removeRig, success, type Rig,
@@ -120,8 +121,12 @@ it.effect("A9 F-3 effective values: catches a comparison of the unresolved refer
   Effect.gen(function* () {
     const fakes = { runner: yield* makeFakeRunner(), secrets: makeFakeSecrets() };
     const planted = "/srv/login-planted-other-0123456789";
-    fakes.secrets.stored.set("secret:same-home", "/srv/login-a");
-    fakes.secrets.stored.set("secret:other-home", planted);
+    // `stored` is read-only, so the references are seeded through the fake's own store.
+    yield* Effect.gen(function* () {
+      const store = yield* SecretStore;
+      yield* store.put("secret:same-home", Redacted.make("/srv/login-a"));
+      yield* store.put("secret:other-home", Redacted.make(planted));
+    }).pipe(Effect.provide(fakes.secrets.layer));
     yield* provideRig(rig, fakes, Effect.gen(function* () {
       yield* registerRebuildCheck();
       for (const [harness, variable] of [["claude", "CLAUDE_CONFIG_DIR"], ["codex", "CODEX_HOME"]] as const) {
