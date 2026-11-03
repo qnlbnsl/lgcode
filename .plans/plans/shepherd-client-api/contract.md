@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v8, review round 1 folded
-version: 8
+status: v9, lead ruling L31
+version: 9
 updated: 2026-11-03
 ---
 
@@ -628,7 +628,9 @@ A piece whose condition can wait on the owner lists those agents too, in the
 same section and read that hold its other lists, under the name `ownerHeld`.
 For the board, those are agents with an open post that needs the owner's
 reply. This is the owner's form of edit E20, and it is checked at open and
-after every batch the helper applies.
+after every batch the helper applies. A piece's `ownerHeld` list is read with
+its other lists. So the helper acts on it at open and at each such read, and
+never on a result older than the stream it has applied.
 
 The test applies
 every piece's hold-unsettled condition, so the owner's wait and an agent's
@@ -1366,7 +1368,8 @@ because the views are an in-memory reference published after the commit
 after the value is read, and holds no writer permit. Every piece's section and
 the wait-state section (section 3) use the same value. A section table, typed over `PieceNamespace`,
 holds each piece's `snapshotFor(caller, view)`, which returns the piece's
-section or nothing (lead ruling L15). Unit 1 writes each entry as "no
+section or nothing (lead ruling L15). Its `view` is that one views value, not
+only the piece's own field. Unit 1 writes each entry as "no
 section". The board's plan writes its bounded summary with no post text,
 and nothing for an agent (lead ruling L23).
 
