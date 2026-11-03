@@ -99,7 +99,7 @@ that outsiders can reach.
   choice A10 asked.
 
 Full log → `decisions.md`. The contract the other two plans build on is
-`contract.md`, version 3 at `876bf4f`, reworked under lead ruling L26.
+`contract.md`, version 4 at `8e80a13`.
 
 ## Workstreams
 
@@ -223,7 +223,7 @@ Conventions for every unit. Paths are relative to the Shephrd repository
 root. Anchors are at engine commit `8ff4c9b` (`scouting.md`). "Rows" are
 rows of this plan's `decisions.md`; "engine rows" are rows of
 `.plans/plans/shepherd-engine/decisions.md`. "The contract" is
-`contract.md` in this folder, version 3 at `876bf4f`; where a
+`contract.md` in this folder, version 4 at `8e80a13`; where a
 unit and the contract disagree, the unit reports it to the lead. A test id
 is a Vitest file path, run with `pnpm vitest run <path>`; Playwright tests
 run with `pnpm playwright test <path>`. Effect code is written from Effect
@@ -261,7 +261,7 @@ section 6, edits E1 to E22.
 | 1.2 | A fixture piece in a test build has its prefixed command served on the Unix socket, its request id replayed by the receipts, its event stored, redacted and rebuilt into its view field, and its view covered by the rebuild check and `debug.compare-views` | Test id: `packages/engine/test/pieces/fixture-piece.test.ts` |
 | 1.3 | Every command name and event tag is unique, every piece name starts with its namespace and a dot, and every command is in exactly one of the planner table and the read table | Test id: `packages/contracts/test/unique.test.ts`; `packages/engine/test/commands/planner-table.test.ts` |
 | 1.4 | Access by caller kind: every engine command gives the owner, a device and an agent exactly today's answer; a command whose entry leaves out `device` is refused for a device and allowed for the owner | Test id: `packages/engine/test/commands/authorization.test.ts` (updated per E2); `packages/engine/test/commands/caller-kinds.test.ts` |
-| 1.5 | Visibility: `agent-scoped`, `owner-only` and `piece-decided` each give the owner, a device, a service, an agent and its child exactly the contract's answer; the engine's events are filtered exactly as today; an event tag without a class does not compile | Test id: `packages/engine/test/api/subscribe-visibility.test.ts`; `packages/engine/test/api/visibility.test.ts`; command: `pnpm -r typecheck` on a fixture with a missing class fails |
+| 1.5 | Visibility: `agent-scoped`, `owner-only` and `piece-decided` each give the owner, a device, a service, an agent and its child exactly the contract's answer; the engine's events are filtered as today, except the read rule's effective-holder case (criterion 1.28); an event tag without a class does not compile | Test id: `packages/engine/test/api/subscribe-visibility.test.ts`; `packages/engine/test/api/visibility.test.ts`; command: `pnpm -r typecheck` on a fixture with a missing class fails |
 | 1.6 | A piece's planner that returns an engine event the state table refuses gets its whole command refused, and nothing is written | Test id: `packages/engine/test/pieces/engine-events.test.ts` |
 | 1.7 | A snapshot taken at sequence N, followed by the events after N, equals a full replay, for the owner and for an agent; a piece's `snapshotFor` can leave its section out for one caller and include it for another | Test id: `packages/engine/test/api/snapshot.test.ts` |
 | 1.8 | A piece's migrations create only `<namespace>_*` tables; a migration that names another table stops start-up | Test id: `packages/engine/test/log/piece-migrations.test.ts` |
@@ -282,6 +282,13 @@ section 6, edits E1 to E22.
 | 1.23 | The dispatcher re-runs the reach check in the send transaction: a target that left the channel after its delivery was queued gets `DeliveryWithdrawn` and is never sent; deliveries without a piece source are dispatched as today | Test id: `packages/engine/test/routing/piece-reach-at-send.test.ts`; `packages/engine/test/routing/deliveries.test.ts` |
 | 1.24 | The reach check runs on every piece-sourced delivery, including one to the caller's own child and one with no caller, and can refuse either | Test id: `packages/engine/test/routing/piece-reach-every.test.ts` |
 | 1.25 | The reach check receives the delivery id and piece source; at queue time it sees the command's own earlier events; after a send-time withdrawal the target's next queued delivery is sent in the same pass | Test id: `packages/engine/test/routing/piece-reach-inputs.test.ts` |
+| 1.26 | A fixture planner's reply comes from its committed batch through `Plan.reply`; the first reply and a resent reply are equal, with one logical change written; engine commands keep their replies | Test id: `packages/engine/test/commands/transaction-receipts.test.ts` (new cases); `packages/engine/test/log/receipts.test.ts` |
+| 1.27 | A read with marks: a lost reply, then a loss of access, then a resend of the same request id is refused; its marks are written with no receipt; the receipts table holds no page text | Test id: `packages/engine/test/api/read-marks.test.ts` |
+| 1.28 | The read rule: for an orchestrator, a lead and a worker, the orchestrator reads the worker only while the lead is paused, crashed or stopped, and the read ends when the lead recovers, live and on catch-up; the lead keeps its read of the worker; management stays `holderAbove` | Test id: `packages/engine/test/api/subscribe-visibility.test.ts` (7.3 changed, new three-generation cases); `packages/engine/test/api/visibility.test.ts` |
+| 1.29 | Every piece event has `keep` in all seven states in the lifecycle table, the table stays exhaustive with no fallback, and the existing state-machine test passes unchanged | Test id: `packages/contracts/test/state-machine.test.ts`; command: `pnpm -r typecheck` |
+| 1.30 | The full caller (with a service's rule) and the device survive the log: live, catch-up, rebuilt and paged-read envelopes are equal for every caller kind, including after a restart; old rows decode with no rule and no device | Test id: `packages/engine/test/log/caller-durable.test.ts`; `log/append.test.ts`, `log/subscribe-gapless.test.ts`, `views/rebuild.test.ts` (new cases) |
+| 1.31 | A piece delivery returned through the real failed-send path, before and after acceptance, writes `DeliveryReturned` with the piece as sender and builds no notice to an agent sender | Test id: `packages/engine/test/routing/deliveries.test.ts` (new cases); `packages/contracts/test/events-roundtrip.test.ts` |
+| 1.32 | The piece batch path: a fixture planner, read and reactor whose batch breaks any of its five checks writes nothing; a raw `DeliveryQueued` from a piece is refused; a reactor writes as `piece { namespace }`; no piece folder imports the log writer | Test id: `packages/engine/test/pieces/piece-batch.test.ts`; boundary test `packages/engine/test/pieces/piece-imports.test.ts` |
 
 **Tasks:**
 
@@ -289,19 +296,20 @@ section 6, edits E1 to E22.
 |---|---|---|
 | 1a.1 | E1 and E10: `CommandsRpcGroup` as the merge point, `engineCommandNames`, the uniqueness test, and dotted names in the command-line registry | `packages/contracts/src/commands.ts` (`commandNames` l.10, `CommandsRpcGroup` l.44, `.merge` l.135); `packages/cli/src/commands/registry.ts:10`; `packages/contracts/src/namespaces.ts` (new) |
 | 1a.2 | E2: the caller-kind access table, the check by credential kind, and the MCP tool list | `commands.ts` (`ownerOnlyCommands` l.16, `commandAccess` l.20); `packages/engine/src/commands/CommandHandler.ts` (l.45, l.70, l.207); `packages/mcp/src/tools.ts:7` |
-| 1a.3 | E3 and E4: the planner table and the read table | `CommandHandler.ts` (`supported` l.54, `planCommand` l.67); `packages/engine/src/api/server.ts` (l.38, l.85, l.153-168); targets `commands/planners.ts`, `api/reads.ts` |
-| 1a.4 | E5 and E6: the event union, piece view fields, piece reactors, and the rebuild check | `packages/contracts/src/events.ts:88`; `packages/engine/src/views/apply.ts` (`emptyViews` l.114, `apply` l.338); `packages/engine/src/service.ts`; `packages/engine/test/support/rebuildCheck.ts`; reactor pattern T3 `apps/server/src/orchestration-v2/DelegatedTaskQuestionReactor.ts` (engine plan 5c.1) |
+| 1a.3 | E3 and E4: the planner table with `Plan.reply`, and the read table with reads with marks | `CommandHandler.ts` (`supported` l.54, `planCommand` l.67, `replyFor` l.97, receipt append l.269); `packages/engine/src/commands/internal.ts:41` (`Plan`); `packages/engine/src/api/server.ts` (l.38, l.85, l.153-168); targets `commands/planners.ts`, `api/reads.ts` |
+| 1a.4 | E5 and E6: the event union, the lifecycle table's piece rows, piece view fields, piece reactors, and the rebuild check | `packages/contracts/src/events.ts:88`; `packages/contracts/src/stateMachine.ts:79` (`eventTable`); `packages/engine/src/views/apply.ts` (`emptyViews` l.114, `apply` l.338); `packages/engine/src/service.ts`; `packages/engine/test/support/rebuildCheck.ts`; reactor pattern T3 `apps/server/src/orchestration-v2/DelegatedTaskQuestionReactor.ts` (engine plan 5c.1) |
 | 1a.5 | E7: piece migrations and side rows | `packages/engine/src/log/migrations.ts`; `packages/engine/src/log/EventLog.ts` (`sideRows`, l.199-204) |
-| 1a.6 | E8: the visibility function and class table | `server.ts:155-159` (inline `Stream.filterEffect`); targets `packages/engine/src/api/visibility.ts`, `packages/contracts/src/visibility.ts` |
+| 1a.6 | E8: the visibility function with the read rule (lead ruling L29), and the class table | `server.ts:155-159` (inline `Stream.filterEffect`); targets `packages/engine/src/api/visibility.ts`, `packages/contracts/src/visibility.ts` |
 | 1a.7 | E9 and E21: the snapshot at a sequence with its section table, and the paged read of one agent's events | `packages/engine/src/log/subscribe.ts:58` (`subscribe`, `PAGE_SIZE`); target `packages/engine/src/api/snapshot.ts` |
 | 1a.8 | E22, and the service builder taking the lists as arguments with the engine's own as the default, so tests run a fixture piece | `packages/engine/src/routing/holders.ts` (`holderAbove`); `packages/engine/src/service.ts`; target `packages/engine/test/support/fixturePiece.ts` |
-| 1b.1 | E11: `Caller`, the envelope's caller, and the receipts key | `events.ts:8` (`Actor`), l.184 (`EventEnvelope`); `EventLog.ts:116` (`callerKey`); `log/subscribe.ts:38`; `migrations.ts:15` |
+| 1b.1 | E11 and E12's durable form: `Caller` with `service` and `piece`, the receipts key, the `caller_rule` and `device_id` columns, `append` taking the full caller, and one row decoder | `events.ts:8` (`Actor`), l.184 (`EventEnvelope`); `EventLog.ts:116` (`callerKey`), l.145 (`commit`), l.182; `log/subscribe.ts:36-38` (`decodeRow`); `views/rebuild.ts:26`; `migrations.ts:15-16` |
 | 1b.2 | E12: the optional `device` field | `events.ts:184`; `CommandHandler.ts:207` |
 | 1b.3 | E13 and E14: the service list, the in-process path, the service rights, and `PermissionAnswered.answeredBy` | Target `packages/engine/src/commands/services.ts`; `server.ts:87` (`authenticate`); `events.ts:132`; `views/apply.ts:45`; `routing/permissions.ts:47` |
-| 1b.4 | E15: `Sender`, wrapping every sender but the owner, and the piece delivery helper | `events.ts:23`, l.112; `packages/engine/src/routing/envelope.ts:23`; `routing/deliveries.ts:46-52`; target `routing/pieceDelivery.ts` |
+| 1b.4 | E15: `Sender` on all three sender fields, wrapping every sender but the owner, and the piece delivery helper | `events.ts:23`, l.112, l.162; `packages/engine/src/routing/envelope.ts:23`; `routing/deliveries.ts:46-52`; target `routing/pieceDelivery.ts` |
 | 1b.5 | E16 and E17: the piece source, its rule table, and own-namespace withdrawal | `events.ts:30` (`Delivery.source`); `routing/deliveries.ts:62`; `CommandHandler.ts` (batch checks) |
 | 1b.6 | E18: the reach check table, at queue time with the projected batch, and at send time with withdraw-and-continue | Target `packages/engine/src/routing/reach.ts`; `routing/waits.ts:110` (`withWaitChecks`, the projection pattern); `routing/deliveries.ts` (dispatcher) |
 | 1b.7 | E19 and E20: the settled test moved to contracts, the hold-unsettled and request-held tables | `routing/waits.ts` (`holds` l.33, `settled` l.39, blocking check l.83); target `packages/contracts/src/settled.ts` |
+| 1b.8 | E23: the piece batch path, delivery requests, the `piece` log caller, and the import boundary test | Target `packages/engine/src/commands/pieceBatch.ts`; `routing/waits.ts:110` (`withWaitChecks`); pattern `packages/engine/src/accounts/available.ts:59-66` (a follower's `log.transact`, which a piece must not use directly) |
 
 **Design artifact:** none.
 
@@ -314,10 +322,13 @@ section 6, edits E1 to E22.
 | A piece's or a service's text reaches an agent unwrapped | High | Criteria 1.14 and 1.18; the renderer wraps every sender but the owner. |
 | A service becomes a way in from outside | High | No service credential exists (criterion 1.13); services are listed in code and reached in process only. |
 | A piece's delivery reaches an agent before its plan writes its reach check | High | Unit 1's refusing entries (criterion 1.22). |
+| A piece's reactor writes around the engine's checks | High | The piece batch path is the only write path, with an import boundary test (criterion 1.32). |
+| A read page, or other record text, is kept in the receipts table | High | Reads are never deduplicated and reads with marks write no receipt (criterion 1.27). |
+| An audit identity is lost on a read of the log | Medium | One row decoder and the equality test (criterion 1.30). |
 | A piece's view drifts from the log | Medium | Pieces' views join the rebuild check (criterion 1.2). |
 | The unit is too big for one build | Medium | Split into 1a and 1b, each with its own criteria. |
 
-**Verify:** criteria 1.1-1.25; environment QA: none.
+**Verify:** criteria 1.1-1.32; environment QA: none.
 
 **Rollout detail:** rollout step 3. Unit 1a merges before 1b starts. The
 board and roles plans start their engine-facing units only after 1b merges.
@@ -773,6 +784,8 @@ planner's R1 items 1 to 6; SECURITY.md security rules 1 to 7.
 | Lead L23 | WS-1 (criterion 1.25) | planned |
 | Owner answer on engine edits (2026-11-03) | WS-1 (units 1a, 1b) | planned (row 63) |
 | Lead L26 | WS-1 (criteria 1.1, 1.22), WS-2 | planned (row 64) |
+| Lead's round 4, S1 to S6 | WS-1 (criteria 1.26-1.32) | planned (rows 68, 70-73) |
+| Lead L29 | WS-1 (criterion 1.28) | planned (row 69) |
 | Roles requests 1-6 | WS-1, WS-3, WS-6; contract section 7 | planned |
 | Board R1 items 1-6 | WS-1, WS-2, WS-5, WS-6; contract section 7 | planned |
 | SECURITY.md rules 1-7 | Guardrails fold | planned |
