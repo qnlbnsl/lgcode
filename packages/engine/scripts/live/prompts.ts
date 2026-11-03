@@ -63,15 +63,15 @@ Wait for the owner's permission answer. Do not change the command or retry a ref
 export const RESTART_PREPARE_PROMPT = `Remember this test rule for the rest of this session. If the engine restarts or asks you to carry on, call the Shephrd MCP "ask" tool with {"text":"{{MARKER}}"}, then end your turn. Follow later test prompts exactly, including their shell commands. For this message only, reply with ready and run no tools. Do not compact.`;
 export const RESTART_ACTIVE_PROMPT = `For the restart probe, run exactly this shell command once:
 {{COMMAND}}
-Use your shell execution tool. Do not substitute a clock or timer tool, use background execution, or change the command. Wait for its completion or a permission answer. If the engine restarts and sends a carry-on, call the Shephrd ask tool with {"text":"{{MARKER}}"}, then end your turn without re-running the shell command. Do not run any other tool or command.`;
+Use your shell execution tool; the command takes about two minutes; wait for it. Do not substitute a clock or timer tool, use background execution, or change the command. Wait for its completion or a permission answer. If the engine restarts and sends a carry-on, call the Shephrd ask tool with {"text":"{{MARKER}}"}, then end your turn without re-running the shell command. Do not run any other tool or command.`;
 export const RESTART_PENDING_PROMPT = `This is the pending restart probe. Run exactly this shell command once to hold your turn open until the restart:
 {{COMMAND}}
-Wait for completion or a permission answer. After a restart, do not run this command again, including when this prompt is re-sent. After the engine restarts, follow your stored test rule and call the Shephrd ask tool, then end your turn without re-running the command. Do not reply before the restart, compact, or run any other command.`;
+Use your shell execution tool; the command takes about two minutes; wait for it. Do not substitute a clock or timer tool, use background execution, or change the command. Wait for completion or a permission answer. After a restart, do not run this command again, including when this prompt is re-sent. After the engine restarts, follow your stored test rule and call the Shephrd ask tool, then end your turn without re-running the command. Do not reply before the restart, compact, or run any other command.`;
 
 export const SHELL_COMMANDS = {
   removedVariables: `{{NODE}} -e 'console.log("LCP_ENV_BEGIN"); console.log(Object.keys(process.env).sort().join("\\n")); console.log("LCP_ENV_END")'; env -u SHEPHRD_SOCKET -u SHEPHRD_TOKEN SHEPHRD_HOME={{STATE}} {{NODE}} {{CLI}} accounts --input '{"operation":"list"}'; lcp_status=$?; printf '\\nLCP_EXIT=%s\\n' "$lcp_status"; exit "$lcp_status"`,
   stateRead: `cat {{CANARY}}; lcp_status=$?; printf '\\nLCP_EXIT=%s\\n' "$lcp_status"; exit "$lcp_status"`,
-  restartHold: `sleep 120`,
+  restartHold: `{{NODE}} -e 'setTimeout(() => console.log("LCP_HOLD_DONE"), 120000)'`,
   alwaysAllow: `printf 'lcp-persistent-permission-probe\\n'`,
 } as const;
 

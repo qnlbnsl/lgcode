@@ -4153,8 +4153,7 @@ Claude received its active prompt at events 341-343 and called exactly
 sleep 120 at events 345 and 348-349. The tool failed at event 350. Its actual
 session result at line 149 says the harness blocks standalone sleep and
 forbids chaining smaller sleeps as a workaround. The model did not decline
-or substitute another command. The current hold cannot establish a working
-turn on that harness. No workaround was added.
+or substitute another command. That standalone hold could not establish a working turn on that harness.
 
 Codex received its active prompt at events 346-347 and accepted it at 391.
 Its session lines 104 and 107 show clock.sleep with duration_ms=120000 and
@@ -4167,8 +4166,15 @@ prompt explicitly requires shell execution and forbids a clock or timer.
 An ended turn without the exact shell hold now fails immediately with a
 named missing attempt instead of waiting for the whole timeout. No service
 kill occurs on that path. Regressions are in probe-fix-round-4.test.ts.
-The unchanged hold can still be blocked by the real harness. The restart
-criteria remain unproven until an authorized real run establishes them.
+Fix round 5 replaces the standalone sleep in both restart phases with the
+absolute Node.js executable running a two-minute setTimeout command. The
+implementation is the commit `fix: run restart holds as exact foreground commands`.
+Both prompts require foreground shell execution and explain the two-minute
+wait. The exact command is shared with the printed dry run and approval
+gates. A standalone sleep, a clock call or background execution is rejected.
+The historical harness block above remains the recorded reason for the
+failed run. The restart criteria remain unproven until an authorized real
+run establishes them.
 
 ## 250. A fresh service has no harness settings, so its first start is refused
 

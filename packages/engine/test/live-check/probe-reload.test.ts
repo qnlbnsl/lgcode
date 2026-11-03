@@ -25,6 +25,8 @@ vi.mock("@shephrd/client", async (importOriginal) => {
 
 registerRebuildCheck({ noLog: true });
 
+// Literal expected command, independently derived from the requested shell probe.
+const HOLD = `'${process.execPath}' -e 'setTimeout(() => console.log("LCP_HOLD_DONE"), 120000)'`;
 const services: LiveService[] = [];
 const engines: FakeEngine[] = [];
 const homes: string[] = [];
@@ -76,7 +78,7 @@ const reload = (plan: Reload = {}): Script => {
       if (p.text.startsWith(RESTART_PENDING_PROMPT.slice(0, 30))) { pending.set(p.agentId, p.deliveryId); return; }
       if (p.text.startsWith(RESTART_PREPARE_PROMPT.slice(0, 40))) { markers.set(p.agentId, markerIn(p.text)); e.turnEnded(p.agentId); return; }
       if (p.text.startsWith(RESTART_ACTIVE_PROMPT.slice(0, 30))) {
-        e.tool(p.agentId, `hold-${p.agentId}`, { command: "sleep 120" });
+        e.tool(p.agentId, `hold-${p.agentId}`, { command: HOLD });
         if (plan.endHoldEarly === true) e.turnEnded(p.agentId);
         return;
       }
@@ -196,9 +198,9 @@ describe("reload (PB-A7, PB-A8, PB-A11, PB-A12) on a scripted engine and a real 
 // receipts, token rotation and the first carry-on stay identical to the control.
 describe("m-7: permissions for a replayed pending hold", () => {
   it.each([
-    { name: "one exact re-request per agent passes with allow-once", commands: ["sleep 120"], passed: true, answers: [ONCE.id, ONCE.id] },
-    { name: "a second exact re-request per agent is denied and fails", commands: ["sleep 120", "sleep 120"], passed: false, answers: [ONCE.id, REJECT.id, ONCE.id, REJECT.id] },
-    { name: "a different command is denied and fails", commands: ["sleep 120; id"], passed: false, answers: [REJECT.id, REJECT.id] },
+    { name: "one exact re-request per agent passes with allow-once", commands: [HOLD], passed: true, answers: [ONCE.id, ONCE.id] },
+    { name: "a second exact re-request per agent is denied and fails", commands: [HOLD, HOLD], passed: false, answers: [ONCE.id, REJECT.id, ONCE.id, REJECT.id] },
+    { name: "a different command is denied and fails", commands: [HOLD + "; id"], passed: false, answers: [REJECT.id, REJECT.id] },
   ])("$name", async ({ commands, passed, answers }) => {
     const engine = await onRealService();
     const waiting = new Map<string, { agent: string; call: string; next: number }>();
@@ -230,6 +232,39 @@ describe("m-7: permissions for a replayed pending hold", () => {
       expect(own).toEqual(commands.length === 2 ? [ONCE.id, REJECT.id] : [passed ? ONCE.id : REJECT.id]);
     }
     if (!passed) expect(result.reason).toContain("denied unexpected restart request");
+  }, 60_000);
+});
+
+describe("issue 245: only the exact foreground Node hold can be replayed", () => {
+  it.each([
+    { name: "the two-minute Node shell command", input: { command: HOLD }, allowed: true },
+    { name: "the former standalone sleep", input: { command: "sleep 120" }, allowed: false },
+    { name: "a clock timer", input: { duration_ms: 120000 }, allowed: false },
+    { name: "background execution of the exact command", input: { command: HOLD, run_in_background: true }, allowed: false },
+  ])("$name", async ({ input, allowed }) => {
+    const engine = await onRealService();
+    const pending = new Map<string, { agent: string; call: string }>();
+    const script = reload({ second: (e, agent, delivery) => {
+      const transaction = `restart-${agent}`;
+      e.emit(agent, { _tag: "SessionOpened", session: { sessionId: transaction } }, { requestId: transaction });
+      e.emit(agent, { _tag: "DeliveryAccepted", deliveryId: delivery }, { requestId: transaction });
+      e.emit(agent, { _tag: "DeliverySent", deliveryId: `carry-${agent}` });
+      const call = `hold-again-${agent}`;
+      e.tool(agent, call, input, "duration_ms" in input ? "clock.sleep" : "Terminal");
+      pending.set(e.permission(agent, call, [ONCE, REJECT]), { agent, call });
+    } });
+    engine.script = { ...script, onAnswer: (e, answer) => {
+      const { agent, call } = pending.get(answer.id)!;
+      e.finish(agent, call, answer.optionId === ONCE.id ? "completed" : "failed", "");
+      e.turnEnded(agent);
+    } };
+    const result = await runProbe(engine, "reload");
+    expect(result.passed).toBe(allowed);
+    expect(engine.answers.map((answer) => answer.optionId)).toEqual(allowed ? [ONCE.id, ONCE.id] : [REJECT.id, REJECT.id]);
+    if (!allowed) expect(result.reason).toContain("denied unexpected restart request");
+    const holds = engine.prompts.filter((p) => p.text.startsWith(RESTART_ACTIVE_PROMPT.slice(0, 30)) || p.text.startsWith(RESTART_PENDING_PROMPT.slice(0, 30)));
+    expect(holds).toHaveLength(4);
+    expect(holds.every((p) => p.text.includes(HOLD) && p.text.includes("the command takes about two minutes; wait for it"))).toBe(true);
   }, 60_000);
 });
 

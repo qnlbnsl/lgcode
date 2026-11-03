@@ -66,6 +66,11 @@ export const exactCommand = (input: string | undefined, command: string): boolea
       ["-c", "-lc"].some((flag) => actual === `${shell} ${flag} ${quoted}`));
   } catch { return false; }
 };
+export const foregroundCommand = (input: string | undefined, command: string): boolean => {
+  if (!exactCommand(input, command)) return false;
+  const value = JSON.parse(input!);
+  return [value.run_in_background, value.background].every((flag) => flag === undefined || flag === false);
+};
 export const mcpAskInput = (input: string | undefined, title: string, marker: string): boolean => {
   try {
     const value = JSON.parse(input ?? "null");

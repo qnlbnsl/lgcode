@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 
 import type { AgentRef, FlowDriver } from "./flow.ts";
 import { CORE_CONFIG, probeCommands } from "./liveProbes.ts";
-import { fill, LEAD_PROMPT, PROMPTS, SHELL_COMMANDS, WORKER_PROMPT } from "./prompts.ts";
+import { fill, LEAD_PROMPT, PROMPTS, WORKER_PROMPT } from "./prompts.ts";
 import { requestId } from "./support.ts";
 
 // Unit 8c: the live side of the journey. The lead is a real Claude Code agent
@@ -103,8 +103,8 @@ export const probePromptFor = (name: string, text: string, workerFolder: string)
   const values: Record<string, string> = name === "REMOVED_VARIABLES_PROMPT" ? { COMMAND: commands.removedVariables }
     : name === "STATE_READ_PROMPT" ? { COMMAND: commands.stateRead }
     : name === "ALWAYS_ALLOW_PROMPT" ? { COMMAND: commands.alwaysAllow }
-    : name === "RESTART_ACTIVE_PROMPT" ? { COMMAND: SHELL_COMMANDS.restartHold, MARKER: "RUN_RANDOM_MARKER" }
-    : name === "RESTART_PENDING_PROMPT" ? { COMMAND: SHELL_COMMANDS.restartHold }
+    : name === "RESTART_ACTIVE_PROMPT" ? { COMMAND: commands.restartHold, MARKER: "RUN_RANDOM_MARKER" }
+    : name === "RESTART_PENDING_PROMPT" ? { COMMAND: commands.restartHold }
     : name === "PROBE_MCP_PROMPT" || name === "RESTART_PREPARE_PROMPT" ? { MARKER: "RUN_RANDOM_MARKER" } : {};
   return fill(text, values);
 };

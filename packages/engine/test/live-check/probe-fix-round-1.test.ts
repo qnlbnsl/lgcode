@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import { probeCommands } from "../../scripts/live/liveProbes.ts";
 import * as evidence from "../../scripts/live/probeEvidence.ts";
 import { probePromptFor } from "../../scripts/live/driver.ts";
-import { RESTART_PENDING_PROMPT, SHELL_COMMANDS, SLASH_UP_PROMPT, SLASH_DOWN_PROMPT } from "../../scripts/live/prompts.ts";
+import { RESTART_PENDING_PROMPT, SLASH_UP_PROMPT, SLASH_DOWN_PROMPT } from "../../scripts/live/prompts.ts";
 import { runProbes, type ProbeDriver } from "../../scripts/live/probes.ts";
 import { makeStepRunner } from "../../scripts/live/flow.ts";
 import { createReporter } from "../../scripts/live/reporter.ts";
@@ -67,9 +67,9 @@ it.each(["claude", "codex"])("M-1: an inapplicable result on the observed %s rec
   expect(reporter.results().find((row) => row.id === target)).toMatchObject({ id: target, passed: false });
 });
 
-it("m-1: the rendered pending replay prompt holds its turn with the named exact sleep command", () => {
+it("m-1: the rendered pending replay prompt holds its turn with the named exact foreground Node command", () => {
   const shown = probePromptFor("RESTART_PENDING_PROMPT", RESTART_PENDING_PROMPT, "/tmp/example/work/project");
-  expect(shown).toContain(SHELL_COMMANDS.restartHold);
+  expect(shown).toContain(`'${process.execPath}' -e 'setTimeout(() => console.log("LCP_HOLD_DONE"), 120000)'`);
   expect(shown).not.toContain('Before a restart, reply with received');
 });
 

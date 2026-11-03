@@ -11,7 +11,7 @@ import * as Fiber from "effect/Fiber";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import { allowOnce, check, type AgentRef } from "./flow.ts";
-import { authRefused, canaryDenied, compactions, exactCommand, exitCodeOf, fixtureEvidence, mcpAskDiscovery, mcpAskInput, receivedUserText, scanTokens, sessionFiles, shellIdentityAbsent, shellIdentityStatus, slashReceipt } from "./probeEvidence.ts";
+import { authRefused, canaryDenied, compactions, exactCommand, exitCodeOf, fixtureEvidence, foregroundCommand, mcpAskDiscovery, mcpAskInput, receivedUserText, scanTokens, sessionFiles, shellIdentityAbsent, shellIdentityStatus, slashReceipt } from "./probeEvidence.ts";
 import { ALWAYS_ALLOW_PROMPT, fill, PROBE_MCP_PROMPT, REMOVED_VARIABLES_PROMPT, RESTART_ACTIVE_PROMPT, RESTART_PENDING_PROMPT, RESTART_PREPARE_PROMPT, SHELL_COMMANDS, SLASH_DOWN_PROMPT, SLASH_RECEIVER_PROMPT, SLASH_UP_PROMPT, STATE_READ_PROMPT } from "./prompts.ts";
 import { ADAPTER_CANCELLED, type Observation, type ProbeAgents, type ProbeDriver, type ProbeId } from "./probes.ts";
 import { apply, emptyViews } from "../../src/views/apply.ts";
@@ -23,6 +23,7 @@ export const CORE_CONFIG = { shell_environment_policy: { inherit: "core" } } as 
 export const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")}'`;
 export const probeCommands = (state: string, node = process.execPath, cli = fileURLToPath(new URL("../../../cli/src/bin.ts", import.meta.url))) => ({
   removedVariables: fill(SHELL_COMMANDS.removedVariables, { STATE: shellQuote(state), NODE: shellQuote(node), CLI: shellQuote(cli) }),
+  restartHold: fill(SHELL_COMMANDS.restartHold, { NODE: shellQuote(node) }),
   stateRead: fill(SHELL_COMMANDS.stateRead, { CANARY: shellQuote(join(state, "live-canary")) }),
   alwaysAllow: SHELL_COMMANDS.alwaysAllow,
 });
@@ -389,12 +390,12 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       // with a carry-on turn (PB-A11).
       for (const { agent } of members()) {
         yield* owner.prompt({ requestId: requestId(), agentId: agent.agentId,
-          text: fill(RESTART_ACTIVE_PROMPT, { COMMAND: SHELL_COMMANDS.restartHold, MARKER: markers.get(agent.agentId)! }) } as never);
+          text: fill(RESTART_ACTIVE_PROMPT, { COMMAND: commands.restartHold, MARKER: markers.get(agent.agentId)! }) } as never);
         const held = yield* eventsUntil(owner, activeMark, "the exact restart hold command (not attempted if declined)", (row) => {
           if (row.agentId === agent.agentId && row.event._tag === "TurnEnded") return true;
           if (row.agentId !== agent.agentId || row.event._tag !== "ThreadItem") return false;
           const tool = event<{ content: Tool }>(row).content;
-          return tool._tag === "tool-call" && exactCommand(tool.input, SHELL_COMMANDS.restartHold);
+          return tool._tag === "tool-call" && foregroundCommand(tool.input, commands.restartHold);
         }, options.agentTimeout);
         yield* check(held.at(-1)?.event._tag !== "TurnEnded",
           `not attempted: ${agent.agentId === agents.lead.agentId ? "claude" : "codex"} ended its hold turn without the exact restart command`);
@@ -450,7 +451,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       yield* check(members().every(({ agent }) => secondTokens.has(agent.agentId) && secondTokens.get(agent.agentId) !== oldTokens.get(agent.agentId)), "not attempted: first-reload tokens were not captured before the second restart");
       const mark = yield* head(carriedOwner);
       const pending = new Map<string, string>();
-      const pendingText = fill(RESTART_PENDING_PROMPT, { COMMAND: SHELL_COMMANDS.restartHold });
+      const pendingText = fill(RESTART_PENDING_PROMPT, { COMMAND: commands.restartHold });
 
       // These calls use the run's peer agent identities, so the engine itself
       // supplies the same escaped data envelope that it uses for an MCP prompt.
@@ -481,7 +482,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
           const request = event<Permission>(row);
           const history = yield* since(fresh, mark);
           const tool = mergedTools(history, agent).find((candidate) => candidate.callId === request.toolCallId);
-          const hold = tool !== undefined && exactCommand(tool.input, SHELL_COMMANDS.restartHold);
+          const hold = tool !== undefined && foregroundCommand(tool.input, commands.restartHold);
           const once = allowOnce(request.options.filter((option) => !option.persistent));
           const ok = once !== undefined && tool !== undefined && (askInput(agent, markers.get(agent.agentId)!)(tool)
             || (hold && !replayedHolds.has(agent.agentId)));
