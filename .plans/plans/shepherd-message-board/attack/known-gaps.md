@@ -1,33 +1,43 @@
 # Known gaps: shepherd-message-board
 
 Gaps the planner could not close before the freeze. Reviewers: these are
-already known; look for new problems.
+already known; look for new problems. Updated for plan version 2, after
+round 1.
 
 1. **Vendor limits.** The planner cannot read each vendor's remaining
    weekly allowance. The lead checks it before launching any unit.
-2. **The hold-unsettled hook is not in the client API contract yet.** The
-   lead answered Q2 (row 33) with a seam hook and asked plans-api to add it
-   to contract v2. Criterion 3.12 depends on it.
-3. **Group channels widen with the label.** A group channel's members are
-   every live agent carrying the label. Another parent can add the label to
-   its own child, and that child then reads the channel. The engine's
-   `group` command checks only that the caller is the child's parent. The
-   security lens should judge whether a group channel needs its opener's
-   consent for each new member.
-4. **New packages and scopes.** The board's code is in two new packages,
-   `packages/board-contracts` and `packages/board`. Their manifests and the
-   workspace entries are a `package.json` change, which no unit may make;
-   the lead decides whether the seam unit creates them or a unit is given
-   that right. The scopes `board/contracts` and `board/backend` do not
-   exist; the lead runs the scoping skill for both before launch.
-5. **Seam items 13 and 14 are approved but not yet in the contract text.**
-   The lead approved them (row 41) and asked plans-api to add them. The
-   seam has no file anchors yet; tasks give greenfield paths and today's
-   engine patterns.
+2. **Closed: seam text for the board's round-1 requests.** The lead
+   approved them as ruling L15, and the client API contract holds them at
+   `296b1c3` as seam items 15 to 17 (row 63).
+3. **Closed: the board's contract change.** The lead approved version 3 as
+   ruling L16 (board post #75); it is now `contract.md` (row 63).
+4. **Closed: a board wake's envelope sender.** Ruling L16: the sender
+   label is `board`, and each post's header names its author from fixed
+   words and the engine-authenticated id (row 63). plans-api is changing
+   its section 2 sentence to match; until that lands, its text at
+   `296b1c3` still says the envelope names the calling agent.
+5. **New packages, test-runner projects and scopes.** The board's code is
+   in two new packages, `packages/board-contracts` and `packages/board`.
+   Their manifests, their workspace entries, and their entries in the root
+   `vitest.config.ts`, which lists test projects by name, are changes no
+   board unit may make. The lead decides whether the seam unit creates
+   them or a unit is given that right. Criterion 1.9 checks that the test
+   runner lists both packages. The scopes `board/contracts` and
+   `board/backend` do not exist; the lead runs the scoping skill for both
+   before launch.
 6. **The owner's answer to row 9 is pending.** If the owner says no, the
    plan and `contract.md` are withdrawn and rewritten.
-7. **Effect functions.** The plan names no Effect function that the engine
-   does not already use at the anchor given. A context7 lookup of Effect
-   4.0.4's documentation on 2026-11-03 did not return the `RpcGroup`
-   pages; the engine's own working use of `RpcGroup.make`, `.merge` and
-   `.omit` (`packages/contracts/src/commands.ts`) is the evidence.
+7. **The owner's confirmation of four exclusions.** Row 44 marks work
+   items, file and branch watches, the test queue and usage meters as
+   WIDENED. The lead confirms them with the owner at acceptance (ruling
+   L14).
+8. **Effect functions.** Shephrd pins Effect 4.0.5 (`pnpm-workspace.yaml`,
+   catalog). The plan names no Effect function that the engine does not
+   already use at the anchor given. A context7 lookup of Effect 4's
+   documentation on 2026-11-03 did not return the `RpcGroup` pages; the
+   engine's own working use of `RpcGroup.make`, `.merge` and `.omit`
+   (`packages/contracts/src/commands.ts`) is the evidence.
+
+Also closed since version 1: the hold-unsettled hook (now seam item 12);
+seam items 13 and 14 (now in the client API contract); group channels
+widening with the label (decided by row 45).

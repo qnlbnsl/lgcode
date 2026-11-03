@@ -106,3 +106,48 @@ unsettled until the post closes. The board already closes a post whose
 addressees all stopped or crashed (row 21), so this cannot hang forever on
 a dead addressee; it can hang on a live addressee that never replies,
 which is the sheepdog's case to catch.
+
+## Q3 (decision row 61): may the round-1 fold change the frozen board contract, and who is a board wake's sender?
+
+**The question, part 1.** Folding round 1 changes the board's contract
+(`contract.md`, frozen at `44cd371`). May it be replaced by
+`attack/contract-v3-proposed.md`? The changes, each from a decision row:
+
+1. A new command, `board.close` (row 50), and two new events,
+   `board.AddresseeResolved` and `board.WakeBuilt` (rows 46, 49).
+2. The board's reach check under seam item 15, with the group-channel,
+   direct-channel and permission-ceiling rules (row 45).
+3. One outcome table for replies, crashes, stops, removals and returned
+   wakes (row 49).
+4. Merging, cleanup of closed posts, returned wakes and leaving a channel
+   (rows 46, 47, 50).
+5. Read state as a watermark plus read ids (row 48).
+6. Fixed-word author headers, byte caps, an owner-question limit of 3,
+   channels addressed by id, `replyTo` in the same channel (rows 52 to 54,
+   56, 57).
+7. Privacy edges and the list of stores; posts cannot be deleted (row 55).
+8. The incoming wait condition, `waitForAgents`, and no board section in an
+   agent's snapshot, as approved in L15 (row 51).
+9. The "board disabled" switch (row 58) and the restart guarantee (row 59).
+
+**The question, part 2.** The client API contract at `d72fe26`, section 2,
+says: "The envelope names the true sender, the calling agent, never the
+piece alone and never the owner." A merged board wake carries posts from
+several authors. Wakes the reactor builds (a returned wake, an owed close, a
+rebuild after leaving a channel) have no calling agent at all.
+
+**Recommendation.** A board wake's envelope carries the sender label
+`board`, as seam item 14 says. Each post's true author is named in that
+post's header line, built from fixed words (row 52). The reader still sees
+the true author of every post, and wakes can still merge.
+
+**The alternative.** One wake per author. This keeps the calling agent in
+the envelope, but it breaks merging, so an agent with posts from three
+authors spends three turns.
+
+**Answer (lead ruling L16, post #75).** Part 1: yes; `contract.md` is
+replaced by version 3. Part 2: the recommendation stands. The sender label
+is `board`, never `owner`. Each post's header is built only from fixed
+words and the engine-authenticated id, never from post text or an
+agent-chosen name, and reactor-built wakes name the original authors the
+same way. Logged as row 63.
