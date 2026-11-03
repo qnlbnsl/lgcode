@@ -4087,3 +4087,46 @@ The post-build A6 adjudicator considers indefinitely failing stop control a MAJO
 consequence, while keeping this finding separate from post-build A6.
 Why it matters: an ordinary stop can fail to end the affected agent until
 the owner intervenes outside the command path.
+
+## 228. A setup timeout after account sign-out records an invalid start-failure event
+
+Found: 2026-11-03, in the re-review of the post-build A3 fix at commit `c9ff320`.
+State: record only, as instructed in fix-round-2 task 3b.
+
+Evidence: finding F-3 is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/rresult-2.md` (not tracked).
+The re-review confirms the path by source inspection and an in-memory
+integration probe with a controlled clock.
+The probe observed one runner stop, one `AgentStartFailed`, a revoked token
+and an agent that remained paused.
+Those observations are the re-reviewer's results, not a test run in this worktree.
+
+What happens: a plain start can still be setting up when another agent on
+its account reports a sign-out.
+In `packages/engine/src/routing/deliveries.ts`, account-wide sign-out pauses
+the starting agent.
+The two-minute setup bound on branch `worker/review-2` then stops its runner
+when setup times out.
+The existing failure branch in `packages/engine/src/commands/start.ts`
+writes `AgentStartFailed` and revokes the agent's token.
+In `packages/contracts/src/stateMachine.ts`, that event is valid only from
+starting, where it changes the agent to stopped.
+In `packages/engine/src/views/apply.ts`, an event invalid from paused leaves
+the lifecycle unchanged.
+The view therefore stays paused without a session or process.
+
+The failure branch predates the setup bound and exists at base commit `8ff4c9b`.
+A setup rejection after sign-out already had the same inconsistency.
+The timeout in the post-build A3 fix adds another route to that branch.
+This does not permanently prevent recovery.
+The production account-return path in `packages/engine/src/recovery/restart.ts`
+can start the paused agent without a session after its account becomes available.
+
+What should happen: any recorded failure event must be valid for the current
+lifecycle while preserving account-return recovery.
+No implementation change is part of this record-only entry.
+
+Score: not assigned, because the re-review supplied no numerical risk score.
+The re-review labels the finding MINOR.
+Why it matters: the timeout records a start failure without reaching the
+stopped state checked by the ordinary setup-timeout test.
