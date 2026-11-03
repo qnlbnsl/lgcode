@@ -192,23 +192,22 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
     agents = given;
     const owner = yield* options.openOwner();
     snapshot();
-    if (id === "fixture-evidence") {
-      return yield* Effect.sync(() => ["claude", "codex"].map((harness) => {
+    if (id === "sandbox-mcp") {
+      // PB-A10 already has real evidence. Cite it beside the MCP observation
+      // without adding another probe or opening another model session.
+      const citations = new Map(["claude", "codex"].map((harness) => {
         const path = fileURLToPath(new URL(`../../../testing/fixtures/${harness}.ndjson`, import.meta.url));
         const rows = readFileSync(path, "utf8").trim().split("\n").map((line) => JSON.parse(line));
         const header = rows[0];
         const categories = [...new Set(rows.flatMap((row) => row.frame?.result?.configOptions ?? []).map((entry: { category?: string }) => entry.category).filter(Boolean))];
         const version = header?.metadata?.protocolVersion;
-        return { harness, outcome: typeof version === "number" && categories.includes("model") && categories.includes("thought_level") ? "cited" : "missing fixture",
-          detail: `${path}:1; adapter ${String(header.version)}, ACP ${String(version)}; categories ${categories.join(",")}; existing evidence, no new adapter session` };
+        return [harness, `PB-A10 existing evidence cited: ${path}:1; adapter ${String(header.version)}, ACP ${String(version)}; categories ${categories.join(",")}; no separate probe`] as const;
       }));
-    }
-    if (id === "sandbox-mcp") {
       const results: Observation[] = [];
       for (const { harness, agent } of members()) {
         const marker = "lcp-mcp-" + randomBytes(8).toString("hex");
         const result = yield* turn(owner, agent, fill(PROBE_MCP_PROMPT, { MARKER: marker }), askInput(agent, marker));
-        results.push({ harness, outcome: askedBy(result.rows, agent, marker) ? "succeeds" : "not attempted", detail: "authenticated QuestionAsked event with the agent as caller, via its MCP ask tool" });
+        results.push({ harness, outcome: askedBy(result.rows, agent, marker) ? "succeeds" : "not attempted", detail: `authenticated QuestionAsked event with the agent as caller, via its MCP ask tool; ${citations.get(harness)}` });
       }
       return results;
     }

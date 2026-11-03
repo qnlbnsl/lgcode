@@ -16,11 +16,11 @@ afterEach(() => { for (const fixture of fixtures.splice(0)) fixture.dispose(); }
 
 // Hand-derived order: the expected list deliberately does not come from the
 // production ALL_STEPS list that the runner also uses to decide its exit code.
-const ids = ["startup-hook", "service", "setup", "lead", "wide-start", "worker-start", "session", "live-view", "routed", "pass-up", "owner-answer", "wake", "fixture-evidence", "sandbox-mcp", "permission-kinds", "removed-variables", "state-read", "slash-up", "slash-down", "always-allow", "reload", "token-scan", "final", "recording"];
+const ids = ["startup-hook", "service", "setup", "lead", "wide-start", "worker-start", "session", "live-view", "routed", "pass-up", "owner-answer", "wake", "sandbox-mcp", "permission-kinds", "removed-variables", "state-read", "slash-up", "slash-down", "always-allow", "reload", "token-scan", "final", "recording"];
 const printed = (lines: string[]) => lines.flatMap((line) => /^(PASS|FAIL|SKIP) ([a-z-]+):/.exec(line)?.slice(1) ?? []);
 
 describe("the real runner and flow against a controlled API", () => {
-  it("returns 0 only after all twenty-four steps pass, closes before recording, and answers on the second owner connection (catches a missing step, wrong answer connection, or premature success)", async () => {
+  it("returns 0 only after all twenty-three steps pass, closes before recording, and answers on the second owner connection (catches a missing step, wrong answer connection, or premature success)", async () => {
     const fixture = setup();
     expect(await main([], fixture.deps)).toBe(0);
     expect(printed(fixture.lines)).toEqual(ids.flatMap((id) => ["PASS", id]));
@@ -33,7 +33,7 @@ describe("the real runner and flow against a controlled API", () => {
     expect(fixture.calls.indexOf("stopped")).toBeLessThan(fixture.calls.indexOf("record"));
     expect(fixture.stopCount).toBe(1);
     expect(fixture.removeCount).toBe(1);
-    expect(fixture.lines.at(-1)).toBe("live-check: all 24 steps passed");
+    expect(fixture.lines.at(-1)).toBe("live-check: all 23 steps passed");
   });
 
   it.each(ids)("a defect at %s exits nonzero and prints SKIP for every later step (catches an ignored failure at any position, including the first and last)", async (id) => {

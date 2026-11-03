@@ -110,6 +110,7 @@ export const dryRunText = (config: LiveConfig = liveConfig({})): string => {
     "- after a recording succeeds, one signed-out probe for that harness: the adapter is started with an empty temporary home and no account variables, and is expected to be refused for authentication.",
     "The probe prompts above add turns to the same two sessions. The reload step restarts the service twice: one working-turn carry-on, then one pending-envelope replay. Each uses SIGKILL on this run's service child only.",
     "The worker account sets CODEX_CONFIG to shell_environment_policy.inherit=core for SEC-PB-8. Shell permissions are answered only for the exact printed command; always allow is used only in its named step.",
+    "PB-A10 already has real evidence in packages/testing/fixtures/{claude,codex}.ndjson. The sandbox-mcp log cites the adapter versions, negotiated ACP versions and config categories; no separate probe is added.",
     "In all a full run starts at most 6 model sessions: 2 in the journey (the lead and the worker), 2 recordings, and up to 2 signed-out probes.", "",
     "Steps the run would take, in order:",
   );

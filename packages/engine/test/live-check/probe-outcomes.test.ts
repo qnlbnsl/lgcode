@@ -8,7 +8,7 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 registerRebuildCheck({ noLog: true });
 
 const good: Record<string, string> = {
-  "fixture-evidence": "cited", "sandbox-mcp": "succeeds", "permission-kinds": "recorded",
+  "sandbox-mcp": "succeeds", "permission-kinds": "recorded",
   "removed-variables": "refused by ancestry check", "state-read": "no mechanism: the agent read the canary file",
   "slash-up": "escaped; no command", "slash-down": "escaped; no command", "always-allow": "scopes recorded; persistent options routed to owner",
   "reload": "old token refused; tool succeeds; found", "token-scan": "not found",
@@ -25,11 +25,14 @@ const run = async (bad?: { id: string; outcome: string }) => {
 };
 
 describe("live probe outcome gates", () => {
+  it("does not add a probe for PB-A10, which already has real fixture evidence", () => {
+    expect(PROBE_STEPS.map((step) => step.id)).not.toContain("fixture-evidence");
+  });
   it("prints each shared fake/live probe step once with both harness outcomes", async () => {
     const { reporter, exit, lines } = await run();
     expect(exit._tag).toBe("Success");
     expect(reporter.results().map((row) => row.id)).toEqual([
-      "fixture-evidence", "sandbox-mcp", "permission-kinds", "removed-variables", "state-read",
+      "sandbox-mcp", "permission-kinds", "removed-variables", "state-read",
       "slash-up", "slash-down", "always-allow", "reload", "token-scan",
     ]);
     expect(lines.every((line) => line.includes("claude:") && line.includes("codex:"))).toBe(true);
@@ -43,7 +46,7 @@ describe("live probe outcome gates", () => {
     ["sandbox-mcp", "tool failed"], ["permission-kinds", "missing options"], ["removed-variables", "acts as owner"],
     ["state-read", "declined"], ["slash-up", "unescaped"], ["slash-down", "command ran"],
     ["always-allow", "persistent option held by agent"], ["reload", "old token accepted"],
-    ["token-scan", "token found"], ["fixture-evidence", "missing fixture"],
+    ["token-scan", "token found"],
   ])("fails %s on %s", async (id, outcome) => {
     expect((await run({ id, outcome })).reporter.results().at(-1)).toMatchObject({ id, passed: false });
   });
@@ -55,11 +58,11 @@ describe("live probe outcome gates", () => {
 
 it.each([
   { rows: [] },
-  { rows: [{ harness: 'claude', outcome: 'cited', detail: 'one harness only' }] },
-  { rows: [{ harness: 'claude', outcome: 'cited', detail: 'first' }, { harness: 'claude', outcome: 'cited', detail: 'duplicate' }] },
+  { rows: [{ harness: 'claude', outcome: 'succeeds', detail: 'one harness only' }] },
+  { rows: [{ harness: 'claude', outcome: 'succeeds', detail: 'first' }, { harness: 'claude', outcome: 'succeeds', detail: 'duplicate' }] },
 ])('fails closed when per-harness observations are absent or duplicated', async ({ rows }) => {
   const reporter = createReporter(() => undefined);
   const result = await Effect.runPromiseExit(Effect.scoped(runProbes({ observe: () => Effect.succeed(rows) }, makeStepRunner(reporter), { lead: { agentId: 'l' }, worker: { agentId: 'w' } })));
   expect(result._tag).toBe('Failure');
-  expect(reporter.results()[0]).toMatchObject({ id: 'fixture-evidence', passed: false, reason: expect.stringContaining('both harnesses') });
+  expect(reporter.results()[0]).toMatchObject({ id: 'sandbox-mcp', passed: false, reason: expect.stringContaining('both harnesses') });
 });

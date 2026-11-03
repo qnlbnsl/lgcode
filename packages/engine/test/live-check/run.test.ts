@@ -68,7 +68,7 @@ describe("the run of pnpm live-check", () => {
     expect(lines[0]).toMatch(/^FAIL startup-hook: .*no service runs for/);
     expect(printedIds(lines)).toEqual(ALL_STEPS.map((step) => step.id));
     expect(lines.filter((line) => line.startsWith("SKIP "))).toHaveLength(ALL_STEPS.length - 1);
-    expect(lines[lines.length - 1]).toMatch(/^live-check: failed \(0 of 24 steps passed\)/);
+    expect(lines[lines.length - 1]).toMatch(/^live-check: failed \(0 of 23 steps passed\)/);
   });
 
   it("fails the service step when the fresh service exits before it serves, keeps its folder and says where it is, and stops it (breaks if a dead service passes, its folder is deleted, or it is left running)", async () => {

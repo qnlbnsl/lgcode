@@ -13,7 +13,6 @@ export interface ProbeDriver {
 
 // Pass rules are exact and closed. Empty evidence and "not attempted" never pass.
 const accepted: Record<ProbeId, ReadonlyArray<string>> = {
-  "fixture-evidence": ["cited"],
   "sandbox-mcp": ["succeeds"],
   "permission-kinds": ["recorded"],
   "removed-variables": ["refused by ancestry check"],

@@ -29,7 +29,6 @@ export const RECORDING_STEP = { id: "recording", title: "the fixtures of Claude 
 
 // L-1: every outcome is checked by the same routine with a live or fake driver.
 export const PROBE_STEPS = [
-  { id: "fixture-evidence", title: "PB-A10: existing real fixture versions and config categories are cited" },
   { id: "sandbox-mcp", title: "PB-A3: each real harness calls a Shephrd tool through its socket" },
   { id: "permission-kinds", title: "SEC-PB-3: each observed permission option has a level and persistence" },
   { id: "removed-variables", title: "SEC-PB-5 and SEC-PB-8: both variables removed; owner ancestry refuses, including core inheritance" },
