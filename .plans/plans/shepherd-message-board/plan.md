@@ -55,6 +55,16 @@ first version let an agent wake a sibling with wider permissions than its
 own, and let a channel bound to a group label take in agents from anywhere
 in the tree.
 
+The second review round again found no blockers, and 24 major problems.
+Three gaps mattered most. First, a channel's membership followed which
+agents were awake, so a lead's usage pause silently emptied its team's
+channel. Second, the notice that tells an asker its question has closed
+could be lost if the asker crashed or the send failed. Third, the owner's
+phone was to download every post at start-up, which would soon pass the
+network's message size limit. This version ties membership to the fixed
+family tree of agents, makes the closing notice a lasting duty, and sends
+the phone only a summary.
+
 The board knows nothing about teams, roles or workflows, because those do
 not belong in Shephrd. The roles plan, piece 4, decides which channels
 exist and who is in them. This plan's `contract.md` answers each of the
@@ -73,11 +83,15 @@ next real wake; the roles plan can force an early hand-over with the
 
 **Who may wake whom.** A channel's members may wake each other, but only
 inside rules that keep the engine's own limits. An agent may not ask for a
-reply from an agent with wider permissions than its own, unless that agent
-is its own parent or grandparent, which the engine already lets it ask. A
-channel that follows a group label takes in only the agents under the
-channel's opener, unless the owner opened it. A direct-message pair keeps
-its right to talk only while the reason for it still holds.
+reply from an agent started with wider permissions than its own, unless one
+is the other's ancestor. A channel that follows a group label takes in only
+labelled agents under one fixed agent, the one that opened it or the one
+the owner names. That never changes when an agent pauses or crashes. A
+direct-message pair keeps its right to talk only while the reason for it
+still holds; when the reason ends, its open questions close and their
+askers are told. Every wake is checked again at the moment it is sent, so
+an agent that has just lost access is not sent text it may no longer
+read.
 
 **Several wakes become one.** An agent never has more than one fresh board
 wake waiting. A new post for it while one is waiting replaces that wake
@@ -90,14 +104,18 @@ any one addressee or from all of them. Each addressee ends in one of four
 ways: it replied, it stopped or crashed, it left the channel, or the
 message could not be delivered twice. When every addressee has ended, or
 the first reply arrives in "any one" mode, the question closes and the
-asker is woken once with every answer and every reason. The asker, a
+asker is woken once with every answer and every reason. That closing
+notice is a lasting duty: it survives a crash, a failed send and a merge,
+and it is cleared only when the asker has received it. The asker, a
 channel manager, the owner or Shephrd's own code can also withdraw a
-question. When a question closes, any of its wakes still waiting are
-removed, so nobody spends a turn on a closed question.
+question; when someone else withdraws it, the asker is told. When a
+question closes, any of its wakes still waiting are removed, so nobody
+spends a turn on a closed question.
 
 **An agent waiting for a board answer is not finished.** If a lead asks
 another lead a question and ends its turn, anyone waiting on the first lead
-is not woken until its question closes. An agent that is itself being
+is not woken until its question closes and its closing notice has reached
+it. An agent that is itself being
 asked a question cannot be stuck behind a blocking wait on the asker; the
 wait gives way, as the engine's own waits do for engine questions.
 
@@ -119,7 +137,12 @@ own code can post as Shephrd.
 **The owner's phone hears about questions for the owner.** A post that
 needs the owner's reply raises one alert on the owner's devices, and the
 alert ends when the post closes. An agent can have at most three such
-questions open at once.
+questions open at once. When the phone starts, it gets a bounded summary
+of the board, with no post text, and reads the text page by page.
+
+**Sizes are measured as they travel.** Every wake and every page is
+measured as the network encodes it, and control characters are removed
+from posts, so no single message can pass the network's limit.
 
 **The board can be switched off, not removed.** Once the board has written
 to the log, the log needs the board's definitions to be read. Rolling back
@@ -167,8 +190,9 @@ of four, a question to one wakes that one only.
 ### What happens when agents and channels change
 
 A background reactor follows the engine's events: an agent that stops,
-crashes, is resumed, or leaves a channel, and a delivery that fails. Each
-case has one rule in the plan's outcome table. The risk is a question that
+crashes, is interrupted, is resumed, or leaves a channel; a direct pair
+that loses its reason to talk; and a delivery that fails or is stopped at
+the moment of sending. Each case has one rule in the plan's outcome table. The risk is a question that
 never closes, or a closed one that wakes someone; tests replay every order
 of reply, crash and resume. When done, a crashed and resumed worker never
 strands its lead's question.
@@ -222,8 +246,13 @@ round-1 reviews (`attack/round-1-*.md`). "The seam" is the extension point
 in the client API contract (`.plans/plans/shepherd-client-api/contract.md`,
 sections 1 to 3 and 6, frozen as v2 at `75ab185` with the addendum
 `cd1d836`, items 13 and 14, item 15 at `d72fe26`, and items 16 and 17 at
-`296b1c3`; rows 42, 61, 63); "seam item N" is that contract's section 6,
-item N. The board's own contract is `contract.md`, version 3 (row 63). Greenfield anchors give
+`296b1c3`, and the send-time reach check of lead ruling L19 in item 15 at
+`ed1755d`; rows 42, 61, 63, 67, 83); "seam item N" is that contract's
+section 6, item N. The board's own contract is `contract.md`, version 4
+(lead ruling L21, row 83). "Ancestor" means by the
+engine's fixed `parent` links, never by holder availability (lead ruling
+L18). "Ceiling" means the permission an agent was started with, from its
+`AgentStarted` (row 73). Greenfield anchors give
 the target path and the neighbouring pattern file; every unit re-reads the
 frozen contract before it starts. A "test id" is a Vitest file path, run
 with `pnpm vitest run <path>`. "Rows" are rows in this plan's
@@ -252,16 +281,21 @@ acceptance tests in `packages/engine/test/acceptance/board-*.test.ts`
 (pattern `flow-start-to-finish.test.ts`), or wherever the seam unit puts
 the composed service's acceptance harness.
 
-**The outcome table (row 49).** Used by the post handler, `board.close` and
-the reactor, as one pure function in `packages/board/src/outcome.ts`.
+**The outcome table (rows 49, 69, 70).** Used by the post handler,
+`board.close` and the reactor, as one pure function in
+`packages/board/src/outcome.ts`.
 
 | Event for one addressee | Its disposition |
 |---|---|
 | It replies in the same channel | `replied` |
-| It stops, crashes, or is interrupted and cannot reload | `gone` (a later resume does not undo it) |
-| It leaves the channel | `removed` |
+| It stops or crashes | `gone` |
+| `AgentInterrupted`, and the agents view shows `reloadable !== true` | `gone`, at once (the engine's `waits.ts:55` test) |
+| `AgentReloadFailed` | `gone` |
+| Interrupted with a reloadable session | none while recovery tries it |
+| It leaves the channel, or a carried post fails the reach check (rows 67, 68) | `removed` |
 | Its board wake for this post is returned twice | `undeliverable` |
 | It pauses | none; the post waits |
+| It replies while `gone` and the post is still open | `replied` (the one allowed change) |
 
 | Post event | Result |
 |---|---|
@@ -271,11 +305,23 @@ the reactor, as one pure function in `packages/board/src/outcome.ts`.
 | The owner replies | closes `answered` |
 | `board.close` | closes `withdrawn` |
 | The author stops, or leaves the channel | closes `withdrawn` |
-| The author crashes, or is interrupted and cannot reload | stays open; a close owed to it is queued when it is next idle |
+| The author crashes, or is interrupted and cannot reload | stays open; replies are still recorded |
 
-At every close except `withdrawn`, the author, if it is an agent, is woken
-once with every reply and every addressee's disposition. At every close,
-the post's demand is removed from every still-queued board wake (row 47).
+**Completions (row 69).** At a close, an agent author is owed a
+completion, unless it withdrew the post itself or stopped. A withdrawal by
+someone else, or by the author's removal from the channel, owes one with
+that reason. The view keeps owed completions per agent. A completion is
+discharged only by `DeliveryAccepted` for a wake whose `board.WakeBuilt`
+names it. It survives merging, cleanup, a return and the author's crash;
+the reactor queues a wake for an idle agent that has owed completions and
+no queued board wake. After two returns it is no longer re-queued, rides
+the next board wake, and is shown as "delivery failed".
+
+**Cleanup (rows 47, 82).** At a close, the post is removed from every
+still-queued board wake that carries it. When one addressee gets a
+disposition, the post is removed only from that addressee's queued wakes.
+A replacement is queued whenever the wake still carries a completion or a
+must-reply post.
 
 **WS-1: One shared definition of the board's commands and events**
 
@@ -288,13 +334,13 @@ Names follow the seam's namespace rule: commands `board.<name>`, event tags
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 1.1 | `ChannelId`, `PostId`, `WakeId` are branded ids; `ReplyMode` is `none`, `any` or `all`; `BoardAuthor` is owner, agent or service; `Disposition` is `replied`, `gone`, `removed` or `undeliverable`; a close outcome is `answered`, `unanswerable` or `withdrawn` | Test id: `packages/board-contracts/test/schemas.test.ts`, "ids, modes, authors, outcomes" |
-| 1.2 | `board.ChannelOpened`, `board.ChannelMembersChanged`, `board.PostWritten`, `board.AddresseeResolved`, `board.PostClosed`, `board.WakeBuilt` and `board.Read` round-trip unchanged | Test id: `packages/board-contracts/test/schemas.test.ts`, "events round-trip" |
+| 1.1 | `ChannelId`, `PostId`, `WakeId` are branded ids; `ReplyMode` is `none`, `any` or `all`; `BoardAuthor` is owner, agent or service; `Disposition` is `replied`, `gone`, `removed` or `undeliverable`; a close outcome is `answered`, `unanswerable` or `withdrawn`; a group channel carries an anchor agent id | Test id: `packages/board-contracts/test/schemas.test.ts`, "ids, modes, authors, outcomes" |
+| 1.2 | `board.ChannelOpened`, `board.ChannelMembersChanged`, `board.PostWritten`, `board.AddresseeResolved`, `board.PostClosed`, `board.WakeBuilt` (with `carried`, `mustReply` and `completions`) and `board.Read` round-trip unchanged | Test id: `packages/board-contracts/test/schemas.test.ts`, "events round-trip" |
 | 1.3 | Every board event is `owner-only` in `boardVisibility`, and no board event has a top-level `agentId` field | Test id: `packages/board-contracts/test/schemas.test.ts`, "hidden from agents" |
 | 1.4 | `boardAccess` matches `contract.md`'s command table: `board.flush` has no `agent`; `service` appears only on `board.post`, `board.close`, `board.status` and `board.flush` | Test id: `packages/board-contracts/test/schemas.test.ts`, "access table" |
-| 1.5 | A post's text refuses more than 16,384 characters; `to` refuses more than 16 addressees; a channel name refuses a non-slug or more than 64 characters | Test id: `packages/board-contracts/test/schemas.test.ts`, "limits" |
+| 1.5 | A post's text refuses more than 16,384 characters; `to` refuses more than 16 addressees; a channel name refuses anything outside `^[a-zA-Z][a-zA-Z0-9_-]{0,63}$` | Test id: `packages/board-contracts/test/schemas.test.ts`, "limits" |
 | 1.6 | `boardAlertSources` raises kind `board.post` with key `post:<postId>` for a post that needs the owner's reply, and ends it on `board.PostClosed` | Test id: `packages/board-contracts/test/alerts.test.ts` |
-| 1.7 | `holdsUnsettled(agentId, boardSection)` and `holdsIncoming(agentId, boardSection)` are exported pure functions (row 51) | Test id: `packages/board-contracts/test/conditions.test.ts` |
+| 1.7 | `holdsUnsettled(agentId, boardSection)` and `holdsIncoming(agentId, boardSection)` are exported pure functions with the inputs and cases of rows 69 and 77, and give the same answer over the bounded snapshot section as over the full view (row 71) | Test id: `packages/board-contracts/test/conditions.test.ts` |
 | 1.8 | Every command and event name in the composed API is unique | The seam's uniqueness test in `packages/api` passes with the board registered |
 | 1.9 | The test runner runs both new packages' tests | Command: `pnpm vitest list` lists files under `packages/board-contracts/test/` and `packages/board/test/` |
 
@@ -323,31 +369,35 @@ The board's view, rebuilt from the log, and the pure rules that decide who
 may open, add, post, read and wake. Two units: 2a the view, 2b the rules.
 
 The view (`packages/board/src/view.ts`) holds: channels (id, name, manager,
-explicit members, optional group label, opener kind owner or agent, kind
-plain, group or direct); posts (id, channel, author, text, `to`, reply
-mode, `replyTo`, each addressee's disposition, replies, status open or
-closed with its outcome, and whether a close is owed to a crashed author);
-read state per member and channel (a watermark plus post ids read above
-it, row 48); the wake index from `board.WakeBuilt` (wake id, delivery id,
-target, carried posts, must-reply posts); and the reactor's last handled
-sequence. Delivery status is never stored: it is read from the engine's
-deliveries view (row 46). A group channel's members are computed from the
-engine's agents view at read time by row 45's rule.
+explicit members, optional group label and anchor, opener kind owner or
+agent, kind plain, group or direct); posts (id, channel, author, text,
+`to`, reply mode, `replyTo`, each addressee's disposition, replies, status
+open or closed with its outcome); owed completions per agent, with their
+return count; each agent's ceiling, from its `AgentStarted` (row 73); read
+state per member and channel (a watermark plus post ids read above it,
+starting at the join, rows 48 and 79); the wake index from
+`board.WakeBuilt` (wake id, delivery id, target, carried posts, must-reply
+posts, completions); and the reactor's last handled sequence. Delivery
+status is never stored: it is read from the engine's deliveries view
+(row 46). A group channel's members are computed from the engine's agents
+view at read time by row 65's rule: live label carriers that have the
+anchor as an ancestor or are the anchor, plus the current manager.
 
 **Done when:**
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 2.1 | `boardAfter` folds every board event and the engine's `DeliveryAccepted` for a board wake, and ignores every other event | Test id: `packages/board/test/view.test.ts`, "fold" |
+| 2.1 | `boardAfter` folds every board event, the engine's `DeliveryAccepted` for a board wake, and `AgentStarted` and `AgentGrouped` (for ceilings and group join positions), and ignores every other event | Test id: `packages/board/test/view.test.ts`, "fold" |
 | 2.2 | The board's view rebuilt from the log alone equals the live view after every board test | The seam's rebuild check covers piece views (seam item 4); `pnpm vitest run packages/board/test` exits 0 |
-| 2.3 | Accepting a wake marks exactly its carried posts read; a `board.Read` marks exactly its page; the watermark moves forward only over a contiguous run; paging back never unreads a post | Test id: `packages/board/test/view.test.ts`, "read state" (cases: 25 unread plus a question, wake carries 21; read an old page; restart) |
+| 2.3 | Accepting a wake marks exactly its carried posts read and discharges exactly its completions; a `board.Read` marks exactly its page; the watermark moves forward only over a contiguous run; paging back never unreads a post; a member joining a channel of 400 posts starts with none unread | Test id: `packages/board/test/view.test.ts`, "read state" (cases: 25 unread plus a question, wake carries 21; read an old page; restart; late join to a plain channel and to a group channel) |
 | 2.4 | An agent can add to a plain channel only an agent it holds and its own holder; every other add is refused | Test id: `packages/board/test/access.test.ts`, "adding members" (child, parent, sibling refused, cousin refused, owner adds anyone) |
 | 2.5 | A manager's rights pass to its holder when it stops or crashes | Test id: `packages/board/test/access.test.ts`, "manager rights pass up" |
-| 2.6 | An agent-opened group channel admits only label carriers whose holder chain passes through its manager; an owner-opened one admits every carrier; an agent cannot bind a label that no agent in its subtree carries; a carrier in another subtree, whether started with the label or given it by `group`, is not a member | Test id: `packages/board/test/access.test.ts`, "group channels" |
-| 2.7 | A direct channel opens, and each later post in it is allowed, only while the pair is holder and held, shares a non-direct channel, or includes the owner; after one side leaves the shared channel, the next post is refused | Test id: `packages/board/test/access.test.ts`, "direct channels" |
-| 2.8 | A non-member cannot read or post in a channel; the owner and every device can; a service can post but not read | Test id: `packages/board/test/access.test.ts`, "read and post" |
-| 2.9 | A post that needs a reply from an agent with a wider permission level than its author is refused, unless that agent is the author's ancestor | Test id: `packages/board/test/access.test.ts`, "ceiling" |
+| 2.6 | A group channel admits label carriers that have its anchor as an ancestor, and its current manager whether or not it carries the label; an owner-opened channel admits only carriers under the anchor the owner named; an agent cannot bind a label that no agent in its subtree carries; a carrier in another subtree, whether started with the label or given it by `group`, is not a member; membership is unchanged when the manager pauses, crashes and is resumed, and no cousin joins when manager rights pass up | Test id: `packages/board/test/access.test.ts`, "group channels" (cases include a manager with no label posting an `all` hand-off to its labelled children) |
+| 2.7 | A direct channel opens, and each later post in it is allowed, only while one side is the other's parent, the pair shares a plain or group channel, or one side is the owner or a service; a paused parent keeps the grant; after one side leaves the last shared channel, the next post is refused, and losing one of two shared channels changes nothing | Test id: `packages/board/test/access.test.ts`, "direct channels" |
+| 2.8 | A non-member cannot read or post in a channel; the owner and every device can; a service can post, and open a direct channel with an agent, but cannot read | Test id: `packages/board/test/access.test.ts`, "read and post" |
+| 2.9 | A post that needs a reply from an agent with a wider ceiling than its author is refused, unless one is the other's ancestor; a target that reports a narrower mode is still refused; a lead that narrows its own mode can still ask its workers | Test id: `packages/board/test/access.test.ts`, "ceiling" |
 | 2.10 | A `replyTo` naming a post in another channel, or sent by a caller no longer in the channel, is refused before anything is written | Test id: `packages/board/test/access.test.ts`, "reply stays in its channel" |
+| 2.11 | The reach check judges each carried post on its own: a failing no-reply post is left out, a failing must-reply post resolves its addressee `removed`, a completion to its author always passes but carries reply text only while the author is a member, and an old carried post never refuses a new command | Test id: `packages/board/test/reach.test.ts` |
 
 **Tasks:**
 
@@ -355,14 +405,15 @@ engine's agents view at read time by row 45's rule.
 |---|---|---|
 | 2a.1 | `emptyBoard` and `boardAfter(state, envelope)`, registered as the board's view | Greenfield `packages/board/src/view.ts`; pattern `packages/engine/src/views/apply.ts`, `deliveriesAfter`, `emptyViews`; registration through seam item 1 |
 | 2a.2 | The outcome function | Greenfield `packages/board/src/outcome.ts` (the outcome table above) |
-| 2b.1 | Authority and reach rules as pure functions over the engine snapshot and the board's view | Greenfield `packages/board/src/access.ts`; uses the seam's rights helper (seam item 8), which wraps `packages/engine/src/routing/holders.ts`, `holderAbove`; the permission levels from `packages/contracts/src/permission.ts` and `packages/engine/src/identity/ceiling.ts` |
+| 2b.1 | Authority and reach rules as pure functions over the engine snapshot and the board's view | Greenfield `packages/board/src/access.ts`; manager rights through the seam's rights helper (seam item 8), which wraps `packages/engine/src/routing/holders.ts`, `holderAbove`; membership and grants from `parent` links in `packages/engine/src/views/apply.ts`, `AgentRow`; ceilings from `AgentStarted.permission` (`packages/contracts/src/events.ts`) compared with `packages/contracts/src/permission.ts` |
 | 2b.2 | The reach check registered under seam item 15 (rows 45, 61) | Greenfield `packages/board/src/reach.ts` |
 
 **Risks:**
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| An authority rule lets an agent read or wake outside its reach | High | Criteria 2.4 to 2.10 each test the forbidden case; unit 2b takes an attack pass |
+| An authority rule lets an agent read or wake outside its reach | High | Criteria 2.4 to 2.11 each test the forbidden case; unit 2b takes an attack pass |
+| A parent inside the anchor's subtree gives its child the label, and the child joins | Low | Accepted and stated (row 66): the subtree is under the anchor's authority |
 | The ceiling rule blocks a real flow, such as a read-only reviewer asking a builder sibling | Medium | The reviewer can post without needing a reply, or ask its parent; the rule is the engine's own ceiling (row 45) |
 | The seam's reach check differs from row 45 | Medium | Seam item 15 at `d72fe26` matches it (row 61); a later difference goes to the lead |
 
@@ -374,35 +425,42 @@ The `board.post` and `board.close` handlers, the wake builder, merging and
 cleanup. One unit, 3a.
 
 How a post is planned, inside the seam's command transaction (seam item
-3): check access and reach (2b) and the owner-question limit (row 54);
-refuse a post that needs a reply with no addressee, or to a stopped or
-crashed addressee; return `board.PostWritten`; if it replies to an open
-post in the same channel from an addressee, return
+3): remove control characters other than newline and tab from the text,
+then redact it (row 72); check access and reach (2b), the owner-question
+limit (row 54) and the limit of 64 open must-reply posts per author
+(row 71); refuse a post that needs a reply with no addressee, with its
+author in `to` (row 78), or to an addressee that is stopped, crashed, or
+interrupted with a session that cannot reload (row 70); return
+`board.PostWritten`; if it replies to an open post in the same channel
+from an addressee, including one resolved `gone`, return
 `board.AddresseeResolved` (`replied`), and, if the outcome function closes
-the post, `board.PostClosed`; compute the wake set (agents only: the
-addressees of a post that needs a reply, minus the author, plus the asker
-of any post this one closed, minus any stopped or crashed agent; a crashed
-asker's close is marked owed); for every post that just closed, remove its
-demand from every still-queued board wake (row 47); for each agent in the
-wake set, if it has a board wake that is queued and was never sent,
-withdraw it (seam item 13); then return one `DeliveryQueued` through the
-delivery helper (seam item 14) with source `{ namespace: "board", id:
-<wake id> }` and sender label `board`, and in the same batch
-`board.WakeBuilt` naming its carried posts. A wake that was sent and
+the post, `board.PostClosed` and an owed completion for its agent author;
+compute the wake set (agents only: the addressees of a post that needs a
+reply, minus the author, plus the author of any post this one closed,
+minus any stopped or crashed agent, whose completion stays owed); apply
+the cleanup rule (rows 47, 82); for each agent in the wake set, if it has
+a board wake that is queued and was never sent, withdraw it (seam item
+13); then return one `DeliveryQueued` through the delivery helper (seam
+item 14) with source `{ namespace: "board", id: <wake id> }` and sender
+label `board`, and in the same batch `board.WakeBuilt` naming its carried
+posts, its must-reply posts and its completions. Every post placed in a
+wake is judged by the reach check on its own (row 67). A wake that was sent and
 requeued keeps its place; new posts for that agent go into one other wake
 (row 46). A merged or replaced wake is a new delivery, so it goes to the
 back of the target's queue (row 62). `board.flush` is a no-op when the
 target already has a never-sent board wake queued (row 62).
 
-The body is plain text, at most 256 KiB of UTF-8 (row 53). It carries, in
-order: every must-reply post, then the oldest unread posts that need no
-reply, up to 20, then a count of the rest. Each post is a header line
-built only from fixed words and the engine-authenticated id (rows 52, 63:
+The body is plain text, at most 256 KiB as JSON encodes it (row 72). It
+carries, in order: the target's owed completions, then every must-reply
+post, then the oldest unread posts that need no reply, up to 20, then a
+count of the rest. Completions never use the 20 digest places. If posts
+are left out, the body ends with "N more posts need your reply; run
+board.read with incoming set" (row 80). Each post is a header line built
+only from fixed words and the engine-authenticated id (rows 52, 63:
 `owner`, `service <name>` or `agent <id>`, never an agent-chosen name),
-its channel id and name,
-its reply mode and its state, then the post's text between fresh random
-markers, with a leading slash escaped. The engine wraps the whole body in
-its agent-text envelope.
+its channel id but never its name (row 74), its reply mode and its state,
+then the post's text between fresh random markers, with a leading slash
+escaped. The engine wraps the whole body in its agent-text envelope.
 
 **Done when:**
 
@@ -410,15 +468,16 @@ its agent-text envelope.
 |---|---|---|
 | 3.1 | In a channel of four agents, a post needing a reply from one queues exactly one delivery, to that one | Test id: `packages/board/test/wakes.test.ts`, "wakes only the addressee" |
 | 3.2 | A post needing no reply queues no delivery for anyone | Test id: `packages/board/test/wakes.test.ts`, "no reply, no wake" |
-| 3.3 | `any` and `all` modes close by the outcome table, and the asker is woken once at the close with every reply and disposition | Test id: `packages/board/test/wakes.test.ts`, "outcome table" (one case per row) |
+| 3.3 | `any` and `all` modes close by the outcome table, and the asker is woken once at the close with every reply and disposition; a withdrawal by someone else, or the author's removal, tells the author once with the reason; the author's own `board.close` or stop tells no one | Test id: `packages/board/test/wakes.test.ts`, "outcome table" (one case per row) |
 | 3.4 | Three posts for one idle-target agent while its never-sent wake is queued leave one queued board wake carrying all three; a requeued wake keeps its place and is not merged; a sent wake is not withdrawn; a paused target is the control case, with its wake left queued and merged in the same way | Test id: `packages/board/test/wakes.test.ts`, "wakes merge" |
-| 3.5 | When a question closes, a queued wake carrying only it is withdrawn, and a queued wake carrying it and another open question is replaced by one carrying only the other | Test id: `packages/board/test/wakes.test.ts`, "closed questions leave the queue" |
+| 3.5 | When a question closes, a queued wake carrying only it is withdrawn, and a queued wake carrying it and another open question is replaced by one carrying only the other; in `all` mode, W1's reply leaves W2's queued wake unchanged; a wake carrying a completion and a withdrawn question is replaced by one carrying the completion | Test id: `packages/board/test/wakes.test.ts`, "closed questions leave the queue" |
 | 3.6 | The wake reaches the agent inside the engine's envelope; each post sits between its own fresh markers with a leading slash escaped; an agent named with a line break, `owner`, a service's name or a copied marker cannot change a header, because no agent-chosen name appears in it; a reactor-built wake names each post's original author | Test id: `packages/board/test/wakes.test.ts`, "text is data" |
 | 3.7 | A secret registered with the redactor never appears in a stored post or wake | Test id: `packages/board/test/wakes.test.ts`, "redacted" |
-| 3.8 | A wake body never exceeds 256 KiB; posts past the cap stay open and unread and are counted in the body | Test id: `packages/board/test/wakes.test.ts`, "byte cap" |
+| 3.8 | A wake body never exceeds 256 KiB as JSON encodes it, for posts of quotes, backslashes and 4-byte characters; control characters other than newline and tab are gone from stored text; posts past the cap stay open and unread, and `board.read` with `incoming` returns exactly the left-out ones | Test id: `packages/board/test/wakes.test.ts`, "byte cap" |
 | 3.9 | A fourth open post needing the owner's reply from one agent is refused | Test id: `packages/board/test/wakes.test.ts`, "owner limit" |
 | 3.10 | `board.close` by the author, the manager, the owner or a service withdraws the post and cleans its wakes; anyone else is refused | Test id: `packages/board/test/wakes.test.ts`, "close" |
 | 3.11 | A merged wake queues behind an engine prompt queued after the wake it replaced; `board.flush` with a never-sent board wake queued adds no delivery | Test id: `packages/board/test/wakes.test.ts`, "merge order and flush" |
+| 3.12 | A post naming its author in `to`, or a 65th open must-reply post from one author, or a question to an interrupted agent that cannot reload, is refused; a reply from an addressee resolved `gone` counts as `replied` while the post is open | Test id: `packages/board/test/wakes.test.ts`, "refusals and late replies" |
 
 **Tasks:**
 
@@ -435,6 +494,7 @@ its agent-text envelope.
 | A merge or cleanup withdraws a wake the dispatcher is about to send | High | The dispatcher writes `DeliverySent` in its own transaction before calling the runner (`deliveries.ts:dispatchQueued`); the handler withdraws only a wake the engine's deliveries view shows still queued in the same snapshot. Criteria 3.4, 3.5; post-build check 1 |
 | A wake already sent costs its target a turn on a question that closed meanwhile | Low | Accepted (row 47); the wake's header names each post's state when built |
 | A replaced requeued wake loses its head place in the queue | Low | Accepted (row 47) |
+| Removing control characters changes pasted tool output | Low | Accepted (row 72): escape codes are noise to a reader, and newline and tab stay |
 | A busy agent's wake waits for its turn to end | Low | Accepted: ACP cannot add to a running turn |
 
 **Verify:** `packages/board/test/wakes.test.ts`; the unchanged engine suite. Device or environment QA: none.
@@ -448,38 +508,63 @@ The reactor reads committed events in order, writes through the seam's
 transaction path, records its last handled sequence, and is safe to run
 twice. Before each write it re-reads the post's status in its own
 transaction's snapshot, so a reply that committed after the reactor read
-its event is never overridden (row 62). Unit 3b: on an addressee's `AgentStopped`, `AgentCrashed`, or
-`AgentReloadFailed` while interrupted, it resolves that addressee `gone`;
-on the author's stop it withdraws the author's open posts; on the author's
-crash it does nothing but mark them suspended; when a crashed author is
-next idle, it queues every close owed to it; on `DeliveryReturned` for a
-board wake, it re-queues one fresh wake with the still-open must-reply
-posts, and on a second return for the same post and target it resolves
-that addressee `undeliverable` (row 46). Unit 3c: on
-`board.ChannelMembersChanged`, and on `AgentStarted` or `AgentGrouped`
-that changes a group channel's computed members, it resolves a leaving
-addressee `removed`, withdraws a leaving author's posts in that channel,
-and withdraws and rebuilds the leaving agent's still-queued board wakes
-without that channel's posts (row 50).
+its event is never overridden (row 62). Its start-up catch-up applies the
+same rules to the state it finds.
 
-The hold-unsettled condition (seam item 12): an agent with an open post of
-its own that needs a reply is not settled. The incoming condition (seam item
-16, row 51): a blocking wait is cancelled with "request held" while its
-waiter is an addressee of an open post that needs its reply and that it
-has not answered.
+Unit 3b, lifecycle:
+
+- On an addressee's `AgentStopped` or `AgentCrashed`, on its
+  `AgentInterrupted` when the agents view shows `reloadable !== true`, and
+  on its `AgentReloadFailed`, it resolves that addressee `gone` (row 70).
+- On the author's stop it withdraws the author's open posts; on the
+  author's crash it leaves them open.
+- When an agent is idle with owed completions and no queued board wake, it
+  queues one (row 69).
+- On `DeliveryReturned` for a board wake, it re-queues one fresh wake with
+  the wake's completions and still-open must-reply posts. On a second
+  return for the same post and target, it resolves that addressee
+  `undeliverable`; on a second return of a completion, it stops
+  re-queuing it (rows 46, 69).
+- On `DeliveryWithdrawn` for a board wake that the engine's dispatcher
+  stopped at send (lead ruling L19), it rebuilds the wake by the per-post
+  reach rule (row 67).
+
+Unit 3c, membership and reach:
+
+- On `board.ChannelMembersChanged`, and on `AgentStarted`, `AgentGrouped`,
+  a stop, a crash or a manager change that alters a group channel's
+  computed members, it resolves a leaving addressee `removed`, withdraws a
+  leaving author's posts in that channel (owing the author a completion
+  with that reason), and rebuilds the leaving agent's still-queued board
+  wakes without that channel's posts (row 50).
+- On the same events, it checks every direct channel whose grant they may
+  end. When a grant ends, it resolves every addressee of an open
+  must-reply post there `removed` (row 68).
+- On the same events, it re-runs the per-post reach rule over every
+  still-queued board wake they may affect (row 67).
+
+The hold-unsettled condition (seam item 12, row 69): an agent is not
+settled while it has an open post of its own that needs a reply, while it
+has an owed completion that has not failed twice, or while it is an
+addressee with no disposition of an open must-reply post that no queued or
+sent board wake carries to it. The incoming condition (seam item 16,
+row 77): a blocking wait is cancelled with "request held" while its
+waiter is an addressee with no disposition of an open post that needs a
+reply.
 
 **Done when:**
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 4.1 | Every row of the outcome table, in every order of reply, crash, resume and stop for two addressees, gives the table's result | Test id: `packages/board/test/reactor.test.ts`, "outcome orders" |
-| 4.2 | A crashed author's question that closes while it is crashed wakes it once when it is resumed and idle | Test id: `packages/board/test/reactor.test.ts`, "owed close" |
-| 4.3 | A returned board wake is re-queued once; a second return resolves the addressee `undeliverable` | Test id: `packages/board/test/reactor.test.ts`, "returned wake" (fake agent's error step) |
-| 4.4 | An addressee removed from the channel, or losing the group label, is resolved `removed`; its queued wake is rebuilt without that channel's posts | Test id: `packages/board/test/reactor.test.ts`, "leaving a channel" |
+| 4.1 | Every row of the outcome table, in every order of reply, crash, resume and stop for two addressees, gives the table's result; an addressee interrupted with a session that cannot reload, and no reload attempt, is resolved `gone` at once, including at start-up catch-up | Test id: `packages/board/test/reactor.test.ts`, "outcome orders" |
+| 4.2 | An owed completion reaches its author once in each order: the close while the author is crashed; the close queued, then the author crashes before the send; the completion merged with a question that is then withdrawn | Test id: `packages/board/test/reactor.test.ts`, "owed completion" |
+| 4.3 | A returned board wake is re-queued once with its completions and open must-reply posts; a second return resolves the addressee `undeliverable`, or marks a completion "delivery failed"; a waiter on the target is not told "settled" between the return and the re-queue | Test id: `packages/board/test/reactor.test.ts`, "returned wake" (fake agent's error step) |
+| 4.4 | An addressee removed from the channel, or losing the group label, is resolved `removed`; its queued wake is rebuilt without that channel's posts; when a direct pair loses its last shared channel, its open question closes `unanswerable` and the asker is told; losing one of two shared channels changes nothing | Test id: `packages/board/test/reactor.test.ts`, "leaving a channel" and "direct grant ends" |
 | 4.5 | The reactor run twice on the same events writes each resolution and close once; a reply committed between the reactor's read and its write is not overridden | Test id: `packages/board/test/reactor.test.ts`, "twice is once" and "racing reply" |
 | 4.6 | An idle agent with an open post of its own that needs a reply is not settled; a paused or crashed one still resolves as the engine already does | Test id: `packages/board/test/settled.test.ts` (with a pause control case) |
-| 4.7 | A blocking wait whose waiter is asked a board question by the agent it waits on returns "request held", whether the question came before or after the wait opened | Test id: `packages/board/test/settled.test.ts`, "no deadlock" (seam item 16) |
+| 4.7 | A blocking wait whose waiter is asked a board question by the agent it waits on returns "request held", whether the question came before or after the wait opened; a waiter resolved `removed` from that question is no longer held | Test id: `packages/board/test/settled.test.ts`, "no deadlock" (seam item 16) |
 | 4.8 | With the board not registered, the engine's settled test and blocking waits behave exactly as today | The engine's existing wait tests under `packages/engine/test/routing/` pass unchanged |
+| 4.9 | A label removed from a busy agent with a queued group wake: the dispatcher's send-time check withdraws the wake, the reactor rebuilds it without that channel's posts, and the agent never receives them; the same holds with the board switched off | Test id: `packages/board/test/reactor.test.ts`, "send-time reach" (lead ruling L19) |
 
 **Tasks:**
 
@@ -487,14 +572,15 @@ has not answered.
 |---|---|---|
 | 3b.1 | The reactor's lifecycle rules | Greenfield `packages/board/src/reactor.ts`; pattern `packages/engine/src/accounts/available.ts`, `followAvailability`; the engine's crash and resume rules in `packages/engine/src/routing/waits.ts` (suspended waits) and `packages/contracts/src/stateMachine.ts`, `commandOutcome` |
 | 3b.2 | The two conditions | Greenfield `packages/board/src/settled.ts`; seam items 12 and 16; the engine's `holds` in `packages/engine/src/routing/waits.ts` |
-| 3c.1 | The reactor's membership rules | `packages/board/src/reactor.ts`; group membership from `packages/engine/src/views/apply.ts`, `AgentRow.groups` |
+| 3c.1 | The reactor's membership, direct-grant and reach rules | `packages/board/src/reactor.ts`; group membership from `packages/engine/src/views/apply.ts`, `AgentRow.groups` and `AgentRow.parent`; the interrupted test from `packages/engine/src/routing/waits.ts:55`; recovery in `packages/engine/src/recovery/restart.ts`, `reloadInterrupted` |
 
 **Risks:**
 
 | Risk | Severity | Mitigation |
 |---|---|---|
 | The reactor writes a resolution twice after a restart | Medium | Each write is idempotent on the view; criterion 4.5 |
-| A text that was already sent reaches an agent that just left the channel | Medium | Accepted and stated (row 50): sent text cannot be recalled |
+| A text that was already sent reaches an agent that just left the channel | Medium | Accepted and stated (row 50): sent text cannot be recalled; a wake still queued is stopped at send (row 67) |
+| The engine's send-time reach check differs from what criterion 4.9 assumes | Medium | It is in seam item 15 at `ed1755d` (L19); a later difference goes to the lead |
 | A question to a live agent that never answers keeps its author unsettled | Medium | `board.close` repairs it; catching a silent agent is the sheepdog's job; `board.status` shows whom the author waits on |
 | The seam's settled test moves into the engine's contracts package, and the board's condition reads only its own snapshot section | Medium | Criterion 4.8 keeps the engine's wait tests unchanged; criterion 1.7 tests the conditions as pure functions |
 
@@ -505,7 +591,9 @@ has not answered.
 Registers the board with the seam, so its commands become MCP tools, CLI
 subcommands and client calls with no code of their own; adds the
 "board disabled" switch (row 58); and gives the seam the board's snapshot
-section through the seam's `snapshotFor` hook (seam item 17, row 51).
+section through the seam's `snapshotFor` hook (seam item 17, rows 51 and
+71): absent for agents, and for the owner, devices and services a bounded
+summary with no post text.
 
 **Done when:**
 
@@ -516,11 +604,12 @@ section through the seam's `snapshotFor` hook (seam item 17, row 51).
 | 5.3 | Agents get `board.open`, `board.members`, `board.post`, `board.close`, `board.read`, `board.channels` and `board.status` as tools, and never `board.flush` | Test id: `packages/board/test/tools.test.ts` |
 | 5.4 | `shephrd --help` lists the eight `board` subcommands | Command: `./bin/shephrd --help`; the seam's CLI parity test passes |
 | 5.5 | A post from a service records the service's name as its author; no socket caller can set a service author | Test id: `packages/board/test/handler.test.ts`, "service author" |
-| 5.6 | `board.status` answers the owner, a device, a service, the agent's holder and the agent itself, and refuses anyone else | Test id: `packages/board/test/handler.test.ts`, "status access" |
+| 5.6 | `board.status` answers the owner, a device, a service, the agent's holder and the agent itself, and refuses anyone else; its reply holds ids, counts and states only, so a holder that is in none of the agent's channels gets no post text and no channel name | Test id: `packages/board/test/handler.test.ts`, "status access" |
 | 5.7 | A post from a paired device records the owner as author and the device in the envelope's `device` field | Test id: `packages/board/test/handler.test.ts`, "device post" |
 | 5.8 | A `board.read` page closes at 512 KiB of encoded text | Test id: `packages/board/test/handler.test.ts`, "page byte cap" |
-| 5.9 | An agent's `client.snapshot` holds no board section; the owner's holds the board's view | Test id: `packages/board/test/handler.test.ts`, "snapshot section" (seam item 17) |
-| 5.10 | With the board switched off, every board command is refused with "board disabled", the reactor and conditions stop, and the service still rebuilds a log that holds board events | Test id: `packages/board/test/disabled.test.ts` |
+| 5.9 | An agent's `client.snapshot` holds no board section; after 1,000 posts of the largest size, the owner's board section holds no post text, stays under 256 KiB encoded, and gives `holdsUnsettled` and `holdsIncoming` the same answers as the full view; a section marked `truncated` is completed by `board.channels` and `board.status` | Test id: `packages/board/test/handler.test.ts`, "snapshot section" (seam item 17) |
+| 5.10 | With the board switched off, every board command is refused with "board disabled", the reactor and conditions stop, the reach check stays registered for the dispatcher, and the service still rebuilds a log that holds board events | Test id: `packages/board/test/disabled.test.ts` |
+| 5.11 | A `board.read` receipt holds only its `board.Read` event, and a `board.post` receipt is scanned like the post's events for registered secrets | Test id: `packages/board/test/handler.test.ts`, "receipts" |
 
 **Tasks:**
 
@@ -537,6 +626,7 @@ section through the seam's `snapshotFor` hook (seam item 17, row 51).
 | A board command skips the receipt or identity step | High | The seam runs every piece command through the engine's handler; criteria 5.1, 5.2; attack pass |
 | A service author can be forged from the socket | High | The service path is in-process only; criterion 5.5 |
 | An agent reads every direct message through `client.snapshot` | High | Criterion 5.9; row 51 |
+| The owner's snapshot outgrows the network's message limit | High | No post text in the section, a 256 KiB cap and a `truncated` fallback to `board.status` (rows 71, 83); criterion 5.9 |
 | A rollback to a build without the board cannot read the log | Medium | Rollback is the switch, not removal (row 58); criterion 5.10 |
 
 **Verify:** the test ids above; the seam's CLI and MCP parity tests. Device or environment QA: rollout step 6, one `shephrd board post` from the owner's terminal against a fresh `/tmp` service, which wakes a fake agent.
@@ -549,9 +639,9 @@ section through the seam's `snapshotFor` hook (seam item 17, row 51).
 |---|---|---|
 | 6.1 | The epic's line: in a channel of four, a question to one wakes that one only, and the reply wakes the asker only | Test id: `packages/engine/test/acceptance/board-wakes-only-addressee.test.ts` |
 | 6.2 | A lead's hand-off in `all` mode to three workers wakes the lead once; with one worker crashed and resumed midway, it still closes | Test id: `packages/engine/test/acceptance/board-collection.test.ts` |
-| 6.3 | A direct message is refused to a non-member on `board.read`, and never appears in any agent's `subscribe`, `client.subscribe` or `client.snapshot` reply | Test id: `packages/engine/test/acceptance/board-privacy.test.ts` |
+| 6.3 | No `board.*` event and no board snapshot section reaches any agent's `subscribe`, `client.subscribe` or `client.snapshot`; an unrelated agent cannot get a direct message through `board.read`, `board.status`, `board.channels` or another agent's thread; as a positive control, the member and its parent see the member's own thread, which may quote the message (row 81) | Test id: `packages/engine/test/acceptance/board-privacy.test.ts` |
 | 6.4 | No file under `packages/board/src/` imports from `packages/engine/src/runner/` or reads `runMode`; a channel with one agent recorded as `interactive` behaves the same | Test id: `packages/board/test/mode-independence.test.ts` |
-| 6.5 | A service killed after a post and before its wake is sent delivers the wake once after restart; one killed after the send without replay proof may deliver it twice, and the board still holds one logical wake | Test id: `packages/engine/test/acceptance/board-restart.test.ts` (two cases) |
+| 6.5 | A service killed after a post and before its wake is sent delivers the wake once after restart; one killed after the send without replay proof may deliver it twice, and the board still holds one logical wake; an addressee on a harness that cannot reload is resolved `gone` after the restart, and its asker is told | Test id: `packages/engine/test/acceptance/board-restart.test.ts` (three cases) |
 | 6.6 | Every existing engine test passes unchanged | Command: `pnpm check` exits 0; `git diff --stat <seam merge> -- packages/engine/test packages/contracts/test` lists only new `board-*` files |
 
 **Tasks:**
@@ -588,17 +678,26 @@ section through the seam's `snapshotFor` hook (seam item 17, row 51).
 6. A harness's own login token, from the account's shadow home, is
    removed from stored posts and wakes (TM-3; SECURITY.md rule 6).
 7. A wake carries only posts from channels its target belongs to, both
-   when it is queued and when it is sent (TM-5).
+   when it is queued and when it is sent (TM-5). The send-time half is the
+   dispatcher's re-check under lead ruling L19; this check proves it
+   under load, against a label change racing the dispatcher.
 8. No `author` or `service` field in a socket or network payload is
    honoured, for agent tokens and device credentials, on both transports
    (TM-6, SEC-BOARD-3).
 9. The largest wake event and the largest `board.read` page, built from
-   posts of 4-byte characters, each stay under the network listener's
-   message limit (TM-7).
+   posts of quotes, backslashes, 4-byte characters, and control characters
+   sent before removal, each stay under the network listener's message
+   limit with the full envelope (TM-7, C2-05, R2-TM-3).
 10. An owner alert for a board post carries no post text (SEC-BOARD-5).
 11. Kills after the queue commit, after a send with replay proof, and after
     a receipt without replay proof each give one logical wake, with
     external sends as the engine allows (ARCH-PB-6; criterion 6.5).
+12. The engine's recovery leaves no interrupted agent that is neither
+    reloadable nor seen by the board's catch-up, for every harness's
+    `reloadable` value (R2-A3).
+13. The owner's board snapshot section, on a team of 50 agents with each
+    agent's limit of open posts, is measured and stays under its cap, or
+    is marked `truncated` (R2-A1).
 
 </details>
 
@@ -610,7 +709,9 @@ seven requests (`requests.md`, "From the message board"); (d) `AGENTS.md`,
 "How agents are run"; (e) SECURITY.md rules 6 and 7; (f) the Synapse list
 items on channels, labels and waking (items 1 to 11, 13, 17, 19, 22);
 (g) the client API contract's answers to the board's six needs (its
-section 7); (h) round 1's 49 findings (`attack/round-1-findings.md`).
+section 7); (h) round 1's 49 findings (`attack/round-1-findings.md`);
+(i) round 2's 39 findings and lead rulings L17 to L19
+(`attack/round-2-findings.md`).
 
 | Source item | Workstream | Status |
 |---|---|---|
@@ -647,6 +748,7 @@ section 7); (h) round 1's 49 findings (`attack/round-1-findings.md`).
 | (f) Item 22 | WS-3 | adopted as `all` mode |
 | (g) 1 to 6 | WS-1, WS-5 | taken in by the client API; `OwnerNeeded` subject refused (row 35) |
 | (h) Round 1 findings | per row in `attack/round-1-findings.md` | every finding folded or answered |
+| (i) Round 2 findings and rulings | per row in `attack/round-2-findings.md` | every finding folded; L17 as row 76, L18 as row 65, L19 as row 67 |
 
 </details>
 
@@ -664,7 +766,7 @@ section 7); (h) round 1's 49 findings (`attack/round-1-findings.md`).
 | `AGENTS.md`, "How agents are run" | Row 5, criterion 6.4 |
 | `AGENTS.md`, "Language" (Effect 4, Node.js 26) | Conventions paragraph |
 | Engine design: pieces build on the engine without changing it | Rows 9, 32, 33, 51, 63; the regression gate |
-| Engine design: the permission ceiling | Row 45 (d), criterion 2.9 |
+| Engine design: the permission ceiling | Rows 45 (d) and 73, by start ceilings; criterion 2.9 |
 | Run rule 6: no `package.json` or lock edits | Conventions paragraph; known gap 5 |
 
 </details>
@@ -678,10 +780,10 @@ at launch; this section names none (owner, 2026-10-16).
 |---|---|---|---|---|---|---|
 | 1 Board contracts | contracts | board/contracts | medium | New schemas whose shapes `contract.md` fixes, on the seam's piece pattern. | no | the seam unit; package and test-runner setup (known gap 5) |
 | 2a Board view and outcome function | backend | board/backend | medium | Pure fold functions and one pure table. | no | 1 |
-| 2b Access and reach rules | backend | board/backend | high | Authorization: who may read, reach and wake whom, including the ceiling. | yes | 2a |
+| 2b Access and reach rules | backend | board/backend | high | Authorization: who may read, reach and wake whom, judged per post, with anchored groups, direct grants and start ceilings. | yes | 2a |
 | 3a Posts, wakes, merge and cleanup | backend | board/backend | high | Wakes merged and cleaned inside one transaction, racing the dispatcher. | no | 2b |
-| 3b Reactor: lifecycle and conditions | backend | board/backend | high | Interacting crash, resume, stop and return rules, run idempotently. | no | 3a |
-| 3c Reactor: membership changes | backend | board/backend | medium | One rule set on 3b's reactor pattern. | no | 3b |
+| 3b Reactor: lifecycle, completions and conditions | backend | board/backend | high | Interacting crash, interrupt, resume, stop and return rules, and durable completions, run idempotently. | no | 3a |
+| 3c Reactor: membership, direct grants and reach | backend | board/backend | high | Membership, grant and per-post reach changes across every event that alters them, against the dispatcher's own check. | yes | 3b |
 | 4 Registration, doors and switch | backend | board/backend | medium | Registration with the seam, which gives the tools, CLI and transports. | yes | 3c |
 | 5 Acceptance suite | backend | board/backend | medium | Four acceptance files and one restart file on the existing harness, plus one scan. | no | 4 |
 
@@ -691,8 +793,8 @@ Scopes: `board/contracts` would edit `packages/board-contracts/**`, and
 Neither exists under `.plans/scopes/` yet; the lead runs the scoping skill
 for both before launch (known gap 5).
 
-Load: 8 build units, 26 launches (8 × 3 for builder, test writer and
-review, plus 2 attack passes). The lead looks up each unit's builder and
+Load: 8 build units, 27 launches (8 × 3 for builder, test writer and
+review, plus 3 attack passes). The lead looks up each unit's builder and
 test writer from the sheet at launch and checks each vendor's remaining
 weekly allowance first; the planner cannot read it (known gap 1).
 
@@ -703,5 +805,6 @@ weekly allowance first; the planner cannot read it (known gap 1).
 | Round | New findings (B/M/m) | Outcome |
 |---|---|---|
 | 1 | 0 / 33 / 16 | Six reviews, grades 6 to 7. Folded into plan v2 as rows 44 to 62. Seam needs approved by the lead (L15, post #69). Contract change asked as Q3 (post #73) and approved as L16 (post #75); `contract.md` is version 3. Details: `attack/round-1-findings.md`. |
+| 2 | 0 / 24 / 15 | Six reviews of plan v2 (`attack/plan-v2.md`) and contract v3 (`attack/contract-v3.md`). Folded into plan v3 as rows 65 to 82, with lead rulings L17 to L19. Contract v4 asked as Q4 (post #96) and approved as L21 (post #98). Details: `attack/round-2-findings.md`. |
 
 </details>

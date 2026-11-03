@@ -1,8 +1,8 @@
 # Known gaps: shepherd-message-board
 
 Gaps the planner could not close before the freeze. Reviewers: these are
-already known; look for new problems. Updated for plan version 2, after
-round 1.
+already known; look for new problems. Updated for plan version 3, after
+round 2.
 
 1. **Vendor limits.** The planner cannot read each vendor's remaining
    weekly allowance. The lead checks it before launching any unit.
@@ -13,9 +13,9 @@ round 1.
    ruling L16 (board post #75); it is now `contract.md` (row 63).
 4. **Closed: a board wake's envelope sender.** Ruling L16: the sender
    label is `board`, and each post's header names its author from fixed
-   words and the engine-authenticated id (row 63). plans-api is changing
-   its section 2 sentence to match; until that lands, its text at
-   `296b1c3` still says the envelope names the calling agent.
+   words and the engine-authenticated id (row 63). The client API's
+   section 2 no longer says the envelope names the calling agent
+   (`ed1755d`).
 5. **New packages, test-runner projects and scopes.** The board's code is
    in two new packages, `packages/board-contracts` and `packages/board`.
    Their manifests, their workspace entries, and their entries in the root
@@ -31,7 +31,16 @@ round 1.
    items, file and branch watches, the test queue and usage meters as
    WIDENED. The lead confirms them with the owner at acceptance (ruling
    L14).
-8. **Effect functions.** Shephrd pins Effect 4.0.5 (`pnpm-workspace.yaml`,
+8. **Two wording points in the client API's seam text.** Sent to the lead
+   with the round 2 fold. (a) Seam item 15 at `ed1755d` says the engine
+   consults a piece's reach check "only ... when the target is outside the
+   calling agent's tree". The board needs the send-time re-check for every
+   board wake, including one whose target is inside the caller's tree and
+   one the reactor built with no caller; criterion 4.9 assumes this.
+   (b) Seam item 16 words the board's condition as "has not answered it";
+   row 77 makes it "has no disposition". The board defines its own
+   condition, so this changes no seam behaviour.
+9. **Effect functions.** Shephrd pins Effect 4.0.5 (`pnpm-workspace.yaml`,
    catalog). The plan names no Effect function that the engine does not
    already use at the anchor given. A context7 lookup of Effect 4's
    documentation on 2026-11-03 did not return the `RpcGroup` pages; the

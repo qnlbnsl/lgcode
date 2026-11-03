@@ -151,3 +151,32 @@ is `board`, never `owner`. Each post's header is built only from fixed
 words and the engine-authenticated id, never from post text or an
 agent-chosen name, and reactor-built wakes name the original authors the
 same way. Logged as row 63.
+
+## Q4 (decision rows 65, 67, 71): may the round-2 fold change the contract, and three points for the seam
+
+**Part 1.** Folding round 2 changes `contract.md` (version 3, ruling L16).
+May it be replaced by `attack/contract-v4-proposed.md`? The changes, by
+row: anchored group membership by `parent` links, with the manager always a
+member (65, 66); direct grants by parentage, and their end (68); the
+reach check judged per post, with the dispatcher's re-check (67);
+completions as durable wake reasons (69); interrupted addressees (70); a
+bounded snapshot section with no post text (71); the wake cap measured as
+encoded JSON, and control characters removed (72); rule 4 by ceilings
+(73); `board.status` and header fields (74); receipts in the store list
+(75); the agent and service direct pair (76); and rows 77 to 82.
+
+**Part 2, my reading of L18.** "Through the manager" is read as through the
+channel's anchor, which is its first manager. When manager rights pass up
+on a crash, the new manager manages the channel and is a member, but the
+channel takes in no one else. Otherwise an opener's crash would widen the
+channel to its holder's whole subtree (threat S4, scenario B).
+
+**Part 3, a seam request.** The board's snapshot section holds no post
+text and is at most 256 KiB, but it can still be truncated on a large
+team. When it is marked `truncated`, `waitForAgents` reads the waited
+agents' condition inputs from `board.status` instead of the section. The
+board's `board.status` reply carries those inputs.
+
+**Part 4, a note for L19.** The board's reach check stays registered while
+the board is switched off, so the dispatcher's re-check still runs then
+(threat R2-TM-1 asked for this).
