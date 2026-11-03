@@ -233,11 +233,12 @@ uses no `herdr agent` command, `collect.sh` or `board-waker.sh`.
 
 <details><summary><b>Implementation details (gates 2, 3, 5, 6, 8)</b></summary>
 
-**Sources this plan builds on.** "CAPI §n" is the client API contract v2,
+**Sources this plan builds on.** "CAPI §n" is the client API contract,
 `.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api` at
-`75ab185` with its addendum `cd1d836` (frozen 2026-11-03, decision row 21). "Board" is the message
-board contract, `.plans/plans/shepherd-message-board/contract.md` on
-`worker/plans-board` at `44cd371` (frozen 2026-11-03, rows 29 and 31). Both assume
+`235d4d6` (v2 frozen at `75ab185`, with seam items 12 to 17 and lead rulings
+L15 and L16; decision rows 21, 32, 33). "Board" is the message board
+contract v3, `.plans/plans/shepherd-message-board/contract.md` on
+`worker/plans-board` at `07b3386` (rows 29, 31, 33). Both assume
 the extension seam (CAPI §6), which is pending the owner (rows 19, 24, 30).
 Engine anchors are at `8ff4c9b` (scouting.md, Scout E). `FOUNDRY` is
 `~/.claude/plugins/marketplaces/founder-os/plugins/harness-sessions/skills/software-foundry`.
@@ -250,8 +251,10 @@ documentation before they are written (team rule 7). Timers are tested with
 (checked on 2026-11-03 against the Effect 4.0.4 `@effect/vitest` README
 through context7). No unit reads an agent's screen or types into a pane.
 Text from an agent, a tool call's input or a file is data: it is matched,
-shortened and quoted, never followed. New problems go into
-`docs/issues.md` in the same change (AGENTS.md rule 3).
+shortened and quoted, never followed. An agent's name, which its parent
+chose, is data too: a roles alert's title is fixed text and the name
+travels in its own field (CAPI §4). New problems go into `docs/issues.md` in
+the same change (AGENTS.md rule 3).
 
 **The roles piece, as CAPI §1 shapes it.** Namespace `roles`. Two packages
 (row 26): `packages/roles-contracts` (schemas only; depends on
@@ -287,11 +290,22 @@ raises `roles.runaway`; `RuleFirstUsed` raises `roles.rule-first-use`. Each
 alert ends when its agent next starts a turn or is stopped, or when the
 owner dismisses it.
 
+Snapshot and sizes (row 33). The roles' `client.snapshot` section comes
+from `snapshotFor(caller, view)`: the whole roles view for the owner,
+devices and services, and nothing for an agent (CAPI §3, seam item 17). The
+roles' stated maxima, which `packages/api`'s size test checks against the
+1 MiB message limit (CAPI §5): a role file of at most 64 KiB, so
+`roles.RoleFileSet` stays under 72 KiB; a `roles.handoff` reply of at most
+64 KiB; a `roles.rules.list` page of at most 200 rules.
+
 Services (CAPI §2, "Services"): `roles.standing-rules` (answers) and
 `roles.sheepdog` (everything else). The engine commands they call are
 exactly `subscribe`, `prompt`, `compact`, `resume` and a one-time `answer`.
 The board commands they call are exactly `board.post`, `board.flush` and
-`board.status` (Board, "For Shephrd's own services").
+`board.status`; a service cannot use `board.read` (Board, "For Shephrd's own
+services"). A notice to an agent is a `board.post` with a `direct` target
+(row 34's assumption); if the board refuses it, or is switched off, the
+notice is an engine `prompt` from the service instead.
 
 **WS-1: Agents know their role, their team and their rules**
 
@@ -305,7 +319,8 @@ package, the role file, and `orient`. Role names are parsed from the free
 |---|---|---|
 | 1.1 | `parseRole("worker:builder")` gives kind `worker` and name `builder`; `parseRole("")` and `parseRole("chef")` give kind `worker` with an `unknown-kind` flag | `packages/roles-contracts/test/role.test.ts` R01-R03 |
 | 1.2 | `RolesRpcGroup` is prefixed `roles.`, every payload has `requestId`, and the composed API's uniqueness test passes with it | `packages/roles-contracts/test/group.test.ts` G01; CAPI §1's uniqueness test in `packages/api` |
-| 1.3 | `rolesAccess` equals the command table above, and every event in `RolesEvent` is `owner-only` in `rolesVisibility` | `group.test.ts` G02-G03 |
+| 1.3 | `rolesAccess` equals the command table above, every event in `RolesEvent` is `owner-only` in `rolesVisibility`, and `snapshotFor` returns nothing for an agent caller | `group.test.ts` G02-G04 |
+| 1.3a | A role file over 64 KiB is refused, and the roles' stated maxima pass the composed API's size test | `roleFile.test.ts` F06; `packages/api` size test (CAPI §5) |
 | 1.4 | A role file that fails the schema is refused with the failing path, and the previous file stays loaded | `packages/roles/test/roleFile.test.ts` F01-F04 |
 | 1.5 | A role file with a key outside the schema, such as `permission` or `rules`, is refused | `roleFile.test.ts` F05 |
 | 1.6 | `shephrd roles orient` and the MCP tool, called by an agent, return its name, kind and role name, its parent's id and name, its children with their states, its open-request and open-question counts, and its role's advice; called by the owner, it is refused | `packages/roles/test/orient.test.ts` O01-O04 |
@@ -316,9 +331,9 @@ package, the role file, and `orient`. Role names are parsed from the free
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
 | 1a | `parseRole` and the three kinds, with generic advice for each: an orchestrator talks to leads; a lead starts, waits on and answers for its own workers; a worker reports to its lead, does not start agents and does not ask the owner | target `packages/roles-contracts/src/role.ts:parseRole`; pattern `packages/contracts/src/permission.ts:permissionLevels` |
-| 1b | `packages/roles-contracts`: `RolesRpcGroup`, `RolesEvent`, `rolesAccess`, `rolesVisibility`, `rolesAlertSources` | CAPI §1, "Where the schemas live"; pattern `packages/contracts/src/commands.ts:CommandsRpcGroup`, `packages/contracts/src/events.ts:Event` |
+| 1b | `packages/roles-contracts`: `RolesRpcGroup`, `RolesEvent`, `rolesAccess`, `rolesVisibility`, `rolesAlertSources`, and the stated maxima above | CAPI §1, "Where the schemas live"; §5 (stated maxima); pattern `packages/contracts/src/commands.ts:CommandsRpcGroup`, `packages/contracts/src/events.ts:Event` |
 | 1c | Role-file schema (role name to advice text and limits), loader from content, `roles.role-file.set` and `get` handlers | target `packages/roles/src/roleFile.ts:loadRoleFile`; pattern `packages/contracts/src/harnesses.ts` |
-| 1d | The roles view (role file, rules, settings, snoozes, the sheepdog's action records, the reactor's cursor, open tool calls by agent) and its registration on the seam | target `packages/roles/src/view.ts:apply`; pattern `packages/engine/src/views/apply.ts:apply`, `emptyViews`; CAPI §1, "Views and reactors" |
+| 1d | The roles view (role file, rules, settings, snoozes, the sheepdog's action records, the reactor's cursor, open tool calls by agent), its `snapshotFor` hook, and its registration on the seam | target `packages/roles/src/view.ts:apply`; pattern `packages/engine/src/views/apply.ts:apply`, `emptyViews`; CAPI §1, "Views and reactors" |
 | 1e | `roles.orient` handler over `client.roster` entries (CAPI §3) and the role file | target `packages/roles/src/orient.ts`; envelope rule `packages/engine/src/routing/envelope.ts` |
 
 **Risks:**
@@ -393,7 +408,7 @@ and timers. The rules in WS-4 and WS-5 plug into it.
 | 3.2 | After a service restart in the middle of a run, the sheepdog sends no nudge, notice, retry or compaction it had already recorded | `fold.test.ts` S02 |
 | 3.3 | Each action's request id is derived from the triggering event's sequence number, so a crash between deciding and writing acts once | `fold.test.ts` S03 |
 | 3.4 | The sheepdog and the answerer call only the engine and board commands listed under "Services" above; a test lists their calls and compares | `packages/roles/test/sheepdog/calls.test.ts` K01 |
-| 3.5 | A notice to an agent is a `board.post` by `roles.sheepdog` in a direct channel with `reply: none`, followed by `board.flush` when it must wake the agent now; a notice to the owner is a roles event that raises an alert | `packages/roles/test/sheepdog/notices.test.ts` N01-N03 |
+| 3.5 | A notice to an agent is a `board.post` by `roles.sheepdog` with a `direct` target and `reply: none`, followed by `board.flush` when it must wake the agent now; when the board refuses the post or is switched off ("board disabled"), the notice is an engine `prompt` from the service; a notice to the owner is a roles event that raises an alert | `packages/roles/test/sheepdog/notices.test.ts` N01-N03, N06 |
 | 3.6 | `roles.snooze` silences team-idle notices for that group until the time passes; `roles.settings.set` changes a limit and the next check uses it | `notices.test.ts` N04-N05 |
 | 3.7 | Timers are re-armed from the view at start-up; a deadline that passed while the service was down fires once at start-up | `packages/roles/test/sheepdog/timers.test.ts` T01-T02 (`TestClock.adjust`) |
 
@@ -413,7 +428,8 @@ and timers. The rules in WS-4 and WS-5 plug into it.
 |---|---|---|
 | Duplicate or lost actions across a restart | major | 3.2 and 3.3; the reactor is safe to run twice on the same event (CAPI §1). |
 | The service caller's rights are wider than the sheepdog needs | major | 3.4. |
-| A notice is read by the lead as an instruction from another agent | minor | Only an in-process service can be a post's author (Board, "Posts", row 36 of the board's log); the notice text is fixed by Shephrd. |
+| A notice is read by the lead as an instruction from another agent | minor | Only an in-process service can be a post's author, and the wake's header names it as `service roles.sheepdog` from fixed words (Board, "How a wake reaches an agent"); the notice text is fixed by Shephrd. |
+| The board is switched off, or refuses a service's direct post (row 34) | minor | 3.5's fallback: an engine `prompt` from the service, which always wakes the recipient. |
 
 **Verify:** `pnpm --filter @shephrd/roles test`. Device or environment QA: none.
 
@@ -601,7 +617,8 @@ adapter needs a new fixture); (2) whether `claude-agent-acp` writes a
 transcript the reader can find under the account's `CLAUDE_CONFIG_DIR`;
 (3) whether the seam's in-process service path lets a service call a
 piece's command (`board.post`) as well as the engine's, as the board
-contract assumes.
+contract assumes; (4) row 34, whether a service may post with a `direct`
+target to an agent.
 
 </details>
 
@@ -653,7 +670,7 @@ seven needs; (H) decisions.md.
 | E: capacity-retry.sh | WS-4d, WS-7b | mapped |
 | F: items 1 to 6 | WS-1, WS-6, WS-3, WS-2 and WS-3, WS-4, — | roster, thread, service caller, `roles.` commands and alert kinds used as given; subscribe filters not needed in-process |
 | G: needs 1, 3, 4, 5, 6, 7 accepted; 2 refused | WS-3, WS-4, WS-5 | accepted needs used as given; work state derived (row 25) |
-| H: rows 1 to 30 | all | each row names its workstream in its own text |
+| H: rows 1 to 34 | all | each row names its workstream in its own text |
 
 </details>
 
