@@ -585,6 +585,14 @@ optional field to an existing schema; no existing value changes meaning.
     `source`, so the piece's rule decides what happens to it when its
     target stops. The board needs this for posts. Existing sources
     (permission, question, wait) keep their rules.
+12. **A registered "hold unsettled" condition** (lead ruling L10, from the
+    board's question Q2, added at the freeze of v2). A piece may register
+    a condition that the engine's settled test in `routing/waits.ts`
+    consults: while the condition holds for an agent, that agent is not
+    settled. The board registers one: an agent with an open post of its
+    own that needs a reply is not settled. The condition is a pure
+    function of the agent and the views, like a visibility rule. With
+    nothing registered, the settled test behaves exactly as today.
 
 The planner estimates this as one engine unit of high complexity, built
 before any piece unit, with an attack pass, because it changes the engine's
