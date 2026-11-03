@@ -651,6 +651,12 @@ optional field to an existing schema; no existing value changes meaning.
     agent's tree (section 2). Its inputs are the caller, the target and the
     views snapshot of the same transaction, never an earlier read (lead
     ruling L15). It grants no other right.
+    The engine checks it twice (lead ruling L19). It checks it first when
+    the piece queues the delivery. The delivery dispatcher checks it again
+    inside the send transaction, against the views snapshot at send time.
+    A delivery that fails the second check is withdrawn with
+    `DeliveryWithdrawn` and never sent. With nothing registered, dispatch
+    is unchanged, and every existing engine test passes unchanged.
 16. **A registered "request held" condition** (lead ruling L15), the
     incoming twin of item 12. The engine already ends a blocking `wait`
     with "request held" when the waiter holds an engine request or
