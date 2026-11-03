@@ -4327,8 +4327,8 @@ establishes it. This finding does not authorize weakening the readiness gate.
 Found: 2026-11-03, during fix round 5, at 138197a with the terminal-output
 changes uncommitted.
 
-Status: fixed by raising the WebSocket open limit in
-`packages/engine/test/support/socketClient.ts` from 5 to 30 seconds.
+Status: mitigated, cause unconfirmed. The WebSocket open limit in
+`packages/engine/test/support/socketClient.ts` went from 5 to 30 seconds.
 The helper's callers do not rely on a fast open timeout. The production
 client's limit is unchanged. No subscription assertion was changed.
 A wider limit reduces these failures but does not prove the absence of
