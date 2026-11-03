@@ -5223,3 +5223,30 @@ The redactor matches base64 runs of a secret
 is base64, so a match on the whole frame may discard the chunk.
 The failure is in the safe direction, because no secret is stored.
 The gap is that the thread gives no sign that output was withheld.
+
+## 275. A real model can decline a live-check probe's command
+
+Found: 2026-11-03, in the final live run at `a105465`.
+Status: open, recorded, not fixed. The outcomes are recorded as they happened.
+The log is `.scratch/foundry-runs/engine-build-1/live-check-2/live-check-run6.log`.
+
+The Codex worker runs on `gpt-6-luna` at low effort.
+In the final run, this model declined two exact commands from a probe.
+It declined the removed-variables command, because that command removes both
+Shephrd variables before it asks for account data.
+It also declined the restart hold, because the prompt says that the hold is part
+of a restart probe.
+The same prompts ran on Codex in earlier runs: the restart hold passed in live
+runs 3 and 5, and the removed-variables command ran in live run 3.
+
+This has two effects on that run's evidence.
+SEC-PB-8 has no observation from the run, and its row reads `not attempted`.
+The `reload` step fails before its first restart, so PB-A7, PB-A8, PB-A11 and
+PB-A12 have no result from the run for either harness.
+Their evidence is live run 5, at `9751bda`.
+The only source changes from `9751bda` to `a105465` are the probe's readiness
+wait and the documents.
+
+A model's refusal is an honest outcome, and the probes do not count it as a pass.
+A later change could reword these prompts, or could run the probes on a stronger
+model. Either would need another real run.
