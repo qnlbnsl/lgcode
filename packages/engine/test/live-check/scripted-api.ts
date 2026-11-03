@@ -129,6 +129,13 @@ export const scriptedApi = (fault: Faults = {}) => {
     remove: () => { removeCount += 1; calls.push("removed"); },
   };
   const deps: RunDeps = {
+    probes: { observe: (id) => Effect.succeed(["claude", "codex"].map((harness) => ({ harness, outcome: fault.step === id ? "not attempted" : ({
+      "fixture-evidence": "cited", "sandbox-mcp": "succeeds", "permission-kinds": "recorded",
+      "removed-variables": "refused by ancestry check", "state-read": "no mechanism: the agent read the canary file",
+      "slash-up": "escaped; no command", "slash-down": "escaped; no command",
+      "always-allow": "scopes recorded; persistent options routed to owner",
+      "reload": "old token refused; tool succeeds; found", "token-scan": "not found",
+    })[id], detail: "controlled adapter boundary; not real-adapter evidence" }))) },
     write: (line) => { lines.push(line); },
     environment: { HOME: home, SHEPHRD_HOME: state, XDG_STATE_HOME: join(root, "xdg"), CODEX_HOME: join(root, "codex") },
     hook: {

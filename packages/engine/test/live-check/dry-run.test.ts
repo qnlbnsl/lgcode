@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { leadPromptFor, liveConfig, liveFolders, REPRESENTATIVE_ROOT } from "../../scripts/live/driver.ts";
+import { leadPromptFor, probePromptFor, liveConfig, liveFolders, REPRESENTATIVE_ROOT } from "../../scripts/live/driver.ts";
 import * as prompts from "../../scripts/live/prompts.ts";
 import { dryRunText, HELP, main, parseArguments, type RunDeps } from "../../scripts/live/run.ts";
 import { ALL_STEPS } from "../../scripts/live/steps.ts";
@@ -27,7 +27,7 @@ const promptConstants: ReadonlyArray<readonly [string, string]> = Object.entries
 // What the dry run shows for a prompt constant: the lead's prompt is shown
 // filled in (fix round 1, F8), the others as written.
 const shownFor = (name: string, text: string, config = liveConfig({})): string =>
-  name === "LEAD_PROMPT" ? leadPromptFor(config, liveFolders(`${REPRESENTATIVE_ROOT}/work`).worker) : text;
+  name === "LEAD_PROMPT" ? leadPromptFor(config, liveFolders(`${REPRESENTATIVE_ROOT}/work`).worker) : probePromptFor(name, text, liveFolders(`${REPRESENTATIVE_ROOT}/work`).worker);
 
 // Every dependency that would start, connect or read something counts its calls.
 const counting = (): { readonly deps: RunDeps; readonly calls: Array<string>; readonly lines: Array<string> } => {
@@ -56,7 +56,7 @@ describe("pnpm live-check --dry-run", () => {
     const output = lines.join("\n");
     expect(code).toBe(0);
     expect(calls).toEqual([]);
-    expect(promptConstants.map(([name]) => name).sort()).toEqual(["LEAD_PROMPT", "RECORDER_PROMPT", "WORKER_PROMPT"]);
+    expect(promptConstants.map(([name]) => name).sort()).toEqual(["ALWAYS_ALLOW_PROMPT", "LEAD_PROMPT", "PROBE_MCP_PROMPT", "RECORDER_PROMPT", "REMOVED_VARIABLES_PROMPT", "RESTART_ACTIVE_PROMPT", "RESTART_PENDING_PROMPT", "RESTART_PREPARE_PROMPT", "SLASH_DOWN_PROMPT", "SLASH_RECEIVER_PROMPT", "SLASH_UP_PROMPT", "STATE_READ_PROMPT", "WORKER_PROMPT"]);
     for (const [name, text] of promptConstants) {
       expect(output, `the dry run does not show ${name} in full`).toContain(shownFor(name, text, deps.config));
       expect(output).toContain(name);
@@ -72,7 +72,7 @@ describe("pnpm live-check --dry-run", () => {
     expect(output).toContain("Sent to: Claude Code (the lead)");
     expect(output).toContain("Sent to: Codex (the worker)");
     expect(output).toContain("Sent to: Claude Code and Codex");
-    expect(prompts.PROMPTS.map((entry) => entry.name)).toEqual(["LEAD_PROMPT", "WORKER_PROMPT", "RECORDER_PROMPT"]);
+    expect(prompts.PROMPTS.map((entry) => entry.name)).toEqual(["LEAD_PROMPT", "WORKER_PROMPT", "PROBE_MCP_PROMPT", "REMOVED_VARIABLES_PROMPT", "STATE_READ_PROMPT", "SLASH_RECEIVER_PROMPT", "SLASH_UP_PROMPT", "SLASH_DOWN_PROMPT", "ALWAYS_ALLOW_PROMPT", "RESTART_PREPARE_PROMPT", "RESTART_ACTIVE_PROMPT", "RESTART_PENDING_PROMPT", "RECORDER_PROMPT"]);
   });
 
   it("lists every step the run would take (breaks if the dry run and the run disagree about the steps)", () => {

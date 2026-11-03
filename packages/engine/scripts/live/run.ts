@@ -12,6 +12,8 @@ import { resolveHarnessDefaults } from "../../src/runner/harnesses.ts";
 import { agentText, envelope } from "../../src/routing/envelope.ts";
 import { routedDelivery } from "../../src/routing/holders.ts";
 import { liveConfig, liveDriver, liveFolders, LIVE_VARIABLES, registerAccounts, renderedPrompts, REPRESENTATIVE_ROOT, type LiveConfig } from "./driver.ts";
+import { liveProbeDriver } from "./liveProbes.ts";
+import type { ProbeDriver } from "./probes.ts";
 import { flow, makeStepRunner, StepFailed } from "./flow.ts";
 import { PROMPTS, placeholdersOf, WORKER_PROMPT } from "./prompts.ts";
 import { realRecord, recordLive, type RecordingDeps } from "./recording.ts";
@@ -106,6 +108,8 @@ export const dryRunText = (config: LiveConfig = liveConfig({})): string => {
     "The re-record step (scripts/live/recording.ts, scripts/recorder.ts) then starts more model sessions, each sent the RECORDER_PROMPT above:",
     "- one Claude Code recording and one Codex recording, each in a new temporary folder;",
     "- after a recording succeeds, one signed-out probe for that harness: the adapter is started with an empty temporary home and no account variables, and is expected to be refused for authentication.",
+    "The probe prompts above add turns to the same two sessions. The reload step restarts the service twice: one working-turn carry-on, then one pending-envelope replay. Each uses SIGKILL on this run's service child only.",
+    "The worker account sets CODEX_CONFIG to shell_environment_policy.inherit=core for SEC-PB-8. Shell permissions are answered only for the exact printed command; always allow is used only in its named step.",
     "In all a full run starts at most 6 model sessions: 2 in the journey (the lead and the worker), 2 recordings, and up to 2 signed-out probes.", "",
     "Steps the run would take, in order:",
   );
@@ -131,6 +135,8 @@ export interface RunDeps {
   readonly serveTimeout: number;
   // After the total limit, how long to wait for the cancelled work to end.
   readonly cancelGrace?: number;
+  // Tests replace only the external adapter boundary, never the flow or gates.
+  readonly probes?: ProbeDriver;
 }
 
 const fixturesFolder = fileURLToPath(new URL("../../../testing/fixtures", import.meta.url));
@@ -179,11 +185,13 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
   // The run's secret list. The owner credential joins it the first time it can
   // be read and stays on it; every printed line is redacted with the list.
   let credential: ReadonlyArray<string> = [];
+  const agentSecrets = new Set<string>();
+  const probeOutputs: Array<{ label: string; text: string }> = [];
   const registered = (): ReadonlyArray<string> => {
     if (credential.length === 0 && service !== undefined) {
       try { credential = readOwnerCredentialFrom(service.state); } catch { /* The final step reports an unreadable credential. */ }
     }
-    return credential;
+    return [...credential, ...agentSecrets];
   };
   const reporter = createReporter(
     (line) => { if (open) deps.write(line); }, deps.clock,
@@ -245,15 +253,35 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
         mkdirSync(workerFolder, { mode: 0o700 });
         yield* registerAccounts(owner, config, yield* Effect.promise(() => deps.harnessSettings()), deps.environment);
       }), () => `${config.leadHarness} (${config.leadModel}, ${config.leadEffort}) and ${config.workerHarness} (${config.workerModel}, ${config.workerEffort})`);
+      const checkRestart = () => Effect.gen(function* () {
+        if (service?.restart === undefined) return yield* Effect.fail(new Error("not attempted: service wrapper cannot restart"));
+        service = yield* Effect.tryPromise((signal) => service!.restart!(signal));
+        const deadline = deps.clock() + deps.serveTimeout;
+        for (;;) {
+          if (service.exited()) return yield* Effect.fail(new Error("restarted service exited before listening"));
+          const connected = yield* Effect.exit(Effect.scoped(deps.connectOwner(service.state)));
+          if (Exit.isSuccess(connected)) return;
+          if (deps.clock() > deadline) return yield* Effect.fail(new Error("restarted service did not listen within the limit"));
+          yield* Effect.sleep(100);
+        }
+      });
       return yield* flow({
         owner, openOwner: () => deps.connectOwner(live.state).pipe(Effect.map((client) => recordReplies(client, replies))),
         driver: liveDriver(owner, config, leadFolder, workerFolder), step,
+        probes: deps.probes ?? liveProbeDriver({
+          service: () => service!, openOwner: () => deps.connectOwner(live.state), environment: deps.environment,
+          agentTimeout: config.agentTimeout, engineTimeout: deps.engineTimeout, secrets: agentSecrets,
+          captureOutput: (source) => { probeOutputs.push(source); },
+          restart: checkRestart,
+        }),
+        probeNote: reporter.note,
         leadHarness: config.leadHarness, workerHarness: config.workerHarness, workerFolder,
         agentTimeout: config.agentTimeout, engineTimeout: deps.engineTimeout, settle: deps.settle,
         // Fails when the credential cannot be read, and the final step names that.
-        secrets: () => readOwnerCredentialFrom(live.state),
+        secrets: () => [...readOwnerCredentialFrom(live.state), ...agentSecrets],
         outputs: () => [
-          { label: "the output of the service process", text: live.output() },
+          ...probeOutputs,
+          { label: "the output of the service process", text: service!.output() },
           { label: "the lines the script printed", text: reporter.printed() },
         ],
         replies: () => replies,

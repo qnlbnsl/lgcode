@@ -3197,3 +3197,38 @@ A single step of the clock, such as a time-server correction, does not cause
 the loop.
 Fix, if wanted: give the recheck a floor of one millisecond, or state in the
 file's header comment that the timer assumes the clock does not move back.
+
+## 212. The live check omitted post-build restart and security evidence
+
+Found: 2026-11-02, in post-build review finding L-1.
+
+Status: the probe implementation is written and covered locally with fake
+adapters. Real-adapter evidence remains pending the lead's reviewed live run.
+
+The original fourteen steps did not inspect the adapters' session files or
+process arguments. They did not try a state-folder canary read, slash-command
+escaping, saved permission scopes, removed identity variables, or a real
+adapter reload. A passing journey therefore did not establish PB-A3, PB-A4,
+PB-A7, PB-A11, PB-A12, or SEC-PB-1 through SEC-PB-8.
+
+The live harness now records explicit outcomes for those criteria. It cites
+existing fixture evidence for PB-A10 and exercises service reconnection for
+PB-A8 during the restart probes. A missing attempt fails. The state-folder
+probe uses only a non-secret canary in the run's temporary state folder. A
+successful read is recorded as having no mechanism, as SECURITY.md requires.
+The token scan reports paths and counts, and never reports matched text.
+Persistent permission answers are restricted to the named command in the
+run's work folder. Only the service child started by the run receives the
+restart signal. No production permission or authentication code was changed.
+
+The restart probe uses two kills. One interrupts working turns to observe
+actual carry-on tool calls. The other interrupts sent envelope deliveries to
+observe recovery accepting their replayed identifiers or re-sending them.
+A receipt from an ordinary post-restart response is not counted as replay.
+A delivery already accepted before the kill is not counted as a replay test.
+
+Local checks cover both directions of received slash escaping, the real
+command-line entry point's ancestry refusal with both variables removed,
+old-token refusal after a real service restart with a fake adapter, planted
+tokens in session files and arguments, and each probe's failure outcomes.
+These checks do not establish real-adapter behavior or close the live gate.

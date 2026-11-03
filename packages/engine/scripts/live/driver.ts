@@ -4,7 +4,8 @@ import type { HarnessSettings } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 
 import type { AgentRef, FlowDriver } from "./flow.ts";
-import { fill, LEAD_PROMPT, PROMPTS, WORKER_PROMPT } from "./prompts.ts";
+import { CORE_CONFIG, probeCommands } from "./liveProbes.ts";
+import { fill, LEAD_PROMPT, PROMPTS, SHELL_COMMANDS, WORKER_PROMPT } from "./prompts.ts";
 import { requestId } from "./support.ts";
 
 // Unit 8c: the live side of the journey. The lead is a real Claude Code agent
@@ -68,9 +69,11 @@ export const registerAccounts = (
     if (found === undefined) return yield* Effect.fail(new Error(`${harness} is not installed: its adapter was not found in packages/engine/node_modules/.bin`));
     yield* (owner.harnesses({ requestId: requestId(), operation: "set", harness: found } as never) as Effect.Effect<unknown, unknown>);
     const configured = environment[variable];
+    const accountEnvironment = { ...(configured === undefined || configured === "" ? {} : { [variable]: configured }),
+      ...(harness === "codex" ? { CODEX_CONFIG: JSON.stringify(CORE_CONFIG) } : {}) };
     yield* (owner.accounts({
       requestId: requestId(), operation: "add",
-      account: { id: account, harness, displayName: account, enabled: true, ...(configured === undefined || configured === "" ? {} : { environment: { [variable]: configured } }) },
+      account: { id: account, harness, displayName: account, enabled: true, ...(Object.keys(accountEnvironment).length === 0 ? {} : { environment: accountEnvironment }) },
     } as never) as Effect.Effect<unknown, unknown>);
   }
 });
@@ -95,8 +98,17 @@ export const leadPromptFor = (config: LiveConfig, workerFolder: string): string 
 
 // Every prompt of the script exactly as the run sends it, in send order. The
 // lead's is filled in by `leadPromptFor`, the function the driver calls.
+export const probePromptFor = (name: string, text: string, workerFolder: string): string => {
+  const commands = probeCommands(join(workerFolder, "../../state"));
+  const values: Record<string, string> = name === "REMOVED_VARIABLES_PROMPT" ? { COMMAND: commands.removedVariables }
+    : name === "STATE_READ_PROMPT" ? { COMMAND: commands.stateRead }
+    : name === "ALWAYS_ALLOW_PROMPT" ? { COMMAND: commands.alwaysAllow }
+    : name === "RESTART_ACTIVE_PROMPT" ? { COMMAND: SHELL_COMMANDS.restartHold, MARKER: "RUN_RANDOM_MARKER" }
+    : name === "PROBE_MCP_PROMPT" || name === "RESTART_PREPARE_PROMPT" ? { MARKER: "RUN_RANDOM_MARKER" } : {};
+  return fill(text, values);
+};
 export const renderedPrompts = (config: LiveConfig, workerFolder: string): ReadonlyArray<{ readonly name: string; readonly receiver: string; readonly step: string; readonly text: string }> =>
-  PROMPTS.map((entry) => ({ ...entry, text: entry.name === "LEAD_PROMPT" ? leadPromptFor(config, workerFolder) : entry.text }));
+  PROMPTS.map((entry) => ({ ...entry, text: entry.name === "LEAD_PROMPT" ? leadPromptFor(config, workerFolder) : probePromptFor(entry.name, entry.text, workerFolder) }));
 
 export const liveDriver = (owner: Client, config: LiveConfig, leadFolder: string, workerFolder: string): FlowDriver => ({
   startLead: () => Effect.gen(function* () {

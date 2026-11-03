@@ -3,9 +3,11 @@ import type { EventEnvelope } from "@shephrd/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
+import * as Fiber from "effect/Fiber";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 
+import { runProbes, type ProbeDriver } from "./probes.ts";
 import { messageOf, type Reporter } from "./reporter.ts";
 import { FINAL_STEP, FLOW_STEPS, type StepSpec } from "./steps.ts";
 import {
@@ -66,6 +68,8 @@ export interface FlowOptions {
   // Another connection of the owner (the live view, and the phone that answers).
   readonly openOwner: () => Effect.Effect<Client, unknown, Scope.Scope>;
   readonly driver: FlowDriver;
+  readonly probes?: ProbeDriver;
+  readonly probeNote?: (text: string) => void;
   readonly step: StepRunner;
   readonly leadHarness: string;
   readonly workerHarness: string;
@@ -167,9 +171,10 @@ export const flow = (options: FlowOptions): Effect.Effect<FlowResult, StepFailed
   const wait = options.agentTimeout;
   const quick = options.engineTimeout;
 
+  let leadApprovals: Fiber.Fiber<void, never> | undefined;
   const lead = yield* step(FLOW_STEP.lead, Effect.gen(function* () {
     const started = yield* driver.startLead();
-    yield* answerLeadRequests(owner, started).pipe(Effect.forkIn(scope));
+    leadApprovals = yield* answerLeadRequests(owner, started).pipe(Effect.forkIn(scope));
     const events = yield* eventsUntil(owner, mark, "the lead's AgentStarted", isTag("AgentStarted", started.agentId), quick);
     const recorded = eventOf<{ harness: string; parent: Actor }>(tagged(events, "AgentStarted", started.agentId)[0]!);
     yield* check(recorded.harness === options.leadHarness, `the lead runs on ${recorded.harness}, not ${options.leadHarness}`);
@@ -232,7 +237,7 @@ export const flow = (options: FlowOptions): Effect.Effect<FlowResult, StepFailed
     return permission;
   }), (permission) => `request ${permission.permissionRequestId}`);
   const requestIdValue = request.permissionRequestId;
-  yield* answerLaterWorkerRequests(owner, worker, () => requestIdValue).pipe(Effect.forkIn(scope));
+  const laterApprovals = yield* answerLaterWorkerRequests(owner, worker, () => requestIdValue).pipe(Effect.forkIn(scope));
 
   // Step 6: the lead passes the request up, and the owner is called once.
   const waitId = yield* step(FLOW_STEP["pass-up"], Effect.gen(function* () {
@@ -303,14 +308,21 @@ export const flow = (options: FlowOptions): Effect.Effect<FlowResult, StepFailed
     yield* check(trouble.length === 0, `the log also holds: ${trouble.join("; ")}`);
   }));
 
+  // The journey's broad legacy approvals must end before exact-command probes.
+  if (leadApprovals !== undefined) yield* Fiber.interrupt(leadApprovals);
+  yield* Fiber.interrupt(laterApprovals);
+  if (options.probes !== undefined) yield* runProbes(options.probes, step, { lead, worker }, options.probeNote);
+  // A restart invalidates old socket connections. The final scan uses a fresh one.
+  const finalOwner = options.probes === undefined ? owner : yield* options.openOwner().pipe(Effect.orDie);
+
   // Criterion 8.5: the views rebuilt from the log equal the live views, and no
   // secret appears in any form in an event, a reply, the accounts list or the
   // output of a process this run started.
   yield* step(FINAL_STEP, Effect.gen(function* () {
-    const reply = yield* (owner["debug.compare-views"]({ requestId: requestId() } as never) as Effect.Effect<{ sequence: number; equal: boolean; differences: ReadonlyArray<string> }, unknown>);
+    const reply = yield* (finalOwner["debug.compare-views"]({ requestId: requestId() } as never) as Effect.Effect<{ sequence: number; equal: boolean; differences: ReadonlyArray<string> }, unknown>);
     yield* check(reply.equal && reply.differences.length === 0, `the live views differ from the rebuild: ${JSON.stringify(reply.differences.slice(0, 5))}`);
-    const all = yield* since(owner, 0);
-    const accounts = yield* (owner.accounts({ requestId: requestId(), operation: "list" } as never) as Effect.Effect<unknown, unknown>);
+    const all = yield* since(finalOwner, 0);
+    const accounts = yield* (finalOwner.accounts({ requestId: requestId(), operation: "list" } as never) as Effect.Effect<unknown, unknown>);
     const secrets = [...options.secrets()];
     yield* check(secrets.length > 0, "the run has no secret to scan for, so the scan would pass without looking");
     for (const secret of secrets) yield* check(secret.length > 8, "a secret of the run is too short to scan for");
