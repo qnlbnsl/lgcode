@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { AgentId, DeliveryId, PermissionLevel, type Event } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
+import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import { pickAccount } from "../accounts/pick.ts";
@@ -8,7 +9,8 @@ import { canUseMode, checkFolder, folderForSpawn } from "../identity/ceiling.ts"
 import { mintAgentToken } from "../identity/tokens.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
 import { agentText } from "../routing/envelope.ts";
-import { withLane } from "../routing/lanes.ts";
+import { bounded, SETUP_TIMEOUT_MILLIS } from "../recovery/reload.ts";
+import { withLane, withPreemption } from "../routing/lanes.ts";
 import { withWaitChecks } from "../routing/waits.ts";
 import { freshRequest, readHarnesses, refused, type Input, type Payload, type Plan } from "./internal.ts";
 
@@ -50,17 +52,23 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
     // Issue 78: the failure carries the wait checks it causes.
     return {
       events: [event], sideRows: { agentTokens: [{ agentId, tokenHash: token.tokenHash, revokedAt: null }] },
-      afterCommit: Effect.gen(function* () {
+      // Fix round 1, A3: the start registers a cancel signal before it asks
+      // for the lane, so a `stop` can pre-empt a setup that is still running
+      // (lanes.ts), and the setup is bounded by the same two minutes as a
+      // resume. A timeout stops the process and fails like a rejection below.
+      afterCommit: withPreemption(runtime.log, agentId)((handle) => Effect.gen(function* () {
         // The new id becomes visible at commit, before this lane is acquired.
         // A stop that wins the lane must prevent the later process spawn.
         // Fix round 1, A2: a sign-out pauses a starting agent too; it still
         // opens its session, which the pause then keeps.
         const waiting = (yield* runtime.views.snapshot).agents[agentId]?.state._tag;
         if (waiting !== "starting" && waiting !== "paused") return;
-        yield* Effect.suspend(() => runtime.runner.start({ agentId, token: token.token, folder, grant, harness, account,
+        yield* handle.cancellable(bounded(runtime, agentId, SETUP_TIMEOUT_MILLIS, Effect.suspend(() => runtime.runner.start({
+          agentId, token: token.token, folder, grant, harness, account,
           permission: payload.permission, ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }),
-        })).pipe(
-          Effect.flatMap((session) => runtime.log.transact((append) => Effect.gen(function* () {
+        })))).pipe(
+          // A stop cancelled the setup and writes the agent's end itself.
+          Effect.flatMap(Option.match({ onNone: () => Effect.void, onSome: (session) => runtime.log.transact((append) => Effect.gen(function* () {
             // An exit can arrive while the session result is being returned.
             const before = (yield* runtime.views.snapshot).agents[agentId]?.state._tag;
             if (before !== "starting" && before !== "paused") return;
@@ -77,7 +85,7 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
             const opened: ReadonlyArray<Event> = [{ _tag: "SessionOpened", agentId, session: session.session,
               protocolVersion: session.protocolVersion, reloadable: session.reloadable }, ...lifecycle];
             yield* append(actor, freshRequest(), randomUUID(), lifecycle.length > 0 ? withWaitChecks(snapshot, opened) : opened, {});
-          })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
+          })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void)) })),
           Effect.catchTag("RunnerRejected", () => runtime.log.transact((append) => Effect.gen(function* () {
             const snapshot = yield* runtime.views.snapshot;
             yield* append(actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, [
@@ -85,6 +93,6 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
             ]), { revokeAgentTokens: [agentId] });
           })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void))),
         );
-      }).pipe(withLane(runtime.log, agentId)),
+      }).pipe(withLane(runtime.log, agentId))),
     };
   });
