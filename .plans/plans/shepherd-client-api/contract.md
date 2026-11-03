@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v5, board Q6 changes 1 to 4 (lead ruling L30)
-version: 5
+status: v6, service rights without answer (roles row 92)
+version: 6
 updated: 2026-11-03
 ---
 
@@ -309,23 +309,24 @@ fixed rights: the foundry roles' sheepdog and their standing-rule answerer
   there is nothing to steal. The Unix socket and the network listener
   never accept one.
 - **The log records it under its own name.** The envelope's `caller` gains
-  one new variant, `service { service, rule? }`. For example, an answer
-  from standing rule 4 is recorded with the caller
-  `{ service: "roles.standing-rules", rule: "4" }`. `PermissionAnswered`'s
-  own `answeredBy` field names the same service and rule (edit E14).
+  one new variant, `service { service, rule? }`. A standing rule's answer
+  is not a command: the engine writes it inside the permission request's
+  own transaction, through the roles' matcher in the permission path, and
+  `PermissionAnswered.answeredBy` names the service and the rule, such as
+  `{ service: "roles.standing-rules", rule: "4" }` (edit E14).
 - **Its receipts are its own.** They are kept under the key
   `service:<name>`.
-- **It may call exactly these engine commands:**
+- **It may call at most these engine commands.** Each service's entry in
+  the service list names the commands it may call, out of this list and
+  the piece commands whose access includes `service`:
   - `subscribe`, seeing every event, as the owner does;
   - `prompt`, to any agent, as a nudge. The text is wrapped as data, a
     leading `/` is escaped as it is for agents' prompts, and the sender is
     shown as the service;
   - `compact`, on any agent, under the engine's state table;
-  - `resume`, on any agent, under the engine's state table;
-  - `answer`, with a one-time allow only. The answer is refused when the
-    chosen option would save a permission rule ("allow always"), or when
-    it is above the asking agent's own permission mode.
-- **Everything else is refused,** including `start`, `stop`, `group`,
+  - `resume`, on any agent, under the engine's state table.
+- **Everything else is refused,** including `answer` (row 75), `start`,
+  `stop`, `group`,
   `pass-up`, `ask`, `wait`, `accounts`, `harnesses`, `debug.compare-views`,
   and any piece command whose access does not include `service`.
 - **Its text is still data.** A service's prompt is never treated as the
@@ -730,7 +731,8 @@ does not compile.
   gets `owner` and `device`. An agent-callable command gets `owner`,
   `device` and `agent`. The planners of `ask`, `wait` and `pass-up` keep
   refusing the owner as they do today. Edit E13 adds `service` to
-  `subscribe`, `prompt`, `compact`, `resume` and `answer`.
+  `subscribe`, `prompt`, `compact` and `resume`. `answer` gets no
+  `service` (row 75).
 - A device is checked as a device. The command handler reads the caller
   kind from the wire credential (`CommandHandler.ts:45`) before it maps a
   device to the owner actor (`CommandHandler.ts:207`). The host-only list
@@ -1004,11 +1006,13 @@ It refuses a name that is not on the list. The server's `authenticate`
 become a service. The service's rights are those of section 2, enforced in
 code:
 
-- the command's access entry must include `service` (edit E2);
+- the command's access entry must include `service` (edit E2), and the
+  service's own entry in the service list must name the command;
 - the engine's rights helper lets a service `prompt`, `compact` and
   `resume` any agent, under the engine's state table;
-- `answer` is accepted only with an option whose `persistent` field is
-  false, at a level no higher than the asking agent's own permission mode;
+- `answer` is refused for every service (row 75), because no service calls
+  it: a standing rule's answer is written inside the engine's permission
+  transaction instead (edit E14);
 - everything else is refused.
 
 - Behaviour change: none for the owner, devices and agents.
@@ -1019,9 +1023,12 @@ code:
 
 **E14. A service's answer names its rule.** In `events.ts:132`,
 `PermissionAnswered.answeredBy` changes from `Actor` to `Caller`. The
-permission view (`views/apply.ts:45`) follows, and the answer planner
-(`routing/permissions.ts:47`) sets it from the caller. So the event itself
-records "standing rule 4", not the owner. `QuestionAnswered.answeredBy`
+permission view (`views/apply.ts:45`) follows. The answer planner
+(`routing/permissions.ts:47`) sets it from the caller, which for the
+`answer` command is the owner or an agent. When the roles' standing-rule
+matcher answers inside the permission request's own transaction (roles
+plan, WS-7a), the engine sets it to the standing-rule service and its
+rule. So the event itself records "standing rule 4", not the owner. `QuestionAnswered.answeredBy`
 stays `Actor`, because a service never answers a question.
 
 - Behaviour change: an existing event field widens. Every existing event

@@ -77,8 +77,9 @@ that outsiders can reach.
   would make the record say "the owner" for things the owner never did.
   The owner chose direct edits on 2026-11-03.
 - **Shephrd's own services get a narrow caller.** The sheepdog, which
-  watches for stalled agents, may nudge, compact, resume and give a
-  one-time allow, and nothing else. It exists only inside Shephrd's
+  watches for stalled agents, may nudge, compact and resume, and nothing
+  else. A standing rule's allow is written inside the engine's permission
+  path, under the rule's own name, not by a service command. It exists only inside Shephrd's
   process, so there is no credential for it to leak, and the record names
   it, not the owner. This is the lead's ruling.
 - **A paired device acts as the owner, minus three host-only commands.**
@@ -99,7 +100,7 @@ that outsiders can reach.
   choice A10 asked.
 
 Full log → `decisions.md`. The contract the other two plans build on is
-`contract.md`, version 5 at `09018d6`.
+`contract.md`, version 6.
 
 ## Workstreams
 
@@ -223,7 +224,7 @@ Conventions for every unit. Paths are relative to the Shephrd repository
 root. Anchors are at engine commit `8ff4c9b` (`scouting.md`). "Rows" are
 rows of this plan's `decisions.md`; "engine rows" are rows of
 `.plans/plans/shepherd-engine/decisions.md`. "The contract" is
-`contract.md` in this folder, version 5 at `09018d6`; where a
+`contract.md` in this folder, version 6; where a
 unit and the contract disagree, the unit reports it to the lead. A test id
 is a Vitest file path, run with `pnpm vitest run <path>`; Playwright tests
 run with `pnpm playwright test <path>`. Effect code is written from Effect
@@ -268,7 +269,7 @@ section 6, edits E1 to E22.
 | 1.9 | A piece's reactor resumes after the service is killed between reading an event and writing its reaction, and writes the reaction exactly once | Test id: `packages/engine/test/pieces/reactors.test.ts` |
 | 1.10 | A paged read of one agent's events returns them in order from a cursor, at most the page size, with the next cursor | Test id: `packages/engine/test/log/agent-read.test.ts` |
 | 1.11 | A device's command is recorded with `caller: owner` and `device: <id>`; the owner terminal's has no `device`; a device's receipts are in the owner's scope | Test id: `packages/engine/test/commands/device-field.test.ts` |
-| 1.12 | The service caller: every engine command, called as a listed service, is allowed or refused exactly as the contract's list says; `answer` accepts a one-time allow, and refuses a persistent option and an option above the asker's mode; the envelope's caller and `PermissionAnswered.answeredBy` are both `service { service, rule }` | Test id: `packages/engine/test/commands/service-caller.test.ts` |
+| 1.12 | The service caller: every engine command, called as a listed service, is allowed or refused exactly as the contract's list and the service's own entry say; `answer` is refused for every service; a standing rule's answer written in the permission path has `PermissionAnswered.answeredBy` `service { service, rule }` | Test id: `packages/engine/test/commands/service-caller.test.ts` |
 | 1.13 | No credential format for a service exists: the socket refuses any bearer that is not an owner, device or agent credential, and a service name that is not on the list is refused in process | Test id: `packages/engine/test/api/auth.test.ts` (new case); `packages/engine/test/commands/service-no-wire.test.ts` |
 | 1.14 | Every sender but the owner is wrapped as data: an agent as today, a service and a piece newly; a leading `/` is escaped; the sender is shown as the service or the piece's namespace; the owner's text is rendered as today | Test id: `packages/engine/test/routing/text-is-data.test.ts` (new cases); `packages/engine/test/routing/sender-wrapping.test.ts` |
 | 1.15 | A piece's delivery source: a piece-sourced delivery whose target stops, crashes or returns it follows the piece's source rule; the permission, question and wait sources behave as before | Test id: `packages/engine/test/routing/piece-source.test.ts` |
