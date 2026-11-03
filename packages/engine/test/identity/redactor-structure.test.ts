@@ -41,11 +41,11 @@ it.effect("A4 event and receipt identities survive collisions while record value
         const sql = yield* SqlClient.SqlClient;
         const rid = Schema.decodeUnknownSync(RequestId)("acct");
         const redactor = yield* Redactor;
-        const account = { id: "acct", harness: "fake", displayName: "acct", environment: { id: "acct", agentId: "acct", text: "acct" } } as never;
+        const account = { id: "acct", harness: "fake", displayName: "acct", environment: { _tag: "acct", id: "acct", agentId: "acct", text: "acct" } } as never;
         const input: Event = { _tag: "AccountChanged", accountId: "acct" as never, account };
         expect.soft(yield* redactor.redact(input)).toEqual({ ...input, account: {
           id: "acct", harness: "fake", displayName: "[REDACTED]",
-          environment: { id: "[REDACTED]", agentId: "[REDACTED]", text: "[REDACTED]" },
+          environment: { _tag: "[REDACTED]", id: "[REDACTED]", agentId: "[REDACTED]", text: "[REDACTED]" },
         } });
         yield* log.append({ _tag: "owner" }, rid, "a".repeat(64), [input], {}, () => ({
           requestId: rid, agentId, deliveryId: "acct", accounts: [account],
@@ -55,7 +55,7 @@ it.effect("A4 event and receipt identities survive collisions while record value
         expect(JSON.parse(rows[0]!.result_json).reply).toEqual({
           requestId: rid, agentId, deliveryId: "acct", accounts: [{
             id: "acct", harness: "fake", displayName: "[REDACTED]",
-            environment: { id: "[REDACTED]", agentId: "[REDACTED]", text: "[REDACTED]" },
+            environment: { _tag: "[REDACTED]", id: "[REDACTED]", agentId: "[REDACTED]", text: "[REDACTED]" },
           }], text: "[REDACTED]", _tag: "acct", acct: "[REDACTED]",
         });
       }).pipe(Effect.scoped, Effect.provide(EventLog.layer.pipe(Layer.provideMerge(Views.layer), Layer.provideMerge(instance("acct").layer))));

@@ -19,6 +19,7 @@ import { application, listen } from "./api/server.ts";
 import { serviceLog } from "./api/serviceLog.ts";
 import { prepareStateFolder, stateFolder } from "./api/stateFolder.ts";
 import * as CommandHandler from "./commands/CommandHandler.ts";
+import { isInferredSecretValue } from "./identity/inferredSecret.ts";
 import { redactingLoggerLayer } from "./identity/logger.ts";
 import { loadOwnerCredential } from "./identity/ownerCredential.ts";
 import { makeRedactor } from "./identity/redactor.ts";
@@ -83,9 +84,7 @@ const program = Effect.scoped(Effect.gen(function* () {
     const inheritedSecrets = Object.entries(process.env)
       .filter(([name]) => /(?:KEY|TOKEN|SECRET|PASSWORD)/i.test(name))
       .map(([, value]) => value)
-      .filter((value): value is string => value !== undefined && value.length >= 8
-        && !/^(?:true|false)$/i.test(value.trim())
-        && !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value.trim()))
+      .filter(isInferredSecretValue)
       .map((value) => Redacted.make(value));
     // Issue 223: the harness login stores the runner opens, re-read live.
     const credentials = makeCredentialRegistry();

@@ -124,7 +124,7 @@ live("A4 inherited flags preserve stored and delivered prompts while a long prov
   Effect.scoped(Effect.gen(function* () {
     const root = makeServiceRoot();
     const providerKey = `sk-ant-api03-${randomBytes(16).toString("hex")}`;
-    const ignored = ["false", "true", "32000", "123456789", "-123456789", "123456.789", "1.2345e12", "short"];
+    const ignored = ["false", "true", "32000", "123456789", "-123456789", "123456.789", "1.2345e12", "short", "        "];
     const service = startService(root, { env: {
       TOKENIZERS_PARALLELISM: "false", CLAUDE_CODE_MAX_OUTPUT_TOKENS: "32000", ANTHROPIC_API_KEY: providerKey,
       ...Object.fromEntries(ignored.map((value, index) => [`PLANTED_TOKEN_${index}`, value])),

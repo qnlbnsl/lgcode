@@ -4,13 +4,16 @@
 // Unbranded adapter strings (itemId, callId, optionId, sessionId) stay text.
 export interface RedactionStructure {
   readonly identity?: true;
+  readonly freeText?: true;
   readonly fields?: Readonly<Record<string, RedactionStructure>>;
   readonly elements?: RedactionStructure;
 }
 
 const identity: RedactionStructure = { identity: true };
 const actor: RedactionStructure = { fields: { agentId: identity } };
-const account: RedactionStructure = { identity: true, fields: { id: identity, harness: identity } };
+const account: RedactionStructure = { identity: true, fields: {
+  id: identity, harness: identity, environment: { freeText: true },
+} };
 const harness: RedactionStructure = { identity: true, fields: { id: identity } };
 const member: RedactionStructure = { identity: true, fields: { agentId: identity } };
 const delivery: RedactionStructure = { fields: {
@@ -34,5 +37,6 @@ export const receiptStructure: RedactionStructure = { fields: {
 } };
 
 export const fieldStructure = (structure: RedactionStructure | undefined, key: string): RedactionStructure | undefined =>
-  key === "_tag" ? identity
+  // A free-text record's `_tag` entry is not a tagged-struct discriminator.
+  structure?.freeText === true ? structure : key === "_tag" ? identity
     : structure?.fields !== undefined && Object.hasOwn(structure.fields, key) ? structure.fields[key] : undefined;
