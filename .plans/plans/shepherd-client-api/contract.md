@@ -1,7 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: draft, awaiting the lead's freeze
+status: v2, awaiting the lead's freeze; the extension seam is pending the owner
+version: 2
 updated: 2026-11-03
 ---
 
@@ -10,14 +11,15 @@ updated: 2026-11-03
 ## What this document is
 
 This document fixes the surface that Shephrd's message board (piece 3) and
-foundry roles (piece 4) build on. It covers six things:
+foundry roles (piece 4) build on. It covers seven things:
 
 1. How a piece adds its own commands and events.
-2. The three kinds of caller, and what each may do.
-3. How a client subscribes, and what it sees.
+2. The four kinds of caller, and what each may do.
+3. How a client subscribes, reads, and what it sees.
 4. How an "owner needed" event becomes an alert.
-5. Request ids and cursors.
+5. Request ids, cursors and the transports.
 6. What the engine must offer for all of this to work.
+7. What the other two pieces asked for, and where each is answered.
 
 It does not depend on the four open design questions: how the phone reaches
 Shephrd from outside the house, how phone alerts are carried, whether
@@ -33,23 +35,30 @@ Abbreviations: RPC means remote procedure call, one request and its reply.
 MCP means the Model Context Protocol, the way agents get Shephrd's tools. CLI
 means the `shephrd` command-line tool.
 
-## One part depends on an answer from the lead
+## One part depends on an answer from the owner
 
 The engine, as built at commit `8ff4c9b`, has no way for another piece to add
 a command or an event. Its server, client library, command-line tool and
 command handler each list the engine's sixteen commands by hand, and its
-event union is closed (scouting, scout 1, items 1 and 2).
+event union is closed (scouting, scout 1, items 1 and 2). The engine also
+knows only two callers, the owner and agents, so it cannot record a
+Shephrd service under its own name.
 
 The engine's design says the other pieces are built "on top of the engine
 without changing it" (owner-approved design, 2026-11-01). So this contract
-assumes one small engine unit, **the extension seam**, and the planner has
-asked the lead whether it may be planned (row 22, question Q1). The seam
-changes no engine command, event or rule. It only lets the service accept
-pieces that are registered with it. The section "What the engine must offer"
-lists exactly what it adds.
+assumes one engine unit, **the extension seam**, built first, as the first
+unit of the client API plan. The lead sent the seam, the service caller and
+the board's matching question to the owner as one question, on 2026-11-03,
+recommending it under this rule (row 31):
 
-If the lead refuses the seam, sections 1 and 6 change, and the lead will
-receive a revised contract before anyone builds on it.
+> No existing command, event, state, reply, rule or test changes.
+
+The seam keeps that rule. Where it adds a variant to an existing schema,
+section 6 says so, and every existing test still passes unchanged.
+
+This contract is written on the assumption that the owner agrees. If the
+owner refuses, sections 1, 2 and 6 change, and the lead receives a revised
+contract before anyone builds on it.
 
 ## 1. How a piece adds its own commands and events
 
@@ -99,7 +108,7 @@ A piece's contracts package exports exactly these five things:
 2. **`<Namespace>Event`**: one Effect Schema union of its event structs, each
    with a namespaced `_tag`.
 3. **`<namespace>Access`**: for every command, the set of caller kinds that
-   may call it, out of `owner`, `device` and `agent` (section 2).
+   may call it, out of `owner`, `device`, `agent` and `service` (section 2).
 4. **`<namespace>Visibility`**: for every event tag, its visibility class
    (section 3).
 5. **`<namespace>AlertSources`**: the events that raise or end an owner
@@ -167,15 +176,33 @@ piece returns against its state table, as it checks its own.
   there. It must be safe to run twice on the same event, because a crash
   can come between reading and writing.
 
-## 2. The three kinds of caller
+### Paged reads
+
+A piece may offer read commands whose reply is a page of records, such as
+the board's `board.read` or the client API's `client.thread` (row 32). Every
+paged read follows one shape:
+
+- The request carries `requestId`, an `after` cursor and a `limit`.
+- The reply carries `requestId`, the `items`, and `next`, the cursor to
+  pass as `after` for the following page. `next` is absent on the last
+  page.
+- A cursor is opaque to the client. A piece may use a log sequence number
+  or its own record id inside it.
+- `limit` has a maximum that the piece states. A larger `limit` is reduced
+  to the maximum, not refused.
+- A paged read applies the same visibility rule as `subscribe` and is not
+  deduplicated.
+
+## 2. The four kinds of caller
 
 | Kind | Credential | Reaches Shephrd through | May call |
 | --- | --- | --- | --- |
 | Owner | The owner credential file in the state folder | The engine's Unix socket only, with the engine's ancestry check | Every command whose access includes `owner` |
 | Paired device | Its own device credential, prefix `shp_d_` | The network listener (piece 2), or the Unix socket | Every command whose access includes `device` |
 | Agent | Its own agent token, prefix `shp_a_` | The engine's Unix socket only, through MCP or the CLI | Every command whose access includes `agent`, under the engine's tree rules |
+| Service (pending the owner) | None. A service exists only inside Shephrd's own process | The seam's in-process command path only | The fixed list under "Services" below, and any piece command whose access includes `service` |
 
-These rules apply to the three kinds:
+These rules apply to the four kinds:
 
 - **A device has the owner's rights, except for a host-only list.** The
   engine already treats a device as the owner (`CommandHandler.ts:207`), and
@@ -202,12 +229,51 @@ These rules apply to the three kinds:
   `debug.compare-views` stay owner-only, which includes devices. `ask`,
   `wait` and `pass-up` stay agent-only. Owner choice A10 makes `wait`
   agents-only (row 4).
-- **The log records which device acted.** Today a device's command is
-  recorded with the caller "owner" (scout 1, item 4). The seam adds a
-  `device` caller to the envelope's `caller` field, so the owner can see
-  which phone answered a request. Rights are unchanged. A device's receipts
-  are kept under its own caller key, so two devices can never collide on a
-  request id.
+- **A device acts as the owner, and the log also says which device.**
+  Today a device's command is recorded with the caller "owner" (scout 1,
+  item 4), and that stays: the envelope's `caller` is still `owner`, and a
+  device's receipts stay in the owner's scope. The seam adds one optional
+  envelope field, `device`, holding the device's id, so the owner can see
+  which phone answered a request (row 33). This is additive: no existing
+  value changes, and an envelope written by the owner's terminal has no
+  `device` field. A piece that records an author, such as the board's
+  post author, records the owner and reuses this field for the device; it
+  adds no field of its own.
+
+### Services
+
+A service is Shephrd's own code acting on the owner's behalf with narrow,
+fixed rights: the foundry roles' sheepdog and their standing-rule answerer
+(lead ruling, row 27). These rules are pending the owner, with the seam:
+
+- **It is in-process only.** A piece registers its services by name when
+  the service starts, such as `roles.sheepdog` or `roles.standing-rules`.
+  A service calls the command path directly through the seam. No service
+  credential exists on the wire or on disk, so there is nothing to steal.
+  The Unix socket and the network listener never accept one.
+- **The log records it under its own name.** The envelope's `caller` gains
+  one new variant, `service { service, rule? }`. For example, an answer
+  from standing rule 4 is recorded with the caller
+  `{ service: "roles.standing-rules", rule: "4" }`. `PermissionAnswered`
+  itself does not change.
+- **Its receipts are its own.** They are kept under the key
+  `service:<name>`.
+- **It may call exactly these engine commands:**
+  - `subscribe`, seeing every event, as the owner does;
+  - `prompt`, to any agent, as a nudge. The text is wrapped as data, a
+    leading `/` is escaped as it is for agents' prompts, and the sender is
+    shown as the service;
+  - `compact`, on any agent, under the engine's state table;
+  - `resume`, on any agent, under the engine's state table;
+  - `answer`, with a one-time allow only. The answer is refused when the
+    chosen option would save a permission rule ("allow always"), or when
+    it is above the asking agent's own permission mode.
+- **Everything else is refused,** including `start`, `stop`, `group`,
+  `pass-up`, `ask`, `wait`, `accounts`, `harnesses`, `debug.compare-views`,
+  and any piece command whose access does not include `service`.
+- **Its text is still data.** A service's prompt is never treated as the
+  owner's. It cannot change permissions, teams or settings (SECURITY.md
+  rule 7).
 
 ## 3. How a client subscribes, and what it sees
 
@@ -228,7 +294,10 @@ These rules apply to the three kinds:
 
 A client that cannot use the whole stream, such as a phone on a mobile
 network, calls `client.subscribe` instead (row 16). It takes the same `after`
-cursor plus a filter: a list of agents, and a list of event kinds. It sends
+cursor plus a filter: a list of agents, a list of group labels, and a list
+of event kinds. A group filter is checked against the agent's groups in the
+views at the moment of each event, so an agent that joins a group later is
+included from that event on (row 30). It sends
 only the events that pass both the visibility rule and the filter. While it
 skips events, it sends a `client.Checkpoint` carrying the latest sequence at
 least every 30 seconds. So the client's cursor keeps moving, and a reconnect
@@ -246,13 +315,20 @@ Every event has one visibility class, set by the piece that owns it:
 
 | Class | Who sees it |
 | --- | --- |
-| `agent-scoped` | The owner and every device. An agent sees it only when the envelope's `agentId` is the agent itself or an agent it holds a parent's rights over. This is the engine's existing rule. |
-| `owner-only` | The owner and every device. Never an agent. |
-| `piece-decided` | The owner and every device. An agent sees it when the owning piece's pure rule says so, given the caller, the envelope and the views. The board uses this, so an agent sees posts in the channels it belongs to. |
+| `agent-scoped` | The owner, every device and every service. An agent sees it only when the envelope's `agentId` is the agent itself or an agent it holds a parent's rights over. This is the engine's existing rule. |
+| `owner-only` | The owner, every device and every service. Never an agent. |
+| `piece-decided` | The owner, every device and every service. An agent sees it when the owning piece's pure rule says so, given the caller, the envelope and the views. |
 
 The engine's own events keep their current behaviour. An engine event with
 an `agentId` is `agent-scoped`. An engine event without one is `owner-only`
 (issue 164 stands).
+
+An event with no visibility class declared is `owner-only`. The board's
+events are `owner-only` (row 34): owner devices see them in their live
+stream, and agents read the board through the board's own commands, not
+through `subscribe`. The client API never widens the engine's agent filter
+for another piece's events. `piece-decided` stays available to any piece
+that needs it later.
 
 Two rules apply to every piece:
 
@@ -261,6 +337,46 @@ Two rules apply to every piece:
   subscription and a rebuilt log always agree on what a caller sees.
 - **A snapshot is filtered by the same rule as the stream.** An agent's
   snapshot holds only what its subscription would show.
+
+### Reading the roster and a thread
+
+Two read commands serve callers that need the current picture or one
+agent's history without holding a subscription open. Both are reads, so
+they are not deduplicated, and both use the same visibility rule as
+`subscribe`.
+
+**`client.roster`** (row 25) lists agents. Each entry holds:
+
+- the agent's id, name, role and groups;
+- its parent's id and name;
+- its lifecycle state and its displayed state;
+- its counts of open permission requests and open questions;
+- its harness, account id, model, effort and permission mode;
+- its folder, its ACP session id, and its start time.
+
+The request may filter by group, by role, and by parent. Access is
+`owner`, `device`, `agent` and `service`:
+
+- The owner, every device and every service see every agent.
+- An agent sees itself and every agent it holds a parent's rights over,
+  which is the engine's own visibility rule. Its own entry names its
+  parent, so `orient` can answer "who is my parent" without seeing the
+  parent's record.
+- An agent does not see its grandchildren. The roles planner asked for a
+  whole subtree. That is wider than what the engine lets an agent
+  subscribe to, and a roster that shows more than `subscribe` would let
+  the two disagree. A lead that needs its workers' workers asks its
+  workers, as the engine's design says.
+
+**`client.thread`** (row 26) reads one agent's thread events, in order,
+from a sequence number, one page at a time. A page holds at most 500
+events and returns the cursor for the next page. It follows the
+paged-read shape in section 1. Access is `owner`, `device`, `agent` and
+`service`, with the same visibility rule. Exporting a thread
+to a file is a client-side feature: `shephrd thread export <agent> --out
+<file>` pages through `client.thread` and writes the file on the caller's
+side. The service never writes a file on a caller's behalf, because a
+remote caller must not be able to choose a path on the host.
 
 ### Events a client does not know
 
@@ -304,7 +420,37 @@ function that takes one envelope and returns either nothing, a request to
 raise an alert, or a request to end one. For example, the foundry roles
 would declare that their "stall reached the owner" event raises an alert of
 kind `roles.stall`. A piece's alert kinds are namespaced. A piece never
-sends a phone alert itself.
+sends a phone alert itself, and a piece never writes the engine's
+`OwnerNeeded` event (row 35). If a piece wrote `OwnerNeeded` and declared
+its own source, the owner would get two alerts for one matter.
+
+The message board declares one kind, `board.post` (row 35). It is raised by
+the board's own event for a post that needs a reply from the owner, with
+the key `post:<postId>`, and it ends when the board records that post as
+answered or closed. Its alert carries the post's id as its subject, so a
+tap opens the post. The board asked instead for a `post` subject on the
+engine's `OwnerNeeded`. That is refused, because it would change an
+existing engine event, which the additive rule forbids, and because the
+alert source gives the same result. `board.post` is pushed to the phone by
+default.
+
+A piece raises an owner alert only for a matter that has reached the
+owner. A notice meant for an agent, such as a lead, goes through the board,
+not through alerts.
+
+The foundry roles declare four kinds (row 28). Whether each one is pushed
+to the phone, or only shown inside the clients, is the owner's alert
+setting. Its defaults are:
+
+| Kind | Raised when | Pushed to the phone by default |
+| --- | --- | --- |
+| `roles.stall` | A stall has reached the owner | Yes. Research item 11 names it. |
+| `roles.replace` | The sheepdog asks the owner to replace a worker | Yes. It needs an owner decision. |
+| `roles.runaway` | Work has run far past its expected length | No. It is shown in the clients. |
+| `roles.rule-first-use` | A standing permission rule is used for the first time | Yes. An automatic allow is security-relevant, so the owner sees its first use. |
+
+The engine's own kinds (`approval`, `question`, `failure`, `account`) are
+pushed by default.
 
 ### The alert's life
 
@@ -356,8 +502,8 @@ design questions. This contract leaves a named slot for it,
 - Every command payload carries `requestId`. Clients mint a random UUID
   (universally unique identifier) for each action the owner takes, such as
   one tap on Allow, and reuse it on every resend of that action.
-- Receipts are kept per caller. Callers are the owner, each device, and
-  each agent.
+- Receipts are kept per caller: the owner (which includes every device,
+  as today), each agent, and each service.
 - The same caller sending the same id with the same body gets the first
   reply again, and nothing acts twice. The same id with a different body is
   refused with "request id reused".
@@ -380,10 +526,27 @@ design questions. This contract leaves a named slot for it,
 - `client.Checkpoint` carries a cursor too. It is not an event in the log;
   it is a marker in a filtered stream.
 
-## 6. What the engine must offer (the extension seam, pending Q1)
+**Transports** (row 36):
 
-These are the engine changes the contract assumes. None changes an engine
-command, event, state rule or permission rule.
+- **Every command on every transport.** The engine's Unix socket and piece
+  2's network listener both serve the whole `ApiRpcGroup`, generically. A
+  piece's command needs no transport code of its own. The engine's socket
+  already dispatches every command in its group this way
+  (`api/server.ts`, `application`).
+- **Message size.** The network listener sets an explicit limit of 1
+  mebibyte (1,048,576 bytes) for one message. That holds the board's
+  largest planned post, 16,384 characters, even at four bytes a character
+  (65,536 bytes), with its envelope, many times over. The engine's socket
+  sets no explicit limit today (scouting, planner's checks) and the seam
+  does not add one there.
+
+## 6. What the engine must offer (the extension seam, pending the owner)
+
+These are the engine changes the contract assumes. They follow the
+additive rule: no existing command, event, state, reply, rule or test
+changes, and every existing engine test, the acceptance suite and the
+rebuild check pass unchanged. Items 6, 10 and 11 add a variant or an
+optional field to an existing schema; no existing value changes meaning.
 
 1. **A registry of pieces at service start-up.** The service is built from
    the engine plus a list of pieces. Each piece supplies its group, events,
@@ -400,18 +563,72 @@ command, event, state rule or permission rule.
    and each piece's view is folded and included in the rebuild check.
 5. **Visibility from pieces.** The subscription filter uses each event's
    visibility class (section 3).
-6. **A device caller.** The envelope's `caller` gains a `device` kind, and
-   a device's receipts are kept under its own key (section 2).
+6. **The acting device.** The envelope gains an optional `device` field.
+   The `caller` stays `owner`, and a device's receipts stay in the owner's
+   scope (section 2).
 7. **A view snapshot at a sequence number,** consistent with the log, for
    `client.snapshot`.
 8. **Exported helpers:** the rights rule and the engine planners a piece
    may call, such as queuing a delivery. The settled test moves into
    `packages/contracts`, so the client library can use it without
    importing the engine.
+   The settled test keeps a re-export at its old place, so existing tests
+   are unchanged.
+9. **A paged read of one agent's events** from a sequence number, for
+   `client.thread`, using the log's existing per-event agent column.
+10. **The service caller.** The `caller` union gains a `service { service,
+    rule? }` variant, the command handler gains the service rights in
+    section 2, and the seam's in-process command path accepts registered
+    services only.
+11. **A delivery source from a piece.** A delivery a piece queues names
+    its source as `{ namespace, id }`, a new variant of the delivery's
+    `source`, so the piece's rule decides what happens to it when its
+    target stops. The board needs this for posts. Existing sources
+    (permission, question, wait) keep their rules.
 
 The planner estimates this as one engine unit of high complexity, built
 before any piece unit, with an attack pass, because it changes the engine's
-only entry point.
+only entry point. If the attack pass or the lead finds it too large, it
+splits into two medium units: the registry, served group, transactions,
+events, views and visibility (items 1 to 5, 7 and 9), then the callers and
+helpers (items 6, 8, 10 and 11).
+
+## 7. What the other pieces asked for, and where each is answered
+
+The lead asked for each request from the other two planners to be taken in
+or refused with a reason.
+
+### The foundry roles
+
+The foundry roles planner listed six needs, in
+`.plans/plans/shepherd-foundry-roles/requests.md` on its branch, section
+"From the client API".
+
+| # | Need | Answer |
+| --- | --- | --- |
+| 1 | A roster query | Taken in as `client.roster` (section 3, row 25). Refused in part: an agent sees itself and the agents it holds a parent's rights over, not its whole subtree, so the roster never shows more than `subscribe` does. |
+| 2 | A thread read, and an export to a file | Taken in as `client.thread`, a paged read (section 3, row 26). The export is a client-side command that writes the caller's own file. The service never writes a file for a caller. |
+| 3 | A narrow caller kind for Shephrd's own services (the sheepdog, the standing-rule answerer) | Taken in as the service caller, in-process only, with the lead's narrow rights (section 2, "Services", row 27). It needs an engine change, which is in the extension seam and pending the owner (section 6, item 10). A scoped device credential was not used: it would put a token for an in-process service on disk for no gain. |
+| 4 | Owner commands for the roles' settings: standing rules, the sheepdog's thresholds, snoozing one group | Taken in as a rule, not as commands: piece 4 defines them in its own `roles.` group with access `owner` and `device` (section 1). Adding a standing rule creates an automatic allow that outlives a stolen phone's revocation, so it is a candidate for the host-only list in question Q2 (row 29). |
+| 5 | Alert kinds the roles raise | Taken in: four namespaced kinds with default phone settings (section 4, row 28). A notice for a lead stays on the board. |
+| 6 | Subscribe filters by group and by event kind | Taken in: `client.subscribe` filters by agent, group and event kind (section 3, row 30). |
+
+### The message board
+
+The message board planner listed six needs, in section R1 of
+`.plans/plans/shepherd-message-board/lead-questions.md` on its branch.
+
+| # | Need | Answer |
+| --- | --- | --- |
+| 1 | Board commands on every client transport, generically | Taken in: both transports serve the whole `ApiRpcGroup` with no per-command code (section 5, "Transports", row 36). |
+| 2 | Board events in the owner's live stream, not widened for agents | Taken in: board events are `owner-only`; the client API never widens the agent filter for them (section 3, row 34). |
+| 3 | An alert for a post addressed to the owner, ideally with a `post` subject on `OwnerNeeded` | Taken in through an alert source, kind `board.post`, keyed by the post, opening the post (section 4, row 35). Refused in part: no `post` subject on `OwnerNeeded`, because that changes an existing engine event, and the board does not write `OwnerNeeded` at all, so one matter raises one alert. |
+| 4 | Paged reads with a cursor | Taken in: one paged-read shape for every piece (section 1, "Paged reads", row 32). |
+| 5 | The owner posts from any device as the owner, reusing any device field | Taken in: the caller stays `owner`; the envelope's optional `device` field records the device, and the board adds no field of its own (section 2, row 33). |
+| 6 | A transport message limit of at least a 16,384-character post plus its envelope | Taken in: the network listener's limit is 1 mebibyte; the engine's socket keeps its current behaviour (section 5, row 36). |
+
+The board's delivery source for posts, from its question Q1, is section 6,
+item 11.
 
 ## What this contract does not settle
 
