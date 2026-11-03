@@ -17,7 +17,7 @@ fixes. There are no blockers.
 
 Six majors are gaps in the shared client API contract, which the roles
 build on. Plans-api fixes them first, in contract v4, as the lead's shared
-items S1 to S4. This plan folds them when the lead sends v4's commit.
+items S1 to S4. This plan folded them on contract v6, as the section below shows.
 
 Seven majors belong to the roles. Two of them, Ls-R4-L2 and Lo-R4-L3,
 describe the same issue, so the roles' own majors are six issues. All
@@ -105,25 +105,27 @@ seven are folded now.
   through the real adapter and handler.
 - **Decision row:** 87.
 
-## The shared majors, waiting for contract v4
+## The shared majors, folded on contract v6
 
-These six are folded when the lead sends client API contract v4's
-commit.
+Client API contract v4 (`8e80a13`) settled these six, and the plan folds
+them on contract v6 (`4a7e352`), which also carries v5's waiting and
+reactor changes (lead ruling L30) and v6's service rights. The plan after
+this fold is frozen as `attack/plan-v7.md`.
 
 | Finding | Shared item | What v4 must settle |
 |---|---|---|
-| A-R4-A1 Planner replies cannot carry a post id | S1 | How a piece's planner returns a durable reply, such as the post id that `roles.notice` needs |
-| A-R4-A2 Read visibility has two incompatible definitions | S2 | Whether a read follows direct-child structure or inherited rights |
-| C-R4-C3 Visibility equates two rights rules | S2 | As A-R4-A2 |
-| TS-R4-TM-2 Direct-child reads conflated with inherited rights | S2 | As A-R4-A2 |
-| C-R4-C1 Event registration omits the lifecycle table | S3 | The lifecycle cell rule for piece events, and `state-machine.test.ts` |
-| TS-R4-TM-1 The caller and device do not survive a log read | S4 | How the service caller and the device survive a read of the log. The roles' own part is folded now: the first-use reactor reads the durable `answeredBy`, not the envelope's caller (task 2e) |
+| A-R4-A1 Planner replies cannot carry a post id | S1 | Settled by CAPI E3's `reply`. Every roles command is a planner or a read; the sheepdog keeps the post id from `board.post`'s reply (row 95) |
+| A-R4-A2 Read visibility has two incompatible definitions | S2 | Settled by CAPI's read rule (L29). `orient` follows it; the hand-off checks the management rule (row 96) |
+| C-R4-C3 Visibility equates two rights rules | S2 | As A-R4-A2 (row 96) |
+| TS-R4-TM-2 Direct-child reads conflated with inherited rights | S2 | As A-R4-A2 (row 96) |
+| C-R4-C1 Event registration omits the lifecycle table | S3 | Settled by CAPI E5's `keepInEveryState`. Roles events keep every state; `DeliveryHeld` and `DeliveryReleased` have explicit rows (row 97) |
+| TS-R4-TM-1 The caller and device do not survive a log read | S4 | Settled by CAPI's durable caller and device form (E11 and E12). The first-use reactor also keys on the durable `answeredBy` (rows 98, 99) |
 
 ## The nineteen minors
 
 | Finding | Fold | Where |
 |---|---|---|
-| A-R4-A3 Edit inventories omit readers and writers | WS-7 half folded: the runner files, `DeliveryHeld` and `DeliveryReleased` lifecycle cells, `state-machine.test.ts`, visibility samples, contracts tests in WS-7's verify line. The shared half (E5, E8, E15) waits for v4 | WS-7 change lists, 7c task, Verify; rows 86, 87 |
+| A-R4-A3 Edit inventories omit readers and writers | WS-7 half: the runner files, `DeliveryHeld` and `DeliveryReleased` lifecycle cells, `state-machine.test.ts`, visibility samples, contracts tests in WS-7's verify line. Shared half settled by CAPI E5, E8 and E15 | WS-7 change lists, 7c task, Verify; rows 86, 87 |
 | A-R4-A4 The stall task names a removed package | Task 4b cites board v6's `packages/engine/src/board/` export and `packages/contracts/src/settled.ts` | 4b; row 94 |
 | C-R4-C4 The stall task imports a removed package | As A-R4-A4 | 4b; row 94 |
 | Lo-R4-L4 The hold condition has no failure policy | Called as a total function; an error counts as no (K13) | 7b, 7.3; row 89 |
@@ -140,12 +142,13 @@ commit.
 | TO F4 WS-7a blocks the shared runner-event path | Resolution is scoped, off the event loop and time-limited; `answerPermission` runs on its own fiber (PC13) | 7a, 7.2; row 91 |
 | TO F5 A rule answer can still raise `OwnerNeeded` | As Ls-R4-L2 (PC10) | 7a, 7.2; row 82 |
 | TO F6 `release` is not tied to the rights helper | `mayActForHolder` over `holderAbove`; refusal tests RL04-RL06; `release` in the CLI parity test | 7b, 7.4; row 93 |
-| TS-R4-TM-4 New events have no lifecycle cells | WS-7b's two cells folded; the roles' events wait for S3 in v4 | 7b; row 87 |
+| TS-R4-TM-4 New events have no lifecycle cells | WS-7b's two cells, and the roles' events through `keepInEveryState` | 7b, 1b, 1.3; rows 87, 97 |
 | TS-R4-TM-5 The stall task names the removed board package | As A-R4-A4 | 4b; row 94 |
 
-Count: 13 majors and 19 minors, 32 in all. Of these, 7 majors and 17
-minors are folded now. A-R4-A3 and TS-R4-TM-4 are folded in part. The 6
-shared majors wait for contract v4.
+Count: 13 majors and 19 minors, 32 in all. All are folded: the roles' own
+7 majors and 17 minors on the client API contract v3 (frozen as
+`attack/plan-v6.md`), and the 6 shared majors, with the shared halves of
+A-R4-A3 and TS-R4-TM-4, on contract v6 (frozen as `attack/plan-v7.md`).
 
 ## Items for the lead
 
@@ -153,4 +156,5 @@ shared majors wait for contract v4.
   as a settings path (row 85). The planner offers narrowing it as an issue
   for `docs/issues.md`, because it touches a settings rule.
 - Drop `service` from the callers allowed to call `answer`, in client API
-  contract v4's E13. No roles service calls it (row 92).
+  contract E13. No roles service calls it (row 92). Done in contract v6
+  (row 101).
