@@ -1,8 +1,8 @@
 # Known gaps: shepherd-message-board
 
 Gaps the planner could not close before the freeze. Reviewers: these are
-already known; look for new problems. Updated for plan version 3, after
-round 2.
+already known; look for new problems. Updated for plan version 4, after
+round 3.
 
 1. **Vendor limits.** The planner cannot read each vendor's remaining
    weekly allowance. The lead checks it before launching any unit.
@@ -31,15 +31,10 @@ round 2.
    items, file and branch watches, the test queue and usage meters as
    WIDENED. The lead confirms them with the owner at acceptance (ruling
    L14).
-8. **Two wording points in the client API's seam text.** Sent to the lead
-   with the round 2 fold. (a) Seam item 15 at `ed1755d` says the engine
-   consults a piece's reach check "only ... when the target is outside the
-   calling agent's tree". The board needs the send-time re-check for every
-   board wake, including one whose target is inside the caller's tree and
-   one the reactor built with no caller; criterion 4.9 assumes this.
-   (b) Seam item 16 words the board's condition as "has not answered it";
-   row 77 makes it "has no disposition". The board defines its own
-   condition, so this changes no seam behaviour.
+8. **Closed: the client API's seam text.** Lead ruling L22 (`586a7ff`)
+   makes the reach check run on every board delivery and uses the "no
+   disposition" wording; lead ruling L23 (`ced973b`) passes the delivery
+   to the check and moves the dispatcher on after a withdrawal (row 98).
 9. **Effect functions.** Shephrd pins Effect 4.0.5 (`pnpm-workspace.yaml`,
    catalog). The plan names no Effect function that the engine does not
    already use at the anchor given. A context7 lookup of Effect 4's

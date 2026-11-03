@@ -180,3 +180,71 @@ board's `board.status` reply carries those inputs.
 **Part 4, a note for L19.** The board's reach check stays registered while
 the board is switched off, so the dispatcher's re-check still runs then
 (threat R2-TM-1 asked for this).
+
+## Q5 (decision rows 84 to 86): the exact client API text that groups 5 and 6 need
+
+Round 3's groups 5 and 6 (logic M3, threat T3-1, T3-3, R3-TM-1) show that
+the board's reach check cannot judge the posts of one wake, because seam
+item 15 never tells it which delivery it is judging. Logic m4 adds that the
+dispatcher stalls after a send-time withdrawal. Threat T3-5 notes a stale
+sentence about the board's snapshot section. The text below is against the
+client API contract at `586a7ff`. Words in **bold** are new; everything
+else is unchanged.
+
+**Change 1, seam item 15, the sentence on inputs.** Replace
+"Its inputs are the caller, when there is one, the target and the views
+snapshot of the same transaction, never an earlier read (lead ruling L15)."
+with:
+
+> Its inputs are the caller, when there is one; the target; **the
+> delivery being judged, as its delivery id and its piece source
+> `{ namespace, id }`;** and the views snapshot of the same transaction,
+> never an earlier read (lead ruling L15). **When the check runs at queue
+> time, that snapshot is projected with the command's own batch, including
+> the piece's own events in it, as the engine's wait checks already project
+> their views (`routing/waits.ts`, `withWaitChecks`).**
+
+**Change 2, seam item 15, the send-time sentence.** Replace
+"A delivery that fails the second check is withdrawn with
+`DeliveryWithdrawn` and never sent." with:
+
+> A delivery that fails the second check is withdrawn with
+> `DeliveryWithdrawn` and never sent, **and the dispatcher goes on to the
+> target's next queued delivery in the same pass.**
+
+**Change 3, section 2, the exception's sentence on purity.** Replace
+"The reach check is a pure function of the caller, the target and the views
+snapshot taken in the same transaction as the delivery" with:
+
+> The reach check is a pure function of the caller, the target, **the
+> delivery being judged** and the views snapshot taken in the same
+> transaction as the delivery
+
+**Change 4, section 3, the snapshot sentence.** Replace
+"The board's section is its whole view for the owner, devices and
+services, and absent for an agent." with:
+
+> The board's section is **a bounded summary with no post text** for the
+> owner, devices and services, and absent for an agent. **The board's own
+> contract states its fields and its cap (lead ruling L21).**
+
+**Why the board needs each.** Change 1 lets the board find the wake in its
+`board.WakeBuilt` index and judge exactly its carried posts and its
+completions' reply text, so a passing requeued wake is never withdrawn
+because of a failing fresh one. The projected snapshot lets the queue-time
+check see the batch's own `board.WakeBuilt`. Change 2 stops an engine
+prompt queued behind a withdrawn wake from waiting for an unrelated event.
+Changes 3 and 4 keep the text consistent.
+
+**Change 5, the board's own contract.** Folding round 3 also changes the
+board's `contract.md` (version 4, ruling L21). May it be replaced by
+`attack/contract-v5-proposed.md`? It adds `board.ManagerChanged` (row 85),
+`board.read` with `repliesTo` (row 88), a fixed-size `board.status` summary
+with paged detail and a paged `board.channels` (row 89), and the rules of
+rows 84 to 97. It assumes changes 1 to 4.
+
+**Answer (lead rulings L23 and L24, posts #114 and #119).** Yes to changes
+1 to 4; plans-api committed them at `ced973b`. Yes to change 5: version 5
+replaces `contract.md`. The lead added that the service-and-agent direct
+pair must pass the reach check at queue and at send, with a test. Logged
+as row 98.
