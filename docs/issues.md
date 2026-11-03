@@ -3761,8 +3761,9 @@ timeouts should be checked against the work the test does.
 Found: 2026-11-03, by the live check at 9340f71 (live-check-2, run 1, step
 `sandbox-mcp`, criterion PB-A3), against the real Codex adapter
 (`@agentclientprotocol/codex-acp` 2.5.0, `@openai/codex` 0.165.0).
-State: fixed locally by owner option (b), in fix round 3 of the live-check
-probes. Real-adapter validation remains pending the lead's next run.
+State: fixed locally by owner option (b), in commit
+`7c2039ff9c31b986675d8793f75dc6304802fc24`.
+Real-adapter validation remains pending the lead's next run.
 
 What happens: the Codex worker, started with the permission "ask", was told
 to call the Shephrd MCP (Model Context Protocol) tool `ask` once. It did call
