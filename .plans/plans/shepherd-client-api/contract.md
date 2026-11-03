@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v4, round 4 shared fixes S1 to S6 (lead ruling L29 for S2)
-version: 4
+status: v5, board Q6 changes 1 to 4 (lead ruling L30)
+version: 5
 updated: 2026-11-03
 ---
 
@@ -198,7 +198,9 @@ piece's batch against its state table, as it checks its own.
   caller `piece { namespace }`, so its batch passes the same checks as a
   planner's. It never appends to the log directly. It records the last
   sequence it handled in its own view, so after a restart it resumes from
-  there. It must be safe to run twice on the same event, because a crash
+  there. A reactor whose rules are all level rules over the current
+  views, such as the board's, keeps no position instead: it runs over what
+  each batch touches, and over the whole state at start-up. It must be safe to run twice on the same event, because a crash
   can come between reading and writing.
 
 ### Paged reads
@@ -492,8 +494,20 @@ Edit E19 moves that test from the engine into `packages/contracts`, so the
 helper and the engine share one copy and cannot disagree. The test applies
 every piece's hold-unsettled condition, so the owner's wait and an agent's
 wait agree (lead ruling L15). Each piece writes its condition in its
-folder in `packages/contracts` as a pure function over its own snapshot
-section. So the helper needs a caller whose snapshot holds those sections:
+folder in `packages/contracts` as
+a pure function (lead ruling L28). A client does not hold a piece's full
+view. So a piece whose condition reads its view, such as the board's,
+carries in its snapshot section the ids of the agents for which its
+condition holds and the sequence they were computed at, and offers a
+read that returns the same lists at the current sequence (for the board,
+`board.status` with no agent). The helper never ends a wait on a piece
+result older than the stream it has applied. Whenever the engine's part
+of the settled test says the waited agents are settled, it reads each
+such piece's lists. If they are newer than the stream it has applied, it
+applies the stream up to their sequence and decides again. It ends the
+wait only when the engine's part and every piece's lists agree at one
+sequence. No timer and no polling are added. So the helper needs a
+caller whose snapshot holds those sections and who may make those reads:
 the owner, a device or a service. The owner's terminal waits with a new
 subcommand, `shephrd client wait`, which runs this helper over
 `subscribe`. The engine's own `shephrd wait` stays agents-only, by owner
@@ -1110,7 +1124,11 @@ writes the board's (lead rulings L13, L15, L19, L22, L23).
   snapshot at send time. A delivery that fails is withdrawn with
   `DeliveryWithdrawn` and never sent. The dispatcher then goes on to the
   target's next queued delivery in the same pass, so one withdrawn delivery
-  never holds up the ones behind it.
+  never holds up the ones behind it. The withdrawal runs the engine's
+  wait checks (`withWaitChecks`, `routing/waits.ts:110`), as the
+  failed-send batch does
+  (`routing/deliveries.ts:259`), so a wait on the target is judged again
+  in the same batch.
 - **Purity.** The check is a pure function of its inputs. It reads no clock
   and no file.
 - **No other right.** An allow lets the delivery through and nothing else.
@@ -1133,10 +1151,14 @@ views and the client library builds from `client.snapshot` and the stream.
 `waits.ts` imports them, with no re-export at the old place. A
 hold-unsettled table, typed over `PieceNamespace`, holds each piece's
 condition: while it holds for an agent, that agent is not settled (lead
-ruling L10). Unit 1 writes each entry as "never". The board's plan writes
-the board's: an agent with an open post of its own that needs a reply is
-not settled. The client helper `waitForAgents` applies the same table
-(section 3).
+ruling L10). Unit 1 writes each entry as "never". The input carries the
+engine's deliveries with their status by delivery
+id. A piece's entry also takes the piece's own view, which the engine
+passes. The board's plan writes the board's entry, a function of both,
+because its third clause asks whether a queued or sent board wake
+carries a post (board contract, "Settled and waiting"). The client
+helper `waitForAgents` applies the engine's part of the test itself, and
+each piece's part through that piece's results (section 3).
 
 - Behaviour change: none in unit 1. The settled test changes for agents
   that use the board once the board's plan writes its entry.
@@ -1214,7 +1236,9 @@ as today. A refused read's marks refuse the read, and its reply is not
 returned. A refused reactor batch is not written. The engine instead
 writes one `CommandRefused { command: "<namespace>.reactor", reason }`
 under the caller `piece { namespace }`, and the reactor counts that event
-as handled, so a restart does not retry it forever. Each piece's tests show
+as handled, so a restart does not retry it forever. A reactor with level
+rules instead tries that duty again only after a
+later batch touches it, or at start-up. Each piece's tests show
 that its reactor never builds a refused batch.
 
 - Behaviour change: none for the engine's commands and the engine's own
