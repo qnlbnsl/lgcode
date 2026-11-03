@@ -531,21 +531,23 @@ event that belongs to a thread.
 Why it matters: a subscriber that filters on the column alone would miss a
 queued delivery in the target's thread.
 
-## 32. A failed COMMIT left the copied SQLite client's transaction open
+## 32. A failed database commit left the copied SQLite client's transaction open
 
 Found: 2026-11-01, in the unit 4a review.
 State: fixed in `third_party/t3code/node-sqlite/src/nodeSqliteClient.ts`.
 
 What happened: the copied client (from T3 Code,
 `packages/shared/src/nodeSqliteClient.ts`) passed no `onCommitFailure` to
-`Client.make`. SQLite can keep a transaction open after a COMMIT fails, for
-example on a deferred foreign-key violation, so the rows of the failed batch
-stayed on the writer connection and the next transaction on it was unsafe.
+`Client.make`. SQLite can keep a transaction open after the database commit
+command (`COMMIT`) fails, for example on a deferred foreign-key violation.
+The rows of the failed batch stayed on the writer connection.
+The next transaction on it was unsafe.
 What should happen: a failed COMMIT is rolled back on the same connection. If
 that rollback fails too, the connection is not reused.
-The fix: `onCommitFailure` runs `ROLLBACK` and counts SQLite's "no transaction
-is active" error as clean. A failed rollback poisons the connection, and each
-later hand-out retries the rollback first, as Effect's `makeSqliteAcquirers`
+The fix: `onCommitFailure` runs the database rollback command (`ROLLBACK`)
+and counts SQLite's "no transaction is active" error as clean.
+A failed rollback poisons the connection.
+Each later hand-out retries the rollback first, as Effect's `makeSqliteAcquirers`
 does. The client's acquirers and reader routing are unchanged.
 Why it matters: the event log promises that a batch is written whole or not at
 all, and the next append must not run inside a leftover transaction.
@@ -1081,6 +1083,25 @@ What should happen: unit 5d decides how a delivery with a `source` (permission, 
 Why it matters: a returned request delivery could tell the asker that its own request failed, while the holder never sees it.
 State: decided by the lead for unit 5d and implemented. The sender of a routed permission or question delivery is its asker. An ordinary error reply returns it to the asker, who gets a notice, and the request stays open with its holder. A stopped or crashed holder's routed delivery is withdrawn, not returned, because its subject moves to the next holder in the same transaction.
 
+Post-build evidence, 2026-11-03, at commit `8ff4c9b`: post-build A1 confirms the
+unresolved consequence of that ruling.
+Evidence: the post-build A1 adjudication is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-1.md` (not tracked).
+It adjudicates flow2 F-1 and flow3 F-1 by source inspection and hand reasoning.
+In `packages/engine/src/routing/deliveries.ts`, `failed` returns the routed
+delivery to the asker and makes the holder idle.
+The following turn end writes nothing, so it never invokes the pass-up rule.
+In `packages/engine/src/routing/holders.ts`, pass-up requires an accepted
+delivery, whereas this delivery is already returned.
+The request stays open with the idle holder, without an `OwnerNeeded` event.
+In `packages/engine/src/routing/waits.ts`, that open request prevents the
+holder from settling.
+A permission asker's return notice also stays queued behind its held turn.
+Score: MAJOR, severity 6 × fallout 3 × probability 4 = 72, band schedule.
+The owner deferred post-build A1 on 2026-11-03, without choosing between
+passing the request up and keeping it with its holder while alerting the owner.
+The existing ruling is not a fix for this remaining stall.
+
 ## 68. A committed permission answer can fail to reach its runner
 
 Found: 2026-11-01, while building unit 5c.
@@ -1234,14 +1255,39 @@ asked by the crashed agent, in the crash append, with the fixed reason
 subjects held by the dead agent. Questions stay open, without an invented
 answer.
 
+Post-build evidence, 2026-11-03, at commit `8ff4c9b`: flow2 F-7 confirms
+the remaining stop case and its effect on ancestor waits.
+Evidence: finding F-7 is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/results/flow2.md` (not tracked).
+It confirms the path by source inspection.
+In `packages/engine/src/commands/stop.ts`, stopping an asker does not cancel
+its open permission requests.
+In `packages/engine/src/routing/waits.ts`, the request prevents its holder
+from settling, so an ancestor's wait stalls.
+An answer commits before the stopped asker's runner refuses it.
+Without an answer, turn-end routing in `packages/engine/src/routing/holders.ts`
+can move the dead request up to the owner and write `OwnerNeeded`.
+The crash cancellation in `packages/engine/src/recovery/crash.ts` does not
+cover this stop path.
+Score: MINOR, severity 4 × fallout 3 × probability 6 = 72, band schedule.
+The owner deferred this finding on 2026-11-03.
+The stop closure remains open under this issue.
+
 ## 75. The wait contract has no owner waiter
 
 Found: 2026-11-01, while building unit 5d.
-State: open for the contracts scope and unit 7.
+State: closed by the owner's decision on 2026-11-03.
 
 What happens: `WaitOpened` requires the waiter's agent identifier, and `Delivery.target` must be an agent. The engine therefore refuses a `wait` from the owner with "command refused".
-Why it matters: decision row 26 gives the owner's terminal `shephrd wait --block`. `AGENTS.md` rule 5 requires that what the owner can do from the terminal is also possible through the API.
-What should happen: the contracts give a wait an owner waiter, at least for blocking waits, which create no delivery.
+Why it mattered: the original decision row 26 gave the owner's terminal `shephrd wait --block`. `AGENTS.md` rule 5 requires that what the owner can do from the terminal is also possible through the API.
+The original proposal was for the contracts to give a wait an owner waiter, at least for blocking waits, which create no delivery.
+
+Closing decision: row 26 of `.plans/plans/shepherd-engine/decisions.md`,
+as amended on 2026-11-03, restricts blocking waits to agents.
+The owner waiter is declined for this engine plan.
+Owner clients get the same result by subscribing to events.
+Revisit this restriction when the client application programming interface
+(API) is planned.
 
 ## 76. Engine notices name the owner as their sender
 
@@ -1598,7 +1644,9 @@ log's redaction boundary.
 ## 103. Adapter setup has no timeout, and spawn registration is not atomic
 
 Found: 2026-11-01, in unit 6a's focused review, finding F-8.
-State: fixed in unit 6d (`recovery/reload.ts`, `runner/AcpRunner.ts`).
+State: open, fix on branch worker/review-2, commit `c9ff320`.
+The plain `start` remainder is being fixed as post-build A3 on branch `worker/review-2`, with a two-minute setup bound and stop pre-emption.
+The post-build A3 correction at `8596f63` has residual cleanup and writer limits in issues 267 and 268.
 
 What happens: initialization, session creation, session load and initial
 configuration have no deadline. An adapter that never responds can keep a
@@ -1620,7 +1668,14 @@ check, so two direct callers cannot create two processes. A reload uses only
 the method the peer advertised at initialize: `session/load` when it
 advertised `loadSession`, otherwise `session/resume` when it advertised
 resume, and otherwise it is refused with "adapter cannot reload". The plain
-`start` command is not bounded yet.
+`start` command was not bounded at the reviewed commit `8ff4c9b`.
+
+What changed on branch `worker/review-2`: commit `c9ff320` applies the same
+two-minute setup bound to a plain start and lets an authorized stop pre-empt
+that setup.
+The post-build result for task 2 reports passing setup tests and a clean
+engine type check on that branch.
+The stalled-send stop path remains open in issue 265.
 
 ## 104. Three harnesses have no verified deny-read or deny-write rule
 
@@ -1879,6 +1934,26 @@ left alone. A group that did not exit after SIGKILL keeps the result
 group did not exit" and goes on. A signal that fails with anything other
 than "no such process" records `left-alone` with the fixed reason "signal
 failed", and the sweep moves on to the next row.
+
+Post-build evidence, 2026-11-03, at commit `8ff4c9b`: post-build A8 records a
+surviving group after its verified leader exits during the sweep.
+Evidence: the post-build A8 adjudication is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-3.md` (not tracked).
+It adjudicates flow4 F-3 and s19 F-1 by source inspection and hand reasoning.
+In `packages/engine/src/recovery/orphans.ts`, the identity reader checks only
+the leader at `/proc/<groupId>`.
+After the verified group receives the termination signal (SIGTERM), its
+leader can exit while a member survives.
+The sweep then skips SIGKILL and reports the group as stopped.
+In `packages/engine/src/service.ts`, pruning the missing leader's process
+row removes the evidence needed to find the surviving group on a later restart.
+This differs from a leader that was already absent before verification.
+The prune also erases the left-alone rows when the leader was already absent
+before the sweep.
+Score: MINOR, severity 5 × fallout 3 × probability 3 = 45, band record.
+The owner's decision on 2026-11-03 keeps leader-only identity, with no exception.
+This is record only, without permission to signal a group after its leader
+has gone.
 
 ## 128. Classified pauses need trustworthy error sources and reset times
 
@@ -3507,3 +3582,699 @@ A possible fix is an iterative maximum, with the forms cached until the set
 of secrets changes.
 Why it matters: an exception in redaction stops that output path, and the
 per-call cost grows with every secret.
+## 250. A fresh service has no harness settings, so its first start is refused
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding N-1.
+State: open, fix on branch worker/review-1.
+
+Evidence: source inspection confirms the missing defaults in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-1.md` (not tracked).
+Its new observation follows post-build A16.
+Row N-1 in `.scratch/foundry-runs/engine-build-1/review-post-build/register.md` (not tracked)
+also records the missing defaults.
+The review reports are in the owner's run folder,
+`.scratch/foundry-runs/engine-build-1/review-post-build/`, which is not tracked.
+
+What happens: `packages/engine/src/runner/harnesses.ts` defines
+`resolveHarnessDefaults`, but no service startup calls it at this commit.
+In `packages/engine/src/commands/internal.ts`, harness settings are read
+only from the projected `HarnessChanged` events.
+Only the owner's command in `packages/engine/src/commands/harnesses.ts`
+writes those events.
+In `packages/engine/src/commands/start.ts`, the first start therefore
+refuses every harness until the owner supplies its full settings by hand.
+
+What should happen: the owner chose automatic loading on the service's first
+start when no harness settings exist.
+The owner also requested a `harnesses reset` command to reload the defaults.
+This is being fixed in this round together with post-build A16 on branch `worker/review-1`.
+An empty model or effort list means that the value is not checked.
+
+Score: MAJOR, severity 6 × fallout 3 × probability 10 = 180, band fix before release.
+Why it matters: every fresh installation refuses the owner's first agent start.
+
+## 251. Interrupting a committed command can skip its runner work
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding A2.
+State: open, deferred by the owner on 2026-11-03.
+
+Evidence: the post-build A2 adjudication is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-2.md` (not tracked).
+It adjudicates flow1 F-1, s13 F-1 and flow5 F-3
+by source inspection and hand reasoning against Effect 4.0.5's source.
+
+What happens: `packages/engine/src/commands/CommandHandler.ts` restores
+interruption around the runner step after the transaction commits.
+A disconnect or cancellation can therefore skip or interrupt that step.
+The stored receipt makes a same-identifier retry return without the step.
+In `packages/engine/src/commands/start.ts`, cancellation during setup can
+leave a committed agent starting, with its prompt queued and no process.
+In `packages/engine/src/recovery/restart.ts`, that starting agent is revived
+after a restart even though the caller cancelled its start.
+In `packages/engine/src/commands/stop.ts`, interruption after the commit
+can leave a live process whose agent is recorded as stopped and whose token
+has been revoked.
+In `packages/engine/src/commands/resume.ts`, the post-commit step has the
+same shape, although its setup already has a time bound.
+
+What should happen: committed runner work needs a durable completion or
+repair policy, including receipt replay.
+The owner has not chosen whether a cancelled start finishes in the background
+or fails without being revived.
+A change that prevents interruption must follow post-build A3's setup bound.
+
+Score: MAJOR, severity 6 × fallout 3 × probability 5 = 90, band schedule.
+The stop path separately scores severity 6 × fallout 4 × probability 2 = 48,
+band record.
+Why it matters: the recorded lifecycle can disagree with the process until
+the owner intervenes.
+
+## 252. Resuming a crashed waiter does not restore its unaccepted wait notice
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding A5.
+State: open, deferred by the owner on 2026-11-03.
+
+Evidence: the post-build A5 adjudication is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-4.md` (not tracked).
+It adjudicates flow3 F-2 by source inspection,
+hand reasoning and a dependency-free replay of the relevant source functions.
+The replay did not execute a real resume or the Effect runtime.
+
+What happens: `packages/engine/src/routing/waits.ts` can satisfy a wait and
+queue its completion while the waiter is busy.
+In `packages/engine/src/recovery/crash.ts`, a crash withdraws that notice
+through `targetGone` in `packages/engine/src/routing/deliveries.ts`.
+The wait remains satisfied in `packages/engine/src/views/apply.ts`.
+Neither `packages/engine/src/commands/resume.ts` nor
+`packages/engine/src/recovery/reload.ts` restores the withdrawn notice.
+Wait checks revisit only open waits, so the resumed lead can look settled
+without receiving its child's completion.
+An ancestor wait opened after resume, or an all-wait kept open by another
+busy member, can then report that lead settled before it handles the result.
+
+What should happen: preserve enough durable association to restore an
+unaccepted notice after a successful resume, without repeating accepted notices.
+The owner has not chosen between restoring the saved completion and reopening
+the wait to compute the members' current states.
+Stopping the waiter must keep its cancellation behavior.
+
+Score: MAJOR, severity 6 × fallout 3 × probability 4 = 72, band schedule.
+Why it matters: delegated work can stop progressing until the owner prompts
+the resumed lead.
+
+## 253. A stalled recovery send prevents healthy recovered agents from continuing
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding A6.
+State: open, deferred by the owner on 2026-11-03.
+
+Evidence: the post-build A6 adjudication is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-5.md` (not tracked).
+It adjudicates flow4 F-1 and s21 F-2 by source
+inspection and hand reasoning.
+No stalled-transport test was executed in that adjudication.
+
+What happens: the startup and account-return send loops in
+`packages/engine/src/recovery/restart.ts` dispatch agents sequentially.
+In `packages/engine/src/runner/AcpRunner.ts`, sending waits for the adapter's
+input write acknowledgement without a transport deadline.
+An adapter that stops reading can hold the first send indefinitely.
+In `packages/engine/src/routing/deliveries.ts`, the ordinary follower cannot
+rescue recovered agents that are already working, because that state requires
+the recovery dispatch option.
+The service can already be serving requests while these agents remain blocked.
+The stalled agent's lane also keeps an ordinary stop waiting behind its send.
+
+What should happen: give each recovery dispatch independent scoped progress
+while preserving its lane, incarnation and delivery reservation.
+Bound or cancel the transport acknowledgement with a policy for partial writes.
+The send deadline and partial-write policy remain owner choices.
+Issue 85's fix for the ordinary follower does not cover these recovery loops.
+
+Score: MAJOR, severity 6 × fallout 3 × probability 4 = 72, band schedule.
+Why it matters: one stalled adapter can strand healthy agents after a restart
+or an account return.
+
+## 254. An obsolete account return can overwrite a newer signed-out pause
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding A7.
+State: open, deferred by the owner on 2026-11-03.
+
+Evidence: the post-build A7 adjudication is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-5.md` (not tracked).
+It adjudicates flow4 F-2, s21 F-1 and flow5 F-2
+by source inspection and hand reasoning.
+The post-build A7 row in `.scratch/foundry-runs/engine-build-1/review-post-build/register.md` (not tracked)
+retains this as a lifecycle finding, because no security property is shown to fail.
+
+What happens: `packages/engine/src/recovery/restart.ts` checks account
+availability before loading a paused agent's session.
+While setup runs, a sibling on that account can report a sign-out through
+`packages/engine/src/routing/deliveries.ts` and pause that agent again.
+The final writer predicate in `packages/engine/src/recovery/reload.ts`
+checks only whether the agent is still paused.
+The obsolete return then opens the session and marks the agent working,
+with a queued carry-on, despite the newer sign-out.
+The signed-out send guard still prevents sending.
+A later owner clearance selects paused agents, so it misses this working
+agent and leaves its carry-on stranded.
+
+What should happen: revalidate the account, its availability, the return
+cause and the pause generation inside the final writer transaction.
+Discard a superseded setup result and stop its replacement process.
+The failure append also needs the same lifecycle validation.
+
+Score: MAJOR, severity 6 × fallout 3 × probability 4 = 72, band schedule.
+Why it matters: clearing the account does not restore progress without an
+additional stop and resume, or a service restart.
+
+## 255. Reading one unreadable receipt disables unrelated commands
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding A11.
+State: open, deferred by the owner on 2026-11-03.
+
+Evidence: the post-build A11 adjudication is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-6.md` (not tracked).
+It adjudicates flow7 F-1 and s05 F-1 by source
+inspection and hand reasoning.
+This entry records post-build A11 from
+`.scratch/foundry-runs/engine-build-1/review-post-build/register.md` (not tracked).
+It also supplements the broader receipt-read problem in issue 59.
+
+What happens: receipt decoding in `packages/engine/src/log/EventLog.ts`
+turns malformed stored data into `LogWriteFailed`.
+The separate receipt decoder in `packages/engine/src/commands/CommandHandler.ts`
+does the same inside the writer transaction.
+The event log treats either read failure as a write failure and latches
+command refusal for the service's lifetime.
+Unrelated fresh commands then fail even though the database is writable.
+The reason allow-list in `packages/engine/src/api/server.ts` reduces the
+reported reason to "command refused".
+Restarting clears the latch, but replaying the bad receipt sets it again.
+
+What should happen: refuse an unreadable receipt locally at both decoding
+sites, while keeping lifetime refusal for actual storage write failures.
+Cover malformed text, invalid envelopes and invalid stored replies in both
+the old and current receipt formats.
+
+Score: MAJOR, severity 6 × fallout 3 × probability 4 = 72, band schedule.
+Why it matters: one corrupt or incompatible receipt can stop every caller's
+command flow until the owner restarts the service and uses a fresh identifier.
+
+## 256. Failed transaction cleanup can bypass the lifetime database refusal
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding A12.
+State: open, deferred by the owner on 2026-11-03.
+
+Evidence: the post-build A12 adjudication is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-6.md` (not tracked).
+It adjudicates flow7 F-2 and s05 F-2 by source
+inspection and hand reasoning against Effect 4.0.5's transaction source.
+No double-fault transaction test was executed in that adjudication.
+
+What happens: a failed database commit command (`COMMIT`), followed by a
+failed database rollback command (`ROLLBACK`), can leave the transaction
+failure in Effect's defect channel.
+The connection is poisoned by
+`third_party/t3code/node-sqlite/src/nodeSqliteClient.ts` until cleanup succeeds.
+In `packages/engine/src/log/EventLog.ts`, typed-error mapping and observation
+miss that defect, so the lifetime write-failure latch is not set.
+If the next connection acquisition successfully rolls back, a new command
+can succeed despite the earlier storage write failure.
+The first failure also bypasses the promised fixed database reason.
+The adjudicator corrected the flow report's claimed fixed web response:
+`packages/engine/src/api/server.ts` can instead return a remote procedure
+call (RPC) defect response on an upgraded connection.
+This entry records the command-refusal defect, without claiming a reproduced
+disclosure or permanent corruption.
+
+What should happen: classify the complete transaction outcome at the database
+boundary and retain lifetime refusal with a fixed safe reason.
+Preserve connection cleanup before reuse and distinguish application defects
+and receipt-read failures from storage failures.
+
+Score: MAJOR, severity 6 × fallout 3 × probability 4 = 72, band schedule.
+Why it matters: one transient storage fault can defeat the promised refusal
+policy even after the physical connection becomes usable again.
+
+## 257. A permission prompt omits the options its agent holder must choose
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding A14.
+State: open, deferred by the owner on 2026-11-03.
+
+Evidence: the post-build A14 adjudication is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-1.md` (not tracked).
+It adjudicates s14 F-1 by source inspection.
+The related s14 F-3 ordering allegation is disproved on the success path.
+
+What happens: `packages/engine/src/routing/permissions.ts` passes only the
+description into the holder's delivery.
+In `packages/engine/src/routing/holders.ts`, moved requests likewise omit
+the options' identifiers, names and kinds.
+The answer handler refuses an option identifier the request does not offer.
+The tool list in `packages/mcp/src/tools.ts` offers no request-reading tool.
+A direct parent can read the raw request event through a subscription, but
+a holder farther up the hierarchy cannot see that child's event.
+Decision row 55 also excludes subscriptions from the agent tools.
+
+What should happen: include the options in both initial and moved deliveries,
+with owner-only choices identified and adapter text enclosed and escaped.
+A request-reading tool would instead require the owner's amendment to row 55.
+
+Score: MAJOR, severity 4 × fallout 3 × probability 8 = 96, band schedule.
+Why it matters: an ordinary agent-held permission request degrades into
+owner intervention because the holder lacks the data needed to answer it.
+
+## 258. Asynchronous live-check errors bypass the promised cleanup
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding A19.
+State: open, deferred by the owner on 2026-11-03.
+
+Evidence: the post-build A19 adjudication is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-7.md` (not tracked).
+It adjudicates s29 F-2 by source inspection,
+hand reasoning and two dependency-free checks with synthetic error emitters.
+The adjudicator's checks used no real service or adapter processes.
+
+What happens: `packages/engine/scripts/live/service.ts` attaches neither
+a child-process error listener nor a log-stream error listener.
+An asynchronous spawn or log failure therefore throws outside the promise
+awaited by `packages/engine/scripts/live/run.ts`.
+The entry in `packages/engine/scripts/live-check.ts` catches only that
+promise's rejection.
+In the adjudicator's injected checks, both errors terminated the wrapper
+with an unhandled error event before the finally or promise markers ran.
+A log failure after spawn can leave the service and detached adapters running.
+A failed spawn alone does not prove a surviving service.
+
+What should happen: attach both error handlers immediately and propagate
+one lifecycle failure into journey cancellation, bounded cleanup and the
+named final failure summary.
+Preserve diagnostics and handle errors during construction or shutdown too.
+
+Score: MAJOR, severity 6 × fallout 3 × probability 4 = 72, band schedule.
+Why it matters: the owner may need to stop leftover work by hand after a
+local filesystem or process-creation fault.
+
+## 259. A dropped permission event leaves an adapter hold with no answerable request
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding flow2 F-6.
+State: open, deferred by the owner on 2026-11-03.
+
+Evidence: finding F-6 is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/results/flow2.md` (not tracked).
+It confirms the path by source inspection.
+
+What happens: a full disk or lock timeout can fail the transaction that
+records `permissionRequested`.
+In `packages/engine/src/commands/CommandHandler.ts`, the runner-event catch
+logs "runner event dropped: processing failed" and continues.
+In `packages/engine/src/runner/AcpRunner.ts`, the permission hold stays pending.
+There is no durable request row for an owner or agent to answer.
+The agent remains working until someone stops it.
+This differs from post-build A1, where a recorded request is stranded at its holder.
+
+What should happen: cancel or reject the adapter hold when its permission
+request cannot be recorded.
+
+Score: MINOR, severity 6 × fallout 3 × probability 4 = 72, band schedule.
+Why it matters: an agent can stay blocked on a request that no client can see.
+
+## 260. A detached service discards its output and hides startup refusal details
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding s08 F-2.
+State: open, deferred by the owner on 2026-11-03.
+
+Evidence: `.scratch/foundry-runs/engine-build-1/review-post-build/results/shepherd-engine-s08.md` (not tracked), F-2, confirms the path by source
+inspection and hand reasoning.
+
+What happens: `packages/cli/src/serve.ts` launches the detached service with
+its standard output and standard error ignored.
+In `packages/engine/src/service.ts`, service logs go to standard output
+and startup refusal reasons go to standard error.
+The launcher keeps neither stream in a log file.
+In `packages/cli/src/bin.ts`, the owner sees only "service failed to start".
+For example, a state folder with mode 0750 hides the specific refusal that
+its mode must be 0700.
+Issue 181's advice to read a log file cannot work on this detached path.
+
+What should happen: retain the output in a private file or capture and
+report the startup refusal through the existing redaction boundary.
+
+Score: MINOR, severity 4 × fallout 3 × probability 6 = 72, band schedule.
+Why it matters: the owner must find another way to diagnose a failed start
+or a detached service crash.
+
+## 261. Account replacement drops omitted fields, and removal ignores running agents
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding s13 F-3.
+State: open, deferred by the owner on 2026-11-03.
+
+Evidence: `.scratch/foundry-runs/engine-build-1/review-post-build/results/shepherd-engine-s13.md` (not tracked), F-3, confirms the path by source
+inspection and hand reasoning.
+
+What happens: `accounts set` in `packages/engine/src/commands/accounts.ts`
+writes exactly the supplied account into `AccountChanged`.
+In `packages/engine/src/views/apply.ts`, that event replaces the whole record.
+Omitting `environment` or `home` therefore drops the old values and references.
+Superseded secret values remain in `packages/engine/src/accounts/SecretStore.ts`
+until restart collection.
+Reusing a secret's name through `set-secret` can also leave the old value stored.
+The remove handler checks no running agent's account usage.
+Those agents can therefore reference an account that no longer exists.
+The review did not establish the later resume outcome.
+
+What should happen: document full replacement or define field merging.
+Refuse removal while agents still use the account and collect superseded values.
+The owner has not chosen the replacement policy.
+
+Score: MINOR, severity 4 × fallout 3 × probability 6 = 72, band schedule.
+Why it matters: an ordinary settings change can surprise the owner and
+require setting the account fields or secrets again.
+
+## 262. A transient process-row write failure refuses one start without latching the engine
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding A13.
+State: record only, with no latch, as decided by the owner on 2026-11-03.
+
+Evidence: the post-build A13 adjudication is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-2.md` (not tracked).
+It adjudicates flow7 F-3 by source inspection
+and hand reasoning.
+The adjudicator lowered the original MAJOR label to MINOR.
+
+What happens: `packages/engine/src/runner/AcpRunner.ts` inserts the process
+row directly through the database client, outside the event-log writer.
+A failed insert becomes a runner rejection and closes the spawned process group.
+In `packages/engine/src/commands/start.ts`, the failure writes `AgentStartFailed`
+and revokes the token if storage has recovered.
+The latch in `packages/engine/src/log/EventLog.ts` sees no failed write,
+so later commands remain available.
+If the storage fault persists into the failure append, that append latches
+the writer normally.
+
+Owner decision: keep the one-start failure without adding a global latch
+for this operational-table write.
+The process is killed and its token is revoked on the recorded failure path.
+
+Score: MINOR, severity 2 × fallout 3 × probability 2 = 12, band record.
+Why it matters: a one-statement fault produces a vague start failure rather
+than a database-specific refusal, while leaving the engine usable.
+
+## 263. Live-check cleanup can adopt and signal a replacement process
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding A18.
+State: record only, as decided by the owner on 2026-11-03.
+
+Evidence: the post-build A18 adjudication is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-7.md` (not tracked).
+It adjudicates s29 F-1 by source inspection,
+hand reasoning and an injected process-table check of the production module.
+The check used synthetic processes and recorded signals without sending them.
+
+What happens: `packages/engine/scripts/live/service.ts` retains the spawned
+child's numeric identifier without an immutable original start time.
+Discovery accepts that identifier as a seed even after the original child exits.
+If another job reuses the number before cleanup, the cleanup records the
+replacement's current start time as its own identity.
+It can then admit that job's descendants and signal them too.
+The identity map is also recreated on each stop call.
+The adjudicator's check recorded SIGTERM for synthetic replacement 4242 and
+its child 4243, while sparing unrelated control 9999.
+Issue 205 records a missing reuse test, but its broader identity assurance
+does not cover reuse before the first identity is recorded.
+
+What should happen: retain the original service identity from spawn through
+every cleanup call and reject an invalid seed before discovering descendants.
+Carry observed identities through discovery and signalling, including the
+initial direct signal.
+No cleanup implementation change is authorized by this record-only decision.
+
+Score: MAJOR, severity 6 × fallout 3 × probability 2 = 36, band record.
+Why it matters: cleanup can stop unrelated owner work after an early exit
+and process-identifier reuse.
+
+## 264. The orphan-sweep test for a surviving group times out before its own deadline
+
+Found: 2026-11-03, by review-fix-2 while verifying the post-build A3 fix.
+State: open, recorded at the review lead's request in board post 8.
+
+Evidence: the fixer's result is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/result-2.md` (not tracked).
+It reports a five-second test timeout in
+`packages/engine/test/recovery/orphans.test.ts`, case F-3.
+The case is named "a group that survives SIGKILL".
+The full engine run on branch `worker/review-2`, commit `c9ff320`, had
+1,627 passing tests, one failing test and two skipped tests.
+Review-fix-2 reproduced the same failure on the untouched base commit
+`8ff4c9b` in a temporary worktree, which was then removed.
+I did not reproduce the runtime failure in this worktree.
+
+What happens: the case keeps one fake process group alive after both signals.
+It allows the sweep eight seconds to return through `Effect.timeoutOption`.
+In `packages/engine/src/recovery/orphans.ts`, the default wait after the
+kill signal is five seconds, after the case's 30-millisecond grace period.
+The reported five-second test timeout therefore expires before that expected
+sweep can complete.
+The root `vitest.config.ts` declares a 60-second test timeout.
+Its effective timeout for this workspace case still needs verification.
+The report does not establish a production sweep failure or a post-build A3 regression.
+
+What should happen: make the case's effective test deadline cover the
+deliberate sweep bound, or inject a shorter sweep wait without weakening
+the assertion that a surviving group is left alone and the next row is swept.
+No test or production implementation is changed by this record.
+
+Score: not assigned, because the new evidence establishes a test failure
+rather than a scored production defect.
+Why it matters: a failure already present on the base commit prevents a
+clean full-suite result for unrelated engine changes.
+
+## 265. A stalled prompt send holds the lane that a stop command needs
+
+Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding flow3 F-5.
+State: open, record only under the owner's 2026-11-03 review choices.
+
+Evidence: finding F-5 is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/results/flow3.md` (not tracked).
+It confirms the path by source inspection
+and hand reasoning, without executing a stalled-send test.
+The post-build A6 adjudication in
+`.scratch/foundry-runs/engine-build-1/review-post-build/adj/result-5.md` (not tracked)
+keeps this stop-control consequence separate from the cross-agent recovery
+scheduling defect.
+Issue 253 records that recovery scheduling defect.
+
+What happens: an adapter can stop reading while a large prompt fills its
+standard-input pipe.
+In `packages/engine/src/routing/deliveries.ts`, dispatch holds the agent's
+lane through the runner's prompt call.
+In `packages/engine/src/runner/AcpRunner.ts`, that call waits for the write
+acknowledgement without a send deadline.
+In `packages/engine/src/commands/CommandHandler.ts`, a stop waits for the
+same lane before it can stop the process.
+The stop therefore waits for the adapter to exit or for an external kill.
+
+The post-build A3 fix on `worker/review-2`, commit `c9ff320`, does not cover this path.
+Its `packages/engine/src/routing/lanes.ts` cancellation registration is used
+only by start setup, as the fixer's result confirms.
+An ordinary stalled send registers no such cancellation signal.
+
+What should happen: bound or cancel the send acknowledgement, or let an
+authorized stop pre-empt the send before acquiring its lane.
+The original flow score is severity 6 × fallout 3 × probability 2 = 36, band record.
+The flow reviewer labelled it MINOR.
+The post-build A6 adjudicator considers indefinitely failing stop control a MAJOR
+consequence, while keeping this finding separate from post-build A6.
+Why it matters: an ordinary stop can fail to end the affected agent until
+the owner intervenes outside the command path.
+
+## 266. A setup timeout after account sign-out records an invalid start-failure event
+
+Found: 2026-11-03, in the re-review of the post-build A3 fix at commit `c9ff320`.
+State: record only, as decided by the review lead on 2026-11-03.
+
+Evidence: finding F-3 is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/rresult-2.md` (not tracked).
+The re-review confirms the path by source inspection and an in-memory
+integration probe with a controlled clock.
+The probe observed one runner stop, one `AgentStartFailed`, a revoked token
+and an agent that remained paused.
+Those observations are the re-reviewer's results, not a test run in this worktree.
+
+What happens: a plain start can still be setting up when another agent on
+its account reports a sign-out.
+In `packages/engine/src/routing/deliveries.ts`, account-wide sign-out pauses
+the starting agent.
+The two-minute setup bound on branch `worker/review-2` then stops its runner
+when setup times out.
+The existing failure branch in `packages/engine/src/commands/start.ts`
+writes `AgentStartFailed` and revokes the agent's token.
+In `packages/contracts/src/stateMachine.ts`, that event is valid only from
+starting, where it changes the agent to stopped.
+In `packages/engine/src/views/apply.ts`, an event invalid from paused leaves
+the lifecycle unchanged.
+The view therefore stays paused without a session or process.
+
+The failure branch predates the setup bound and exists at base commit `8ff4c9b`.
+A setup rejection after sign-out already had the same inconsistency.
+The timeout in the post-build A3 fix adds another route to that branch.
+This does not permanently prevent recovery.
+The production account-return path in `packages/engine/src/recovery/restart.ts`
+can start the paused agent without a session after its account becomes available.
+
+What should happen: any recorded failure event must be valid for the current
+lifecycle while preserving account-return recovery.
+No implementation change is part of this record-only entry.
+
+Score: not assigned, because the re-review supplied no numerical risk score.
+The re-review labels the finding MINOR.
+Why it matters: the timeout records a start failure without reaching the
+stopped state checked by `packages/engine/test/commands/start-setup.test.ts`
+on branch `worker/review-2`.
+
+## 267. A cancelled start's fallback cleanup races with a later stop or resume
+
+Found: 2026-11-03, in the re-review of the post-build A3 correction at `8596f63`.
+State: open, recorded at the review lead's request in board post 23.
+
+Evidence: finding F-1 is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/rresult-2b.md` (not tracked).
+The re-reviewer confirmed the path by source inspection and supplemental
+integration probes with a delayed writer.
+The probes observed a duplicate terminal event after a successful stop and
+revocation of the new token after a successful resume.
+They did not establish that the fallback killed a real operating-system process.
+
+What happens: on branch `worker/review-2`, a cancelled start in
+`packages/engine/src/commands/start.ts` releases its agent's lane before
+waiting for the stops that cancelled it to settle.
+It then checks the lifecycle outside the writer transaction and runs fallback cleanup.
+The cleanup stops a runner by agent identifier and unconditionally appends
+`AgentStartFailed` while revoking every token for that agent.
+It does not recheck the current state or original token incarnation inside
+the writer transaction.
+The settlement helper in `packages/engine/src/routing/lanes.ts` waits only
+for a snapshot of the stops already registered.
+A later valid stop can therefore commit `AgentStopped` before the old
+fallback appends `AgentStartFailed`.
+A subsequent `resume --fresh` in `packages/engine/src/commands/resume.ts`
+can open a new incarnation whose token the old fallback then revokes.
+The view can stay idle while its new token is unusable.
+The runner stop in `packages/engine/src/runner/AcpRunner.ts` also selects
+only by agent identifier, so stale cleanup could target a later process.
+The review directly proved the event and token consequences, rather than that kill.
+
+What should happen: keep fallback cleanup inside the agent's lane and
+validate the current state and the original token inside the failure transaction.
+Cleanup from one incarnation must not stop or revoke a later incarnation.
+This remains part of the post-build A3 follow-up linked from issue 103.
+No implementation change is made by this record.
+
+Score: not assigned, because the re-review supplied no numerical risk score.
+The re-review labels the finding MAJOR.
+Why it matters: overlapping commands or a delayed writer can let cleanup
+from a cancelled start corrupt a later successful stop or resume.
+
+## 268. A cancelled start can outwait its settlement deadline at the event writer
+
+Found: 2026-11-03, in the re-review of the post-build A3 correction at `8596f63`.
+State: open, recorded at the review lead's request in board post 23.
+
+Evidence: finding F-2 is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/rresult-2b.md` (not tracked).
+The re-reviewer checked the source and ran supplemental integration probes
+through the real writer boundary.
+One probe held the writer beyond the settlement deadline.
+Another injected `LogWriteFailed` inside the real transaction to exercise
+the production refusal latch without inducing a physical disk fault.
+These are the re-reviewer's observations, not runtime tests run in this worktree.
+
+What happens: on branch `worker/review-2`, the two-minute timeout in
+`packages/engine/src/routing/lanes.ts` bounds only the wait for stop settlement.
+The fallback append in `packages/engine/src/commands/start.ts` runs afterward.
+If a stop still holds the writer indefinitely, the cancelled start can wait
+indefinitely for that writer even after its settlement deadline has expired.
+The timed probe progressed only after the writer was released.
+
+A real writer failure has a different remaining limit.
+In `packages/engine/src/log/EventLog.ts`, `LogWriteFailed` latches refusal
+for the lifetime of the writer.
+The fallback uses that same writer, so it cannot append its terminal event
+or revoke the original token after the latch is set.
+The probe observed an agent still starting with an unrevoked token and
+no `AgentStartFailed`, although the runner stop was called.
+The new writer-failure case in
+`packages/engine/test/commands/start-setup.test.ts` instead injects a
+one-shot failure outside the real writer.
+Its following fallback transaction can succeed because that synthetic
+failure never exercises the refusal latch.
+It does not prove terminal completion under the production latched failure.
+
+What should happen: qualify the completion guarantee on a usable writer
+or define a separate recovery policy for failed persistence.
+Distinguish the recoverable synthetic failure from the real latched failure
+in the test evidence.
+Do not bypass the storage-failure latch to force a terminal append.
+The settlement deadline must not be described as a bound on later writer work.
+This remains part of the post-build A3 follow-up linked from issue 103.
+No implementation change is made by this record.
+
+Score: not assigned, because the re-review supplied no numerical risk score.
+The re-review labels the finding MINOR.
+Why it matters: the claimed terminal-outcome guarantee and its time bound
+are stronger than the persistence path and the test establish.
+
+## 269. An account home that equals a stored secret value is redacted, so the account event fails its schema and later account commands are refused
+
+Found: 2026-11-03, in the re-review of the post-build A9 fix at `1f2602a`.
+State: open, residual after the last fix round; code on branch
+`worker/review-1` at `1f2602a`.
+
+Evidence: finding F-1 is in
+`.scratch/foundry-runs/engine-build-1/review-post-build/fix-round-1/rresult-1b.md` (not tracked).
+The re-reviewer reproduced the failure through the real service with a
+Claude account and a planted login-folder value.
+The same path applies to Codex by source inspection.
+These are the re-reviewer's observations, not runtime tests run in this worktree.
+
+What happens: add or set a Claude or Codex account whose home equals the
+value stored under `CLAUDE_CONFIG_DIR` or `CODEX_HOME`.
+The value can be stored through `accounts set-secret` or supplied through
+a `secret:` reference.
+The redactor registers that stored value in `packages/engine/src/service.ts`.
+`packages/engine/src/log/EventLog.ts:250` redacts the account event before
+the schema check at `packages/engine/src/log/EventLog.ts:182`.
+The redacted home no longer meets the absolute-path requirement at
+`packages/contracts/src/accounts.ts:22`.
+The command fails with a `SchemaError`.
+The secret file has already been written at
+`packages/engine/src/commands/accounts.ts:78` and cannot be rolled back
+with the database transaction.
+Receipt redaction at `packages/engine/src/log/EventLog.ts:221` also replaces
+the home in the stored account result.
+Receipt decoding at `packages/engine/src/commands/CommandHandler.ts:252`
+then refuses `accounts list` on a fresh connection.
+
+The command tests use a pass-through redactor at
+`packages/engine/test/support/handlerRig.ts:117`,
+`packages/engine/test/commands/account-login.test.ts:120`, and
+`packages/engine/test/commands/account-login.test.ts:142`.
+They therefore do not exercise the real service's redaction boundary.
+The fix now accepts the matching input instead of refusing it.
+The matching-folder acceptance rule in row A9 of
+`.scratch/foundry-runs/engine-build-1/review-post-build/owner-choices.md` (not tracked)
+remains unmet through the real service.
+
+What should happen: use an end-to-end representation that accepts the
+matching setting while preserving secret removal.
+Do not exempt secrets from redaction.
+The registry in `packages/engine/src/service.ts` is also involved in
+owner finding B1, recorded in issue 223.
+Post-build A4 is being fixed on branch `worker/review-4`.
+It has no issue entry.
+The post-build A4 fixer must account for this residual when changing that registry.
+
+Score: not assigned, because this is a residual after the last fix round.
+The re-review labels the finding MAJOR.
+Why it matters: a matching login-folder configuration can fail after
+persisting its secret and leave later account commands refused.
