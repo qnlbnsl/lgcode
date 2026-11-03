@@ -1,0 +1,23 @@
+{
+  "name": "@shephrd/t3-source-control",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=26.13 <27"
+  },
+  "exports": {
+    "./mergeMessage": {
+      "types": "./src/mergeMessage.ts",
+      "import": "./src/mergeMessage.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

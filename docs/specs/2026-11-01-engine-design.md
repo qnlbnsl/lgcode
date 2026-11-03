@@ -1,4 +1,4 @@
-# The Shepherd engine: design
+# The Shephrd engine: design
 
 Status: **approved by the owner on 2026-11-01.** The owner asked Claude to
 check the spec against the design session instead of reading it, and to
@@ -16,7 +16,7 @@ needs the owner's review.
 
 ## What the engine is
 
-Shepherd is built in four pieces:
+Shephrd is built in four pieces:
 
 1. The engine.
 2. The client API.
@@ -97,7 +97,7 @@ These are built on the capabilities above, in later pieces:
 - **Written with the Effect library, version 4** (2026-11-01). The reason is
   reuse: T3 Code is written with Effect 4, so its ACP client, event store,
   accounts and testing code can be copied with credit instead of rebuilt.
-  Shepherd pins the same Effect version as the T3 Code commit it copies from.
+  Shephrd pins the same Effect version as the T3 Code commit it copies from.
   At commit `6fc9144`, that is Effect 4.0.5.
 - **Several accounts for every harness** (2026-11-01). Modelled on T3 Code's
   "provider instances".
@@ -168,7 +168,7 @@ The commands are:
 | `compact` | The owner, or the agent's parent | Asks an agent to compact its context. |
 | `group` | The owner, or the agent's parent | Adds or removes an agent's group labels. |
 | `accounts` | The owner only | Adds, changes, disables or removes an account. |
-| `harnesses` | The owner only | Reads and changes each harness's settings: its run mode, its ACP adapter command, and how its permission modes map onto Shepherd's scale. |
+| `harnesses` | The owner only | Reads and changes each harness's settings: its run mode, its ACP adapter command, and how its permission modes map onto Shephrd's scale. The service loads the defaults itself on its first start, when its log holds no harness settings, and `harnesses reset` loads them again. An empty list of models or efforts means the list is not checked. |
 | `subscribe` | The owner, or any agent | Sends every event after a given sequence number, then each new event as it is written. |
 
 "The agent's parent" means the agent that started it. **Chosen in this spec:**
@@ -186,7 +186,7 @@ There is one runner for each agent in ACP mode. The runner:
   `claude-agent-acp`, Codex uses `codex-acp`, and Gemini CLI speaks ACP
   itself.
 - Gives the process the account's environment (its home directory or API
-  key), the agent's own token, and Shepherd's tools over the Model Context
+  key), the agent's own token, and Shephrd's tools over the Model Context
   Protocol (MCP).
 - Opens an ACP session and records the session id, which `resume` needs.
 - Turns everything the agent streams into events: text, plan, tool calls,
@@ -225,7 +225,7 @@ What an agent may do depends on who started whom. That gives two rules:
 - **Permission routing.** A permission request goes to the agent that started
   the asker.
 
-**Chosen in this spec:** permission modes are compared on Shepherd's own
+**Chosen in this spec:** permission modes are compared on Shephrd's own
 scale, because each harness names its modes differently. The scale, from
 narrowest to widest, is: read only, ask before every change, edit files
 without asking, and full access. Each harness maps its own modes onto this
@@ -241,7 +241,7 @@ The engine offers one API with two kinds of call: commands, and `subscribe`.
 
 - The web page, the phone and the owner's terminal use the API directly.
 - Agents reach the same API in two ways: a small command-line tool, and
-  Shepherd's tools over MCP. Both are thin wrappers with no rules of their
+  Shephrd's tools over MCP. Both are thin wrappers with no rules of their
   own.
 
 **Chosen in this spec:** the API runs over a WebSocket on the loopback
@@ -258,12 +258,35 @@ accounts for Codex or three Cursor accounts.
   directory (`CODEX_HOME` for Codex, `CLAUDE_CONFIG_DIR` for Claude Code), or
   its own API key (`CURSOR_API_KEY` for Cursor).
 - `HOME` is never changed, because that hides Claude Code's saved login.
+- The account's `home` field is passed through the harness's own variable,
+  and its `secret` field through the harness's key variable (`ANTHROPIC_API_KEY`
+  for Claude Code, `OPENAI_API_KEY` for Codex, `GEMINI_API_KEY` for Gemini,
+  `CURSOR_API_KEY` for Cursor). The mapping is keyed on the harness id and is
+  in `runner/harnesses.ts`. Harness settings record no adapter kind, so a
+  custom harness id, such as `custom-claude`, has no mapping.
+- A field the harness has no variable for is refused, never dropped. A `home`
+  on Gemini, Cursor or a custom harness id is refused, and so is a `secret` on
+  a custom harness id. The refusal is fixed text that names the field and the
+  harness id, such as `account home is not supported by harness gemini`, and
+  holds no secret. It is made when the account is added, set, or given a
+  secret, and again when the agent is started.
+- An account whose `home` and explicit `CLAUDE_CONFIG_DIR` or `CODEX_HOME` name
+  different folders is refused when it is set, and again when it is started.
+  The check compares the folders the child would get, so a `secret:` reference
+  is resolved through the secret store first. A reference to the same folder is
+  accepted, a reference to another folder is refused, and a reference that
+  cannot be resolved counts as different. The refusal text never holds the
+  resolved value. An explicit key variable in the environment wins over
+  `secret`.
 - An account can carry extra environment variables.
 - Secret values are stored as references, not plain text, and never reach
   the log or a client.
 - Codex accounts can share one set of sessions through T3 Code's "shadow home"
   arrangement, so a Codex thread can move to another account. Claude Code has
   no equivalent, so a Claude thread stays on its first account.
+- A Codex account that is not named `codex` gets a private login: its own
+  `auth.json` in a shadow home under the state folder, with the sessions shared
+  from its `home`. Only the account named `codex` uses `home` directly.
 
 `start` either names an account or asks for any account of that harness. With
 "any", the engine picks the usable account with the fewest running agents. An
@@ -276,7 +299,7 @@ This is how capabilities 1, 2, 3, 5, 6 and 7 work together. A team lead starts
 a worker, the worker asks for permission, the owner answers from the phone,
 and the lead is woken once when the worker finishes.
 
-1. **The lead asks.** The lead calls `start` through Shepherd's tools, with
+1. **The lead asks.** The lead calls `start` through Shephrd's tools, with
    its own token. It asks for a Codex worker on any Codex account, in a
    folder, in the group "auth", with the permission mode "ask before every
    change", and with a first prompt.
@@ -285,7 +308,7 @@ and the lead is woken once when the worker finishes.
    id it has seen before. It picks the Codex account, writes "agent started"
    with the lead as parent, and creates the worker's token.
 3. **The runner starts the worker.** It starts `codex-acp` as a child process
-   with the account's home directory, the worker's token and Shepherd's
+   with the account's home directory, the worker's token and Shephrd's
    tools. It opens an ACP session and writes the session id.
 4. **The worker works.** The first prompt is written as "prompt sent, from the
    lead", then sent. Everything the worker streams back becomes events, and
@@ -320,7 +343,7 @@ An agent is always in exactly one of these states:
 | Waiting on a permission | A permission request from this agent is open. |
 | Waiting on an answer | A question from this agent, sent with `ask`, is open. |
 | Paused for a limit | The account ran out of usage. This is not a failure. |
-| Interrupted | Shepherd restarted while this agent was running. |
+| Interrupted | Shephrd restarted while this agent was running. |
 | Crashed | The adapter process ended without being stopped. |
 | Stopped | The agent was stopped with `stop`. |
 
@@ -336,7 +359,7 @@ Every change of state is an event, so `subscribe` reports it.
    needed" event. The engine does not restart it. Retrying is the sheepdog's job, in piece 4, because an
    agent that crashes on some input will usually crash again on the same
    input.
-2. **Shepherd itself restarts.** The engine rebuilds the views from the log.
+2. **Shephrd itself restarts.** The engine rebuilds the views from the log.
    Every agent that was running is marked "interrupted", and its open
    permission requests close, because the process that asked has gone. Each
    agent's ACP session is reloaded where its adapter supports reloading,
@@ -416,7 +439,7 @@ implementation plan records what was changed.
 | The Codex shadow home | `apps/server/src/provider/Drivers/CodexHomeLayout.ts`, `apps/server/src/provider/CodexManagedHome.ts` | Codex accounts that share sessions. Not read yet. |
 | Replay and fake programs | `packages/provider-testing` | Tests 1 and 2. |
 
-T3 Code's code is written for T3's own design. Where Shepherd's design
+T3 Code's code is written for T3's own design. Where Shephrd's design
 differs, such as permission routing, waits and deliveries, the copied code is
 changed rather than used as it is.
 
@@ -439,10 +462,10 @@ Pairing (rule 3) and encrypted remote access (rule 5) belong to piece 2.
 
 ## What this spec leaves open
 
-- **Packaging.** Shepherd could run as a Node.js program or as one file
+- **Packaging.** Shephrd could run as a Node.js program or as one file
   compiled with Bun. Effect supports both. T3 Code runs on Node.js, so the
   copied code is known to work there.
-- **Licence.** Shepherd's own licence is not chosen yet.
+- **Licence.** Shephrd's own licence is not chosen yet.
 - **The log's retention rule.** Recorded in `docs/issues.md`.
 - **The client API (piece 2).** Device pairing, phone alerts, remote access
   and the web page need their own short design round. This spec gives piece 2
@@ -458,9 +481,9 @@ they disagree, this section wins. Each change is a row in
 
 ### How clients reach the engine (row 21)
 
-The engine listens on a Unix domain socket, `engine.sock`, in Shepherd's
-state folder, not on a TCP port. The state folder is `$SHEPHERD_HOME`, which
-defaults to `~/.local/state/shepherd`, and only the owner's user can open it,
+The engine listens on a Unix domain socket, `engine.sock`, in Shephrd's
+state folder, not on a TCP port. The state folder is `$SHEPHRD_HOME`, which
+defaults to `~/.local/state/shephrd`, and only the owner's user can open it,
 so only the owner's user can connect. Every connection still presents a
 credential before it can do anything (row 48). The loopback WebSocket for the web page and the phone moves to piece 2,
 which adds Origin and Host checks and connection limits.
@@ -496,7 +519,7 @@ not wake the orchestrator that is waiting on the lead.
   it, and again after a restart, so a wake cannot be lost. The waiter gets
   one message that gives each member's state when the wait closed. A crash
   is reported at once as well.
-- A blocking `shepherd wait --block` returns at once if the caller already
+- A blocking `shephrd wait --block` returns at once if the caller already
   holds a request or question, and returns as soon as one is routed to it,
   so it cannot deadlock.
 
@@ -551,7 +574,7 @@ The owner chose fully automatic recovery (row 49). In order:
 1. The engine takes a lifetime lock, so a second copy reports the running one
    and exits.
 2. It removes a leftover socket file and listens, but refuses every
-   connection with "recovering" until step 9. Shepherd's tool server for agents retries
+   connection with "recovering" until step 9. Shephrd's tool server for agents retries
    for up to a minute.
 3. It rebuilds the views.
 4. It revokes every agent token.
@@ -578,36 +601,36 @@ The owner chose fully automatic recovery (row 49). In order:
 - Each start, resume or reload gives the agent a new token, and the old one
   stops working. Stopping, a crash or a restart also revokes it.
 - The adapter's environment is built from a short allow-list plus the
-  account's own settings, and exactly two Shepherd variables: the socket path
+  account's own settings, and exactly two Shephrd variables: the socket path
   and the token. Herdr's variables and unrelated API keys are never passed on.
-- Shepherd's command-line tool acts as the owner only when neither Shepherd
+- Shephrd's command-line tool acts as the owner only when neither Shephrd
   variable is set and the command was not started from inside an agent's
   process tree. It checks the socket and its folders before it sends any
   credential. The agents' tool server never acts as the owner.
-- Agents get Shepherd's commands as tools, except the owner's commands, the
+- Agents get Shephrd's commands as tools, except the owner's commands, the
   live stream and the secret-setting command.
 - The engine offers agents no file or terminal access through ACP. Agents use
   their own harness's tools and sandbox.
 - The permission ceiling also covers where a child works (inside its
   parent's folder, or a worktree of the same repository, and never the
-  owner's home folder, Shepherd's state folder or Shepherd's own install),
+  owner's home folder, Shephrd's state folder or Shephrd's own install),
   the "allow always" kind of answer, and mode changes the adapter reports.
   An answer that would save a permission rule, or a request to edit a
   harness's settings file, always goes to the owner.
-- Every secret Shepherd knows is removed from every event before it is
+- Every secret Shephrd knows is removed from every event before it is
   written, including encoded forms and secrets split across streamed pieces,
   and from the service's own log.
 - Text from one agent that reaches another is wrapped in an envelope with a
   random marker and labelled as data. A leading `/` in any prompt one agent
   sends to another is escaped, so it cannot run a command.
-- Shepherd's files are readable only by the owner's user.
+- Shephrd's files are readable only by the owner's user.
 
 ### What agents can read (rows 47, 61)
 
-Agents run as the owner's Unix user, so they can read Shepherd's state
+Agents run as the owner's Unix user, so they can read Shephrd's state
 folder, including the owner's credential. The owner accepted this on
 2026-11-01: the permission ceiling protects against mistakes, not against a
 deliberately hostile agent, and SECURITY.md says so. Where a harness offers
-a way, Shepherd adds a rule forbidding its agents to read the state folder.
-The real fix, Shepherd running as its own Unix user, comes before remote
+a way, Shephrd adds a rule forbidding its agents to read the state folder.
+The real fix, Shephrd running as its own Unix user, comes before remote
 access is built.

@@ -6,11 +6,11 @@ parked: false
 updated: 2026-11-01
 ---
 
-# Shepherd runs the Foundry's teams on its own
+# Shephrd runs the Foundry's teams on its own
 
 ## Outcome
 
-Shepherd, a Herdr plugin, runs teams of coding agents over the Agent Client
+Shephrd, a Herdr plugin, runs teams of coding agents over the Agent Client
 Protocol: an orchestrator, team leads and workers, coordinated through a
 strict message board, and visible and answerable from a web page, a phone,
 or a pane in Herdr. The Foundry skill no longer needs Herdr commands or shell
@@ -18,7 +18,7 @@ scripts to start, watch, approve or wake its agents.
 
 ## Done when
 
-- The Foundry skill's Steps 3 to 5 and 8 run through Shepherd alone, with no
+- The Foundry skill's Steps 3 to 5 and 8 run through Shephrd alone, with no
   `herdr agent` command and no `collect.sh` or `board-waker.sh`.
 - The owner answers a permission request and reads a thread from a phone
   that was paired with a one-time code.
@@ -38,14 +38,14 @@ scripts to start, watch, approve or wake its agents.
 
 ## Out of scope
 
-- Team shapes and workflows. They live outside Shepherd (`AGENTS.md`, rule 6).
+- Team shapes and workflows. They live outside Shephrd (`AGENTS.md`, rule 6).
 - Interactive mode, where an agent runs in a Herdr pane. It follows this epic.
 - The desktop and phone apps themselves. Piece 2 gives them their API and a
   web page.
 
 ## Choices
 
-- 2026-10-30: the owner split Shepherd into four pieces and chose to build the
+- 2026-10-30: the owner split Shephrd into four pieces and chose to build the
   engine first, then the client API, the message board and the foundry roles.
   The engine comes first because the other three are built on its
   capabilities without changing it.

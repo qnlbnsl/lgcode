@@ -1,0 +1,1 @@
+{"harness":"gemini","kind":"out-of-usage","text":"Rate limit exceeded. Try again later.","source":"https://github.com/google-gemini/gemini-cli/blob/main/packages/cli/src/acp/acpSession.ts lines 490-494; read 2026-11-01; not a live capture","verified":false}

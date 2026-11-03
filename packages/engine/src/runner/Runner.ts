@@ -1,0 +1,130 @@
+import {
+  AgentId, DeliveryId, EpochMilliseconds, Event, PermissionOption, PermissionRequestId,
+  type Account, type Delivery, type HarnessSettings, type PermissionLevel, type SessionReference,
+} from "@shephrd/contracts";
+import * as Context from "effect/Context";
+import * as Data from "effect/Data";
+import type * as Effect from "effect/Effect";
+import type * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
+import type * as Stream from "effect/Stream";
+
+import type { folderForSpawn } from "../identity/ceiling.ts";
+
+export class RunnerRejected extends Data.TaggedError("RunnerRejected")<{
+  readonly reason: string;
+}> {}
+
+export interface RunnerCapabilities {
+  readonly loadSession: boolean;
+  readonly resumeSession: boolean;
+  readonly setModeConfigOption: boolean;
+}
+
+// Rows 51 and 66 and issue 154: what a reload replayed, in order, returned
+// with the load result so the replay scan never waits on the event stream.
+// A user item is redacted user-message text; a break stands for any other
+// replayed update (an agent message, a plan, a tool call, a file change), so
+// user chunks are joined only when nothing else came between them.
+export type ReplayItem = { readonly _tag: "user"; readonly text: string } | { readonly _tag: "break" };
+
+export interface SessionInfo {
+  readonly session: SessionReference;
+  readonly protocolVersion: number;
+  readonly reloadable: boolean;
+  // Present on a load; absent on a start, which replays nothing.
+  readonly replay?: ReadonlyArray<ReplayItem>;
+}
+
+// Every event belongs to the spawn identified by its unrevoked token hash.
+// The runner takes agentId, incarnation and deliveryId from its own process
+// table, never from child data (issue 61): deliveryId names the delivery the
+// runner itself sent with `prompt` or `compact`. permissionRequestId is the
+// runner's own id, unique across agents; it must mint that id rather than
+// forward a child-supplied id. `deliveryUpdate` reports a notice for the
+// sent delivery; `promptReply` reports the reply to it, and a successful
+// reply that ends the turn comes before that turn's `turnEnded`.
+// `turnEnded` names the delivery whose `session/prompt` reply ended, also
+// from the runner's own process table, so a repeated old turn end cannot end
+// a later turn.
+export const RunnerEvent = Schema.Union([
+  Schema.TaggedStruct("exited", {
+    agentId: AgentId,
+    incarnation: Schema.NonEmptyString,
+    exitCode: Schema.NullOr(Schema.Int),
+    signal: Schema.NullOr(Schema.String),
+    stderr: Schema.String,
+  }),
+  Schema.TaggedStruct("permissionRequested", {
+    agentId: AgentId,
+    incarnation: Schema.NonEmptyString,
+    permissionRequestId: PermissionRequestId,
+    toolCallId: Schema.NonEmptyString,
+    description: Schema.String,
+    options: Schema.Array(PermissionOption).check(Schema.isMinLength(1)),
+    settingsWrite: Schema.Boolean,
+  }),
+  Schema.TaggedStruct("turnEnded", { agentId: AgentId, incarnation: Schema.NonEmptyString, deliveryId: DeliveryId }),
+  Schema.TaggedStruct("deliveryUpdate", {
+    agentId: AgentId,
+    incarnation: Schema.NonEmptyString,
+    deliveryId: DeliveryId,
+    kind: Schema.Literals(["message", "plan", "tool-call", "file-change", "available_commands_update"]),
+    replay: Schema.Boolean,
+    // Issue 144: who spoke a message, so a reload's replay scan reads only
+    // the user's content (row 66).
+    role: Schema.optionalKey(Schema.Literals(["user", "agent"])),
+    text: Schema.String,
+    content: Schema.optionalKey(Event.pipe(Schema.toTaggedUnion("_tag")).cases.ThreadItem.fields.content),
+  }),
+  Schema.TaggedStruct("modeReported", {
+    agentId: AgentId, incarnation: Schema.NonEmptyString, mode: Schema.String,
+    level: Schema.optionalKey(Schema.Literals(["read-only", "ask", "edit", "full"])),
+    ceiling: Schema.Literals(["read-only", "ask", "edit", "full"]),
+  }),
+  Schema.TaggedStruct("promptReply", {
+    agentId: AgentId,
+    incarnation: Schema.NonEmptyString,
+    deliveryId: DeliveryId,
+    outcome: Schema.Union([
+      Schema.TaggedStruct("success", {}),
+      // Issue 105: `resetAt` is the provider's reported reset time, when it gave one.
+      Schema.TaggedStruct("pause", {
+        reason: Schema.Literals(["out-of-usage", "signed-out"]), error: Schema.String,
+        resetAt: Schema.optionalKey(EpochMilliseconds),
+      }),
+      Schema.TaggedStruct("error", { error: Schema.String }),
+    ]),
+  }),
+]);
+export type RunnerEvent = typeof RunnerEvent.Type;
+
+interface Spawn {
+  readonly agentId: AgentId;
+  readonly token: Redacted.Redacted<string>;
+  readonly folder: string;
+  readonly grant: Parameters<typeof folderForSpawn>[0];
+  readonly harness: HarnessSettings;
+  readonly account: Account;
+  readonly permission: PermissionLevel;
+  readonly model?: string;
+  readonly effort?: string;
+}
+
+// `prompt` and `compact` return once the request is sent; the reply arrives
+// later as a `promptReply` event. Each send names the incarnation the engine
+// reserved it for, the SHA-256 hash of the target's live token; the runner
+// refuses with `RunnerRejected` when that is not its live process's
+// incarnation, so a send reserved for an earlier run never reaches a later one.
+export class Runner extends Context.Service<Runner, {
+  readonly start: (input: Spawn) => Effect.Effect<SessionInfo, RunnerRejected>;
+  readonly load: (input: Spawn & { readonly session: SessionReference }) => Effect.Effect<SessionInfo, RunnerRejected>;
+  readonly prompt: (input: { readonly agentId: AgentId; readonly incarnation: string; readonly delivery: Delivery }) => Effect.Effect<void, RunnerRejected>;
+  readonly cancel: (input: { readonly agentId: AgentId }) => Effect.Effect<void, RunnerRejected>;
+  readonly answerPermission: (input: { readonly agentId: AgentId; readonly requestId: string; readonly optionId: string }) => Effect.Effect<void, RunnerRejected>;
+  readonly setMode: (input: { readonly agentId: AgentId; readonly permission: PermissionLevel }) => Effect.Effect<void, RunnerRejected>;
+  readonly compact: (input: { readonly agentId: AgentId; readonly incarnation: string; readonly delivery: Delivery }) => Effect.Effect<void, RunnerRejected>;
+  readonly stop: (input: { readonly agentId: AgentId }) => Effect.Effect<void, RunnerRejected>;
+  readonly capabilities: RunnerCapabilities;
+  readonly events: Stream.Stream<RunnerEvent>;
+}>()("shephrd/engine/runner/Runner") {}
