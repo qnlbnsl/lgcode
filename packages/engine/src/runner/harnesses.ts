@@ -1,10 +1,41 @@
 import { delimiter, isAbsolute, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import { HarnessId, type HarnessSettings, type PermissionLevel } from "@shephrd/contracts"
+import { HarnessId, type Account, type HarnessSettings, type PermissionLevel } from "@shephrd/contracts"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Schema from "effect/Schema"
+
+// Fix round 1, A9: how an account's login reaches each harness. `homeVariable`
+// names the variable that moves the harness's login folder, so the account's
+// `home` can be passed without changing HOME. `keyVariable` names the variable
+// that carries an API key, which the account's `secret` fills. A harness with
+// no entry, or no field, has no such variable to set.
+export interface HarnessLogin {
+  readonly homeVariable?: string
+  readonly keyVariable?: string
+}
+
+const harnessLogins: Readonly<Record<string, HarnessLogin>> = {
+  claude: { homeVariable: "CLAUDE_CONFIG_DIR", keyVariable: "ANTHROPIC_API_KEY" },
+  codex: { homeVariable: "CODEX_HOME", keyVariable: "OPENAI_API_KEY" },
+  gemini: { keyVariable: "GEMINI_API_KEY" },
+  cursor: { keyVariable: "CURSOR_API_KEY" }
+}
+
+export const harnessLogin = (harnessId: string): HarnessLogin =>
+  Object.hasOwn(harnessLogins, harnessId) ? harnessLogins[harnessId]! : {}
+
+// The name of the login variable that disagrees with the account's `home`, if
+// any. Both being set to the same folder is not a conflict. A value that is
+// not an absolute path cannot be the same folder as an absolute `home`.
+export const homeConflict = (harnessId: string, account: Pick<Account, "home" | "environment">): string | undefined => {
+  const variable = harnessLogin(harnessId).homeVariable
+  if (variable === undefined || account.home === undefined) return undefined
+  const explicit = account.environment?.[variable]
+  if (explicit === undefined) return undefined
+  return isAbsolute(explicit) && resolve(explicit) === resolve(account.home) ? undefined : variable
+}
 
 export const resolveHarnessDefaults = (options: { readonly binDirectory: string; readonly path: string }) =>
   Effect.gen(function*() {

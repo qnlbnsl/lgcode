@@ -37,6 +37,7 @@ import { Redactor } from "../log/Redactor.ts";
 import { makeStderrTail, stderrTailLines } from "../recovery/crash.ts";
 import { linuxProcessReader } from "../recovery/orphans.ts";
 import { buildBaseEnvironment } from "./baseEnvironment.ts";
+import { harnessLogin, homeConflict } from "./harnesses.ts";
 import { classifyError } from "./classify.ts";
 import { compactPrompt } from "./compact.ts";
 import { setConfig, type ConfigOption } from "./config.ts";
@@ -296,8 +297,23 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         variables[name] = Redacted.value(secret);
       } else variables[name] = value;
     }
+    // Fix round 1, A9: the account's `home` goes to the harness's own login
+    // variable and its `secret` to the harness's key variable. HOME is not
+    // touched, so the keychain login stays reachable.
+    const login = harnessLogin(harness.id);
+    const conflict = homeConflict(harness.id, input.account);
+    if (conflict !== undefined) return yield* rejected(`account home differs from ${conflict}`);
+    if (input.account.home !== undefined && login.homeVariable !== undefined && harness.id !== "codex") variables[login.homeVariable] = input.account.home;
+    const secretVariable = input.account.secret !== undefined && login.keyVariable !== undefined && variables[login.keyVariable] === undefined ? login.keyVariable : undefined;
+    if (secretVariable !== undefined && input.account.secret !== undefined) {
+      const secret = yield* secrets.resolve(input.account.secret);
+      if (secret === undefined) return yield* rejected("account secret is unavailable");
+      resolvedSecrets.push(secret);
+      variables[secretVariable] = Redacted.value(secret);
+    }
     if (harness.id === "codex") {
-      const homed = yield* withCodexHome({ stateFolder: configuration.stateFolder, home: configuration.environment.HOME ?? input.folder, accountId: input.account.id, variables }).pipe(
+      const homed = yield* withCodexHome({ stateFolder: configuration.stateFolder, home: configuration.environment.HOME ?? input.folder, accountId: input.account.id, variables,
+        ...(input.account.home === undefined ? {} : { homePath: input.account.home }) }).pipe(
         Effect.provideService(FileSystem.FileSystem, fileSystem), Effect.provideService(Path.Path, pathService),
         Effect.mapError(() => rejected("account home cannot be prepared")),
       );
@@ -305,7 +321,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     }
     const base = buildBaseEnvironment({ parent: configuration.environment, accountVariables: variables,
       shephrdSocket: configuration.socketPath, shephrdToken: Redacted.value(input.token) });
-    const environment = yield* mergeProviderInstanceEnvironment(Object.entries(variables).map(([name, value]) => ({ name, value, sensitive: input.account.environment?.[name]?.startsWith("secret:") ?? false })), base).pipe(
+    const environment = yield* mergeProviderInstanceEnvironment(Object.entries(variables).map(([name, value]) => ({ name, value, sensitive: name === secretVariable || (input.account.environment?.[name]?.startsWith("secret:") ?? false) })), base).pipe(
       Effect.provideService(HomeDirectory, configuration.environment.HOME ?? input.folder),
     );
     // Issue 223: the adapter can read its own login store and print a token

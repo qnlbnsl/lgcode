@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Account } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import type { LogWriteFailed } from "../log/EventLog.ts";
+import { homeConflict } from "../runner/harnesses.ts";
 import { refused, type Input, type Payload, type Plan } from "./internal.ts";
 
 // A view's availability fields are derived, never part of AccountChanged.
@@ -22,6 +23,10 @@ export const accounts = ({ snapshot }: Input, payload: Payload<"accounts">): Eff
       case "set": {
         const existing = snapshot.accounts[payload.account.id];
         if ((payload.operation === "add" && existing !== undefined) || (payload.operation === "set" && existing === undefined)) return yield* refused();
+        // Fix round 1, A9: a home and an explicit login variable that name
+        // different folders leave no way to tell which login the owner meant.
+        const conflict = homeConflict(payload.account.harness, payload.account);
+        if (conflict !== undefined) return yield* refused(`account home differs from ${conflict}`);
         return { events: [{ _tag: "AccountChanged", accountId: payload.account.id, account: payload.account }] };
       }
       case "remove":
@@ -41,6 +46,8 @@ export const setSecret = ({ runtime, snapshot }: Input, payload: Payload<"accoun
     if (account === undefined) return yield* refused();
     const reference = `secret:${randomUUID()}`;
     const environment = Object.fromEntries([...Object.entries(account.environment ?? {}), [payload.name, reference]]);
+    const conflict = homeConflict(account.harness, { ...account, environment });
+    if (conflict !== undefined) return yield* refused(`account home differs from ${conflict}`);
     // Store before committing a reference. A failed log write may leave an
     // unreferenced secret, but never a committed reference with no value.
     yield* runtime.secrets.put(reference, payload.value);

@@ -258,6 +258,14 @@ accounts for Codex or three Cursor accounts.
   directory (`CODEX_HOME` for Codex, `CLAUDE_CONFIG_DIR` for Claude Code), or
   its own API key (`CURSOR_API_KEY` for Cursor).
 - `HOME` is never changed, because that hides Claude Code's saved login.
+- The account's `home` field is passed through the harness's own variable,
+  and its `secret` field through the harness's key variable (`ANTHROPIC_API_KEY`
+  for Claude Code, `OPENAI_API_KEY` for Codex, `GEMINI_API_KEY` for Gemini,
+  `CURSOR_API_KEY` for Cursor). The mapping is in `runner/harnesses.ts`. A
+  harness with no home variable, such as Cursor, does not use `home`.
+- An account whose `home` and explicit `CLAUDE_CONFIG_DIR` or `CODEX_HOME` name
+  different folders is refused when it is set, and again when it is started.
+  An explicit key variable in the environment wins over `secret`.
 - An account can carry extra environment variables.
 - Secret values are stored as references, not plain text, and never reach
   the log or a client.
