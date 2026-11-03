@@ -20,8 +20,8 @@ scripts to start, watch, approve or wake its agents.
 
 - The Foundry skill's Steps 3 to 5 and 8 run through Shephrd alone, with no
   `herdr agent` command and no `collect.sh` or `board-waker.sh`.
-- The owner answers a permission request and reads a thread from a phone
-  that was paired with a one-time code.
+- The owner answers a permission request and reads a thread from a phone,
+  through the owner's own reverse proxy to the loopback web server.
 - A message on the board wakes only the agent that needs to answer it.
 
 ## Plans
@@ -29,7 +29,7 @@ scripts to start, watch, approve or wake its agents.
 | Order | Plan slug | What it delivers | State |
 |---|---|---|---|
 | 1 | shepherd-engine | The engine: agents over ACP, the event log, commands, permissions, waits, accounts, and one authenticated API. | linked |
-| 2 | shepherd-client-api | Device pairing, phone alerts, encrypted remote access, the web page, and a thread viewer in a Herdr pane. | planned |
+| 2 | shepherd-client-api | Phone alerts, remote access through the owner's proxy, the web page, and a thread viewer in a Herdr pane. Device pairing is deferred. | planned |
 | 3 | shepherd-message-board | Channels, direct messages and wake rules, behind one delivery interface. | planned |
 | 4 | shepherd-foundry-roles | The orchestrator, team leads, workers, standing permission rules and the sheepdog. | planned |
 
@@ -61,3 +61,10 @@ scripts to start, watch, approve or wake its agents.
   behaviour when it needs to. Each such change is recorded in that plan's
   decisions log, its tests are updated, and it is reviewed like an engine
   unit.
+- 2026-11-03: the client API design talk changed row 2's scope. The web server
+  starts with no login, and pairing with a one-time code moves to a later
+  plan. The owner's words: "b. for now just leave it be. i want to start using
+  it. only me on my network so does not matter", and "like make it in a way
+  that we can add pairing without major refactors". The done-when line no
+  longer names a paired phone. Full decisions:
+  `docs/specs/2026-11-03-client-api-design.md`.
