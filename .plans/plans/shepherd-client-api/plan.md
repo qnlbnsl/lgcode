@@ -443,7 +443,7 @@ device revocation.
 Purpose: serve the web page and the API on the loopback address, open for
 now, with the checks a browser needs and a guard against agents' processes.
 SECURITY.md rule 1, and rule 2 as the owner suspended it. Rows 36, 76, 80,
-81, 82, 84. Unit 5.
+81, 82, 84, 90. Unit 5.
 
 **Done when:**
 
@@ -452,7 +452,7 @@ SECURITY.md rule 1, and rule 2 as the owner suspended it. Rows 36, 76, 80,
 | 5.1 | The web server binds `127.0.0.1` on the configured port; a setting that names any other address is refused at start-up and by the settings command | Test id: `packages/engine/test/client/web-bind.test.ts` |
 | 5.2 | Every request's caller comes from `webCaller`, and from nowhere else: while the server is open it is access kind `device`, actor owner, and envelope `device: open-web`; a command over the web server is recorded with `device: open-web`; no route builds a caller of its own | Test id: `packages/engine/test/client/web-caller.test.ts`; boundary test `packages/engine/test/client/web-caller-imports.test.ts` |
 | 5.3 | A request that presents the owner credential or an agent token, as a bearer or a cookie, gets HTTP 401 before any RPC message | Test id: `packages/engine/test/client/web-host-credentials.test.ts` |
-| 5.4 | A WebSocket upgrade whose `Origin` or `Host` is not on the allow-list is refused with HTTP 403; with no public address set, the allow-list is the loopback page's own address | Test id: `packages/engine/test/client/web-origin.test.ts` |
+| 5.4 | Only Shephrd's own page may drive the web server (row 90): a request whose `Host` does not name the loopback address and port gets HTTP 403; a WebSocket upgrade, or any request but a `GET` or `HEAD` of a static file, whose `Origin` is missing or does not name the page gets HTTP 403; a page served from another origin in a real browser cannot open the WebSocket; the public address is allowed only in proxy mode (criterion 10.1) | Test id: `packages/engine/test/client/web-origin.test.ts`; `packages/web/e2e/cross-origin.spec.ts` (Playwright, a second page on another port) |
 | 5.5 | The computer-only commands are refused over the web server by name, whatever the caller: the pairing-code command's reserved name, `client.web.settings`, and every command the roles plan adds to the list for standing rules; a fixture command added to the list is refused; each still works over the Unix socket with the owner credential | Test id: `packages/engine/test/client/web-host-only.test.ts` |
 | 5.6 | The guard: a connection from a process in a recorded agent adapter's process group, or descended from an adapter, is refused at upgrade; a same-user process that is not an agent passes; a peer owned by another user id passes; a same-user peer whose process cannot be found is refused | Test id: `packages/engine/test/client/web-guard.test.ts` (a real child of a fake adapter over real loopback, and a fixture `/proc` tree for the other-user and not-found cases) |
 | 5.7 | The guard runs once per connection, never per message, and reads nothing outside `/proc` | Test id: `packages/engine/test/client/web-guard.test.ts` (a counting fake of the lookup) |
@@ -640,7 +640,7 @@ Unit 10.
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 10.1 | In proxy mode, the web server accepts the public address's `Host` and `Origin`, and still binds only loopback | Test id: `packages/engine/test/client/web-proxy.test.ts` |
+| 10.1 | In proxy mode, the web server accepts the public address setting's `Host` and `Origin` as well as the loopback ones, whatever the proxy does with `Host`, and still binds only loopback; outside proxy mode the public address is refused | Test id: `packages/engine/test/client/web-proxy.test.ts` |
 | 10.2 | In proxy mode, a request whose last `X-Forwarded-For` entry is one of the host's own addresses is refused; outside proxy mode, forwarded headers are ignored; a direct connection that forges the header still meets the guard first | Test id: `packages/engine/test/client/web-proxy-own-address.test.ts` |
 | 10.3 | `docs/remote-access.md` describes the setup: WireGuard to the host, an example Caddyfile that proxies the public address to the loopback port, the public address setting, and the guard's limits | Command: `test -s docs/remote-access.md && grep -q reverse_proxy docs/remote-access.md` |
 | 10.4 | From a phone on mobile data, through the owner's proxy, the page opens and shows the situation view | On-device step: the owner's phone, rollout step 8 |
@@ -650,7 +650,7 @@ Unit 10.
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
 | 10.1 | Proxy mode in the web server's settings, the public allow-list and the own-address check | Target `packages/engine/src/client/web/proxy.ts`; WS-5's guards and `webCaller`; the host's addresses from Node's `os.networkInterfaces()` |
-| 10.2 | The setup document with the example Caddyfile | Target `docs/remote-access.md`; post-build check PB-2 |
+| 10.2 | The setup document with the example Caddyfile, which names the public address setting the owner sets to match the proxy's site address | Target `docs/remote-access.md`; post-build check PB-2 |
 
 **Design artifact:** none.
 
@@ -746,6 +746,7 @@ the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
 | Design decision 5 and condition: open web server, pairing slots in | WS-4, WS-5 (5.2), WS-7 (7.1) | planned (rows 80, 81) |
 | Design decision 6: three computer-only commands | WS-5 (5.5), WS-7 (7.8) | planned (row 82) |
 | Same-machine guard | WS-5 (5.6, 5.7), WS-10 (10.2) | planned (rows 84, 89) |
+| Manager's attack-list entry A11 (lead, board #201): `Host` and `Origin` name the server | WS-5 (5.4), WS-10 (10.1) | planned (row 90) |
 | Features §3: threads where the owner already works (pane viewer) | WS-8 | planned |
 | Features §3: VS Code extension | none | out of scope (row 51) |
 | Features §4: one authenticated API for every client | WS-1, WS-2, WS-5 | planned; the web server is open for now (row 80) |
@@ -803,7 +804,7 @@ the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
 | AGENTS.md, "Language": TypeScript, Effect 4, Node.js 26 | All code is TypeScript with Effect 4.0.5; Effect claims checked against the installed source (rows 24, scouting). |
 | AGENTS.md, "How agents are run": one delivery interface | The client API reads events and roster fields that do not depend on run mode; piece deliveries go through the engine's delivery path (contract edit E16). |
 | Owner answer, 2026-11-03: edit the engine directly (row 63); lead ruling L26 (row 64) | Units 1a and 1b make contract section 6's edits; each change to existing behaviour is named with its tests (rows 64, 67; criterion 1.1). |
-| Owner decisions, design talk 1 (2026-11-03) | Folded as rows 76 to 89 and contract v7; the owner's words are quoted in `docs/specs/2026-11-03-client-api-design.md`. |
+| Owner decisions, design talk 1 (2026-11-03) | Folded as rows 76 to 89 and contract v7; the lead's A11 is row 90; the owner's words are quoted in `docs/specs/2026-11-03-client-api-design.md`. |
 | Run team rule 6: scope | This planning run writes the plan folder, the design note, and the SECURITY.md and AGENTS.md text the owner approved (row 85). |
 
 </details>

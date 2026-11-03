@@ -261,6 +261,14 @@ These rules apply to the four kinds:
   `webCaller` finds the loopback peer's process and refuses it when it
   descends from an agent, by the engine's ancestry rule (row 84). This is a
   guard against accidents and simple misuse, not a security boundary.
+- **Only Shephrd's own page may drive the web server** (row 90). A
+  request is accepted only when its `Host` names the web server, and, for
+  anything but a `GET` or `HEAD` of a static file, its `Origin` names the
+  page. The allowed names are the loopback address and port, plus, in
+  proxy mode only, the public address setting. A WebSocket upgrade, or any
+  other request that changes state, with no `Origin` is refused. This
+  stops a web page in the owner's browser and DNS rebinding. It does not
+  stop a local program, which can send any header.
 - **Remote access comes through the owner's proxy.** The web server binds
   loopback only, also in proxy mode (row 76). In proxy mode it accepts the
   public address's `Host` and `Origin`, and refuses a request whose last
