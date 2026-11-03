@@ -223,7 +223,19 @@ These rules apply to the four kinds:
   agent-callable command that acts on another agent checks the engine's
   rights rule (the agent itself, or an agent it holds a parent's rights
   over), through a helper the seam exports. A piece does not invent its own
-  tree rule.
+  tree rule, with one exception below.
+- **One exception: a piece's delivery may reach outside the caller's tree**
+  (lead ruling L13). A delivery that a piece queues with its own
+  `{ namespace, id }` source (section 6, item 11) may reach a target
+  outside the calling agent's tree, but only when that piece's registered
+  reach check allows it. For the board, the reach check is channel
+  membership, so a worker can message a sibling in the same channel. The
+  reach check is a pure function of the caller, the target and the views,
+  like a visibility rule. The exception grants no lifecycle right: it never
+  allows `stop`, `answer`, `compact`, `resume` or an engine `prompt` on the
+  target. The envelope names the true sender, the calling agent, never the
+  piece alone and never the owner. The text is still wrapped as data
+  (section 6, item 14).
 - **The engine's own access is unchanged.** `accounts`, `accounts
   set-secret`, `accounts mark-available`, `harnesses` and
   `debug.compare-views` stay owner-only, which includes devices. `ask`,
@@ -609,6 +621,10 @@ optional field to an existing schema; no existing value changes meaning.
     shown as the piece, never as the owner or an agent. The engine always
     wraps the body in its agent-text envelope, with a fresh random marker,
     and escapes a leading `/`. A piece can never send a raw prompt.
+15. **A piece's reach check** (lead ruling L13). A piece may register one
+    reach check. The engine consults it only for a delivery the piece
+    queues with its own source, when the target is outside the calling
+    agent's tree (section 2). It grants no other right.
 
 The planner estimates this as one engine unit of high complexity, built
 before any piece unit, with an attack pass, because it changes the engine's
