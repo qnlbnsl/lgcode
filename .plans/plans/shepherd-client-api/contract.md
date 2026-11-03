@@ -234,8 +234,12 @@ These rules apply to the four kinds:
   snapshot taken in the same transaction as the delivery, like a
   visibility rule (lead ruling L15). The exception grants no lifecycle right: it never
   allows `stop`, `answer`, `compact`, `resume` or an engine `prompt` on the
-  target. The envelope names the true sender, the calling agent, never the
-  piece alone and never the owner. The text is still wrapped as data
+  target. A piece's delivery carries the piece's label as its sender (section 6,
+  item 14), never "owner". The piece must name each item's true author in
+  a header built only from fixed words and the engine-authenticated caller
+  id, never from agent text. This holds also for wakes the piece builds
+  with no caller, such as one wake that merges several posts (lead ruling
+  L16). The text is still wrapped as data
   (section 6, item 14).
 - **The engine's own access is unchanged.** `accounts`, `accounts
   set-secret`, `accounts mark-available`, `harnesses` and
