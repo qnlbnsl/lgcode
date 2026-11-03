@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v6, service rights without answer (roles row 92)
-version: 6
+status: v7, design talk 1 folded
+version: 7
 updated: 2026-11-03
 ---
 
@@ -21,11 +21,11 @@ foundry roles (piece 4) build on. It covers seven things:
 6. The shared engine edits that the client API plan's first unit makes.
 7. What the other two pieces asked for, and where each is answered.
 
-It does not depend on the four open design questions: how the phone reaches
-Shephrd from outside the house, how phone alerts are carried, whether
-Shephrd's own Unix user comes first, and whether an alert link can answer a
-question by itself. Where one of those touches this contract, the contract
-leaves a named slot and says so.
+The owner settled the client API's design questions in design talk 1 on
+2026-11-03. The decisions are in `docs/specs/2026-11-03-client-api-design.md`
+(rows 76 to 89). This contract follows them: a loopback web server that is
+open for now, alerts through ntfy behind one sender interface, and three
+commands that work only at the computer.
 
 The decision log is `decisions.md` in this folder. Row numbers below refer to
 it. The engine anchors are in `scouting.md`. Everything here is a plan; none
@@ -226,7 +226,7 @@ paged read follows one shape:
 | Kind | Credential | Reaches Shephrd through | May call |
 | --- | --- | --- | --- |
 | Owner | The owner credential file in the state folder | The engine's Unix socket only, with the engine's ancestry check | Every command whose access includes `owner` |
-| Paired device | Its own device credential, prefix `shp_d_` | The network listener (piece 2), or the Unix socket | Every command whose access includes `device` |
+| Web caller (a device) | None while the web server is open (row 80). Pairing will later give each device its own credential, prefix `shp_d_` | The loopback web server (piece 2) | Every command whose access includes `device` |
 | Agent | Its own agent token, prefix `shp_a_` | The engine's Unix socket only, through MCP or the CLI | Every command whose access includes `agent`, under the engine's tree rules |
 | Service | None. A service exists only inside Shephrd's own process | The engine's in-process command path only | The fixed list under "Services" below, and any piece command whose access includes `service` |
 
@@ -237,18 +237,35 @@ calls no command.
 
 These rules apply to the four kinds:
 
-- **A device has the owner's rights, except for a host-only list.** The
-  engine already treats a device as the owner (`CommandHandler.ts:207`), and
-  AGENTS.md rule 5 says a web or mobile client is never a second-class
-  citizen. The proposed host-only list has two entries: creating a pairing
-  code, and changing the network listener's settings. A stolen phone then
-  cannot add more devices, which would survive its own revocation. This
-  list is open and goes to the lead as question Q2 (row 23). Until the lead
-  answers, it is the assumption.
-- **The network listener accepts device credentials only** (row 14). The
-  owner credential is refused there, because the owner's proof rests on the
-  Unix socket and its ancestry check. Agent tokens are refused there,
-  because agents always run on the host.
+- **A device has the owner's rights, except for three commands.** The
+  engine already treats a device as the owner (`CommandHandler.ts:207`).
+  The owner chose three commands that work only at the computer, over the
+  engine's Unix socket with the owner credential: creating a pairing code,
+  changing the web server's settings, and adding a standing permission rule
+  (row 82). Their access entries leave out `device`, and the web server
+  also refuses them by name. AGENTS.md rule 5 is narrowed for these three.
+- **Every web server request is a web caller, decided in one place.** The
+  web server is open for now (row 80, SECURITY.md rule 2 suspended for it
+  by the owner). One function, `webCaller`, decides the caller of every
+  request. While the server is open it answers the web caller: access kind
+  `device`, actor owner, and the envelope field `device: open-web`, a
+  reserved id that is never minted for a real device. So the log always
+  shows that an act came through the web server. Pairing later changes only
+  this function (row 81). The engine's Unix socket keeps its
+  authentication unchanged.
+- **The web server refuses the host's own credentials.** A request that
+  presents the owner credential or an agent token is refused there, because
+  the owner's proof rests on the Unix socket and its ancestry check, and
+  agents always run on the host.
+- **The web server refuses an agent's process.** At connection open,
+  `webCaller` finds the loopback peer's process and refuses it when it
+  descends from an agent, by the engine's ancestry rule (row 84). This is a
+  guard against accidents and simple misuse, not a security boundary.
+- **Remote access comes through the owner's proxy.** The web server binds
+  loopback only, also in proxy mode (row 76). In proxy mode it accepts the
+  public address's `Host` and `Origin`, and refuses a request whose last
+  `X-Forwarded-For` entry is one of the host's own addresses. Outside proxy
+  mode it ignores forwarded headers (row 89).
 - **The pane viewer is the owner.** The thread viewer in a Herdr pane uses
   the owner credential over the Unix socket, exactly as the owner's terminal
   does (lead ruling L4, row 7).
@@ -306,8 +323,8 @@ fixed rights: the foundry roles' sheepdog and their standing-rule answerer
   the engine's service list, such as `roles.sheepdog` or
   `roles.standing-rules`. A service calls the engine's in-process command
   path directly. No service credential exists on the wire or on disk, so
-  there is nothing to steal. The Unix socket and the network listener
-  never accept one.
+  there is nothing to steal. The Unix socket and the web server never
+  accept one.
 - **The log records it under its own name.** The envelope's `caller` gains
   one new variant, `service { service, rule? }`. A standing rule's answer
   is not a command: the engine writes it inside the permission request's
@@ -368,7 +385,7 @@ does not re-scan what was skipped.
 
 The transport closes a subscription that falls 2,048 events behind, or that
 leaves a chunk unacknowledged for five seconds (issue 41). The client
-reconnects from its cursor. The network listener also sends a heartbeat,
+reconnects from its cursor. The web server also sends a heartbeat,
 more often than a reverse proxy's idle timeout, which is set in piece 2's
 settings.
 
@@ -579,10 +596,13 @@ Piece 2's alert reactor reads committed events in order (row 18):
    sourceSequence }`. The `key` names what the alert is about, such as
    `permission:<id>`, `question:<id>`, `crash:<agentId>:<sequence>` or
    `account:<id>`. Only one alert is open for each key at a time.
-2. **Deliver.** Piece 2 sends the alert to the owner's phone by a channel
-   that the design round chooses. Each attempt is recorded as
-   `client.AlertDelivered` or `client.AlertDeliveryFailed`, with the
-   channel and the attempt number, never the channel's credentials.
+2. **Deliver.** Piece 2 sends the alert to the owner's phone through one
+   interface, `AlertSender`, so the push carrier can change later without
+   changing these rules (row 83). ntfy is the only carrier this plan
+   builds. The ntfy server and topic are settings with no default value in
+   code (row 77). Each attempt is recorded as `client.AlertDelivered` or
+   `client.AlertDeliveryFailed`, with the carrier's name and the attempt
+   number, never the carrier's credentials.
 3. **Clear.** The reactor writes `client.AlertCleared { alertId, cause }`
    when the alert's subject closes, or when the owner dismisses it with
    `client.alerts.dismiss`.
@@ -604,20 +624,24 @@ an alert.
 
 ### What an alert may carry
 
-An alert that leaves the host carries only four things: its kind, the
-agent's name, a title that Shephrd writes from fixed text, and a link to
-the page (row 19). It never carries any other agent text, tool output, file
-contents or any secret. The owner reads the details inside an
-authenticated client.
+An alert that leaves the host carries only five things: its kind, the
+agent's name, the agent's team (its group labels), a title that Shephrd
+writes from fixed text, and a link to the agent's thread on the page (row
+87). It never carries any other agent text, tool output, file contents or
+any secret. The owner reads the details on the page.
 
-The agent's name is agent-chosen text: the agent's parent chose it (lead
-ruling L15). So it is treated as data. It travels in its own field, marked
-as the agent's name, never inside Shephrd's title. Control and formatting
-characters and line breaks are removed, and it is cut to 64 characters.
+The agent's name and its group labels are agent-chosen text: the agent's
+parent chose them (lead ruling L15). So they are treated as data. Each
+travels in its own field, never inside Shephrd's title. Control and
+formatting characters and line breaks are removed, and each is cut to 64
+characters.
 
-Whether that link can answer a question by itself is one of the four
-design questions. This contract leaves a named slot for it,
-`AlertRaised.actions`, which stays empty until the design note decides.
+The link opens the thread, and the owner answers there (row 79). It never
+answers by itself, and opening it runs no command. The link is built from
+the page's public address, which is one of the web server's settings and
+so works only at the computer (row 88); with none set, an alert has no
+link. The ntfy server, topic and token reference are alert settings, which
+the owner and the web caller may change (row 88).
 
 ## 5. Request ids and cursors
 
@@ -654,12 +678,12 @@ design questions. This contract leaves a named slot for it,
 **Transports** (row 36):
 
 - **Every command on every transport.** The engine's Unix socket and piece
-  2's network listener both serve the whole `CommandsRpcGroup`,
+  2's loopback web server both serve the whole `CommandsRpcGroup`,
   generically. A
   piece's command needs no transport code of its own. The engine's socket
   already dispatches every command in its group this way
   (`api/server.ts`, `application`).
-- **Message size.** The network listener sets an explicit limit of 1
+- **Message size.** The web server sets an explicit limit of 1
   mebibyte (1,048,576 bytes) for one message. The limit is sized against
   the largest single event or reply any piece can produce, not against a
   post's text (lead ruling L15). Each piece states its largest event and
@@ -1296,7 +1320,7 @@ The foundry roles planner listed six needs, in
 | 1 | A roster query | Taken in as `client.roster` (section 3, row 25). Refused in part: an agent sees only the agents it may read by the read rule (section 3, lead ruling L29), not its whole subtree, so the roster never shows more than `subscribe` does. |
 | 2 | A thread read, and an export to a file | Taken in as `client.thread`, a paged read (section 3, row 26). The export is a client-side command that writes the caller's own file. The service never writes a file for a caller. |
 | 3 | A narrow caller kind for Shephrd's own services (the sheepdog, the standing-rule answerer) | Taken in as the service caller, in-process only, with the lead's narrow rights (section 2, "Services", row 27). Unit 1 edits the engine to add it (section 6, edits E11, E13 and E14). A scoped device credential was not used: it would put a token for an in-process service on disk for no gain. |
-| 4 | Owner commands for the roles' settings: standing rules, the sheepdog's thresholds, snoozing one group | Taken in as a rule, not as commands: piece 4 defines them in its own `roles.` group with access `owner` and `device` (section 1). Adding a standing rule creates an automatic allow that outlives a stolen phone's revocation, so it is a candidate for the host-only list in question Q2 (row 29). |
+| 4 | Owner commands for the roles' settings: standing rules, the sheepdog's thresholds, snoozing one group | Taken in as a rule, not as commands: piece 4 defines them in its own `roles.` group with access `owner` and `device` (section 1). Adding a standing rule creates an automatic allow that outlives a moment's access, so it works only at the computer: its access entry leaves out `device` (rows 29, 82). |
 | 5 | Alert kinds the roles raise | Taken in: four namespaced kinds with default phone settings (section 4, row 28). A notice for a lead stays on the board. |
 | 6 | Subscribe filters by group and by event kind | Taken in: `client.subscribe` filters by agent, group and event kind (section 3, row 30). |
 
@@ -1312,21 +1336,17 @@ The message board planner listed six needs, in section R1 of
 | 3 | An alert for a post addressed to the owner, ideally with a `post` subject on `OwnerNeeded` | Taken in through an alert source, kind `board.post`, keyed by the post, opening the post (section 4, row 35). Refused in part: no `post` subject on `OwnerNeeded`, because the alert source gives the same result, and the board does not write `OwnerNeeded` at all, so one matter raises one alert. |
 | 4 | Paged reads with a cursor | Taken in: one paged-read shape for every piece (section 1, "Paged reads", row 32). |
 | 5 | The owner posts from any device as the owner, reusing any device field | Taken in: the caller stays `owner`; the envelope's optional `device` field records the device, and the board adds no field of its own (section 2, row 33). |
-| 6 | A transport message limit of at least a 16,384-character post plus its envelope | Taken in: the network listener's limit is 1 mebibyte, sized against each piece's largest event and page (lead ruling L15); the engine's socket keeps its current behaviour (section 5, rows 36, 58). |
+| 6 | A transport message limit of at least a 16,384-character post plus its envelope | Taken in: the web server's limit is 1 mebibyte, sized against each piece's largest event and page (lead ruling L15); the engine's socket keeps its current behaviour (section 5, rows 36, 58). |
 
 The board's delivery source for posts, from its question Q1, is section 6,
 edit E16.
 
 ## What this contract does not settle
 
-These belong to the design round or to the full plan:
+These are left to later plans:
 
-- The network listener's address, its encryption, and how the phone reaches
-  it from outside the house (design questions 1 and 3).
-- The alert channel (design question 2).
-- Whether an alert link can answer by itself (design question 4).
-- How a browser presents its device credential. A browser's WebSocket cannot
-  set an `Authorization` header, so the web page needs another way, such as
-  a cookie set at pairing. The plan decides this. It does not change what
-  the other pieces build on.
-- The pane viewer's technology (lead ruling L4).
+- Authentication and pairing for the web server, including how a browser
+  presents its device credential. The owner deferred both (rows 80, 86).
+  They slot into `webCaller` and do not change what the other pieces build
+  on.
+- Shephrd's own Unix user (row 78).

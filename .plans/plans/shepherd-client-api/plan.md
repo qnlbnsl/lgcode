@@ -1,31 +1,30 @@
 ---
 topic: shepherd-client-api
-status: assemble
+status: ready for review
 tier: L
 created: 2026-11-03
 updated: 2026-11-03
 epic: shepherd-foundation
 ---
 
-# Build Shephrd's client API: pairing, alerts, the web page and the pane viewer
+# Build Shephrd's client API: the web page, alerts, remote access and the pane viewer
 
 ## Overview
 
 This plan builds the second of Shephrd's four pieces, the client API. When
-it is done, the owner can pair a phone with a one-time code, get an alert
-on that phone when an agent needs them, open a web page on the phone to
-read any agent's conversation and answer its permission request, and read
-the same conversations in a pane inside Herdr. That is epic row 2, and it
-delivers the epic's second "done when": "The owner answers a permission
-request and reads a thread from a phone that was paired with a one-time
-code."
+it is done, the owner gets an alert on the phone when an agent needs them,
+taps it to open the agent's conversation on a web page, answers its
+permission request there, and reads any thread from outside the house
+through the owner's own proxy. The same conversations can be read and
+answered in a pane inside Herdr. That is epic row 2, except pairing, which
+the owner deferred.
 
 Today the engine runs agents and records everything they do, but only the
 owner's own terminal can reach it, through a private socket file on the
-machine. Nothing pairs a phone, nothing sends an alert, and there is no web
-page. The engine already has the parts this plan builds on: it records
-when the owner is needed, it can stream every event to a client, and it
-has a slot for device credentials that nothing fills yet.
+machine. Nothing sends an alert, and there is no web page. The engine
+already has the parts this plan builds on: it records when the owner is
+needed, it can stream every event to a client, and it has a slot for
+device credentials that nothing fills yet.
 
 The work starts with edits to the engine itself. The engine's list of
 commands, its list of event kinds and its two kinds of caller are all
@@ -41,33 +40,30 @@ The rest is built on those engine edits, in this order:
 - the shared definitions every client uses;
 - reads that suit a phone: a snapshot, a roster, a paged thread, and a
   filtered live stream;
-- pairing and per-device credentials, with revocation;
-- a web listener on the machine's own loopback address;
-- alerts, from "owner needed" to a phone notification;
+- a web server on the machine's own loopback address, open for now;
+- alerts, from "owner needed" to a phone notification through ntfy;
 - the web page and the pane viewer;
-- Shephrd running as its own Unix user, then remote access from outside
-  the house;
+- remote access through the owner's own reverse proxy;
 - an end-to-end check, and one check by the owner on a real phone.
 
-Four product choices belong to the owner and are still open, in a short
-design round held beside this plan: how the phone reaches Shephrd from
-outside the house, how alerts are carried, whether Shephrd's own Unix user
-comes before remote access, and whether an alert's link can answer a
-question by itself. The plan is written on the design partner's recommended
-option for each: the owner's own WireGuard and reverse proxy, the ntfy
-notification service, the own-user setup first, and no answering from a
-link. Units 5, 6b, 9 and 10 change if the owner chooses otherwise; the
-rest does not. When the owner decides, a short design note records the
-decisions, and this plan is updated to match.
+The owner settled the design questions on 2026-11-03, in design talk 1
+(`docs/specs/2026-11-03-client-api-design.md`). The web server listens only
+on loopback, and the owner's own proxy, such as Caddy, carries remote access
+over WireGuard. Alerts go through the owner's ntfy server, behind one
+sender interface so the carrier can change later. There is no own-user
+unit and no pairing unit in this plan: the owner wants Shephrd in use
+first, and both come later. The web server starts with no authentication,
+by the owner's choice, and is built so that pairing slots in later.
 
 The main risks are security risks, because this piece opens Shephrd to a
-network for the first time. Anyone who reaches the API with a valid
-credential can, in effect, run code on the machine (SECURITY.md). The plan
-answers that with: device credentials only on the network, a pairing code
-that cannot be guessed in its five attempts, a cookie the page's own
-scripts cannot read, checks that stop another website from using it, phone
-alerts that never carry an agent's text, and an attack pass on every unit
-that outsiders can reach.
+network for the first time. While the web server is open, any agent on the
+machine, and anyone who reaches the owner's proxy, can act with the owner's
+full control (SECURITY.md, rule 2, suspended for the web server by the
+owner). The plan limits that where it can without adding authentication:
+three commands work only at the computer, the web server refuses a
+connection from an agent's process, other websites cannot use the page,
+phone alerts never carry an agent's text, and every unit that outsiders can
+reach gets an attack pass.
 
 ## Key decisions
 
@@ -79,28 +75,35 @@ that outsiders can reach.
 - **Shephrd's own services get a narrow caller.** The sheepdog, which
   watches for stalled agents, may nudge, compact and resume, and nothing
   else. A standing rule's allow is written inside the engine's permission
-  path, under the rule's own name, not by a service command. It exists only inside Shephrd's
-  process, so there is no credential for it to leak, and the record names
-  it, not the owner. This is the lead's ruling.
-- **A paired device acts as the owner, minus three host-only commands.**
-  A phone can do everything the terminal can, except create a pairing code,
-  change the network settings, or add a standing permission rule. Each of
-  those would outlive a stolen phone's revocation. This narrows AGENTS.md
-  rule 5, so the owner decides it in the design talk; the plan assumes yes.
-- **The web page holds its credential in a cookie its scripts cannot
-  read,** and every connection must come from Shephrd's own page.
-- **Phone alerts carry no agent text.** An alert says what kind of thing
-  needs the owner and which agent; the owner reads the details on the page.
-  An agent's text in a notification could talk the owner into tapping
-  Allow.
+  path, under the rule's own name, not by a service command. A service
+  exists only inside Shephrd's process, so there is no credential for it to
+  leak, and the record names it, not the owner. This is the lead's ruling.
+- **A loopback web server, reached from outside through the owner's
+  proxy.** Shephrd builds no encryption, relay or Tailscale support of its
+  own. The owner chose this.
+- **The web server is open for now, and pairing slots in later.** Every
+  request passes through one function that decides the caller, so adding
+  pairing changes that function only. The engine's own socket keeps its
+  authentication. The owner chose this.
+- **Three commands work only at the computer:** creating a pairing code,
+  changing the web server's settings, and adding a standing permission
+  rule. Each outlives a moment's access. The owner chose this.
+- **The web server refuses a connection from an agent's process.** This
+  stops an agent that simply runs `curl` against it. It is a guard, not a
+  wall, and SECURITY.md says so.
+- **Phone alerts carry no agent text,** and go through one sender
+  interface, with ntfy first. An alert says what kind of thing needs the
+  owner and which agent; the owner reads the details on the page. An
+  agent's text in a notification could talk the owner into tapping Allow.
 - **React for the web page, Ink for the pane viewer.** Both use React, so
   they share state code; Ink is React for terminals.
 - **The engine's own `wait` stays agents-only.** The owner's terminal waits
   with a new `shephrd client wait`, built on the live stream, as owner
   choice A10 asked.
 
-Full log → `decisions.md`. The contract the other two plans build on is
-`contract.md`, version 6.
+Full log → `decisions.md`. The design decisions →
+`docs/specs/2026-11-03-client-api-design.md`. The contract the other two
+plans build on is `contract.md`, version 7.
 
 ## Workstreams
 
@@ -108,7 +111,7 @@ Full log → `decisions.md`. The contract the other two plans build on is
 
 The engine's fixed lists of commands, events, views, visibility rules,
 background reactors and alert sources become lists that each later piece
-adds itself to. The engine also records which phone acted, gains the
+adds itself to. The engine also records which client acted, gains the
 narrow service caller, lets a piece queue its own kind of delivery, and
 lets a piece keep an agent "not finished" while it waits on a board reply.
 The risk is breaking the engine that already works. Every change to
@@ -133,40 +136,41 @@ conversation. The owner's terminal can wait for agents to finish through
 the same stream. The risk is a snapshot and the stream disagreeing; a test
 replays the whole record and compares.
 
-### Pairing a phone with a one-time code
+### Pairing a phone, later
 
-The owner runs `shephrd pair` in the terminal and types the eight-character
-code into the phone's browser within ten minutes. The phone gets its own
-credential, which the owner can list, rename and revoke on its own;
-revoking closes its connections within a second. The risk is someone
-guessing a code; five wrong tries kill it.
+The owner deferred pairing. This plan builds the slot for it: one function
+decides every web request's caller, the page sends its credential header
+from one place, and the engine already stores per-device credentials. A
+later plan adds the pairing commands and changes that one function.
 
-### A web listener on the machine itself
+### A web server on the machine itself
 
 Shephrd starts a small web server on the loopback address, which only the
-machine itself can reach. It serves the web page and the API, accepts only
-device credentials, checks that every connection comes from Shephrd's own
-page, limits message size and connection count, and keeps idle connections
-alive. The risk is another website or program using it; the origin checks
-and the attack pass guard that.
+machine itself can reach. It serves the web page and the API, with no
+login for now. It checks that every connection comes from Shephrd's own
+page, refuses a connection from an agent's process, refuses the three
+computer-only commands, limits message size and connection count, and
+keeps idle connections alive. The risk is another website or a local
+program using it; the origin checks, the agent check and the attack pass
+guard what they can, and SECURITY.md states what they cannot.
 
 ### Alerts that reach the owner's phone
 
 When the engine records that the owner is needed, or another piece raises
-an alert, Shephrd records an alert, sends it to the phone, and clears it
-when the matter closes. Each alert kind can be switched between "push to
-the phone" and "show in the page only". The risk is an alert lost or sent
-twice across a restart; the alert's record in the log prevents both.
+an alert, Shephrd records an alert, sends it to the owner's ntfy topic, and
+clears it when the matter closes. A tap opens the agent's thread on the
+page. Each alert kind can be switched between "push to the phone" and
+"show in the page only". The risk is an alert lost or sent twice across a
+restart; the alert's record in the log prevents both.
 
 ### The web page
 
 A phone-friendly page with three parts: a situation view (what needs the
 owner, what is working, what is idle), a thread view where the owner reads
 an agent's conversation, answers its requests and sends it a message, and
-pages for alerts, devices and settings. Its look is decided in an owner
-session from a mock. The risk is an agent's text being run as code in the
-page; every agent string is shown as text, and the page forbids inline
-scripts.
+pages for alerts and settings. Its look is decided in an owner session from
+a mock. The risk is an agent's text being run as code in the page; every
+agent string is shown as text, and the page forbids inline scripts.
 
 ### Threads in a Herdr pane
 
@@ -175,25 +179,28 @@ pane, live, and lets the owner answer and prompt from there. It uses the
 owner's terminal credential, with the engine's check that it is not running
 inside an agent.
 
-### Shephrd runs as its own user, then remote access
+### Shephrd's own user, later
 
-Shephrd's private files move to their own Unix user, so the agents, which
-run as the owner, can no longer read the account keys and the record. Only
-after that, the page is opened to the owner's phone outside the house,
-through the owner's own WireGuard and reverse proxy. Both wait on the
-owner's design decisions.
+The owner deferred Shephrd's own Unix user until Shephrd is in daily use.
+Until then, any agent can read Shephrd's private files, as SECURITY.md
+says.
+
+### Remote access through the owner's proxy
+
+The owner's own reverse proxy, such as Caddy, takes the phone's requests
+over WireGuard, adds the encryption, and passes them to the loopback web
+server. Shephrd checks the proxy's headers and documents an example setup.
 
 ### Proof on a real phone
 
 An automated test drives the whole flow in a phone-sized browser. Then the
-owner pairs a real phone, answers a real permission request from it, and
-reads a thread.
+owner gets a real alert on a real phone, opens it, answers a real
+permission request, and reads the thread.
 
 ## Rollout order
 
-1. **The owner answers the four design questions.** Units 6b, 9 and 10
-   follow the design decisions. The owner's answer on engine edits came on
-   2026-11-03 (row 63).
+1. **The design decisions are made** (2026-11-03, design talk 1). The
+   owner's answer on engine edits came the same day (row 63).
 2. **The lead adds the new packages and dependencies** in one change
    (decision row 52), and writes the new scopes (row 53).
 3. **The shared engine edits** (units 1a, then 1b) on the `engine` branch,
@@ -201,19 +208,17 @@ reads a thread.
    passes on top of them, because the board and roles plans build on them
    too.
 4. **The shared definitions** (unit 2).
-5. **Reads, pairing and the alert reactor** (units 3, 4 and 6a), which can
-   be built side by side.
-6. **The web listener** (unit 5), then **the web page** (units 7a to 7c)
-   and **the pane viewer** (unit 8). The page and the viewer wait on the
+5. **Reads and the alert reactor** (units 3 and 6a), which can be built
+   side by side.
+6. **The web server** (unit 5), then **the web page** (units 7a to 7c) and
+   **the pane viewer** (unit 8). The page and the viewer wait on the
    owner's mock session.
-7. **The alert channel** (unit 6b). The owner installs the ntfy app and
-   chooses a server and topic.
-8. **Shephrd's own user** (unit 9). The owner runs its setup with
-   administrator rights once.
-9. **Remote access** (unit 10). The owner points the reverse proxy at the
-   listener.
-10. **The proof** (unit 11): the automated phone flow, then the owner's
-    check on a real phone.
+7. **The alert channel** (unit 6b). The owner sets the ntfy server and
+   topic.
+8. **Remote access** (unit 10). The owner points the reverse proxy at the
+   web server.
+9. **The proof** (unit 11): the automated phone flow, then the owner's
+   check on a real phone.
 
 ---
 <!-- ⛔ implementation details and gate evidence below; owner overview is complete -->
@@ -224,7 +229,7 @@ Conventions for every unit. Paths are relative to the Shephrd repository
 root. Anchors are at engine commit `8ff4c9b` (`scouting.md`). "Rows" are
 rows of this plan's `decisions.md`; "engine rows" are rows of
 `.plans/plans/shepherd-engine/decisions.md`. "The contract" is
-`contract.md` in this folder, version 6; where a
+`contract.md` in this folder, version 7; where a
 unit and the contract disagree, the unit reports it to the lead. A test id
 is a Vitest file path, run with `pnpm vitest run <path>`; Playwright tests
 run with `pnpm playwright test <path>`. Effect code is written from Effect
@@ -348,7 +353,7 @@ lists, and make clashes and unknown events safe for every client. Unit 2.
 | 2.3 | Every `client` command's payload, reply and error carries a non-empty `requestId` | Test id: `packages/contracts/test/client/request-id.test.ts` |
 | 2.4 | A client that receives an event tag it does not know records an unknown event and moves its cursor past it | Test id: `packages/client/test/unknown-event.test.ts` |
 | 2.5 | Every command in `CommandsRpcGroup` is a `shephrd` subcommand, and the MCP server offers exactly the commands whose access includes `agent` | Test id: `packages/cli/test/parity.test.ts` and `command-inventory.test.ts` (updated per E2 and E10) |
-| 2.6 | Every piece's stated largest event and largest page, plus the envelope, fit under the 1 MiB listener limit | Test id: `packages/contracts/test/size-limits.test.ts` |
+| 2.6 | Every piece's stated largest event and largest page, plus the envelope, fit under the 1 MiB web server limit | Test id: `packages/contracts/test/size-limits.test.ts` |
 
 **Tasks:**
 
@@ -413,72 +418,59 @@ Contract section 3. Unit 3.
 
 **Rollout detail:** rollout step 5.
 
-**WS-4: Pairing a phone with a one-time code**
+**WS-4: Pairing a phone, deferred to a later plan**
 
-Purpose: add devices safely and let the owner remove any one of them.
-SECURITY.md rules 3 and 4. Rows 23, 47, 48, 49. Unit 4.
+The owner deferred pairing and authentication on 2026-11-03 (rows 80, 81,
+86). This plan builds no pairing unit. It builds the slot that pairing
+fills later, and each part of the slot is a criterion of another unit:
 
-**Done when:**
+- One function, `webCaller`, decides the caller of every web server
+  request (criterion 5.2).
+- The web page sends its credential header from one place in its client,
+  empty for now (criterion 7.1).
+- The engine's per-device credentials in
+  `packages/engine/src/identity/devices.ts` stay as they are, as the
+  credential that pairing will issue.
+- The name of the pairing-code command is on the computer-only list from
+  the start (criterion 5.5).
 
-| # | Criterion | Observed by (test id / command / on-device step) |
-|---|---|---|
-| 4.1 | `shephrd pair` (owner only, from the host) prints an eight-character code and its expiry; the code is stored only as a SHA-256 hash, lives 10 minutes and works once | Test id: `packages/engine/test/client/pairing-code.test.ts` |
-| 4.2 | A connection presenting a pairing code can call only `client.pair.complete`; completing it returns a device credential once, writes `DeviceAdded` with the device name, and sets the browser cookie per row 47; the credential appears in no event, reply other than that one, or service log | Test id: `packages/engine/test/client/pairing-complete.test.ts` |
-| 4.3 | Five wrong codes invalidate the live code; attempts are rate-limited per connection source | Test id: `packages/engine/test/client/pairing-limits.test.ts` |
-| 4.4 | `client.devices` lists, renames and revokes devices; revoking writes `DeviceRevoked` and closes that device's open connections within one second, leaving others open | Test id: `packages/engine/test/client/devices.test.ts` |
-| 4.5 | The host-only commands (create a pairing code, change listener settings, add a standing rule) are refused for a device | Test id: `packages/engine/test/client/host-only.test.ts` |
+Rows 47 (the cookie), 48 (the code) and 49 (pairing completion) are kept
+for the later plan, deferred. That plan also adds the devices page and
+device revocation.
 
-**Tasks:**
+**WS-5: A web server on the machine itself**
 
-| # | Task | Anchor (file + symbol; line optional) |
-|---|---|---|
-| 4.1 | Pairing codes in a `client_pairing_codes` side table, hashed; attempts counted | Target `packages/engine/src/client/pairing/`; pattern `packages/engine/src/identity/credential.ts:sha256Hex` (l.62) |
-| 4.2 | Device minting and storage through the engine's side rows | `packages/engine/src/identity/devices.ts:mintDeviceCredential` (l.12); `EventLog.ts` `sideRows.devices` (l.202-204), `revokeDevices` (l.199-200) |
-| 4.3 | Revocation closing connections | `packages/engine/src/api/server.ts:119-126` (re-check on each batch and every 100 ms) |
-| 4.4 | `shephrd pair`, `shephrd devices` | Target `packages/cli/src/commands/`; generated from `ApiRpcGroup` (2.3) |
-
-**Design artifact:** the pairing screen is part of WS-7's mock.
-
-**Risks:**
-
-| Risk | Severity | Mitigation |
-|---|---|---|
-| A code is guessed | High | 40 bits, five attempts, ten minutes (row 48); criterion 4.3; attack pass. |
-| A stolen phone adds more devices | High | Pairing codes are host-only (criterion 4.5, row 55, pending the owner). |
-| A credential leaks into the record | High | The redactor registers device credentials (`service.ts:87`); criterion 4.2. |
-
-**Verify:** criteria 4.1-4.5; environment QA: none.
-
-**Rollout detail:** rollout step 5.
-
-**WS-5: A web listener on the machine itself**
-
-Purpose: serve the web page and the API to devices, on loopback by default,
-with the checks a browser needs. SECURITY.md rules 1, 2, 5. Rows 14, 36,
-40, 47. Unit 5.
+Purpose: serve the web page and the API on the loopback address, open for
+now, with the checks a browser needs and a guard against agents' processes.
+SECURITY.md rule 1, and rule 2 as the owner suspended it. Rows 36, 76, 80,
+81, 82, 84. Unit 5.
 
 **Done when:**
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 5.1 | The listener binds `127.0.0.1` on the configured port by default; binding any other address is refused unless unit 10's setting allows it | Test id: `packages/engine/test/client/listener-bind.test.ts` |
-| 5.2 | It accepts device credentials and pairing codes only; the owner credential and agent tokens get HTTP 401 before any RPC message | Test id: `packages/engine/test/client/listener-auth.test.ts` |
-| 5.3 | A WebSocket upgrade whose `Origin` or `Host` is not on the allow-list is refused with HTTP 403 | Test id: `packages/engine/test/client/listener-origin.test.ts` |
-| 5.4 | The browser cookie is `HttpOnly`, `SameSite=Strict`, `Path=/`, and `Secure` when the request came over HTTPS; a non-browser client may send `Authorization: Bearer` | Test id: `packages/engine/test/client/listener-cookie.test.ts` |
-| 5.5 | A message over 1 MiB closes the connection | Test id: `packages/engine/test/client/listener-size.test.ts` |
-| 5.6 | A heartbeat is sent at the configured interval, 25 seconds by default | Test id: `packages/engine/test/client/listener-heartbeat.test.ts` |
-| 5.7 | Static files are served with `Content-Security-Policy: default-src 'self'; script-src 'self'; frame-ancestors 'none'` and no inline script | Test id: `packages/engine/test/client/listener-static.test.ts` |
-| 5.8 | Connections are capped per device and in total | Test id: `packages/engine/test/client/listener-limits.test.ts` |
-| 5.9 | A test piece's command works over the listener with no listener code of its own | Test id: `packages/engine/test/client/listener-generic.test.ts` |
+| 5.1 | The web server binds `127.0.0.1` on the configured port; a setting that names any other address is refused at start-up and by the settings command | Test id: `packages/engine/test/client/web-bind.test.ts` |
+| 5.2 | Every request's caller comes from `webCaller`, and from nowhere else: while the server is open it is access kind `device`, actor owner, and envelope `device: open-web`; a command over the web server is recorded with `device: open-web`; no route builds a caller of its own | Test id: `packages/engine/test/client/web-caller.test.ts`; boundary test `packages/engine/test/client/web-caller-imports.test.ts` |
+| 5.3 | A request that presents the owner credential or an agent token, as a bearer or a cookie, gets HTTP 401 before any RPC message | Test id: `packages/engine/test/client/web-host-credentials.test.ts` |
+| 5.4 | A WebSocket upgrade whose `Origin` or `Host` is not on the allow-list is refused with HTTP 403; with no public address set, the allow-list is the loopback page's own address | Test id: `packages/engine/test/client/web-origin.test.ts` |
+| 5.5 | The computer-only commands are refused over the web server by name, whatever the caller: the pairing-code command's reserved name, `client.web.settings`, and every command the roles plan adds to the list for standing rules; a fixture command added to the list is refused; each still works over the Unix socket with the owner credential | Test id: `packages/engine/test/client/web-host-only.test.ts` |
+| 5.6 | The guard: a connection from a process in a recorded agent adapter's process group, or descended from an adapter, is refused at upgrade; a same-user process that is not an agent passes; a peer owned by another user id passes; a same-user peer whose process cannot be found is refused | Test id: `packages/engine/test/client/web-guard.test.ts` (a real child of a fake adapter over real loopback, and a fixture `/proc` tree for the other-user and not-found cases) |
+| 5.7 | The guard runs once per connection, never per message, and reads nothing outside `/proc` | Test id: `packages/engine/test/client/web-guard.test.ts` (a counting fake of the lookup) |
+| 5.8 | A message over 1 MiB closes the connection | Test id: `packages/engine/test/client/web-size.test.ts` |
+| 5.9 | A heartbeat is sent at the configured interval, 25 seconds by default | Test id: `packages/engine/test/client/web-heartbeat.test.ts` |
+| 5.10 | Static files are served with `Content-Security-Policy: default-src 'self'; script-src 'self'; frame-ancestors 'none'` and no inline script | Test id: `packages/engine/test/client/web-static.test.ts` |
+| 5.11 | Connections are capped in total | Test id: `packages/engine/test/client/web-limits.test.ts` |
+| 5.12 | A test piece's command works over the web server with no web server code of its own | Test id: `packages/engine/test/client/web-generic.test.ts` |
+| 5.13 | The engine's Unix socket keeps its authentication: its existing tests pass unchanged, and it still refuses a connection with no credential | Test id: `packages/engine/test/api/auth.test.ts` (unchanged) |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 5.1 | The HTTP server: static files and the WebSocket RPC on one port | Target `packages/engine/src/client/listener/`; pattern `packages/engine/src/api/server.ts` (`listen`, l.52; `makeProtocolWithHttpEffectWebsocket`, l.128; `boundedProtocol`, l.130); Effect `http/HttpStaticServer.ts:layer` (l.242) |
-| 5.2 | Authentication at upgrade: cookie or bearer, device or pairing code | `server.ts:authenticate` (l.87); Effect `HttpServerResponse.setCookie` (l.732) |
-| 5.3 | Origin and Host allow-lists, size limit, heartbeat, connection caps | Target `packages/engine/src/client/listener/guards.ts` |
-| 5.4 | Listener settings (port, allow-lists, heartbeat) as host-only commands | Target `packages/engine/src/client/settings.ts` |
+| 5.1 | The HTTP server: static files and the WebSocket RPC on one loopback port | Target `packages/engine/src/client/web/`; pattern `packages/engine/src/api/server.ts` (`listen`, l.52; `makeProtocolWithHttpEffectWebsocket`, l.128; `boundedProtocol`, l.130); Effect `http/HttpStaticServer.ts:layer` (l.242) |
+| 5.2 | `webCaller`: the one caller function, the refusal of host credentials, and the guard | Target `packages/engine/src/client/web/webCaller.ts`; pattern `server.ts:authenticate` (l.87); the ancestry rule `packages/engine/src/api/ancestry.ts`; peer lookup target `packages/engine/src/client/web/peer.ts` (`/proc/net/tcp`, `/proc/net/tcp6`, `/proc/<pid>/fd`), taking the `/proc` root as an argument so tests use a fixture tree |
+| 5.3 | The computer-only list, `Origin` and `Host` allow-lists, size limit, heartbeat and connection cap | Target `packages/contracts/src/client/hostOnly.ts`; `packages/engine/src/client/web/guards.ts` |
+| 5.4 | `client.web.settings` (port, public address, proxy mode, heartbeat), with access `owner` only | Target `packages/engine/src/client/settings.ts`; access table `packages/contracts/src/commands.ts` (`commandAccess`, l.20) |
 
 **Design artifact:** none.
 
@@ -486,19 +478,22 @@ with the checks a browser needs. SECURITY.md rules 1, 2, 5. Rows 14, 36,
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| Another website uses the owner's cookie (cross-site WebSocket hijacking) | High | `SameSite=Strict` and the Origin check (criteria 5.3, 5.4); attack pass. |
-| A local program reaches the listener without pairing | High | Device credentials only (criterion 5.2). |
-| A slow or huge client exhausts memory | Medium | Criteria 5.5, 5.8, and the engine's backlog bound (issue 41). |
+| An agent on the machine acts as the owner through the open web server | High | Accepted by the owner while the server is open (row 80, SECURITY.md rule 2). The guard refuses an agent's process (criterion 5.6), the three computer-only commands are refused (criterion 5.5), and SECURITY.md states that the guard is not a boundary. Attack pass. |
+| Another website uses the page (cross-site WebSocket hijacking) | High | The `Origin` and `Host` checks (criterion 5.4); attack pass. |
+| A route builds its own caller, so pairing later misses it | Medium | Criterion 5.2's boundary test. |
+| The guard refuses the owner's own browser on the host | Medium | A same-user process that is not an agent passes (criterion 5.6); post-build check PB-4 confirms the lookup works on the owner's host. |
+| A slow or huge client exhausts memory | Medium | Criteria 5.8 and 5.11, and the engine's backlog bound (issue 41). |
 
-**Verify:** criteria 5.1-5.9; environment QA: none.
+**Verify:** criteria 5.1-5.13; environment QA: none.
 
 **Rollout detail:** rollout step 6.
 
 **WS-6: Alerts that reach the owner's phone**
 
 Purpose: turn "owner needed" and other pieces' alert sources into
-recorded alerts, push them, and clear them. Contract section 4. Rows 18,
-19, 20, 28, 35, 41. Units: 6a the reactor; 6b the channel.
+recorded alerts, send them through one sender interface, and clear them.
+Contract section 4. Rows 18, 20, 28, 35, 77, 79, 83, 87, 88. Units: 6a the
+reactor; 6b the sender interface and the ntfy carrier.
 
 **Done when:**
 
@@ -508,18 +503,21 @@ recorded alerts, push them, and clear them. Contract section 4. Rows 18,
 | 6.2 | One alert is open per key; each kind clears on the contract's closing event; `client.alerts.dismiss` clears one | Test id: `packages/engine/test/client/alert-life.test.ts` |
 | 6.3 | Killing the service between an event and its alert gives exactly one alert after restart | Test id: `packages/engine/test/client/alert-reactor-restart.test.ts` |
 | 6.4 | A test piece's alert source raises and ends its own kind | Test id: `packages/engine/test/client/alert-piece-source.test.ts` |
-| 6.5 | An agent string planted in a request, a question and a crash appears in no `AlertRaised` event and no pushed payload; the agent's name travels in its own field, with control and formatting characters and line breaks removed, cut to 64 characters, never inside the title | Test id: `packages/engine/test/client/alert-no-agent-text.test.ts` |
-| 6.6 | Each kind's push setting has the contract's default and can be changed by the owner and a device | Test id: `packages/engine/test/client/alert-settings.test.ts` |
-| 6.7 | ntfy: an alert is posted to the configured server and topic with its title, kind, agent name and link; the access token comes from the secrets store by reference | Test id: `packages/engine/test/client/alert-ntfy.test.ts` (against a local fake ntfy server) |
-| 6.8 | A failed push is recorded as `client.AlertDeliveryFailed`, retried with backoff a bounded number of times, and never stops the reactor | Test id: `packages/engine/test/client/alert-ntfy-retry.test.ts` |
-| 6.9 | The ntfy token appears in no event and no service log | Test id: `packages/engine/test/client/alert-ntfy-secret.test.ts` |
+| 6.5 | An agent string planted in a request, a question and a crash appears in no `AlertRaised` event and no sent payload; the agent's name and its group labels each travel in their own field, with control and formatting characters and line breaks removed, cut to 64 characters, never inside the title | Test id: `packages/engine/test/client/alert-no-agent-text.test.ts` |
+| 6.6 | Each kind's push setting has the contract's default and can be changed by the owner and the web caller | Test id: `packages/engine/test/client/alert-settings.test.ts` |
+| 6.7 | The alert rules call only `AlertSender`: with a fake sender, every raised alert that is pushed by its kind's setting reaches the fake once, with its kind, name, team, title and link; no alert module imports a carrier | Test id: `packages/engine/test/client/alert-sender.test.ts`; boundary test `packages/engine/test/client/alert-sender-imports.test.ts` |
+| 6.8 | With no ntfy server or topic set, nothing is pushed, nothing fails, and the alert stays in the clients; the code and the default settings hold no ntfy address | Test id: `packages/engine/test/client/alert-ntfy-unset.test.ts`; command: `grep -rn "ntfy\.sh\|192\.168\." packages/engine/src packages/contracts/src` prints nothing |
+| 6.9 | ntfy: an alert is posted to the configured server and topic with its title, kind, agent name, team and link; the access token comes from the secrets store by reference | Test id: `packages/engine/test/client/alert-ntfy.test.ts` (against a local fake ntfy server) |
+| 6.10 | The link opens the agent's thread at the public address setting, carries no credential and no command; with no public address set, the alert has no link | Test id: `packages/engine/test/client/alert-link.test.ts` |
+| 6.11 | A failed send is recorded as `client.AlertDeliveryFailed` with the carrier's name and attempt number, retried with backoff a bounded number of times, and never stops the reactor | Test id: `packages/engine/test/client/alert-ntfy-retry.test.ts` |
+| 6.12 | The ntfy token appears in no event and no service log | Test id: `packages/engine/test/client/alert-ntfy-secret.test.ts` |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 6a.1 | The alert reactor, alert events, the key and closing tables, dismiss, settings | Target `packages/engine/src/client/alerts/`; producers `packages/engine/src/routing/holders.ts:49`, `recovery/crash.ts:69`, `routing/deliveries.ts:194` |
-| 6b.1 | The channel interface and the ntfy channel | Target `packages/engine/src/client/alerts/channels/ntfy.ts`; secret references per engine row 19 (`secrets.json`) |
+| 6a.1 | The alert reactor, alert events, the key and closing tables, dismiss, push settings | Target `packages/engine/src/client/alerts/`; producers `packages/engine/src/routing/holders.ts:49`, `recovery/crash.ts:69`, `routing/deliveries.ts:194` |
+| 6b.1 | `AlertSender`, the carrier settings with no default, the link builder, and the ntfy carrier | Target `packages/engine/src/client/alerts/AlertSender.ts`, `packages/engine/src/client/alerts/carriers/ntfy.ts`; secret references per engine row 19 (`secrets.json`) |
 
 **Design artifact:** none.
 
@@ -529,57 +527,62 @@ recorded alerts, push them, and clear them. Contract section 4. Rows 18,
 |---|---|---|
 | An alert is lost or sent twice across a restart | High | Criterion 6.3. |
 | Agent text in a notification steers the owner | High | Criterion 6.5; titles come from a fixed table. |
-| A public ntfy topic reveals alert titles | Medium | Titles hold no thread text; the owner may use a self-hosted server or an access token (design question 2). |
+| The owner's server address is written into the code | Medium | Criterion 6.8. |
+| A later carrier needs the alert rules changed | Low | Criterion 6.7's boundary test. |
+| A caller of the open web server redirects alerts | Medium | Accepted while the server is open (row 88); such a caller could already answer requests. Recorded as a known gap. |
 
-**Verify:** criteria 6.1-6.9; environment QA: on the owner's phone, an alert from rollout step 7 arrives (unit 11).
+**Verify:** criteria 6.1-6.12; environment QA: on the owner's phone, an alert arrives (unit 11).
 
-**Rollout detail:** 6a at rollout step 5; 6b at step 7, after the owner picks a server and topic.
+**Rollout detail:** 6a at rollout step 5; 6b at step 7, when the owner sets the ntfy server and topic.
 
 **WS-7: The web page**
 
 Purpose: give the phone and any browser the owner's view: what needs the
-owner, every thread, and the answer and prompt actions. Units: 7a shell,
-pairing and situation view; 7b thread view, answering and prompting; 7c
-alerts, devices and settings.
+owner, every thread, and the answer and prompt actions. Units: 7a shell
+and situation view; 7b thread view, answering and prompting; 7c alerts and
+settings.
 
 **Done when:**
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 7.1 | The pairing screen completes pairing against a test service and lands on the situation view | Test id: `packages/web/test/pairing.test.tsx` |
+| 7.1 | The page's RPC client sends its credential header from one module, empty for now; no other module sets a credential | Test id: `packages/web/test/credential-header.test.ts`; boundary test `packages/web/test/credential-imports.test.ts` |
 | 7.2 | The situation view sorts agents into "needs you", "working" and "idle" from snapshot and stream, and resumes from its cursor after a dropped connection | Test id: `packages/web/test/situation.test.tsx` |
 | 7.3 | At 360 pixels wide, no page scrolls sideways | Test id: `packages/web/e2e/layout.spec.ts` (Playwright) |
 | 7.4 | The thread view shows text, plans, tool calls, file changes and requests; a planted `<img src=x onerror=...>` in agent text is shown as text and runs nothing | Test ids: `packages/web/test/thread.test.tsx`, `packages/web/test/agent-text.test.tsx` |
 | 7.5 | Answering a request sends one `answer` with one request id; a double tap acts once | Test id: `packages/web/test/answer.test.tsx` |
 | 7.6 | The owner can prompt an agent from the thread view | Test id: `packages/web/test/prompt.test.tsx` |
-| 7.7 | The alerts page lists open and cleared alerts, and a tap opens the alert's subject | Test id: `packages/web/test/alerts.test.tsx` |
-| 7.8 | The devices page lists and revokes devices, and shows no "create pairing code" on a device | Test id: `packages/web/test/devices.test.tsx` |
-| 7.9 | An unknown event does not break any page | Test id: `packages/web/test/unknown-event.test.tsx` |
+| 7.7 | The alerts page lists open and cleared alerts, and a tap opens the alert's thread | Test id: `packages/web/test/alerts.test.tsx` |
+| 7.8 | The settings page changes alert settings and offers no computer-only action: no pairing code, no web server setting, no standing rule | Test id: `packages/web/test/settings.test.tsx` |
+| 7.9 | An alert's thread link opens that thread and sends no command | Test id: `packages/web/test/thread-link.test.tsx` |
+| 7.10 | An unknown event does not break any page | Test id: `packages/web/test/unknown-event.test.tsx` |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 7a.1 | Vite and React app; the RPC client over a browser WebSocket; pairing; situation view | Target `packages/web/src/`; Effect `socket/Socket.ts:layerWebSocketConstructorGlobal` (l.877), `rpc/RpcClient.ts:layerProtocolSocket` (l.1293); pattern Synapse `web/` (research, "The web server skeleton") |
-| 7b.1 | Thread view, answering, prompting | Target `packages/web/src/thread/`; events from `ApiEvent` |
-| 7c.1 | Alerts, devices, settings pages | Target `packages/web/src/admin/` |
+| 7a.1 | Vite and React app; the RPC client over a browser WebSocket, with the one credential module; situation view | Target `packages/web/src/`; Effect `socket/Socket.ts:layerWebSocketConstructorGlobal` (l.877), `rpc/RpcClient.ts:layerProtocolSocket` (l.1293); pattern Synapse `web/` (research, "The web server skeleton") |
+| 7b.1 | Thread view, thread links, answering, prompting | Target `packages/web/src/thread/`; events from `ApiEvent` |
+| 7c.1 | Alerts and settings pages | Target `packages/web/src/admin/` |
 
 **Design artifact:** mock gate: owner session. The mock must decide: the
 situation view's lanes and what each row shows; how a permission request's
-options are laid out on a phone (Allow once, Deny, and whether "allow
-always" appears at all); how a long tool call or file change is folded;
-the thread view's prompt box; and the alerts, devices and settings pages.
+options are laid out on a phone (Allow once, Deny, and whether the agent's
+own "allow always" option appears at all, since a Shephrd standing rule
+works only at the computer); how a long tool call or file change is
+folded; the thread view's prompt box; and the alerts and settings pages.
 No unit of WS-7 starts before the owner approves the mock.
 
 **Risks:**
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| Agent text runs as code in the page (cross-site scripting) | High | Criterion 7.4; React text rendering only, no raw HTML; the CSP of criterion 5.7. |
+| Agent text runs as code in the page (cross-site scripting) | High | Criterion 7.4; React text rendering only, no raw HTML; the CSP of criterion 5.10. |
 | A double tap answers twice | Medium | Criterion 7.5. |
+| A link in an alert acts without the owner | Medium | Criterion 7.9. |
 | The page is unusable on a phone | Medium | Criterion 7.3; the mock gate. |
 
-**Verify:** criteria 7.1-7.9; environment QA: the owner's real phone in unit 11.
+**Verify:** criteria 7.1-7.10; environment QA: the owner's real phone in unit 11.
 
 **Rollout detail:** rollout step 6.
 
@@ -619,62 +622,35 @@ and its keys for moving, answering and prompting.
 
 **Rollout detail:** rollout step 6.
 
-**WS-9: Shephrd runs as its own Unix user** (pending design question 3, row 42)
+**WS-9: Shephrd's own Unix user, deferred**
 
-Purpose: move the state folder, the account keys and the record out of the
-agents' reach before remote access opens the page to the network.
-SECURITY.md, "What Shephrd protects". Unit 9.
+The owner deferred Shephrd's own Unix user on 2026-11-03 (row 78). This
+plan has no unit 9, and remote access does not wait for one. SECURITY.md's
+paragraph "Agents can read Shephrd's own files" says that the setup is
+still planned, and that until then any agent can read Shephrd's state
+folder.
 
-**Done when:**
+**WS-10: Remote access through the owner's proxy**
 
-| # | Criterion | Observed by (test id / command / on-device step) |
-|---|---|---|
-| 9.1 | `shephrd setup own-user`, run once with administrator rights, creates the `shephrd` user and group, moves the state folder, and installs the service to run as that user | On-host step: the command exits 0, and `stat -c '%U %a' <state folder>` prints `shephrd 700` |
-| 9.2 | A process running as the owner cannot read `secrets.json`, the event database or the devices table | On-host step: `scripts/own-user-check.sh` exits 0 |
-| 9.3 | The owner's `shephrd` command still connects, through the socket's group permission, and the ancestry check still applies | Test id: `packages/cli/test/own-user-socket.test.ts`; on-host step: `shephrd client roster` succeeds as the owner |
-
-**Tasks:**
-
-| # | Task | Anchor (file + symbol; line optional) |
-|---|---|---|
-| 9.1 | Setup command, state-folder move, socket group permission | Target `packages/cli/src/commands/setup.ts`; state folder resolution `packages/engine/src/identity/ownerCredential.ts` (l.105), client `packages/client/src/identity.ts:48` |
-| 9.2 | The check script | Target `scripts/own-user-check.sh` |
-
-**Design artifact:** none. The unit's own design (where the owner
-credential lives, how Herdr starts a service under another user) is
-settled in the design note before the unit starts.
-
-**Risks:**
-
-| Risk | Severity | Mitigation |
-|---|---|---|
-| The service cannot start after the move | High | A dry-run mode and a reverse command; criterion 9.1. |
-| The owner credential is still readable by agents | Medium | Accepted limit per SECURITY.md; the ancestry check stays; recorded as a known gap. |
-
-**Verify:** criteria 9.1-9.3; environment QA: on the owner's host.
-
-**Rollout detail:** rollout step 8; the owner runs the setup command.
-
-**WS-10: Remote access from outside the house** (pending design question 1, row 40)
-
-Purpose: let the phone reach the page through the owner's own WireGuard
-and reverse proxy, with TLS at the proxy. SECURITY.md rule 5. Unit 10.
+Purpose: let the phone reach the page through the owner's own reverse
+proxy over WireGuard, with the encryption at the proxy. Rows 76, 84, 89.
+Unit 10.
 
 **Done when:**
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 10.1 | In proxy mode, the listener accepts the configured public Host and Origin, requires the proxy's `X-Forwarded-Proto: https`, and sets the cookie `Secure` | Test id: `packages/engine/test/client/listener-proxy.test.ts` |
-| 10.2 | Binding a non-loopback address is allowed only for an address on a WireGuard interface, and plain HTTP is never offered to it without the proxy | Test id: `packages/engine/test/client/listener-bind-remote.test.ts` |
-| 10.3 | `docs/remote-access.md` describes the proxy and WireGuard setup with one example | Command: `test -s docs/remote-access.md` |
-| 10.4 | From a phone on mobile data, through the owner's proxy, the page opens and shows the situation view | On-device step: owner's phone, rollout step 9 |
+| 10.1 | In proxy mode, the web server accepts the public address's `Host` and `Origin`, and still binds only loopback | Test id: `packages/engine/test/client/web-proxy.test.ts` |
+| 10.2 | In proxy mode, a request whose last `X-Forwarded-For` entry is one of the host's own addresses is refused; outside proxy mode, forwarded headers are ignored; a direct connection that forges the header still meets the guard first | Test id: `packages/engine/test/client/web-proxy-own-address.test.ts` |
+| 10.3 | `docs/remote-access.md` describes the setup: WireGuard to the host, an example Caddyfile that proxies the public address to the loopback port, the public address setting, and the guard's limits | Command: `test -s docs/remote-access.md && grep -q reverse_proxy docs/remote-access.md` |
+| 10.4 | From a phone on mobile data, through the owner's proxy, the page opens and shows the situation view | On-device step: the owner's phone, rollout step 8 |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 10.1 | Proxy mode settings and checks | Target `packages/engine/src/client/listener/proxy.ts`; WS-5's guards |
-| 10.2 | The setup document | Target `docs/remote-access.md` |
+| 10.1 | Proxy mode in the web server's settings, the public allow-list and the own-address check | Target `packages/engine/src/client/web/proxy.ts`; WS-5's guards and `webCaller`; the host's addresses from Node's `os.networkInterfaces()` |
+| 10.2 | The setup document with the example Caddyfile | Target `docs/remote-access.md`; post-build check PB-2 |
 
 **Design artifact:** none.
 
@@ -682,23 +658,25 @@ and reverse proxy, with TLS at the proxy. SECURITY.md rule 5. Unit 10.
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| The API is exposed without encryption | High | Criteria 10.1, 10.2; attack pass. |
-| A spoofed forwarding header from a local program | Medium | Proxy headers are trusted only from the configured proxy address. |
+| Anyone who reaches the proxy has the owner's control | High | Accepted by the owner while the server is open (row 80): the owner's WireGuard limits who reaches it. Attack pass. |
+| An agent reaches the web server through the proxy's public address | Medium | Criterion 10.2. |
+| The example sends the API without encryption | Medium | The example terminates TLS at Caddy, and the web server never binds a non-loopback address (criteria 5.1, 10.1). |
 
 **Verify:** criteria 10.1-10.4; environment QA: the owner's phone.
 
-**Rollout detail:** rollout step 9, after unit 9.
+**Rollout detail:** rollout step 8; the owner points the proxy at the web server.
 
 **WS-11: Proof on a real phone**
 
-Purpose: show the epic's second "done when" end to end. Unit 11.
+Purpose: show the epic's second "done when" end to end, without pairing.
+Unit 11.
 
 **Done when:**
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 11.1 | In a phone-sized headless browser: pair with a code, see a fake agent's permission request, answer it, see the agent released, read the thread, and see the alert reach a fake ntfy server | Test id: `packages/web/e2e/phone-flow.spec.ts` |
-| 11.2 | The owner pairs a real phone, gets a real alert, answers a real permission request from it, and reads the thread | On-device step: the owner's phone, recorded in the run's result file |
+| 11.1 | In a phone-sized headless browser: a fake agent asks permission, the alert reaches a fake ntfy server with a thread link, the link opens the thread, the owner answers, the agent is released, and the thread reads back | Test id: `packages/web/e2e/phone-flow.spec.ts` |
+| 11.2 | The owner gets a real alert on a real phone through ntfy, opens its link through the proxy, answers a real permission request, and reads the thread | On-device step: the owner's phone, recorded in the run's result file |
 
 **Tasks:**
 
@@ -716,17 +694,23 @@ Purpose: show the epic's second "done when" end to end. Unit 11.
 
 **Verify:** criteria 11.1-11.2; environment QA: criterion 11.2.
 
-**Rollout detail:** rollout step 10.
+**Rollout detail:** rollout step 9.
 
 Post-build checks (code-level worries a plan cannot settle):
 
-- PB-1: confirm Effect 4.0.5's Node HTTP server lets the listener set the
-  WebSocket message size limit (criterion 5.5); if not, enforce it in the
-  protocol wrapper, as `boundedProtocol` does for backlogs.
-- PB-2: confirm a browser sends the `SameSite=Strict` cookie on the page's
-  own WebSocket upgrade behind the owner's proxy.
+- PB-1: confirm Effect 4.0.5's Node HTTP server lets the web server set
+  the WebSocket message size limit (criterion 5.8); if not, enforce it in
+  the protocol wrapper, as `boundedProtocol` does for backlogs.
+- PB-2: confirm, from Caddy's current documentation, how its reverse proxy
+  sets `X-Forwarded-For`, and whether it appends to or replaces a value
+  the client sent, before criterion 10.2's check is written.
 - PB-3: confirm how a Herdr plugin action opens a new pane (Herdr 0.9.x
   plugin manual) before unit 8's action is written.
+- PB-4: confirm, on the owner's host, that a process running as the owner
+  can read the `/proc/<pid>/fd` links of the owner's other processes. A
+  `hidepid` mount option or a hardened kernel setting could hide them. Then
+  the guard refuses every same-user peer, including the owner's own
+  browser on the host.
 
 </details>
 
@@ -737,36 +721,46 @@ when"; the engine design's capabilities 6, 8 and 9 and "What this spec
 leaves open" (client API); `docs/features.md` section 3 ("Threads where the
 owner already works") and section 4; `docs/research/t3-code.md` items 9 to
 12; `docs/issues.md` issues 65, 75 and 164; owner choice A10; lead rulings
-L1 to L4, L10, L11, L13, L15, L16, L19, L22, L23 and L26; the owner's answer on engine edits (2026-11-03); the roles planner's requests 1 to 6 and the board
-planner's R1 items 1 to 6; SECURITY.md security rules 1 to 7.
+L1 to L4, L10, L11, L13, L15, L16, L19, L22, L23, L26, L28, L29 and L30;
+the owner's answer on engine edits (2026-11-03); the owner's decisions in
+design talk 1 (2026-11-03, `docs/specs/2026-11-03-client-api-design.md`);
+the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
+6; SECURITY.md security rules 1 to 7.
 
 | Source item | Workstream | Status |
 |---|---|---|
-| Epic row 2: device pairing | WS-4 | planned |
+| Epic row 2: device pairing | WS-4 | deferred by the owner (rows 80, 86); the slot is built (criteria 5.2, 5.5, 7.1) |
 | Epic row 2: phone alerts | WS-6 | planned |
-| Epic row 2: encrypted remote access | WS-9, WS-10 | planned, pending design questions 1 and 3 |
+| Epic row 2: encrypted remote access | WS-10 | planned; the encryption is at the owner's proxy (row 76) |
 | Epic row 2: the web page | WS-5, WS-7 | planned |
 | Epic row 2: thread viewer in a Herdr pane | WS-8 | planned |
-| Epic done-when 2: answer and read from a paired phone | WS-11 | planned |
+| Epic done-when 2: answer and read from a paired phone | WS-11 | planned without pairing; the epic's wording names a paired phone, so the lead rewords it (known gap) |
 | Engine capability 6: read any thread live from any client | WS-3, WS-7, WS-8 | planned |
 | Engine capability 8: owner needed becomes a phone alert | WS-6 | planned |
 | Engine capability 9: talk to any agent remotely | WS-7, WS-10 | planned |
-| Engine design: client API needs its own design round | rows 8, 40-43; design note after the decisions | in progress |
+| Engine design: client API needs its own design round | rows 76-89; `docs/specs/2026-11-03-client-api-design.md` | done |
+| Design decision 1: loopback web server, the owner's proxy | WS-5, WS-10 | planned (row 76) |
+| Design decision 2 and addendum: ntfy behind one sender interface | WS-6 | planned (rows 77, 83) |
+| Design decision 3: no own-user unit | WS-9 | deferred by the owner (row 78) |
+| Design decision 4: links open the thread | WS-6 (6.10), WS-7 (7.9) | planned (row 79) |
+| Design decision 5 and condition: open web server, pairing slots in | WS-4, WS-5 (5.2), WS-7 (7.1) | planned (rows 80, 81) |
+| Design decision 6: three computer-only commands | WS-5 (5.5), WS-7 (7.8) | planned (row 82) |
+| Same-machine guard | WS-5 (5.6, 5.7), WS-10 (10.2) | planned (rows 84, 89) |
 | Features §3: threads where the owner already works (pane viewer) | WS-8 | planned |
 | Features §3: VS Code extension | none | out of scope (row 51) |
-| Features §4: one authenticated API for every client | WS-1, WS-2, WS-5 | planned |
-| Features §4: device pairing | WS-4 | planned |
+| Features §4: one authenticated API for every client | WS-1, WS-2, WS-5 | planned; the web server is open for now (row 80) |
+| Features §4: device pairing | WS-4 | deferred (row 86) |
 | Features §4: live updates | WS-3 | planned |
 | Features §4: updates that survive a sleeping phone | WS-3, WS-5 (heartbeat) | planned |
 | Features §4: browser terminal | none | out of scope (lead L2, row 5) |
 | Features §4: four phone alerts | WS-6 | planned |
-| Features §4: Shephrd runs as its own user | WS-9 | planned, pending design question 3 |
+| Features §4: Shephrd runs as its own user | WS-9 | deferred by the owner (row 78) |
 | Features §4: macOS support | none | out of scope (owner, 2026-11-01, Linux only) |
 | Features §4: herding names | none | shelved by the owner |
 | Research item 9 | WS-3 | planned |
 | Research item 10 (browser terminal) | none | out of scope (row 5) |
 | Research item 11 | WS-6 | planned |
-| Research item 12 (signed links) | WS-6 | not adopted, pending design question 4 (row 43) |
+| Research item 12 (signed links) | none | not adopted by the owner (row 79) |
 | Issue 65 (owner alert withdrawal) | WS-6 | planned (derived ends, row 18) |
 | Issue 75 (no owner waiter) | WS-3 | planned (client wait, rows 4, 50) |
 | Issue 164 (agent-less events hidden from agents) | WS-1 | stands (contract section 3) |
@@ -785,11 +779,13 @@ planner's R1 items 1 to 6; SECURITY.md security rules 1 to 7.
 | Lead L23 | WS-1 (criterion 1.25) | planned |
 | Owner answer on engine edits (2026-11-03) | WS-1 (units 1a, 1b) | planned (row 63) |
 | Lead L26 | WS-1 (criteria 1.1, 1.22), WS-2 | planned (row 64) |
+| Lead L28 | WS-1, WS-3 (3.5) | planned (contract section 1) |
 | Lead's round 4, S1 to S6 | WS-1 (criteria 1.26-1.32) | planned (rows 68, 70-73) |
 | Lead L29 | WS-1 (criterion 1.28) | planned (row 69) |
+| Lead L30 (board Q6 changes 1 to 4) | WS-1, WS-3 (3.5) | planned (contract v5) |
 | Roles requests 1-6 | WS-1, WS-3, WS-6; contract section 7 | planned |
 | Board R1 items 1-6 | WS-1, WS-2, WS-5, WS-6; contract section 7 | planned |
-| SECURITY.md rules 1-7 | Guardrails fold | planned |
+| SECURITY.md rules 1-7 | Guardrails fold | planned; rule 2 suspended for the web server by the owner |
 
 </details>
 
@@ -800,14 +796,15 @@ planner's R1 items 1 to 6; SECURITY.md security rules 1 to 7.
 | AGENTS.md rule 1: never push to `vitalysim/herdr-synapse` | Every unit pushes to `qnlbnsl/sheprd` only. |
 | AGENTS.md rule 2: credit copied code | No code is copied in this plan. A unit that copies any (for example from Synapse's web page) follows rule 2 under `third_party/`. |
 | AGENTS.md rule 3: keep the lists current | Each unit records problems in `docs/issues.md`; this planner's finds go to the lead in the result file. |
-| AGENTS.md rule 4: SECURITY.md is binding | Rule 1: WS-5 criterion 5.1. Rule 2: rows 14, 49; criteria 5.2, 4.2. Rule 3: row 48; criteria 4.1, 4.3. Rule 4: criterion 4.4. Rule 5: WS-10; criterion 10.2. Rule 6: criteria 4.2, 6.5, 6.9. Rule 7: rows 19, 37; criteria 1.13, 7.4. |
-| AGENTS.md rule 5: the API is the product's surface | Every owner action is an API command; devices have the owner's rights except the host-only list (row 55, pending the owner); `shephrd client wait` runs on the API (row 50). |
+| AGENTS.md rule 4: SECURITY.md is binding | Rule 1: criterion 5.1. Rule 2: suspended for the loopback web server by the owner on 2026-11-03 (row 80), with SECURITY.md's text owner-approved (row 85); the Unix socket keeps it (criterion 5.13), and the web server refuses the host's credentials (criterion 5.3). Rules 3 and 4: deferred with pairing (row 86). Rule 5: the web server binds loopback only and the proxy carries the encryption (criteria 5.1, 10.1). Rule 6: criteria 6.5, 6.12. Rule 7: rows 19, 37, 87; criteria 1.13, 7.4. |
+| AGENTS.md rule 5: the API is the product's surface | Every owner action is an API command. Rule 5 is narrowed by the owner for three computer-only commands (rows 82, 85; criterion 5.5). `shephrd client wait` runs on the API (row 50). |
 | AGENTS.md rule 6: team shapes do not belong here | No team shape or workflow is defined; alert kinds and services are mechanisms. |
 | AGENTS.md rule 7: commit only when asked | The run's team rules allow commits; units commit per the lead. |
 | AGENTS.md, "Language": TypeScript, Effect 4, Node.js 26 | All code is TypeScript with Effect 4.0.5; Effect claims checked against the installed source (rows 24, scouting). |
 | AGENTS.md, "How agents are run": one delivery interface | The client API reads events and roster fields that do not depend on run mode; piece deliveries go through the engine's delivery path (contract edit E16). |
 | Owner answer, 2026-11-03: edit the engine directly (row 63); lead ruling L26 (row 64) | Units 1a and 1b make contract section 6's edits; each change to existing behaviour is named with its tests (rows 64, 67; criterion 1.1). |
-| Run team rule 6: scope | This planning run writes only the plan folder and, later, the design note. |
+| Owner decisions, design talk 1 (2026-11-03) | Folded as rows 76 to 89 and contract v7; the owner's words are quoted in `docs/specs/2026-11-03-client-api-design.md`. |
+| Run team rule 6: scope | This planning run writes the plan folder, the design note, and the SECURITY.md and AGENTS.md text the owner approved (row 85). |
 
 </details>
 
@@ -822,30 +819,28 @@ at launch; this section names none (owner, 2026-10-16).
 | 1b Engine callers and rules: caller schema, device field, service caller, sender wrapping, piece source, withdrawal, reach check, wait conditions | backend | engine/backend | high | Adds a caller kind and authorization rules, and changes the prompt renderer and the dispatcher. | yes | 1a |
 | 2 Client contracts and client parity | contracts | client-api/contracts | medium | New schemas in the engine's contracts package, on its existing pattern. | no | 1b |
 | 3 Reads, filtered stream, client wait | backend | client-api/backend | medium | Handlers over the engine's snapshot and read, with a shared visibility function. | no | 2 |
-| 4 Pairing and devices | backend | client-api/backend | high | Authentication and credential creation. | yes | 2 |
-| 5 Loopback web listener | backend | client-api/backend | high | A new network entry point with browser authentication. | yes | 4 |
+| 5 Loopback web server, `webCaller` and the guard | backend | client-api/backend | high | A new network entry point with no authentication, a process lookup and the browser checks. | yes | 2 |
 | 6a Alert reactor and alert events | backend | client-api/backend | medium | A reactor on the engine's reactor pattern, with fixed mapping tables. | no | 2 |
-| 6b ntfy channel | backend | client-api/backend | medium | One outbound HTTP channel with retries and a secret reference. | no | 6a, design question 2 |
-| 7a Web page: shell, pairing, situation view | mobile-ui | client-api/mobile-ui | medium | A new screen set from an approved mock. | no | 5, mock session |
-| 7b Web page: thread view, answer, prompt | mobile-ui | client-api/mobile-ui | medium | Screens from the mock, rendering untrusted text as text. | no | 7a |
-| 7c Web page: alerts, devices, settings | mobile-ui | client-api/mobile-ui | medium | Screens from the mock over existing commands. | no | 7a, 6a |
+| 6b `AlertSender` and the ntfy carrier | backend | client-api/backend | medium | One interface and one outbound HTTP carrier with retries and a secret reference. | no | 6a |
+| 7a Web page: shell, credential module, situation view | mobile-ui | client-api/mobile-ui | medium | A new screen set from an approved mock. | no | 5, mock session |
+| 7b Web page: thread view, links, answer, prompt | mobile-ui | client-api/mobile-ui | medium | Screens from the mock, rendering untrusted text as text. | no | 7a |
+| 7c Web page: alerts and settings | mobile-ui | client-api/mobile-ui | medium | Screens from the mock over existing commands. | no | 7a, 6a |
 | 8 Pane viewer | mobile-ui | client-api/mobile-ui | medium | A terminal screen set over the client library. | no | 3, mock session |
-| 9 Own Unix user | infra | client-api/infra | high | Moves secrets and changes how the service runs on the host. | yes | 5, design question 3 |
-| 10 Remote access through the owner's proxy | backend | client-api/backend | medium | Settings and checks on top of unit 5's guards. | yes | 9, design question 1 |
+| 10 Remote access through the owner's proxy | backend | client-api/backend | medium | Settings and one header check on top of unit 5's guards, and a setup document. | yes | 5 |
 | 11 Phone flow and owner check | backend | client-api/backend | medium | One end-to-end test plus an owner step. | no | 6b, 7b, 10 |
 
-Load: 15 build units. At the sheet's builder, test writer and focused
-reviewer for each unit, that is 45 launches, plus 12 for the six attack
-passes (one attacker and one verifier each), 57 in all. From the sheet's
+Load: 13 build units. At the sheet's builder, test writer and focused
+reviewer for each unit, that is 39 launches, plus 8 for the four attack
+passes (one attacker and one verifier each), 47 in all. From the sheet's
 tables: the medium backend and contracts units (2, 3, 6a, 6b, 10, 11) build
 on the OpenAI vendor; the medium `mobile-ui` units (7a, 7b, 7c, 8) build on
-the Anthropic vendor; the provisional high backend and infra units (1a, 1b,
-4, 5, 9) alternate between the two. That is roughly 8 to 9 builds on
-OpenAI and 6 to 7 on Anthropic, with test writers and reviewers on the
-other vendor, and the attackers on the sheet's attack tier: about 27 to 29
-OpenAI and 28 to 30 Anthropic launches. The planner cannot read the
-remaining weekly allowance; the lead checks each vendor's limit before
-launching (known gap).
+the Anthropic vendor; the provisional high backend units (1a, 1b, 5)
+alternate between the two. That is roughly 7 to 8 builds on OpenAI and 5
+to 6 on Anthropic, with test writers and reviewers on the other vendor,
+and the attackers on the sheet's attack tier: about 22 to 23 OpenAI and 24
+to 25 Anthropic launches. The planner cannot read the remaining weekly
+allowance; the lead checks each vendor's limit before launching (known
+gap).
 
 </details>
 

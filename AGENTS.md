@@ -81,7 +81,12 @@ ACP agent and an interactive agent can sit on the same team.
    the owner's explicit approval in the current task.
 5. **The client API is the product's surface.** Anything the owner can do
    from the terminal must also be possible through the API, so a web or
-   mobile client is never a second-class citizen.
+   mobile client is never a second-class citizen. Three commands are the
+   exception, by the owner's choice on 2026-11-03: creating a pairing code,
+   changing the web server's settings, and adding a standing permission
+   rule. They work only at the computer, over the engine's Unix socket with
+   the owner credential, never through the web server or a phone. Each
+   outlives a moment's access.
 6. **Team shapes and workflows do not belong here.** Shephrd provides roles,
    the board, and the API. The definitions of particular teams live outside
    this repository.

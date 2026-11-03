@@ -40,13 +40,16 @@ an agent's mistakes, not a deliberately hostile agent. Where a harness
 supports it, Shephrd adds a rule that forbids its agents to read the state
 folder, but that rule is a guard against accidents, not a wall. The owner
 accepted this limit on 2026-11-01. The real fix is to run Shephrd as its own
-user, so its private files are out of the agents' reach. It is planned for
-before remote access is built.
+user, so its private files are out of the agents' reach. It is still
+planned. On 2026-11-03 the owner approved building remote access before it,
+so that Shephrd is in use sooner. Until it is built, any agent can read
+Shephrd's state folder, including the stored account keys.
 
 The part of Shephrd that needs the most care is its client API, because it
 lets a web page, a desktop app, or a phone control agents that can run
 commands on the host. Anyone who can reach that API with a valid credential
-can, in effect, run code on the machine.
+can, in effect, run code on the machine. While the loopback web server is
+open (rule 2 below), no credential is needed there at all.
 
 ## Harnesses with no deny-read or deny-write rule
 
@@ -78,6 +81,25 @@ These rules apply to every change. A change that breaks one is a security bug.
    other address is an explicit setting that the owner turns on.
 2. **Every API request is authenticated, including on loopback.** There is no
    unauthenticated mode.
+
+   **Suspended for the loopback web server.** The owner suspended this rule
+   for the loopback web server on 2026-11-03, until authentication is added
+   ("b. for now just leave it be. i want to start using it. only me on my
+   network so does not matter"). The engine's Unix socket keeps its
+   authentication unchanged. The risk the owner accepted: every agent on the
+   machine can reach the open server on `127.0.0.1`, and so can anyone who
+   reaches the owner's proxy. Either can act with the owner's full control.
+   An agent stuck on an approval could approve itself, or start agents with
+   full access, which bypasses the permission ceiling and the ancestry
+   check. Two limits stay in force while it is open. First, three commands
+   work only over the engine's Unix socket with the owner credential, never
+   through the web server: creating a pairing code, changing the web
+   server's settings, and adding a standing permission rule. Second, the web
+   server refuses a connection from a process that descends from an agent.
+   That second check stops accidents and simple misuse, not a hostile agent:
+   an agent can start a process outside its own process tree, or ask
+   another program to connect for it. Authentication, with pairing, ends
+   this suspension.
 3. **A new device is paired with a short-lived, single-use pairing code.**
    A pairing code is never reusable and never stored in plain text.
 4. **Each device gets its own credential, and each credential can be revoked
