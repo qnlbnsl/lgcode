@@ -11,7 +11,7 @@ import * as Fiber from "effect/Fiber";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import { allowOnce, check, type AgentRef } from "./flow.ts";
-import { authRefused, canaryDenied, compactions, exactCommand, exitCodeOf, fixtureEvidence, mcpAskInput, receivedUserText, scanTokens, sessionFiles, shellIdentityAbsent, slashReceipt } from "./probeEvidence.ts";
+import { authRefused, canaryDenied, compactions, exactCommand, exitCodeOf, fixtureEvidence, mcpAskDiscovery, mcpAskInput, receivedUserText, scanTokens, sessionFiles, shellIdentityAbsent, shellIdentityStatus, slashReceipt } from "./probeEvidence.ts";
 import { ALWAYS_ALLOW_PROMPT, fill, PROBE_MCP_PROMPT, REMOVED_VARIABLES_PROMPT, RESTART_ACTIVE_PROMPT, RESTART_PENDING_PROMPT, RESTART_PREPARE_PROMPT, SHELL_COMMANDS, SLASH_DOWN_PROMPT, SLASH_RECEIVER_PROMPT, SLASH_UP_PROMPT, STATE_READ_PROMPT } from "./prompts.ts";
 import { ADAPTER_CANCELLED, type Observation, type ProbeAgents, type ProbeDriver, type ProbeId } from "./probes.ts";
 import { apply, emptyViews } from "../../src/views/apply.ts";
@@ -262,7 +262,8 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       const results: Observation[] = [];
       for (const { harness, agent } of members()) {
         const marker = "lcp-mcp-" + randomBytes(8).toString("hex");
-        const result = yield* turn(owner, agent, fill(PROBE_MCP_PROMPT, { MARKER: marker }), askInput(agent, marker));
+        const result = yield* turn(owner, agent, fill(PROBE_MCP_PROMPT, { MARKER: marker }), (tool) => askInput(agent, marker)(tool) || (harness === "claude" && mcpAskDiscovery(tool)));
+        yield* check(mergedTools(result.rows, agent).filter(mcpAskDiscovery).length <= 1, "unexpected repeated ask discovery");
         const calls = mergedTools(result.rows, agent).filter(askInput(agent, marker));
         const failed = calls.find((tool) => tool.status === "failed");
         const question = tagged(result.rows, "QuestionAsked").some((row) => event<{ text: string }>(row).text === marker);
@@ -309,7 +310,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
             : executed.some((tool) => tool.status === "failed" && canaryDenied(tool.output ?? "", join(options.service().state, "live-canary"))) ? "refused" : "attempted; failed";
         }
         const detail = id === "state-read" ? `exact canary command; completed tool calls=${executed.length}; SECURITY.md:51 lists no default deny-read rule`
-          : `exact command; completed tool calls=${executed.length}; ${harness === "codex" ? `core inheritance configured=${String(coreConfigured)}; shell identity variable names absent=${String(shellIdentityAbsent(output))} (SEC-PB-8)` : "both Shephrd variables removed (SEC-PB-5)"}`;
+          : `exact command; completed tool calls=${executed.length}; ${harness === "codex" ? `core inheritance configured=${String(coreConfigured)}; shell identity variable names=${shellIdentityStatus(output)} (SEC-PB-8)` : "both Shephrd variables removed (SEC-PB-5)"}`;
         results.push({ harness, outcome, detail: `${detail}${outcome === "attempted; failed" ? `; errors=${toolErrors(attempted)}` : ""}` });
       }
       return results;
@@ -362,6 +363,8 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       if (result.noSafePersistent) return rows("no safe persistent option offered", "persistent destination absent or outside localSettings/session; rejected before answering always; current public permission contract does not expose the destination");
       const calls = mergedTools(result.rows, agent);
       const failureOutcome = calls.length > 0 ? "attempted; failed" : "not attempted";
+      if (calls.length > 0 && result.asked.length === 0) return rows("no persistent permission request observed",
+        `exact command observed; permission requests=0; chosen options=0; no always-allow answer was sent; saved scope is unproven; errors=${toolErrors(calls)}`);
       let after: { permissions?: { allow?: string[] } };
       try { after = settings(); } catch { return rows(failureOutcome, `settings.local.json was not written after always allow; errors=${toolErrors(mergedTools(result.rows, agent))}`); }
       const offered = result.asked.flatMap((request) => request.options);
@@ -387,11 +390,14 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       for (const { agent } of members()) {
         yield* owner.prompt({ requestId: requestId(), agentId: agent.agentId,
           text: fill(RESTART_ACTIVE_PROMPT, { COMMAND: SHELL_COMMANDS.restartHold, MARKER: markers.get(agent.agentId)! }) } as never);
-        yield* eventsUntil(owner, activeMark, "the exact restart hold command (not attempted if declined)", (row) => {
+        const held = yield* eventsUntil(owner, activeMark, "the exact restart hold command (not attempted if declined)", (row) => {
+          if (row.agentId === agent.agentId && row.event._tag === "TurnEnded") return true;
           if (row.agentId !== agent.agentId || row.event._tag !== "ThreadItem") return false;
           const tool = event<{ content: Tool }>(row).content;
           return tool._tag === "tool-call" && exactCommand(tool.input, SHELL_COMMANDS.restartHold);
         }, options.agentTimeout);
+        yield* check(held.at(-1)?.event._tag !== "TurnEnded",
+          `not attempted: ${agent.agentId === agents.lead.agentId ? "claude" : "codex"} ended its hold turn without the exact restart command`);
       }
       const activeRows = yield* since(owner, activeMark);
       yield* check(members().every(({ agent }) => !tagged(activeRows, "TurnEnded", agent.agentId).length), "not attempted: a hold turn ended before SIGKILL");

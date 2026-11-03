@@ -38,7 +38,7 @@ export const failingOutcomes: Partial<Record<ProbeId, ReadonlyArray<string>>> = 
   "state-read": ["attempted; failed"],
   "slash-up": ["attempted; failed"],
   "slash-down": ["attempted; failed"],
-  "always-allow": ["attempted; failed"],
+  "always-allow": ["attempted; failed", "no persistent permission request observed"],
   "reload": ["attempted; failed", "attempted; failed: pending delivery accepted before reload (restart race)"],
 };
 

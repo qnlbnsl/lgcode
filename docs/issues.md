@@ -3270,6 +3270,16 @@ arguments still present, and a stale token snapshot after the first restart.
 They cover each guard separately without weakening the existing evidence
 requirements. These remain local tests, not real-adapter evidence.
 
+Fix round 4 distinguishes a command that ran without any permission request
+from a request without a safe persistent destination. In live-check-2 run 2,
+events 322-325 show the exact printf command completing, with no
+PermissionRequested or PermissionAnswered for that call. No option or
+destination was selected. The probe now reports
+`no persistent permission request observed`, which fails. It does not claim
+that an always-allow answer was sent or that a settings write failed after
+one. It still requires the owner-held request, verified destination and
+saved scope before it can pass SEC-PB-4.
+
 ## 218. The state-read probe records the owner's own rejection as a deny rule
 
 Found: 2026-11-02, by the L-1 probe test writer.
@@ -3908,8 +3918,13 @@ accepts nor requeues the already-sent delivery.
 
 Found: 2026-11-03, by the token scan in live-check-2 run 2 at 9e10ed6.
 
-Status: open. This is a security finding, recorded for the owner's hostile
-pass; the owner decides the fix.
+Status: open, deferred by the owner to the hostile pass (2026-11-03).
+The tokens are per spawn and short-lived, and on a single-user machine the
+owner treats this as ordinary exposure.
+
+The owner's decision, relayed through the manager on 2026-11-03:
+
+> do not fix it now. The tokens are per spawn and short-lived, and on a single-user machine this is ordinary exposure, the same as any tool that puts a token on its command line. Leave issue 240 open and deferred to the hostile pass.
 
 The runner gives every adapter except Codex the Shephrd tool server through
 the Agent Client Protocol (ACP) `mcpServers` list, with the agent's token as
@@ -3937,3 +3952,145 @@ parent environment for stdio tool servers; or use Claude Code's `${VAR}`
 expansion in the server's `env` entry, if `--mcp-config` expands it. Either
 must be checked against the pinned versions before it is relied on. The same
 path is used for every other non-Codex harness, so each needs the same check.
+
+## 241. A real adapter shell obtains owner access after removing both identity variables
+
+Found: 2026-11-03, while diagnosing live-check-2 run 2 at 9e10ed6.
+
+Status: open. This is a real security finding for SEC-PB-5. No engine code
+was changed in this diagnostic round.
+
+The Claude lead ran the exact removed-variable command. Events 157-158
+record its input, event 159 requests permission, event 161 selects allow-once,
+and event 162 marks the call completed. The call id is
+toolu_01H5T2W8rk4qpNBxZNMddW4r. The command removes SHEPHRD_SOCKET and
+SHEPHRD_TOKEN with env -u, sets SHEPHRD_HOME to the run's state folder and
+starts the real command-line interface's accounts list command. Its actual
+tool result, line 102 of the lead's session file, contains the accounts list
+and LCP_EXIT=0. The engine's thread lost that output, as recorded in issue 242.
+
+This is owner access, rather than the required HTTP 403 ancestry refusal.
+The guard in packages/engine/src/api/ancestry.ts did not prevent this real
+adapter shell's request. The exact reason it missed the caller's ancestry
+remains to be established. Passing fake-adapter tests do not refute this
+observed real-adapter result.
+
+Evidence: /tmp/shephrd-live-Twd6bJ/state/events.sqlite, opened read-only, and
+/home/qnlbnsl/.claude/projects/-tmp-shephrd-live-Twd6bJ-work/e04b371b-45ed-4430-a3a0-483cbb74acd7.jsonl,
+lines 101-102. The exact command is recorded in the worker's round-4 result.
+It contains no token value.
+
+## 242. The runner loses version 2 terminal output and exit updates
+
+Found: 2026-11-03, while diagnosing live-check-2 run 2 at 9e10ed6.
+
+Status: open. This is a real engine bug. This round permits diagnosis and
+probe fixes only, so no engine code was changed.
+
+The Claude canary call, toolu_01TVjd63cUyrVjoXchJwiCSx, appears at events
+239-245. The Codex call, exec-9c103f2b-ee5f-498f-b122-f94a49f6c20b, appears
+at events 262-263. Both completed the exact canary command. Their thread
+items contain a terminal reference and empty content, rather than stdout or
+an exit code. The actual tool results in the two named session files contain
+the run's random canary and LCP_EXIT=0. Both reads succeeded, so the observed
+SEC-PB-6 result is no mechanism. There is no observed deny-read refusal.
+The automated probe correctly fails when its public evidence lacks output,
+rather than trusting the model's prose.
+
+The installed adapters explain the carrier. Their version 2 terminal
+converters split terminal metadata into terminal_update and
+terminal_output_chunk notifications. Claude's converter is dist/v2/terminal.js;
+Codex has the corresponding converter in dist/index.js. Before conversion,
+the metadata contains terminal output and exit fields. Version 2 selects
+this path even with empty clientCapabilities. The output travels in later
+notifications, rather than rawOutput on the completed tool call.
+
+packages/engine/src/runner/translate.ts only handles message, plan and
+tool-call updates. It ignores terminal notifications and does not retain
+their metadata. This source path explains the missing output. The run did
+not retain raw Agent Client Protocol frames, so the exact wire notifications
+cannot be replayed from it. A fix should preserve terminal output and exits,
+correlate them with their tool call and retain the existing secret redaction
+before persistence. It must not fill output from model prose.
+
+This also hides the owner-access result in issue 241 and the Codex refusal
+in issue 243. The session evidence is Claude lines 101-102 and 110-111, and
+Codex lines 44-47 and 59-62, in the paths named by live-check-run2.log.
+
+## 243. The real Codex shell stops at socket ownership before the ancestry check
+
+Found: 2026-11-03, while diagnosing live-check-2 run 2 at 9e10ed6.
+
+Status: open. The live harness path remains unproven for SEC-PB-8. No client,
+engine or sandbox rule was changed.
+
+Events 233-234 show the exact removed-variable command and its failed
+completion for Codex. Its session tool output at line 47 contains a complete
+LCP_ENV_BEGIN and LCP_ENV_END listing. Neither SHEPHRD_SOCKET nor
+SHEPHRD_TOKEN appears in it. Core inheritance did remove both names. The
+probe printed absent=false because issue 242 hid the output, rather than
+because either name was observed. The probe now distinguishes an unobserved
+listing from observed absent or present names, without weakening its gate.
+
+The actual command-line interface printed `shephrd: the folder /tmp above
+the socket is owned by another user`, followed by LCP_EXIT=1. This is the
+local check in packages/client/src/socketCheck.ts, before authentication.
+It is not the HTTP 403 ancestry refusal required by SEC-PB-8. The original
+sandbox's ownership view was not captured, so its namespace or filesystem
+cause has not been established. The guard must not be weakened to force a pass.
+
+Evidence: the kept events.sqlite and lines 44-47 of
+/home/qnlbnsl/.codex/sessions/2026/11/03/rollout-2026-11-03T13-35-25-01a1a2e8-be04-7a62-86d6-6820e17dcee2.jsonl.
+
+## 244. The sandbox probe rejects the exact lookup needed for a deferred tool
+
+Found: 2026-11-03, in live-check-2 run 2 at 9e10ed6, events 118-129.
+
+Status: fixed locally in live-check probe fix round 4. Real-adapter
+confirmation remains for the lead's next run.
+
+Claude used ToolSearch with exactly
+`{"query":"select:mcp__shephrd__ask","max_results":1}`. Its result named only
+mcp__shephrd__ask. It then called that tool with the exact marker and wrote
+its authenticated QuestionAsked at event 127. The probe rejected the lookup
+after the turn ended, so it never sent Codex its sandbox prompt. Codex's
+later authenticated ask at event 270 was issued by the probe's agent client
+for the slash test, rather than by a model tool call. It proves socket
+authentication, but is not evidence of Codex's Model Context Protocol tool
+route or its sandbox marker.
+
+The probe permits one exact, completed Claude lookup returning only that
+tool reference. An unrelated query, reference, failure or tool remains
+rejected. Discovery never counts as an ask. Both agents must still make
+their exact ask and produce their own authenticated QuestionAsked. The
+printed prompt names this optional discovery explicitly. Regressions are
+in probe-fix-round-4.test.ts.
+
+## 245. The restart hold fails when the harness blocks sleep or the model substitutes a timer
+
+Found: 2026-11-03, in live-check-2 run 2 at 9e10ed6.
+
+Status: open for real-adapter restart evidence. The prompt and missing-hold
+diagnostic are tightened locally in probe fix round 4. No restart criterion
+is marked passed.
+
+Claude received its active prompt at events 341-343 and called exactly
+sleep 120 at events 345 and 348-349. The tool failed at event 350. Its actual
+session result at line 149 says the harness blocks standalone sleep and
+forbids chaining smaller sleeps as a workaround. The model did not decline
+or substitute another command. The current hold cannot establish a working
+turn on that harness. No workaround was added.
+
+Codex received its active prompt at events 346-347 and accepted it at 391.
+Its session lines 104 and 107 show clock.sleep with duration_ms=120000 and
+Sleep completed. No shell hold was sent through the adapter. Its turn ended
+at event 392, so the exact-command condition never matched. This is model
+behavior, rather than a lost prompt or a shell command that ran.
+
+The prepare prompt no longer says to reject later shell work. The active
+prompt explicitly requires shell execution and forbids a clock or timer.
+An ended turn without the exact shell hold now fails immediately with a
+named missing attempt instead of waiting for the whole timeout. No service
+kill occurs on that path. Regressions are in probe-fix-round-4.test.ts.
+The unchanged hold can still be blocked by the real harness. The restart
+criteria remain unproven until an authorized real run establishes them.

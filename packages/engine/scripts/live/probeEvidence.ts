@@ -78,6 +78,24 @@ export const mcpAskInput = (input: string | undefined, title: string, marker: st
     return /shephrd.*ask|ask.*shephrd/i.test(title) && value.text === marker && Object.keys(value).length === 1;
   } catch { return false; }
 };
+
+// Claude's deferred tools require a lookup before the ask can be invoked.
+// Permit only discovery of this exact tool, with its own completed reference;
+// it is never evidence that the ask itself happened.
+export const mcpAskDiscovery = (tool: { input?: string; title: string; status: string; output?: string }): boolean => {
+  if (tool.title !== "ToolSearch" || tool.status !== "completed") return false;
+  try {
+    const input = JSON.parse(tool.input ?? "null");
+    if (input?.query !== "select:mcp__shephrd__ask" || input.max_results !== 1 || Object.keys(input).length !== 2) return false;
+    const references = (tool.output ?? "").split("\n").filter(Boolean).flatMap((line) => {
+      const value: unknown = JSON.parse(line);
+      if (!Array.isArray(value)) throw new Error("not a lookup result");
+      return value;
+    });
+    return references.length > 0 && references.every((reference) => reference?.type === "tool_reference"
+      && reference.tool_name === "mcp__shephrd__ask" && Object.keys(reference).length === 2);
+  } catch { return false; }
+};
 export const authRefused = (output: string, exitCode: number | undefined): boolean =>
   exitCode !== undefined && exitCode !== 0 && /the engine refused this identity \(HTTP 403\)/.test(output);
 
@@ -97,13 +115,14 @@ export const fixtureEvidence = (ndjson: string, harness: string, path: string): 
 
 // The command prints names before explicitly removing identity variables, so
 // this observes the shell policy rather than just the env -u operation.
-export const shellIdentityAbsent = (output: string): boolean => {
+export const shellIdentityStatus = (output: string): "absent" | "present" | "not observed" | "invalid listing" => {
   const listing = /(?:^|\n)LCP_ENV_BEGIN\r?\n([\s\S]*?)\r?\nLCP_ENV_END(?:\r?\n|$)/.exec(output)?.[1];
-  if (listing === undefined) return false;
+  if (listing === undefined) return "not observed";
   const names = listing.split(/\r?\n/);
-  return names.length > 0 && names.every((name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
-    && !names.includes("SHEPHRD_SOCKET") && !names.includes("SHEPHRD_TOKEN");
+  if (names.length === 0 || !names.every((name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name))) return "invalid listing";
+  return names.includes("SHEPHRD_SOCKET") || names.includes("SHEPHRD_TOKEN") ? "present" : "absent";
 };
+export const shellIdentityAbsent = (output: string): boolean => shellIdentityStatus(output) === "absent";
 
 export const canaryDenied = (output: string, path: string): boolean => {
   const lines = output.split(/\r?\n/);
