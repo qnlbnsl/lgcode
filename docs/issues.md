@@ -3372,3 +3372,28 @@ again after service shutdown.
 It saves those captured bytes to a test-owned log inside its temporary
 folder and scans that file as well.
 It does not claim to exercise a separate production file sink.
+
+## 231. Adapter updates still queued when the adapter exits are dropped without a trace
+
+Found: 2026-11-02, while fixing issue 223 on branch `worker/engine-shb`.
+State: open. It is older than the issue 223 fix.
+
+What happens: when the adapter process exits, the exit watcher in
+`packages/engine/src/runner/AcpRunner.ts` sets `processEntry.dead = true`
+at once (line 507 at commit `6882768`).
+The session update handler returns without doing anything for a dead
+process (line 396 at the same commit).
+An update the adapter wrote before it exited, but which the handler had not
+yet reached, is therefore dropped.
+No warning is logged and no event is written for it.
+The drop depends on timing.
+A first version of the issue 223 fix made each update slower to handle, and
+the refresh regression test then lost tool output written just before a
+crash.
+The final fix handles each update in one redaction pass, and that test
+passed eight runs in a row, but the race remains.
+What should happen: every update the adapter wrote before it exited is
+handled before the process is treated as dead, or a dropped update is at
+least logged.
+Why it matters: the last output before a crash, often the most useful for
+diagnosis, can be missing from the thread.
