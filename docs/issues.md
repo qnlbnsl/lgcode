@@ -4253,25 +4253,25 @@ with the database transaction.
 Receipt redaction at `packages/engine/src/log/EventLog.ts:221` also replaces
 the home in the stored account result.
 Receipt decoding at `packages/engine/src/commands/CommandHandler.ts:252`
-then refuses `accounts list` on every connection.
+then refuses `accounts list` on a fresh connection.
 
 The command tests use a pass-through redactor at
 `packages/engine/test/support/handlerRig.ts:117`,
 `packages/engine/test/commands/account-login.test.ts:120`, and
 `packages/engine/test/commands/account-login.test.ts:142`.
 They therefore do not exercise the real service's redaction boundary.
-This is not a regression against the base, which never compared the
-effective secret-reference value with the account home.
 The fix now accepts the matching input instead of refusing it.
-The matching-folder acceptance promise at
-`docs/specs/2026-11-01-engine-design.md:276` remains unmet through the real service.
+The matching-folder acceptance rule in row A9 of
+`.scratch/foundry-runs/engine-build-1/review-post-build/owner-choices.md` (not tracked)
+remains unmet through the real service.
 
-What should happen: refuse an account whose home equals one of its own
-stored secret values, with a fixed reason, or keep the login folder out of
-the redactor registry.
+What should happen: use an end-to-end representation that accepts the
+matching setting while preserving secret removal.
 Do not exempt secrets from redaction.
-The registry in `packages/engine/src/service.ts` also belongs to owner
-finding B1 and post-build A4, which is recorded in issue 250.
+The registry in `packages/engine/src/service.ts` is also involved in
+owner finding B1, recorded in issue 223.
+Post-build A4 is being fixed on branch `worker/review-4`.
+It has no issue entry.
 The post-build A4 fixer must account for this residual when changing that registry.
 
 Score: not assigned, because this is a residual after the last fix round.
