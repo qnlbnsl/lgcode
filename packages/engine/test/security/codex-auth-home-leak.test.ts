@@ -12,6 +12,7 @@ import {
   startPayloadFor, withEngine, type RunnerRig,
 } from "../support/acpRunnerRig.ts";
 import { call, ownerCredential, success } from "../support/handlerRig.ts";
+import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { eventually } from "../support/routingRig.ts";
 
 let rig: RunnerRig;
@@ -51,6 +52,7 @@ it.live("a Codex auth.json access token emitted by the adapter never reaches the
     const harness = harnessFor("codex", adapter);
     const account = accountFor("codex", { turns: [] }, echoFile(rig), {}, "codex");
     return yield* withEngine(rig, { harness, accounts: [account] }, () => Effect.gen(function* () {
+      yield* registerRebuildCheck();
       success(yield* call(ownerCredential, "start", startPayloadFor(harness, account, rig.work, { prompt: "show status" })));
       const sql = yield* SqlClient.SqlClient;
       const stored = yield* eventually(

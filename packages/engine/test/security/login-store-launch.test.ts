@@ -12,6 +12,7 @@ import {
   type RunnerRig,
 } from "../support/acpRunnerRig.ts";
 import { call, ownerCredential, readLog, success } from "../support/handlerRig.ts";
+import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { eventually, snapshot } from "../support/routingRig.ts";
 
 // Issue 223 (finding B1): a harness login store is read before the adapter
@@ -46,6 +47,7 @@ it.live("a login store that cannot be inspected refuses the launch before any ad
     const harness = harnessFor("codex", writeFakeAdapter(rig));
     const account = accountFor("codex", { turns: [] }, echo, {}, "codex");
     return yield* withEngine(rig, { harness, accounts: [account] }, (context) => Effect.gen(function* () {
+      yield* registerRebuildCheck();
       const reply = success(yield* call(ownerCredential, "start", startPayloadFor(harness, account, rig.work, { prompt: "show status" })));
       const failures = yield* eventually(readLog, (rows) => rows.some((row) => row.event._tag === "AgentStartFailed"));
       expect(failures.filter((row) => row.event._tag === "AgentStartFailed").map((row) => row.event))
@@ -84,6 +86,7 @@ it.live("a token written to the login store while the adapter runs is redacted, 
     const harness = harnessFor("codex", adapter);
     const account = accountFor("codex", { turns: [] }, echo, {}, "codex");
     return yield* withEngine(rig, { harness, accounts: [account] }, () => Effect.gen(function* () {
+      yield* registerRebuildCheck();
       success(yield* call(ownerCredential, "start", startPayloadFor(harness, account, rig.work, { prompt: "show status" })));
       yield* eventually(Effect.sync(() => existsSync(echo)), (spawned) => spawned);
       writeFileSync(store, document(second));
