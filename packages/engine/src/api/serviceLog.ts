@@ -14,13 +14,26 @@ const messages = new Set([
   "Dropped an ACP notification that failed to decode",
 ]);
 
+// Fix round 2, F-2: the first-start warning names the harness adapters that
+// were not found. Only the four default ids, each once and in the defaults'
+// order, are allowed, so the line holds no text the sink has not fixed.
+const missingAdapters = /^harness adapters not found: (?:claude|codex|gemini|cursor)(?:, (?:claude|codex|gemini|cursor))*$/;
+const fixedMessage = (message: unknown): boolean => {
+  if (typeof message !== "string") return false;
+  if (messages.has(message)) return true;
+  if (!missingAdapters.test(message)) return false;
+  const ids = message.slice("harness adapters not found: ".length).split(", ");
+  const order = ["claude", "codex", "gemini", "cursor"];
+  return new Set(ids).size === ids.length && ids.every((id, index) => index === 0 || order.indexOf(id) > order.indexOf(ids[index - 1]!));
+};
+
 export const serviceLog = (protocol: boolean, write: (line: string) => void) => (line: string): void => {
   if (protocol) { write(line); return; }
   try {
     const entry = JSON.parse(line) as { timestamp: string; level: string; message: unknown };
     write(JSON.stringify({
       timestamp: entry.timestamp, level: entry.level,
-      message: typeof entry.message === "string" && messages.has(entry.message) ? entry.message : "service diagnostic",
+      message: fixedMessage(entry.message) ? entry.message : "service diagnostic",
     }));
   } catch { write('{"message":"service diagnostic"}'); }
 };
