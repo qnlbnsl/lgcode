@@ -21,6 +21,8 @@ import { engineLists, type EngineLists } from "../../pieces/lists.ts";
 import { Restart } from "../../recovery/service.ts";
 import { Views } from "../../views/Views.ts";
 import { installWebRuntime, settingsOf, type ClientWebView } from "../settings.ts";
+import { alertReactor, initializeAlerts } from "../alerts/reactor.ts";
+import { clientPieceView } from "../alerts/view.ts";
 import { makeSession } from "./session.ts";
 import { webCaller } from "./webCaller.ts";
 import { requestPolicy } from "./proxy.ts";
@@ -40,7 +42,13 @@ export const serve = (options: {
   const batchServices = yield* Effect.context<Effect.Services<ReturnType<typeof writePieceBatch>>>();
   const recovery = yield* Effect.serviceOption(Restart);
   const lists = options.lists ?? engineLists;
-  let settings = settingsOf((yield* views.snapshot).client) ?? options.settings ?? defaultWebSettings;
+  // Finish the installed alert reactor's startup write before returning a
+  // ready listener. Recovery still gates initialization in the real service.
+  if (lists.reactors.client === alertReactor && lists.views.client === clientPieceView
+    && (Option.isNone(recovery) || (yield* recovery.value.ready))) yield* initializeAlerts;
+  // An explicit listener configuration overrides the view's initialized defaults.
+  // The production service omits it and uses the persisted settings.
+  let settings = options.settings ?? settingsOf((yield* views.snapshot).client) ?? defaultWebSettings;
   const port = settings.port;
   const usable = options.password !== undefined && Redacted.value(options.password).length >= 8;
   let state: "off" | "no-password" | "running" | "port-taken" = settings.enabled ? (usable ? "port-taken" : "no-password") : "off";
