@@ -21,7 +21,14 @@ export interface AgentRoles {
   readonly matters: ReadonlyArray<Matter>;
 }
 interface Wake { readonly agentId: string; readonly postIds: ReadonlyArray<string> }
+export interface StallClock {
+  readonly postId: string;
+  readonly agentId: string;
+  readonly occurrence: number;
+  readonly originSequence?: number;
+}
 export interface RolesView extends RoleFileState {
+  readonly stalls: Readonly<Record<string, StallClock>>;
   readonly settings: RolesSettings;
   readonly snoozes: Readonly<Record<string, number>>;
   readonly actions: ReadonlyArray<RolesActionRecord>;
@@ -35,7 +42,7 @@ export interface RolesView extends RoleFileState {
 const keyed = <T>(): Readonly<Record<string, T>> => Object.create(null) as Record<string, T>;
 const get = <T>(rows: Readonly<Record<string, T>>, key: string): T | undefined => Object.hasOwn(rows, key) ? rows[key] : undefined;
 export const emptyRoles = (): RolesView => ({
-  ...emptyRoleFile(), settings: {}, snoozes: keyed(), actions: [], agents: keyed(), position: 0,
+  ...emptyRoleFile(), stalls: keyed(), settings: {}, snoozes: keyed(), actions: [], agents: keyed(), position: 0,
   wakes: keyed(), deliveryWakes: keyed(),
 });
 const change = (view: RolesView, id: string, update: (agent: AgentRoles) => AgentRoles): RolesView => {

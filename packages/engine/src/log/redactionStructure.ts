@@ -22,7 +22,7 @@ const delivery: RedactionStructure = { fields: {
 
 export const eventStructure: RedactionStructure = { fields: {
   agentId: identity, accountId: identity, deliveryId: identity,
-  roleFileHash: identity, noticeRecipient: identity, postId: identity,
+  roleFileHash: identity, noticeRecipient: identity, postId: identity, stalledPostId: identity,
   channelId: identity, wakeId: identity, anchorAgentId: identity, targetAgentId: identity,
   decidingPostId: identity, replyToPostId: identity,
   permissionRequestId: identity, questionId: identity, waitId: identity, alertId: identity, alertKey: identity, carrierGeneration: identity,

@@ -20,7 +20,7 @@ export const sanitizeName = (name: string): string => name.replace(/[^\p{L}\p{N}
 const fixedText: Record<RolesAction["_tag"], string> = {
   "roles.StallSeen": "Work is waiting. Check the board and carry on, or report what is blocking it.",
   "roles.StallEnded": "Work has resumed.",
-  "roles.ReplaceAdvised": "This agent has stalled repeatedly. Review its work and consider replacing it.",
+  "roles.ReplaceAdvised": "This agent has stalled repeatedly. Review its work and use roles.handoff to prepare a replacement.",
   "roles.RunawayReported": "This agent has passed its running limit. Review its current turn.",
   "roles.GaveUp": "Automatic recovery has ended. Review this agent and decide how to continue.",
   "roles.CrashAdmitted": "Automatic crash recovery has been admitted.",

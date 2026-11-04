@@ -10,8 +10,8 @@ export interface ActionIdentity {
 }
 // One top agent can belong to several idle groups at the same log position.
 // Keep those decisions separate, including when their notices are rerouted.
-export const actionSubject = (action: { readonly _tag: string; readonly agentId: string; readonly group?: string }): string =>
-  action._tag === "roles.TeamIdleReported" ? JSON.stringify([action.agentId, action.group]) : action.agentId;
+export const actionSubject = (action: { readonly _tag: string; readonly agentId: string; readonly group?: string; readonly stalledPostId?: string }): string =>
+  action._tag === "roles.TeamIdleReported" ? JSON.stringify([action.agentId, action.group]) : action.stalledPostId === undefined ? action.agentId : JSON.stringify([action.agentId, action.stalledPostId]);
 export const actionRequestId = (action: ActionIdentity): string => [
   "roles", action.rule, action.subject, String(action.triggerSequence), action.kind, action.recipient, String(action.occurrence),
 ].map(encodeURIComponent).join(":");
