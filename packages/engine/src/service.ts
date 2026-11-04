@@ -2,14 +2,16 @@ import { lstatSync, readFileSync, realpathSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
+import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as SqlClient from "effect/sql/SqlClient";
 
@@ -25,18 +27,15 @@ import { loadOwnerCredential } from "./identity/ownerCredential.ts";
 import { makeRedactor } from "./identity/redactor.ts";
 import { takeLock } from "./lock.ts";
 import * as EventLog from "./log/EventLog.ts";
-import { migrate } from "./log/migrations.ts";
+import { migrate, migratePieces } from "./log/migrations.ts";
 import * as Restart from "./recovery/restart.ts";
 import { linuxProcessReader } from "./recovery/orphans.ts";
 import * as AcpRunner from "./runner/AcpRunner.ts";
 import { installedHarnessDefaults } from "./runner/harnesses.ts";
+import { engineLists, type EngineLists } from "./pieces/lists.ts";
+import { drainPieceErrors } from "./pieces/guardPiece.ts";
+import type { Runtime } from "./commands/internal.ts";
 import * as Views from "./views/Views.ts";
-
-// Capture the inherited token for redaction, then erase it before building
-// anything capable of spawning a child. It is never a service identity.
-const inheritedToken = process.env.SHEPHRD_TOKEN;
-delete process.env.SHEPHRD_TOKEN;
-process.umask(0o077);
 
 const inTemporaryFolder = (folder: string): boolean => {
   try {
@@ -45,7 +44,40 @@ const inTemporaryFolder = (folder: string): boolean => {
   } catch { return false; }
 };
 
-const program = Effect.scoped(Effect.gen(function* () {
+const baseServices = (lists: EngineLists) => Layer.unwrap(Effect.gen(function* () {
+  yield* migrate;
+  yield* migratePieces(lists.migrations);
+  return EventLog.makeLayer(lists).pipe(Layer.provideMerge(Views.makeLayer(lists)));
+}));
+
+const pieceFollowers = (lists: EngineLists) => Layer.effectDiscard(Effect.gen(function* () {
+  const recovery = yield* Effect.serviceOption(Restart.Restart);
+  const drain = Effect.suspend(() => Effect.forEach(drainPieceErrors(), (entry) =>
+    Effect.logError("piece table failed").pipe(Effect.annotateLogs({ ...entry })), { discard: true }));
+  yield* Effect.forever(drain.pipe(Effect.andThen(Effect.sleep(1_000)))).pipe(Effect.ensuring(drain), Effect.forkScoped);
+  for (const [namespace, reactor] of Object.entries(lists.reactors)) {
+    if (reactor === undefined) continue;
+    // Recovery is awaited outside the restart loop. A normal completion stops
+    // the follower; failures restart it after a bounded delay, without a cause.
+    const run: Effect.Effect<void, unknown, SqlClient.SqlClient | CommandHandler.CommandHandler | EventLog.EventLog | Views.Views | import("./runner/Runner.ts").Runner | import("./commands/SecretStore.ts").SecretStore> = Effect.suspend(() => reactor as typeof run).pipe(Effect.catchCause((cause) => {
+      if (Cause.hasInterrupts(cause)) return Effect.failCause(cause);
+      if (cause.reasons.some((reason) => reason._tag === "Fail" && reason.error instanceof EventLog.LogWriteFailed)) {
+        return Effect.logError("piece reactor stopped: database write failed").pipe(Effect.annotateLogs({ namespace }));
+      }
+      return Effect.logError("piece reactor failed").pipe(Effect.annotateLogs({ namespace }), Effect.andThen(Effect.sleep(1_000)), Effect.andThen(Effect.suspend(() => run)));
+    }));
+    yield* (Option.isSome(recovery) ? recovery.value.whenReady : Effect.void).pipe(Effect.andThen(run), Effect.forkScoped);
+  }
+}));
+
+const handlerServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults">, lists: EngineLists) =>
+  pieceFollowers(lists).pipe(Layer.provideMerge(CommandHandler.layer(configuration, lists)));
+
+// Importing this module never starts the CLI or changes the process environment.
+export const buildServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults">, lists: EngineLists = engineLists) =>
+  handlerServices(configuration, lists).pipe(Layer.provideMerge(baseServices(lists)));
+
+const program = (inheritedToken: string | undefined) => Effect.scoped(Effect.gen(function* () {
   const folder = yield* Effect.try({ try: () => {
     const path = stateFolder(process.env);
     prepareStateFolder(path);
@@ -100,12 +132,12 @@ const program = Effect.scoped(Effect.gen(function* () {
     });
     const configuration = { home: process.env.HOME ?? folder, stateFolder: folder, pluginRoot: fileURLToPath(new URL("../../..", import.meta.url)),
       harnessDefaults: installedHarnessDefaults(process.env.PATH ?? "") };
-    const base = EventLog.layer.pipe(Layer.provideMerge(Views.layer));
+    const base = baseServices(engineLists);
     const runner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: { ...process.env }, protocolLog, credentials }).pipe(
       Layer.provideMerge(SecretStore.layer({ stateFolder: folder })),
     );
     const recovery = Restart.layer(configuration).pipe(Layer.provideMerge(Layer.merge(base, runner)));
-    const services = CommandHandler.layer(configuration).pipe(Layer.provideMerge(recovery), Layer.provideMerge(redactor.layer));
+    const services = handlerServices(configuration, engineLists).pipe(Layer.provideMerge(recovery), Layer.provideMerge(redactor.layer));
     return yield* Effect.gen(function* () {
       if (debug) yield* Effect.logInfo("debug RPC group enabled");
       yield* listener.install(yield* application({ ownerCredential, debug }));
@@ -135,18 +167,23 @@ const program = Effect.scoped(Effect.gen(function* () {
 
 // A graceful signal interrupts the whole scoped program. Finalizers close
 // connections and adapters before releasing the lifetime lock.
-const fiber = Effect.runFork(program);
-const stop = () => fiber.interruptUnsafe();
-process.once("SIGTERM", stop);
-process.once("SIGINT", stop);
-const result = await Effect.runPromise(Fiber.await(fiber));
-process.removeListener("SIGTERM", stop);
-process.removeListener("SIGINT", stop);
-if (Exit.isFailure(result) && !result.cause.reasons.every((reason) => reason._tag === "Interrupt")) {
-  // Startup failures contain fixed service-owned categories only. Never
-  // serialize a cause: the underlying database may quote stored data.
-  const allowed = ["state folder is a symbolic link", "state folder mode is not 0700", "state folder is owned by another user", "state folder is not a directory", "socket path exceeds 100 bytes"];
-  const message = result.cause.reasons.flatMap((reason) => reason._tag === "Fail" && reason.error instanceof Error ? [reason.error.message] : []).find((value) => allowed.includes(value));
-  process.stderr.write(`${message ?? "service failed"}\n`);
-  process.exitCode = 1;
+if (process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  const inheritedToken = process.env.SHEPHRD_TOKEN;
+  delete process.env.SHEPHRD_TOKEN;
+  process.umask(0o077);
+  const fiber = Effect.runFork(program(inheritedToken));
+  const stop = () => fiber.interruptUnsafe();
+  process.once("SIGTERM", stop);
+  process.once("SIGINT", stop);
+  const result = await Effect.runPromise(Fiber.await(fiber));
+  process.removeListener("SIGTERM", stop);
+  process.removeListener("SIGINT", stop);
+  if (Exit.isFailure(result) && !result.cause.reasons.every((reason) => reason._tag === "Interrupt")) {
+    // Startup failures contain fixed service-owned categories only. Never
+    // serialize a cause: the underlying database may quote stored data.
+    const allowed = ["state folder is a symbolic link", "state folder mode is not 0700", "state folder is owned by another user", "state folder is not a directory", "socket path exceeds 100 bytes"];
+    const message = result.cause.reasons.flatMap((reason) => reason._tag === "Fail" && reason.error instanceof Error ? [reason.error.message] : []).find((value) => allowed.includes(value));
+    process.stderr.write(`${message ?? "service failed"}\n`);
+    process.exitCode = 1;
+  }
 }

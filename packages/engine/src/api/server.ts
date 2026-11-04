@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import type { Socket } from "node:net";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import { CommandsRpcGroup, ServiceRpcGroup, type AgentId } from "@shephrd/contracts";
+import { CommandsRpcGroup, type Actor, type AgentId } from "@shephrd/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -16,6 +16,7 @@ import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
+import * as RpcSchema from "effect/rpc/RpcSchema";
 import * as RpcServer from "effect/rpc/RpcServer";
 import type * as Rpc from "effect/rpc/Rpc";
 import type * as RpcGroup from "effect/rpc/RpcGroup";
@@ -26,10 +27,10 @@ import { CommandHandler } from "../commands/CommandHandler.ts";
 import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
 import { EventLog } from "../log/EventLog.ts";
-import { subscribe } from "../log/subscribe.ts";
+import { freshRequest, refused as refuseCommand } from "../commands/internal.ts";
+import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { Restart } from "../recovery/service.ts";
 import { Views } from "../views/Views.ts";
-import { compareViews } from "../views/compare.ts";
 import { outsideAdapters } from "./ancestry.ts";
 
 type Services = CommandHandler | EventLog | Views | SqlClient.SqlClient;
@@ -46,6 +47,11 @@ const reasons = new Set([
 const commandError = (requestId: unknown, reason = "command refused") => ({
   _tag: "CommandError" as const, requestId, reason: reasons.has(reason) ? reason : "command refused",
 });
+// Authentication refusals already carry a fixed public reason. Preserve it
+// across a generic read wrapper without returning arbitrary failure content.
+const readError = (requestId: unknown, error: unknown) => commandError(requestId,
+  typeof error === "object" && error !== null && "reason" in error && typeof error.reason === "string"
+    ? error.reason : "command refused");
 
 // This listener can be opened before migrations or recovery. Its only
 // initial response, including to an unauthenticated upgrade, is recovering.
@@ -73,7 +79,7 @@ export const listen = (socketPath: string) => Effect.gen(function* () {
   };
 });
 
-export const application = (options: { readonly ownerCredential: Redacted.Redacted<string>; readonly debug: boolean }) => Effect.gen(function* () {
+export const application = (options: { readonly ownerCredential: Redacted.Redacted<string>; readonly debug: boolean; readonly lists?: Pick<EngineLists, "commands" | "access"> & { readonly reads: Readonly<Record<string, unknown>> } }) => Effect.gen(function* () {
   const services = yield* Effect.context<Services>();
   const handler = yield* CommandHandler;
   const log = yield* EventLog;
@@ -82,7 +88,8 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
   const expected = Buffer.from(Redacted.value(options.ownerCredential));
   // The runtime group really omits debug. Use its superset type only to
   // share assembly of the dynamically enumerated, schema-checked handlers.
-  const group = (options.debug ? CommandsRpcGroup : ServiceRpcGroup) as typeof CommandsRpcGroup;
+  const lists = options.lists ?? engineLists;
+  const group = (options.debug ? lists.commands : lists.commands.omit("debug.compare-views")) as typeof CommandsRpcGroup;
 
   const authenticate = (raw: string) => Effect.gen(function* () {
     const bytes = Buffer.from(raw);
@@ -150,20 +157,30 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
         Effect.flatMap((count) => count >= 2_048 ? invalidate : Effect.void))).pipe(Effect.forkScoped);
       return subscription;
     }) };
-    const handlers = yield* group.toHandlers(Effect.succeed(Object.fromEntries([...group.requests.keys()].map((name) => [name, (payload: { requestId: string; after: number }) => {
-      if (name === "subscribe") return Stream.unwrap(authenticateRequest(payload.requestId).pipe(Effect.as(subscribe(payload.after).pipe(
-        Stream.filterEffect((envelope) => agentId === undefined ? Effect.succeed(true) : views.snapshot.pipe(Effect.map((snapshot) => {
-          if (envelope.agentId === undefined) return false;
-          const parent = snapshot.agents[envelope.agentId]?.parent;
-          return envelope.agentId === agentId || (parent?._tag === "agent" && parent.agentId === agentId);
-        }))),
-        Stream.mapError(() => commandError(payload.requestId)),
-        Stream.provideService(EventLog, boundedLog),
-      ))));
-      if (name === "debug.compare-views") return authenticateRequest(payload.requestId).pipe(Effect.andThen(credential._tag === "owner"
-        ? compareViews().pipe(Effect.map((result) => ({ requestId: payload.requestId, sequence: result.sequence, equal: result.differences.length === 0, differences: result.differences.map((difference) => difference.path.join(".")) })), Effect.mapError(() => commandError(payload.requestId)))
-        : Effect.fail(commandError(payload.requestId))));
-      return handler.execute(credential, name, payload).pipe(Effect.mapError((error) => commandError(payload.requestId, error.reason)));
+    const actor: Actor = agentId === undefined ? { _tag: "owner" } : { _tag: "agent", agentId };
+    const handlers = yield* group.toHandlers(Effect.succeed(Object.fromEntries([...group.requests].map(([name, rpc]) => [name, (payload: { requestId: string; after: number }) => {
+      const read = (Object.hasOwn(lists.reads, name) ? lists.reads[name] : undefined) as import("./reads.ts").ReadHandler | undefined;
+      if (read === undefined) return handler.execute(credential, name, payload).pipe(Effect.mapError((error) => commandError(payload.requestId, error.reason)));
+      const prepare = authenticateRequest(payload.requestId).pipe(Effect.andThen(Effect.gen(function* () {
+        if (name === "debug.compare-views" && credential._tag !== "owner") return yield* refuseCommand();
+        if (!lists.access[name]?.includes(actor._tag)) return yield* refuseCommand();
+        return yield* handler.input(actor);
+      })));
+      if (RpcSchema.isStreamSchema(rpc.successSchema)) return Stream.unwrap(prepare.pipe(Effect.map((input) =>
+        read(input, payload) as Stream.Stream<unknown, unknown, Services>
+      ))).pipe(Stream.mapError((error) => readError(payload.requestId, error)), Stream.provideService(EventLog, boundedLog));
+      return prepare.pipe(Effect.flatMap((input) => read(input, payload) as Effect.Effect<import("./reads.ts").ReadReply, unknown, Services>),
+        Effect.flatMap((result) => Effect.gen(function* () {
+          const marks = result.marks ?? [];
+          if (marks.length > 0) {
+            const namespace = name.split(".")[0]!;
+            if (!name.includes(".") || marks.some((mark) => !mark._tag.startsWith(`${namespace}.`))) return yield* refuseCommand();
+            // E23 replaces this own-namespace mark batch with the shared piece
+            // validator. Read replies are never receipts, even on a retry.
+            yield* log.append(actor, freshRequest(), "read marks", marks, {}, false);
+          }
+          return result.reply;
+        })), Effect.mapError((error) => readError(payload.requestId, error)));
     }])) as unknown as Handlers));
     yield* RpcServer.make(group).pipe(Effect.provide(handlers), Effect.provideService(RpcServer.Protocol, boundedProtocol), Effect.forkScoped);
     return yield* Effect.raceFirst(httpEffect, Deferred.await(invalidated).pipe(Effect.as(HttpServerResponse.empty())));
@@ -173,7 +190,7 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
   return app;
 });
 
-export const serve = (options: { readonly socketPath: string; readonly ownerCredential: Redacted.Redacted<string>; readonly debug: boolean }) => Effect.gen(function* () {
+export const serve = (options: { readonly socketPath: string; readonly ownerCredential: Redacted.Redacted<string>; readonly debug: boolean; readonly lists?: Pick<EngineLists, "commands" | "access"> & { readonly reads: Readonly<Record<string, unknown>> } }) => Effect.gen(function* () {
   const listener = yield* listen(options.socketPath);
   yield* listener.install(yield* application(options));
 });

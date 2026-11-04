@@ -75,6 +75,9 @@ type EventEffect = "invalid" | "keep" | "transition" | StateName
 const allStates = (effect: EventEffect): Record<StateName, EventEffect> => ({
   starting: effect, working: effect, idle: effect, paused: effect, interrupted: effect, crashed: effect, stopped: effect
 })
+// Piece events cannot change the engine's lifecycle.
+export const keepInEveryState = <const T extends ReadonlyArray<string>>(tags: T): Record<T[number], Record<StateName, EventEffect>> =>
+  Object.fromEntries(tags.map((tag) => [tag, allStates("keep")])) as Record<T[number], Record<StateName, EventEffect>>
 // Explicit keys make every new event require a decision for all seven states.
 const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
   AgentStarted: allStates("invalid"),

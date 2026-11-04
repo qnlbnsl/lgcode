@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   CommandsRpcGroup, Event as EventSchema, RequestId,
-  type Actor, type Event, type HarnessSettings,
+  type Actor, type Event, type EventEnvelope, type HarnessSettings,
 } from "@shephrd/contracts";
 import type * as Context from "effect/Context";
 import * as Data from "effect/Data";
@@ -11,6 +11,7 @@ import type * as SqlClient from "effect/sql/SqlClient";
 import type * as Rpc from "effect/rpc/Rpc";
 import type * as RpcGroup from "effect/rpc/RpcGroup";
 
+import type { EngineLists } from "../pieces/lists.ts";
 import { LogWriteFailed, type EventLog, type SideRows } from "../log/EventLog.ts";
 import type { Runner } from "../runner/Runner.ts";
 import type { Views } from "../views/Views.ts";
@@ -24,6 +25,7 @@ export class CommandRefused extends Data.TaggedError("CommandRefused")<{ readonl
 export const refused = (reason = "command refused") => new CommandRefused({ reason });
 
 export interface Runtime {
+  readonly lists?: EngineLists;
   readonly sql: SqlClient.SqlClient;
   readonly log: Context.Service.Shape<typeof EventLog>;
   readonly runner: Context.Service.Shape<typeof Runner>;
@@ -43,9 +45,15 @@ export interface Input {
 export interface Plan {
   readonly events: ReadonlyArray<Event>;
   readonly sideRows?: SideRows;
+  readonly reply?: (batch: ReadonlyArray<EventEnvelope>) => Record<string, unknown>;
   // Runs after the commit. A blocking command returns its final reply here.
   readonly afterCommit?: Effect.Effect<void | Record<string, unknown>, LogWriteFailed>;
 }
+
+// Piece planners cannot run engine hooks or omit their committed-batch reply.
+export type PiecePlan = Omit<Plan, "afterCommit" | "reply"> & {
+  readonly reply: (batch: ReadonlyArray<EventEnvelope>) => Record<string, unknown>;
+};
 
 export const freshRequest = () => Schema.decodeUnknownSync(RequestId)(randomUUID());
 export const readHarnesses = (runtime: Runtime): Effect.Effect<ReadonlyArray<HarnessSettings>, LogWriteFailed> =>
