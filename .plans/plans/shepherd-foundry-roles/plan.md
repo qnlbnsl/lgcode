@@ -294,14 +294,9 @@ rights without `answer`, v7's design talk 1, v8's review round 1, and v9's
 two points from the board's question 7 under lead ruling L31, v10's review
 round 2, v11's review round 3, v12's two lines from this plan's rows 122 and 129, and v13's final-round fold and engine re-anchor; the shared engine edits E1 to E32 in its
 section 6, and lead rulings L15, L16,
-L19, L22 and L23; decision rows 21, 32, 33, 52, 55, 80, 95 to 101, 103 to
-136). Edit E28 is pending the owner's question 6, and either answer leaves
+L19, L22 and L23; decision rows 21, 32, 33, 52, 55, 80, 95 to 101, 103 to 137). Edit E28 is pending the owner's question 6, and either answer leaves
 this plan unchanged (row 108). "Board" is
-the message board contract v10, `.plans/plans/shepherd-message-board/contract.md`
-on `worker/plans-board` at `da88bc0`, v6's rework under L26 with the
-board's round 4 fold and its folds of the client API contract up to v11, of
-which v8's two additions the lead approved as ruling L31 (lead rulings L17,
-L21, L24, L28, L30 and L31; rows 29, 31, 33, 34, 55, 94, 102, 109, 130); round 2 reviewed v4 at `bcc33e1`. Both build on the
+the message board contract v11, `.plans/plans/shepherd-message-board/contract.md` on `worker/plans-board` at `5c631b2`, v6's rework under L26 with the board's round 4 fold, its final round's fold and its folds of the client API contract up to v13, of which v8's two additions the lead approved as ruling L31 (lead rulings L17, L21, L24, L28, L30 and L31; rows 29, 31, 33, 34, 55, 94, 102, 109, 130, 137); round 2 reviewed v4 at `bcc33e1`. Both build on the
 shared engine edits of CAPI §6, which the client API plan's first unit
 makes directly in the engine, under the owner's answer of 2026-11-03 and
 lead ruling L26 (row 80). Lead rulings L20 and L25 govern standing rules
@@ -378,18 +373,15 @@ marks. Commands, their access and their kind:
 | `roles.record` | service | planner | The sheepdog writes its own action records: a closed list of action kinds, allowed only for `roles.sheepdog` (rows 67, 99). Its reply is the record's sequence number. |
 
 Events, all `owner-only` (CAPI §3), so agents never see them through
-`subscribe`: `roles.RoleFileSet` (with the device, if any),
-`roles.RuleAdded`, `roles.RuleDisabled`,
-`roles.RuleRemoved`, `roles.RuleFirstUsed`, `roles.SettingsChanged` (with
-the device, if any), `roles.Snoozed`, and the sheepdog's action records
+`subscribe`: `roles.RoleFileSet` (with the device, if any, as `deviceId`, and the file's hash, as `hash`), `roles.RuleAdded` (with the whole rule, as `rule`), `roles.RuleDisabled`,
+`roles.RuleRemoved`, `roles.RuleFirstUsed`, `roles.SettingsChanged` (with the device, if any, as `deviceId`), `roles.Snoozed`, and the sheepdog's action records
 `roles.TeamIdleReported`, `roles.StallSeen`, `roles.ReplaceAdvised`,
 `roles.RunawayReported`, `roles.CapacityRetried`, `roles.CrashAdmitted`, `roles.CrashRetried`,
 `roles.GaveUp`, `roles.RoleAdviceBroken`, `roles.CacheFlushed`,
-`roles.CompactRequested` and `roles.StallEnded`, and `roles.SheepdogBaseline { position, on }`, written at the sheepdog's first start and on each change of its switch (rows 104, 115). `roles.RuleFirstUsed` carries the rule's id and the asking agent. Each action record carries its subject agent,
-its recipient (an agent id, or `owner`), the sequence number of the event
+`roles.CompactRequested` and `roles.StallEnded`, and `roles.SheepdogBaseline { position, on }`, written at the sheepdog's first start and on each change of its switch (rows 104, 115). `roles.RuleDisabled`, `roles.RuleRemoved` and `roles.RuleFirstUsed` carry the rule's id, as `ruleId`, and `roles.RuleFirstUsed` also carries the asking agent, as `agentId`. Each action record carries its subject agent, as `agentId`, its recipient, as `recipient` (an agent id, or `owner`), the sequence number of the event
 that triggered it, the `sourceSequence` of the last stream event the
 sheepdog had handled when it decided (row 104), its occurrence number, whether its notice was sent (`sent`, or
-`board-off`), and, for a sent notice, the post id that `board.post` returns as its
+`board-off`), and, for a sent notice, the post id, as `postId`, that `board.post` returns as its
 planner reply (CAPI E3; row 69). `GaveUp` also carries its cause (`crash`,
 `resume-refused`, `reload-failed` or `capacity`) and `engineAlertOpen`:
 whether an engine `failure` alert for the same agent was open when the
@@ -627,13 +619,14 @@ package, the role file, and `orient`. Role names are parsed from the free
 | 1.5 | A role file with a key outside the schema, such as `permission` or `rules`, is refused; so is a limit outside its bounds (row 48) | `roleFile.test.ts` F05, F07 |
 | 1.6 | The exact MCP tool list in `packages/contracts/test/commands.test.ts` names `roles.orient` (CAPI E2, CAPI row 140; row 113). `shephrd roles orient` and the MCP tool, called by an agent, return its name, kind and role name, its parent's id and name, the agents it may read by CAPI's read rule with their states (its children, and, while a child is unavailable, which means in any state but idle or working, that child's children whose effective holder it is), its open-request and open-question counts, and its role's advice; called by the owner, it is refused | `packages/engine/test/roles/orient.test.ts` O01-O04, O06 (O06 a lead that becomes its worker's worker's effective holder while the worker is paused sees it, and stops seeing it when the worker recovers) |
 | 1.7 | Advice text is returned inside the engine's data envelope with a fresh marker, and a leading `/` is escaped | `orient.test.ts` O05 |
+| 1.8 | A registered secret whose value also occurs inside a roles id leaves that id whole: `hash`, `recipient`, `postId`, `deviceId`, the action record's `agentId`, a rule's listed harness ids, and a standing-rule answer's `answeredBy` service, in the event and in the receipt; the roles view and the first-use count still find them; a numeric `ruleId` is unchanged; and the same secret in a rule's words, its note, a role or group name, or role file text is still removed (row 137) | `packages/engine/test/roles/redaction-ids.test.ts` RI01 to RI03 |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
 | 1a | `parseRole` and the three kinds, with generic advice for each: an orchestrator talks to leads; a lead starts, waits on and answers for its own workers; a worker reports to its lead, does not start agents and does not ask the owner | target `packages/contracts/src/roles/role.ts:parseRole`; pattern `packages/contracts/src/permission.ts:permissionLevels` |
-| 1b | `packages/contracts/src/roles/`: the roles' command group, events, access entries, visibility entries, alert sources and the stated maxima above, each added to the engine's lists (CAPI E1, E2, E5, E8), the four alert kinds' titles in the fixed table, with the roles' events spread into the lifecycle table by `keepInEveryState` and one sample each in `subscribe-visibility.test.ts` (row 97) | CAPI §1, "Where a piece's code lives"; §5 (stated maxima); pattern `packages/contracts/src/commands.ts:CommandsRpcGroup`, `packages/contracts/src/events.ts:Event` |
+| 1b | `packages/contracts/src/roles/`: the roles' command group, events, access entries, visibility entries, alert sources and the stated maxima above, each added to the engine's lists (CAPI E1, E2, E5, E8), the four alert kinds' titles in the fixed table, with the roles' events spread into the lifecycle table by `keepInEveryState` and one sample each in `subscribe-visibility.test.ts` (row 97); the roles' id fields added to the redactor's tables (row 137): in `eventStructure`, `hash`, `recipient`, `postId` (unless the board's B13 has already added it) and `rule { deviceId, harnesses }`, with `deviceId` and `agentId` already there; in `receiptStructure`, `hash`, the reply of `roles.role-file.set`; and in the shared `actor` shape, the `service` and `namespace` of the client API's `Caller` (CAPI E11), which `answeredBy` and a receipt envelope's `caller` use | target `packages/engine/src/log/redactionStructure.ts:eventStructure`, `receiptStructure`, `actor`; CAPI §1, "Where a piece's code lives"; §5 (stated maxima); pattern `packages/contracts/src/commands.ts:CommandsRpcGroup`, `packages/contracts/src/events.ts:Event` |
 | 1c | Role-file schema (role name to advice text and limits, each limit within row 48's bounds), loader from content, `roles.role-file.set` and `get` handlers | target `packages/engine/src/roles/roleFile.ts:loadRoleFile`; pattern `packages/contracts/src/harnesses.ts` |
 | 1d | The roles view (role file, rules, settings, switches, snoozes, the sheepdog's action records, each agent's open matters (3.13), the admitted crash retries not yet finished (row 134), the stall and retry counters, with the sequence of each event that a timer counts from and no time from an envelope (row 122), each agent's highest permission mode since it started, the sheepdog's position, derived as above; the first-use reactor keeps none, because its rule is a level rule, rows 99, 104), its bounded `snapshotFor` entry, `roles.actions.list`, and its field in the engine's views (CAPI E6, E9) | target `packages/engine/src/roles/view.ts:apply`; `packages/engine/src/views/apply.ts:apply`, `emptyViews`; CAPI §1, "Views and reactors"; Board's bounded snapshot section as the pattern |
 | 1e | `roles.orient` read over `client.roster` entries, which apply CAPI's read rule (§3, E8; row 96), and the role file | target `packages/engine/src/roles/orient.ts`; envelope rule `packages/engine/src/routing/envelope.ts` |
@@ -864,7 +857,7 @@ into it.
 Each rule is a pure function from the roles view, the engine's views, the
 board's status (its fixed-size summary, and its `incoming` and `own`
 detail lists, and, with no agent, the ids of the agents for which each
-board condition holds and the sequence they were computed at, Board v10)
+board condition holds and the sequence they were computed at, Board v11)
 and the clock to a list of actions, so each is
 tested alone.
 
@@ -970,7 +963,7 @@ one automatic retry holds across a restart.
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
 | 4a | Team idle rule over engine groups, per top agent and per holder, with the "busy" test, which counts a usage-limit pause as busy (row 74) | target `packages/engine/src/roles/sheepdog/rules/teamIdle.ts`; groups from `AgentStarted.groups` and `AgentGrouped` (`packages/contracts/src/events.ts:Event`); `FOUNDRY/scripts/team-idle-watch.sh` l.13-14 ("Only 'working' counts as busy") |
-| 4b | Stall state machine, with its counter per post and addressee (row 37), and the transitive "waits on" and "waiting on others" tests (rows 56, 74) | target `rules/stall.ts`; Board v10, `board.status` with `detail` `incoming` and `own`, and with no agent for the condition lists (Board row 103), and its pure-function export from `packages/engine/src/board/` ("For Shephrd's own services"); the shared settled test in `packages/contracts/src/settled.ts` (CAPI E19), which replaced `routing/waits.ts:settled`: the sheepdog applies its engine part itself, from the engine's deliveries with their status, and the board's part through `board.status` with no agent, whose lists carry the sequence they were computed at; it decides only when both agree at one sequence, as the client wait helper does (CAPI §3, lead ruling L30; row 100) |
+| 4b | Stall state machine, with its counter per post and addressee (row 37), and the transitive "waits on" and "waiting on others" tests (rows 56, 74) | target `rules/stall.ts`; Board v11, `board.status` with `detail` `incoming` and `own`, and with no agent for the condition lists (Board row 103), and its pure-function export from `packages/engine/src/board/` ("For Shephrd's own services"); the shared settled test in `packages/contracts/src/settled.ts` (CAPI E19), which replaced `routing/waits.ts:settled`: the sheepdog applies its engine part itself, from the engine's deliveries with their status, and the board's part through `board.status` with no agent, whose lists carry the sequence they were computed at; it decides only when both agree at one sequence, as the client wait helper does (CAPI §3, lead ruling L30; row 100) |
 | 4c | Runaway rule from `DeliverySent`, `TurnEnded`, pauses, permission requests and blocking waits (`packages/engine/src/routing/waits.ts` l.162-170); worker age rule from `AgentStarted` | target `rules/runaway.ts`; `packages/engine/src/routing/deliveries.ts` l.248 (`DeliverySent`); `FOUNDRY/scripts/context-keeper.sh` (`WORKER_MAX_MIN`) |
 | 4d | Capacity rule over `DeliveryHeld`: release timer, and the give-up triggered by `DeliveryReturned` with `cause: "capacity"`; the hold condition reads the engine's own count (7.3, rows 75, 89) | target `rules/capacity.ts`; WS-7b's `DeliveryHeld` and `DeliveryReleased`; `FOUNDRY/scripts/capacity-retry.sh` (5-minute backoff, 12 retries) |
 | 4e | Crash rule: the check for a new admission, `roles.CrashAdmitted` and its fold, one `resume`, the carry-on prompt, the continuation of an admitted retry, then give up, with `engineAlertOpen` (row 134) | target `rules/crash.ts`; `AgentCrashed` from `packages/engine/src/recovery/crash.ts:64`; `packages/engine/src/commands/resume.ts` l.26, l.51-54; `packages/engine/src/recovery/reload.ts:reloadedEvents`; CAPI §4 (the engine's `failure` alert and when it clears) |
@@ -1370,7 +1363,7 @@ seven needs; (H) decisions.md; (I) lead rulings L17 and L19 to L27.
 | E: capacity-retry.sh | WS-4d, WS-7b | mapped (rows 57, 75) |
 | F: items 1 to 6 | WS-1, WS-6, WS-3, WS-2 and WS-3, WS-4, — | roster, thread, service caller, `roles.` commands and alert kinds used as given; subscribe filters not needed in-process |
 | G: needs 1, 3, 4, 5, 6, 7 accepted; 2 refused | WS-3, WS-4, WS-5 | accepted needs used as given, with v8's `board.status` detail lists and its condition lists with no agent; work state derived (rows 25, 55) |
-| H: rows 1 to 136 | all | each row names its workstream in its own text |
+| H: rows 1 to 137 | all | each row names its workstream in its own text |
 | I: L17 (service direct pair; no engine-prompt fallback) | WS-3 | mapped (row 34) |
 | I: L19, L22, L23 (reach check at queue and send, with the delivery) | — | the roles register no reach check; the sheepdog's notices pass the board's (rows 52, 55) |
 | I: L20 (standing-rule matching, including opt-in prefix) | WS-2, WS-7a | mapped (rows 35, 67, 79) |
@@ -1469,6 +1462,7 @@ either would run out (known gap 1).
 | board v10 | — | Cited board contract v10 at `c053fda` (board #247), and aligned with its criterion 6.7: an open capacity hold keeps its agent unsettled even once its queue is empty, which reverses row 126, and unit 11b names the held cases. The roles view learns a wake's delivery id from `DeliveryQueued`, because `board.WakeBuilt` now names its source id (rows 129 to 131). Frozen as `attack/plan-v13.md`. |
 | client API v12 | — | Cited client API contract v12 at `8a34e59` and board at `da88bc0`, whose contract stays v10 (board #259). V12 states this plan's two lines: `client.event`'s reply carries the envelope, and `capacityHeld` is in an owner's snapshot and not in an agent's. The use of `capacityHeld` was checked (row 132). Frozen as `attack/plan-v14.md`. |
 | 5 | 0 / 3 / 4 | Grades 7, 7, 8 and 10, no refusals (`attack/round-5-findings.md`). Three majors, two issues, folded: the hand-off reads the real prompt events, and an admitted crash retry survives a restart. The four minors are not folded, by the manager's rule, and are listed in `attack/known-gaps.md`. Anchors moved to engine `9e386b0`; no drift changed a design (rows 133 to 135). Cites client API contract v13 at `5f08c31` (row 136). Frozen as `attack/plan-v15.md`. |
+| redaction | — | Lead ruling on board #279, no separate round. The roles' id fields join the redactor's tables in task 1b, and criterion 1.8 tests them (row 137). Cites board contract v11 at `5c631b2`, and client API contract v13 stays cited at `5f08c31`, with its copy unchanged. Frozen as `attack/plan-v16.md`. |
 
 
 
