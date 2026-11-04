@@ -34,6 +34,16 @@ const owesWake = (snapshot: Snapshot, target: AgentId): boolean => {
       && (isUnread(snapshot, { _tag: "agent", agentId: target }, post) || reminderDue(snapshot, target, post)));
 };
 
+// A reminder already built remains owed when cleanup in another target's
+// transaction withdraws its wake. Taking intervening work cannot erase it.
+const owedReminders = (snapshot: Snapshot, target: AgentId): ReadonlySet<string> => new Set(
+  Object.values(boardView(snapshot).wakes).filter((wake) => wake.targetAgentId === target).flatMap((wake) => wake.reminders).filter((id) => {
+    const post = own(boardView(snapshot).posts, id);
+    return post?.status === "open" && post.reply !== "none" && own(post.dispositions, target) === undefined
+      && own(post.reminderAcceptedAt, target) === undefined && (own(post.returns ?? {}, target) ?? 0) < 2;
+  }),
+);
+
 // Called by writePieceBatch under the writer permit. Every observation, close,
 // cleanup and replacement therefore uses the same state as the engine checks.
 export const lifecycleBatch = (snapshot: Snapshot, target: AgentId, lists?: EngineLists): PieceBatch => {
@@ -72,12 +82,13 @@ export const lifecycleBatch = (snapshot: Snapshot, target: AgentId, lists?: Engi
   }
   // Do not request a rebuild of a healthy wake. In particular a full wake must
   // not be repeatedly cut and rebuilt for a question that did not fit in it.
-  const cleaned = refreshWakes(state, [], lists);
+  const cleaned = refreshWakes(state, [], lists, false, new Set([target]));
   for (const event of cleaned.events) append(event);
   const deliveries = [...cleaned.deliveries];
+  const reminders = owedReminders(state, target);
   if (activeWakes(state, target).length === 0 && !cleaned.events.some((event) => event._tag === "board.WakeBuilt" && event.targetAgentId === target)
-    && owesWake(state, target)) {
-    const wake = buildWake(state, target);
+    && (reminders.size > 0 || owesWake(state, target))) {
+    const wake = buildWake(state, target, { reminders });
     if (wake !== undefined) { append(wake.event); deliveries.push(wake.delivery); }
   }
   return { events, deliveries };
@@ -85,25 +96,26 @@ export const lifecycleBatch = (snapshot: Snapshot, target: AgentId, lists?: Engi
 
 // A refusal touches nothing. Do not fan an unrelated successful target's wake
 // back out to every post by the same author: that would retry refused duties.
-const touchedTargets = (snapshot: Snapshot, batch: ReadonlyArray<EventEnvelope>): ReadonlySet<AgentId> => {
-  const targets = new Set<AgentId>();
-  const postTargets = (id: string) => {
+const touchedTargets = (snapshot: Snapshot, batch: ReadonlyArray<EventEnvelope>): ReadonlyMap<AgentId, number> => {
+  const targets = new Map<AgentId, number>();
+  const touch = (target: AgentId, sequence: number) => targets.set(target, Math.max(targets.get(target) ?? 0, sequence));
+  const postTargets = (id: string, sequence: number) => {
     const post = own(boardView(snapshot).posts, id);
     if (post === undefined) return;
-    if (post.author._tag === "agent") targets.add(post.author.agentId);
-    for (const to of post.to) if (to._tag === "agent") targets.add(to.agentId);
+    if (post.author._tag === "agent") touch(post.author.agentId, sequence);
+    for (const to of post.to) if (to._tag === "agent") touch(to.agentId, sequence);
   };
-  for (const { event } of batch) {
+  for (const { event, sequence } of batch) {
     if (event._tag === "CommandRefused") continue;
-    if ("agentId" in event) targets.add(event.agentId);
-    if (event._tag === "DeliveryQueued") targets.add(event.delivery.target);
-    if (event._tag === "board.WakeBuilt") targets.add(event.targetAgentId);
+    if ("agentId" in event) touch(event.agentId, sequence);
+    if (event._tag === "DeliveryQueued") touch(event.delivery.target, sequence);
+    if (event._tag === "board.WakeBuilt") touch(event.targetAgentId, sequence);
     else if ("postId" in event && event._tag.startsWith("board.")) {
-      postTargets(event.postId);
-      if (event._tag === "board.PostWritten" && event.replyToPostId !== undefined) postTargets(event.replyToPostId);
+      postTargets(event.postId, sequence);
+      if (event._tag === "board.PostWritten" && event.replyToPostId !== undefined) postTargets(event.replyToPostId, sequence);
     } else if (event._tag === "board.Read") {
-      for (const id of event.postIds) postTargets(id);
-    } else if (event._tag === "board.ManagerChanged" && event.manager._tag === "agent") targets.add(event.manager.agentId);
+      for (const id of event.postIds) postTargets(id, sequence);
+    } else if (event._tag === "board.ManagerChanged" && event.manager._tag === "agent") touch(event.manager.agentId, sequence);
   }
   return targets;
 };
@@ -117,13 +129,22 @@ export const boardReactor = Effect.scoped(Effect.gen(function* () {
   if (Option.isSome(recovery)) yield* recovery.value.whenReady;
   const initial = yield* views.snapshot;
   const lists = views.lists;
-  const run = (target: AgentId, sourceSequence: number) => writePieceBatch({
-    namespace: "board", kind: "reactor", sourceSequence,
-    build: (snapshot) => lifecycleBatch(snapshot, target, lists),
+  // Coalesce buffered notifications already included in a transaction's read.
+  // This is disposable subscription bookkeeping, not a durable reactor cursor
+  // or a pending duty: every invocation still scans the whole state first.
+  const inspected = new Map<AgentId, number>();
+  const run = (target: AgentId, sourceSequence?: number) => writePieceBatch({
+    namespace: "board", kind: "reactor", sourceSequence: sourceSequence ?? ((snapshot) => snapshot.sequence),
+    build: (snapshot) => {
+      inspected.set(target, snapshot.sequence);
+      return lifecycleBatch(snapshot, target, lists);
+    },
   }, lists);
-  for (const agent of Object.values(initial.agents)) yield* run(agent.agentId, initial.sequence);
+  for (const agent of Object.values(initial.agents)) yield* run(agent.agentId);
   yield* subscribe(initial.sequence).pipe(Stream.runForEachArray((batch) => Effect.gen(function* () {
     const snapshot = yield* views.snapshot;
-    for (const target of touchedTargets(snapshot, batch)) yield* run(target, batch.at(-1)!.sequence);
+    for (const [target, sequence] of touchedTargets(snapshot, batch)) {
+      if (sequence > (inspected.get(target) ?? 0)) yield* run(target, sequence);
+    }
   })));
 }));

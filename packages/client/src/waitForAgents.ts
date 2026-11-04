@@ -1,4 +1,4 @@
-import { foldSettled, holdUnsettled, pieceNamespaces, reasonOf, waitSatisfied, type ClientSnapshot, type EventEnvelope, type SettledInput, type WaitMember, type RequestId, type HoldCondition } from "@shephrd/contracts"
+import { foldSettled, pieceNamespaces, reasonOf, waitSatisfied, type ClientSnapshot, type EventEnvelope, type SettledInput, type WaitMember, type RequestId } from "@shephrd/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import type { Client, ClientEnvelope } from "./core.ts"
@@ -69,11 +69,9 @@ export const waitForAgents = (client: Client, options: WaitOptions): Effect.Effe
           || [...conditions.values()].some((lists) => lists.ownerHeld?.includes(id))
       }
       const reason = reasonOf(state, id)
-      const held = reason === "settled" && (pieceNamespaces.some((namespace) => {
-        try { return (holdUnsettled[namespace] as HoldCondition)(state, id, conditions.get(namespace)) }
-        catch { return true }
-      })
-        || [...conditions.values()].some((lists) => lists.holdsUnsettled.includes(id)))
+      // A client receives the piece's computed condition lists, not its full
+      // private view. Apply those lists after their sequence gate is current.
+      const held = reason === "settled" && [...conditions.values()].some((lists) => lists.holdsUnsettled.includes(id))
       if (reason !== undefined && !held) resolved.push({ agentId: id as WaitMember["agentId"], reason })
     }
     if (ownerHeld) return { outcome: "request-held", members: resolved }

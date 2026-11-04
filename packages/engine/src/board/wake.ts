@@ -233,7 +233,7 @@ export const completionOwed = (snapshot: Snapshot, post: BoardPostView, closer: 
 // Shared by command cleanup and the reactor. Call with the transaction's
 // snapshot, never a cached view. New delivery requests are materialised only
 // after these events by the engine's piece batch path.
-export const refreshWakes = (snapshot: Snapshot, targets: ReadonlyArray<AgentId>, lists?: EngineLists, digestOnly = false): {
+export const refreshWakes = (snapshot: Snapshot, targets: ReadonlyArray<AgentId>, lists?: EngineLists, digestOnly = false, queueOnly?: ReadonlySet<AgentId>): {
   readonly events: ReadonlyArray<Event>; readonly deliveries: ReadonlyArray<DeliveryRequest>;
 } => {
   const events: Event[] = [];
@@ -294,6 +294,9 @@ export const refreshWakes = (snapshot: Snapshot, targets: ReadonlyArray<AgentId>
   } while (changed);
   const deliveries: DeliveryRequest[] = [];
   for (const target of rebuilding) {
+    // A reactor transaction queues for one target. Other withdrawn targets
+    // are repaired by their own level scans, so their refusals stay isolated.
+    if (queueOnly !== undefined && !queueOnly.has(target)) continue;
     const built = buildWake(state, target, { digestOnly, ...(reminders.has(target) ? { reminders: reminders.get(target)! } : {}) });
     if (built === undefined) continue;
     append(built.event);
