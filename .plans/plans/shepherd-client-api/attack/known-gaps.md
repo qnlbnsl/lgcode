@@ -15,9 +15,6 @@ close it. "Rows" are rows of `decisions.md` in this folder.
 - **Each vendor's remaining weekly allowance is unknown.** The planner
   cannot read it. The lead checks each vendor's limit before launching the
   48 launches in the sizing section.
-- **Row 51 is widened.** No owner quote backs the exclusion of the VS Code
-  extension, so the row stays open until the lead cites one or the owner
-  confirms it. The plan builds no extension (row 121).
 - **`docs/issues.md` and `docs/features.md` are not updated here.** They
   go through the lead. The wanted entries are in the planner's result
   file.
@@ -63,10 +60,10 @@ close it. "Rows" are rows of `decisions.md` in this folder.
 - **A phone can get an alert twice.** Delivery is at least once. A crash
   after the carrier accepts and before the local record sends it again. ntfy's
   sequence id replaces the earlier one where the server honours it (row 106).
-- **Plain HTTP inside WireGuard is refused.** A public request must carry
-  `X-Forwarded-Proto: https`, so an owner who wants plain HTTP inside
-  WireGuard cannot have it. This goes beyond the ruling. The owner can ask for
-  the other choice (row 113).
+- **Shephrd does not encrypt the password on the network.** With an `http` public
+  address, the password and the session cookie cross the owner's network unencrypted by
+  Shephrd, and only what the owner runs in front of it protects them. The owner chose
+  plain HTTP (row 198).
 - **ntfy's own settings cannot be enforced.** The owner's server decides its
   access rules. `docs/remote-access.md` advises deny-all, and Shephrd cannot
   check it (row 115).
@@ -121,8 +118,7 @@ folded. These minors of round 4 stay open.
   content.
 ## Facts the planner could not verify
 
-- **The owner's real proxy.** Caddy's documentation answers how its defaults
-  treat `X-Forwarded-Proto` and `Host`, but the owner said
-  "a caddy or something". Post-build check PB-2 tests the real one (row 113).
+- **The owner's real proxy.** It does not exist yet, and the owner said "a caddy or
+  something". Post-build check PB-2 tests it once it does (row 198).
 - **The owner's ntfy server.** Post-build check PB-5 confirms that it honours
   the sequence id and the delete by it.

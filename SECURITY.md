@@ -109,9 +109,10 @@ These rules apply to every change. A change that breaks one is a security bug.
    password means restarting the engine, which also ends the session. A browser
    holds the token in an `HttpOnly`, `SameSite=Strict` cookie, which is `Secure`
    through the proxy.
-5. **Remote access goes over an encrypted channel**, such as TLS, a Tailscale
-   tailnet, or an SSH tunnel. Shephrd does not offer plain HTTP to a
-   non-loopback address.
+5. **An encrypted channel for remote access is the owner's setup**, such as TLS, a
+   Tailscale tailnet, or an SSH tunnel. Shephrd serves plain HTTP on loopback and
+   does not offer it to a non-loopback address. The owner's words, on 2026-11-03:
+   "Let's just focus on plain HTTP. That's what the software itself is doing, right? Then, whatever proxy we add on to it, that proxies to localhost. We'll figure this out then. Because I have to set up a local certificate authority so that I can do ARPA DNS certs"
 6. **Secrets never reach logs, the message board, or a client.** This covers
    API tokens, the web password, the session token, and the agent harnesses'
    own login tokens. Agents do not inherit the web password's variable.

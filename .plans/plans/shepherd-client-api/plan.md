@@ -85,10 +85,10 @@ view each get an attack pass.
   One random token per engine start, held in memory, is the session. There are no
   rate limits and no lockouts, and no command is kept from a logged-in dashboard. If
   the variable is not set, the web server does not start. The owner chose this.
-- **The proxy path has one rule of its own.** The web server accepts a public
-  request only over HTTPS, as the proxy reports it, because a password now crosses
-  the proxy. The owner may still overrule this at acceptance. This is the lead's
-  ruling.
+- **The software serves plain HTTP on loopback.** A public address may be `http` or
+  `https`, and the login cookie is `Secure` only when it is `https`. Proxy, certificate
+  and DNS setup are the owner's later work. With an `http` address, only what the owner
+  runs in front protects the password. The owner chose this.
 - **Phone alerts carry no thread text,** and go through one sender
   interface, with ntfy first. An alert says what kind of thing needs the
   owner, and names the agent and its team, each cut short and under a fixed
@@ -123,7 +123,7 @@ view each get an attack pass.
 
 Full log → `decisions.md`. The design decisions →
 `docs/specs/2026-11-03-client-api-design.md`. The contract the other two
-plans build on is `contract.md`, version 16.
+plans build on is `contract.md`, version 17.
 
 ## Workstreams
 
@@ -209,10 +209,10 @@ says.
 ### Remote access through the owner's proxy
 
 The owner's own reverse proxy, such as Caddy, takes the phone's requests
-over WireGuard, adds the encryption, and passes them to the loopback web
-server. The example setup binds only the WireGuard address. Shephrd also
-checks that each public request came over HTTPS. A test by the owner shows that a
-phone off WireGuard, and another device at home, cannot reach it.
+over WireGuard and passes them to the loopback web server. Any encryption is at the
+proxy, and that setup is the owner's later work, so the setup document is an example.
+The owner's check on a real phone runs once the proxy exists, and it does not gate the
+build.
 
 ### Proof on a real phone
 
@@ -240,9 +240,9 @@ permission request, and reads the thread.
    owner's mock session.
 7. **The alert channel** (unit 6b). The owner sets the ntfy server and
    topic.
-8. **Remote access and the proof** (unit 11): the setup document, then the owner
-   points the reverse proxy at the web server. The automated phone flow runs, then
-   the owner's check on a real phone.
+8. **Remote access and the proof** (unit 11): the setup document and the automated
+   phone flow. Once the owner's proxy exists, the owner points it at the web server and
+   makes the check on a real phone. That step does not gate the build.
 
 ### Rolling back
 
@@ -267,7 +267,7 @@ Conventions for every unit. Paths are relative to the Shephrd repository
 root. Anchors are at engine commit `9e386b0`, and `scouting.md` records the first scouting at `8ff4c9b`. "Rows" are
 rows of this plan's `decisions.md`; "engine rows" are rows of
 `.plans/plans/shepherd-engine/decisions.md`. "The contract" is
-`contract.md` in this folder, version 16; where a
+`contract.md` in this folder, version 17; where a
 unit and the contract disagree, the unit reports it to the lead. A test id
 is a Vitest file path, run from the repository root with
 `pnpm vitest run <path>`; Playwright tests run with
@@ -515,7 +515,7 @@ password, with the checks a browser needs. SECURITY.md rules 1, 2, 3, 4 and 6. R
 | 5.2 | Every request's caller comes from `webCaller`, and from nowhere else: a valid cookie makes it the command handler's `{ _tag: "owner" }` credential, and a command is recorded with `caller: owner`; without one, every API request and WebSocket upgrade gets HTTP 401 before any RPC message, and only `POST /api/login` and the static files are served; a stop from a logged-in session cancels a start whose setup never returns; no route builds a caller of its own | Test id: `packages/engine/test/client/web-caller.test.ts`; boundary test `packages/engine/test/client/web-caller-imports.test.ts` |
 | 5.3 | A request that presents the owner credential or an agent token, as a bearer or a cookie, gets HTTP 401 before any RPC message | Test id: `packages/engine/test/client/web-host-credentials.test.ts` |
 | 5.4 | Only Shephrd's own page may drive the web server (row 90): a request whose `Host` does not name `127.0.0.1` at the port gets HTTP 403, and a `Host` or `Origin` naming `localhost` or `[::1]` is refused; Shephrd prints and links only `http://127.0.0.1:<port>`; a WebSocket upgrade, or any request but a `GET` or `HEAD` of a static file, whose `Origin` is missing or does not name the page gets HTTP 403; a page served from another origin in a real browser cannot open the WebSocket; the public address is allowed only in proxy mode (criterion 10.1) | Test id: `packages/engine/test/client/web-origin.test.ts`; `packages/web/e2e/cross-origin.spec.ts` (Playwright, a second page on another port) |
-| 5.5 | The login: `POST /api/login` with the right password in its body sets a cookie that is `HttpOnly`, `SameSite=Strict` and `Path=/`, with no `Max-Age`, and `Secure` only on a public request; a wrong, empty, missing or over-4-KiB password gets HTTP 401, no cookie and no event; a password in the URL is not read; the comparison uses hashes, so a wrong length does not throw; a login with a missing or foreign `Origin` gets HTTP 403; `POST /api/session` answers HTTP 204 with a valid cookie and HTTP 401 without one; in a real browser, a login is followed by a working WebSocket upgrade with no header set by the page, and a page opened from a link on another site still connects | Test id: `packages/engine/test/client/web-login.test.ts`; `packages/web/e2e/login.spec.ts` (Playwright) |
+| 5.5 | The login: `POST /api/login` with the right password in its body sets a cookie that is `HttpOnly`, `SameSite=Strict` and `Path=/`, with no `Max-Age`, and `Secure` only on a public request with an `https` public address; a wrong, empty, missing or over-4-KiB password gets HTTP 401, no cookie and no event; a password in the URL is not read; the comparison uses hashes, so a wrong length does not throw; a login with a missing or foreign `Origin` gets HTTP 403; `POST /api/session` answers HTTP 204 with a valid cookie and HTTP 401 without one; in a real browser, a login is followed by a working WebSocket upgrade with no header set by the page, and a page opened from a link on another site still connects | Test id: `packages/engine/test/client/web-login.test.ts`; `packages/web/e2e/login.spec.ts` (Playwright) |
 | 5.6 | The session: one 32-byte random token per engine start, and nothing about it in the database or the state folder; a restart makes the old cookie get HTTP 401; `POST /api/logout` replaces the token, closes every web connection, and makes the old cookie get HTTP 401; a long advance of the test clock does not end a session | Test id: `packages/engine/test/client/web-session.test.ts` |
 | 5.7 | The variable not set: unset, empty or under 8 characters, the web server does not bind, the engine and its Unix socket run as normal, `client.web.settings` reports `serverState: no-password`, the service's log says why, and no `client.WebServerDown` or alert is written | Test id: `packages/engine/test/client/web-no-password.test.ts` |
 | 5.8 | An inbound message over 1 MiB closes the connection; the limit does not apply to what the server sends | Test id: `packages/engine/test/client/web-size.test.ts` |
@@ -526,7 +526,7 @@ password, with the checks a browser needs. SECURITY.md rules 1, 2, 3, 4 and 6. R
 | 5.13 | The engine's Unix socket keeps its authentication: its existing tests pass, apart from the device cases of E12, and it still refuses a connection with no credential | Test id: `packages/engine/test/api/auth.test.ts` (one new case, per E12 and E13) |
 | 5.14 | During recovery the web server answers HTTP 503 and serves no command or stream | Test id: `packages/engine/test/client/web-recovery.test.ts` |
 | 5.15 | When its port cannot be bound, the engine keeps running and the Unix socket works; one `client.WebServerDown` is written, a `client.web-down` alert is raised, the bind is retried every 30 seconds (test clock), and on success `client.WebServerUp` clears the alert; held before recovery is ready, its first record is written after it; a port taken across restarts writes one `client.WebServerDown`; `enabled` off closes the outage and its alert | Test id: `packages/engine/test/client/web-bind-failure.test.ts` |
-| 5.16 | `client.web.settings.set` validates the record as contract section 5 says: a `publicAddress` that is not `https` or not in canonical form is refused, and proxy mode on with no public address is refused; it works from a logged-in session and from the owner's terminal; any change closes every web connection, so a reconnect is judged under the new settings | Test id: `packages/engine/test/client/web-settings.test.ts` |
+| 5.16 | `client.web.settings.set` validates the record as contract section 5 says: a `publicAddress` that is neither `http` nor `https`, or not in canonical form, is refused, and both schemes are accepted, and proxy mode on with no public address is refused; it works from a logged-in session and from the owner's terminal; any change closes every web connection, so a reconnect is judged under the new settings | Test id: `packages/engine/test/client/web-settings.test.ts` |
 | 5.17 | The password stays secret (E34): with the variable set, a fake adapter's recorded environment holds neither its name nor its value; after a right and a wrong login, the service's log, the event log, the receipts and every client reply hold neither the password nor the session token; an agent's text that contains the password is redacted in its event | Test id: `packages/engine/test/client/web-password-environment.test.ts`; `packages/engine/test/client/web-password-redaction.test.ts`; `packages/engine/test/runner/baseEnvironment.test.ts` (new case) |
 
 **Tasks:**
@@ -729,8 +729,8 @@ folder.
 **WS-10: Remote access through the owner's proxy**
 
 Purpose: let the phone reach the page through the owner's own reverse
-proxy over WireGuard, with the encryption at the proxy. Rows 76, 113, 115, 116, 134,
-141, 193. It has no unit of its own: unit 5 builds criteria 10.1 and 10.2, and unit 11
+proxy over WireGuard, with any encryption at the proxy, as the owner's later work. Rows
+76, 113, 115, 116, 134, 141, 193, 198. It has no unit of its own: unit 5 builds criteria 10.1 and 10.2, and unit 11
 builds criteria 10.3 and 10.4 (row 194).
 
 **Done when:**
@@ -738,15 +738,15 @@ builds criteria 10.3 and 10.4 (row 194).
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
 | 10.1 | In proxy mode, the web server accepts the public address setting's `Host` and `Origin` whatever the proxy does with `Host`, and a request that is not public keeps the loopback names, and still binds only loopback; outside proxy mode the public address is refused | Test id: `packages/engine/test/client/web-proxy.test.ts` |
-| 10.2 | Every row of contract section 5's proxy table holds: with proxy mode off, a request with any forwarded header is refused; a public request whose `X-Forwarded-Proto` is not `https`, or that names no public address, is refused; a settings change closes open connections; a public request with `Host` set to the public address and a loopback `Origin` is refused, and the pair for a proxy that rewrites `Host` is accepted; a login over the accepted public row sets a `Secure` cookie, and a login on loopback does not | Test id: `packages/engine/test/client/web-proxy-table.test.ts` |
-| 10.3 | `docs/remote-access.md` describes the setup: `SHEPHRD_WEB_PASSWORD`, a long string set on the service alone and never in Herdr's environment, and that changing it means restarting the engine; WireGuard to the host; an example Caddyfile whose site uses `bind` on the WireGuard address and a `remote_ip` matcher for the WireGuard network, and proxies to the loopback port; the web server's two proxy settings; that the proxy must set `X-Forwarded-Proto`; that the page is at `127.0.0.1`; the warning to store a secret with `accounts set-secret`; the ntfy server's deny-all setup; the limit that an agent on the same user can read the password; and a "lost phone" section; that a `client.web-down` alert means the page must not be opened; and the limit of a squatter on the loopback port | Command: `grep -q SHEPHRD_WEB_PASSWORD docs/remote-access.md && grep -q 'bind ' docs/remote-access.md && grep -q remote_ip docs/remote-access.md && grep -q reverse_proxy docs/remote-access.md && grep -qi 'lost phone' docs/remote-access.md && grep -qi deny-all docs/remote-access.md && grep -q X-Forwarded-Proto docs/remote-access.md && grep -q 127.0.0.1 docs/remote-access.md && grep -q 'accounts set-secret' docs/remote-access.md && grep -q 'client.web-down' docs/remote-access.md` |
-| 10.4 | From a phone on mobile data with WireGuard on, through the owner's proxy, the login form opens, the password works, and the page shows the situation view. With WireGuard off on mobile data, and from another device on the home network, the page cannot be reached | On-device step: the owner's phone and a second device, rollout step 8 |
+| 10.2 | Every row of contract section 5's proxy table holds: with proxy mode off, a request with any forwarded header is refused; a public request that names no public address is refused; a settings change closes open connections; a public request with `Host` set to the public address and a loopback `Origin` is refused, and the pair for a proxy that rewrites `Host` is accepted; with each form of public address, an `Origin` with the other scheme is refused; `X-Forwarded-Proto` changes no result, with any value or none; a login over the accepted public row sets a `Secure` cookie when the public address is `https`, and none when it is `http`; a login on loopback never does | Test id: `packages/engine/test/client/web-proxy-table.test.ts` |
+| 10.3 | `docs/remote-access.md` describes the setup: `SHEPHRD_WEB_PASSWORD`, a long string set on the service alone and never in Herdr's environment, and that changing it means restarting the engine; WireGuard to the host; an example Caddyfile whose site uses `bind` on the WireGuard address and a `remote_ip` matcher for the WireGuard network, and proxies to the loopback port; that the setup is an example and the proxy is the owner's own; that with an `http` public address only what the owner runs in front protects the password; the web server's two proxy settings; that the page is at `127.0.0.1`; the warning to store a secret with `accounts set-secret`; the ntfy server's deny-all setup; the limit that an agent on the same user can read the password; and a "lost phone" section; that a `client.web-down` alert means the page must not be opened; and the limit of a squatter on the loopback port | Command: `grep -q SHEPHRD_WEB_PASSWORD docs/remote-access.md && grep -q 'bind ' docs/remote-access.md && grep -q remote_ip docs/remote-access.md && grep -q reverse_proxy docs/remote-access.md && grep -qi 'lost phone' docs/remote-access.md && grep -qi deny-all docs/remote-access.md && grep -q 127.0.0.1 docs/remote-access.md && grep -q 'accounts set-secret' docs/remote-access.md && grep -q 'client.web-down' docs/remote-access.md` |
+| 10.4 | From a phone on mobile data with WireGuard on, through the owner's proxy, the login form opens, the password works, and the page shows the situation view. With WireGuard off on mobile data, and from another device on the home network, the page cannot be reached | On-device step: the owner's phone and a second device, rollout step 8, once the owner's proxy exists; it does not gate the build |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 10.1 | Proxy mode in the web server's settings, the public allow-list, and the forwarded protocol table | Target `packages/engine/src/client/web/proxy.ts`; WS-5's guards and `webCaller` |
+| 10.1 | Proxy mode in the web server's settings, the public allow-list, and the proxy table | Target `packages/engine/src/client/web/proxy.ts`; WS-5's guards and `webCaller` |
 | 10.2 | The setup document with the example Caddyfile, which names the settings the owner sets to match the proxy's site address | Target `docs/remote-access.md`; Caddy's `bind` and `remote_ip` documentation; post-build check PB-2 |
 
 **Design artifact:** none.
@@ -756,11 +756,11 @@ builds criteria 10.3 and 10.4 (row 194).
 | Risk | Severity | Mitigation |
 |---|---|---|
 | Anyone who reaches the proxy can try the password | Medium | The password is the boundary, by the owner's choice (row 184). The example binds only WireGuard, and the owner checks the negative steps (criterion 10.4). |
-| The example sends the API without encryption | Medium | The example terminates TLS at Caddy, the web server never binds a non-loopback address, and a public request must carry `X-Forwarded-Proto: https`, so the password does not cross the proxy in the clear (criteria 5.1, 10.1, 10.2). |
+| With an `http` public address, the password and the session cookie cross the owner's network unencrypted by Shephrd | Medium | Accepted by the owner (row 198), and named in the known gaps. Only what the owner runs in front protects them. The web server binds only loopback (criterion 5.1), and `Secure` follows the address (criterion 10.2). |
 
-**Verify:** criteria 10.1-10.4; environment QA: the owner's phone.
+**Verify:** criteria 10.1-10.3; criterion 10.4 is the owner's step once the proxy exists.
 
-**Rollout detail:** rollout step 8; the owner points the proxy at the web server.
+**Rollout detail:** rollout step 8; the owner points the proxy at the web server when it exists.
 
 **WS-11: Proof on a real phone**
 
@@ -772,7 +772,7 @@ also builds WS-10's setup document and its on-device step (criteria 10.3, 10.4).
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
 | 11.1 | In a phone-sized headless browser: a fake agent asks permission, the alert reaches a fake ntfy server with a thread link, the owner logs in, the link opens the thread, the owner answers, the agent is released, and the thread reads back | Test id: `packages/web/e2e/phone-flow.spec.ts` |
-| 11.2 | The owner gets a real alert on a real phone through ntfy, opens its link through the proxy, answers a real permission request, and reads the thread | On-device step: the owner's phone, recorded in the run's result file |
+| 11.2 | The owner gets a real alert on a real phone through ntfy, opens its link through the proxy, answers a real permission request, and reads the thread | On-device step: the owner's phone, recorded in the run's result file, once the owner's proxy exists; it does not gate the build |
 
 **Tasks:**
 
@@ -788,7 +788,7 @@ also builds WS-10's setup document and its on-device step (criteria 10.3, 10.4).
 |---|---|---|
 | The flow passes headless but fails on a real phone | Medium | Criterion 11.2 by the owner. |
 
-**Verify:** criteria 10.3, 10.4, 11.1 and 11.2; environment QA: criteria 10.4 and 11.2.
+**Verify:** criteria 10.3 and 11.1; criteria 10.4 and 11.2 are the owner's steps once the proxy exists.
 
 **Rollout detail:** rollout step 9.
 
@@ -797,10 +797,10 @@ Post-build checks (code-level worries a plan cannot settle):
 - PB-1: confirm Effect 4.0.5's Node HTTP server lets the web server set
   the inbound WebSocket message size limit (criterion 5.8); if not, enforce it in
   the protocol wrapper, as `boundedProtocol` does for backlogs.
-- PB-2: on the owner's real proxy, confirm what the web server receives:
-  `X-Forwarded-Proto` and `Host`. A missing forwarded header is a failed check, and
-  the owner fixes the proxy's settings before relying on it. Caddy's documentation
-  says how its defaults treat them, but the owner said "a caddy or something".
+- PB-2: once the owner's proxy exists, confirm that the web server receives `Host` and
+  `Origin` as the table expects, that `Origin` matches the public address with its scheme,
+  and that the login cookie's `Secure` attribute matches that scheme. A proxy that
+  rewrites `Origin` is a failed check.
 - PB-3: confirm how a Herdr plugin action opens a new pane (Herdr 0.9.x
   plugin manual) before unit 8's action is written.
 - PB-5: confirm that the owner's ntfy server honours the sequence id and the
@@ -816,8 +816,8 @@ Post-build checks (code-level worries a plan cannot settle):
   limited send counts as a failed attempt, that retries recover it, and that the
   limit's `Retry-After` causes no tight loop. Also confirm that a non-ASCII agent
   name does not fail a send, and that a name holding a URL is not a tappable link.
-- PB-9: confirm that the page's content policy allows `wss` through the proxy on
-  the owner's phone.
+- PB-9: once the owner's proxy exists, confirm that the page's content policy allows its
+  WebSocket through the proxy on the owner's phone, with the public address's scheme.
 - PB-10: confirm that `thread export` over an existing file keeps mode 0600 or
   refuses, and that the service's log holds neither the password nor the
   session cookie.
@@ -881,7 +881,7 @@ the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
 |---|---|---|
 | Epic row 2: device pairing | WS-5 | replaced by one password, by the owner (row 184) |
 | Epic row 2: phone alerts | WS-6 | planned |
-| Epic row 2: encrypted remote access | WS-10 | planned; the encryption is at the owner's proxy (row 76) |
+| Epic row 2: encrypted remote access | WS-10 | planned as plain HTTP behind the owner's proxy; encryption is the owner's later setup (row 198) |
 | Epic row 2: the web page | WS-5, WS-7 | planned |
 | Epic row 2: thread viewer in a Herdr pane | WS-8 | planned |
 | Epic done-when 2: answer and read from a phone | WS-11 | planned after a real login; the lead rewords the epic, so done-when 2 names no pairing |
@@ -896,7 +896,7 @@ the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
 | Design decision 7: one password, a logged-in session is the owner (replaces decisions 5 and 6, the condition and the guard) | WS-5 (5.2, 5.5 to 5.7, 5.17), WS-7 (7.1, 7.8) | planned (rows 184 to 188) |
 | Manager's attack-list entry A11 (lead, board #201): `Host` and `Origin` name the server | WS-5 (5.4), WS-10 (10.1) | planned (row 90) |
 | Features §3: threads where the owner already works (pane viewer) | WS-8 | planned |
-| Features §3: VS Code extension | none | not built; WIDENED, open until the scope is confirmed (rows 51, 121) |
+| Features §3: VS Code extension | none | out of scope, confirmed by the owner (row 199) |
 | Features §4: one authenticated API for every client | WS-1, WS-2, WS-5 | planned |
 | Features §4: device pairing | none | replaced by one password (row 184); mobile login is later (row 196) |
 | Features §4: live updates | WS-3 | planned |
@@ -937,6 +937,7 @@ the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
 | Lead's rulings on round 3, 1 to 8 | WS-1, WS-2, WS-3, WS-5, WS-6, WS-7, WS-8, WS-10 | planned (rows 158 to 175; `attack/round-3-findings.md`) |
 | Lead's v12 note, two lines and a ruling | WS-1 (1.44), WS-3 (3.1, 3.8) | planned (rows 176 to 178); roles unit 11b writes the capacity-hold clause |
 | Lead's final rulings, R4-A1 and the re-anchor to `9e386b0` | WS-1 (1.42), WS-2, WS-7 (7.14) | planned (rows 179 to 181; `attack/round-4-findings.md`) |
+| Owner question 10: plain HTTP | WS-5 (5.5, 5.16), WS-10 (10.2, 10.3) | planned (row 198) |
 | Owner question 6 | none | answered no; edit E28 and criterion 1.41 are removed (rows 95, 184) |
 | The owner's password ruling and the lead's rulings on it | WS-1 (1.34, E12), WS-5 (5.2, 5.5 to 5.7, 5.17, E34), WS-7 (7.1, 7.8), WS-10 (10.1 to 10.4) | planned (rows 184 to 196) |
 | Roles requests 1-6 | WS-1, WS-3, WS-6; contract section 7 | planned |
@@ -952,7 +953,7 @@ the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
 | AGENTS.md rule 1: never push to `vitalysim/herdr-synapse` | Every unit pushes to `qnlbnsl/sheprd` only. |
 | AGENTS.md rule 2: credit copied code | No code is copied in this plan. A unit that copies any (for example from Synapse's web page) follows rule 2 under `third_party/`. |
 | AGENTS.md rule 3: keep the lists current | Each unit records problems in `docs/issues.md`; this planner's finds go to the lead in the result file. |
-| AGENTS.md rule 4: SECURITY.md is binding | Rule 1: criterion 5.1. Rule 2: restored for the web server, with the password as its authentication (criteria 5.2, 5.5), and the Unix socket keeps its own (criterion 5.13). Rules 3 and 4: rewritten for one password and one session, with the owner's words as the approval (row 184; criteria 5.5, 5.6). Rule 5: the web server binds loopback only, the proxy carries the encryption, and a public request must be HTTPS (criteria 5.1, 10.1, 10.2). Rule 6: criteria 1.39, 1.40, 3.1, 5.17, 6.5, 6.12 to 6.15. Rule 7: rows 19, 37, 87, 140; criteria 1.13, 3.3, 7.4, 7.12. |
+| AGENTS.md rule 4: SECURITY.md is binding | Rule 1: criterion 5.1. Rule 2: restored for the web server, with the password as its authentication (criteria 5.2, 5.5), and the Unix socket keeps its own (criterion 5.13). Rules 3 and 4: rewritten for one password and one session, with the owner's words as the approval (row 184; criteria 5.5, 5.6). Rule 5: moved to the owner's setup, by the owner's words (row 198); the web server binds loopback only (criterion 5.1). Rule 6: criteria 1.39, 1.40, 3.1, 5.17, 6.5, 6.12 to 6.15. Rule 7: rows 19, 37, 87, 140; criteria 1.13, 3.3, 7.4, 7.12. |
 | AGENTS.md rule 5: the API is the product's surface | Every owner action is an API command, and a logged-in session may call every one, so rule 5 reads as it did (row 186). `debug.compare-views` exists only under the test-only debug flag (row 195). `shephrd client wait` runs on the API (row 50). |
 | AGENTS.md rule 6: team shapes do not belong here | No team shape or workflow is defined; alert kinds and services are mechanisms. |
 | AGENTS.md rule 7: commit only when asked | The run's team rules allow commits; units commit per the lead. |
@@ -1012,5 +1013,6 @@ gap).
 | v14 | — | No review round, by the lead's ruling. New edit E33 lists this plan's id fields in the engine's redaction structure (row 182). |
 | v15 | — | No review round, by the lead's ruling. The owner's answer: question 6 is no, and login is one password. The plan loses pairing, devices, the guard, the computer-only list and the lasting-setting alert (rows 184 to 196). |
 | 5 | 0 / 1 / 0 | The lead's final check of contract v15: two Sol reviews, `attack/round-5-architect-sol.md` (grade 7, one major) and `attack/round-5-threat-model-sol.md` (grade 10, ship), no refusals. The major, R5-A1, is folded as contract v16 and row 197: E12's test list gains three files. |
+| v17 | — | No review round, by the lead's instructions. The owner chose plain HTTP (row 198), and row 51 is closed (row 199). |
 
 </details>
