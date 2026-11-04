@@ -6,6 +6,8 @@ import { ClientError } from "./errors.ts"
 
 export { ClientError }
 export type { Client, ClientEnvelope, UnknownEvent } from "./core.ts"
+export { waitForAgents } from "./waitForAgents.ts"
+export type { WaitOptions, ClientWaitReply } from "./waitForAgents.ts"
 export interface ConnectOptions {
   readonly url: string
   readonly attempts?: number | undefined

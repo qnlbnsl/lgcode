@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema"
-import { Actor, EventEnvelope, PermissionActionFields, PermissionOption, SessionReference } from "../events.ts"
+import { Actor, EventEnvelope, PermissionOption, SessionReference } from "../events.ts"
 import { AccountId, AgentId, DeliveryId, EpochMilliseconds, EventSequence, HarnessId, WaitId } from "../ids.ts"
 import { PermissionLevel } from "../permission.ts"
 import { DisplayedState, LifecycleState } from "../stateMachine.ts"
@@ -18,6 +18,7 @@ export const Oversized = Schema.TaggedStruct("client.Oversized", {
   bytes: Schema.Int.check(Schema.isGreaterThan(0))
 })
 export const ClientStreamItem = Schema.Union([EventEnvelope, Checkpoint, Oversized])
+export type ClientStreamItem = typeof ClientStreamItem.Type
 export const contentOnlyEventTags = ["ThreadItem"] as const
 
 export const RosterEntry = Schema.Struct({
@@ -34,7 +35,7 @@ export type RosterEntry = typeof RosterEntry.Type
 
 const RowDisplay = Schema.Struct({
   preview: Schema.String, options: Schema.Array(PermissionOption), optionCount: Count,
-  settingsWrite: Schema.optionalKey(Schema.Boolean), toolKind: PermissionActionFields.toolKind,
+  settingsWrite: Schema.optionalKey(Schema.Boolean), toolKind: Schema.optionalKey(Schema.Literals(["read", "edit", "delete", "move", "search", "execute", "think", "fetch", "switch_mode", "other", "unknown"])),
   bytes: Count
 })
 const IdentityRow = Schema.Struct({

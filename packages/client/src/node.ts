@@ -11,6 +11,8 @@ import { checkSocket, defaultSocketSecurity, type SocketSecurity } from "./socke
 export { ancestryHeaders, ClientError, resolveIdentity, stateFolder }
 export type { Client, Environment, SocketSecurity }
 export type { ClientEnvelope, UnknownEvent } from "./core.ts"
+export { waitForAgents } from "./waitForAgents.ts"
+export type { WaitOptions, ClientWaitReply } from "./waitForAgents.ts"
 export interface ConnectOptions {
   readonly environment: Environment
   readonly socketSecurity?: SocketSecurity | undefined

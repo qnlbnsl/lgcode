@@ -15,6 +15,8 @@ const usage = (): string => [
   "Usage: shephrd <command> [options]", "",
   "Commands:",
   ...commandNames.map((name) => `  ${name}`),
+  "  client wait --block <agent-id>...",
+  "  thread export <agent-id> --out <file>",
   "  serve --detach",
   "  mcp", "",
   "Run shephrd <command> --help for a command's options.",

@@ -39,6 +39,7 @@ import { engineLists, type EngineLists } from "./pieces/lists.ts";
 import { drainPieceErrors } from "./pieces/guardPiece.ts";
 import type { Runtime } from "./commands/internal.ts";
 import * as Views from "./views/Views.ts";
+import { serve as serveWeb } from "./client/web/server.ts";
 
 const inTemporaryFolder = (folder: string): boolean => {
   try {
@@ -82,7 +83,7 @@ const handlerServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "
 export const buildServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults">, lists: EngineLists = engineLists) =>
   handlerServices(configuration, lists).pipe(Layer.provideMerge(baseServices(lists)));
 
-const program = (inheritedToken: string | undefined) => Effect.scoped(Effect.gen(function* () {
+const program = (inheritedToken: string | undefined, webPassword: Redacted.Redacted<string> | undefined) => Effect.scoped(Effect.gen(function* () {
   const folder = yield* Effect.try({ try: () => {
     const path = stateFolder(process.env);
     prepareStateFolder(path);
@@ -116,7 +117,7 @@ const program = (inheritedToken: string | undefined) => Effect.scoped(Effect.gen
     const registry = yield* Effect.acquireRelease(Effect.sync(() => new DatabaseSync(databasePath, { readOnly: true })), (database) => Effect.sync(() => database.close()));
     // Explicit credentials keep every nonempty value. Only values inferred
     // from inherited variable names need A4's length and scalar-value gate.
-    const explicitSecrets = [ownerCredential, ...[inheritedToken]
+    const explicitSecrets = [ownerCredential, ...(webPassword === undefined ? [] : [webPassword]), ...[inheritedToken]
       .filter((value): value is string => value !== undefined && value.length > 0).map((value) => Redacted.make(value))];
     const inheritedSecrets = Object.entries(process.env)
       .filter(([name]) => /(?:KEY|TOKEN|SECRET|PASSWORD)/i.test(name))
@@ -146,6 +147,9 @@ const program = (inheritedToken: string | undefined) => Effect.scoped(Effect.gen
     return yield* Effect.gen(function* () {
       if (debug) yield* Effect.logInfo("debug RPC group enabled");
       yield* listener.install(yield* application({ ownerCredential, debug }));
+      const web = yield* serveWeb({ password: webPassword, staticRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
+        registerSecret: (secret) => { explicitSecrets.push(secret); } });
+      yield* Effect.addFinalizer(() => web.close);
       yield* (yield* Restart.Restart).recover;
       // A retained row never grants authority unless its identity is still
       // live. Remove dead or replaced identities after recovery has swept
@@ -174,9 +178,11 @@ const program = (inheritedToken: string | undefined) => Effect.scoped(Effect.gen
 // connections and adapters before releasing the lifetime lock.
 if (process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const inheritedToken = process.env.SHEPHRD_TOKEN;
+  const webPassword = process.env.SHEPHRD_WEB_PASSWORD === undefined ? undefined : Redacted.make(process.env.SHEPHRD_WEB_PASSWORD);
+  delete process.env.SHEPHRD_WEB_PASSWORD;
   delete process.env.SHEPHRD_TOKEN;
   process.umask(0o077);
-  const fiber = Effect.runFork(program(inheritedToken));
+  const fiber = Effect.runFork(program(inheritedToken, webPassword));
   const stop = () => fiber.interruptUnsafe();
   process.once("SIGTERM", stop);
   process.once("SIGINT", stop);

@@ -2,6 +2,8 @@
 // protocol test mode it also removes arbitrary copied-library causes,
 // annotations and method names, preserving only fixed diagnostic categories.
 const messages = new Set([
+  "web server disabled: web password is unset or shorter than eight characters",
+  "web server status could not be recorded",
   "debug RPC group enabled", "request failed: defect", "adapter frame dropped: malformed",
   "adapter request refused: unsupported", "permission answer delivery failed",
   "adapter content dropped: no active turn", "adapter update dropped: malformed",

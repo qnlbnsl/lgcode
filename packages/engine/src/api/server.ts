@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import type { Socket } from "node:net";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import { CommandsRpcGroup, type Actor, type AgentId } from "@shephrd/contracts";
+import { CommandsRpcGroup, type Actor, type AgentId, type EventEnvelope } from "@shephrd/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -82,13 +82,18 @@ export const listen = (socketPath: string) => Effect.gen(function* () {
   };
 });
 
-export const application = (options: { readonly ownerCredential: Redacted.Redacted<string>; readonly debug: boolean; readonly lists?: Pick<EngineLists, "commands" | "access"> & { readonly reads: Readonly<Record<string, unknown>> } }) => Effect.gen(function* () {
+export interface Identity { readonly credential: Credential; readonly agentId?: AgentId }
+type ApplicationOptions = { readonly debug: boolean; readonly lists?: Pick<EngineLists, "commands" | "access"> & { readonly reads: Readonly<Record<string, unknown>> } } & (
+  | { readonly ownerCredential: Redacted.Redacted<string>; readonly webIdentity?: never }
+  | { readonly ownerCredential?: never; readonly webIdentity: (request: HttpServerRequest.HttpServerRequest) => Identity | undefined }
+);
+export const application = (options: ApplicationOptions) => Effect.gen(function* () {
   const services = yield* Effect.context<Services>();
   const handler = yield* CommandHandler;
   const log = yield* EventLog;
   const views = yield* Views;
   const recovery = yield* Effect.serviceOption(Restart);
-  const expected = Buffer.from(Redacted.value(options.ownerCredential));
+  const expected = options.ownerCredential === undefined ? undefined : Buffer.from(Redacted.value(options.ownerCredential));
   // The runtime group really omits debug. Use its superset type only to
   // share assembly of the dynamically enumerated, schema-checked handlers.
   const lists = options.lists ?? engineLists;
@@ -96,7 +101,7 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
 
   const authenticate = (raw: string) => Effect.gen(function* () {
     const bytes = Buffer.from(raw);
-    if (bytes.length === expected.length && timingSafeEqual(bytes, expected)) return { credential: { _tag: "owner" } as Credential };
+    if (expected !== undefined && bytes.length === expected.length && timingSafeEqual(bytes, expected)) return { credential: { _tag: "owner" } as Credential };
     if (raw.startsWith("shp_a_")) {
       const agentId = yield* verifyAgentToken(raw);
       return { credential: { _tag: "agent", token: Redacted.make(raw) } as Credential, agentId };
@@ -108,23 +113,24 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
     if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return refused(503, "recovering");
     const request = yield* HttpServerRequest.HttpServerRequest;
     const bearer = /^Bearer ([A-Za-z0-9_-]+)$/.exec(request.headers.authorization ?? "");
-    if (bearer === null || bearer[1]!.length > 256) return refused(401, "invalid credential");
-    const raw = bearer[1]!;
-    const identity = yield* authenticate(raw);
+    if (options.webIdentity === undefined && (bearer === null || bearer[1]!.length > 256)) return refused(401, "invalid credential");
+    const raw = bearer?.[1] ?? "";
+    const currentIdentity = () => options.webIdentity === undefined ? authenticate(raw) : Effect.sync(() => Option.fromUndefinedOr(options.webIdentity!(request)));
+    const identity = yield* currentIdentity();
     if (Option.isNone(identity)) return refused(401, "invalid credential");
     const { credential, agentId } = identity.value as { credential: Credential; agentId?: AgentId };
-    if (credential._tag === "owner" && !(yield* outsideAdapters(request.headers["shephrd-ancestors"], request.headers["shephrd-process-group"]))) return refused(403, "owner credential refused");
+    if (options.webIdentity === undefined && credential._tag === "owner" && !(yield* outsideAdapters(request.headers["shephrd-ancestors"], request.headers["shephrd-process-group"]))) return refused(403, "owner credential refused");
     // Ordinary HTTP is used by serve --detach to detect this service. It
     // performs the same authentication but never starts an RPC session.
     if (request.headers.upgrade?.toLowerCase() !== "websocket") return refused(400, "websocket required");
     const invalidated = yield* Deferred.make<void>();
     const invalidate = Deferred.succeed(invalidated, undefined);
-    const authenticateRequest = (requestId: string) => authenticate(raw).pipe(Effect.flatMap((current) =>
+    const authenticateRequest = (requestId: string) => currentIdentity().pipe(Effect.flatMap((current) =>
       Option.isNone(current)
         ? invalidate.pipe(Effect.andThen(Effect.fail(commandError(requestId, "invalid credential"))))
         : Effect.void,
     ));
-    const check = authenticate(raw).pipe(Effect.flatMap((current) => Option.isNone(current) ? invalidate : Effect.void));
+    const check = currentIdentity().pipe(Effect.flatMap((current) => Option.isNone(current) ? invalidate : Effect.void));
     if (credential._tag !== "owner") {
       const changes = yield* log.subscribeCommitted;
       // Recheck after subscribing to close the handshake/watcher gap. Batch
@@ -136,15 +142,32 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
     }
     const { protocol, httpEffect } = yield* RpcServer.makeProtocolWithHttpEffectWebsocket.pipe(Effect.provide(RpcSerialization.layerJson));
     const pending = new Map<string, number>();
+    const filteredStreams = new Set<string>();
     const boundedProtocol: RpcServer.Protocol["Service"] = {
       ...protocol,
       run: (receive) => protocol.run((clientId, message) => {
+        if (message._tag === "Request" && message.tag === "client.subscribe") filteredStreams.add(String(message.id));
         if (message._tag === "Ack" || message._tag === "Interrupt") pending.delete(String(message.requestId));
+        if (message._tag === "Interrupt") filteredStreams.delete(String(message.requestId));
         return receive(clientId, message);
       }),
       send: (clientId, message, transferables) => {
         if (message._tag === "Chunk") pending.set(String(message.requestId), Date.now());
-        if (message._tag === "Exit") pending.delete(String(message.requestId));
+        if (message._tag === "Exit") { pending.delete(String(message.requestId)); filteredStreams.delete(String(message.requestId)); }
+        if (message._tag === "Chunk" && filteredStreams.has(String(message.requestId))) {
+          // The handler emits singletons. Measure the real encoded wrapper as
+          // well, so an event just below the item limit still fits its frame.
+          return Effect.forEach(message.values, (value) => {
+            let item = value;
+            const frame = () => ({ ...message, values: [item] as [unknown] });
+            if (Buffer.byteLength(JSON.stringify(frame())) > 256 * 1024 && typeof value === "object" && value !== null && "event" in value) {
+              const row = value as EventEnvelope;
+              item = { _tag: "client.Oversized", sequence: row.sequence, tag: row.event._tag,
+                ...(row.agentId === undefined ? {} : { agentId: row.agentId }), bytes: Buffer.byteLength(JSON.stringify(row)) };
+            }
+            return protocol.send(clientId, frame(), transferables);
+          }, { discard: true });
+        }
         return protocol.send(clientId, message, transferables);
       },
     };

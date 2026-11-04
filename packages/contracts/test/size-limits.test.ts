@@ -53,7 +53,7 @@ it("1.11 a full-body WakeBuilt index of the smallest questions stays below the m
   const minimumItemBytes = Buffer.byteLength(JSON.stringify(`${id}\nRun board.acknowledge with this post's id when you start responding.\n`)) - 2;
   const count = Math.floor((256 * 1024 - 2) / minimumItemBytes);
   const ids = Array.from({ length: count }, (_, i) => `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`);
-  const event = { _tag: "board.WakeBuilt", wakeId: "wake-1", targetAgentId: "target", carried: ids, mustReply: ids, completions: [], reminders: [], noAnswers: [] };
+  const event = { _tag: "board.WakeBuilt", wakeId: "wake-1", targetAgentId: "target", carried: ids, mustReply: ids, completions: [], completionReplyText: [], reminders: [], noAnswers: [] };
   expect(ids.length).toBeGreaterThan(1000);
   expect(Schema.decodeUnknownSync(codec("BoardEvent"))(event)).toEqual(event);
   expect(eventBytes(event)).toBeLessThan(256 * 1024);

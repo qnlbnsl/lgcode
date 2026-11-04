@@ -29,7 +29,7 @@ export const samples: ReadonlyArray<Record<string, unknown> & { _tag: string }> 
   { _tag: "board.PostAcknowledged", postId: "post-1", addressee: agent("target") },
   { _tag: "board.AddresseeResolved", postId: "post-1", addressee: agent("target"), disposition: "replied", decidingPostId: "post-2", authorIsOwner: false },
   { _tag: "board.PostClosed", postId: "post-1", outcome: "answered", closer: owner, completionOwed: true },
-  { _tag: "board.WakeBuilt", wakeId: "wake-1", targetAgentId: "target", carried: ["post-1"], mustReply: ["post-1"], completions: ["post-0"], reminders: ["post-reminder"], noAnswers: [{ postId: "post-no-answer", addressee: agent("silent") }] },
+  { _tag: "board.WakeBuilt", wakeId: "wake-1", targetAgentId: "target", carried: ["post-1"], mustReply: ["post-1"], completions: ["post-0"], completionReplyText: ["post-0"], reminders: ["post-reminder"], noAnswers: [{ postId: "post-no-answer", addressee: agent("silent") }] },
   { _tag: "board.Read", channelId: "channel-1", reader: agent("target"), postIds: ["post-1"] },
 ];
 export const envelope = (event: unknown, sequence = 10) => ({

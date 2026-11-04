@@ -1,12 +1,12 @@
 import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
-import { AlertRpcGroup } from "./client/commands.ts"
 import { BoardRpcGroup, boardAccess } from "./board/commands.ts"
 import { Account } from "./accounts.ts"
 import { EventEnvelope, WaitMember } from "./events.ts"
 import { HarnessSettings, RunMode } from "./harnesses.ts"
 import { AccountId, AgentId, DeliveryId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
+import { AlertRpcGroup, ClientRpcGroup, clientCommandAccess } from "./client/commands.ts"
 import { PermissionLevel } from "./permission.ts"
 import { RolesRpcGroup, rolesAccess } from "./roles/commands.ts"
 
@@ -135,11 +135,19 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 ).merge(DebugRpcGroup)
 
 // Later pieces merge their prefixed groups here, in namespace order.
-export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(AlertRpcGroup).merge(BoardRpcGroup).merge(RolesRpcGroup)
+export const WebRpcGroup = ClientRpcGroup.omit(
+  "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence",
+  "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
+  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"
+)
+export const ClientReadsRpcGroup = ClientRpcGroup.omit("client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", "client.web.settings", "client.web.settings.set")
+const InstalledClientRpcGroup = ClientReadsRpcGroup.merge(AlertRpcGroup).merge(WebRpcGroup)
+export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(BoardRpcGroup).merge(InstalledClientRpcGroup).merge(RolesRpcGroup)
 export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 
 // A new command requires an access decision at the composition point.
 export const commandAccess = {
+  "client.web.settings": ["owner"], "client.web.settings.set": ["owner"],
   "client.alerts.list": ["owner"], "client.alerts.dismiss": ["owner"],
   "client.alerts.settings": ["owner"], "client.alerts.settings.set": ["owner"],
   "client.alerts.carrier.set": ["owner"], "client.alerts.carrier.set-token": ["owner"],
@@ -150,7 +158,10 @@ export const commandAccess = {
   "pass-up": ["owner", "agent"], ask: ["owner", "agent"], wait: ["owner", "agent"],
   stop: ["owner", "agent"], resume: ["owner", "agent", "service"], compact: ["owner", "agent", "service"], group: ["owner", "agent"],
   accounts: ["owner"], "accounts set-secret": ["owner"], "accounts mark-available": ["owner"],
-  harnesses: ["owner"], subscribe: ["owner", "agent", "service"], "debug.compare-views": ["owner"]
+  harnesses: ["owner"], subscribe: ["owner", "agent", "service"], "debug.compare-views": ["owner"],
+  "client.snapshot": clientCommandAccess["client.snapshot"], "client.roster": clientCommandAccess["client.roster"],
+  "client.thread": clientCommandAccess["client.thread"], "client.subscribe": clientCommandAccess["client.subscribe"],
+  "client.event": clientCommandAccess["client.event"], "client.sequence": clientCommandAccess["client.sequence"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>, ReadonlyArray<CallerKind>>
-export const ownerOnlyCommands = engineCommandNames.filter((name) => !(commandAccess[name] as ReadonlyArray<CallerKind>).includes("agent"))
-export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }, { namespace: "client", group: AlertRpcGroup }, { namespace: "board", group: BoardRpcGroup }, { namespace: "roles", group: RolesRpcGroup }] as const
+export const ownerOnlyCommands = [...CommandsRpcGroup.requests.keys()].filter((name) => !(commandAccess[name as keyof typeof commandAccess] as ReadonlyArray<CallerKind>).includes("agent"))
+export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }, { namespace: "board", group: BoardRpcGroup }, { namespace: "client", group: InstalledClientRpcGroup }, { namespace: "roles", group: RolesRpcGroup }] as const

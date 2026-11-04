@@ -1,4 +1,4 @@
-import { CommandsRpcGroup, Event, EventEnvelope, WireCommandsRpcGroup, WireEnvelope } from "@shephrd/contracts"
+import { CommandsRpcGroup, Event, EventEnvelope, WireCommandsRpcGroup, WireEnvelope, contentOnlyEventTags } from "@shephrd/contracts"
 import type * as Duration from "effect/Duration"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
@@ -206,7 +206,41 @@ export const connectWith = (options: CoreConnectOptions): Effect.Effect<Client, 
           const request = first ? payload : { ...payload, requestId: globalThis.crypto.randomUUID(), after }
           first = false
           return ((connection.client as any)[tag](request, callOptions) as Stream.Stream<any, unknown>).pipe(
-            Stream.mapEffect((item) => isEnvelope(item) ? decodeEnvelope(item) : decodeReply(item, success.ast)),
+            Stream.mapEffect((item): Effect.Effect<any, unknown> => {
+              if (tag !== "client.subscribe" || item._tag !== "client.Oversized"
+                || !knownTags.has(item.tag) || (contentOnlyEventTags as ReadonlyArray<string>).includes(item.tag)) {
+                return isEnvelope(item) ? decodeEnvelope(item) : decodeReply(item, success.ast)
+              }
+              const rpc = CommandsRpcGroup.requests.get("client.event")!
+              return unary("client.event", rpc.successSchema)({ requestId: globalThis.crypto.randomUUID(), sequence: item.sequence }).pipe(
+                Effect.flatMap((reply: any) => Effect.gen(function* () {
+                  let value = reply
+                  if (typeof reply.data === "string") {
+                    value = yield* Effect.try({
+                      try: () => {
+                        const lines = reply.data.split("\n")
+                        const marker = /^Data from another agent \[([^\]]+)\] \(delivery .*\):$/.exec(lines[0] ?? "")?.[1]
+                        if (lines.length !== 3 || marker === undefined || lines[2] !== `End data [${marker}]`) throw new Error()
+                        return JSON.parse(lines[1]!)
+                      },
+                      catch: () => new ClientError({ message: "the event recovery reply was invalid" })
+                    })
+                    const wire = yield* Schema.decodeUnknownEffect(WireEnvelope)(value.envelope)
+                    value = { envelope: yield* decodeEnvelope(wire) }
+                  }
+                  if (!isEnvelope(value.envelope) || value.envelope.sequence !== item.sequence) {
+                    return yield* new ClientError({ message: "the event recovery reply was invalid" })
+                  }
+                  return value.envelope
+                })),
+                // A refused read can mean that the caller's read rights changed.
+                // Reconnect from before this marker and let visibility decide.
+                Effect.catch(() => Effect.fail(new ClientError({ message: "the state event could not be recovered" }))),
+                // Socket.write queues the Interrupt synchronously. Allow an I/O
+                // turn before the enclosing consumer can close the read socket.
+                Effect.onInterrupt(() => Effect.promise<void>(() => new Promise((resolve) => setTimeout(resolve, 0))))
+              )
+            }),
             Stream.tap((item) => Effect.sync(() => { after = item.sequence; failures = 0 })),
             Stream.tapError((error) => isTransport(error) ? streams.drop(connection) : Effect.void),
             Stream.ensuring(streams.release(connection))

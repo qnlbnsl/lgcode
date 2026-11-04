@@ -43,7 +43,13 @@ for (const command of CommandsRpcGroup.requests.keys()) {
       stop: { agentId: "member" }, resume: { agentId: "member", fresh: true }, compact: { agentId: "member" },
       group: { agentId: "member", add: ["review"], remove: ["build"] },
       accounts: { operation: "list" }, "accounts mark-available": { accountId: "account" },
+      "client.web.settings": {},
+      "client.web.settings.set": { settings: { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false } },
       harnesses: { operation: "list" }, subscribe: { after: 100 }, "debug.compare-views": {},
+      "client.snapshot": {}, "client.roster": { group: "review", role: "worker", parent: "lead" },
+      "client.thread": { agentId: "member", after: 100, limit: 500 },
+      "client.event": { sequence: 101 }, "client.sequence": {},
+      "client.subscribe": { after: 100, filter: { agents: ["member"], kinds: ["TurnEnded"] } },
       "board.open": { name: "Review", group: "review", anchorAgentId: "member" },
       "board.members": { channelId: "channel", add: ["member"], remove: ["former"] },
       "board.post": { channelId: "channel", text: "Which option?", to: [{ _tag: "agent", agentId: "member" }], reply: "all", replyTo: "earlier-post" },
@@ -72,7 +78,12 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         compact: { ...base, deliveryId: "delivery" }, ask: { ...base, questionId: "question" },
         wait: { ...base, waitId: "wait", members: [{ agentId: "member", reason: "settled" }], outcome: "satisfied" },
         accounts: { ...base, accounts: [] }, harnesses: { ...base, harnesses: [] },
+        "client.web.settings": { ...base, enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false, serverState: "running" },
         "debug.compare-views": { ...base, sequence: 100, equal: true, differences: [] },
+        "client.snapshot": { ...base, sequence: 100, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 },
+        "client.roster": { ...base, agents: [] }, "client.thread": { ...base, items: [] },
+        "client.sequence": { ...base, sequence: 100 },
+        "client.event": { ...base, envelope: { sequence: 101, eventId: "parity-event", occurredAt: 1_800_000_000_000, caller: { _tag: "owner" }, agentId: "member", event: { _tag: "TurnEnded", agentId: "member", compact: false } } },
         "board.open": { ...base, channelId: "channel" },
         "board.members": { ...base, memberCount: 1 },
         "board.post": { ...base, postId: "post" },
@@ -90,7 +101,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         "roles.actions.list": { ...base, records: [], truncated: false },
         "roles.record": { ...base, sequence: 101 },
       };
-      if (frame.tag === "subscribe") {
+      if (frame.tag === "subscribe" || frame.tag === "client.subscribe") {
         chunk(socket, frame, [{ sequence: 101, eventId: "parity-event", occurredAt: 1_800_000_000_000,
           caller: { _tag: "agent", agentId: "member" }, agentId: "member", event: { _tag: "TurnEnded", agentId: "member", compact: false } }]);
         succeed(socket, frame, undefined);
@@ -122,7 +133,7 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "compact", "group", "pass-up", "prompt", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "prompt", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
   const nonAgent = Object.entries(commandAccess).filter(([, kinds]) => !(kinds as ReadonlyArray<string>).includes("agent")).map(([name]) => name);

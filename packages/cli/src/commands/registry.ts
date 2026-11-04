@@ -2,7 +2,7 @@ import { CommandsRpcGroup, commandAccess, type CallerKind } from "@shephrd/contr
 import type * as Rpc from "effect/rpc/Rpc"
 import type * as RpcGroup from "effect/rpc/RpcGroup"
 
-export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>
+export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>> | "client.wait" | "thread.export"
 
 // The commands the shephrd command recognises are the requests of the RPC
 // group, the same list the client builds its methods from; only the
@@ -32,7 +32,17 @@ const summaries: Record<CommandName, string> = {
   "accounts mark-available": "Mark an account available again.",
   harnesses: "List, set or reset harness settings.",
   subscribe: "Print the event stream from a sequence.",
+  "client.web.settings": "Read the web server settings and state.",
+  "client.web.settings.set": "Change the web server settings.",
   "debug.compare-views": "Compare the live views with a rebuild (test services only).",
+  "client.snapshot": "Read client.snapshot, the current team and its sequence.",
+  "client.roster": "Read client.roster, filtered by group, role or parent.",
+  "client.thread": "Read client.thread, one page of an agent's events.",
+  "client.event": "Read client.event, a whole event by sequence.",
+  "client.sequence": "Read client.sequence, the published views sequence.",
+  "client.subscribe": "Follow client.subscribe, a filtered event stream.",
+  "client.wait": "Wait for agents using the owner's client helper.",
+  "thread.export": "Export a thread to a local file with mode 0600.",
   "board.open": "Open a plain channel or a channel bound to a group.",
   "board.members": "Add or remove members of a plain channel.",
   "board.post": "Write a post in a channel or to a direct target, and request replies when needed.",
@@ -58,7 +68,8 @@ export const isCommand = (name: string): name is CommandName => (commandNames as
 // The longest command name that opens the arguments: "accounts set-secret"
 // before "accounts".
 export const matchCommand = (args: ReadonlyArray<string>): { readonly command: CommandName; readonly rest: ReadonlyArray<string> } | undefined => {
-  const candidates = commandNames.flatMap((command) => [
+  const names: ReadonlyArray<CommandName> = [...commandNames, "client.wait", "thread.export"]
+  const candidates = names.flatMap((command) => [
     { command, words: command.split(" ") },
     { command, words: command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ") },
   ])
@@ -70,7 +81,8 @@ export const matchCommand = (args: ReadonlyArray<string>): { readonly command: C
 }
 
 export const helpText = (command: CommandName): string => {
-  const owner = commandAccess[command] !== undefined && !(commandAccess[command] as ReadonlyArray<CallerKind>).includes("agent")
+  const access = command in commandAccess ? commandAccess[command as keyof typeof commandAccess] : ["owner"]
+  const owner = !(access as ReadonlyArray<CallerKind>).includes("agent")
     ? "This command is for the owner's terminal; an agent's identity is refused.\n" : ""
   if (command === "accounts set-secret") {
     return [
@@ -93,7 +105,8 @@ export const helpText = (command: CommandName): string => {
     "  --input <json>  The command's payload as one JSON object. A requestId is added when absent.",
     "  --help          Show this help."
   ]
-  if (command === "wait") {
+  if (command === "thread.export") return "Usage: shephrd thread export <agent> --out <file>\n\nExport all thread pages to a file on this computer with mode 0600.\n"
+  if (command === "wait" || command === "client.wait") {
     options.splice(1, 0,
       "  --block         Hold this process until the agents settle. Exit 1 if any crashed or stopped,",
       "                  else 2 if any paused or was interrupted, else 0.",
