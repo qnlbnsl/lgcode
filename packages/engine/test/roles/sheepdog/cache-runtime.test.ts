@@ -116,10 +116,13 @@ it.effect.each([
 it.effect("a capacity hold opened after arming suppresses compaction even with an empty queue", () => run((runner, client) => Effect.gen(function* () {
   const who = yield* start(runner, client);
   yield* turn(runner, client, who, "before-hold", warm);
+  yield* TestClock.adjust("57 minutes");
   // The capacity producer is a runner event, not an owner command. Only this
   // otherwise unreachable empty-hold condition uses a historical event fixture.
+  // Open it near the cache deadline so the capacity rule has not released it.
   yield* appendSetup([eventOf({ _tag: "DeliveryHeld", agentId: who.agentId, deliveryId: "empty-hold", reason: "capacity" })]);
-  yield* TestClock.adjust("58 minutes");
+  yield* TestClock.adjust("1 minute");
+  expect((yield* snapshot).agents[who.agentId]?.capacityHeld).toBe(true);
   yield* pause(100); expect(runner.callsOf("compact")).toHaveLength(0);
 })));
 

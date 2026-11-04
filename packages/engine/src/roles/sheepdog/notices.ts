@@ -81,7 +81,9 @@ export const sendNotice = (action: NoticeAction, rule: string, lists: EngineList
     else {
       const post = yield* executeService(sheepdogCaller, "board.post", {
         requestId: id("post"), direct: { _tag: "agent", agentId: action.noticeRecipient }, to: [{ _tag: "agent", agentId: action.noticeRecipient }], reply: "none",
-        text: noticeText(action._tag, own(snapshot.agents, action.agentId)?.name ?? "Unnamed agent"),
+        text: action._tag === "roles.GaveUp" && action.cause === "capacity"
+          ? `Capacity recovery has ended. Move the work to another model. Agent: ${sanitizeName(own(snapshot.agents, action.agentId)?.name ?? "Unnamed agent") || "Unnamed agent"}.`
+          : noticeText(action._tag, own(snapshot.agents, action.agentId)?.name ?? "Unnamed agent"),
       }, lists).pipe(Effect.result);
       if (post._tag === "Failure") {
         if (post.failure._tag === "LogWriteFailed") return yield* post.failure;
