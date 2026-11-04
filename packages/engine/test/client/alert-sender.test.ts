@@ -15,7 +15,7 @@ interface Sender { readonly send: (payload: Payload, ...context: any[]) => Effec
 const titles: Record<string, string> = {
   approval: "Permission needs your approval", question: "A question needs your answer",
   failure: "An agent needs your attention", account: "An account needs your attention", other: "Your attention is needed",
-  "client.web-down": "The web server is down", "board.post": "A post needs your reply",
+  "client.web-down": "The web server is down", "board.post": "A post needs your reply", "board.no-answer": "An agent has not answered your post",
   "roles.stall": "An agent has stalled", "roles.replace": "A worker needs replacement",
   "roles.runaway": "Work has exceeded its expected length", "roles.rule-first-use": "A permission rule was used for the first time",
 };
@@ -40,9 +40,9 @@ it("6.6/6.7 every enabled kind reaches only AlertSender, send-time changes take 
     }
     expect(sends).toHaveLength(0);
     yield* configure("https://push.example");
-    const pushed = yield* eventually(Effect.sync(() => [...sends]), (rows) => rows.length === 10);
+    const pushed = yield* eventually(Effect.sync(() => [...sends]), (rows) => rows.length === 11);
     expect(pushed.map((row) => row.kind).sort()).toEqual([
-      "account", "approval", "board.post", "client.web-down", "failure", "other", "question", "roles.replace", "roles.rule-first-use", "roles.stall",
+      "account", "approval", "board.no-answer", "board.post", "client.web-down", "failure", "other", "question", "roles.replace", "roles.rule-first-use", "roles.stall",
     ]);
     for (const payload of pushed) {
       expect(payload).toMatchObject({ alertId: `sender-${payload.kind}`, agentName: "name-worker", team: ["build"], title: titles[payload.kind] });
@@ -50,7 +50,7 @@ it("6.6/6.7 every enabled kind reaches only AlertSender, send-time changes take 
       expect(payload.link).toContain("https://shephrd.example");
     }
     success(yield* call(ownerCredential, "client.alerts.settings.set", { kind: "roles.runaway", push: true }));
-    expect(yield* eventually(Effect.sync(() => sends.length), (n) => n === 11)).toBe(11);
+    expect(yield* eventually(Effect.sync(() => sends.length), (n) => n === 12)).toBe(12);
     expect(sends.at(-1)?.kind).toBe("roles.runaway");
     success(yield* call(ownerCredential, "client.alerts.dismiss", { alertId: "sender-other" }));
     expect(yield* eventually(Effect.sync(() => [...clears]), (rows) => rows.length > 0)).toEqual(["sender-other"]);

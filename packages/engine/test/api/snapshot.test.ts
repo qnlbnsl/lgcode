@@ -67,7 +67,8 @@ it("1.22 default snapshots include the installed roles summary for the owner and
     snapshot: Effect.succeed(emptyViews()), applyCommitted: () => Effect.void,
   })) as Effect.Effect<SnapshotReply, unknown, never>);
   const reply = await run(owner);
-  for (const namespace of ["client", "board"]) expect(Object.hasOwn(reply, namespace)).toBe(false);
+  expect(Object.hasOwn(reply, "client")).toBe(false);
+  expect(reply.board).toMatchObject({ disabled: false, holdsUnsettled: [], holdsIncoming: [], ownerHeld: [] });
   expect(reply.roles).toEqual({
     roleFile: null, settings: {}, matters: { items: [], truncated: false },
     snoozes: { items: [], truncated: false }, agents: { items: [], truncated: false },

@@ -5,6 +5,7 @@ import { run as runReadRig, snapshotFor, event, permissionFor, questionFor, byte
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { action, fileEvent } from "../roles/fixtures.ts";
 import { rolesActionKinds } from "@shephrd/contracts";
+import { channel, post } from "../board/fixtures.ts";
 
 const run = <A>(program: Effect.Effect<A, any, any>) => runReadRig(program, registerRebuildCheck());
 
@@ -24,7 +25,15 @@ it("3.1 a 200-agent, 100-request team with full display text stays below 4 MiB a
   yield* appendSetup([fileEvent(), ...Array.from({ length: 200 }, (_, i) => rolesActionKinds.map((kind) => action(kind, {
     agentId: `agent-${i}`, noticeRecipient: "lead", ...(kind === "GaveUp" ? { engineAlertOpen: true } : {}),
   }))).flat()]);
+  // WS-5: count a board section filled to its metadata budget as well.
+  const addressees = Array.from({ length: 16 }, (_, i) => ({ _tag: "agent", agentId: `agent-${i}` }));
+  yield* appendSetup([channel({ members: [{ _tag: "owner" }, ...addressees] }), ...Array.from({ length: 1_000 }, (_, i) =>
+    post(`snapshot-board-${i}`, { author: { _tag: "owner" }, to: addressees, reply: "none", text: '"'.repeat(16_384) }))]);
   const reply = yield* snapshotFor();
+  expect(reply.board).toBeDefined();
+  expect(reply.board.truncated).toBe(true);
+  expect(bytes(reply.board)).toBeLessThanOrEqual(256 * 1024);
+  expect(bytes(reply.board)).toBeGreaterThan(250 * 1024);
   expect(reply.agents.filter((row: any) => row.capacityHeld === true)).toHaveLength(200);
   expect(reply.roles, "1d's roles summary must count toward the aggregate 4 MiB snapshot budget").toBeDefined();
   expect(bytes(reply.roles)).toBeLessThanOrEqual(128 * 1024);

@@ -15,10 +15,17 @@ import { Views } from "../../views/Views.ts";
 import { engineOpenMatters, engineSource, openQuestions, subjectClosed } from "./sources.ts";
 import { clientView, type AlertRow } from "./view.ts";
 
-export type AlertSourceResult = (AlertSourceRequest & { readonly _tag: "raise" })
-  | { readonly _tag: "end"; readonly key: string } | undefined;
+export type PieceAlertSourceRequest = Omit<AlertSourceRequest, "subject" | "key"> & {
+  readonly key: string;
+  readonly subject?: AlertSourceRequest["subject"] | string;
+};
+type AlertAction = (PieceAlertSourceRequest & { readonly _tag: "raise" }) | { readonly _tag: "end"; readonly key: string };
+export type AlertSourceResult = AlertAction | ReadonlyArray<AlertAction> | undefined;
 
 const decodeSource = Schema.decodeUnknownSync(AlertSourceRequest);
+const decodePieceSource = (namespace: PieceNamespace, source: PieceAlertSourceRequest): AlertSourceRequest => decodeSource({
+  ...source, ...(typeof source.subject === "string" ? { subject: { _tag: "piece", namespace, id: source.subject } } : {}),
+});
 const ownedKind = (namespace: PieceNamespace, source: AlertSourceRequest): boolean => source.kind.startsWith(`${namespace}.`);
 const raises = (sources: ReadonlyArray<AlertSourceRequest>, snapshot: Snapshot, sequence: number, baseline = false): Event[] => {
   const keys = new Set(Object.values(clientView(snapshot.client).alerts).filter((row) => row.status === "open").map((row) => row.alertKey));
@@ -64,18 +71,21 @@ const react = (envelope: EventEnvelope, snapshot: Snapshot, lists: EngineLists):
   const view = clientView(snapshot.client);
   if (envelope.sequence <= (view.position ?? 0)) return [];
   const sources: AlertSourceRequest[] = [];
-  const ends = new Map<PieceNamespace, string>();
+  const ends: Array<readonly [PieceNamespace, string]> = [];
   const engine = engineSource(envelope, snapshot);
   if (engine !== undefined) sources.push(engine);
   for (const namespace of pieceNamespaces) {
     const source = lists.alertSources?.[namespace];
     if (source === undefined) continue;
-    const result = guardPiece("alertSources", namespace, (): AlertSourceResult => {
+    const results = guardPiece("alertSources", namespace, () => {
       const result = source(envelope);
-      return result?._tag === "raise" ? { ...decodeSource(result), _tag: "raise" } : result;
-    }, undefined);
-    if (result?._tag === "raise" && ownedKind(namespace, result)) sources.push(result);
-    else if (result?._tag === "end") ends.set(namespace, result.key);
+      const actions = result === undefined ? [] : Array.isArray(result) ? result : [result as AlertAction];
+      return actions.map((action) => action._tag === "raise" ? { ...decodePieceSource(namespace, action), _tag: "raise" as const } : action);
+    }, []);
+    for (const result of results) {
+      if (result._tag === "raise" && ownedKind(namespace, result)) sources.push(result);
+      else if (result._tag === "end") ends.push([namespace, result.key]);
+    }
   }
   const agentId = resumed(envelope, snapshot);
   if (agentId !== undefined) sources.push(...openQuestions(snapshot, agentId));
@@ -106,7 +116,7 @@ export const initializeAlerts = Effect.gen(function* () {
     for (const namespace of pieceNamespaces) {
       const scan = lists.openMatters?.[namespace];
       if (scan === undefined) continue;
-      const matters = guardPiece("openMatters", namespace, () => scan(snapshot).map((source) => decodeSource(source)), []);
+      const matters = guardPiece("openMatters", namespace, () => scan(snapshot).map((source) => decodePieceSource(namespace, source)), []);
       sources.push(...matters.filter((source) => ownedKind(namespace, source)));
     }
     return { events: [{ _tag: "client.AlertBaseline", position: snapshot.sequence }, ...raises(sources, snapshot, snapshot.sequence, true)] };

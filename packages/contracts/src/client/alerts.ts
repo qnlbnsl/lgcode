@@ -9,7 +9,7 @@ export const AlertKey = Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]+(?:
 export type AlertKey = typeof AlertKey.Type
 export const alertKindNames = [
   "approval", "question", "failure", "account", "other", "client.web-down",
-  "board.post", "roles.stall", "roles.replace", "roles.runaway", "roles.rule-first-use"
+  "board.post", "board.no-answer", "roles.stall", "roles.replace", "roles.runaway", "roles.rule-first-use"
 ] as const
 export const AlertKind = Schema.Literals(alertKindNames)
 export type AlertKind = typeof AlertKind.Type
@@ -17,7 +17,7 @@ export const alertTitles = {
   approval: "Permission needs your approval", question: "A question needs your answer",
   failure: "An agent needs your attention", account: "An account needs your attention",
   other: "Your attention is needed", "client.web-down": "The web server is down",
-  "board.post": "A post needs your reply", "roles.stall": "An agent has stalled",
+  "board.post": "A post needs your reply", "board.no-answer": "An agent has not answered your post", "roles.stall": "An agent has stalled",
   "roles.replace": "A worker needs replacement", "roles.runaway": "Work has exceeded its expected length",
   "roles.rule-first-use": "A permission rule was used for the first time"
 } as const satisfies Record<AlertKind, string>

@@ -6,7 +6,7 @@ import type { BoardPostView } from "@shephrd/contracts/board/view";
 import { BoardChannelName, BoardPostText } from "@shephrd/contracts/board/schemas";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import type { ReadHandler, ReadReply } from "../api/reads.ts";
+import { agentReadReply, type ReadHandler, type ReadReply } from "../api/reads.ts";
 import { refused, type Input, type Payload, type PiecePlan } from "../commands/internal.ts";
 import { holderAbove } from "../routing/holders.ts";
 import { project } from "../routing/waits.ts";
@@ -162,18 +162,24 @@ const flush: Planner = (input, raw) => Effect.gen(function* () {
     reply: (batch) => ({ requestId: payload.requestId, ...(built === undefined ? {} : { wakeId: batchId(batch, "board.WakeBuilt").wakeId }) }) };
 });
 
-// Both reads page from one snapshot. Tokens identify an item within the
+// All reads page from one snapshot. Tokens identify an item within the
 // filtered result, and never grant access on a later request.
-const page = <T>(items: ReadonlyArray<T>, payload: Record<string, unknown>, key: (item: T) => string): Record<string, unknown> => {
+const page = <T>(items: ReadonlyArray<T>, payload: Record<string, unknown>, key: (item: T) => string,
+  wrap: (reply: Record<string, unknown>) => Record<string, unknown> = (reply) => reply) => {
   const start = payload.after === undefined ? 0 : items.findIndex((item) => key(item) === payload.after) + 1;
   const result: T[] = [];
+  const reply = () => ({ requestId: payload.requestId, items: result,
+    ...(start + result.length < items.length && result.length > 0 ? { next: key(result.at(-1)!) } : {}) });
   for (const item of items.slice(start)) {
-    if (result.length >= (payload.limit as number | undefined ?? 200) || encodedBytes([...result, item]) > 512 * 1024) break;
+    if (result.length >= (payload.limit as number | undefined ?? 200)) break;
     result.push(item);
+    // Include the envelope, escaping and cursor in the actual wire budget.
+    // A singleton still advances a cursor even for a legacy oversized item.
+    if (result.length > 1 && encodedBytes(wrap(reply())) > 512 * 1024) { result.pop(); break; }
   }
-  return { requestId: payload.requestId, items: result, ...(start + result.length < items.length && result.length > 0 ? { next: key(result.at(-1)!) } : {}) };
+  return reply();
 };
-const channels: ReadHandler = (input, payload) => Effect.succeed({ reply: page(
+const channels: ReadHandler = (input, payload) => input.runtime.lists?.boardEnabled === false ? Effect.fail(refused("board disabled")) : Effect.succeed({ reply: page(
   Object.values(boardView(input.snapshot).channels).filter((channel) => canRead(input.snapshot, input.actor, channel.channelId)).map((channel) => ({
     channelId: channel.channelId, name: channel.name, kind: channel.kind, members: channelMembers(input.snapshot, channel.channelId),
     ...(channel.manager === undefined ? {} : { manager: channel.manager }),
@@ -182,22 +188,66 @@ const channels: ReadHandler = (input, payload) => Effect.succeed({ reply: page(
   })), payload, (channel) => channel.channelId,
 ) });
 
+const read: ReadHandler = (input, payload) => Effect.gen(function* () {
+  if (input.runtime.lists?.boardEnabled === false) return yield* refused("board disabled");
+  const { snapshot, actor } = input;
+  if (actor._tag !== "owner" && actor._tag !== "agent") return yield* refused();
+  const board = boardView(snapshot);
+  const referenced = typeof payload.post === "string" ? own(board.posts, payload.post)
+    : typeof payload.repliesTo === "string" ? own(board.posts, payload.repliesTo) : undefined;
+  if ((payload.post !== undefined || payload.repliesTo !== undefined)
+    && (referenced === undefined || !canRead(snapshot, actor, referenced.channelId))) return yield* refused();
+  if (typeof payload.channelId === "string" && !canRead(snapshot, actor, payload.channelId)) return yield* refused();
+  const posts = Object.values(board.posts).filter((post) => canRead(snapshot, actor, post.channelId)
+    && (payload.channelId === undefined || post.channelId === payload.channelId)
+    && (payload.post === undefined || post.postId === payload.post)
+    && (payload.repliesTo === undefined || post.replyTo === payload.repliesTo)
+    && (payload.open !== true || (post.status === "open" && sameAuthor(post.author, actor)))
+    && (payload.incoming !== true || (post.status === "open" && post.reply !== "none"
+      && post.to.some((to) => sameAuthor(to, actor))
+      && (own(post.dispositions, readerKey(actor)) === undefined || own(post.dispositions, readerKey(actor)) === "no-answer"))))
+    .sort((a, b) => a.sequence - b.sequence);
+  const items = posts.map((post) => ({ postId: post.postId, channelId: post.channelId, author: post.author,
+    text: post.text, to: post.to, reply: post.reply, sequence: post.sequence, status: post.status,
+    dispositions: postDispositions(post), acknowledged: post.acknowledged,
+    ...(post.replyTo === undefined ? {} : { replyTo: post.replyTo }),
+    ...(post.outcome === undefined ? {} : { outcome: post.outcome }),
+  }));
+  const wrap = (value: Record<string, unknown>) => actor._tag === "agent" ? agentReadReply(payload.requestId, value) : value;
+  const plain = page(items, payload, (post) => post.postId, wrap);
+  const reply = wrap(plain);
+  const returned = new Set(plain.items.map((post) => post.postId));
+  const unread = posts.filter((post) => returned.has(post.postId) && isUnread(snapshot, actor, post));
+  const byChannel = new Map<ChannelId, PostId[]>();
+  for (const post of unread) {
+    const ids = byChannel.get(post.channelId) ?? [];
+    ids.push(post.postId);
+    byChannel.set(post.channelId, ids);
+  }
+  const marks: Event[] = [...byChannel].map(([channelId, postIds]) => ({ _tag: "board.Read", channelId, reader: actor, postIds }));
+  return { reply, marks };
+});
+
 const status = (input: Input, raw: Record<string, unknown>): Effect.Effect<ReadReply, ReturnType<typeof refused>> => Effect.gen(function* () {
   const payload = raw as Payload<"board.status">;
   const { snapshot, actor } = input;
   const board = boardView(snapshot);
+  const disabled = input.runtime.lists?.boardEnabled === false;
   if (payload.agentId === undefined) {
     if (actor._tag !== "owner" && actor._tag !== "service") return yield* refused();
     const ids = Object.keys(snapshot.agents);
-    return { reply: { requestId: payload.requestId, sequence: snapshot.sequence, disabled: false,
-      holdsUnsettled: ids.filter((id) => holdsUnsettled(id, board, snapshot.deliveries)),
-      holdsIncoming: ids.filter((id) => holdsIncoming(id, board)), ownerHeld: ownerHeld(board) } };
+    return { reply: { requestId: payload.requestId, sequence: snapshot.sequence, disabled,
+      holdsUnsettled: disabled ? [] : ids.filter((id) => holdsUnsettled(id, board, snapshot.deliveries)),
+      holdsIncoming: disabled ? [] : ids.filter((id) => holdsIncoming(id, board)), ownerHeld: disabled ? [] : ownerHeld(board) } };
   }
   const id = payload.agentId;
   if (own(snapshot.agents, id) === undefined) return yield* refused("agent not found");
   const holder = holderAbove(snapshot, id);
   if (actor._tag !== "owner" && actor._tag !== "service" && !(actor._tag === "agent" && (actor.agentId === id
     || (holder._tag === "agent" && holder.agentId === actor.agentId)))) return yield* refused();
+  if (disabled) return { reply: { requestId: payload.requestId, agentId: id, sequence: snapshot.sequence, disabled: true,
+    unread: 0, incomingOpen: 0, ownOpen: 0, owed: 0, failedCompletions: 0, wakeQueued: false, wakeSent: false,
+    holdsUnsettled: false, holdsIncoming: false } };
   const posts = Object.values(board.posts);
   const incoming = posts.filter((post) => post.status === "open" && post.reply !== "none"
     && post.to.some((to) => to._tag === "agent" && to.agentId === id)
@@ -227,4 +277,4 @@ const status = (input: Input, raw: Record<string, unknown>): Effect.Effect<ReadR
 
 export const boardPlanners = { "board.open": open, "board.members": members, "board.post": post,
   "board.close": close, "board.acknowledge": acknowledge, "board.flush": flush } satisfies Record<string, Planner>;
-export const boardReads = { "board.channels": channels, "board.status": status } satisfies Record<string, ReadHandler>;
+export const boardReads = { "board.read": read, "board.channels": channels, "board.status": status } satisfies Record<string, ReadHandler>;

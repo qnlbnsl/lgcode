@@ -40,6 +40,7 @@ import { drainPieceErrors } from "./pieces/guardPiece.ts";
 import type { Runtime } from "./commands/internal.ts";
 import * as Views from "./views/Views.ts";
 import { serve as serveWeb } from "./client/web/server.ts";
+import { boardEnabledAtStartup, withBoardEnabled } from "./board/switch.ts";
 
 const inTemporaryFolder = (folder: string): boolean => {
   try {
@@ -84,6 +85,7 @@ export const buildServices = (configuration: Pick<Runtime, "home" | "stateFolder
   handlerServices(configuration, lists).pipe(Layer.provideMerge(baseServices(lists)));
 
 const program = (inheritedToken: string | undefined, webPassword: Redacted.Redacted<string> | undefined) => Effect.scoped(Effect.gen(function* () {
+  const lists = withBoardEnabled(engineLists, boardEnabledAtStartup(process.env));
   const folder = yield* Effect.try({ try: () => {
     const path = stateFolder(process.env);
     prepareStateFolder(path);
@@ -138,16 +140,16 @@ const program = (inheritedToken: string | undefined, webPassword: Redacted.Redac
     });
     const configuration = { home: process.env.HOME ?? folder, stateFolder: folder, pluginRoot: fileURLToPath(new URL("../../..", import.meta.url)),
       harnessDefaults: installedHarnessDefaults(process.env.PATH ?? "") };
-    const base = baseServices(engineLists);
+    const base = baseServices(lists);
     const runner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: { ...process.env }, protocolLog, credentials }).pipe(
       Layer.provideMerge(SecretStore.layer({ stateFolder: folder })),
     );
     const recovery = Restart.layer(configuration).pipe(Layer.provideMerge(Layer.merge(base, runner)));
-    const services = handlerServices(configuration, engineLists).pipe(Layer.provideMerge(recovery), Layer.provideMerge(redactor.layer));
+    const services = handlerServices(configuration, lists).pipe(Layer.provideMerge(recovery), Layer.provideMerge(redactor.layer));
     return yield* Effect.gen(function* () {
       if (debug) yield* Effect.logInfo("debug RPC group enabled");
-      yield* listener.install(yield* application({ ownerCredential, debug }));
-      const web = yield* serveWeb({ password: webPassword, staticRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
+      yield* listener.install(yield* application({ ownerCredential, debug, lists }));
+      const web = yield* serveWeb({ password: webPassword, lists, staticRoot: fileURLToPath(new URL("../../web/dist", import.meta.url)),
         registerSecret: (secret) => { explicitSecrets.push(secret); } });
       yield* Effect.addFinalizer(() => web.close);
       yield* (yield* Restart.Restart).recover;
