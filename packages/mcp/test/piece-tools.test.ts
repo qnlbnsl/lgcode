@@ -12,7 +12,8 @@ it("1a E2 tools derive new agent-callable piece commands but exclude streams and
     Rpc.make("subscribe", { payload: { requestId: Contracts.RequestId }, success: Schema.String, stream: true }),
     Rpc.make("set-secret", { payload: { requestId: Contracts.RequestId }, success: Schema.Void }),
   ).prefix("client.");
-  const ownerOnly = new Set(["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views"]);
+  const ownerOnly = new Set(["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views",
+    "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]);
   const access = Object.fromEntries([...Contracts.CommandsRpcGroup.requests.keys()].map((name) => [name, ownerOnly.has(name) ? ["owner"] : ["owner", "agent"]]));
   vi.resetModules();
   vi.doMock("@shephrd/contracts", () => ({ ...Contracts, CommandsRpcGroup: Contracts.CommandsRpcGroup.merge(group), commandAccess: {

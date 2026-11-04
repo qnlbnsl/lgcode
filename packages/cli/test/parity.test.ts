@@ -25,6 +25,10 @@ for (const command of CommandsRpcGroup.requests.keys()) {
   it(`P03 ${command} catches a registered CLI command dispatching the wrong RPC or dropping payload fields`, async () => {
     const root = prepareRoot();
     const payloads: Record<string, Record<string, unknown>> = {
+      "client.alerts.list": { after: 0, limit: 1, status: "open" },
+      "client.alerts.dismiss": { alertId: "alert-1" },
+      "client.alerts.settings": {},
+      "client.alerts.settings.set": { kind: "approval", push: false },
       start: { name: "Parity agent", role: "worker", harness: "fake", account: { _tag: "any" }, permission: "ask", folder: root.work, groups: ["review"], model: "small", effort: "low", prompt: "Check parity." },
       prompt: { agentId: "member", text: "A prompt with spaces." },
       answer: { kind: "question", id: "question", text: "The answer." },
@@ -41,6 +45,8 @@ for (const command of CommandsRpcGroup.requests.keys()) {
     const engine = await fakeEngine(root, { onRequest: (frame, socket) => {
       const base = { requestId: frame.payload.requestId };
       const replies: Record<string, unknown> = {
+        "client.alerts.list": { ...base, items: [], next: 10 },
+        "client.alerts.settings": { ...base, kinds: [{ kind: "approval", push: false }], carrier: { _tag: "none" }, tokenSet: false },
         start: { ...base, agentId: "member" }, prompt: { ...base, deliveryId: "delivery" },
         compact: { ...base, deliveryId: "delivery" }, ask: { ...base, questionId: "question" },
         wait: { ...base, waitId: "wait", members: [{ agentId: "member", reason: "settled" }], outcome: "satisfied" },
@@ -53,7 +59,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         succeed(socket, frame, undefined);
       } else succeed(socket, frame, replies[frame.tag] ?? base);
     } });
-    const environment = (ownerOnlyCommands as ReadonlyArray<string>).includes(command) ? serviceEnvironment(root) : agentEnvironment(root);
+    const environment = ((ownerOnlyCommands as ReadonlyArray<string>).includes(command) || command.startsWith("client.alerts.")) ? serviceEnvironment(root) : agentEnvironment(root);
     const child = startCli(root, [...command.split(" "), "--input", JSON.stringify(payload)], environment);
     expect(await finishCli(child)).toEqual({ code: 0, signal: null });
     expect(engine.requests).toHaveLength(1);
@@ -77,7 +83,7 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
     "answer", "ask", "compact", "group", "pass-up", "prompt", "resume", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
-  for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", ...ownerOnlyCommands]) {
+  for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", ...ownerOnlyCommands]) {
     expect(names).not.toContain(excluded);
   }
   assertNoSecrets(child, [token]);
