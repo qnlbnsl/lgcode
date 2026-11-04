@@ -3,8 +3,15 @@ import { Situation } from "./situation.tsx"
 import type { AgentId } from "@shephrd/contracts"
 import { Thread } from "./thread/index.tsx"
 import { threadLocation } from "./thread/links.ts"
+import { Alerts } from "./admin/alerts.tsx"
+import { Settings } from "./admin/settings.tsx"
 
 type Session = "checking" | "login" | "owner" | "unavailable"
+type Page = "situation" | "alerts" | "settings"
+function currentPage(href: string): Page {
+  const page = new URL(href).searchParams.get("page")
+  return page === "alerts" || page === "settings" ? page : "situation"
+}
 
 export function App() {
   const [session, setSession] = useState<Session>("checking")
@@ -13,6 +20,7 @@ export function App() {
   const [probe, setProbe] = useState(0)
   const action = useRef<AbortController | undefined>(undefined)
   const [href, setHref] = useState(() => location.href)
+  const page = currentPage(href)
   const route = threadLocation(href)
   const agentId = route.agentId as AgentId | undefined
   const subject = route.subject
@@ -114,7 +122,24 @@ export function App() {
       <input id="password" name="password" type="password" autoComplete="off" required disabled={busy} />
       <button type="submit" disabled={busy}>{busy ? "Logging in…" : "Log in"}</button>
     </form>}
-    {session === "owner" && (agentId === undefined ? <Situation onSessionExpired={sessionExpired} />
-      : <Thread key={agentId} agentId={agentId} {...(subject === undefined ? {} : { subject })} onSessionExpired={sessionExpired} />)}
+    {session === "owner" && <>
+      <nav aria-label="Pages">
+        {([
+          ["situation", "/", "Situation"], ["alerts", "/?page=alerts", "Alerts"], ["settings", "/?page=settings", "Settings"]
+        ] as const).map(([target, href, label]) => <a key={href} href={href}
+          aria-current={agentId === undefined && page === target ? "page" : undefined}
+          onClick={(event) => {
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+            event.preventDefault()
+            history.pushState(null, "", href)
+            setHref(location.href)
+          }}>{label}</a>)}
+      </nav>
+      {agentId !== undefined ? <Thread key={agentId} agentId={agentId}
+        {...(subject === undefined ? {} : { subject })} onSessionExpired={sessionExpired} />
+        : page === "alerts" ? <Alerts onSessionExpired={sessionExpired} />
+        : page === "settings" ? <Settings onSessionExpired={sessionExpired} />
+        : <Situation onSessionExpired={sessionExpired} />}
+    </>}
   </main>
 }
