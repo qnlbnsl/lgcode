@@ -7,6 +7,24 @@ import { actionJson, DataText, visibleText } from "./text.tsx"
 
 type RequestEvent = Extract<Event, { _tag: "PermissionRequested" | "QuestionAsked" }>
 
+export function PermissionAnswer({ event, items }: {
+  readonly event: Extract<Event, { _tag: "PermissionAnswered" }>
+  readonly items: ReadonlyArray<ClientEnvelope>
+}) {
+  const request = items.find((item) => item.event._tag === "PermissionRequested"
+    && item.event.agentId === event.agentId && item.event.permissionRequestId === event.permissionRequestId)?.event
+  const answer = event.answer
+  const text = answer._tag === "cancelled" ? "Cancelled"
+    : request?._tag === "PermissionRequested"
+      ? request.options.find((option) => option.id === answer.optionId)?.name ?? answer.optionId
+      : answer.optionId
+  return <article aria-label="Permission answer">
+    <h3>Permission answer</h3>
+    <p>Request: {visibleText(event.permissionRequestId)}</p>
+    <DataText text={text} />
+  </article>
+}
+
 export function requestOpen(event: RequestEvent, sequence: number, items: ReadonlyArray<ClientEnvelope>, snapshot?: ClientSnapshot) {
   const permission = event._tag === "PermissionRequested"
   const id = permission ? event.permissionRequestId : event.questionId
