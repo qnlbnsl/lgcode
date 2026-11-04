@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema"
+import { BoardEvent } from "./board/events.ts"
 import { Account } from "./accounts.ts"
 import { HarnessSettings, RunMode } from "./harnesses.ts"
 import { AccountId, AgentId, BootId, DeliveryId, EpochMilliseconds, EventId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
@@ -222,7 +223,7 @@ export const EngineEvent = Schema.Union([
   Schema.TaggedStruct("CommandRefused", { command: Schema.NonEmptyString, reason: Schema.String, sourceSequence: Schema.optionalKey(EventSequence) })
 ])
 // Later pieces merge their event unions here, in namespace order.
-export const Event = EngineEvent
+export const Event = Schema.Union([...EngineEvent.members, ...BoardEvent.members])
 export type Event = typeof Event.Type
 
 export const EventEnvelope = Schema.Struct({
@@ -236,4 +237,4 @@ export const EventEnvelope = Schema.Struct({
 })
 export type EventEnvelope = typeof EventEnvelope.Type
 
-export const eventGroups = [{ namespace: "engine", events: EngineEvent }] as const
+export const eventGroups = [{ namespace: "engine", events: EngineEvent }, { namespace: "board", events: BoardEvent }] as const

@@ -1,7 +1,9 @@
 import type { Event } from "./events.ts"
+import { boardVisibility } from "./board/events.ts"
 
 export type VisibilityClass = "agent-scoped" | "owner-only" | "piece-decided"
 export const eventVisibility = {
+  ...boardVisibility,
   AgentStarted: "agent-scoped",
   AgentStartFailed: "agent-scoped",
   SessionOpened: "agent-scoped",
