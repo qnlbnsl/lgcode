@@ -26,10 +26,10 @@ the logic review of the acknowledge change (round 7).
    engine-change table names.
 6. **Closed: the owner's answer to row 9.** The owner said to edit the
    engine directly (row 99).
-7. **The owner's confirmation of four exclusions.** Row 44 marks work
-   items, file and branch watches, the test queue and usage meters as
-   WIDENED. The lead confirms them with the owner at acceptance (ruling
-   L14).
+7. **Closed: the owner's confirmation of four exclusions.** The owner accepted
+   the plan at `ea7aea5`, contract version 15, by answering "a" to question 12,
+   which also confirms that work items, file and branch watches, the test queue
+   and usage meters stay out (row 157, which closes row 44).
 8. **Closed: the client API's seam text.** Lead ruling L22 (`586a7ff`)
    makes the reach check run on every board delivery and uses the "no
    disposition" wording; lead ruling L23 (`ced973b`) passes the delivery
