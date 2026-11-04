@@ -83,17 +83,21 @@ const react = (envelope: EventEnvelope, snapshot: Snapshot, lists: EngineLists):
   for (const row of Object.values(view.alerts)) {
     if (row.status !== "open") continue;
     const source = { ...row, key: row.alertKey };
-    const ended = [...ends].some(([namespace, key]) => key === row.alertKey && ownedKind(namespace, source));
-    if (ended || (touchesSubject(row, envelope.event) && subjectClosed(source, snapshot))) clears.push({
+    // The snapshot can be ahead of this follower. An older state event
+    // cannot close a later alert. A piece's explicit end instead follows
+    // its source order, including when raise and end were both in catch-up.
+    const ended = row.sourceSequence < envelope.sequence
+      && [...ends].some(([namespace, key]) => key === row.alertKey && ownedKind(namespace, source));
+    if (ended || (row.sequence < envelope.sequence && touchesSubject(row, envelope.event) && subjectClosed(source, snapshot))) clears.push({
       _tag: "client.AlertCleared", alertId: row.alertId, cause: "subject closed", sourceSequence: envelope.sequence,
     });
   }
   return [...clears, ...raises(sources, snapshot, envelope.sequence)];
 };
 
-// The service runs this under its recovery gate and restarts defects from
-// the view's durable source position. LogWriteFailed stops the follower.
-export const alertReactor = Effect.gen(function* () {
+// Startup can await this same idempotent initialization before returning a
+// listener. The writer permit serializes it with the background follower.
+export const initializeAlerts = Effect.gen(function* () {
   const views = yield* Views;
   const lists = views.lists!;
   yield* writePieceBatch({ namespace: "client", kind: "reactor", sourceSequence: 0, build: (snapshot) => {
@@ -107,6 +111,14 @@ export const alertReactor = Effect.gen(function* () {
     }
     return { events: [{ _tag: "client.AlertBaseline", position: snapshot.sequence }, ...raises(sources, snapshot, snapshot.sequence, true)] };
   } }, lists);
+});
+
+// The service runs this under its recovery gate and restarts defects from
+// the view's durable source position. LogWriteFailed stops the follower.
+export const alertReactor = Effect.gen(function* () {
+  const views = yield* Views;
+  const lists = views.lists!;
+  yield* initializeAlerts;
   const position = clientView((yield* views.snapshot).client).position!;
   yield* subscribe(position).pipe(Stream.runForEach((envelope) => writePieceBatch({
     namespace: "client", kind: "reactor", sourceSequence: envelope.sequence,

@@ -25,7 +25,7 @@ export const eventStructure: RedactionStructure = { fields: {
   roleFileHash: identity, noticeRecipient: identity, postId: identity,
   channelId: identity, wakeId: identity, anchorAgentId: identity, targetAgentId: identity,
   decidingPostId: identity, replyToPostId: identity,
-  permissionRequestId: identity, questionId: identity, waitId: identity, alertId: identity, alertKey: identity,
+  permissionRequestId: identity, questionId: identity, waitId: identity, alertId: identity, alertKey: identity, carrierGeneration: identity,
   account, harness, parent: actor, sender: actor, holder: actor, answeredBy: actor, from: actor,
   to: { ...actor, elements: actor }, author: actor, reader: actor, opener: actor, closer: actor, manager: actor, addressee: actor,
   membersAdded: { elements: member }, membersRemoved: { elements: member },

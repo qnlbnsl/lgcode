@@ -3,7 +3,7 @@ import { eventEffect } from "./stateMachine.ts"
 import type { PieceNamespace } from "./namespaces.ts"
 
 export interface SettledInput {
-  readonly agents: Readonly<Record<string, { readonly state: { readonly _tag: string }; readonly reloadable?: boolean }>>
+  readonly agents: Readonly<Record<string, { readonly state: { readonly _tag: string }; readonly reloadable?: boolean; readonly capacityHeld?: boolean }>>
   readonly requests: Readonly<Record<string, { readonly agentId: string; readonly status: string; readonly holder: Actor }>>
   readonly questions: SettledInput["requests"]
   readonly deliveries: Readonly<Record<string, { readonly target: string; readonly status: string }>>
@@ -17,6 +17,7 @@ export const holds = (state: SettledInput, id: string): boolean =>
   [...Object.values(state.requests), ...Object.values(state.questions)].some((row) => row.status === "open" && row.holder._tag === "agent" && row.holder.agentId === id)
 export const settled = (state: SettledInput, id: string): boolean =>
   Object.hasOwn(state.agents, id) && state.agents[id]?.state._tag === "idle"
+  && state.agents[id]?.capacityHeld !== true
   && !Object.values(state.deliveries).some((row) => row.target === id && (row.status === "queued" || row.status === "sent"))
   && !Object.values(state.requests).some((row) => row.status === "open" && row.agentId === id)
   && !Object.values(state.questions).some((row) => row.status === "open" && row.agentId === id)
@@ -52,7 +53,9 @@ export const foldSettled = (state: SettledInput, { event }: EventEnvelope): Sett
       const effect = eventEffect(agent.state._tag as Parameters<typeof eventEffect>[0], event._tag)
       const tag = effect === "transition" && event._tag === "StateChanged" ? event.state._tag
         : ["starting", "working", "idle", "crashed", "stopped", "interrupted"].includes(effect) ? effect : agent.state._tag
-      return { ...agent, state: { _tag: tag }, ...(event._tag === "SessionOpened" ? { reloadable: event.reloadable } : {}) }
+      return { ...agent, state: { _tag: tag }, ...(event._tag === "SessionOpened" ? { reloadable: event.reloadable } : {}),
+        ...(event._tag === "DeliveryHeld" ? { capacityHeld: true } :
+          ["DeliveryReleased", "AgentStopped", "AgentCrashed"].includes(event._tag) ? { capacityHeld: false } : {}) }
     }) }
   }
   switch (event._tag) {

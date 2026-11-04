@@ -2,7 +2,7 @@ import {
   CommandsRpcGroup, Event, EventEnvelope, commandAccess, commandGroups, eventGroups, eventVisibility,
   holdUnsettled, requestHeld, type HoldCondition, type AlertSourceRequest, type Caller, type CallerKind, type PieceNamespace, type VisibilityClass,
 } from "@shephrd/contracts";
-import type * as Effect from "effect/Effect";
+import * as Effect from "effect/Effect";
 import type * as Schema from "effect/Schema";
 import type * as RpcGroup from "effect/rpc/RpcGroup";
 import type { Input, Plan, Snapshot, CommandRefused } from "../commands/internal.ts";
@@ -12,7 +12,10 @@ import { boardPlaceholderReads } from "../board/placeholders.ts";
 import { boardPlanners, boardReads } from "../board/commands.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
 import { pieceViews, type PieceView } from "./viewTables.ts";
+import { snapshotFor as rolesSnapshotFor } from "../roles/snapshot.ts";
 
+import { alertDelivery } from "../client/alerts/delivery.ts";
+import { carrierKeep, carrierPlanners } from "../client/alerts/token.ts";
 import { alertReactor, type AlertSourceResult } from "../client/alerts/reactor.ts";
 import { alertPlanners, alertReads } from "../client/alerts/commands.ts";
 
@@ -47,15 +50,15 @@ export interface EngineLists {
 const absent = () => undefined;
 export const engineLists: EngineLists = {
   commandGroups, eventGroups, commands: CommandsRpcGroup, event: Event, envelope: EventEnvelope,
-  reach, sourceRules, holdUnsettled, requestHeld, secretKeep: { client: () => [], board: () => [], roles: () => [] },
-  services: {}, secretCommands: ["accounts set-secret"],
+  reach, sourceRules, holdUnsettled, requestHeld, secretKeep: { client: carrierKeep, board: () => [], roles: () => [] },
+  services: {}, secretCommands: ["accounts set-secret", "client.alerts.carrier.set-token"],
   access: commandAccess,
-  planners: { ...planners, ...alertPlanners, ...boardPlanners },
+  planners: { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners },
   reads: { ...reads, ...alertReads, ...boardPlaceholderReads, ...boardReads },
   views: pieceViews,
   migrations: { client: [], board: [], roles: [] }, visibility: eventVisibility, pieceVisibility: {},
-  snapshotSections: { client: absent, board: absent, roles: absent },
+  snapshotSections: { client: absent, board: absent, roles: rolesSnapshotFor },
   alertSources: { client: absent, board: absent, roles: absent },
   openMatters: { client: () => [], board: () => [], roles: () => [] },
-  reactors: { client: alertReactor },
+  reactors: { client: Effect.all([alertReactor, alertDelivery], { concurrency: "unbounded", discard: true }) },
 } satisfies EngineLists;

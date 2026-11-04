@@ -32,6 +32,7 @@ import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { checkPieceBatch, pieceNamespace } from "./pieceBatch.ts";
 import { SecretStore } from "./SecretStore.ts";
 import { loadFirstDefaults } from "./harnesses.ts";
+import { webSettingsCommitted } from "../client/settings.ts";
 import { CommandRefused, freshRequest, readHarnesses, refused, type Input, type Runtime, type Snapshot } from "./internal.ts";
 
 export { CommandRefused } from "./internal.ts";
@@ -76,7 +77,7 @@ const replyFor = (snapshot: Snapshot, name: string, requestId: RequestId, envelo
   return { reply };
 };
 
-export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults">, lists: EngineLists = engineLists) =>
+export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults"> & { readonly capacityHoldCondition?: import("../routing/deliveries.ts").CapacityHoldCondition }, lists: EngineLists = engineLists) =>
   Layer.effect(CommandHandler, Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const log = yield* EventLog;
@@ -119,7 +120,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
                 ? { _tag: "ModeRefused", agentId: event.agentId, mode: event.mode, ceiling: event.ceiling, reason: "mode exceeds permission ceiling" }
                 : { _tag: "ModeChanged", agentId: event.agentId, mode: event.mode, level: event.level }]);
             }
-            case "promptReply": return yield* write(yield* promptReply(snapshot, event, log.redactText));
+            case "promptReply": return yield* write(yield* promptReply(snapshot, event, log.redactText, configuration.capacityHoldCondition));
             case "exited": {
               return yield* write(crashEvents(snapshot, event, lists),
                 { revokeAgentTokens: [event.agentId] });
@@ -164,7 +165,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
       if (credential._tag === "owner") return { _tag: "owner" } as const;
       if (credential._tag === "service") {
         if (!Object.hasOwn(lists.services, credential.service) || !lists.services[credential.service]?.includes(name)
-          || (pieceNamespace(name) === undefined && !["prompt", "compact", "resume", "subscribe"].includes(name))) return yield* refused();
+          || (pieceNamespace(name) === undefined && !["prompt", "compact", "resume", "release", "subscribe"].includes(name))) return yield* refused();
         return credential;
       }
       const agentId = yield* verifyAgentToken(Redacted.value(credential.token)).pipe(Effect.mapError(() => refused("invalid credential")));
@@ -314,6 +315,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           return { ...(yield* decodeReceipt(written[0].result_json)), afterCommit: plan.afterCommit };
         })));
         if (outcome.failure !== undefined) return yield* outcome.failure;
+        if (name === "client.web.settings.set") yield* webSettingsCommitted(views);
         const late = outcome.afterCommit === undefined ? undefined : yield* step(outcome.afterCommit);
         return late ?? outcome.reply!;
       })).pipe(

@@ -59,7 +59,7 @@ export interface AcpRunnerOptions {
   // shares one registry with its own redactor; without one the runner keeps
   // its own, so its redaction still covers them.
   readonly credentials?: CredentialRegistry;
-  readonly classifyError?: (input: { harness: string; text: string }) => "out-of-usage" | "signed-out" | undefined;
+  readonly classifyError?: (input: { harness: string; text: string }) => "out-of-usage" | "signed-out" | "capacity" | undefined;
 }
 type Spawn = Parameters<Runner["Service"]["start"]>[0];
 type Send = Parameters<Runner["Service"]["prompt"]>[0];
@@ -283,7 +283,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       ? (configuration.classifyError ?? classifyError)({ harness, text: clean }) : undefined;
     const classification = turn.error !== undefined || candidate === "out-of-usage" ? candidate : undefined;
     yield* emit({ _tag: "promptReply", ...identity(entry), deliveryId: turn.deliveryId,
-      outcome: classification !== undefined ? { _tag: "pause", reason: classification, error: clean,
+      outcome: classification === "capacity" ? { _tag: "capacity", error: clean } : classification !== undefined ? { _tag: "pause", reason: classification, error: clean,
         ...(classification === "out-of-usage" && turn.error !== undefined && turn.resetAt !== undefined ? { resetAt: turn.resetAt } : {}) }
         : turn.error !== undefined ? { _tag: "error", error: clean } : { _tag: "success" } });
     if (entry.turn === turn) delete entry.turn;

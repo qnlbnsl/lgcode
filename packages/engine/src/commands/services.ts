@@ -10,7 +10,7 @@ import { pieceNamespace } from "./pieceBatch.ts";
 const permitted = (service: string, name: string, lists: EngineLists): boolean =>
   Object.hasOwn(lists.services, service) && lists.services[service]?.includes(name) === true
   && lists.access[name]?.includes("service") === true
-  && (pieceNamespace(name) !== undefined || ["prompt", "compact", "resume", "subscribe"].includes(name));
+  && (pieceNamespace(name) !== undefined || ["prompt", "compact", "resume", "release", "subscribe"].includes(name));
 export const executeService = (caller: Extract<Caller, { _tag: "service" }>, name: string, payload: Record<string, unknown>, lists: EngineLists = engineLists) => Effect.gen(function* () {
   if (!permitted(caller.service, name, lists)) return yield* refused();
   return yield* (yield* CommandHandler).execute(caller, name, payload);

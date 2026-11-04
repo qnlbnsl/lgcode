@@ -27,6 +27,7 @@ const expectedCommands = [
   "wait",
   "stop",
   "resume",
+  "release",
   "compact",
   "group",
   "accounts",
@@ -43,20 +44,24 @@ const clientReads = ["client.snapshot", "client.roster", "client.thread", "clien
 // three named ones plus the two that change accounts and harness settings as a whole (`accounts`,
 // `harnesses`). `subscribe` is agent-callable (criterion 7.3: an agent's `subscribe` sees its own
 // events) but is not offered as an MCP tool because a stream cannot be a tool.
+const expectedWebCommands = ["client.web.settings", "client.web.settings.set"]
+const expectedApiCommands = [...expectedCommands, ...expectedWebCommands]
 const expectedOwnerOnly = ["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "board.flush",
   "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record",
-  "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]
+  "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
+  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", ...expectedWebCommands]
 
-const expectedMcpOffered = ["start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group"]
+const expectedMcpOffered = ["start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "release", "compact", "group"]
 const boardCommands = ["board.open", "board.members", "board.post", "board.close", "board.acknowledge", "board.read", "board.channels", "board.status", "board.flush"]
 const boardTools = boardCommands.filter((name) => name !== "board.flush")
 
 const rolesCommands = ["roles.orient", "roles.handoff", "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record"]
 const rolesTools = ["roles.orient", "roles.handoff"]
 const clientTools = ["client.snapshot", "client.roster", "client.thread", "client.event"]
-const alertCommands = ["client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]
-const testedCommands = [...expectedCommands, ...alertCommands]
-const expectedRpcCommands = [...expectedCommands, ...boardCommands, ...clientReads, ...alertCommands, ...rolesCommands]
+const alertCommands = ["client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
+  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"]
+const testedCommands = [...expectedApiCommands, ...alertCommands]
+const expectedRpcCommands = [...testedCommands, ...boardCommands, ...clientReads, ...rolesCommands]
 
 const sorted = (values: ReadonlyArray<string>) => [...values].sort()
 
@@ -76,7 +81,7 @@ const rpcFor = (name: string) => {
 
 describe("command lists", () => {
   // Catches: a command dropped, renamed or added in `commandNames` (the list is exact, with no duplicates).
-  it("lists exactly the sixteen commands of row 55", () => {
+  it("lists the engine commands, including capacity release", () => {
     expect(commandNames).toHaveLength(expectedCommands.length)
     expect(sorted(commandNames)).toEqual(sorted(expectedCommands))
     expect(new Set(commandNames).size).toBe(commandNames.length)
@@ -94,15 +99,15 @@ describe("command lists", () => {
   it("assigns caller kinds to every command, agreeing with the owner-only list", () => {
     expect(sorted(Object.keys(commandAccess))).toEqual(sorted(expectedRpcCommands))
     for (const name of alertCommands) expect(commandAccess[name as keyof typeof commandAccess]).toEqual(["owner"])
-    for (const name of expectedCommands) {
+    for (const name of expectedApiCommands) {
       const kinds = commandAccess[name as keyof typeof commandAccess]
-      expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["prompt", "compact", "resume", "subscribe"].includes(name) ? ["owner", "agent", "service"] : ["owner", "agent"])
+      expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["prompt", "compact", "resume", "release", "subscribe"].includes(name) ? ["owner", "agent", "service"] : ["owner", "agent"])
     }
   })
 
   // Catches: a secret-setting command offered to agents. Row 55 asserts the MCP list against an
   // explicit list; this derives it the way unit 7 will (agent-callable, minus the stream).
-  it("offers ten engine, eight board, four client and two roles tools, excluding streams, board.flush and alerts", () => {
+  it("offers eleven engine, eight board, four client and two roles tools, excluding streams, board.flush and alerts", () => {
     const offered = [...CommandsRpcGroup.requests.keys()].filter((name) => ((commandAccess as Record<string, ReadonlyArray<string>>)[name] ?? []).includes("agent") && name !== "subscribe" && name !== "client.subscribe")
     expect(sorted(offered)).toEqual(sorted([...expectedMcpOffered, ...boardTools, ...clientTools, ...rolesTools]))
     for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", ...alertCommands]) {
@@ -184,7 +189,7 @@ describe("the groups the service serves (fix round 1, item 4)", () => {
   })
 
   // Catches: the full inventory (the CLI and clients) losing the debug command when the service group was cut.
-  it("CommandsRpcGroup keeps every pinned engine, client read, alert, board and roles command", () => {
+  it("CommandsRpcGroup keeps every pinned engine, web, client read, alert, board and roles command", () => {
     expect(CommandsRpcGroup.requests.size).toBe(expectedRpcCommands.length)
     expect([...CommandsRpcGroup.requests.keys()]).toEqual(expect.arrayContaining(expectedCommands))
     expect(CommandsRpcGroup.requests.has(debugCommand)).toBe(true)

@@ -97,6 +97,7 @@ export const RunnerEvent = Schema.Union([
         reason: Schema.Literals(["out-of-usage", "signed-out"]), error: Schema.String,
         resetAt: Schema.optionalKey(EpochMilliseconds),
       }),
+      Schema.TaggedStruct("capacity", { error: Schema.String }),
       Schema.TaggedStruct("error", { error: Schema.String }),
     ]),
   }),

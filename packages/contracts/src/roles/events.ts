@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema"
+import * as Tuple from "effect/Tuple"
 import { AgentId, EpochMilliseconds, EventSequence } from "../ids.ts"
 import { RoleFileHash, RolesSettings } from "./schema.ts"
 
@@ -48,6 +49,11 @@ export const RolesAction = Schema.Union([
   actionEvent("StallEnded", {}),
 ])
 export type RolesAction = typeof RolesAction.Type
+// Records retain the event's fields and add their durable log position.
+export const RolesActionRecord = RolesAction.mapMembers(Tuple.map(Schema.fieldsAssign({
+  sequence: EventSequence, noticeRead: Schema.optionalKey(Schema.Boolean),
+}))).check(Schema.makeFilter(Schema.is(RolesAction)))
+export type RolesActionRecord = typeof RolesActionRecord.Type
 export const RolesEvent = Schema.Union([
   Schema.TaggedStruct("roles.RoleFileSet", { content: Schema.String, roleFileHash: RoleFileHash }),
   Schema.TaggedStruct("roles.SettingsChanged", { settings: RolesSettings }),
