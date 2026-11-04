@@ -7,6 +7,16 @@ import { expect, it } from "vitest";
 
 import { fixtureLists, loadLists, type EngineLists } from "../../engine/test/support/fixturePiece.ts";
 import { definitions } from "./client/support.ts";
+import { commandNames as boardCommands, samples as boardEvents } from "./board/fixtures.ts";
+
+it("board 1.8 every real board declaration is registered once in the full API with its namespace intact", async () => {
+  const lists = await loadLists();
+  assertDeclarations(lists);
+  const commands = lists.commandGroups.filter((entry) => entry.namespace === "board").flatMap((entry) => [...entry.group.requests.keys()]);
+  const events = lists.eventGroups.filter((entry) => entry.namespace === "board").flatMap((entry) => declaredTags(entry.events));
+  expect(commands.sort()).toEqual([...boardCommands].sort());
+  expect(events.sort()).toEqual(boardEvents.map((event) => event._tag).sort());
+});
 
 const engineNames = [
   "start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group",

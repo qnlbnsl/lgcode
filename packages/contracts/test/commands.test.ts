@@ -10,6 +10,7 @@ import {
   engineCommandNames as commandNames,
   CommandsRpcGroup,
   DebugRpcGroup,
+  EngineCommandsRpcGroup,
   ownerOnlyCommands,
   ServiceRpcGroup
 } from "../src/commands.ts"
@@ -43,10 +44,15 @@ const expectedCommands = [
 // events) but is not offered as an MCP tool because a stream cannot be a tool.
 const expectedOwnerOnly = ["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views"]
 
-const alertCommands = ["client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]
-const expectedRpcCommands = [...expectedCommands, ...alertCommands]
-
 const expectedMcpOffered = ["start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group"]
+const boardCommands = ["board.open", "board.members", "board.post", "board.close", "board.acknowledge", "board.read", "board.channels", "board.status", "board.flush"]
+const boardTools = boardCommands.filter((name) => name !== "board.flush")
+
+const rolesCommands = ["roles.orient", "roles.handoff", "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record"]
+const rolesTools = ["roles.orient", "roles.handoff"]
+const alertCommands = ["client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]
+const testedCommands = [...expectedCommands, ...alertCommands]
+const expectedRpcCommands = [...expectedCommands, ...alertCommands, ...boardCommands, ...rolesCommands]
 
 const sorted = (values: ReadonlyArray<string>) => [...values].sort()
 
@@ -92,9 +98,9 @@ describe("command lists", () => {
 
   // Catches: a secret-setting command offered to agents. Row 55 asserts the MCP list against an
   // explicit list; this derives it the way unit 7 will (agent-callable, minus the stream).
-  it("leaves exactly ten commands for the MCP server once subscribe and the owner-only ones are removed", () => {
-    const offered = expectedRpcCommands.filter((name) => (commandAccess[name] as ReadonlyArray<string>).includes("agent") && name !== "subscribe")
-    expect(sorted(offered)).toEqual(sorted(expectedMcpOffered))
+  it("offers the ten engine tools, eight board tools and two roles tools, excluding board.flush", () => {
+    const offered = [...CommandsRpcGroup.requests.keys()].filter((name) => ((commandAccess as Record<string, ReadonlyArray<string>>)[name] ?? []).includes("agent") && name !== "subscribe")
+    expect(sorted(offered)).toEqual(sorted([...expectedMcpOffered, ...boardTools, ...rolesTools]))
     for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", ...alertCommands]) {
       expect(offered, excluded).not.toContain(excluded)
     }
@@ -105,12 +111,14 @@ describe("command RPC group", () => {
   // Catches: a command with no `Rpc` (the API cannot serve it) or an `Rpc` for a command not in the list.
   it("has one Rpc per command, tagged with the command name", () => {
     expect(sorted([...CommandsRpcGroup.requests.keys()])).toEqual(sorted(expectedRpcCommands))
+    expect(sorted([...EngineCommandsRpcGroup.requests.keys()])).toEqual(sorted(expectedCommands))
+    expect([...CommandsRpcGroup.requests.keys()]).toEqual(expect.arrayContaining(expectedCommands))
     for (const name of expectedRpcCommands) expect(rpcFor(name)._tag).toBe(name)
   })
 
   // Catches: a request that carries no request id (a retried request could not be matched to its
   // reply, and the idempotency of writes is lost), or one where the id is optional.
-  it.each(expectedRpcCommands)("%s: every variant of the request carries a required request id", (name) => {
+  it.each(testedCommands)("%s: every variant of the request carries a required request id", (name) => {
     const variants = variantsOf(rpcFor(name).payloadSchema.ast)
     expect(variants.length, "payload must be a struct or a union of structs").toBeGreaterThan(0)
     for (const properties of variants) {
@@ -122,7 +130,7 @@ describe("command RPC group", () => {
 
   // Catches: a request id typed as anything (a number, an empty string) instead of the shared
   // `RequestId` shape: a non-empty string.
-  it.each(expectedRpcCommands)("%s: the request id accepts a non-empty string and rejects other values", (name) => {
+  it.each(testedCommands)("%s: the request id accepts a non-empty string and rejects other values", (name) => {
     for (const properties of variantsOf(rpcFor(name).payloadSchema.ast)) {
       const id = properties.find((property) => property.name === "requestId")!
       const decode = Schema.decodeUnknownSync(Schema.make<Schema.Codec<string>>(id.type))
@@ -134,7 +142,7 @@ describe("command RPC group", () => {
 
   // Catches: a reply that does not echo the request id, so a client cannot pair a reply with its
   // request. `subscribe` is exempt: its reply is a stream of events (checked below).
-  it.each(expectedRpcCommands.filter((name) => name !== "subscribe"))(
+  it.each(testedCommands.filter((name) => name !== "subscribe"))(
     "%s: every variant of the reply carries a request id",
     (name) => {
       const variants = variantsOf(rpcFor(name).successSchema.ast)
@@ -148,7 +156,7 @@ describe("command RPC group", () => {
   // Catches: `subscribe` modelled as a single reply (a client would get one snapshot and no live
   // events), or any other command accidentally modelled as a stream (it would never complete).
   it("makes subscribe, and only subscribe, a streaming command", () => {
-    for (const name of expectedRpcCommands) {
+    for (const name of testedCommands) {
       expect(RpcSchema.isStreamSchema(rpcFor(name).successSchema), name).toBe(name === "subscribe")
     }
   })
@@ -160,16 +168,21 @@ describe("the groups the service serves (fix round 1, item 4)", () => {
 
   // Catches: the production group being only a comment: `ServiceRpcGroup` missing, or still holding the
   // debug command (row 74: it is served only behind the test flag), or missing another command.
-  it("ServiceRpcGroup has every non-debug command and not debug.compare-views", () => {
+  it("ServiceRpcGroup has every pinned non-debug command, without debug.compare-views", () => {
     expect(ServiceRpcGroup, "ServiceRpcGroup export").toBeDefined()
     expect(ServiceRpcGroup.requests.size).toBe(withoutDebug.length)
     expect(ServiceRpcGroup.requests.has(debugCommand)).toBe(false)
+    expect([...ServiceRpcGroup.requests.keys()]).toEqual(expect.arrayContaining(withoutDebug))
+    expect(sorted([...ServiceRpcGroup.requests.keys()])).toEqual(
+      sorted([...CommandsRpcGroup.requests.keys()].filter((name) => name !== debugCommand))
+    )
     expect(sorted([...ServiceRpcGroup.requests.keys()])).toEqual(sorted(withoutDebug))
   })
 
   // Catches: the full inventory (the CLI and clients) losing the debug command when the service group was cut.
-  it("CommandsRpcGroup keeps the complete pinned command inventory", () => {
+  it("CommandsRpcGroup keeps every pinned engine, alert, board and roles command", () => {
     expect(CommandsRpcGroup.requests.size).toBe(expectedRpcCommands.length)
+    expect([...CommandsRpcGroup.requests.keys()]).toEqual(expect.arrayContaining(expectedCommands))
     expect(CommandsRpcGroup.requests.has(debugCommand)).toBe(true)
   })
 

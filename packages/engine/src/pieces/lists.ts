@@ -8,6 +8,7 @@ import type * as RpcGroup from "effect/rpc/RpcGroup";
 import type { Input, Plan, Snapshot, CommandRefused } from "../commands/internal.ts";
 import { planners } from "../commands/planners.ts";
 import { reads, type ReadHandler } from "../api/reads.ts";
+import { boardPlaceholderPlanners, boardPlaceholderReads } from "../board/placeholders.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
 import { pieceViews, type PieceView } from "./viewTables.ts";
 
@@ -47,7 +48,10 @@ export const engineLists: EngineLists = {
   commandGroups, eventGroups, commands: CommandsRpcGroup, event: Event, envelope: EventEnvelope,
   reach, sourceRules, holdUnsettled, requestHeld, secretKeep: { client: () => [], board: () => [], roles: () => [] },
   services: {}, secretCommands: ["accounts set-secret"],
-  access: commandAccess, planners: { ...planners, ...alertPlanners }, reads: { ...reads, ...alertReads }, views: pieceViews,
+  access: commandAccess,
+  planners: { ...planners, ...alertPlanners, ...boardPlaceholderPlanners },
+  reads: { ...reads, ...alertReads, ...boardPlaceholderReads },
+  views: pieceViews,
   migrations: { client: [], board: [], roles: [] }, visibility: eventVisibility, pieceVisibility: {},
   snapshotSections: { client: absent, board: absent, roles: absent },
   alertSources: { client: absent, board: absent, roles: absent },

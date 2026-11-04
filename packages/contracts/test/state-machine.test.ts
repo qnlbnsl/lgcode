@@ -6,6 +6,7 @@ import type * as SchemaAST from "effect/SchemaAST"
 import { describe, expect, it } from "vitest"
 
 import { Event } from "../src/events.ts"
+import { samples as boardEvents } from "./board/fixtures.ts"
 import {
   canTransition,
   commandOutcome,
@@ -18,6 +19,11 @@ import {
 
 type StateName = "starting" | "working" | "idle" | "paused" | "interrupted" | "crashed" | "stopped"
 const states: ReadonlyArray<StateName> = ["starting", "working", "idle", "paused", "interrupted", "crashed", "stopped"]
+
+it.each(boardEvents.map((event) => [event._tag, event] as const))("board 1.10 %s keeps all seven lifecycle states", (tag, wire) => {
+  expect(Schema.is(Event)(wire), `${tag} must join Event before the lifecycle table can keep it`).toBe(true)
+  for (const state of states) expect(eventEffect(state, tag as never), `${tag} in ${state}`).toBe("keep")
+})
 
 describe("lifecycle states", () => {
   // Catches: a state added or dropped (row 24 names exactly seven; "waiting on a permission" and

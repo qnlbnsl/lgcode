@@ -14,6 +14,7 @@ import { start } from "./start.ts";
 import { stop } from "./stop.ts";
 import { refused, type Input, type Payload, type Plan } from "./internal.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
+import { setRoleFile } from "../roles/roleFile.ts";
 
 type Planner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<Plan, ReturnType<typeof refused> | LogWriteFailed>;
 const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan: Planner): Planner => (input, payload) => Effect.gen(function* () {
@@ -26,6 +27,12 @@ const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan
   return yield* plan(input, payload);
 });
 export const planners = {
+  "roles.role-file.set": (input, payload) => setRoleFile(input, payload as Payload<"roles.role-file.set">),
+  // Their implementation units replace these refusals; each declared command
+  // already has exactly one execution kind and cannot accidentally run elsewhere.
+  "roles.settings.set": () => Effect.fail(refused()),
+  "roles.snooze": () => Effect.fail(refused()),
+  "roles.record": () => Effect.fail(refused()),
   start: (input, payload) => start(input, payload as Payload<"start">),
   prompt: targeted("prompt", (input, payload) => Effect.succeed(prompt(input, payload as Payload<"prompt">))),
   answer: (input, payload) => answer(input, payload as Payload<"answer">),
