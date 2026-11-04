@@ -6,6 +6,7 @@ import * as RpcGroup from "effect/rpc/RpcGroup";
 import { expect, it } from "vitest";
 
 import { fixtureLists, loadLists, type EngineLists } from "../../engine/test/support/fixturePiece.ts";
+import { definitions } from "./client/support.ts";
 import { commandNames as boardCommands, samples as boardEvents } from "./board/fixtures.ts";
 
 it("board 1.8 every real board declaration is registered once in the full API with its namespace intact", async () => {
@@ -52,6 +53,18 @@ it("1a E1 preserves the engine inventory independently of later piece commands",
 
 it("1.3 checks every constituent declaration before merge, with a real prefixed fixture group", async () => {
   assertDeclarations(fixtureLists(await loadLists()));
+});
+
+it("2.1/2.2 checks the full client definitions against every other group before merge, including commands not yet installed", async () => {
+  const lists = await loadLists();
+  const client = definitions();
+  assertDeclarations({ ...lists,
+    commandGroups: [...lists.commandGroups.filter(({ namespace }) => namespace !== "client"), { namespace: "client", group: client }],
+    commands: lists.commands.merge(client),
+  });
+  for (const { namespace, events } of lists.eventGroups) {
+    if (namespace === "engine") for (const tag of declaredTags(events)) expect(tag.includes("."), `Engine tag ${tag}`).toBe(false);
+  }
 });
 
 it("1.3 duplicate commands are detected even though Effect merge silently replaces them", async () => {

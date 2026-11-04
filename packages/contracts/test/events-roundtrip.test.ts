@@ -6,7 +6,7 @@ import * as Schema from "effect/Schema"
 import * as SchemaAST from "effect/SchemaAST"
 import { describe, expect, it } from "vitest"
 
-import { Event, EventEnvelope } from "../src/events.ts"
+import { EngineEvent, Event, EventEnvelope } from "../src/events.ts"
 import { EventId } from "../src/ids.ts"
 import { LifecycleState } from "../src/stateMachine.ts"
 
@@ -15,16 +15,7 @@ import { LifecycleState } from "../src/stateMachine.ts"
 // the forty-first event, written once when an account runs out). Copied here on purpose: the test must not read
 // the list it checks from the code under test. Plan wording -> tag:
 // "command refused" -> CommandRefused, "agent reload failed" -> AgentReloadFailed, and so on.
-const expectedTags = [
-  "board.ChannelOpened",
-  "board.ChannelMembersChanged",
-  "board.ManagerChanged",
-  "board.PostWritten",
-  "board.PostAcknowledged",
-  "board.AddresseeResolved",
-  "board.PostClosed",
-  "board.WakeBuilt",
-  "board.Read",
+const expectedEngineTags = [
   "AgentStarted",
   "AgentStartFailed",
   "SessionOpened",
@@ -66,6 +57,27 @@ const expectedTags = [
   "CommandRefused"
 ]
 
+// The shared union has the engine inventory plus these client declarations.
+// Keep the expected list independent of the production event-tag inventory.
+const expectedClientTags = [
+  "client.AlertBaseline", "client.AlertRaised", "client.AlertDelivered", "client.AlertDeliveryFailed",
+  "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
+  "client.AlertCarrierTokenSet", "client.AlertCarrierTokenCleared", "client.WebSettingsChanged",
+  "client.WebServerDown", "client.WebServerUp"
+]
+const expectedBoardTags = [
+  "board.ChannelOpened",
+  "board.ChannelMembersChanged",
+  "board.ManagerChanged",
+  "board.PostWritten",
+  "board.PostAcknowledged",
+  "board.AddresseeResolved",
+  "board.PostClosed",
+  "board.WakeBuilt",
+  "board.Read",
+]
+const expectedTags = [...expectedEngineTags, ...expectedBoardTags, ...expectedClientTags]
+
 const tagOf = (member: { readonly ast: SchemaAST.AST }): string => {
   const ast = member.ast
   if (ast._tag !== "Objects") throw new Error("every event must be a struct")
@@ -102,7 +114,14 @@ describe("TurnEnded usage (foundry roles 7c)", () => {
 describe("event tags", () => {
   // Catches: an event dropped from, added to, or renamed in the union; two members sharing a tag
   // (the second would never decode).
-  it("are exactly the engine inventory and nine board events, each once", () => {
+  it("keeps exactly the unchanged engine event inventory, each once", () => {
+    const tags = EngineEvent.members.map(tagOf)
+    expect(tags).toHaveLength(expectedEngineTags.length)
+    expect(new Set(tags).size, "duplicate engine tags").toBe(tags.length)
+    expect([...tags].sort()).toEqual([...expectedEngineTags].sort())
+  })
+
+  it("contains exactly the engine, board and client events, each once", () => {
     const tags = members.map(tagOf)
     expect(tags).toHaveLength(expectedTags.length)
     expect(new Set(tags).size, "duplicate tags").toBe(tags.length)

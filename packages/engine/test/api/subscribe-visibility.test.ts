@@ -11,7 +11,7 @@ import { chmodSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, it } from "@effect/vitest";
-import { Event, type EventEnvelope } from "@shephrd/contracts";
+import { Event, eventVisibility, type EventEnvelope } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Redacted from "effect/Redacted";
@@ -91,6 +91,18 @@ const samples: Record<string, (a: string, n: string) => Record<string, unknown>>
   AccountAvailable: () => ({ accountId: "primary", cause: "owner cleared" }),
   HarnessChanged: () => ({ harness }),
   CommandRefused: () => ({ command: "start", reason: "refused" }),
+  "client.AlertBaseline": () => ({ position: 0 }),
+  "client.AlertRaised": (a, n) => ({ alertId: `alert-${n}`, alertKey: `permission:${n}`, kind: "approval", agentId: a, subject: { _tag: "permission", id: `p-${n}` }, title: "Permission needs your approval", sourceSequence: 0 }),
+  "client.AlertDelivered": (_a, n) => ({ alertId: `alert-${n}`, carrier: "ntfy", generation: 0, attempt: 1 }),
+  "client.AlertDeliveryFailed": (_a, n) => ({ alertId: `alert-${n}`, carrier: "ntfy", generation: 0, attempt: 1, reason: "carrier unavailable" }),
+  "client.AlertCleared": (_a, n) => ({ alertId: `alert-${n}`, cause: "subject closed", sourceSequence: 0 }),
+  "client.AlertSettingsChanged": () => ({ kind: "approval", push: false }),
+  "client.AlertCarrierChanged": () => ({ carrier: { _tag: "none" } }),
+  "client.AlertCarrierTokenSet": () => ({ origin: "https://alerts.example.test", carrierGeneration: "fixture-generation" }),
+  "client.AlertCarrierTokenCleared": () => ({}),
+  "client.WebSettingsChanged": () => ({ settings: { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false } }),
+  "client.WebServerDown": () => ({ reason: "port taken" }),
+  "client.WebServerUp": () => ({}),
 };
 const terminal = new Set(["AgentStartFailed", "AgentCrashed", "AgentStopped"]);
 
@@ -148,7 +160,10 @@ const collect = (socket: string, bearer: string, after: number, last: (envelope:
 
 it("7.3 the samples cover every event type in the contracts' union (breaks when a new event type is added without a visibility case)", () => {
   expect(Object.keys(samples).sort()).toEqual(tags);
-  for (const tag of tags) expect(() => sample(tag, "agent-x", "check")).not.toThrow();
+  for (const tag of tags) {
+    expect(() => sample(tag, "agent-x", "check")).not.toThrow();
+    if (tag.startsWith("client.")) expect(eventVisibility[tag as keyof typeof eventVisibility]).toBe("owner-only");
+  }
 });
 
 live("7.3 for every event type, an agent's subscribe returns exactly the events of itself and its children, in catch-up and live, and never a grandchild's, a stranger's or an agent-less event (breaks if the filter is skipped on either path, follows the whole subtree, or lets agent-less events through)", () =>
@@ -160,12 +175,13 @@ live("7.3 for every event type, an agent's subscribe returns exactly the events 
     const visible = new Set<string>([self.agentId, child.agentId]);
 
     const expectedAfter = (after: number) => readLog.pipe(Effect.map((rows) => rows
-      .filter((row) => row.sequence > after && "agentId" in row.event && visible.has((row.event as { agentId: string }).agentId))
+      .filter((row) => row.sequence > after && eventVisibility[row.event._tag] !== "owner-only" && "agentId" in row.event && visible.has((row.event as { agentId: string }).agentId))
       .map((row) => row.sequence)));
 
     // Catch-up: everything already in the log.
     const replay = yield* collect(socket, self.token, 0, isMarker("replay"));
     expect(replay.map((envelope) => envelope.sequence)).toEqual(yield* expectedAfter(0));
+    expect(replay.every((envelope) => eventVisibility[envelope.event._tag] !== "owner-only")).toBe(true);
     for (const envelope of replay) expect(visible.has(envelope.agentId ?? "none"), JSON.stringify(envelope.event)).toBe(true);
 
     // Every type was really exercised on both sides of the rule.
@@ -191,6 +207,7 @@ live("7.3 for every event type, an agent's subscribe returns exactly the events 
       return [...(yield* Fiber.join(fiber))];
     }));
     expect(liveRound.map((envelope) => envelope.sequence)).toEqual(yield* expectedAfter(head));
+    expect(liveRound.every((envelope) => eventVisibility[envelope.event._tag] !== "owner-only")).toBe(true);
   })), 120_000);
 
 live("7.3 the owner's subscribe returns every event, agent-less ones included (breaks if the owner is filtered like an agent)", () =>
