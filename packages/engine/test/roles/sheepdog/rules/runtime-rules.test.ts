@@ -1,0 +1,243 @@
+import { randomBytes } from "node:crypto";
+import { join } from "node:path";
+import { it } from "@effect/vitest";
+import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
+import type { RolesActionRecord } from "@shephrd/contracts";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
+import { TestClock } from "effect/testing";
+import { afterEach, beforeEach, expect, vi } from "vitest";
+import { serve } from "../../../../src/api/server.ts";
+import { executeService } from "../../../../src/commands/services.ts";
+import { refused } from "../../../../src/commands/internal.ts";
+import { engineLists, type EngineLists } from "../../../../src/pieces/lists.ts";
+import { layer as redactor } from "../../../../src/log/Redactor.ts";
+import { buildServices } from "../../../../src/service.ts";
+import type { RolesView } from "../../../../src/roles/view.ts";
+import { callForAction } from "../../../../src/roles/sheepdog/actions.ts";
+import { sheepdogCaller } from "../../../../src/roles/sheepdog/notices.ts";
+import { alertLog } from "../../../support/alertsRig.ts";
+import { fixtureClient } from "../../../support/fixturePiece.ts";
+import { makeFakeRunner, type FakeRunner } from "../../../support/fakeRunner.ts";
+import { appendSetup, eventOf, makeFakeSecrets, makeRig, removeRig, seedAccount, seedAgent, seedHarness, startPayload, type Rig } from "../../../support/handlerRig.ts";
+import { eventually, pause, snapshot } from "../../../support/routingRig.ts";
+import { registerRebuildCheck } from "../../../support/rebuildCheck.ts";
+
+let rig: Rig;
+beforeEach(() => { rig = makeRig(); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
+const quiet: EngineLists = { ...engineLists, reactors: {} };
+const roles = snapshot.pipe(Effect.map((view) => view.roles as RolesView));
+const actions = (tag: string) => roles.pipe(Effect.map((view) => view.actions.filter((action) => action._tag === tag)));
+const run = <A, E, R>(lists: EngineLists, body: (runner: FakeRunner) => Effect.Effect<A, E, R>) => Effect.gen(function* () {
+  const runner = yield* makeFakeRunner();
+  return yield* Effect.scoped(Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    return yield* body(runner);
+  })).pipe(Effect.provide(buildServices(rig, lists).pipe(Layer.provide(Layer.mergeAll(runner.layer, makeFakeSecrets().layer, redactor)))), Effect.provide(runner.layer));
+}).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped) as Effect.Effect<A, E>;
+const socket = (lists = engineLists) => Effect.gen(function* () {
+  const bearer = randomBytes(32).toString("base64url");
+  const socketPath = join(rig.stateFolder, "rules.sock");
+  yield* serve({ socketPath, ownerCredential: Redacted.make(bearer), debug: true, lists });
+  return yield* fixtureClient(socketPath, bearer, lists as any);
+});
+const setup = Effect.gen(function* () {
+  yield* seedAccount(); yield* seedHarness();
+  yield* eventually(roles, (view) => view.baseline !== undefined);
+});
+const rowsOf = (tag: string) => alertLog.pipe(Effect.map((rows) => rows.filter((row) => row.event._tag === tag)));
+
+it.effect("idle groups nudge every top, share one holder notice, and repeat hourly through sheepdog turns", () => run(engineLists, () => Effect.gen(function* () {
+  yield* setup;
+  yield* seedAgent({ id: "holder", state: "idle" });
+  yield* seedAgent({ id: "top-a", parent: "holder", groups: ["build"] });
+  yield* seedAgent({ id: "top-b", parent: "holder", groups: ["build"] });
+  const client = yield* socket();
+  yield* client["roles.snooze"]!({ requestId: "arm", group: "other", until: 0 });
+  yield* pause(100);
+  yield* TestClock.adjust("60 minutes");
+  expect(yield* eventually(actions("roles.TeamIdleReported"), (rows) => rows.length === 2)).toHaveLength(2);
+  const posts = (yield* rowsOf("board.PostWritten")).filter((row) => row.event._tag === "board.PostWritten" && row.event.text.includes("team has no running work"));
+  expect(posts).toHaveLength(1);
+  const targets = (yield* rowsOf("DeliveryQueued")).flatMap((row) => row.event._tag === "DeliveryQueued"
+    && row.event.delivery.sender._tag === "service" ? [row.event.delivery.target] : []);
+  expect(targets.sort()).toEqual(["top-a", "top-b"]);
+  yield* TestClock.adjust("60 minutes");
+  const repeats = yield* eventually(actions("roles.TeamIdleReported"), (rows) => rows.length === 4);
+  expect(repeats.map((row) => row.occurrence)).toEqual([1, 1, 2, 2]);
+})));
+
+it.effect("an unknown account reset suppresses idleness and account recovery restarts the whole hour", () => run(engineLists, () => Effect.gen(function* () {
+  yield* setup;
+  yield* seedAgent({ id: "top", groups: ["build"] });
+  yield* pause(100);
+  yield* TestClock.adjust("30 minutes");
+  yield* appendSetup([eventOf({ _tag: "AccountOutOfUsage", accountId: "primary" })]);
+  yield* pause(100);
+  yield* TestClock.adjust("90 minutes");
+  expect(yield* actions("roles.TeamIdleReported")).toHaveLength(0);
+  yield* appendSetup([eventOf({ _tag: "AccountAvailable", accountId: "primary", cause: "owner cleared" })]);
+  yield* pause(100);
+  yield* TestClock.adjust("59 minutes");
+  expect(yield* actions("roles.TeamIdleReported")).toHaveLength(0);
+  yield* TestClock.adjust("1 minute");
+  expect(yield* eventually(actions("roles.TeamIdleReported"), (rows) => rows.length > 0)).toHaveLength(1);
+})));
+
+it.effect("a running turn subtracts completed permission holds and reports only once", () => run(engineLists, () => Effect.gen(function* () {
+  yield* setup;
+  const client = yield* socket();
+  const started = yield* client.start!({ ...startPayload(rig, { role: "lead", groups: [] }), requestId: "lead" });
+  const agentId = started.agentId as string;
+  yield* client.prompt!({ requestId: "work", agentId, text: "Do the assigned work." });
+  yield* pause(100);
+  yield* TestClock.adjust("60 minutes");
+  yield* appendSetup([eventOf({ _tag: "PermissionRequested", agentId, permissionRequestId: "hold", holder: { _tag: "owner" },
+    deliveryId: "held-request", toolCallId: "tool", description: "Write a file.", settingsWrite: false,
+    options: [{ id: "once", name: "Once", kind: "allow_once", level: "ask", persistent: false }] })]);
+  yield* pause(100);
+  yield* TestClock.adjust("90 minutes");
+  expect(yield* actions("roles.RunawayReported")).toHaveLength(0);
+  yield* appendSetup([eventOf({ _tag: "PermissionCancelled", agentId, permissionRequestId: "hold", reason: "test closed" })]);
+  yield* pause(100);
+  yield* TestClock.adjust("60 minutes");
+  expect(yield* actions("roles.RunawayReported")).toHaveLength(0);
+  yield* TestClock.adjust(1);
+  expect(yield* eventually(actions("roles.RunawayReported"), (rows) => rows.length > 0)).toHaveLength(1);
+  yield* TestClock.adjust("180 minutes");
+  expect(yield* actions("roles.RunawayReported")).toHaveLength(1);
+})));
+
+it.effect("a current crash admits, reloads, carries on, and a second crash gives up without reloading", () => run(engineLists, (runner) => Effect.gen(function* () {
+  yield* setup;
+  const client = yield* socket();
+  const started = yield* client.start!({ ...startPayload(rig, { groups: [] }), requestId: "worker" });
+  const agentId = started.agentId as string;
+  yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId, exitCode: 1, signal: null, stderr: "untrusted crash detail" })]);
+  expect(yield* eventually(actions("roles.CrashRetried"), (rows) => rows.length > 0)).toHaveLength(1);
+  expect(runner.callsOf("load")).toHaveLength(1);
+  const rows = yield* alertLog;
+  expect(rows.findIndex((row) => row.event._tag === "roles.CrashAdmitted")).toBeLessThan(rows.findLastIndex((row) => row.event._tag === "SessionOpened"));
+  expect(rows.filter((row) => row.event._tag === "DeliveryQueued" && row.caller._tag === "service")).toHaveLength(1);
+  yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId, exitCode: 1, signal: null, stderr: "second detail" })]);
+  expect(yield* eventually(actions("roles.GaveUp"), (rows) => rows.length > 0)).toHaveLength(1);
+  expect(runner.callsOf("load")).toHaveLength(1);
+})));
+
+it.effect("switching the sheepdog back on restarts a runaway clock from its new baseline", () => run(engineLists, () => Effect.gen(function* () {
+  yield* setup;
+  const client = yield* socket();
+  const started = yield* client.start!({ ...startPayload(rig, { role: "lead", groups: [] }), requestId: "lead" });
+  yield* client.prompt!({ requestId: "work", agentId: started.agentId, text: "Do the assigned work." });
+  yield* pause(100);
+  yield* TestClock.adjust("90 minutes");
+  yield* client["roles.settings.set"]!({ requestId: "off", settings: { sheepdog: false } });
+  expect((yield* eventually(roles, (view) => view.baseline?.on === false)).baseline?.on).toBe(false);
+  yield* TestClock.adjust("180 minutes");
+  expect(yield* actions("roles.RunawayReported")).toHaveLength(0);
+  yield* client["roles.settings.set"]!({ requestId: "on", settings: { sheepdog: true } });
+  expect((yield* eventually(roles, (view) => view.baseline?.on === true)).baseline?.on).toBe(true);
+  yield* pause(100);
+  yield* TestClock.adjust("119 minutes");
+  expect(yield* actions("roles.RunawayReported")).toHaveLength(0);
+  yield* TestClock.adjust(60_001);
+  expect(yield* eventually(actions("roles.RunawayReported"), (rows) => rows.length > 0)).toHaveLength(1);
+})));
+
+it.effect("a refused crash admission never resumes the agent", () => {
+  const real = engineLists.planners["roles.record"]!;
+  const lists: EngineLists = { ...engineLists, planners: { ...engineLists.planners, "roles.record": (input, payload) =>
+    (payload.action as { _tag: string })._tag === "roles.CrashAdmitted"
+      ? Effect.fail(refused())
+      : real(input, payload) } };
+  return run(lists, (runner) => Effect.gen(function* () {
+    yield* setup;
+    yield* seedAgent({ id: "worker", state: "idle" });
+    yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId: "worker", exitCode: 1, signal: null, stderr: "detail" })]);
+    yield* eventually(rowsOf("CommandRefused"), (rows) => rows.length > 0);
+    expect(runner.callsOf("load")).toHaveLength(0);
+    expect(yield* actions("roles.CrashAdmitted")).toHaveLength(0);
+  }));
+});
+
+for (const boundary of ["admitted", "opened", "carried", "stopped", "disabled", "crashed-again"] as const) {
+  it.effect(`crash recovery restarts safely after the ${boundary} boundary`, () => Effect.gen(function* () {
+    let admission: RolesActionRecord;
+    yield* run(quiet, () => Effect.gen(function* () {
+      yield* seedAccount(); yield* seedHarness();
+      yield* seedAgent({ id: "worker", state: "idle", folder: rig.work });
+      const [crash] = yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId: "worker", exitCode: 1, signal: null, stderr: "detail" })]);
+      yield* executeService(sheepdogCaller, "roles.record", { requestId: "baseline", action: { _tag: "roles.SheepdogBaseline", position: crash!.sequence, on: true } });
+      yield* executeService(sheepdogCaller, "roles.record", { requestId: "admission", action: { _tag: "roles.CrashAdmitted", agentId: "worker", noticeRecipient: "owner",
+        triggerSequence: crash!.sequence, sourceSequence: crash!.sequence, occurrence: 1, notice: "sent" } });
+      admission = (yield* roles).agents.worker!.openCrash!;
+      if (boundary === "opened" || boundary === "carried") yield* callForAction(admission, "crash", "resume", {}, quiet);
+      if (boundary === "carried") yield* callForAction(admission, "crash", "prompt", { text: "You were resumed after a crash. Carry on with what you were doing." }, quiet);
+      if (boundary === "stopped") yield* appendSetup([eventOf({ _tag: "AgentStopped", agentId: "worker" })]);
+      if (boundary === "crashed-again") {
+        yield* callForAction(admission, "crash", "resume", {}, quiet);
+        yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId: "worker", exitCode: 1, signal: null, stderr: "second detail" })]);
+      }
+      if (boundary === "disabled") yield* executeService(sheepdogCaller, "roles.record", { requestId: "off-baseline", action: { _tag: "roles.SheepdogBaseline", position: (yield* snapshot).sequence, on: false } });
+    }));
+    yield* run(engineLists, (runner) => Effect.gen(function* () {
+      if (boundary === "crashed-again") {
+        expect(yield* eventually(actions("roles.GaveUp"), (rows) => rows.length > 0)).toHaveLength(1);
+        yield* pause(100);
+        expect(yield* actions("roles.GaveUp")).toHaveLength(1);
+        expect(runner.callsOf("load")).toHaveLength(0);
+        expect((yield* roles).agents.worker!.openCrash).toBeUndefined();
+        return;
+      }
+      if (boundary === "stopped" || boundary === "disabled") {
+        yield* pause(200);
+        expect(yield* actions("roles.CrashRetried")).toHaveLength(0);
+        expect(runner.callsOf("load")).toHaveLength(0);
+        return;
+      }
+      expect(yield* eventually(actions("roles.CrashRetried"), (rows) => rows.length > 0)).toHaveLength(1);
+      expect(runner.callsOf("load")).toHaveLength(boundary === "admitted" ? 1 : 0);
+      const prompts = (yield* rowsOf("DeliveryQueued")).filter((row) => row.event._tag === "DeliveryQueued" && row.caller._tag === "service");
+      expect(prompts).toHaveLength(1);
+      expect((yield* roles).agents.worker!.openCrash).toBeUndefined();
+    }));
+  }));
+}
+
+it.effect("a missed idle deadline is checked once on restart and then waits another hour", () => Effect.gen(function* () {
+  yield* run(quiet, () => Effect.gen(function* () {
+    yield* seedAccount(); yield* seedHarness(); yield* seedAgent({ id: "top", groups: ["build"] });
+    yield* executeService(sheepdogCaller, "roles.record", { requestId: "idle-baseline", action: {
+      _tag: "roles.SheepdogBaseline", position: (yield* snapshot).sequence, on: true,
+    } });
+  }));
+  yield* TestClock.adjust("90 minutes");
+  yield* run(engineLists, () => Effect.gen(function* () {
+    expect(yield* eventually(actions("roles.TeamIdleReported"), (rows) => rows.length > 0)).toHaveLength(1);
+    yield* pause(100);
+    expect(yield* actions("roles.TeamIdleReported")).toHaveLength(1);
+    yield* TestClock.adjust("59 minutes");
+    expect(yield* actions("roles.TeamIdleReported")).toHaveLength(1);
+    yield* TestClock.adjust("1 minute");
+    expect(yield* eventually(actions("roles.TeamIdleReported"), (rows) => rows.length > 1)).toHaveLength(2);
+  }));
+}));
+
+it.effect("role advice reports each break kind once through authenticated agent commands and a restart", () => Effect.gen(function* () {
+  let bearer: string;
+  for (const attempt of [1, 2]) yield* run(engineLists, () => Effect.gen(function* () {
+    if (attempt === 1) {
+      yield* setup;
+      bearer = (yield* seedAgent({ id: "worker", groups: [] })).token;
+    }
+    const socketPath = join(rig.stateFolder, "advice.sock");
+    yield* serve({ socketPath, ownerCredential: Redacted.make(randomBytes(32).toString("base64url")), debug: true, lists: engineLists });
+    const client = yield* fixtureClient(socketPath, bearer!, engineLists as any);
+    yield* client.start!({ ...startPayload(rig, { groups: [] }), requestId: `child-${attempt}` });
+    expect(yield* eventually(actions("roles.RoleAdviceBroken"), (rows) => rows.length > 0)).toHaveLength(1);
+    yield* pause(100);
+    expect(yield* actions("roles.RoleAdviceBroken")).toHaveLength(1);
+  }));
+}));
