@@ -1,11 +1,12 @@
 # The message board's contract
 
-Status: **version 10, for the foundry-roles plan to build on.** Written by
-the board's planner on 2026-11-03. Version 9 is `attack/contract-v9.md`.
-This version folds the client API contract version 11 (`3bd2358`; lead's
-post #240; rows 135 to 139). It builds on the client API contract version 12
-(`8a34e59`), whose copy is `client-api-contract-v12.md` in this folder. That
-version changes only citations here, so this stays version 10 (row 142). A later change to this file goes to `plans-lead` as a
+Status: **version 11, for the foundry-roles plan to build on.** Written by
+the board's planner on 2026-11-03. Version 10 is `attack/contract-v10.md`.
+This version folds the one major finding of the final review round, under
+the lead's ruling (post #266; row 143): a stop, a crash or a leaving keeps its
+effect after it is undone. It builds on the client API contract version 12
+(`8a34e59`), whose copy is `client-api-contract-v12.md` in this folder, and on
+the engine at `9e386b0` (row 144). A later change to this file goes to `plans-lead` as a
 question first. The board's plan is `.plans/plans/shepherd-message-board/plan.md`;
 its decisions are rows in `decisions.md` in the same folder, named in
 brackets below.
@@ -82,8 +83,9 @@ rule 6). The roles plan decides which channels exist and who is in them.
   `^[a-zA-Z][a-zA-Z0-9_-]{0,63}$`, the engine's slug pattern, and is unique
   among the channels of one manager.
 - **The manager.** The opener is a plain or group channel's first manager.
-  The manager seat moves only when the current manager stops: the reactor
-  then writes `board.ManagerChanged`, naming the nearest ancestor that is
+  The manager seat moves only when the current manager stops, even if it has
+  been resumed before the reactor runs: the reactor then writes
+  `board.ManagerChanged`, naming the nearest ancestor that is
   not stopped, not crashed, and not interrupted with a session that cannot
   reload, or the owner if there is none. A crash, an interrupt, a pause, an
   account change or a resume moves nothing; a stop is final, so rights
@@ -237,7 +239,9 @@ A post has:
   still open, a reply from an addressee with any other disposition makes
   it `replied`. That covers `gone`, `undeliverable`, and `removed` once the
   addressee is a member again. A crash and a stop are judged only by these
-  lifecycle rows, never as leaving the channel.
+  lifecycle rows, never as leaving the channel. A stop, a crash or a leaving
+  that happened after the post keeps its effect even if it was undone before
+  the reactor ran ("The board's reactor", below; row 143).
 
 - **How a post closes.**
 
@@ -248,13 +252,14 @@ A post has:
   | Either mode, every addressee has a disposition, none `replied` | `unanswerable` |
   | The owner replies | `answered` |
   | `board.close` | `withdrawn` |
-  | The author stops, or is removed from the channel | `withdrawn` |
+  | The author stops, or is removed from the channel, after the post | `withdrawn` |
 
   When the author crashes, or is interrupted and cannot reload, its open
   posts stay open and replies are still recorded. A crash never counts as
   leaving the channel.
 - **Completions.** At a close, an agent author is owed a completion,
-  except when the author withdrew the post itself or stopped. A post
+  except when the author withdrew the post itself or stopped after the post,
+  even if it has since been resumed and whatever closed the post (row 143). A post
   withdrawn by someone else, or because its author was removed from the
   channel, owes a completion with that reason. An owed completion is a
   durable reason to wake the author: it survives merging, cleanup, a
@@ -604,8 +609,9 @@ engine's lifecycle table (edit E5; row 112).
 The board's view also folds these engine events: `DeliveryQueued` with a
 board source (to learn the wake's delivery id, row 132), `DeliveryAccepted` and
 `DeliveryReturned` for board wakes, `AgentStarted`, `AgentGrouped`,
-`AgentStopped` (to drop owed completions), and the `StateChanged` out of
-`stopped` (to restart read state) (row 114).
+`AgentStopped` (to drop owed completions and record the stop's sequence),
+`AgentCrashed` and `AgentReloadFailed` (to record that sequence), and the
+`StateChanged` out of `stopped` (to restart read state) (rows 114, 143).
 
 The board asks for its wakes by returning delivery requests, which the
 piece batch path turns into `DeliveryQueued` through the piece-delivery
@@ -660,16 +666,38 @@ alone, and the owner's wait does not end on a failed read.
 
 - Every rule of the reactor is a level rule: a condition over the board's
   view and the engine's views, and the duty it owes while the condition
-  holds. Examples: an addressee with no disposition that is stopped,
-  crashed, or interrupted and not reloadable is `gone`; one that is no
-  longer a member, or whose direct grant fails, is `removed`; an open post
-  whose agent author is no longer a member and is not stopped closes
-  `withdrawn`; a channel whose manager is stopped gets a
-  `board.ManagerChanged`; a still-queued wake carrying a post its target
+  holds. Examples: the five rules in the next bullet; a direct grant that
+  fails makes its addressees `removed`; a still-queued wake carrying a post its target
   may no longer read is rebuilt; an owed completion or an unread open
   must-reply post that no queued or sent wake carries is queued, while its
   target is neither stopped nor crashed and has no board wake queued or
   sent, until its return count reaches two.
+- **A stop, a crash or a leaving stays true after it is undone** (row 143).
+  A resume or a rejoin can land before the reactor's next transaction, also
+  while the board is switched off, so a rule cannot ask only about an agent's
+  state now. The board's view keeps, from the events it folds: for each agent,
+  the sequence of its last stop, and of its last crash or failed reload; for
+  each channel and member, the sequence at which the member last left it; for
+  each post, its own sequence; and for each channel, the sequence at which its
+  manager took the seat. The rules compare them, and no list of pending duties
+  is kept:
+
+  | The rule | It applies when |
+  | --- | --- |
+  | An addressee with no disposition is `gone` | It stopped, crashed or failed a reload after the post, or it is now interrupted and not reloadable |
+  | An addressee with no disposition is `removed` | It left the channel after the post, or it is not a member now |
+  | An open post of an agent author closes `withdrawn`, with no completion | The author stopped after the post |
+  | An open post of an agent author closes `withdrawn`, with a completion that gives the reason | The author left the channel after the post, or it is not a member now, and it did not stop after the post |
+  | A plain or group channel gets `board.ManagerChanged` | Its manager stopped after taking the seat |
+
+  So "the author stopped after posting" and "the manager stopped after taking
+  the seat" stay true after a resume, and a post written after the resume or
+  the rejoin is not caught. A disposition or a close that has already committed
+  makes its rule false, so a reply is never overridden. An interrupt that a
+  resume undoes counts for nothing, because the agent can still take its wake.
+  A direct grant is judged only as it stands now: if a grant lapses and returns
+  before the reactor runs, the post stays open, because its addressee can
+  still be reached and can still answer.
 - It runs after every committed batch, over the agents, channels and posts
   that batch touches, and over the whole state at start-up and when the
   board is switched on. It keeps no position: a duty lost to a restart is

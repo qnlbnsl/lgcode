@@ -1,8 +1,8 @@
 # Known gaps: shepherd-message-board
 
 Gaps the planner could not close before the freeze. Reviewers: these are
-already known; look for new problems. Updated for plan version 9, after
-the client API version 11 fold. That fold was not a review round.
+already known; look for new problems. Updated for plan version 10, after
+the final review round (round 5).
 
 1. **Vendor limits.** The planner cannot read each vendor's remaining
    weekly allowance. The lead checks it before launching any unit.
@@ -47,3 +47,17 @@ the client API version 11 fold. That fold was not a review round.
 Also closed since version 1: the hold-unsettled hook (now seam item 12);
 seam items 13 and 14 (now in the client API contract); group channels
 widening with the label (decided by row 45).
+
+## Round minors, not folded
+
+The lead ruled that the final round folds majors only (post #266). These stay
+open for the build's units to read.
+
+- **R5-A2** (architecture). An agent's `board.read` page does not state the data
+  envelope that an agent's `client.thread` page has, so a post's text reaches
+  the reading agent unlabelled.
+- **C5-02** (critic). Reading a question does not remove its already-queued
+  duplicate wake, so the agent can spend one needless turn.
+- **C5-03** (critic). Criterion 6.6's diff starts at client API unit 1b's merge,
+  so it also counts test changes from later client API units that this plan
+  depends on.
