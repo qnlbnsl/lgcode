@@ -65,6 +65,23 @@ const startAgent = (context: RunnerContext, script: Record<string, unknown>, age
 
 const turnEndedFor = (deliveryId: string) => (event: RunnerEvent) => event._tag === "turnEnded" && event.deliveryId === deliveryId;
 
+live("U07 stream: a context-only usage_update with used zero is persisted without fabricating request tokens or thread text (catches requiring terminal usage or dropping zero)", () => {
+  const harness = harnessFor("first", writeFakeAdapter(rig));
+  const account = accountFor("first", { turns: [[{ step: "raw_frame", frame: JSON.stringify({
+    jsonrpc: "2.0", method: "session/update", params: { sessionId: "${session}",
+      update: { sessionUpdate: "usage_update", used: 0, size: 400_000 } },
+  }) }]] }, echoFile(rig));
+  return withEngine(rig, { harness, accounts: [account] }, (context) => Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    success(yield* call(ownerCredential, "start", startPayloadFor(harness, account, rig.work, { prompt: "report context only" })));
+    const rows = yield* eventually(readLog, (rows) => tagged(rows, "TurnEnded").length === 1);
+    expect(tagged(rows, "ThreadItem")).toEqual([]);
+    expect(tagged(rows, "TurnEnded")).toHaveLength(1);
+    expect(tagged(rows, "TurnEnded")[0]).toHaveProperty("usage", { used: 0 });
+    expect(context.events.find((event) => event._tag === "turnEnded")).toHaveProperty("usage", { used: 0 });
+  }));
+});
+
 const entries = [
   { content: "Read the code", priority: "high", status: "completed" },
   { content: "Write the test", priority: "medium", status: "in_progress" },
