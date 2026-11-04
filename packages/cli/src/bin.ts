@@ -18,6 +18,7 @@ const usage = (): string => [
   "  client wait --block <agent-id>...",
   "  thread export <agent-id> --out <file>",
   "  serve --detach",
+  "  view",
   "  mcp", "",
   "Run shephrd <command> --help for a command's options.",
   "--version prints the version."
@@ -28,6 +29,19 @@ const main = (argv: ReadonlyArray<string>, environment: Readonly<Record<string, 
     const [first] = argv
     if (first === undefined || first === "--help" || first === "-h" || first === "help") { out(usage()); return 0 }
     if (first === "--version" || first === "-V") { out(`${version()}\n`); return 0 }
+    if (first === "view") {
+      if (argv.includes("--help") || argv.includes("-h")) {
+        out("Usage: shephrd view\n\nRead live agent threads in an owner terminal.\nUse Up/Down to select an agent, PgUp/PgDn to scroll, p to prompt, a to inspect a request, and q to quit.\n")
+        return 0
+      }
+      if (argv.length === 2 && argv[1] === "--open-pane") {
+        const { openViewerPane } = yield* Effect.promise(() => import("../../viewer/src/openPane.ts"))
+        return yield* Effect.promise(() => openViewerPane(environment))
+      }
+      if (argv.length !== 1) { err("usage: shephrd view\n"); return 2 }
+      const { runViewer } = yield* Effect.promise(() => import("../../viewer/src/run.ts"))
+      return yield* runViewer(environment)
+    }
     if (first === "serve") {
       if (argv.includes("--help")) { out("Usage: shephrd serve --detach\n\nStart the engine service in the background, or report that it is already running.\n"); return 0 }
       if (argv.length !== 2 || argv[1] !== "--detach") { err("usage: shephrd serve --detach\n"); return 2 }
