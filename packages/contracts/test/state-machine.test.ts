@@ -327,6 +327,8 @@ describe("event table: (lifecycle state, event) cells", () => {
     AgentStopped: { ...allStates("stopped"), stopped: "invalid" },
     AgentReloadFailed: { ...allStates("invalid"), interrupted: "keep", paused: "keep" },
     DeliveryQueued: { ...allStates("keep"), crashed: "invalid", stopped: "invalid" },
+    DeliveryHeld: { ...allStates("invalid"), working: "idle" },
+    DeliveryReleased: allStates("keep"),
     DeliverySent: { ...allStates("invalid"), idle: "working", working: "keep" }
   }
 
@@ -373,4 +375,12 @@ describe("event table: (lifecycle state, event) cells", () => {
       }
     }
   })
+})
+
+// WS-7b: assert the new cells independently of Event's current inventory, so
+// a missing declaration cannot silently skip the lifecycle behavior.
+it("CH01 catches a hold leaving a working agent working, or a release changing its lifecycle", () => {
+  expect(Schema.is(Event)({ _tag: "DeliveryHeld", agentId: "target", deliveryId: "delivery", reason: "capacity" }), "DeliveryHeld must enter the lifecycle table").toBe(true)
+  expect(eventEffect("working", "DeliveryHeld" as never)).toBe("idle")
+  for (const state of states) expect(eventEffect(state, "DeliveryReleased" as never)).toBe("keep")
 })

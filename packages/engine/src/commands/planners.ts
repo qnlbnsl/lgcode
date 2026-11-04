@@ -5,6 +5,7 @@ import { answer } from "../routing/permissions.ts";
 import { ask } from "../routing/questions.ts";
 import { wait } from "../routing/waits.ts";
 import { accounts, setSecret, markAvailable } from "./accounts.ts";
+import { release } from "./release.ts";
 import { compact } from "./compact.ts";
 import { group } from "./group.ts";
 import { harnesses } from "./harnesses.ts";
@@ -35,6 +36,7 @@ export const planners = {
   "roles.settings.set": () => Effect.fail(refused()),
   "roles.snooze": () => Effect.fail(refused()),
   "roles.record": () => Effect.fail(refused()),
+  release: (input, payload) => release(input, payload as Payload<"release">),
   start: (input, payload) => start(input, payload as Payload<"start">),
   prompt: targeted("prompt", (input, payload) => Effect.succeed(prompt(input, payload as Payload<"prompt">))),
   answer: (input, payload) => answer(input, payload as Payload<"answer">),

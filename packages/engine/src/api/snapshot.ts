@@ -47,6 +47,7 @@ export const snapshot = (caller: Caller, lists: EngineLists = engineLists) => Ef
     sequence: view.sequence,
     agents: roster(caller, view).map((row) => ({
       ...row, name: cutUtf8(row.name, 64), groups: cutGroups(row.groups),
+      ...(caller._tag !== "agent" ? { capacityHeld: view.agents[row.agentId]?.capacityHeld === true } : {}),
       ...(row.parentName === undefined ? {} : { parentName: cutUtf8(row.parentName, 64) }),
       ...(caller._tag !== "agent" && view.agents[row.agentId]?.reloadable !== undefined ? { reloadable: view.agents[row.agentId]!.reloadable } : {}),
     })),

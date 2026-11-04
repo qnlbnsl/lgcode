@@ -84,8 +84,8 @@ export const reloadedEvents = (
   const unaccepted = sent.filter((row) => !found.includes(row));
   const requeued = rows.filter((row) => row.status === "queued" && row.reason !== undefined && row.content._tag !== "carry-on");
   const carried = rows.some((row) => row.status === "queued" && row.content._tag === "carry-on");
-  const retry = unaccepted.length > 0 || requeued.length > 0;
-  const carry = !retry && !carried && (found.length > 0 || midTurn);
+  const retry = !agent.capacityHeld && (unaccepted.length > 0 || requeued.length > 0);
+  const carry = !agent.capacityHeld && !retry && !carried && (found.length > 0 || midTurn);
   const id = freshDelivery();
   return [
     ...(agent.state._tag === "starting" ? [] : [{ _tag: "StateChanged" as const, agentId, state: { _tag: "starting" as const } }]),
@@ -96,7 +96,7 @@ export const reloadedEvents = (
     ...(carry ? [{ _tag: "DeliveryQueued" as const, delivery: {
       id, target: agentId, sender: { _tag: "owner" as const }, content: { _tag: "carry-on" as const, text: carryOnText(id, carryText) },
     } }] : []),
-    ...(retry || carry || carried ? [{ _tag: "StateChanged" as const, agentId, state: { _tag: "working" as const } }] : []),
+    ...(!agent.capacityHeld && (retry || carry || carried) ? [{ _tag: "StateChanged" as const, agentId, state: { _tag: "working" as const } }] : []),
   ];
 };
 

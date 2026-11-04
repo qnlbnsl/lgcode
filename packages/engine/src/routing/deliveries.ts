@@ -1,3 +1,4 @@
+import { carryOnText } from "../accounts/available.ts";
 import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { guardPiece } from "../pieces/guardPiece.ts";
 import { canReach } from "./reach.ts";
@@ -26,6 +27,33 @@ const decodeRunMode = Schema.decodeUnknownSync(RunMode);
 const decodeAccountId = Schema.decodeUnknownSync(AccountId);
 const pending = (row: Row) => row.status === "queued" || row.status === "sent";
 
+export type CapacityHoldCondition = (agentId: AgentId, snapshot: Snapshot) => unknown;
+
+// The log is the source of the per-agent, per-outage retry count. Releases,
+// carry-ons and recovery keep it; a completed turn or another error ends it.
+export const capacityHoldCount = (snapshot: Snapshot, agentId: AgentId): number => {
+  let count = 0;
+  let turn: string | undefined;
+  for (const { event } of snapshot.threads[agentId] ?? []) {
+    switch (event._tag) {
+      case "DeliverySent": turn = event.deliveryId; break;
+      case "DeliveryHeld": count++; turn = undefined; break;
+      case "DeliveryReturned":
+        if (event.cause === "capacity" || turn === event.deliveryId) count = 0;
+        break;
+      case "TurnEnded":
+      case "AgentStopped":
+      case "AgentCrashed": count = 0; turn = undefined; break;
+      case "AgentInterrupted": turn = undefined; break;
+      case "StateChanged":
+        if (event.state._tag === "paused" && turn !== undefined) count = 0;
+        if (event.state._tag !== "working") turn = undefined;
+        break;
+    }
+  }
+  return count;
+};
+
 const asDelivery = ({ status: _status, method: _method, reason: _reason, ...delivery }: Row): Delivery => delivery;
 
 // Rows 29, 51 and 53: a requeued delivery and a carry-on go first, then the
@@ -45,8 +73,8 @@ const nextQueued = (snapshot: Snapshot, agentId: string): Row | undefined => {
 
 // Rows 29, 68 and 69: a returned delivery tells an agent sender, in a
 // delivery of its own. The owner reads the return from the log.
-const returnTo = (snapshot: Snapshot, row: Row, reason: string): ReadonlyArray<Event> => {
-  const returned: Event = { _tag: "DeliveryReturned", agentId: row.target, deliveryId: row.id, sender: row.sender, reason };
+const returnTo = (snapshot: Snapshot, row: Row, reason: string, cause?: "capacity"): ReadonlyArray<Event> => {
+  const returned: Event = { _tag: "DeliveryReturned", agentId: row.target, deliveryId: row.id, sender: row.sender, reason, ...(cause === undefined ? {} : { cause }) };
   if (row.sender._tag !== "agent") return [returned];
   const sender = snapshot.agents[row.sender.agentId]?.state._tag;
   if (sender === undefined || sender === "crashed" || sender === "stopped") return [returned];
@@ -140,10 +168,10 @@ const turnDelivery = (snapshot: Snapshot, agentId: AgentId, deliveryId: string):
 // Row 68: an unclassified failure returns the delivery to its sender, and the
 // agent goes idle. An accepted delivery is not put back in the queue. The
 // reason is already redacted.
-const failed = (snapshot: Snapshot, agentId: AgentId, deliveryId: string, reason: string): ReadonlyArray<Event> => {
+const failed = (snapshot: Snapshot, agentId: AgentId, deliveryId: string, reason: string, cause?: "capacity"): ReadonlyArray<Event> => {
   const row = turnDelivery(snapshot, agentId, deliveryId);
   if (row === undefined) return [];
-  return [...returnTo(snapshot, row, reason), { _tag: "StateChanged", agentId, state: { _tag: "idle" } }];
+  return [...returnTo(snapshot, row, reason, cause), { _tag: "StateChanged", agentId, state: { _tag: "idle" } }];
 };
 
 // What pausing one agent on a paused account writes: a delivery it had sent
@@ -177,11 +205,36 @@ const pauseAgent = (
 // error text is never written (decision row 40).
 export const promptReply = (
   snapshot: Snapshot, event: Extract<RunnerEvent, { _tag: "promptReply" }>, redactText: (text: string) => Effect.Effect<string>,
+  capacityHoldCondition?: CapacityHoldCondition,
 ): Effect.Effect<ReadonlyArray<Event>> => Effect.gen(function* () {
   const { agentId, deliveryId, outcome } = event;
   switch (outcome._tag) {
     case "success": return accepted(snapshot, agentId, deliveryId);
     case "error": return failed(snapshot, agentId, deliveryId, yield* redactText(outcome.error));
+    case "capacity": {
+      const row = turnDelivery(snapshot, agentId, deliveryId);
+      if (row === undefined) return [];
+      let hold = false;
+      let invalid = false;
+      try {
+        const result = capacityHoldCondition === undefined ? false : capacityHoldCondition(agentId, snapshot);
+        hold = result === true;
+        invalid = typeof result !== "boolean";
+      } catch {
+        invalid = true;
+      }
+      if (invalid) yield* Effect.logWarning("capacity hold condition failed");
+      if (!hold) return failed(snapshot, agentId, deliveryId, yield* redactText(outcome.error), "capacity");
+      const id = freshDelivery();
+      return [
+        ...(row.status === "sent" ? [{ _tag: "DeliveryRequeued" as const, agentId, deliveryId, reason: "model at capacity" }]
+          : [{ _tag: "DeliveryQueued" as const, delivery: {
+            id, target: agentId, sender: owner,
+            content: { _tag: "carry-on" as const, text: carryOnText(id, "Capacity is available again. Carry on with what you were doing.") },
+          } }]),
+        { _tag: "DeliveryHeld", agentId, deliveryId, reason: "capacity" },
+      ];
+    }
     case "pause": {
       const row = turnDelivery(snapshot, agentId, deliveryId);
       if (row === undefined) return [];
@@ -244,7 +297,7 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
   const ready = (snapshot: Snapshot) => {
     const agent = snapshot.agents[agentId];
     const state = agent?.state._tag;
-    return agent !== undefined && snapshot.accounts[agent.account]?.status !== "needs-sign-in"
+    return agent !== undefined && !agent.capacityHeld && snapshot.accounts[agent.account]?.status !== "needs-sign-in"
       && (state === "idle" || (options.recovered === true && state === "working" && reloaded(snapshot)))
       ? nextQueued(snapshot, agentId) : undefined;
   };
@@ -296,7 +349,8 @@ const readyAfter = (envelope: EventEnvelope): ReadonlyArray<AgentId> => {
     case "SessionOpened":
     case "TurnEnded":
     case "DeliveryReturned":
-    case "DeliveryRequeued": return [event.agentId];
+    case "DeliveryRequeued":
+    case "DeliveryReleased": return [event.agentId];
     case "StateChanged": return event.state._tag === "idle" ? [event.agentId] : [];
     default: return [];
   }
