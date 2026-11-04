@@ -12,7 +12,7 @@ import { ClientRpcGroup, clientCommandAccess } from "./client/commands.ts"
 import { RolesRpcGroup, rolesAccess } from "./roles/commands.ts"
 
 export const engineCommandNames = [
-  "start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group",
+  "start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "release", "compact", "group",
   "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "subscribe", "debug.compare-views"
 ] as const
 // Compatibility for clients that still import the original engine inventory.
@@ -88,6 +88,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
       outcome: Schema.Literals(["opened", "satisfied", "request-held", "cancelled"])
     }), error: Refused
   }),
+  Rpc.make("release", { payload: target, success: Ack, error: Refused }),
   Rpc.make("stop", { payload: target, success: Ack, error: Refused }),
   Rpc.make("resume", {
     payload: { ...target, fresh: Schema.optionalKey(Schema.Boolean) }, success: Ack, error: Refused
@@ -149,6 +150,7 @@ export const commandAccess = {
   ...rolesAccess,
   start: ["owner", "agent"], prompt: ["owner", "agent", "service"], answer: ["owner", "agent"],
   "pass-up": ["owner", "agent"], ask: ["owner", "agent"], wait: ["owner", "agent"],
+  release: ["owner", "agent", "service"],
   stop: ["owner", "agent"], resume: ["owner", "agent", "service"], compact: ["owner", "agent", "service"], group: ["owner", "agent"],
   accounts: ["owner"], "accounts set-secret": ["owner"], "accounts mark-available": ["owner"],
   harnesses: ["owner"], subscribe: ["owner", "agent", "service"], "debug.compare-views": ["owner"],

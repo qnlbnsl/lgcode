@@ -34,6 +34,8 @@ export const eventVisibility = {
   DeliverySent: "agent-scoped",
   DeliveryAccepted: "agent-scoped",
   DeliveryRequeued: "agent-scoped",
+  DeliveryHeld: "agent-scoped",
+  DeliveryReleased: "agent-scoped",
   DeliveryReturned: "agent-scoped",
   DeliveryWithdrawn: "agent-scoped",
   AgentCrashed: "agent-scoped",

@@ -22,6 +22,7 @@ const summaries: Record<CommandName, string> = {
   wait: "Wait for agents to settle. With --block, hold this process until they do.",
   stop: "Stop an agent.",
   resume: "Resume an agent.",
+  release: "Release an agent’s capacity hold.",
   compact: "Compact an agent's context.",
   group: "Add an agent to groups, or remove it from them.",
   accounts: "List, add, set, disable or remove accounts.",
