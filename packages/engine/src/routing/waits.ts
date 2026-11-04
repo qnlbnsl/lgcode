@@ -4,7 +4,7 @@
 // was reused, no code.
 import { randomUUID } from "node:crypto";
 import {
-  WaitId,
+  WaitId, holds, reasonOf, waitSatisfied, pieceNamespaces,
   type AgentId, type Event, type EventEnvelope, type WaitMember,
 } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
@@ -13,50 +13,24 @@ import * as Schema from "effect/Schema";
 
 import { freshRequest, refused, type Input, type Payload, type Plan, type Runtime, type Snapshot } from "../commands/internal.ts";
 import { EventLog } from "../log/EventLog.ts";
-import { apply } from "../views/apply.ts";
+import { applyWith } from "../views/apply.ts";
 import { Views } from "../views/Views.ts";
 import { envelope } from "./envelope.ts";
 import { freshDelivery, holderAbove } from "./holders.ts";
 
-type Reason = WaitMember["reason"];
+import { engineLists, type EngineLists } from "../pieces/lists.ts";
+import { guardPiece } from "../pieces/guardPiece.ts";
+
 type Wait = Snapshot["waits"][string];
 
 const decodeWaitId = Schema.decodeUnknownSync(WaitId);
 
 // The state a batch leaves behind, before it is written. The envelopes are
 // placeholders that only `apply` reads; nothing projected is ever stored.
-export const project = (snapshot: Snapshot, events: ReadonlyArray<Event>): Snapshot =>
-  events.reduce((state, event, index) => apply(state, {
+export const project = (snapshot: Snapshot, events: ReadonlyArray<Event>, lists: EngineLists = engineLists): Snapshot =>
+  events.reduce((state, event, index) => applyWith(state, {
     sequence: snapshot.sequence + index + 1, eventId: "projected", occurredAt: 0, caller: { _tag: "owner" }, event,
-  } as unknown as EventEnvelope), snapshot);
-
-const holds = (state: Snapshot, id: string): boolean =>
-  Object.values(state.requests).some((row) => row.status === "open" && row.holder._tag === "agent" && row.holder.agentId === id)
-  || Object.values(state.questions).some((row) => row.status === "open" && row.holder._tag === "agent" && row.holder.agentId === id);
-
-// Row 50: settled is a predicate on the agent's current state only. Idle
-// already excludes a compact turn, which ends with the turn.
-const settled = (state: Snapshot, id: string): boolean =>
-  state.agents[id]?.state._tag === "idle"
-  && !Object.values(state.deliveries).some((row) => row.target === id && (row.status === "queued" || row.status === "sent"))
-  && !Object.values(state.requests).some((row) => row.status === "open" && row.agentId === id)
-  && !Object.values(state.questions).some((row) => row.status === "open" && row.agentId === id)
-  && !holds(state, id)
-  && !Object.values(state.waits).some((row) => row.agentId === id && row.status === "open" && !row.blocking);
-
-// Rows 25 and 50: a member's reason is its state now. A reloadable
-// interrupted member is not resolved, because recovery can restore it.
-const reasonOf = (state: Snapshot, id: string): Reason | undefined => {
-  const agent = state.agents[id];
-  switch (agent?.state._tag) {
-    case "crashed": return "crashed";
-    case "stopped": return "stopped";
-    case "paused": return "paused";
-    case "interrupted": return agent.reloadable === true ? undefined : "interrupted";
-    case "idle": return settled(state, id) ? "settled" : undefined;
-    default: return undefined;
-  }
-};
+  } as unknown as EventEnvelope, lists.views), snapshot);
 
 // Every engine notice is the engine's own data, wrapped like agent text.
 const notice = (waiter: AgentId, waitId: WaitId, text: string): Event => {
@@ -69,7 +43,7 @@ const notice = (waiter: AgentId, waitId: WaitId, text: string): Event => {
 
 const listing = (members: ReadonlyArray<WaitMember>) => members.map((member) => `- agent ${member.agentId}: ${member.reason}`).join("\n");
 
-const check = (state: Snapshot, wait: Wait): ReadonlyArray<Event> => {
+const check = (state: Snapshot, wait: Wait, lists: EngineLists): ReadonlyArray<Event> => {
   const agentId = wait.agentId;
   const waitId = decodeWaitId(wait.waitId);
   const waiter = state.agents[agentId]?.state._tag;
@@ -80,16 +54,18 @@ const check = (state: Snapshot, wait: Wait): ReadonlyArray<Event> => {
   // belongs to a connection the crash ended.
   if (waiter === "crashed") return wait.blocking ? [{ _tag: "WaitCancelled", agentId, waitId, reason: "agent crashed" }] : [];
   // Row 26: level-triggered, so a request already held returns at once.
-  if (wait.blocking && holds(state, agentId)) return [{ _tag: "WaitCancelled", agentId, waitId, reason: "request held" }];
+  if (wait.blocking && (holds(state, agentId) || pieceNamespaces.some((ns) => guardPiece("requestHeld", ns, () => lists.requestHeld[ns](state, agentId, state[ns]), false)))) return [{ _tag: "WaitCancelled", agentId, waitId, reason: "request held" }];
   const recorded = new Map(wait.resolved.map((member) => [member.agentId as string, member.reason]));
   const current = wait.members.flatMap((member): ReadonlyArray<WaitMember> => {
-    const reason = reasonOf(state, member);
+    const held = pieceNamespaces.some((ns) => guardPiece("holdUnsettled", ns, () => lists.holdUnsettled[ns](state, member, state[ns]), true));
+    const engineReason = reasonOf(state, member);
+    const reason = held && engineReason === "settled" ? undefined : engineReason;
     return reason === undefined ? [] : [{ agentId: member, reason }];
   });
   const events: Array<Event> = current.filter((member) => recorded.get(member.agentId) !== member.reason)
     .map((member) => ({ _tag: "WaitMemberResolved", agentId, waitId, member }));
   // Row 67: a member that went back to working no longer counts.
-  if (wait.mode === "any" ? current.length > 0 : current.length === wait.members.length) {
+  if (waitSatisfied(wait.mode, wait.members, current)) {
     events.push({ _tag: "WaitSatisfied", agentId, waitId, members: current });
     // Row 50: a blocking wait creates no delivery.
     if (!wait.blocking) events.push(notice(agentId, waitId, `Wait ${waitId} finished.\n${listing(current)}`));
@@ -107,14 +83,24 @@ const check = (state: Snapshot, wait: Wait): ReadonlyArray<Event> => {
 // so a resolution and its wake commit with the event that resolves them.
 // A closed wait or a wake changes other agents' settled state, so the checks
 // repeat on the projected state until nothing more follows.
-export const withWaitChecks = (snapshot: Snapshot, events: ReadonlyArray<Event>): ReadonlyArray<Event> => {
+export const withWaitChecks = (snapshot: Snapshot, events: ReadonlyArray<Event>, lists: EngineLists = engineLists): ReadonlyArray<Event> => {
   const all = [...events];
-  let state = project(snapshot, events);
+  let state = project(snapshot, events, lists);
+  for (const id of new Set(events.filter((event) => event._tag === "DeliveryWithdrawn").map((event) => event.agentId))) {
+    const thread = state.threads[id] ?? [];
+    const since = thread.findLastIndex((row) => row.event._tag === "StateChanged" && row.event.state._tag === "working");
+    if (state.agents[id]?.state._tag === "working" && since >= 0
+      && !thread.slice(since + 1).some((row) => row.event._tag === "DeliverySent")
+      && !Object.values(state.deliveries).some((row) => row.target === id && (row.status === "queued" || row.status === "sent"))) {
+      const idle: Event = { _tag: "StateChanged", agentId: state.agents[id]!.agentId, state: { _tag: "idle" } };
+      all.push(idle); state = project(state, [idle], lists);
+    }
+  }
   for (let round = 0; round <= Object.keys(state.waits).length; round++) {
-    const more = Object.values(state.waits).filter((wait) => wait.status === "open").flatMap((wait) => check(state, wait));
+    const more = Object.values(state.waits).filter((wait) => wait.status === "open").flatMap((wait) => check(state, wait, lists));
     if (more.length === 0) break;
     all.push(...more);
-    state = project(state, more);
+    state = project(state, more, lists);
   }
   return all;
 };
@@ -125,7 +111,7 @@ export const recheckWaits = () => Effect.gen(function* () {
   const log = yield* EventLog;
   const views = yield* Views;
   yield* log.transact((append) => Effect.gen(function* () {
-    const events = withWaitChecks(yield* views.snapshot, []);
+    const events = withWaitChecks(yield* views.snapshot, [], log.lists);
     if (events.length > 0) yield* append({ _tag: "owner" }, freshRequest(), randomUUID(), events, {});
   }));
 });

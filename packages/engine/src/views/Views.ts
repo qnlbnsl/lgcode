@@ -14,7 +14,7 @@ import { applyWith, emptyViews } from "./apply.ts";
 import { rebuild } from "./rebuild.ts";
 
 // The live views: the state of every agent, thread, request, question, wait,
-// delivery, account and device, kept in memory and updated by the event
+// delivery and account, kept in memory and updated by the event
 // writer after each COMMIT. `applyCommitted` has no error channel: `apply` is
 // pure, so a defect in it is a defect and never a failed append.
 export class Views extends Context.Service<

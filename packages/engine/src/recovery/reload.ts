@@ -3,7 +3,7 @@
 // a session is reloaded through whichever method the peer advertised. The
 // shape was reused, no code.
 import { randomUUID } from "node:crypto";
-import { PermissionLevel, type Actor, type AgentId, type Event } from "@shephrd/contracts";
+import { PermissionLevel, type Caller, type AgentId, type Event } from "@shephrd/contracts";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -102,7 +102,7 @@ export const reloadedEvents = (
 
 export interface Reload {
   readonly runtime: Runtime;
-  readonly actor: Actor;
+  readonly actor: Caller;
   readonly agent: Agent;
   readonly spawn: Spawn;
   readonly token: Token;
@@ -132,11 +132,11 @@ export const reload = (input: Reload): Effect.Effect<boolean, LogWriteFailed> =>
     const snapshot = yield* runtime.views.snapshot;
     if (!input.still(snapshot.agents[agentId])) return false;
     if (outcome._tag === "Failure") {
-      yield* append(input.actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, input.failed(snapshot)), { revokeAgentTokens: [agentId] });
+      yield* append(input.actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, input.failed(snapshot), runtime.lists), { revokeAgentTokens: [agentId] });
       return false;
     }
     const events = reloadedEvents(snapshot, agentId, outcome.success, input.midTurn, input.carryText ?? RESTART_CARRY_ON);
-    yield* append(input.actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), input.storeToken
+    yield* append(input.actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, events, runtime.lists), input.storeToken
       ? { revokeAgentTokens: [agentId], agentTokens: [{ agentId, tokenHash: token.tokenHash, revokedAt: null }] } : {});
     return true;
   })).pipe(Effect.catchTag("RequestIdReused", () => Effect.succeed(false)));

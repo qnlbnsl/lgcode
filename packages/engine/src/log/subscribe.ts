@@ -26,6 +26,7 @@ export interface EventRow {
   readonly sequence: number;
   readonly event_id: string;
   readonly caller: string;
+  readonly caller_rule?: string | null;
   readonly request_id: string;
   readonly agent_id: string | null;
   readonly occurred_at: number;
@@ -34,12 +35,16 @@ export interface EventRow {
 
 export const decodeRowWith = (row: EventRow, envelope: Schema.Codec<EventEnvelope, unknown> = EventEnvelope) => Effect.try({
   try: () => {
-    if (row.caller !== "owner" && !row.caller.startsWith("agent:")) throw new Error("invalid caller");
+    const caller = row.caller === "owner" ? { _tag: "owner" }
+      : row.caller.startsWith("agent:") ? { _tag: "agent", agentId: row.caller.slice(6) }
+      : row.caller.startsWith("service:") ? { _tag: "service", service: row.caller.slice(8), ...(row.caller_rule == null ? {} : { rule: row.caller_rule }) }
+      : row.caller.startsWith("piece:") ? { _tag: "piece", namespace: row.caller.slice(6) } : undefined;
+    if (caller === undefined) throw new Error("invalid caller");
     return Schema.decodeUnknownSync(envelope)({
       sequence: row.sequence,
       eventId: row.event_id,
       occurredAt: row.occurred_at,
-      caller: row.caller === "owner" ? { _tag: "owner" } : { _tag: "agent", agentId: row.caller.slice(6) },
+      caller,
       requestId: row.request_id,
       ...(row.agent_id === null ? {} : { agentId: row.agent_id }),
       event: JSON.parse(row.payload_json),
@@ -81,7 +86,7 @@ export const subscribe = (after: number): Stream.Stream<
   // A fixed upper bound keeps replay finite while the writer continues. Pages
   // release the reader between reads, and bound the memory used by catch-up.
   const catchUp = Stream.paginate(after, (cursor) => SqliteClient.readOnly(sql<EventRow>`
-    SELECT sequence, event_id, caller, request_id, agent_id, occurred_at, payload_json
+    SELECT sequence, event_id, caller, caller_rule, request_id, agent_id, occurred_at, payload_json
     FROM events WHERE sequence > ${cursor} AND sequence <= ${head}
     ORDER BY sequence LIMIT ${PAGE_SIZE}`
   ).pipe(Effect.map((page) => [

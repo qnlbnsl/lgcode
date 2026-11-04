@@ -56,7 +56,5 @@ export const journey = [
   event({ _tag: "PermissionAnswered", agentId: "agent-a", permissionRequestId: "permission-a", answeredBy: owner, answer: { _tag: "selected", optionId: "once" } }),
   event({ _tag: "QuestionAnswered", agentId: "agent-a", questionId: "question-a", answeredBy: owner, text: "events.ts", deliveryId: "answer-delivery" }),
   event({ _tag: "WaitMemberResolved", agentId: "agent-a", waitId: "wait-a", member: { agentId: "agent-b", reason: "settled" } }),
-  event({ _tag: "DeviceAdded", deviceId: "phone", name: "Phone" }),
-  event({ _tag: "DeviceRevoked", deviceId: "phone" }),
   event({ _tag: "TurnEnded", agentId: "agent-a", compact: false }),
 ];

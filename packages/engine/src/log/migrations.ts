@@ -76,6 +76,7 @@ const migrations: ReadonlyArray<{ readonly id: number; readonly statements: Read
     ],
     backfillThreads: true,
   },
+  { id: 3, statements: ["ALTER TABLE events ADD COLUMN caller_rule TEXT", "DROP TABLE IF EXISTS devices"] },
 ];
 
 // Idempotent: each entry runs once, in its own transaction, and is recorded in

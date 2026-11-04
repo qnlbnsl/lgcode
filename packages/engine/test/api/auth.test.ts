@@ -9,7 +9,6 @@ import { chmodSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, it } from "@effect/vitest";
-import { DeviceId } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
@@ -20,7 +19,7 @@ import { mintAgentToken } from "../../src/identity/tokens.ts";
 import { makeFakeRunner } from "../support/fakeRunner.ts";
 import {
   appendSetup, call, eventOf, headSequence, makeFakeSecrets, makeRig, ownerCredential, provideRig, removeRig,
-  rotateToken, seedAccount, seedAgent, seedDevice, seedHarness, type Rig,
+  rotateToken, seedAccount, seedAgent, seedHarness, type Rig,
 } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { ancestryHeaders, authorization, connect, requestFrame, upgrade, upgradeStatus } from "../support/socketClient.ts";
@@ -92,24 +91,21 @@ live("7.2 a malformed credential is refused with 401, and the refusal body never
     }
   })));
 
-live("7.2 a revoked agent token, a revoked device credential and a well-formed token that was never issued are refused with 401 on upgrade (breaks if only the token's shape is checked on upgrade, or revoked rows are not filtered)", () =>
+live("7.2 a revoked agent token and a well-formed token that was never issued are refused with 401 on upgrade (breaks if only the token's shape is checked on upgrade, or revoked rows are not filtered)", () =>
   withServer(({ socket }) => Effect.gen(function* () {
     const stopped = yield* seedAgent({ id: "agent-stopped", state: "stopped" });
     const live = yield* seedAgent({ id: "agent-rotated" });
     yield* rotateToken(live.agentId);
-    const device = yield* seedDevice("Old phone");
-    yield* appendSetup([eventOf({ _tag: "DeviceRevoked", deviceId: device.deviceId })], { revokeDevices: [Schema.decodeUnknownSync(DeviceId)(device.deviceId)] });
     const unknown = Redacted.value(mintAgentToken().token);
-    for (const value of [stopped.token, live.token, device.credential, unknown]) {
+    for (const value of [stopped.token, live.token, unknown]) {
       yield* expectRefused(socket, { ...authorization(value), ...ancestryHeaders() }, value);
     }
   })));
 
-live("7.2 control: the owner credential, a live agent token and a live device credential are each accepted and can call a command (breaks if the server refuses every upgrade, which would pass the refusal cases)", () =>
+live("7.2 control: the owner credential and a live agent token are each accepted and can call a command (breaks if the server refuses every upgrade, which would pass the refusal cases)", () =>
   withServer(({ socket }) => Effect.gen(function* () {
     const agent = yield* seedAgent({ id: "agent-live" });
-    const device = yield* seedDevice("Phone");
-    for (const value of [ownerSecret, agent.token, device.credential]) {
+    for (const value of [ownerSecret, agent.token]) {
       const outcome = yield* promise(() => upgradeStatus(socket, { ...authorization(value), ...ancestryHeaders() }));
       expect(outcome.status).toBe(101);
     }
@@ -146,7 +142,7 @@ live("7.2 stopping an agent closes its open connections and its open subscriptio
     owner.socket!.terminate();
   })));
 
-live("7.2 a token rotation closes the old token's connection while the new token connects, and a device revocation closes that device's connection (breaks if the invalidation signal follows only stop events, or is keyed by agent rather than by credential)", () =>
+live("7.2 a token rotation closes the old token's connection while the new token connects, (breaks if the invalidation signal follows only stop events, or is keyed by agent rather than by credential)", () =>
   withServer(({ socket }) => Effect.gen(function* () {
     const agent = yield* seedAgent({ id: "agent-rotating" });
     const old = yield* promise(() => upgrade(socket, { ...authorization(agent.token), ...ancestryHeaders() }));
@@ -156,18 +152,5 @@ live("7.2 a token rotation closes the old token's connection while the new token
     const next = yield* promise(() => upgrade(socket, { ...authorization(fresh), ...ancestryHeaders() }));
     expect(next.status).toBe(101);
 
-    const device = yield* seedDevice("Tablet");
-    const other = yield* seedDevice("Laptop");
-    const tablet = yield* promise(() => upgrade(socket, { ...authorization(device.credential), ...ancestryHeaders() }));
-    const laptop = yield* promise(() => upgrade(socket, { ...authorization(other.credential), ...ancestryHeaders() }));
-    let laptopClosed = false;
-    laptop.socket!.once("close", () => { laptopClosed = true; });
-    yield* appendSetup([eventOf({ _tag: "DeviceRevoked", deviceId: device.deviceId })], { revokeDevices: [Schema.decodeUnknownSync(DeviceId)(device.deviceId)] });
-    yield* closesWithin(tablet.socket!, "the revoked device's connection");
-    // Rule 4: revoking one device does not sign out another.
-    const still = yield* promise(() => upgradeStatus(socket, { ...authorization(other.credential), ...ancestryHeaders() }));
-    expect(still.status).toBe(101);
-    expect(laptopClosed).toBe(false);
     next.socket!.terminate();
-    laptop.socket!.terminate();
   })));

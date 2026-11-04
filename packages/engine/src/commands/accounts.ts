@@ -30,6 +30,7 @@ const effectiveValue = (secrets: Input["runtime"]["secrets"], value: string): Ef
 // login variable. `supplied` is a value just given for one environment name.
 const loginReason = (secrets: Input["runtime"]["secrets"], account: Account, supplied?: { readonly name: string; readonly value: string }) =>
   Effect.gen(function* () {
+    if (account.secret?.startsWith("secret:client.") || Object.values(account.environment ?? {}).some((value) => value.startsWith("secret:client."))) return "reserved secret reference";
     const unsupported = loginRefusal(account.harness, account);
     if (unsupported !== undefined) return unsupported;
     const variable = harnessLogin(account.harness).homeVariable;

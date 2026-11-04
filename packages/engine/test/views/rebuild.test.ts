@@ -55,7 +55,6 @@ it.effect("4.4 live parity: catches missing committed batches, skipping sequence
       waits: { "wait-a": { status: "open", resolved: [{ agentId: "agent-b", reason: "settled" }] } },
       deliveries: { "delivery-a": { status: "accepted" } },
       accounts: { primary: { status: "available" } },
-      devices: { phone: { name: "Phone", revoked: true } },
     });
   })),
 );
@@ -195,8 +194,8 @@ it.effect("4c F3 planted difference: catches a rebuild hook that ignores corrupt
   withViews(home, Effect.gen(function* () {
     yield* registerRebuildCheck({ expectDifference: true });
     yield* append("drop-revocation", [...ready,
-      event({ _tag: "DeviceAdded", deviceId: "phone", name: "Phone" }),
-      event({ _tag: "DeviceRevoked", deviceId: "phone" }),
+      event({ _tag: "AccountChanged", accountId: "phone", account: { id: "phone", harness: "first", displayName: "Phone", enabled: true } }),
+      event({ _tag: "AccountChanged", accountId: "phone", account: { id: "phone", harness: "first", displayName: "Phone", enabled: false } }),
       event({ _tag: "AgentGrouped", agentId: "agent-a", groups: ["review"] }),
     ]);
     const closed = yield* Effect.scoped(registerRebuildCheck()).pipe(Effect.exit);
@@ -205,11 +204,11 @@ it.effect("4c F3 planted difference: catches a rebuild hook that ignores corrupt
     if (defect._tag !== "Success") throw new Error("The planted difference did not fail the rebuild hook");
     expect(defect.success).toBeInstanceOf(Error);
     expect((defect.success as Error).message).toContain("Live views differ from the rebuild at sequence 6");
-    expect((defect.success as Error).message).toContain('["devices","phone","revoked"]');
+    expect((defect.success as Error).message).toContain('["accounts","phone","enabled"]');
   }), {
     replace: (real) => ({
       ...real,
-      applyCommitted: (batch) => real.applyCommitted(batch.filter((row) => row.event._tag !== "DeviceRevoked")),
+      applyCommitted: (batch) => real.applyCommitted(batch.filter((row) => !(row.event._tag === "AccountChanged" && row.event.account?.enabled === false))),
     }),
   }),
 );

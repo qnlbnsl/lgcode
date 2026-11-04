@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { it } from "@effect/vitest";
-import { AgentId, DeliveryId, DeviceId, PermissionRequestId, RequestId, type Event } from "@shephrd/contracts";
+import { AgentId, DeliveryId, PermissionRequestId, RequestId, type Event } from "@shephrd/contracts";
 import * as AcpClient from "@shephrd/t3-effect-acp/client";
 import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import * as Cause from "effect/Cause";
@@ -22,7 +22,6 @@ import { afterEach, beforeEach, expect, vi } from "vitest";
 import { makeRedactor } from "../../src/identity/redactor.ts";
 import { redactingLoggerLayer } from "../../src/identity/logger.ts";
 import { mintAgentToken } from "../../src/identity/tokens.ts";
-import { mintDeviceCredential } from "../../src/identity/devices.ts";
 import * as EventLog from "../../src/log/EventLog.ts";
 import { migrate } from "../../src/log/migrations.ts";
 import * as Views from "../../src/views/Views.ts";
@@ -186,10 +185,10 @@ it.effect.each([0, 1, 2])(
   }),
 );
 
-it.effect.each(["agent", "device"] as const)(
+it.effect.each(["agent"] as const)(
   "5.11 stored hash/%s: catches requiring the raw token in the live-secret registry or ignoring embedded prefixes",
   (kind) => Effect.gen(function* () {
-    const minted = kind === "agent" ? mintAgentToken() : mintDeviceCredential();
+    const minted = mintAgentToken();
     const raw = Redacted.value(minted.token);
     const sql = yield* SqlClient.SqlClient;
     yield* migrate;
@@ -199,19 +198,15 @@ it.effect.each(["agent", "device"] as const)(
       yield* registerRebuildCheck();
       const log = yield* EventLog.EventLog;
       yield* log.append({ _tag: "owner" }, Schema.decodeUnknownSync(RequestId)(randomUUID()), "a".repeat(64), [
-        kind === "agent" ? { _tag: "TurnStarted", agentId } : { _tag: "DeviceAdded", deviceId: Schema.decodeUnknownSync(DeviceId)("phone"), name: "Phone" },
-      ], kind === "agent"
-        ? { agentTokens: [{ agentId, tokenHash: minted.tokenHash, revokedAt: null }] }
-        : { devices: [{ deviceId: Schema.decodeUnknownSync(DeviceId)("phone"), name: "Phone", tokenHash: minted.tokenHash, createdAt: 1, revokedAt: null }] });
+        { _tag: "TurnStarted", agentId },
+      ], { agentTokens: [{ agentId, tokenHash: minted.tokenHash, revokedAt: null }] });
     }).pipe(Effect.scoped, Effect.provide(EventLog.layer.pipe(Layer.provideMerge(Views.layer), Layer.provide(instance.layer))));
-    const rows = kind === "agent"
-      ? yield* sql<{ token_hash: string }>`SELECT token_hash FROM agent_tokens`
-      : yield* sql<{ token_hash: string }>`SELECT token_hash FROM devices`;
+    const rows = yield* sql<{ token_hash: string }>`SELECT token_hash FROM agent_tokens`;
     for (const row of rows) tokenHashes.add(row.token_hash);
     yield* Effect.gen(function* () {
       const service = yield* Redactor;
       expect(yield* service.redact(textEvent(`bearer:${raw}; safe`))).toEqual(textEvent("bearer:[REDACTED]; safe"));
-      const unknown = Redacted.value((kind === "agent" ? mintAgentToken() : mintDeviceCredential()).token);
+      const unknown = Redacted.value((mintAgentToken()).token);
       expect(instance.redactText(`unknown:${unknown}; safe`)).toBe(`unknown:${unknown}; safe`);
     }).pipe(Effect.provide(instance.layer));
   }).pipe(

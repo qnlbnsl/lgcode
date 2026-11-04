@@ -9,9 +9,9 @@ import { afterEach, beforeEach, expect, vi } from "vitest";
 
 import { makeFakeRunner } from "../support/fakeRunner.ts";
 import {
-  agentCredential, agentIdOf, agentRow, appendSetup, call, crashAgent, deviceCredential, eventOf, failureOf,
+  agentCredential, agentIdOf, agentRow, appendSetup, call, crashAgent, eventOf, failureOf,
   folderIn, harnessSettings, headSequence, logAfter, makeFakeSecrets, makeRig, ownerCredential, provideRig,
-  removeRig, revokeTokens, seedAccount, seedAgent, seedDevice, seedHarness, startPayload, success, viewsWithoutSequence,
+  removeRig, revokeTokens, seedAccount, seedAgent, seedHarness, startPayload, success, viewsWithoutSequence,
   type Credential, type Fakes, type Rig, type SeedState,
 } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
@@ -86,10 +86,10 @@ const expectOutcome = (
 // ---------------------------------------------------------------------------
 
 type CallerKind =
-  | "owner" | "device" | "parent" | "grandparent" | "sibling" | "child" | "unrelated" | "stopped-parent" | "revoked-token";
+  | "owner" | "parent" | "grandparent" | "sibling" | "child" | "unrelated" | "stopped-parent" | "revoked-token";
 
 const expected: Readonly<Record<CallerKind, Expectation>> = {
-  owner: "allowed", device: "allowed", parent: "allowed",
+  owner: "allowed", parent: "allowed",
   grandparent: "refused", sibling: "refused", child: "refused", unrelated: "refused",
   "stopped-parent": "rejected", "revoked-token": "rejected",
 };
@@ -128,10 +128,8 @@ const world = (state: SeedState) => Effect.gen(function* () {
   const keeper = yield* seedAgent({ id: "keeper", parent: "boss" });
   yield* seedAgent({ id: "revoked-target", parent: "keeper", state });
   yield* revokeTokens(agentIdOf("keeper"));
-  const device = yield* seedDevice();
   const credentials: Record<CallerKind, readonly [Credential, string]> = {
     owner: [ownerCredential, "target"],
-    device: [deviceCredential(device.credential), "target"],
     parent: [agentCredential(parent.token), "target"],
     grandparent: [agentCredential(boss.token), "target"],
     sibling: [agentCredential(sibling.token), "target"],
@@ -159,28 +157,14 @@ for (const [command, state] of validStates) {
   }
 }
 
-it.effect("5.3 revoked device: catches a device credential that still works after the device is revoked", () =>
-  withRig((fakes) => Effect.gen(function* () {
-    yield* seedAgent({ id: "agent-a" });
-    const device = yield* seedDevice();
-    yield* appendSetup([eventOf({ _tag: "DeviceRevoked", deviceId: device.deviceId })], { revokeDevices: [device.deviceId] });
-    yield* expectOutcome("rejected", deviceCredential(device.credential), "stop", { agentId: "agent-a" }, fakes);
-  })).pipe(Effect.orDie));
 
 it.effect("5.3 forged credentials: catches an agent token or device credential that was never issued being treated as a caller", () =>
   withRig((fakes) => Effect.gen(function* () {
     yield* seedAgent({ id: "agent-a" });
     yield* expectOutcome("rejected", agentCredential("shp_a_" + "0".repeat(40)), "stop", { agentId: "agent-a" }, fakes);
-    yield* expectOutcome("rejected", deviceCredential("shp_d_" + "0".repeat(40)), "stop", { agentId: "agent-a" }, fakes);
     yield* expectOutcome("rejected", agentCredential("not a token"), "stop", { agentId: "agent-a" }, fakes);
   })).pipe(Effect.orDie));
 
-it.effect("5.3 device token as agent token: catches a credential of one kind being accepted as the other", () =>
-  withRig((fakes) => Effect.gen(function* () {
-    yield* seedAgent({ id: "agent-a" });
-    const device = yield* seedDevice();
-    yield* expectOutcome("rejected", agentCredential(device.credential), "stop", { agentId: "agent-a" }, fakes);
-  })).pipe(Effect.orDie));
 
 // ---------------------------------------------------------------------------
 // Rights pass up the ancestor chain (decision row 27)
@@ -264,17 +248,12 @@ for (const [name, payload] of ownerOnly) {
     yield* appendSetup([eventOf({ _tag: "AccountChanged", accountId: "spare", account: { id: "spare", harness: "first", enabled: true } })]);
     const agent = yield* seedAgent({ id: "agent-a" });
     const dead = yield* seedAgent({ id: "agent-dead", state: "stopped" });
-    const device = yield* seedDevice();
-    const revoked = yield* seedDevice("Old phone");
-    yield* appendSetup([eventOf({ _tag: "DeviceRevoked", deviceId: revoked.deviceId })], { revokeDevices: [revoked.deviceId] });
-    return { agent, dead, device, revoked };
+    return { agent, dead };
   });
   const cases: ReadonlyArray<readonly [string, Expectation, (w: Effect.Success<typeof ownerOnlyWorld>) => Credential]> = [
     ["the owner", "allowed", () => ownerCredential],
-    ["a device", "allowed", (w) => deviceCredential(w.device.credential)],
     ["an agent", "refused", (w) => agentCredential(w.agent.token)],
     ["a stopped agent's token", "rejected", (w) => agentCredential(w.dead.token)],
-    ["a revoked device", "rejected", (w) => deviceCredential(w.revoked.credential)],
   ];
   for (const [who, want, credential] of cases) {
     it.effect(`5.3 owner-only ${label} as ${who}: catches ${who} being ${want === "allowed" ? "refused" : "allowed"}`, () =>
@@ -306,13 +285,6 @@ it.effect("5.3 start as owner: catches an owner-started agent being held to the 
     }
   })).pipe(Effect.orDie));
 
-it.effect("5.3 start as device: catches a device's start recorded with a parent other than the owner", () =>
-  withRig((fakes) => Effect.gen(function* () {
-    const device = yield* seedDevice();
-    const written = yield* expectOutcome("allowed", deviceCredential(device.credential), "start", startPayload(rig, { prompt: "Go." }), fakes);
-    expect(written.map((row) => row.event).find((event) => event._tag === "AgentStarted")).toMatchObject({ parent: { _tag: "owner" } });
-    expect(written.every((row) => row.caller._tag === "owner")).toBe(true);
-  })).pipe(Effect.orDie));
 
 for (const state of ["idle", "working"] as const) it.effect(`5.3 start as a ${state} agent: catches an agent being unable to start a child, or the child's parent and first-prompt sender being recorded as the owner`, () =>
   withRig((fakes) => Effect.gen(function* () {
@@ -477,7 +449,7 @@ it.effect("5.3 resume of an owner-started agent: catches the ceiling being appli
 // permission and asked a question; the holder holds both. `dead` is stopped
 // and `keeper`'s token has been revoked.
 type RoutingCaller =
-  | "owner" | "device" | "holder" | "ancestor" | "sibling" | "child" | "asker" | "unrelated" | "stopped" | "revoked-token";
+  | "owner" | "holder" | "ancestor" | "sibling" | "child" | "asker" | "unrelated" | "stopped" | "revoked-token";
 
 const routingWorld = (fakes: Fakes) => Effect.gen(function* () {
   const boss = yield* seedAgent({ id: "boss" });
@@ -489,14 +461,12 @@ const routingWorld = (fakes: Fakes) => Effect.gen(function* () {
   const dead = yield* seedAgent({ id: "dead", parent: "boss", state: "stopped" });
   const keeper = yield* seedAgent({ id: "keeper", parent: "boss" });
   yield* revokeTokens(agentIdOf("keeper"));
-  const device = yield* seedDevice();
   const permission = yield* requestPermission(fakes.runner, asker);
   const questionId: string = success(yield* call(agentCredential(asker.token), "ask", { text: "Which branch?" })).questionId;
   expect(permission.row.holder).toEqual({ _tag: "agent", agentId: "holder" });
   expect((yield* (yield* Views.Views).snapshot).questions[questionId]?.holder).toEqual({ _tag: "agent", agentId: "holder" });
   const credentials: Record<RoutingCaller, Credential> = {
     owner: ownerCredential,
-    device: deviceCredential(device.credential),
     holder: agentCredential(holder.token),
     ancestor: agentCredential(boss.token),
     sibling: agentCredential(sibling.token),
@@ -512,12 +482,12 @@ const routingWorld = (fakes: Fakes) => Effect.gen(function* () {
 // Only the holder or the owner may answer or pass up (row 27). Anyone with a
 // live token may ask, for itself; the owner has no one to ask.
 const holderOnly: Readonly<Record<RoutingCaller, Expectation>> = {
-  owner: "allowed", device: "allowed", holder: "allowed",
+  owner: "allowed", holder: "allowed",
   ancestor: "refused", sibling: "refused", child: "refused", asker: "refused", unrelated: "refused",
   stopped: "rejected", "revoked-token": "rejected",
 };
 const anyLiveAgent: Readonly<Record<RoutingCaller, Expectation>> = {
-  owner: "refused", device: "refused", holder: "allowed",
+  owner: "refused", holder: "allowed",
   ancestor: "allowed", sibling: "allowed", child: "allowed", asker: "allowed", unrelated: "allowed",
   stopped: "rejected", "revoked-token": "rejected",
 };
@@ -529,7 +499,7 @@ const callerId: Partial<Record<RoutingCaller, string>> = {
   holder: "holder", ancestor: "boss", sibling: "sibling", child: "kid", asker: "asker", unrelated: "unrelated",
 };
 const recordedAs = (kind: RoutingCaller) =>
-  kind === "owner" || kind === "device" ? { _tag: "owner" } : { _tag: "agent", agentId: callerId[kind] };
+  kind === "owner" ? { _tag: "owner" } : { _tag: "agent", agentId: callerId[kind] };
 
 type RoutingWorld = Effect.Success<ReturnType<typeof routingWorld>>;
 const routingCommands: ReadonlyArray<{

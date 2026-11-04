@@ -24,9 +24,9 @@ import * as RpcSerialization from "effect/rpc/RpcSerialization";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import { CommandHandler } from "../commands/CommandHandler.ts";
-import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
 import { EventLog } from "../log/EventLog.ts";
+import { checkPieceBatch, pieceNamespace } from "../commands/pieceBatch.ts";
 import { freshRequest, refused as refuseCommand } from "../commands/internal.ts";
 import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { Restart } from "../recovery/service.ts";
@@ -98,8 +98,7 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
       const agentId = yield* verifyAgentToken(raw);
       return { credential: { _tag: "agent", token: Redacted.make(raw) } as Credential, agentId };
     }
-    yield* verifyDeviceCredential(raw);
-    return { credential: { _tag: "device", credential: Redacted.make(raw) } as Credential };
+    return yield* refuseCommand("invalid credential");
   }).pipe(Effect.option);
 
   const app: Application = Effect.scoped(Effect.gen(function* () {
@@ -172,12 +171,14 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
       return prepare.pipe(Effect.flatMap((input) => read(input, payload) as Effect.Effect<import("./reads.ts").ReadReply, unknown, Services>),
         Effect.flatMap((result) => Effect.gen(function* () {
           const marks = result.marks ?? [];
-          if (marks.length > 0) {
-            const namespace = name.split(".")[0]!;
-            if (!name.includes(".") || marks.some((mark) => !mark._tag.startsWith(`${namespace}.`))) return yield* refuseCommand();
-            // E23 replaces this own-namespace mark batch with the shared piece
-            // validator. Read replies are never receipts, even on a retry.
-            yield* log.append(actor, freshRequest(), "read marks", marks, {}, false);
+          if (marks.length > 0 || (result.deliveries?.length ?? 0) > 0 || Object.keys(result.sideRows ?? {}).length > 0) {
+            const namespace = pieceNamespace(name);
+            if (namespace === undefined) return yield* refuseCommand();
+            yield* log.transact((append) => Effect.gen(function* () {
+              const snapshot = yield* views.snapshot;
+              const events = yield* checkPieceBatch(namespace, snapshot, { events: marks, deliveries: result.deliveries, sideRows: result.sideRows }, actor, log.lists ?? engineLists);
+              yield* append(actor, freshRequest(), "read marks", events, result.sideRows ?? {}, false);
+            }));
           }
           return result.reply;
         })), Effect.mapError((error) => readError(payload.requestId, error)));

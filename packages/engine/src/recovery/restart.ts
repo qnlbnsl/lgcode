@@ -1,3 +1,4 @@
+import { collectSecrets } from "../accounts/collectSecrets.ts";
 // Pattern: T3 Code packages/effect-acp/src/client.ts (`loadSession`, line 91;
 // MIT licence; the copy here is third_party/t3code/effect-acp/src/client.ts)
 // for the reload itself, through reload.ts. The recovery order is Shephrd's
@@ -67,8 +68,8 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
   const views = yield* Views;
   const runner = yield* Runner;
   const secrets = yield* SecretStore;
-  const services = yield* Effect.context<EventLog | Views | Runner | SqlClient.SqlClient>();
-  const runtime: Runtime = { ...options, sql, log, views, runner, secrets };
+  const services = yield* Effect.context<EventLog | Views | Runner | SecretStore | SqlClient.SqlClient>();
+  const runtime: Runtime = { ...options, ...(log.lists === undefined ? {} : { lists: log.lists }), sql, log, views, runner, secrets };
   const reader = options.reader ?? (process.platform === "linux" ? linuxProcessReader : macosProcessReader);
   const timeoutMillis = options.setupTimeoutMillis ?? SETUP_TIMEOUT_MILLIS;
   const canReload = runner.capabilities.loadSession || runner.capabilities.resumeSession;
@@ -80,7 +81,7 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
 
   const write = (events: ReadonlyArray<Event>) => log.transact((append) => Effect.gen(function* () {
     const snapshot = yield* views.snapshot;
-    const all = withWaitChecks(snapshot, events);
+    const all = withWaitChecks(snapshot, events, log.lists);
     if (all.length > 0) yield* append(owner, freshRequest(), randomUUID(), all, {});
   })).pipe(ignoreReused(undefined));
 
@@ -136,17 +137,6 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
     if (events.length > 0) yield* write(events);
   });
 
-  // Issue 119: a stored secret that no current account names is removed.
-  const collectSecrets = Effect.gen(function* () {
-    if (secrets.retainOnly === undefined) return;
-    const keep = new Set<string>();
-    for (const account of Object.values((yield* views.snapshot).accounts)) {
-      if (account.secret !== undefined) keep.add(account.secret);
-      for (const value of Object.values(account.environment ?? {})) if (value.startsWith("secret:")) keep.add(value);
-    }
-    yield* secrets.retainOnly(keep).pipe(Effect.catchTag("LogWriteFailed", () => Effect.logWarning("unreferenced secret collection failed")));
-  });
-
   // Step 7 for one interrupted agent. An agent caught starting with no
   // session is started again. A reloadable agent is reloaded with a new
   // token. Any other agent stays interrupted until `resume --fresh`.
@@ -166,7 +156,7 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
       yield* log.transact((append) => Effect.gen(function* () {
         const current = yield* views.snapshot;
         if (current.agents[agentId]?.state._tag !== "interrupted") return;
-        yield* append(owner, freshRequest(), randomUUID(), withWaitChecks(current, failed()), { revokeAgentTokens: [agentId] });
+        yield* append(owner, freshRequest(), randomUUID(), withWaitChecks(current, failed(), log.lists), { revokeAgentTokens: [agentId] });
       })).pipe(ignoreReused(undefined));
       return false;
     }
@@ -198,7 +188,7 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
       yield* log.transact((append) => Effect.gen(function* () {
         const current = yield* views.snapshot;
         if (!still(current.agents[agentId])) return;
-        yield* append(owner, freshRequest(), randomUUID(), withWaitChecks(current, failed()), { revokeAgentTokens: [agentId] });
+        yield* append(owner, freshRequest(), randomUUID(), withWaitChecks(current, failed(), log.lists), { revokeAgentTokens: [agentId] });
       })).pipe(ignoreReused(undefined));
       return false;
     }
@@ -220,7 +210,7 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
       const skip = new Set<AgentId>(Object.values(snapshot.agents)
         .filter((agent) => returnable(agent, accountId, cause) && !live.has(agent.agentId)).map((agent) => agent.agentId));
       const events = returnAgents(snapshot, accountId, cause, skip);
-      if (events.length > 0) yield* append(owner, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), {});
+      if (events.length > 0) yield* append(owner, freshRequest(), randomUUID(), withWaitChecks(snapshot, events, log.lists), {});
       return [...skip] as ReadonlyArray<AgentId>;
     })).pipe(ignoreReused([] as ReadonlyArray<AgentId>));
     const reloaded: Array<AgentId> = [];
@@ -265,7 +255,7 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
   // holder stayed interrupted move. The same append re-checks every open wait.
   const reevaluate = log.transact((append) => Effect.gen(function* () {
     const snapshot = yield* views.snapshot;
-    const events = withWaitChecks(snapshot, moveFromInterrupted(snapshot));
+    const events = withWaitChecks(snapshot, moveFromInterrupted(snapshot), log.lists);
     if (events.length > 0) yield* append(owner, freshRequest(), randomUUID(), events, {});
   })).pipe(ignoreReused(undefined));
 
@@ -285,7 +275,7 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
     yield* log.append(owner, freshRequest(), randomUUID(), [], { revokeAgentTokens: "all" }, false).pipe(ignoreReused([]));
     yield* sweep;
     yield* interrupt;
-    yield* collectSecrets;
+    yield* collectSecrets(yield* views.snapshot, log.lists);
     const recovered = new Set<string>();
     for (const agent of Object.values((yield* views.snapshot).agents)) {
       if (agent.state._tag === "interrupted" && (yield* reloadInterrupted(agent.agentId))) recovered.add(agent.agentId);

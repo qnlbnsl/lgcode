@@ -15,8 +15,6 @@ export const WaitId = Schema.NonEmptyString.pipe(Schema.brand("WaitId"))
 export type WaitId = typeof WaitId.Type
 export const DeliveryId = Schema.NonEmptyString.pipe(Schema.brand("DeliveryId"))
 export type DeliveryId = typeof DeliveryId.Type
-export const DeviceId = Schema.NonEmptyString.pipe(Schema.brand("DeviceId"))
-export type DeviceId = typeof DeviceId.Type
 export const BootId = Schema.NonEmptyString.pipe(Schema.brand("BootId"))
 export type BootId = typeof BootId.Type
 

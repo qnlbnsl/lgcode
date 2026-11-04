@@ -8,7 +8,7 @@ import { pickAccount } from "../accounts/pick.ts";
 import { canUseMode, checkFolder, folderForSpawn } from "../identity/ceiling.ts";
 import { mintAgentToken } from "../identity/tokens.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
-import { agentText } from "../routing/envelope.ts";
+import { agentText, senderOf } from "../routing/envelope.ts";
 import { bounded, SETUP_TIMEOUT_MILLIS } from "../recovery/reload.ts";
 import { withLane, withPreemption } from "../routing/lanes.ts";
 import { withWaitChecks } from "../routing/waits.ts";
@@ -17,6 +17,7 @@ import { freshRequest, readHarnesses, refused, type Input, type Payload, type Pl
 export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Plan, ReturnType<typeof refused> | LogWriteFailed> =>
   Effect.gen(function* () {
     const { runtime, actor, snapshot } = input;
+    if (actor._tag !== "owner" && actor._tag !== "agent") return yield* refused();
     const parent = actor._tag === "agent" ? snapshot.agents[actor.agentId] : undefined;
     if (actor._tag === "agent" && (parent === undefined || !canUseMode(actor, Schema.decodeUnknownSync(PermissionLevel)(parent.permission), payload.permission))) {
       return yield* refused();
@@ -43,8 +44,8 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
       ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }),
       ...(payload.prompt === undefined ? {} : {
         firstPromptDelivery: {
-          id: deliveryId, target: agentId, sender: actor,
-          content: { _tag: "prompt" as const, text: agentText(actor, deliveryId, payload.prompt) },
+          id: deliveryId, target: agentId, sender: senderOf(actor),
+          content: { _tag: "prompt" as const, text: agentText(senderOf(actor), deliveryId, payload.prompt) },
         },
       }),
     };
@@ -63,7 +64,7 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
           const snapshot = yield* runtime.views.snapshot;
           yield* append(actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, [
             { _tag: "AgentStartFailed", agentId, reason: "agent start failed" },
-          ]), { revokeAgentTokens: [agentId] });
+          ], runtime.lists), { revokeAgentTokens: [agentId] });
         })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void));
         const cancelled = yield* Effect.gen(function* () {
           // The new id becomes visible at commit, before this lane is acquired.
@@ -92,7 +93,7 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
                 : before === "paused" ? [{ _tag: "StateChanged", agentId, state: { _tag: "idle" } }] : [];
               const opened: ReadonlyArray<Event> = [{ _tag: "SessionOpened", agentId, session: session.session,
                 protocolVersion: session.protocolVersion, reloadable: session.reloadable }, ...lifecycle];
-              yield* append(actor, freshRequest(), randomUUID(), lifecycle.length > 0 ? withWaitChecks(snapshot, opened) : opened, {});
+              yield* append(actor, freshRequest(), randomUUID(), lifecycle.length > 0 ? withWaitChecks(snapshot, opened, runtime.lists) : opened, {});
               return false;
             })).pipe(Effect.catchTag("RequestIdReused", () => Effect.succeed(false))) })),
             Effect.catchTag("RunnerRejected", () => failStart.pipe(Effect.as(false))),

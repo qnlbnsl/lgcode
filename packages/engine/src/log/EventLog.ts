@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import {
-  EventEnvelope, type Actor, type AgentId, type BootId, DeviceId, type Event, type RequestId,
+  EventEnvelope, type Caller, type AgentId, type BootId, type Event, type RequestId,
 } from "@shephrd/contracts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
@@ -47,15 +47,6 @@ export interface ProcessRow {
   readonly executable: string;
 }
 
-// A device row holds the credential's hash, never the credential.
-export interface DeviceRow {
-  readonly deviceId: DeviceId;
-  readonly name: string;
-  readonly tokenHash: string;
-  readonly createdAt: number;
-  readonly revokedAt: number | null;
-}
-
 // Rows written in the same transaction as the batch's events (decision row
 // 32, issue 33). Revocations are applied before inserts, so a rotation
 // revokes an agent's earlier tokens and then adds its new one. `"all"`
@@ -65,13 +56,11 @@ export interface SideRows {
   readonly [table: `${"client" | "board" | "roles"}_${string}`]: ReadonlyArray<Readonly<Record<string, unknown>>> | undefined;
   readonly revokeAgentTokens?: ReadonlyArray<AgentId> | "all";
   readonly agentTokens?: ReadonlyArray<AgentTokenRow>;
-  readonly revokeDevices?: ReadonlyArray<DeviceId>;
-  readonly devices?: ReadonlyArray<DeviceRow>;
   readonly processes?: ReadonlyArray<ProcessRow>;
 }
 
 type Append = (
-  caller: Actor, requestId: RequestId, bodyHash: string,
+  caller: Caller, requestId: RequestId, bodyHash: string,
   events: ReadonlyArray<Event>, sideRows: SideRows,
   receipt?: false | ((envelopes: ReadonlyArray<EventEnvelope>) => unknown),
 ) => Effect.Effect<ReadonlyArray<EventEnvelope>, LogWriteFailed | RequestIdReused>;
@@ -117,7 +106,14 @@ const failureReason = (error: SqlError): string => {
 // The caller as stored in `events.caller` and `receipts.caller`. It is built
 // field by field so the text does not depend on property order or on extra
 // runtime properties.
-const callerKey = (actor: Actor): string => actor._tag === "owner" ? "owner" : `agent:${actor.agentId}`;
+export const callerKey = (actor: Caller): string => {
+  switch (actor._tag) {
+    case "owner": return "owner";
+    case "agent": return `agent:${actor.agentId}`;
+    case "service": return `service:${actor.service}`;
+    case "piece": return `piece:${actor.namespace}`;
+  }
+};
 
 // Pattern: T3 Code apps/server/src/orchestration-v2/EventSink.ts
 // (`sql.withTransaction`, lines 716 and 781; MIT licence). The shape was
@@ -150,7 +146,7 @@ export const makeLayer = (lists: EngineLists = engineLists) => Layer.effect(Even
 
   const commit = (
     caller: string, requestId: RequestId, bodyHash: string, events: ReadonlyArray<Event>,
-    sideRows: SideRows, actor: Actor, occurredAt: number,
+    sideRows: SideRows, actor: Caller, occurredAt: number,
     receiptResult?: false | ((envelopes: ReadonlyArray<EventEnvelope>) => unknown),
   ): Effect.Effect<{
     readonly envelopes: ReadonlyArray<EventEnvelope>;
@@ -180,8 +176,8 @@ export const makeLayer = (lists: EngineLists = engineLists) => Layer.effect(Even
         const eventId = randomUUID();
         const agentId = "agentId" in event ? event.agentId : undefined;
         const rows = yield* sql<{ sequence: number }>`
-          INSERT INTO events (event_id, caller, request_id, agent_id, thread_agent_id, event_type, occurred_at, payload_json)
-          VALUES (${eventId}, ${caller}, ${requestId}, ${agentId ?? null}, ${threadAgent(event) ?? null}, ${event._tag}, ${occurredAt}, ${JSON.stringify(event)})
+          INSERT INTO events (event_id, caller, caller_rule, request_id, agent_id, thread_agent_id, event_type, occurred_at, payload_json)
+          VALUES (${eventId}, ${caller}, ${actor._tag === "service" ? actor.rule ?? null : null}, ${requestId}, ${agentId ?? null}, ${threadAgent(event) ?? null}, ${event._tag}, ${occurredAt}, ${JSON.stringify(event)})
           RETURNING sequence`;
         const row = rows[0];
         if (row === undefined) return yield* Effect.fail(new LogWriteFailed({ reason: "event insert returned no sequence" }));
@@ -201,13 +197,6 @@ export const makeLayer = (lists: EngineLists = engineLists) => Layer.effect(Even
       for (const token of sideRows.agentTokens ?? []) {
         yield* sql`INSERT INTO agent_tokens (token_hash, agent_id, revoked_at)
           VALUES (${token.tokenHash}, ${token.agentId}, ${token.revokedAt})`;
-      }
-      for (const deviceId of sideRows.revokeDevices ?? []) {
-        yield* sql`UPDATE devices SET revoked_at = ${occurredAt} WHERE device_id = ${deviceId} AND revoked_at IS NULL`;
-      }
-      for (const device of sideRows.devices ?? []) {
-        yield* sql`INSERT INTO devices (device_id, name, token_hash, created_at, revoked_at)
-          VALUES (${device.deviceId}, ${device.name}, ${device.tokenHash}, ${device.createdAt}, ${device.revokedAt})`;
       }
       for (const row of sideRows.processes ?? []) {
         yield* sql`INSERT INTO processes (agent_id, group_id, boot_id, start_time, user_id, executable)
@@ -248,11 +237,9 @@ export const makeLayer = (lists: EngineLists = engineLists) => Layer.effect(Even
 
   // Identifiers and token hashes are not free text and are left alone.
   const redactSideRows = (sideRows: SideRows): Effect.Effect<SideRows> => Effect.gen(function* () {
-    const devices = yield* Effect.forEach(sideRows.devices ?? [], (device) =>
-      Effect.map(redactor.redactText(device.name), (name): DeviceRow => ({ ...device, name })));
     const processes = yield* Effect.forEach(sideRows.processes ?? [], (row) =>
       Effect.map(redactor.redactText(row.executable), (executable): ProcessRow => ({ ...row, executable })));
-    return { ...sideRows, devices, processes };
+    return { ...sideRows, processes };
   });
 
   const transact: Context.Service.Shape<typeof EventLog>["transact"] = (use) =>

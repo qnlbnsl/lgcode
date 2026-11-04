@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   EventEnvelope, commandOutcome,
-  type Actor, type Event, type HarnessSettings, type RequestId,
+  type Caller, type Event, type HarnessSettings, type RequestId,
 } from "@shephrd/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -15,9 +15,8 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import { followAvailability } from "../accounts/available.ts";
 import { sha256Hex } from "../identity/credential.ts";
-import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
-import { EventLog, LogWriteFailed, type SideRows } from "../log/EventLog.ts";
+import { EventLog, LogWriteFailed, callerKey, type SideRows } from "../log/EventLog.ts";
 import { crashEvents } from "../recovery/crash.ts";
 import { Restart } from "../recovery/service.ts";
 import { Runner, RunnerEvent } from "../runner/Runner.ts";
@@ -29,6 +28,7 @@ import { waitReply, withWaitChecks } from "../routing/waits.ts";
 import { Views } from "../views/Views.ts";
 import { apply } from "../views/apply.ts";
 import { engineLists, type EngineLists } from "../pieces/lists.ts";
+import { checkPieceBatch, pieceNamespace } from "./pieceBatch.ts";
 import { SecretStore } from "./SecretStore.ts";
 import { loadFirstDefaults } from "./harnesses.ts";
 import { CommandRefused, freshRequest, readHarnesses, refused, type Input, type Runtime, type Snapshot } from "./internal.ts";
@@ -37,11 +37,11 @@ export { CommandRefused } from "./internal.ts";
 
 type Credential =
   | { readonly _tag: "owner" }
-  | { readonly _tag: "device"; readonly credential: Redacted.Redacted<string> }
+  | Extract<Caller, { _tag: "service" }>
   | { readonly _tag: "agent"; readonly token: Redacted.Redacted<string> };
 
 export class CommandHandler extends Context.Service<CommandHandler, {
-  readonly input: (actor: Actor) => Effect.Effect<Input>;
+  readonly input: (actor: Caller) => Effect.Effect<Input>;
   readonly execute: (credential: Credential, name: string, payload: unknown) => Effect.Effect<Record<string, unknown>, CommandRefused | LogWriteFailed>;
 }>()("shephrd/engine/commands/CommandHandler") {}
 
@@ -107,7 +107,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           if (tokens.length === 0) return;
           // Every batch carries the wait checks it causes (rows 25 and 50).
           const write = (events: ReadonlyArray<Event>, sideRows: SideRows = {}) => events.length === 0 ? Effect.void
-            : append({ _tag: "owner" }, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), sideRows).pipe(Effect.asVoid);
+            : append({ _tag: "owner" }, freshRequest(), randomUUID(), withWaitChecks(snapshot, events, lists), sideRows).pipe(Effect.asVoid);
           switch (event._tag) {
             case "permissionRequested": return yield* write(yield* permissionRequested(snapshot, event));
             case "turnEnded": return yield* write(turnEnded(snapshot, event));
@@ -120,7 +120,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
             }
             case "promptReply": return yield* write(yield* promptReply(snapshot, event, log.redactText));
             case "exited": {
-              return yield* write(crashEvents(snapshot, event),
+              return yield* write(crashEvents(snapshot, event, lists),
                 { revokeAgentTokens: [event.agentId] });
             }
           }
@@ -159,6 +159,19 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     // to mean the stop commits: the result is the step that tells the start
     // how the stop ended, and the start finishes the agent itself when the
     // stop did not (lanes.ts, round 2 F-1).
+    const resolveCredential = (credential: Credential, name: string): Effect.Effect<Exclude<Caller, { _tag: "piece" }>, CommandRefused> => Effect.gen(function* () {
+      if (credential._tag === "owner") return { _tag: "owner" } as const;
+      if (credential._tag === "service") {
+        if (!Object.hasOwn(lists.services, credential.service) || !lists.services[credential.service]?.includes(name)
+          || (pieceNamespace(name) === undefined && !["prompt", "compact", "resume", "subscribe"].includes(name))) return yield* refused();
+        return credential;
+      }
+      const agentId = yield* verifyAgentToken(Redacted.value(credential.token)).pipe(Effect.mapError(() => refused("invalid credential")));
+      const current = (yield* views.snapshot).agents[agentId];
+      if (current === undefined || current.state._tag === "stopped" || current.state._tag === "crashed") return yield* refused("invalid credential");
+      return { _tag: "agent", agentId } as const;
+    }).pipe(Effect.provideService(SqlClient.SqlClient, sql));
+
     const preemptStart = (credential: Credential, name: string, rawPayload: unknown) => Effect.gen(function* () {
       const agentId = name === "stop" ? laneFor(name, rawPayload) : undefined;
       const rpc = lists.commands.requests.get("stop");
@@ -167,14 +180,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
         try: () => Schema.decodeUnknownSync(Schema.toType(rpc.payloadSchema))(rawPayload),
         catch: () => refused(),
       });
-      let caller: Actor;
-      if (credential._tag === "owner") caller = { _tag: "owner" };
-      else if (credential._tag === "device") {
-        yield* verifyDeviceCredential(Redacted.value(credential.credential));
-        caller = { _tag: "owner" };
-      } else {
-        caller = { _tag: "agent", agentId: yield* verifyAgentToken(Redacted.value(credential.token)) };
-      }
+      const caller = yield* resolveCredential(credential, name);
       const snapshot = yield* views.snapshot;
       const target = snapshot.agents[agentId];
       if (target === undefined || (target.state._tag !== "starting" && target.state._tag !== "paused")
@@ -200,17 +206,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
         const step = isBlockingWait(name, rawPayload) ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : restore;
         const outcome = yield* step(log.transact((append) => Effect.gen(function* () {
           // Invalid credentials never write an event or retrieve a receipt.
-          let actor: Actor;
-          if (credential._tag === "owner") actor = { _tag: "owner" };
-          else if (credential._tag === "device") {
-            yield* verifyDeviceCredential(Redacted.value(credential.credential)).pipe(Effect.mapError(() => refused("invalid credential")));
-            actor = { _tag: "owner" };
-          } else {
-            const agentId = yield* verifyAgentToken(Redacted.value(credential.token)).pipe(Effect.mapError(() => refused("invalid credential")));
-            const current = (yield* views.snapshot).agents[agentId];
-            if (current === undefined || current.state._tag === "stopped" || current.state._tag === "crashed") return yield* refused("invalid credential");
-            actor = { _tag: "agent", agentId };
-          }
+          const actor = yield* resolveCredential(credential, name);
           const rpc = lists.commands.requests.get(name);
           if (rpc === undefined || !Object.hasOwn(lists.planners, name)) return yield* refused();
           const payload = yield* Effect.try({
@@ -218,7 +214,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
               // The transport supplies decoded values. Normalize the wrapper's
               // label before validating it; the label is not secret data.
               let value = rawPayload;
-              if (name === "accounts set-secret" && typeof value === "object" && value !== null
+              if (lists.secretCommands.includes(name) && typeof value === "object" && value !== null
                 && "value" in value && Redacted.isRedacted(value.value)) {
                 value = { ...value, value: Redacted.make(Redacted.value(value.value), { label: "secret value" }) };
               }
@@ -231,10 +227,10 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           // Identifiers bypass event-text redaction. Reject a secret-bearing
           // id before looking up a receipt or planning even a refusal event.
           if ((yield* log.redactText(requestId)) !== requestId) return yield* refused();
-          const bodyHash = sha256Hex(canonical(name === "accounts set-secret"
-            ? { command: name, accountId: payload.accountId, nonce: payload.nonce }
+          const bodyHash = sha256Hex(canonical(lists.secretCommands.includes(name)
+            ? { command: name, payload: Object.fromEntries(Object.entries(body).filter(([key]) => key !== "value")) }
             : { command: name, payload: body }));
-          const caller = actor._tag === "owner" ? "owner" : `agent:${actor.agentId}`;
+          const caller = callerKey(actor);
           const receipts = yield* sql<{ body_hash: string; result_json: string }>`
             SELECT body_hash, result_json FROM receipts WHERE caller = ${caller} AND request_id = ${requestId}`;
           const snapshot = yield* views.snapshot;
@@ -260,10 +256,12 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           const planned = yield* Effect.gen(function* () {
             if (!lists.access[name]?.includes(actor._tag)) return yield* refused();
             const plan = yield* lists.planners[name]!({ runtime, actor, snapshot }, payload);
-            // Until E23 adds the delivery batch path, a piece writes only its own declared events.
-            const namespace = name.includes(".") ? name.split(".")[0]! : undefined;
-            if (namespace !== undefined && (plan.events.some((event) => !event._tag.startsWith(`${namespace}.`))
-              || Object.keys(plan.sideRows ?? {}).some((table) => !table.startsWith(`${namespace}_`)))) return yield* refused();
+            const namespace = pieceNamespace(name);
+            if (namespace !== undefined) {
+              if (plan.afterCommit !== undefined) return yield* refused();
+              const events = yield* checkPieceBatch(namespace, snapshot, plan, actor, lists);
+              return { ...plan, events };
+            }
             return plan;
           }).pipe(Effect.result);
           if (planned._tag === "Failure") {
@@ -274,7 +272,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
             return { failure, afterCommit: undefined };
           }
           const plan = planned.success;
-          yield* append(actor, requestId, bodyHash, withWaitChecks(snapshot, plan.events), plan.sideRows ?? {}, (batch) =>
+          yield* append(actor, requestId, bodyHash, pieceNamespace(name) === undefined ? withWaitChecks(snapshot, plan.events, lists) : plan.events, plan.sideRows ?? {}, (batch) =>
             plan.reply === undefined ? replyFor(snapshot, name, requestId, batch, settings).reply : plan.reply(batch));
           // Return precisely the redacted result that a later retry reads.
           const written = yield* sql<{ result_json: string }>`

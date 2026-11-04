@@ -54,8 +54,6 @@ const expectedTags = [
   "AccountAvailable",
   "AccountOutOfUsage",
   "HarnessChanged",
-  "DeviceAdded",
-  "DeviceRevoked",
   "CommandRefused"
 ]
 

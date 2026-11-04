@@ -118,8 +118,6 @@ const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
   AccountOutOfUsage: allStates("keep"),
   AccountAvailable: allStates("keep"),
   HarnessChanged: allStates("keep"),
-  DeviceAdded: allStates("keep"),
-  DeviceRevoked: allStates("keep"),
   CommandRefused: allStates("keep")
 }
 export const eventEffect = (state: StateName, event: Event["_tag"]): EventEffect => eventTable[event][state]

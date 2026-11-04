@@ -82,7 +82,7 @@ describe("command lists", () => {
     expect(sorted(Object.keys(commandAccess))).toEqual(sorted(expectedCommands))
     for (const name of expectedCommands) {
       const kinds = commandAccess[name as keyof typeof commandAccess]
-      expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["owner", "agent"])
+      expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["prompt", "compact", "resume", "subscribe"].includes(name) ? ["owner", "agent", "service"] : ["owner", "agent"])
     }
   })
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   CommandsRpcGroup, Event as EventSchema, RequestId,
-  type Actor, type Event, type EventEnvelope, type HarnessSettings,
+  type Caller, type Event, type EventEnvelope, type HarnessSettings,
 } from "@shephrd/contracts";
 import type * as Context from "effect/Context";
 import * as Data from "effect/Data";
@@ -39,11 +39,12 @@ export interface Runtime {
 }
 export interface Input {
   readonly runtime: Runtime;
-  readonly actor: Actor;
+  readonly actor: Caller;
   readonly snapshot: Snapshot;
 }
 export interface Plan {
   readonly events: ReadonlyArray<Event>;
+  readonly deliveries?: ReadonlyArray<import("../routing/pieceDelivery.ts").DeliveryRequest>;
   readonly sideRows?: SideRows;
   readonly reply?: (batch: ReadonlyArray<EventEnvelope>) => Record<string, unknown>;
   // Runs after the commit. A blocking command returns its final reply here.
