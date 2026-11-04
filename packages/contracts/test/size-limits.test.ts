@@ -152,3 +152,22 @@ it("2.6 future piece maxima survive the tolerant wire encoder and real chunk wra
     expect(bytes({ _tag: "Chunk", requestId: "1", values: [encoded] })).toBeLessThan(900 * 1024);
   }
 });
+
+it("1.3a roles action pages encode 500 real records below 256 KiB and reject a malformed record", () => {
+  const rpc = Contracts.CommandsRpcGroup.requests.get("roles.actions.list")!;
+  expect(rpc, "roles.actions.list must have a shared reply schema").toBeDefined();
+  const schema = rpc.successSchema as Schema.Codec<unknown>;
+  const items = Array.from({ length: 500 }, (_, index) => ({
+    _tag: "roles.StallSeen", agentId: "00000000-0000-4000-8000-000000000001",
+    noticeRecipient: "owner", triggerSequence: 1, sourceSequence: index + 1,
+    occurrence: index + 1, notice: "sent", postId: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    sequence: 501 - index,
+  }));
+  const page = { requestId: "roles-size-page", items, next: 2 };
+  const decoded = Schema.decodeUnknownSync(schema)(page);
+  expect(decoded).toEqual(page);
+  expect(frameBytes(Schema.encodeSync(schema)(decoded), false)).toBeLessThan(256 * 1024);
+  // A Schema.Unknown placeholder must not earn this size guarantee: a real
+  // client needs the record's required identity and sequence to survive.
+  expect(() => Schema.decodeUnknownSync(schema)({ requestId: "bad-page", items: [{ _tag: "roles.StallSeen" }] })).toThrow();
+});

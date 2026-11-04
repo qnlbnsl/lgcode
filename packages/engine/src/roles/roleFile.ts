@@ -42,7 +42,7 @@ export const loadRoleFile = (content: string): Effect.Effect<LoadedRoleFile, Rol
   return { file, roleFileHash };
 });
 
-// This unit stores only the loaded file. The roles-view unit extends this fold.
+// The full roles fold delegates the loaded-file fields to this reducer.
 export interface RoleFileState { readonly file: RoleFile | null; readonly roleFileHash: string | null }
 export const emptyRoleFile = (): RoleFileState => ({ file: null, roleFileHash: null });
 export const reduceRoleFile = (state: unknown, event: Readonly<Record<string, unknown>>): unknown => {
@@ -73,4 +73,8 @@ export const setRoleFile = (input: Input, payload: Payload<"roles.role-file.set"
 
 export const getRoleFile = (input: Input, payload: Record<string, unknown>) => input.actor._tag !== "owner"
   ? Effect.fail(refused())
-  : Effect.succeed({ reply: { requestId: payload.requestId, ...input.snapshot.roles as RoleFileState } });
+  : Effect.succeed({ reply: {
+    requestId: payload.requestId,
+    file: (input.snapshot.roles as RoleFileState).file,
+    roleFileHash: (input.snapshot.roles as RoleFileState).roleFileHash,
+  } });

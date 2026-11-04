@@ -3,8 +3,8 @@ import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
 import type { CallerKind } from "../commands.ts"
 import { AgentId, EpochMilliseconds, EventSequence, RequestId } from "../ids.ts"
-import { RolesAction } from "./events.ts"
-import { RoleFile, RoleFileHash, RolesSettings, rolesMaxima } from "./schema.ts"
+import { RolesAction, RolesActionRecord } from "./events.ts"
+import { RoleFile, RoleFileHash, RolesSettings } from "./schema.ts"
 
 const request = { requestId: RequestId }
 const Ack = Schema.Struct(request)
@@ -27,8 +27,8 @@ export const RolesRpcGroup = RpcGroup.make(
   Rpc.make("actions.list", {
     payload: {
       ...request, agentId: Schema.optionalKey(AgentId), before: Schema.optionalKey(EventSequence),
-      limit: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(rolesMaxima.actionPageItems))),
-    }, success: Schema.Unknown, error: Refused,
+      limit: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
+    }, success: Schema.Struct({ ...request, items: Schema.Array(RolesActionRecord), next: Schema.optionalKey(EventSequence) }), error: Refused,
   }),
   Rpc.make("record", { payload: { ...request, action: RolesAction }, success: Schema.Struct({ ...request, sequence: EventSequence }), error: Refused }),
 ).prefix("roles.")

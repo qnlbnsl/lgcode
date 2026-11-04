@@ -11,6 +11,7 @@ import { reads, type ReadHandler } from "../api/reads.ts";
 import { boardPlaceholderPlanners, boardPlaceholderReads } from "../board/placeholders.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
 import { pieceViews, type PieceView } from "./viewTables.ts";
+import { snapshotFor as rolesSnapshotFor } from "../roles/snapshot.ts";
 
 import { alertDelivery } from "../client/alerts/delivery.ts";
 import { carrierKeep, carrierPlanners } from "../client/alerts/token.ts";
@@ -55,7 +56,7 @@ export const engineLists: EngineLists = {
   reads: { ...reads, ...alertReads, ...boardPlaceholderReads },
   views: pieceViews,
   migrations: { client: [], board: [], roles: [] }, visibility: eventVisibility, pieceVisibility: {},
-  snapshotSections: { client: absent, board: absent, roles: absent },
+  snapshotSections: { client: absent, board: absent, roles: rolesSnapshotFor },
   alertSources: { client: absent, board: absent, roles: absent },
   openMatters: { client: () => [], board: () => [], roles: () => [] },
   reactors: { client: Effect.all([alertReactor, alertDelivery], { concurrency: "unbounded", discard: true }) },

@@ -59,14 +59,21 @@ it("1.7 a section may be included for the owner and omitted for an agent", async
   expect(Object.hasOwn(await run({ _tag: "agent", agentId: "agent-a" }), "client")).toBe(false);
 });
 
-it("1.22 default snapshot sections are absent for every namespace", async () => {
+it("1.22 default snapshots include the installed roles summary for the owner and omit it for agents", async () => {
   registerRebuildCheck({ noLog: true });
   const snapshot = await loadSnapshot();
   const lists = await loadLists();
-  const reply = await Effect.runPromise(snapshot(owner, lists).pipe(Effect.provideService(Views, {
+  const run = (caller: Caller) => Effect.runPromise(snapshot(caller, lists).pipe(Effect.provideService(Views, {
     snapshot: Effect.succeed(emptyViews()), applyCommitted: () => Effect.void,
   })) as Effect.Effect<SnapshotReply, unknown, never>);
-  for (const namespace of ["client", "board", "roles"]) expect(Object.hasOwn(reply, namespace)).toBe(false);
+  const reply = await run(owner);
+  for (const namespace of ["client", "board"]) expect(Object.hasOwn(reply, namespace)).toBe(false);
+  expect(reply.roles).toEqual({
+    roleFile: null, settings: {}, matters: { items: [], truncated: false },
+    snoozes: { items: [], truncated: false }, agents: { items: [], truncated: false },
+  });
+  const agentReply = await run({ _tag: "agent", agentId: "agent-a" });
+  for (const namespace of ["client", "board", "roles"]) expect(Object.hasOwn(agentReply, namespace)).toBe(false);
 });
 
 it("1.44 a throwing snapshot section is omitted and marked failed while healthy sections survive", async () => {

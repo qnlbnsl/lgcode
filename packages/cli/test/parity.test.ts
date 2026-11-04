@@ -98,7 +98,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         "roles.role-file.set": { ...base, roleFileHash }, "roles.role-file.get": { ...base, file: roleFile, roleFileHash },
         "roles.settings.get": { ...base, settings: { sheepdog: true, limits: { stallMinutes: 10 } } },
         "roles.settings.set": base, "roles.snooze": base,
-        "roles.actions.list": { ...base, records: [], truncated: false },
+        "roles.actions.list": { ...base, items: [] },
         "roles.record": { ...base, sequence: 101 },
       };
       if (frame.tag === "subscribe" || frame.tag === "client.subscribe") {

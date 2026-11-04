@@ -9,7 +9,7 @@ import { emptyViews } from "../../src/views/apply.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 registerRebuildCheck({ noLog: true });
 
-it("1.22 default tables refuse delivery and add no holds, requests, kept secrets or snapshot section", async () => {
+it("1.22 default tables refuse delivery and add no holds, requests or kept secrets, with only the installed roles snapshot", async () => {
   const lists = await loadLists() as Rules;
   const state = { ...emptyViews() };
   expect(lists.reach, "E18 must install an exhaustive refusing table").toBeDefined();
@@ -19,7 +19,13 @@ it("1.22 default tables refuse delivery and add no holds, requests, kept secrets
     expect(lists.holdUnsettled[namespace]!(state, "target", state[namespace])).toBe(false);
     expect(lists.requestHeld[namespace]!(state, "target", state[namespace])).toBe(false);
     expect(lists.secretKeep[namespace]!(state)).toEqual([]);
-    expect(lists.snapshotSections[namespace]!({ _tag: "owner" }, state)).toBeUndefined();
+    const section = lists.snapshotSections[namespace]!({ _tag: "owner" }, state);
+    if (namespace === "roles") expect(section).toEqual({
+      roleFile: null, settings: {}, matters: { items: [], truncated: false },
+      snoozes: { items: [], truncated: false }, agents: { items: [], truncated: false },
+    });
+    else expect(section).toBeUndefined();
+    expect(lists.snapshotSections[namespace]!({ _tag: "agent", agentId: "target" }, state)).toBeUndefined();
   }
 });
 
