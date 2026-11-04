@@ -1,13 +1,21 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Situation } from "./situation.tsx"
+import { Alerts } from "./admin/alerts.tsx"
+import { Settings } from "./admin/settings.tsx"
 
 type Session = "checking" | "login" | "owner" | "unavailable"
+type Page = "situation" | "alerts" | "settings"
+function currentPage(): Page {
+  const page = new URLSearchParams(location.search).get("page")
+  return page === "alerts" || page === "settings" ? page : "situation"
+}
 
 export function App() {
   const [session, setSession] = useState<Session>("checking")
   const [message, setMessage] = useState("")
   const [busy, setBusy] = useState(false)
   const [probe, setProbe] = useState(0)
+  const [page, setPage] = useState(currentPage)
   const action = useRef<AbortController | undefined>(undefined)
 
   useEffect(() => {
@@ -25,6 +33,17 @@ export function App() {
   }, [probe])
 
   useEffect(() => () => action.current?.abort(), [])
+
+  useEffect(() => {
+    const change = () => setPage(currentPage())
+    addEventListener("popstate", change)
+    return () => removeEventListener("popstate", change)
+  }, [])
+
+  function sessionExpired() {
+    setMessage("Your session ended. Log in again.")
+    setSession("login")
+  }
 
   function logIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -93,9 +112,22 @@ export function App() {
       <input id="password" name="password" type="password" autoComplete="off" required disabled={busy} />
       <button type="submit" disabled={busy}>{busy ? "Logging in…" : "Log in"}</button>
     </form>}
-    {session === "owner" && <Situation onSessionExpired={() => {
-      setMessage("Your session ended. Log in again.")
-      setSession("login")
-    }} />}
+    {session === "owner" && <>
+      <nav aria-label="Pages">
+        {([
+          ["situation", "/", "Situation"], ["alerts", "/?page=alerts", "Alerts"], ["settings", "/?page=settings", "Settings"]
+        ] as const).map(([target, href, label]) => <a key={href} href={href}
+          aria-current={page === target ? "page" : undefined}
+          onClick={(event) => {
+            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+            event.preventDefault()
+            history.pushState(null, "", href)
+            setPage(target)
+          }}>{label}</a>)}
+      </nav>
+      {page === "alerts" ? <Alerts onSessionExpired={sessionExpired} />
+        : page === "settings" ? <Settings onSessionExpired={sessionExpired} />
+        : <Situation onSessionExpired={sessionExpired} />}
+    </>}
   </main>
 }
