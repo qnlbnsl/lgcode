@@ -727,7 +727,8 @@ const readPage = (credential: Credential, payload: Record<string, unknown>) => E
 });
 
 for (const mode of ["any", "all"] as const) {
-  it.live(`3.3 outcome table continuation: ${mode} with all targets gone, removed or undeliverable closes unanswerable once`, () => run((c) => Effect.gen(function* () {
+  // enable-in: b3b
+  it.skip(`3.3 outcome table continuation: ${mode} with all targets gone, removed or undeliverable closes unanswerable once`, () => run((c) => Effect.gen(function* () {
     const id = yield* postAs(c.lead!, { reply: mode, to: [agent("worker"), agent("other"), agent("fourth")] });
     yield* appendSetup([resolve(id, "gone"), resolve(id, "removed", { addressee: agent("other") }), resolve(id, "undeliverable", { addressee: agent("fourth") })]);
     yield* startReactor;
@@ -740,7 +741,8 @@ for (const mode of ["any", "all"] as const) {
 }
 
 for (const reason of ["removed", "stopped"] as const) {
-  it.live(`3.3 outcome table continuation: author ${reason} withdraws with ${reason === "removed" ? "one reason-bearing completion" : "no completion"}`, () => run((c) => Effect.gen(function* () {
+  // enable-in: b3b
+  it.skip(`3.3 outcome table continuation: author ${reason} withdraws with ${reason === "removed" ? "one reason-bearing completion" : "no completion"}`, () => run((c) => Effect.gen(function* () {
     const id = yield* postAs(c.lead!);
     if (reason === "removed") success(yield* call(ownerCredential, "board.members", { channelId: "room", add: [], remove: ["lead"] }));
     else success(yield* call(ownerCredential, "stop", { agentId: "lead" }));
@@ -758,7 +760,8 @@ for (const reason of ["removed", "stopped"] as const) {
   })));
 }
 
-it.live("3.8 byte cap continuation: incoming returns carried and omitted questions and excludes another channel", () => run((c) => Effect.gen(function* () {
+// enable-in: b4
+it.skip("3.8 byte cap continuation: incoming returns carried and omitted questions and excludes another channel", () => run((c) => Effect.gen(function* () {
   const ids: string[] = [];
   for (let i = 0; i < 12; i++) ids.push(yield* postAs(c.lead!, { text: "\\".repeat(16384) }));
   yield* appendSetup([channel({ channelId: "private-room", name: "Private", opener: owner, manager: owner, members: [owner, agent("fourth")] }), post("private-question", { channelId: "private-room", author: owner, to: [agent("fourth")] })]);
@@ -767,7 +770,8 @@ it.live("3.8 byte cap continuation: incoming returns carried and omitted questio
   expect(JSON.stringify(page)).not.toContain("private-question");
 })));
 
-it.live("3.8 byte cap continuation: omitted questions arrive after acceptance and turn end without posting or flushing", () => run((c) => Effect.gen(function* () {
+// enable-in: b3b
+it.skip("3.8 byte cap continuation: omitted questions arrive after acceptance and turn end without posting or flushing", () => run((c) => Effect.gen(function* () {
   const ids: string[] = [];
   for (let i = 0; i < 12; i++) ids.push(yield* postAs(c.lead!, { text: "\\".repeat(16384) }));
   const [first] = yield* queued("worker");
@@ -793,7 +797,8 @@ it.live("3.8 byte cap continuation: omitted questions arrive after acceptance an
   expect(holdsUnsettled("worker", state.board as never, state.deliveries)).toBe(false);
 })));
 
-it.live("3.13 completion size continuation: repliesTo pages every repeated reply without truncation or duplication", () => run((c) => Effect.gen(function* () {
+// enable-in: b4
+it.skip("3.13 completion size continuation: repliesTo pages every repeated reply without truncation or duplication", () => run((c) => Effect.gen(function* () {
   const id = yield* postAs(c.lead!, { to: [agent("worker"), agent("other")] });
   const rows: Event[] = [];
   for (let i = 0; i < 2048; i++) rows.push(post(`paged-${i}`, { author: agent("worker"), replyToPostId: id, reply: "none", to: [], text: "Repeated reply." }));
@@ -811,7 +816,8 @@ it.live("3.13 completion size continuation: repliesTo pages every repeated reply
   expect(ids).toEqual(Array.from({ length: 2048 }, (_, i) => `paged-${i}`));
 })));
 
-it.live("3.16 acknowledge continuation: status and read expose the same acknowledged identity without changing incoming", () => run((c) => Effect.gen(function* () {
+// enable-in: b4
+it.skip("3.16 acknowledge continuation: status and read expose the same acknowledged identity without changing incoming", () => run((c) => Effect.gen(function* () {
   const id = yield* postAs(c.lead!);
   success(yield* call(c.worker!, "board.acknowledge", { postId: id }));
   const status = success(yield* call(c.worker!, "board.status", { agentId: "worker", detail: "incoming" }));

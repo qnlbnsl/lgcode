@@ -3,6 +3,7 @@ import { type AgentId, type Event, type EventEnvelope } from "@shephrd/contracts
 import { ChannelId, PostId, type BoardAddressee, type BoardAuthor } from "@shephrd/contracts/board/ids";
 import { holdsIncoming, holdsUnsettled, ownerHeld } from "@shephrd/contracts/board/conditions";
 import type { BoardPostView } from "@shephrd/contracts/board/view";
+import { BoardChannelName, BoardPostText } from "@shephrd/contracts/board/schemas";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type { ReadHandler, ReadReply } from "../api/reads.ts";
@@ -30,8 +31,10 @@ const open: Planner = (input, raw) => Effect.gen(function* () {
   if (payload.group === undefined && payload.anchorAgentId !== undefined) return yield* refused("an anchor requires a group");
   const anchor = payload.anchorAgentId ?? (opener._tag === "agent" ? opener.agentId : undefined);
   if (payload.group !== undefined && !canOpenGroup(input.snapshot, input.actor, payload.group, anchor)) return yield* refused("group cannot be opened");
+  const name = yield* input.runtime.log.redactText(payload.name);
+  if (!Schema.is(BoardChannelName)(name)) return yield* refused("name holds a secret");
   const event: Extract<Event, { _tag: "board.ChannelOpened" }> = {
-    _tag: "board.ChannelOpened", channelId: Schema.decodeUnknownSync(ChannelId)(randomUUID()), name: payload.name,
+    _tag: "board.ChannelOpened", channelId: Schema.decodeUnknownSync(ChannelId)(randomUUID()), name,
     kind: payload.group === undefined ? "plain" : "group", opener, manager: opener,
     members: payload.group === undefined ? [opener] : [],
     ...(payload.group === undefined ? {} : { group: payload.group, anchorAgentId: anchor! }),
@@ -98,6 +101,7 @@ const post: Planner = (input, raw) => Effect.gen(function* () {
   }
   // Sanitise before redaction and before constructing any derived wake text.
   const text = yield* input.runtime.log.redactText(payload.text.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, ""));
+  if (!Schema.is(BoardPostText)(text)) return yield* refused("post too long once secrets are hidden");
   const postId = Schema.decodeUnknownSync(PostId)(randomUUID());
   const written: Event = { _tag: "board.PostWritten", postId, channelId, author, text, to, reply: payload.reply,
     ...(payload.replyTo === undefined ? {} : { replyToPostId: payload.replyTo }) };
