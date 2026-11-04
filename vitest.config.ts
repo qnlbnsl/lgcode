@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
@@ -6,6 +7,9 @@ const packageNames = ["contracts", "client", "engine", "cli", "mcp", "testing", 
 export default defineConfig({
   test: {
     environment: "node",
+    // Integration tests spawn adapters, so leave capacity for their children
+    // instead of starting a test worker for almost every available CPU.
+    maxWorkers: Math.min(4, availableParallelism()),
     hookTimeout: 60_000,
     testTimeout: 60_000,
     allowOnly: !process.env["CI"],
