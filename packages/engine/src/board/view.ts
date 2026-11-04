@@ -27,21 +27,24 @@ const noticeKey = (postId: PostId, addressee: BoardAddressee): string => JSON.st
 // metadata. Parent links locate group joins without consulting live agents.
 // Acceptance is historical evidence for a later return, even when a wake
 // carried only completions. It is not a copy of current delivery status.
+// The close's actor and sequence distinguish an owner's deciding reply from
+// replies written after the close, without retaining another copy of text.
 interface FoldIndexes {
   readonly parents: Keyed<Actor>;
   readonly acceptedWakes: Keyed<EventSequence>;
+  readonly closures: Keyed<{ readonly closer: BoardAuthor; readonly sequence: EventSequence }>;
 }
 export interface BoardFold extends BoardView, FoldIndexes {}
 const indexes = (state: BoardView): FoldIndexes => {
   const stored = state as BoardView & Partial<FoldIndexes>;
-  return { parents: stored.parents ?? keyed(), acceptedWakes: stored.acceptedWakes ?? keyed() };
+  return { parents: stored.parents ?? keyed(), acceptedWakes: stored.acceptedWakes ?? keyed(), closures: stored.closures ?? keyed() };
 };
 
 export const emptyBoard = (): BoardFold => ({
   channels: keyed(), posts: keyed(), completions: keyed(), noAnswers: keyed(), wakes: keyed(),
   lastTurnEnd: keyed(), ceilings: keyed(), stopped: [], lastStopped: keyed(), lastCrashed: keyed(),
   labels: keyed(), lastLabelLeft: keyed(), lastMemberLeft: keyed(), readState: keyed(),
-  parents: keyed(), acceptedWakes: keyed(),
+  parents: keyed(), acceptedWakes: keyed(), closures: keyed(),
 });
 
 const channelPosts = (state: BoardView, channelId: string): ReadonlyArray<BoardPostView> =>
@@ -200,12 +203,14 @@ export const boardAfter = (state: BoardView, envelope: Pick<EventEnvelope, "even
     case "board.PostClosed": {
       const post = get(state.posts, event.postId);
       if (post === undefined || post.status === "closed") return state;
-      return { ...state,
+      const closed: BoardFold = { ...state, ...indexes(state),
+        closures: put(indexes(state).closures, post.postId, { closer: event.closer, sequence }),
         posts: put(state.posts, post.postId, { ...post, status: "closed", outcome: event.outcome }),
         completions: event.completionOwed && post.author._tag === "agent"
           ? put(state.completions, post.postId, { postId: post.postId, authorAgentId: post.author.agentId, returns: 0 }) : state.completions,
         noAnswers: filter(state.noAnswers, (notice) => notice.postId !== post.postId),
       };
+      return closed;
     }
     case "board.WakeBuilt": return { ...state, wakes: put(state.wakes, event.wakeId, event) };
     case "board.Read": return markRead(state, event.reader, event.channelId, event.postIds, sequence);
