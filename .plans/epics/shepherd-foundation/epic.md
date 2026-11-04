@@ -29,7 +29,7 @@ scripts to start, watch, approve or wake its agents.
 | Order | Plan slug | What it delivers | State |
 |---|---|---|---|
 | 1 | shepherd-engine | The engine: agents over ACP, the event log, commands, permissions, waits, accounts, and one authenticated API. | linked |
-| 2 | shepherd-client-api | Phone alerts, remote access through the owner's proxy, the web page, and a thread viewer in a Herdr pane. Device pairing is deferred. | planned |
+| 2 | shepherd-client-api | Phone alerts, remote access through the owner's proxy, the web page behind one password, and a thread viewer in a Herdr pane. | planned |
 | 3 | shepherd-message-board | Channels, direct messages and wake rules, behind one delivery interface. | planned |
 | 4 | shepherd-foundry-roles | The orchestrator, team leads, workers, standing permission rules and the sheepdog. | planned |
 
@@ -68,3 +68,10 @@ scripts to start, watch, approve or wake its agents.
   that we can add pairing without major refactors". The done-when line no
   longer names a paired phone. Full decisions:
   `docs/specs/2026-11-03-client-api-design.md`.
+- 2026-11-03: the owner replaced that open start, and pairing, with one
+  password. The service reads it from a local environment variable, and the
+  dashboard asks for it. Pairing codes and per-device credentials come out, and
+  there are no rate limits. Mobile app login is later, and it starts by looking
+  at what Home Assistant does. The owner's words: "just a single password would
+  be fine", and "we don't need multi-user capabilities". This supersedes the
+  entry above where they differ.
