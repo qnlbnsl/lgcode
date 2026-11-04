@@ -31,7 +31,11 @@ it("1.22 all piece rule tables reject a missing namespace at compile time", asyn
   const root = mkdtempSync("/tmp/shephrd-table-types-");
   const filename = join(root, "fixture.mts");
   const config = join(root, "tsconfig.json");
-  writeFileSync(config, JSON.stringify({ extends: resolve("tsconfig.base.json"), files: [filename] }));
+  writeFileSync(config, JSON.stringify({
+    extends: resolve("tsconfig.base.json"),
+    compilerOptions: { typeRoots: [resolve("node_modules/@types")], rewriteRelativeImportExtensions: false },
+    files: [filename],
+  }));
   const prelude = `import { engineLists } from ${JSON.stringify(resolve("packages/engine/src/pieces/lists.ts"))};\n`;
   const tables = ["reach", "sourceRules", "holdUnsettled", "requestHeld", "secretKeep"];
   const compile = (source: string) => {
