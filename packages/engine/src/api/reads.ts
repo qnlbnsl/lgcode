@@ -7,7 +7,7 @@ import { subscribe } from "../log/subscribe.ts";
 import { compareViews } from "../views/compare.ts";
 import { visibleTo } from "./visibility.ts";
 
-export interface ReadReply { readonly reply: Record<string, unknown>; readonly marks?: ReadonlyArray<Event> }
+export interface ReadReply { readonly reply: Record<string, unknown>; readonly marks?: ReadonlyArray<Event>; readonly deliveries?: ReadonlyArray<import("../routing/pieceDelivery.ts").DeliveryRequest>; readonly sideRows?: import("../log/EventLog.ts").SideRows }
 export type ReadHandler = (input: Input, payload: Record<string, unknown>) =>
   Effect.Effect<ReadReply, any, any> | Stream.Stream<EventEnvelope, any, any>;
 export const reads: Record<"subscribe" | "debug.compare-views", ReadHandler> = {

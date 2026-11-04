@@ -20,7 +20,7 @@ export const agentRead = (input: { readonly caller: Actor; readonly agentId: str
   let cursor = input.after;
   for (;;) {
     const page = yield* SqliteClient.readOnly(sql<EventRow>`
-      SELECT sequence, event_id, caller, request_id, agent_id, occurred_at, payload_json FROM events
+      SELECT sequence, event_id, caller, caller_rule, request_id, agent_id, occurred_at, payload_json FROM events
       WHERE thread_agent_id = ${input.agentId} AND sequence > ${cursor} AND sequence <= ${view.sequence} ORDER BY sequence LIMIT 512`);
     for (const row of page) {
       const envelope = yield* decodeRowWith(row, lists.envelope);

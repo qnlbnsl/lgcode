@@ -316,6 +316,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     // Fix round 2, F-1: a field the harness cannot apply would run the agent on
     // another login than the account names, so it is refused here as well as
     // when the account is set.
+    if (input.account.secret?.startsWith("secret:client.") || Object.values(input.account.environment ?? {}).some((value) => value.startsWith("secret:client."))) return yield* rejected("reserved secret reference");
     const unsupported = loginRefusal(harness.id, input.account);
     if (unsupported !== undefined) return yield* rejected(unsupported);
     const resolvedSecrets = [input.token];
@@ -570,7 +571,39 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         const mapped = yield* Effect.forEach(request.options, (option) => Effect.gen(function* () {
           return mapPermissionOption(harness.id, { ...option, name: yield* redactText(option.name, processEntry.covered), kind: yield* redactText(option.kind, processEntry.covered) });
         }));
-        yield* emit({ _tag: "permissionRequested", ...identity(processEntry), permissionRequestId: hold.id,
+        // Redact the whole decoded value before applying either byte cap.
+        const fields: import("@shephrd/contracts").PermissionAction = yield* Effect.gen(function* () {
+          const result: Record<string, unknown> = {};
+          if (tool.kind != null) result.toolKind = tool.kind;
+          if (tool.rawInput !== undefined) {
+            const clean = yield* cleanStructure(tool.rawInput, processEntry.covered);
+            const encoded = JSON.stringify(clean);
+            if (encoded !== JSON.stringify(tool.rawInput)) result.inputRedacted = true;
+            if (Buffer.byteLength(encoded) > 8192) {
+              result.inputTruncated = true;
+              // A cut remains valid JSON, even for multibyte text and escapes.
+              const characters = Array.from(encoded);
+              let low = 0, high = Math.min(characters.length, 8192);
+              while (low < high) {
+                const middle = Math.ceil((low + high) / 2);
+                if (Buffer.byteLength(JSON.stringify(characters.slice(0, middle).join(""))) <= 8192) low = middle;
+                else high = middle - 1;
+              }
+              result.toolInput = characters.slice(0, low).join("");
+            } else result.toolInput = clean;
+          }
+          if (tool.locations != null) {
+            const clean = (yield* cleanStructure(tool.locations, processEntry.covered)) as Array<{ path: string; line?: number }>;
+            const bounded: Array<{ path: string; line?: number }> = [];
+            for (const location of clean.slice(0, 16)) {
+              if (Buffer.byteLength(JSON.stringify([...bounded, location])) > 2048) break;
+              bounded.push(location);
+            }
+            result.locations = bounded;
+          }
+          return result;
+        });
+        yield* emit({ _tag: "permissionRequested", ...fields, ...identity(processEntry), permissionRequestId: hold.id,
           toolCallId: tool.toolCallId, description, options: mapped, settingsWrite: settingsWrite((tool.locations ?? []).map((location) => location.path), folder, environment.CLAUDE_CONFIG_DIR) });
         return { outcome: yield* Deferred.await(hold.answer) };
       }));

@@ -40,7 +40,5 @@ export const eventVisibility = {
   AccountOutOfUsage: "agent-scoped",
   AccountAvailable: "agent-scoped",
   HarnessChanged: "agent-scoped",
-  DeviceAdded: "agent-scoped",
-  DeviceRevoked: "agent-scoped",
   CommandRefused: "agent-scoped",
 } satisfies Record<Event["_tag"], VisibilityClass>

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import {
-  AgentId, DeviceId, Event as EventSchema, RequestId,
+  AgentId, Event as EventSchema, RequestId,
   type Actor, type Event, type HarnessSettings, type LifecycleState, type PermissionLevel,
 } from "@shephrd/contracts";
 import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
@@ -17,7 +17,6 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import * as CommandHandler from "../../src/commands/CommandHandler.ts";
 import * as SecretStore from "../../src/commands/SecretStore.ts";
-import { mintDeviceCredential } from "../../src/identity/devices.ts";
 import { mintAgentToken } from "../../src/identity/tokens.ts";
 import * as EventLog from "../../src/log/EventLog.ts";
 import { migrate } from "../../src/log/migrations.ts";
@@ -138,16 +137,14 @@ export const provideRig = <A, E, R>(
 };
 
 // A caller, as the transport hands it to the handler. The owner is
-// authenticated by the transport itself; devices and agents present a
+// authenticated by the transport itself; agents present a
 // credential the handler checks inside the writer (criterion 5.1).
 export type Credential =
   | { readonly _tag: "owner" }
-  | { readonly _tag: "device"; readonly credential: Redacted.Redacted<string> }
   | { readonly _tag: "agent"; readonly token: Redacted.Redacted<string> };
 
 export const ownerCredential: Credential = { _tag: "owner" };
 export const agentCredential = (raw: string): Credential => ({ _tag: "agent", token: Redacted.make(raw) });
-export const deviceCredential = (raw: string): Credential => ({ _tag: "device", credential: Redacted.make(raw) });
 
 // The test seam to the handler. The handler's static signature is its
 // builder's to choose, so the payload is cast here, in one place.
@@ -248,15 +245,6 @@ export const seedAgent = (spec: SeedAgent) => Effect.gen(function* () {
   });
   seedFakeProcess(yield* Runner, agentId, Redacted.value(token.token), !revoked);
   return { agentId, token: Redacted.value(token.token) };
-});
-
-export const seedDevice = (name = "Phone") => Effect.gen(function* () {
-  const deviceId = Schema.decodeUnknownSync(DeviceId)(`device-${randomUUID().slice(0, 8)}`);
-  const minted = mintDeviceCredential();
-  yield* appendSetup([decodeEvent({ _tag: "DeviceAdded", deviceId, name })], {
-    devices: [{ deviceId, name, tokenHash: minted.tokenHash, createdAt: 1, revokedAt: null }],
-  });
-  return { deviceId, credential: Redacted.value(minted.token) };
 });
 
 // A new token for an agent that already has one, revoking the earlier ones.

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   DeliveryId, PermissionRequestId, QuestionId,
-  type Actor, type AgentId, type Event,
+  type Actor, type Caller, type AgentId, type Event, type PermissionAction,
 } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -32,25 +32,34 @@ export const holderAbove = (snapshot: Snapshot, id: string, leaving: ReadonlyArr
   return { _tag: "owner" };
 };
 
-export const mayActForHolder = (snapshot: Snapshot, actor: Actor, holder: Actor): boolean => {
+export const mayActForHolder = (snapshot: Snapshot, actor: Caller, holder: Actor): boolean => {
   if (actor._tag === "owner") return true;
-  if (holder._tag === "owner") return false;
+  if (actor._tag !== "agent" || holder._tag === "owner") return false;
   const effective = available(snapshot, holder.agentId) ? holder : holderAbove(snapshot, holder.agentId);
   return effective._tag === "agent" && effective.agentId === actor.agentId;
 };
 
 export const freshDelivery = (): DeliveryId => Schema.decodeUnknownSync(DeliveryId)(randomUUID());
 
+export const permissionText = (title: string, action: PermissionAction = {}): string => [
+  `Tool kind: ${action.toolKind ?? "unknown"}`,
+  ...(action.locations === undefined || action.locations.length === 0 ? [] : [`Locations: ${JSON.stringify(action.locations)}`]),
+  ...(action.toolInput === undefined ? ["The action's input is not visible."] : [`Input: ${JSON.stringify(action.toolInput)}`]),
+  ...(action.inputRedacted === true ? ["Part of the action's input is hidden, because redaction changed it."] : []),
+  ...(action.inputTruncated === true ? ["The action's input is cut at 8 KiB."] : []),
+  `Title: ${escapeLeadingSlash(title)}`,
+].join("\n");
+
 // Rows 38 and 58: the asker's text goes inside the envelope, escaped, after
 // a label the engine writes. Issue 67: the asker is the delivery's sender.
 export const routedDelivery = (
-  agentId: AgentId, holder: Actor, deliveryId: DeliveryId, subject: Subject, text: string,
+  agentId: AgentId, holder: Actor, deliveryId: DeliveryId, subject: Subject, text: string, action?: PermissionAction,
 ): ReadonlyArray<Event> => holder._tag === "owner" ? [{
   _tag: "OwnerNeeded", agentId, subject, reason: "request needs the owner",
 }] : [{
   _tag: "DeliveryQueued", delivery: {
     id: deliveryId, target: holder.agentId, sender: { _tag: "agent", agentId }, source: subject,
-    content: { _tag: "prompt", text: envelope(deliveryId, `${subject._tag === "permission" ? "Permission request" : "Question"} ${subject.id} from agent ${agentId}:\n${escapeLeadingSlash(text)}`) },
+    content: { _tag: "prompt", text: envelope(deliveryId, `${subject._tag === "permission" ? "Permission request" : "Question"} ${subject.id} from agent ${agentId}:\n${subject._tag === "permission" ? permissionText(text, action) : escapeLeadingSlash(text)}`) },
   },
 }];
 
@@ -85,7 +94,7 @@ const move = (snapshot: Snapshot, subject: Subject, leaving: ReadonlyArray<strin
     : { _tag: "QuestionMoved", agentId: row.agentId, questionId: subject.id, from: row.holder, to, deliveryId };
   const text = "description" in row ? row.description : row.text;
   return [moved, ...withdrawQueued(snapshot, row.deliveryId, "request moved"),
-    ...routedDelivery(row.agentId, to, deliveryId, subject, text)];
+    ...routedDelivery(row.agentId, to, deliveryId, subject, text, "action" in row ? row.action : undefined)];
 };
 
 // Stop, crash, pause and recovery append these events with their own cause.

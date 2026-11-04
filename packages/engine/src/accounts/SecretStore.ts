@@ -62,6 +62,16 @@ export const layer = (configuration: { readonly stateFolder: string }): Layer.La
         try: () => retainOnly(keep),
         catch: () => new LogWriteFailed({ reason: "secret store write failed" }),
       })),
+      removeCarrierValue: (generation) => !/^[A-Za-z0-9_-]+$/.test(generation) ? Effect.void : writes.withPermit(Effect.tryPromise({
+        try: async () => {
+          const values = await read(path);
+          const reference = `secret:client.alerts.carrier.${generation}`;
+          if (!Object.hasOwn(values, reference)) return;
+          delete values[reference];
+          await replace(values);
+        },
+        catch: () => new LogWriteFailed({ reason: "secret store write failed" }),
+      })),
       resolve: (reference) => Effect.promise(() => read(path)).pipe(
         Effect.map((values) => {
           const value = Object.hasOwn(values, reference) ? values[reference] : undefined;

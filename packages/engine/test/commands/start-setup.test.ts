@@ -12,7 +12,7 @@ import { preempt, withPreemption } from "../../src/routing/lanes.ts";
 import { SETUP_TIMEOUT_MILLIS } from "../../src/recovery/reload.ts";
 import { makeFakeRunner } from "../support/fakeRunner.ts";
 import {
-  agentRow, call, deviceCredential, failureOf, freshRequest, makeFakeSecrets, makeRig, ownerCredential, provideRig,
+  agentRow, call, agentCredential, failureOf, freshRequest, makeFakeSecrets, makeRig, ownerCredential, provideRig,
   readLog, removeRig, seedAccount, seedHarness, startPayload, success, type Fakes, type Rig,
 } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
@@ -86,9 +86,9 @@ it.live("A3 stop: catches a stop from a caller with no right to it that cancels 
     fakes.runner.script("start", () => Effect.never.pipe(Effect.onInterrupt(() => Effect.sync(() => { interrupted = true; }))));
     yield* call(ownerCredential, "start", startPayload(rig)).pipe(Effect.forkScoped);
     const agentId = yield* startedAgent(fakes);
-    // A device credential that was never issued; it queues for the lane and
+    // An agent token that was never issued; it queues for the lane and
     // is refused there, and must not have touched the setup.
-    yield* call(deviceCredential("shp_d_not-issued"), "stop", { agentId }).pipe(Effect.forkScoped);
+    yield* call(agentCredential("shp_a_not-issued"), "stop", { agentId }).pipe(Effect.forkScoped);
     yield* pause(300);
     expect(interrupted).toBe(false);
     expect((yield* agentRow(agentId))?.state._tag).toBe("starting");

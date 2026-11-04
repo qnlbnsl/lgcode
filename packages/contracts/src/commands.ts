@@ -137,11 +137,11 @@ export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 
 // A new command requires an access decision at the composition point.
 export const commandAccess = {
-  start: ["owner", "agent"], prompt: ["owner", "agent"], answer: ["owner", "agent"],
+  start: ["owner", "agent"], prompt: ["owner", "agent", "service"], answer: ["owner", "agent"],
   "pass-up": ["owner", "agent"], ask: ["owner", "agent"], wait: ["owner", "agent"],
-  stop: ["owner", "agent"], resume: ["owner", "agent"], compact: ["owner", "agent"], group: ["owner", "agent"],
+  stop: ["owner", "agent"], resume: ["owner", "agent", "service"], compact: ["owner", "agent", "service"], group: ["owner", "agent"],
   accounts: ["owner"], "accounts set-secret": ["owner"], "accounts mark-available": ["owner"],
-  harnesses: ["owner"], subscribe: ["owner", "agent"], "debug.compare-views": ["owner"]
+  harnesses: ["owner"], subscribe: ["owner", "agent", "service"], "debug.compare-views": ["owner"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>, ReadonlyArray<CallerKind>>
 export const ownerOnlyCommands = engineCommandNames.filter((name) => !(commandAccess[name] as ReadonlyArray<CallerKind>).includes("agent"))
 export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }] as const

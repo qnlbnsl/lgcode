@@ -1,3 +1,6 @@
+import { engineLists, type EngineLists } from "../pieces/lists.ts";
+import { guardPiece } from "../pieces/guardPiece.ts";
+import { canReach } from "./reach.ts";
 import { randomUUID } from "node:crypto";
 import { AccountId, RunMode, type AgentId, type Delivery, type Event, type EventEnvelope } from "@shephrd/contracts";
 import * as Cause from "effect/Cause";
@@ -70,11 +73,19 @@ const movedOrWake = (snapshot: Snapshot, row: Row): boolean => {
 // Row 69 and criterion 5.9: what a stopped or crashed target had not taken
 // is withdrawn, and returned to its sender as not delivered unless it was a
 // wake or has moved. Give it the state after the batch's own moves.
-export const targetGone = (snapshot: Snapshot, agentId: AgentId, cause: "stopped" | "crashed"): ReadonlyArray<Event> =>
-  Object.values(snapshot.deliveries).filter((row) => row.target === agentId && pending(row)).flatMap((row): ReadonlyArray<Event> => [
-    { _tag: "DeliveryWithdrawn", agentId, deliveryId: row.id, reason: cause === "stopped" ? "agent stopped" : "agent crashed" },
-    ...(movedOrWake(snapshot, row) ? [] : returnTo(snapshot, row, "not delivered")),
-  ]);
+export const targetGone = (snapshot: Snapshot, agentId: AgentId, cause: "stopped" | "crashed", lists: EngineLists = engineLists): ReadonlyArray<Event> =>
+  Object.values(snapshot.deliveries).filter((row) => row.target === agentId && pending(row)).flatMap((row): ReadonlyArray<Event> => {
+    if (row.source?._tag === "piece") {
+      const namespace = row.source.namespace;
+      return guardPiece("sourceRules", namespace, () => lists.sourceRules[namespace](), "withdraw") === "return"
+        ? returnTo(snapshot, row, "not delivered")
+        : [{ _tag: "DeliveryWithdrawn", agentId, deliveryId: row.id, reason: cause === "stopped" ? "agent stopped" : "agent crashed" }];
+    }
+    return [
+      { _tag: "DeliveryWithdrawn", agentId, deliveryId: row.id, reason: cause === "stopped" ? "agent stopped" : "agent crashed" },
+      ...(movedOrWake(snapshot, row) ? [] : returnTo(snapshot, row, "not delivered")),
+    ];
+  });
 
 // The delivery that started the agent's current turn: the last one sent
 // since the previous turn end. None while the agent is not working.
@@ -214,11 +225,12 @@ export const promptReply = (
 // sends that head once. It counts as sent once any delivery was sent after
 // the reload's "working". `laneHeld` is for a caller that already holds the
 // agent's lane, such as `resume`.
-export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?: boolean; readonly laneHeld?: boolean } = {}) => Effect.gen(function* () {
+export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?: boolean; readonly laneHeld?: boolean; readonly lists?: EngineLists } = {}) => Effect.gen(function* () {
   const log = yield* EventLog;
   const views = yield* Views;
   const runner = yield* Runner;
   const sql = yield* SqlClient.SqlClient;
+  const lists = options.lists ?? log.lists ?? engineLists;
   const reloaded = (snapshot: Snapshot) => {
     const thread = snapshot.threads[agentId] ?? [];
     const since = thread.findLastIndex((row) => row.event._tag === "StateChanged" && row.event.state._tag === "working");
@@ -237,8 +249,17 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
   if (ready(yield* views.snapshot) === undefined) return;
   yield* (options.laneHeld === true ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : withLane(log, agentId))(Effect.gen(function* () {
     const reserved = yield* log.transact((append) => Effect.gen(function* () {
-      const snapshot = yield* views.snapshot;
-      const row = ready(snapshot);
+      let snapshot = yield* views.snapshot;
+      let row = ready(snapshot);
+      while (row !== undefined && row.source?._tag === "piece") {
+        const queued = snapshot.threads[agentId]?.find((envelope) => envelope.event._tag === "DeliveryQueued" && envelope.event.delivery.id === row!.id);
+        const caller = queued?.caller;
+        if (canReach({ ...(caller === undefined || caller._tag === "piece" ? {} : { caller }), target: agentId, deliveryId: row.id, source: row.source, snapshot }, lists)) break;
+        const events = withWaitChecks(snapshot, [{ _tag: "DeliveryWithdrawn", agentId, deliveryId: row.id, reason: "delivery no longer reachable" }], lists);
+        yield* append(owner, freshRequest(), randomUUID(), events, {});
+        snapshot = project(snapshot, events, lists);
+        row = ready(snapshot);
+      }
       if (row === undefined) return undefined;
       const tokens = yield* sql<{ token_hash: string }>`
         SELECT token_hash FROM agent_tokens WHERE agent_id = ${agentId} AND revoked_at IS NULL
@@ -256,7 +277,7 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
       Effect.catchTag("RunnerRejected", () => log.transact((append) => Effect.gen(function* () {
         const snapshot = yield* views.snapshot;
         const events = failed(snapshot, agentId, reserved.delivery.id, "delivery failed");
-        if (events.length > 0) yield* append(owner, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), {});
+        if (events.length > 0) yield* append(owner, freshRequest(), randomUUID(), withWaitChecks(snapshot, events, lists), {});
       }))),
     );
   }));

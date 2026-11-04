@@ -1,4 +1,4 @@
-import type { Actor } from "@shephrd/contracts";
+import type { Caller } from "@shephrd/contracts";
 import { pieceNamespaces } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import { engineLists, type EngineLists } from "../pieces/lists.ts";
@@ -6,7 +6,7 @@ import { guardPiece } from "../pieces/guardPiece.ts";
 import { Views } from "../views/Views.ts";
 import { mayReadAgent } from "./visibility.ts";
 
-export const snapshot = (caller: Actor, lists: EngineLists = engineLists) => Effect.gen(function* () {
+export const snapshot = (caller: Caller, lists: EngineLists = engineLists) => Effect.gen(function* () {
   // Publication can lag COMMIT, so every section and the cursor share this value.
   const view = yield* (yield* Views).snapshot;
   const readable = (id: string) => mayReadAgent(caller, id, view);

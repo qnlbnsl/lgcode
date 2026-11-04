@@ -71,7 +71,6 @@ it.effect.each([
   { _tag: "PermissionMoved", agentId: "acct", permissionRequestId: "acct", deliveryId: "acct", from: { _tag: "agent", agentId: "acct" }, to: { _tag: "owner" } },
   { _tag: "QuestionMoved", agentId: "acct", questionId: "acct", deliveryId: "acct", from: { _tag: "owner" }, to: { _tag: "agent", agentId: "acct" } },
   { _tag: "OwnerNeeded", agentId: "acct", reason: "safe", subject: { _tag: "permission", id: "acct" } },
-  { _tag: "DeviceRevoked", deviceId: "acct" },
   { _tag: "SessionOpened", agentId: "acct", session: { _tag: "acp", sessionId: "safe" }, protocolVersion: 2, reloadable: true,
     process: { groupId: 42, bootId: "acct", startTime: "123", userId: 1000, executable: "/tmp/safe" } },
 ])("A4 $_tag preserves nested branded identities even when they equal an explicit secret", (input) =>

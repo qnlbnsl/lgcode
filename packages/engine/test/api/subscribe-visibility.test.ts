@@ -88,8 +88,6 @@ const samples: Record<string, (a: string, n: string) => Record<string, unknown>>
   AccountOutOfUsage: () => ({ accountId: "primary", resetAt: 1_900_000_000_000 }),
   AccountAvailable: () => ({ accountId: "primary", cause: "owner cleared" }),
   HarnessChanged: () => ({ harness }),
-  DeviceAdded: (_a, n) => ({ deviceId: `device-${n}`, name: "Phone" }),
-  DeviceRevoked: (_a, n) => ({ deviceId: `device-${n}` }),
   CommandRefused: () => ({ command: "start", reason: "refused" }),
 };
 const terminal = new Set(["AgentStartFailed", "AgentCrashed", "AgentStopped"]);

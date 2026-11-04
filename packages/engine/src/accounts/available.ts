@@ -62,7 +62,7 @@ export const returnOne = (accountId: string, cause: Cause) => Effect.gen(functio
   yield* log.transact((append) => Effect.gen(function* () {
     const snapshot = yield* views.snapshot;
     const events = returnAgents(snapshot, accountId, cause);
-    if (events.length > 0) yield* append(owner, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), {});
+    if (events.length > 0) yield* append(owner, freshRequest(), randomUUID(), withWaitChecks(snapshot, events, log.lists), {});
   })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void));
 });
 

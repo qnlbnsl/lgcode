@@ -128,7 +128,7 @@ const program = (inheritedToken: string | undefined) => Effect.scoped(Effect.gen
           return [...known, ...Object.values(values as Record<string, unknown>).filter((value): value is string => typeof value === "string").map((value) => Redacted.make(value))];
         } catch { return known; }
       },
-      tokenHashes: () => new Set((registry.prepare("SELECT token_hash FROM agent_tokens UNION SELECT token_hash FROM devices").all() as Array<{ token_hash: string }>).map((row) => row.token_hash)),
+      tokenHashes: () => new Set((registry.prepare("SELECT token_hash FROM agent_tokens").all() as Array<{ token_hash: string }>).map((row) => row.token_hash)),
     });
     const configuration = { home: process.env.HOME ?? folder, stateFolder: folder, pluginRoot: fileURLToPath(new URL("../../..", import.meta.url)),
       harnessDefaults: installedHarnessDefaults(process.env.PATH ?? "") };

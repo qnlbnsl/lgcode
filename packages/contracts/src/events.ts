@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema"
 import { Account } from "./accounts.ts"
 import { HarnessSettings, RunMode } from "./harnesses.ts"
-import { AccountId, AgentId, BootId, DeliveryId, DeviceId, EpochMilliseconds, EventId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
+import { AccountId, AgentId, BootId, DeliveryId, EpochMilliseconds, EventId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
 import { PermissionLevel } from "./permission.ts"
 import { LifecycleState } from "./stateMachine.ts"
 
@@ -10,6 +10,29 @@ export const Actor = Schema.Union([
   Schema.TaggedStruct("agent", { agentId: AgentId })
 ])
 export type Actor = typeof Actor.Type
+
+export const Caller = Schema.Union([
+  Actor,
+  Schema.TaggedStruct("service", { service: Schema.NonEmptyString, rule: Schema.optionalKey(Schema.NonEmptyString) }),
+  Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles"]) })
+])
+export type Caller = typeof Caller.Type
+export const Sender = Schema.Union([
+  Actor,
+  Schema.TaggedStruct("service", { service: Schema.NonEmptyString }),
+  Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles"]) })
+])
+export type Sender = typeof Sender.Type
+
+export const PermissionActionFields = {
+  toolKind: Schema.optionalKey(Schema.Literals(["read", "edit", "delete", "move", "search", "execute", "think", "fetch", "switch_mode", "other"])),
+  toolInput: Schema.optionalKey(Schema.Unknown),
+  locations: Schema.optionalKey(Schema.Array(Schema.Struct({ path: Schema.String, line: Schema.optionalKey(Schema.Int) }))),
+  inputRedacted: Schema.optionalKey(Schema.Boolean),
+  inputTruncated: Schema.optionalKey(Schema.Boolean)
+}
+export type PermissionAction = typeof PermissionAction.Type
+export const PermissionAction = Schema.Struct(PermissionActionFields)
 
 export const SessionReference = Schema.Union([
   Schema.TaggedStruct("acp", { sessionId: Schema.NonEmptyString }),
@@ -20,7 +43,7 @@ export type SessionReference = typeof SessionReference.Type
 export const Delivery = Schema.Struct({
   id: DeliveryId,
   target: AgentId,
-  sender: Actor,
+  sender: Sender,
   content: Schema.Union([
     Schema.TaggedStruct("prompt", { text: Schema.String }),
     Schema.TaggedStruct("compact", {}),
@@ -30,7 +53,8 @@ export const Delivery = Schema.Struct({
   source: Schema.optionalKey(Schema.Union([
     Schema.TaggedStruct("permission", { id: PermissionRequestId }),
     Schema.TaggedStruct("question", { id: QuestionId }),
-    Schema.TaggedStruct("wait", { id: WaitId })
+    Schema.TaggedStruct("wait", { id: WaitId }),
+    Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles"]), id: Schema.NonEmptyString })
   ]))
 })
 export type Delivery = typeof Delivery.Type
@@ -109,7 +133,7 @@ export const EngineEvent = Schema.Union([
     process: Schema.optionalKey(ProcessIdentity),
     reloadable: Schema.Boolean
   }),
-  Schema.TaggedStruct("PromptSent", { ...delivery, sender: Actor, text: Schema.String }),
+  Schema.TaggedStruct("PromptSent", { ...delivery, sender: Sender, text: Schema.String }),
   Schema.TaggedStruct("ThreadItem", {
     ...agent, itemId: Schema.NonEmptyString, content: ThreadContent, replay: Schema.Boolean
   }),
@@ -125,11 +149,12 @@ export const EngineEvent = Schema.Union([
     toolCallId: Schema.NonEmptyString,
     description: Schema.String,
     options: Schema.Array(PermissionOption).check(Schema.isMinLength(1)),
-    settingsWrite: Schema.Boolean
+    settingsWrite: Schema.Boolean,
+    ...PermissionActionFields
   }),
   Schema.TaggedStruct("PermissionAnswered", {
     ...permission,
-    answeredBy: Actor,
+    answeredBy: Caller,
     answer: Schema.Union([
       Schema.TaggedStruct("selected", { optionId: Schema.NonEmptyString }),
       Schema.TaggedStruct("cancelled", {})
@@ -159,7 +184,7 @@ export const EngineEvent = Schema.Union([
   Schema.TaggedStruct("DeliverySent", { ...delivery, method: RunMode }),
   Schema.TaggedStruct("DeliveryAccepted", { ...delivery }),
   Schema.TaggedStruct("DeliveryRequeued", { ...delivery, reason: Schema.String }),
-  Schema.TaggedStruct("DeliveryReturned", { ...delivery, sender: Actor, reason: Schema.String }),
+  Schema.TaggedStruct("DeliveryReturned", { ...delivery, sender: Sender, reason: Schema.String }),
   Schema.TaggedStruct("DeliveryWithdrawn", { ...delivery, reason: Schema.String }),
   Schema.TaggedStruct("AgentCrashed", {
     ...agent, exitCode: Schema.NullOr(Schema.Int), signal: Schema.NullOr(Schema.String), stderr: Schema.String
@@ -174,10 +199,8 @@ export const EngineEvent = Schema.Union([
   Schema.TaggedStruct("AccountOutOfUsage", { ...account, resetAt: Schema.optionalKey(EpochMilliseconds) }),
   Schema.TaggedStruct("AccountAvailable", { ...account, cause: Schema.Literals(["usage reset", "owner cleared"]) }),
   Schema.TaggedStruct("HarnessChanged", { harness: HarnessSettings }),
-  Schema.TaggedStruct("DeviceAdded", { deviceId: DeviceId, name: Schema.String }),
-  Schema.TaggedStruct("DeviceRevoked", { deviceId: DeviceId }),
   // Keep this minimal: a refused request may contain a secret-setting value.
-  Schema.TaggedStruct("CommandRefused", { command: Schema.NonEmptyString, reason: Schema.String })
+  Schema.TaggedStruct("CommandRefused", { command: Schema.NonEmptyString, reason: Schema.String, sourceSequence: Schema.optionalKey(EventSequence) })
 ])
 // Later pieces merge their event unions here, in namespace order.
 export const Event = EngineEvent
@@ -187,7 +210,7 @@ export const EventEnvelope = Schema.Struct({
   sequence: EventSequence,
   eventId: EventId,
   occurredAt: EpochMilliseconds,
-  caller: Actor,
+  caller: Caller,
   requestId: Schema.optionalKey(RequestId),
   agentId: Schema.optionalKey(AgentId),
   event: Event

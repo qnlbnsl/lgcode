@@ -16,17 +16,17 @@ export class CredentialCheckFailed extends Data.TaggedError("CredentialCheckFail
   readonly reason: "credential check failed";
 }> {}
 
-// The wire form of an agent token or device credential (decision row 73):
+// The wire form of an agent token (decision row 73):
 // a fixed prefix, 32 random bytes in base64url (43 characters, no padding),
 // an underscore, and the first eight lowercase hexadecimal digits of the
 // SHA-256 digest of those bytes. The checksum lets a malformed value be
 // refused before any table is read, and the prefix is what the redactor
 // searches for before it hashes anything.
-export type CredentialPrefix = "shp_a_" | "shp_d_";
+export type CredentialPrefix = "shp_a_";
 
 export const credentialLength = 6 + 43 + 1 + 8;
 
-const shape = /^shp_[ad]_[A-Za-z0-9_-]{43}_[a-f0-9]{8}$/;
+const shape = /^shp_a_[A-Za-z0-9_-]{43}_[a-f0-9]{8}$/;
 
 export const sha256Hex = (value: string | Uint8Array): string => createHash("sha256").update(value).digest("hex");
 
@@ -41,7 +41,7 @@ export const mintCredential = (prefix: CredentialPrefix): {
   return { token: Redacted.make(raw), tokenHash: sha256Hex(raw) };
 };
 
-// True when `raw` has the shape, the given prefix (or either prefix), a
+// True when `raw` has the shape, the given prefix, a
 // canonical base64url payload of exactly 32 bytes and a matching checksum.
 // It hashes only the 32 decoded bytes, so its cost is fixed.
 export const hasValidChecksum = (raw: string, prefix?: CredentialPrefix): boolean => {

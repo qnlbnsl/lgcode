@@ -1,5 +1,5 @@
 import {
-  AgentId, DeliveryId, EpochMilliseconds, Event, PermissionOption, PermissionRequestId,
+  AgentId, DeliveryId, EpochMilliseconds, Event, PermissionActionFields, PermissionOption, PermissionRequestId,
   type Account, type Delivery, type HarnessSettings, type PermissionLevel, type SessionReference,
 } from "@shephrd/contracts";
 import * as Context from "effect/Context";
@@ -63,6 +63,7 @@ export const RunnerEvent = Schema.Union([
     description: Schema.String,
     options: Schema.Array(PermissionOption).check(Schema.isMinLength(1)),
     settingsWrite: Schema.Boolean,
+    ...PermissionActionFields,
   }),
   Schema.TaggedStruct("turnEnded", { agentId: AgentId, incarnation: Schema.NonEmptyString, deliveryId: DeliveryId }),
   Schema.TaggedStruct("deliveryUpdate", {

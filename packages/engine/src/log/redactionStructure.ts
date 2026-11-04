@@ -10,20 +10,21 @@ export interface RedactionStructure {
 }
 
 const identity: RedactionStructure = { identity: true };
-const actor: RedactionStructure = { fields: { agentId: identity } };
+const actor: RedactionStructure = { fields: { agentId: identity, service: identity, rule: identity, namespace: identity } };
 const account: RedactionStructure = { identity: true, fields: {
   id: identity, harness: identity, environment: { freeText: true },
 } };
 const harness: RedactionStructure = { identity: true, fields: { id: identity } };
-const member: RedactionStructure = { identity: true, fields: { agentId: identity } };
+const member: RedactionStructure = { identity: true, fields: { agentId: identity, service: identity, rule: identity, namespace: identity } };
 const delivery: RedactionStructure = { fields: {
-  id: identity, target: identity, sender: actor, source: { fields: { id: identity } },
+  id: identity, target: identity, sender: actor, source: { fields: { id: identity, namespace: identity } },
 } };
 
 export const eventStructure: RedactionStructure = { fields: {
-  agentId: identity, accountId: identity, deliveryId: identity, deviceId: identity,
+  agentId: identity, accountId: identity, deliveryId: identity,
   permissionRequestId: identity, questionId: identity, waitId: identity,
   account, harness, parent: actor, sender: actor, holder: actor, answeredBy: actor, from: actor, to: actor,
+  toolInput: { freeText: true },
   delivery, firstPromptDelivery: delivery, subject: { fields: { id: identity } },
   member, members: { elements: member }, process: { fields: { bootId: identity } },
 } };

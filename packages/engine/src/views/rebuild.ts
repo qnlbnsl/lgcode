@@ -25,7 +25,7 @@ export const rebuild = (upTo: EventSequence, lists: EngineLists = engineLists): 
 > => Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
   return yield* Stream.paginate(0, (cursor: number) => SqliteClient.readOnly(sql<EventRow>`
-    SELECT sequence, event_id, caller, request_id, agent_id, occurred_at, payload_json
+    SELECT sequence, event_id, caller, caller_rule, request_id, agent_id, occurred_at, payload_json
     FROM events WHERE sequence > ${cursor} AND sequence <= ${upTo}
     ORDER BY sequence LIMIT ${PAGE_SIZE}`
   ).pipe(Effect.map((page) => [
