@@ -12,3 +12,15 @@ id = "serve"
 title = "Start Shephrd"
 contexts = ["global"]
 command = ["./bin/shephrd", "serve", "--detach"]
+
+[[actions]]
+id = "view"
+title = "View Shephrd threads"
+contexts = ["global"]
+command = ["./bin/shephrd", "view", "--open-pane"]
+
+[[panes]]
+id = "view"
+title = "Shephrd threads"
+placement = "split"
+command = ["./bin/shephrd", "view"]
