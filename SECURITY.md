@@ -21,8 +21,8 @@ Include these details:
 - The impact: what an attacker can read, change, or run.
 - A minimal reproduction.
 
-Redact message boards, local paths, credentials, API tokens, pairing links,
-and raw provider responses before you send anything.
+Redact message boards, local paths, credentials, API tokens, the web password,
+session cookies, and raw provider responses before you send anything.
 
 ## What Shephrd protects, and what it does not
 
@@ -40,13 +40,22 @@ an agent's mistakes, not a deliberately hostile agent. Where a harness
 supports it, Shephrd adds a rule that forbids its agents to read the state
 folder, but that rule is a guard against accidents, not a wall. The owner
 accepted this limit on 2026-11-01. The real fix is to run Shephrd as its own
-user, so its private files are out of the agents' reach. It is planned for
-before remote access is built.
+user, so its private files are out of the agents' reach. It is still
+planned. On 2026-11-03 the owner approved building remote access before it,
+so that Shephrd is in use sooner. Until it is built, any agent can read
+Shephrd's state folder, including the stored account keys.
+
+Agents can also read the web password. Agents run as the owner's user, so an
+agent can read the engine's first environment through `/proc`, even though the
+engine deletes the variable and agents do not inherit it. The password protects
+against the network. It is not a boundary against an agent on the same user
+until the own-user setup exists. The owner accepted this limit on 2026-11-03.
 
 The part of Shephrd that needs the most care is its client API, because it
 lets a web page, a desktop app, or a phone control agents that can run
 commands on the host. Anyone who can reach that API with a valid credential
-can, in effect, run code on the machine.
+can, in effect, run code on the machine. On the web server, that credential is
+one password.
 
 ## Harnesses with no deny-read or deny-write rule
 
@@ -77,16 +86,36 @@ These rules apply to every change. A change that breaks one is a security bug.
 1. **The API listens on the loopback address by default.** Listening on any
    other address is an explicit setting that the owner turns on.
 2. **Every API request is authenticated, including on loopback.** There is no
-   unauthenticated mode.
-3. **A new device is paired with a short-lived, single-use pairing code.**
-   A pairing code is never reusable and never stored in plain text.
-4. **Each device gets its own credential, and each credential can be revoked
-   on its own.** Revoking one phone does not sign out every client.
-5. **Remote access goes over an encrypted channel**, such as TLS, a Tailscale
-   tailnet, or an SSH tunnel. Shephrd does not offer plain HTTP to a
-   non-loopback address.
+   unauthenticated mode. The engine's Unix socket uses the owner credential and
+   agent tokens. The web server uses one password, which the service reads from
+   the local environment variable `SHEPHRD_WEB_PASSWORD`, and the session that a
+   correct password earns. A logged-in session is the owner. If the variable is
+   not set, the web server does not start. Only the login route and the page's
+   static files, which hold no data, are served with no session.
+
+   The loopback port has a limit of its own. While the web server is down, or
+   when it never started, another local user can bind `127.0.0.1` at its port,
+   because that needs no rights. That program can show a fake login form and
+   capture the password. In proxy mode, the proxy sends the phone's requests to
+   it, and it can serve a page with a long cache lifetime under the real public
+   address. `docs/remote-access.md` says that a `client.web-down` alert means the
+   page must not be opened. A local program can also send any header, so the
+   `Host` and `Origin` checks stop web pages and not local programs.
+3. **The password is checked in constant time and is not kept by the browser.**
+   A login carries it in the request body, never in a URL. One person uses
+   Shephrd, and the owner chose no rate limits and no lockouts on 2026-11-03.
+4. **A session is one random token per engine start, held in memory only.**
+   Logging out replaces the token, which signs out every client. Changing the
+   password means restarting the engine, which also ends the session. A browser
+   holds the token in an `HttpOnly`, `SameSite=Strict` cookie, which is `Secure`
+   on a public request when the public address is `https`.
+5. **An encrypted channel for remote access is the owner's setup**, such as TLS, a
+   Tailscale tailnet, or an SSH tunnel. Shephrd serves plain HTTP on loopback and
+   does not offer it to a non-loopback address. The owner's words, on 2026-11-03:
+   "Let's just focus on plain HTTP. That's what the software itself is doing, right? Then, whatever proxy we add on to it, that proxies to localhost. We'll figure this out then. Because I have to set up a local certificate authority so that I can do ARPA DNS certs"
 6. **Secrets never reach logs, the message board, or a client.** This covers
-   API tokens, pairing codes, and the agent harnesses' own login tokens.
+   API tokens, the web password, the session token, and the agent harnesses'
+   own login tokens. Agents do not inherit the web password's variable.
 7. **Text from an agent is data, not a command.** A message on the board
    cannot change permissions, teams, or settings unless the owner's
    credential approves it.
