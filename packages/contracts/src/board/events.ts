@@ -36,6 +36,10 @@ export const BoardEvent = Schema.Union([
   Schema.TaggedStruct("board.WakeBuilt", {
     wakeId: WakeId, targetAgentId: AgentId,
     carried: Schema.Array(PostId), mustReply: Schema.Array(PostId), completions: Schema.Array(PostId),
+    // Exactly the completions whose captured payload contains reply text.
+    // An empty array identifies a metadata-only replacement. Reach checks
+    // use this captured manifest, never the post's current replies.
+    completionReplyText: Schema.Array(PostId),
     reminders: Schema.Array(PostId),
     noAnswers: Schema.Array(Schema.Struct({ postId: PostId, addressee: BoardAddressee }))
   }),

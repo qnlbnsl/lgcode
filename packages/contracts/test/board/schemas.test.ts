@@ -82,6 +82,15 @@ void [plain, postAsChannel, channelAsWake, wakeAsPost, agentAsPost];
 });
 
 describe("events round-trip", () => {
+  it("requires the captured completion text manifest rather than inferring it from replies", () => {
+    const { completionReplyText: _manifest, ...missing } = samples[7]!;
+    for (const schema of [codec("BoardEvent"), Contracts.Event]) {
+      const decode = Schema.decodeUnknownSync(schema);
+      expect(() => decode(missing)).toThrow();
+      expect(decode({ ...missing, completionReplyText: [] })).toEqual({ ...missing, completionReplyText: [] });
+      expect(decode({ ...missing, completionReplyText: ["post-0"] })).toEqual(samples[7]);
+    }
+  });
   it.each(samples.map((event) => [event._tag, event] as const))("1.2 %s survives BoardEvent, Event and JSON without stripping fields", (_tag, wire) => {
     for (const schema of [codec("BoardEvent"), Contracts.Event]) {
       const decoded = Schema.decodeUnknownSync(schema)(wire);
