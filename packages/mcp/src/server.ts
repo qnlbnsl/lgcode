@@ -81,7 +81,10 @@ const buildToolkit = (environment: Environment) => {
         // tool call interrupts it, and the client sends the engine an interrupt.
         return retryRecoveringEffect(Effect.suspend(() => clientFor.pipe(
           Effect.flatMap((client) => (client as any)[name](payloadFor(name, parameters, requestId)) as Effect.Effect<unknown, unknown>)
-        ))).pipe(Effect.mapError((error) => new Error(failureText(error))))
+        ))).pipe(
+          Effect.map((reply: any) => typeof reply?.data === "string" ? reply.data : reply),
+          Effect.mapError((error) => new Error(failureText(error)))
+        )
       }
     ]))
   })
