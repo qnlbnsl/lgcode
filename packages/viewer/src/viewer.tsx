@@ -1,5 +1,2 @@
-import { Text } from "ink";
-
-export function Viewer() {
-  return <Text>Shephrd viewer</Text>;
-}
+export { Viewer } from "./view.ts";
+export type { ViewerProps } from "./view.ts";
