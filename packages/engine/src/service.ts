@@ -17,6 +17,9 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import { makeCredentialRegistry } from "./accounts/credentialSource.ts";
 import * as SecretStore from "./accounts/SecretStore.ts";
+import { AlertSender } from "./client/alerts/AlertSender.ts";
+import { makeNtfy } from "./client/alerts/carriers/ntfy.ts";
+import { SecretStore as SecretStoreService } from "./commands/SecretStore.ts";
 import { application, listen } from "./api/server.ts";
 import { serviceLog } from "./api/serviceLog.ts";
 import { prepareStateFolder, stateFolder } from "./api/stateFolder.ts";
@@ -53,6 +56,8 @@ const baseServices = (lists: EngineLists) => Layer.unwrap(Effect.gen(function* (
 
 const pieceFollowers = (lists: EngineLists) => Layer.effectDiscard(Effect.gen(function* () {
   const recovery = yield* Effect.serviceOption(Restart.Restart);
+  const customSender = yield* Effect.serviceOption(AlertSender);
+  const sender = Option.isSome(customSender) ? customSender.value : makeNtfy(yield* SecretStoreService);
   const drain = Effect.suspend(() => Effect.forEach(drainPieceErrors(), (entry) =>
     Effect.logError("piece table failed").pipe(Effect.annotateLogs({ ...entry })), { discard: true }));
   yield* Effect.forever(drain.pipe(Effect.andThen(Effect.sleep(1_000)))).pipe(Effect.ensuring(drain), Effect.forkScoped);
@@ -67,7 +72,7 @@ const pieceFollowers = (lists: EngineLists) => Layer.effectDiscard(Effect.gen(fu
       }
       return Effect.logError("piece reactor failed").pipe(Effect.annotateLogs({ namespace }), Effect.andThen(Effect.sleep(1_000)), Effect.andThen(Effect.suspend(() => run)));
     }));
-    yield* (Option.isSome(recovery) ? recovery.value.whenReady : Effect.void).pipe(Effect.andThen(run), Effect.forkScoped);
+    yield* (Option.isSome(recovery) ? recovery.value.whenReady : Effect.void).pipe(Effect.andThen(run.pipe(Effect.provideService(AlertSender, sender))), Effect.forkScoped);
   }
 }));
 

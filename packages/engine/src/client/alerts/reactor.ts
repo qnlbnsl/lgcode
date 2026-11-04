@@ -83,8 +83,12 @@ const react = (envelope: EventEnvelope, snapshot: Snapshot, lists: EngineLists):
   for (const row of Object.values(view.alerts)) {
     if (row.status !== "open") continue;
     const source = { ...row, key: row.alertKey };
-    const ended = [...ends].some(([namespace, key]) => key === row.alertKey && ownedKind(namespace, source));
-    if (ended || (touchesSubject(row, envelope.event) && subjectClosed(source, snapshot))) clears.push({
+    // The snapshot can be ahead of this follower. An older state event
+    // cannot close a later alert. A piece's explicit end instead follows
+    // its source order, including when raise and end were both in catch-up.
+    const ended = row.sourceSequence < envelope.sequence
+      && [...ends].some(([namespace, key]) => key === row.alertKey && ownedKind(namespace, source));
+    if (ended || (row.sequence < envelope.sequence && touchesSubject(row, envelope.event) && subjectClosed(source, snapshot))) clears.push({
       _tag: "client.AlertCleared", alertId: row.alertId, cause: "subject closed", sourceSequence: envelope.sequence,
     });
   }

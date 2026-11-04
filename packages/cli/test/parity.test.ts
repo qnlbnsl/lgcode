@@ -24,7 +24,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
 // Full payload parity has a compact escape hatch: every non-secret RPC accepts
 // --input JSON. Friendly wait/subscribe flags are separately exercised.
 for (const command of CommandsRpcGroup.requests.keys()) {
-  if (command === "accounts set-secret") continue; // S01 checks its stdin-only dispatch.
+  if (command === "accounts set-secret" || command === "client.alerts.carrier.set-token") continue; // Dedicated tests check stdin-only dispatch.
   it(`P03 ${command} catches a registered CLI command dispatching the wrong RPC or dropping payload fields`, async () => {
     const root = prepareRoot();
     const payloads: Record<string, Record<string, unknown>> = {
@@ -32,6 +32,8 @@ for (const command of CommandsRpcGroup.requests.keys()) {
       "client.alerts.dismiss": { alertId: "alert-1" },
       "client.alerts.settings": {},
       "client.alerts.settings.set": { kind: "approval", push: false },
+      "client.alerts.carrier.set": { carrier: { _tag: "ntfy", server: "https://push.example", topic: "owner_alerts" } },
+      "client.alerts.carrier.clear-token": {},
       start: { name: "Parity agent", role: "worker", harness: "fake", account: { _tag: "any" }, permission: "ask", folder: root.work, groups: ["review"], model: "small", effort: "low", prompt: "Check parity." },
       prompt: { agentId: "member", text: "A prompt with spaces." },
       answer: { kind: "question", id: "question", text: "The answer." },

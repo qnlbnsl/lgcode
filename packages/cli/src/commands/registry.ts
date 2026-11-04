@@ -10,6 +10,9 @@ export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>> | "cli
 export const commandNames: ReadonlyArray<CommandName> = [...CommandsRpcGroup.requests.keys()] as Array<CommandName>
 
 const summaries: Record<CommandName, string> = {
+  "client.alerts.carrier.set": "Change the alert carrier.",
+  "client.alerts.carrier.set-token": "Store the carrier token from standard input, after confirming the server.",
+  "client.alerts.carrier.clear-token": "Clear the carrier token.",
   "client.alerts.list": "List alerts.",
   "client.alerts.dismiss": "Dismiss an alert.",
   "client.alerts.settings": "Read alert settings.",
@@ -92,6 +95,11 @@ export const helpText = (command: CommandName): string => {
       "Pipe it in, or type it at the prompt. One final newline is removed."
     ].join("\n") + "\n"
   }
+  if (command === "client.alerts.carrier.set-token") return [
+    "Usage: shephrd client alerts carrier set-token", "       shephrd client.alerts.carrier.set-token", "", summaries[command], owner,
+    "Takes no arguments. Type yes to confirm the displayed server, then supply the token on standard input.",
+    "The token is never echoed or accepted in --input."
+  ].join("\n") + "\n"
   const options = [
     "Options:",
     "  --input <json>  The command's payload as one JSON object. A requestId is added when absent.",

@@ -47,7 +47,8 @@ const expectedWebCommands = ["client.web.settings", "client.web.settings.set"]
 const expectedApiCommands = [...expectedCommands, ...expectedWebCommands]
 const expectedOwnerOnly = ["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "board.flush",
   "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record",
-  "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", ...expectedWebCommands]
+  "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
+  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", ...expectedWebCommands]
 
 const expectedMcpOffered = ["start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group"]
 const boardCommands = ["board.open", "board.members", "board.post", "board.close", "board.acknowledge", "board.read", "board.channels", "board.status", "board.flush"]
@@ -56,7 +57,8 @@ const boardTools = boardCommands.filter((name) => name !== "board.flush")
 const rolesCommands = ["roles.orient", "roles.handoff", "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record"]
 const rolesTools = ["roles.orient", "roles.handoff"]
 const clientTools = ["client.snapshot", "client.roster", "client.thread", "client.event"]
-const alertCommands = ["client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]
+const alertCommands = ["client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
+  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"]
 const testedCommands = [...expectedApiCommands, ...alertCommands]
 const expectedRpcCommands = [...testedCommands, ...boardCommands, ...clientReads, ...rolesCommands]
 
