@@ -30,6 +30,8 @@ export const HarnessSettings = Schema.Struct({
   reportedModes: Schema.Array(Schema.Struct({ id: Schema.NonEmptyString, level: PermissionLevel })),
   defaultModel: Schema.optionalKey(Schema.NonEmptyString),
   defaultEffort: Schema.optionalKey(Schema.NonEmptyString),
+  // Cache lifetime in minutes, set by the owner when usage has no TTL split.
+  cacheLifetime: Schema.optionalKey(Schema.Literals([5, 60])),
   defaultPermission: PermissionLevel,
   models: Schema.Array(Schema.NonEmptyString),
   efforts: Schema.Array(Schema.NonEmptyString),

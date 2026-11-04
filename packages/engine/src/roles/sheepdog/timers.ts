@@ -5,14 +5,16 @@ import { executeService } from "../../commands/services.ts";
 import type { EngineLists } from "../../pieces/lists.ts";
 import { sheepdogCaller } from "./notices.ts";
 
-export type TimerRule = "stall" | "team-idle" | "capacity" | "notice-cache" | "runaway";
-export const missedDeadlineAction = (rule: TimerRule): "recheck" | "drop" => rule === "notice-cache" ? "drop" : "recheck";
+export type TimerRule = "stall" | "team-idle" | "capacity" | "notice-cache" | "compact-cache" | "runaway";
+export const missedDeadlineAction = (rule: TimerRule): "recheck" | "drop" => rule === "notice-cache" || rule === "compact-cache" ? "drop" : "recheck";
 export const boardTimer = (rule: TimerRule): boolean => rule === "stall" || rule === "team-idle" || rule === "notice-cache";
 export interface TimerOrigin {
   readonly key: string;
   readonly rule: TimerRule;
   readonly originSequence: number;
   readonly delayMillis: number;
+  // A model cache has a real expiry, which a service baseline cannot extend.
+  readonly absoluteDueAt?: number;
 }
 export interface ArmedTimer extends TimerOrigin { readonly dueAt: number }
 export const deadline = (occurredAt: number, delayMillis: number): number => occurredAt + delayMillis;
@@ -36,7 +38,7 @@ export const makeTimerReader = (lists: EngineLists) => {
     const floor = yield* time(floorSequence);
     const boardFloor = origins.some((origin) => boardTimer(origin.rule)) ? yield* time(boardFloorSequence) : floor;
     const armed: ArmedTimer[] = [];
-    for (const origin of origins) armed.push({ ...origin, dueAt: deadline(Math.max(
+    for (const origin of origins) armed.push({ ...origin, dueAt: origin.absoluteDueAt ?? deadline(Math.max(
       boardTimer(origin.rule) ? boardFloor : floor, yield* time(origin.originSequence),
     ), origin.delayMillis) });
     // Do not let long-lived service subscriptions retain the whole log.
