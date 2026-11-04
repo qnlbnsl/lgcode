@@ -1,6 +1,9 @@
 node_modules/
 coverage/
 .vitest/
+**/dist/
+playwright-report/
+test-results/
 **/test/.state/
 **/tests/.state/
 **/test/**/shephrd-state/

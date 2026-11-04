@@ -15,6 +15,7 @@
     "live-check": "node packages/engine/scripts/live-check.ts"
   },
   "devDependencies": {
+    "@playwright/test": "catalog:",
     "@effect/openapi-generator": "catalog:",
     "@effect/platform-node": "catalog:",
     "@effect/vitest": "catalog:",
@@ -22,7 +23,9 @@
     "@types/ws": "catalog:",
     "effect": "catalog:",
     "fast-check": "catalog:",
+    "jsdom": "catalog:",
     "typescript": "catalog:",
+    "vite": "catalog:",
     "vitest": "catalog:"
   }
 }

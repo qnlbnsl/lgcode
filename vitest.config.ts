@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-const packageNames = ["contracts", "client", "engine", "cli", "mcp", "testing"];
+const packageNames = ["contracts", "client", "engine", "cli", "mcp", "testing", "web", "viewer"];
 
 export default defineConfig({
   test: {
@@ -10,6 +10,8 @@ export default defineConfig({
     testTimeout: 60_000,
     allowOnly: !process.env["CI"],
     retry: 0,
+    // Keep project names visible when Vitest detects an agent's environment.
+    reporters: ["default"],
     setupFiles: [fileURLToPath(new URL("./scripts/test-environment.ts", import.meta.url))],
     fakeTimers: {
       toFake: [
@@ -23,13 +25,15 @@ export default defineConfig({
       ...packageNames.map((name) => ({
         test: {
           name,
-          include: [`packages/${name}/**/*.{test,spec}.ts`],
+          environment: name === "web" ? "jsdom" : "node",
+          include: [`packages/${name}/**/*.{test,spec}.{ts,tsx}`],
+          exclude: [`packages/${name}/e2e/**`, "**/node_modules/**"],
         },
       })),
       {
         test: {
           name: "third-party",
-          include: ["third_party/t3code/**/*.{test,spec}.ts"],
+          include: ["third_party/t3code/**/*.{test,spec}.{ts,tsx}"],
         },
       },
     ],
