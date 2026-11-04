@@ -61,8 +61,8 @@ it("3.6 a board post to the owner ends a working member's wait after fresh owner
   const waitForAgents = await loadWait(); let reads = 0;
   const peer = await clientApiPeer("node", (frame, socket) => {
     if (frame.tag === "client.snapshot") succeed(socket, frame, { requestId: frame.payload.requestId, ...initial });
-    if (frame.tag === "board.status") succeed(socket, frame, { requestId: frame.payload.requestId, sequence: ++reads === 1 ? 10 : 11, holdsUnsettled: [], holdsIncoming: [], ownerHeld: reads === 1 ? [] : ["agent-a"] });
-    if (frame.tag === "subscribe") chunk(socket, frame, [{ ...state(11, "working"), event: { _tag: "board.PostWritten", postId: "post-to-owner", author: { _tag: "agent", agentId: "agent-a" }, to: [{ _tag: "owner" }] } }]);
+    if (frame.tag === "board.status") succeed(socket, frame, { requestId: frame.payload.requestId, sequence: ++reads === 1 ? 10 : 11, holdsUnsettled: [], holdsIncoming: [], ownerHeld: reads === 1 ? [] : ["agent-a"], disabled: false });
+    if (frame.tag === "subscribe") chunk(socket, frame, [{ ...state(11, "working"), event: { _tag: "board.PostWritten", postId: "post-to-owner", channelId: "channel", author: { _tag: "agent", agentId: "agent-a" }, text: "Please review this post.", to: [{ _tag: "owner" }], reply: "all" } }]);
   });
   const connect = await peer.connect();
   const result = await Effect.runPromise(Effect.scoped(Effect.gen(function* () { return yield* waitForAgents(yield* connect, { members: ["agent-a"], mode: "all" }).pipe(Effect.timeout(4_000)); })));

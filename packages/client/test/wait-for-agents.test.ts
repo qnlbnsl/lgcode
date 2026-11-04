@@ -104,8 +104,8 @@ it("3.5 a piece hold predating the snapshot is checked by fresh lists before an 
   const waitForAgents = await loadWait(); let reads = 0;
   const peer = await clientApiPeer("node", (frame, socket) => {
     if (frame.tag === "client.snapshot") succeed(socket, frame, { requestId: frame.payload.requestId, ...initial });
-    else if (frame.tag === "board.status") succeed(socket, frame, { requestId: frame.payload.requestId, sequence: ++reads === 1 ? 10 : 11, holdsUnsettled: reads === 1 ? ["agent-a"] : [], holdsIncoming: [], ownerHeld: [] });
-    else if (frame.tag === "subscribe") chunk(socket, frame, [{ ...turnEnd(11), event: { _tag: "board.PostClosed", postId: "p" } }]);
+    else if (frame.tag === "board.status") succeed(socket, frame, { requestId: frame.payload.requestId, sequence: ++reads === 1 ? 10 : 11, holdsUnsettled: reads === 1 ? ["agent-a"] : [], holdsIncoming: [], ownerHeld: [], disabled: false });
+    else if (frame.tag === "subscribe") chunk(socket, frame, [{ ...turnEnd(11), event: { _tag: "board.PostClosed", postId: "p", outcome: "answered", closer: { _tag: "owner" }, completionOwed: false } }]);
   });
   const connect = await peer.connect();
   const result = await Effect.runPromise(Effect.scoped(Effect.gen(function* () { return yield* waitForAgents(yield* connect, { members, mode: "all" }).pipe(Effect.timeout(4_000)); })));

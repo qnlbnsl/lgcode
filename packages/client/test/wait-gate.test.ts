@@ -91,7 +91,7 @@ it("3.9 the wait helper's nested piece read completes despite a stream queue bac
     if (frame.tag === "client.snapshot") succeed(socket, frame, { requestId: frame.payload.requestId, ...initial });
     if (frame.tag === "board.status") {
       pieceReads++; readConnection = connection;
-      if (pieceReads === 1) succeed(socket, frame, { requestId: frame.payload.requestId, ...initial.board });
+      if (pieceReads === 1) succeed(socket, frame, { requestId: frame.payload.requestId, ...initial.board, disabled: false });
       else pending = { frame, socket };
     }
     if (frame.tag === "subscribe") {
@@ -104,6 +104,6 @@ it("3.9 the wait helper's nested piece read completes despite a stream queue bac
   const running = Effect.runPromise(Effect.scoped(Effect.gen(function* () { return yield* waitForAgents(yield* connect, { members: ["agent-a"], mode: "all" }).pipe(Effect.timeout(5_000)); })));
   await until("nested piece read", () => pending);
   expect(readConnection).not.toBe(streamConnection);
-  succeed(pending!.socket, pending!.frame, { requestId: pending!.frame.payload.requestId, sequence: 11, holdsUnsettled: [], holdsIncoming: [], ownerHeld: [] });
+  succeed(pending!.socket, pending!.frame, { requestId: pending!.frame.payload.requestId, sequence: 11, holdsUnsettled: [], holdsIncoming: [], ownerHeld: [], disabled: false });
   expect((await running).outcome).toBe("satisfied");
 });
