@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v16, final check folded, anchored to engine 9e386b0
-version: 16
+status: v17, plain HTTP, anchored to engine 9e386b0
+version: 17
 updated: 2026-11-03
 ---
 
@@ -27,7 +27,9 @@ The owner settled the client API's design questions in design talk 1 on
 since: a loopback web server, and alerts through ntfy behind one sender interface.
 Version 8 folds review round 1 (rows 91 to 128). Version 15 follows the owner's
 later choice: login is one password, one person uses Shephrd, and a logged-in
-session is the owner (rows 184 to 196).
+session is the owner (rows 184 to 196). Version 17 follows another of the owner's
+choices: the software serves plain HTTP, and what runs in front of it is the owner's
+later work (row 198).
 
 The decision log is `decisions.md` in this folder. Row numbers below refer to
 it. The engine anchors are in `scouting.md`. Everything here is a plan; none
@@ -320,8 +322,8 @@ These rules apply to the three kinds:
   in a URL. The server hashes both values with SHA-256 and compares the hashes
   with `timingSafeEqual`, in constant time, because that function throws on inputs of
   different lengths. On a match, the reply sets the session token in a cookie
-  that is `HttpOnly`, `SameSite=Strict` and `Path=/`, and `Secure` when the request
-  is public (section 5). The cookie has no `Max-Age`. A wrong password gets HTTP
+  that is `HttpOnly`, `SameSite=Strict` and `Path=/`, and `Secure` only when the request
+  is public and the public address is `https` (section 5, row 198). The cookie has no `Max-Age`. A wrong password gets HTTP
   401 and writes no event. The password itself is not stored in the browser. There
   are no rate limits and no lockouts, by the owner's choice.
 - **A session is one token per engine start** (row 186). The token is 32 random
@@ -379,9 +381,9 @@ These rules apply to the three kinds:
   stop a local program, which can send any header.
 - **Remote access comes through the owner's proxy.** The web server binds
   loopback only, also in proxy mode (row 76). Proxy mode has two settings: whether
-  it is on, and the public address. A public request must carry
-  `X-Forwarded-Proto: https`, because a password now crosses the proxy (row 113).
-  Outside proxy mode, a request that carries a forwarded header is refused. Section
+  it is on, and the public address, which may be `http` or `https`. The web server
+  serves plain HTTP, and its only HTTPS logic is the cookie's `Secure` attribute (row
+  198). Proxy, certificate and DNS setup are the owner's later work. Outside proxy mode, a request that carries a forwarded header is refused. Section
   5, "The web server's settings", gives the full table (row 193).
 - **`debug.compare-views` is not on the web server** (rows 99, 195). It exists only
   under the engine's debug flag, which needs a test variable and a temporary folder
@@ -1318,7 +1320,7 @@ client is judged again under the new settings when it reconnects (row 140):
 | `port` | 8787 | The loopback port. A change applies at the next service start. |
 | `heartbeatSeconds` | 25 | The heartbeat interval. |
 | `proxyMode` | Off | Whether the public address applies. |
-| `publicAddress` | None | The page's address through the proxy, in one canonical form: `https://host` or `https://host:port`, in lower case, with no path and no default port. A form that is not `https` is refused. |
+| `publicAddress` | None | The page's address through the proxy, in one canonical form: `http://host`, `https://host`, or either with `:port`, in lower case, with no path and no default port. Any other form is refused. |
 
 The command refuses proxy mode on without a public address. A logged-in dashboard
 that turns `enabled` off, or changes the public address, loses its own connection,
@@ -1331,16 +1333,19 @@ A request is **public** when proxy mode is on and the request names the public
 address or carries a forwarded header. "Accepted" in this table means that the request
 goes on to `webCaller`, where the cookie decides, or to the login route:
 
-| Proxy mode | Request | `X-Forwarded-Proto` | Result |
-| --- | --- | --- | --- |
-| Off | Any request with a forwarded header | Any | Refused, HTTP 403 |
-| Off | Names loopback, with no forwarded header | None | Accepted |
-| Off | Names the public address | None | Refused, HTTP 403 |
-| On | Public | Not `https` | Refused |
-| On | Public, and names neither the public address in `Host` nor in `Origin` | `https` | Refused |
-| On | Public, with an `Origin` that is not the public address | `https` | Refused |
-| On | Public, names the public address in `Host` or `Origin`, and any `Origin` is the public address | `https` | Accepted |
-| On | Names loopback, with no forwarded header | None | Accepted, as a local browser |
+| Proxy mode | Request | Result |
+| --- | --- | --- |
+| Off | Any request with a forwarded header | Refused, HTTP 403 |
+| Off | Names loopback, with no forwarded header | Accepted |
+| Off | Names the public address | Refused, HTTP 403 |
+| On | Public, and names neither the public address in `Host` nor in `Origin` | Refused |
+| On | Public, with an `Origin` that is not the public address | Refused |
+| On | Public, names the public address in `Host` or `Origin`, and any `Origin` is the public address | Accepted |
+| On | Names loopback, with no forwarded header | Accepted, as a local browser |
+
+An `Origin` matches the public address only with the same scheme, host and port (row
+198). The web server reads no forwarded header's value, so a proxy's reported protocol
+decides nothing.
 
 The "or" exists for a proxy that rewrites `Host`, and that case needs only a public
 `Origin`. So a public request with `Host` set to the public address and a loopback
@@ -1348,9 +1353,8 @@ The "or" exists for a proxy that rewrites `Host`, and that case needs only a pub
 
 The forwarded headers are `X-Forwarded-For`, `X-Forwarded-Proto`,
 `X-Forwarded-Host` and `Forwarded`. A local program that forges one outside proxy
-mode only refuses itself. `docs/remote-access.md` requires the proxy to set
-`X-Forwarded-Proto`. Post-build check PB-2 treats a missing header on the owner's
-proxy as a failed check, and tests what the owner's own proxy sends.
+mode only refuses itself. Post-build check PB-2 tests what the owner's own proxy sends,
+once it exists.
 
 The web server answers HTTP 503 during recovery, as the engine's socket does
 (`server.ts:99`). If its port cannot be bound, the engine keeps running without
@@ -2478,4 +2482,6 @@ edit E16.
 These are left to later plans:
 
 - Login for a mobile app. It starts by looking at what Home Assistant does (row 196).
+- Proxy, certificate and DNS setup. They are the owner's later work, and the setup
+  document is an example (row 198).
 - Shephrd's own Unix user (row 78).

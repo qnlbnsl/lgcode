@@ -187,10 +187,11 @@ spends a turn on a closed question.
 **An agent waiting for a board answer is not finished.** If a lead asks
 another lead a question and ends its turn, anyone waiting on the first lead
 is not woken until its question closes and its closing notice has reached
-it. An agent that received a question, in a wake or by reading it, and
-ended its turn without answering counts as finished, as the engine would
-say; its asker keeps waiting, and the sheepdog or the owner deals with the
-silence. A question that did not fit in a wake is sent in the next one. The
+it. An agent that received a question and ended its turn without answering gets one reminder. If its next turn
+ends the same way, it is marked as having given no answer and counts as
+finished, and its asker is told once; a late reply still counts. An addressee
+can acknowledge a post when it starts responding, which takes the post out of
+any wake still queued for it. A question that did not fit in a wake is sent in the next one. The
 owner's own wait reads a fresh board result before it ends, so it agrees
 with an agent's wait. An agent that is itself being
 asked a question cannot be stuck behind a blocking wait on the asker; the
@@ -245,7 +246,7 @@ Full log → `decisions.md`
 
 ### One shared definition of the board's commands and events
 
-The board's eight commands and eight events join the engine's shared
+The board's nine commands and nine events join the engine's shared
 definitions, which every client and the engine read. The risk is a
 definition that shows a private message to the wrong agent, or a name that
 collides with another piece's; tests check that every board event is
@@ -343,13 +344,13 @@ root. The recorded engine commit is `9e386b0` (row 144). Engine anchors come fro
 `scouting.md` (scans at `8ff4c9b`) and the round-1 reviews
 (`attack/round-1-*.md`), and every named file was re-checked at `9e386b0`. "The client API contract" is
 `.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api`,
-version 16 at `220a433`, copied to `client-api-contract-v16.md` in this folder
-(rows 121, 128, 129, 135, 142, 146, 147, 150, 151). "Edit EN" is that contract's section 6,
+version 17 at `b38aa6f`, copied to `client-api-contract-v17.md` in this folder
+(rows 121, 128, 129, 135, 142, 146, 147, 150, 151, 155). "Edit EN" is that contract's section 6,
 edit EN: a direct edit to the engine that the client API plan's units 1a
 and 1b make, and that the board then adds its own entries to. "The piece
 batch path" is edit E23: every batch a planner, a read's marks or the
 reactor produces passes its checks before it is written. The board's own
-contract is `contract.md`, version 13 (rows 121 to 151). "Ancestor" means by the
+contract is `contract.md`, version 14 (rows 121 to 155). "Ancestor" means by the
 engine's fixed `parent` links, never by holder availability (lead ruling
 L18). "Ceiling" means the permission an agent was started with, from its
 `AgentStarted` (row 73). Greenfield anchors give
@@ -400,7 +401,7 @@ board adds to, so the board adds nothing to its expectations.
 | B2 | The board's events join the `Event` union (edit E5), with one `...keepInEveryState(board tags)` line in the lifecycle table, each with the class `owner-only` (edit E8); its alert source joins the alert list, and its kind's title joins the client API's title table, added by whichever of this unit and client API unit 6a is built second (row 122) | `packages/contracts/src/events.ts`; `packages/contracts/src/stateMachine.ts`, `eventTable`; `packages/contracts/src/board/events.ts`; `packages/contracts/src/visibility.ts` | None: no board event changes a lifecycle state, no engine view reads a board tag, and no agent sees one | `packages/contracts/test/events-roundtrip.test.ts` gains the board's eight events; `packages/contracts/test/state-machine.test.ts` keeps its expectations and covers the board's tags; `packages/engine/test/api/subscribe-visibility.test.ts` gains one sample per board event (l.52, l.149) and keeps its expectations for the engine's tags (row 112) | 1 |
 | B3 | The board's view is the views state's `board` field (edit E6) | `packages/engine/src/views/apply.ts`, `State`, `emptyViews`, `apply` | The views state gains a field, and `debug.compare-views` reports differences in it | `packages/engine/test/views/apply.test.ts`, `rebuild.test.ts`, `compare-views.test.ts` and `test/support/viewFixtures.ts` gain the field; their expectations for the engine's fields stay | 2a |
 | B4 | The board's reach check replaces unit 1's "refuse" entry (edit E18) | `packages/engine/src/routing/reach.ts` | Board wakes can be queued and sent; the dispatcher withdraws a board wake that fails at send | `routing/deliveries.test.ts` and `accounts/carry-on-dispatch.test.ts` keep their expectations | 2b |
-| B5 | The board's five planners join the planner table (edit E3): `board.open`, `board.members`, `board.post`, `board.close`, `board.flush` (row 107), none of which sets `afterCommit` (edit E3). Its source rule stays unit 1's "withdraw" (edit E16; row 126): edit E16 asks only what happens when the target stops or crashes, and a returned delivery is finished, so no rule applies to it | `packages/engine/src/commands/planners.ts`; a test on the source-rule table in `packages/engine/src/routing/deliveries.ts` | None for the engine's commands and sources | `commands/handler.test.ts` and `routing/deliveries.test.ts` keep their expectations | 3a |
+| B5 | The board's six planners join the planner table (edit E3): `board.open`, `board.members`, `board.post`, `board.close`, `board.acknowledge`, `board.flush` (rows 107, 152), none of which sets `afterCommit` (edit E3). Its source rule stays unit 1's "withdraw" (edit E16; row 126): edit E16 asks only what happens when the target stops or crashes, and a returned delivery is finished, so no rule applies to it | `packages/engine/src/commands/planners.ts`; a test on the source-rule table in `packages/engine/src/routing/deliveries.ts` | None for the engine's commands and sources | `commands/handler.test.ts` and `routing/deliveries.test.ts` keep their expectations | 3a |
 | B6 | The board's hold-unsettled entry replaces "never" (edit E19) | The table in `packages/contracts/src/settled.ts`; `packages/contracts/src/board/conditions.ts` | `settled` is false for an agent with an open must-reply post of its own, an owed completion, or a question that never reached it, so a `wait` on that agent, and `waitForAgents`, last until it clears | `routing/waits.test.ts` and `acceptance/capability-05-wait.test.ts` keep their expectations, because they write no board event (criterion 4.8) | 3b |
 | B7 | The board's request-held entry replaces "never" (edit E20) | The table that `packages/engine/src/routing/waits.ts` reads | A blocking `wait` ends with "request held" when its waiter is asked a board question it has not answered | `routing/waits.test.ts` keeps its expectations | 3b |
 | B8 | The board's reactor joins the engine's followers of committed events, starting after `recovery.whenReady` and writing only through the piece batch path (edits E6, E23; row 124) | `packages/engine/src/service.ts`, where edit E6 starts piece reactors; today's followers start at `packages/engine/src/commands/CommandHandler.ts:179-181` (rows 117, 144) | The service runs one more follower | None | 3b |
@@ -408,7 +409,7 @@ board adds to, so the board adds nothing to its expectations.
 | B10 | "board disabled" joins the public reasons the server passes | `packages/engine/src/api/server.ts:41`, the allowed reasons that `commandError` (l.46) keeps | A board command refused while the board is off shows "board disabled", not "command refused" (row 116) | The server's error tests keep their expectations and gain the board's reason on both transports | 4 |
 | B11 | The board's entry joins the thread page's subject panel table (row 122) | `packages/web/src/thread/subjects/board.tsx`, and one line in the table that client API unit 7b writes | The panel shows the board's entry for a board subject instead of the fallback | `packages/web/test/subject-panel.test.tsx` keeps its expectations for an unknown namespace | 6 |
 | B12 | The board's `openMatters` replaces "none" in the client API's table (client API section 4; row 131) | `packages/engine/src/board/openMatters.ts`; one line in that table | The alert reactor's first-start scan raises a `baseline` alert for each post that is open and needs the owner's reply | None; client API criterion 6.16 uses a fixture entry | 4 |
-| B13 | The board's id fields join the redactor's structure tables (rows 145, 148, 151). These are the exact event paths: `board.ChannelOpened`: `channelId`, `opener`, `manager`, `anchorAgentId`, `members`; `board.ChannelMembersChanged`: `channelId`, `membersAdded`, `membersRemoved`; `board.ManagerChanged`: `channelId`, `manager`; `board.PostWritten`: `postId`, `channelId`, `author`, `to`, `replyToPostId`; `board.AddresseeResolved`: `postId`, `addressee`, `decidingPostId`; `board.PostClosed`: `postId`, `closer`; `board.WakeBuilt`: `wakeId`, `targetAgentId`, `carried`, `mustReply`, `completions`; `board.Read`: `channelId`, `reader`, `postIds`. A planner's `reply` in `receiptStructure` lists `channelId` and `postId`. `anchorAgentId`, `targetAgentId`, `decidingPostId`, `replyToPostId` and the plain ids are identities. The table already lists `to` as an `actor` for `PermissionMoved` and `QuestionMoved`, so this change adds `elements: actor` to that entry and keeps its `fields`. The author, reader, opener, closer, manager and addressee use `actor`, whose service fields come from client API edit E33. `membersAdded` and `membersRemoved` use the table's `member` under `elements`, and `carried`, `mustReply`, `completions` and `postIds` hold their ids under `elements`. The names are specific because the table exempts a field by its name across all events; the command, the read page and the view keep `replyTo`, `anchor` and `target` | `packages/engine/src/log/redactionStructure.ts`, `eventStructure` and `receiptStructure` | A board id bypasses string-value redaction, as the engine's own ids do; a post's text, a channel's name and a label stay text | None change their expectations | 3a |
+| B13 | The board's id fields join the redactor's structure tables (rows 145, 148, 151, 152, 153). These are the exact event paths: `board.ChannelOpened`: `channelId`, `opener`, `manager`, `anchorAgentId`, `members`; `board.ChannelMembersChanged`: `channelId`, `membersAdded`, `membersRemoved`; `board.ManagerChanged`: `channelId`, `manager`; `board.PostWritten`: `postId`, `channelId`, `author`, `to`, `replyToPostId`; `board.PostAcknowledged`: `postId`, `addressee`; `board.AddresseeResolved`: `postId`, `addressee`, `decidingPostId`; `board.PostClosed`: `postId`, `closer`; `board.WakeBuilt`: `wakeId`, `targetAgentId`, `carried`, `mustReply`, `completions`, `reminders`, `noAnswers`; `board.Read`: `channelId`, `reader`, `postIds`. A planner's `reply` in `receiptStructure` lists `channelId` and `postId`. `anchorAgentId`, `targetAgentId`, `decidingPostId`, `replyToPostId` and the plain ids are identities. The table already lists `to` as an `actor` for `PermissionMoved` and `QuestionMoved`, so this change adds `elements: actor` to that entry and keeps its `fields`. The author, reader, opener, closer, manager and addressee use `actor`, whose service fields come from client API edit E33. `membersAdded` and `membersRemoved` use the table's `member` under `elements`, and `carried`, `mustReply`, `completions`, `reminders` and `postIds` hold their ids under `elements`, and each of `noAnswers`'s `elements` has `postId` and `addressee`. The names are specific because the table exempts a field by its name across all events; the command, the read page and the view keep `replyTo`, `anchor` and `target` | `packages/engine/src/log/redactionStructure.ts`, `eventStructure` and `receiptStructure` | A board id bypasses string-value redaction, as the engine's own ids do; a post's text, a channel's name and a label stay text | None change their expectations | 3a |
 
 The board writes no side table and adds no migration (edit E7): its state
 is its view, rebuilt from the log.
@@ -481,7 +482,7 @@ B1 and B2.
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
 | 1.1 | `ChannelId`, `PostId`, `WakeId` are branded ids; `ReplyMode` is `none`, `any` or `all`; `BoardAuthor` is owner, agent or service; `Disposition` is `replied`, `gone`, `removed` or `undeliverable`; a close outcome is `answered`, `unanswerable` or `withdrawn`; a group channel carries an anchor agent id | Test id: `packages/contracts/test/board/schemas.test.ts`, "ids, modes, authors, outcomes" |
-| 1.2 | `board.ChannelOpened`, `board.ChannelMembersChanged`, `board.ManagerChanged`, `board.PostWritten`, `board.AddresseeResolved`, `board.PostClosed`, `board.WakeBuilt` (with the wake's source id, `carried`, `mustReply` and `completions`, and no delivery id; row 132) and `board.Read` round-trip unchanged | Test id: `packages/contracts/test/board/schemas.test.ts`, "events round-trip" |
+| 1.2 | `board.ChannelOpened`, `board.ChannelMembersChanged`, `board.ManagerChanged`, `board.PostWritten`, `board.PostAcknowledged`, `board.AddresseeResolved`, `board.PostClosed`, `board.WakeBuilt` (with the wake's source id, `carried`, `mustReply`, `completions`, `reminders` and `noAnswers`, and no delivery id; rows 132, 153) and `board.Read` round-trip unchanged | Test id: `packages/contracts/test/board/schemas.test.ts`, "events round-trip" |
 | 1.3 | Every board event is `owner-only` in `boardVisibility`, and no board event has a top-level `agentId` field | Test id: `packages/contracts/test/board/schemas.test.ts`, "hidden from agents" |
 | 1.4 | `boardAccess` matches `contract.md`'s command table: `board.flush` has no `agent`; `service` appears only on `board.post`, `board.close`, `board.status` and `board.flush` | Test id: `packages/contracts/test/board/schemas.test.ts`, "access table" |
 | 1.5 | A post's text refuses more than 16,384 characters; `to` refuses more than 16 addressees; a channel name refuses anything outside `^[a-zA-Z][a-zA-Z0-9_-]{0,63}$`; a `board.status` summary has a fixed shape with no list in it; a completion holds at most 17 reply ids whatever the number of replies (row 111) | Test id: `packages/contracts/test/board/schemas.test.ts`, "limits" |
@@ -497,8 +498,8 @@ B1 and B2.
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
 | 1a | Ids, `ReplyMode`, `BoardAuthor`, `Disposition`, outcomes | Greenfield `packages/contracts/src/board/ids.ts`; pattern `packages/contracts/src/ids.ts`, `AgentId` |
-| 1b | The eight events, as `BoardEvent`, joined to the `Event` union and the lifecycle table (B2) | Greenfield `packages/contracts/src/board/events.ts`; pattern `packages/contracts/src/events.ts`, `QuestionAsked`; `packages/contracts/src/stateMachine.ts`, `eventTable`, `keepInEveryState`; edit E5 |
-| 1c | The eight commands, as `BoardRpcGroup`, prefixed `board.`, merged into `CommandsRpcGroup` (B1) | Greenfield `packages/contracts/src/board/commands.ts`; pattern `packages/contracts/src/commands.ts`, `CommandsRpcGroup`; edits E1, E2 |
+| 1b | The nine events, as `BoardEvent`, joined to the `Event` union and the lifecycle table (B2) | Greenfield `packages/contracts/src/board/events.ts`; pattern `packages/contracts/src/events.ts`, `QuestionAsked`; `packages/contracts/src/stateMachine.ts`, `eventTable`, `keepInEveryState`; edit E5 |
+| 1c | The nine commands, as `BoardRpcGroup`, prefixed `board.`, merged into `CommandsRpcGroup` (B1) | Greenfield `packages/contracts/src/board/commands.ts`; pattern `packages/contracts/src/commands.ts`, `CommandsRpcGroup`; edits E1, E2 |
 | 1d | The access and visibility entries, `boardAlertSources`, the title for kind `board.post`, the board view's type, `holdsUnsettled`, `holdsIncoming`, `ownerHeld` | Greenfield `packages/contracts/src/board/index.ts` and `conditions.ts`; shapes from the client API contract, sections 1, 4 and 6 (edits E2, E8, E19) |
 | 1e | The board's stated largest event and page | Greenfield `packages/contracts/src/board/limits.ts`; the client API's `packages/contracts/test/size-limits.test.ts` |
 
@@ -525,8 +526,10 @@ agent, kind plain, group or direct; the manager is stored and changes only
 by `board.ManagerChanged`, rows 85 and 106; a direct channel has none; an
 agent opener of a plain channel is an explicit member); posts (id,
 channel, author, text, `to`, reply mode, `replyTo`, each addressee's
-disposition and deciding reply, replies, status open or closed with its
-outcome); owed completions per agent; return counts per post or
+disposition and deciding reply, who has acknowledged, the sequence at which it took
+the post, whether its reminder was accepted and at what sequence, replies, status open
+or closed with its outcome); owed completions and no-answer notices per agent; each
+agent's last `TurnEnded` with `compact` false (row 153); return counts per post or
 completion and target, counting only wakes returned without an accept
 (rows 91, 110); each agent's ceiling, from its `AgentStarted` (row 73);
 the set of stopped agents, from `AgentStopped` and the change out of
@@ -659,13 +662,14 @@ escaped. The engine wraps the whole body in its agent-text envelope.
 | 3.13 | A sixteen-addressee `all` collection whose replies are each 16,384 backslashes gives a completion under 64 KiB encoded, with every disposition and each deciding reply's id; an open `all` post that collects 2,048 short repeated replies before its last addressee answers gives a completion under 64 KiB, with at most 17 ids and the reply count; `board.read` with `repliesTo` returns every reply in pages; five such completions owed at once take at most 128 KiB of one wake, and the rest ride the next (row 111) | Test id: `packages/engine/test/board/wakes.test.ts`, "completion size" |
 | 3.14 | `board.open` returns its channel id and `board.post` its post id through the real handler; a resent request id returns an equal reply and writes nothing; no planner's reply holds post text (row 107) | Test id: `packages/engine/test/board/handler.test.ts`, "planner replies" |
 | 3.15 | A completion carried by a sent wake that is not yet accepted is not packed into a second wake built meanwhile; after that wake is returned, the next wake carries it; a replacement built after `resume --fresh` re-queued an accepted wake carries no discharged completion (row 115) | Test id: `packages/engine/test/board/wakes.test.ts`, "one copy of a completion" |
+| 3.16 | `board.acknowledge` by an addressee writes one `board.PostAcknowledged` and marks the post read; a repeat, a closed post and an addressee with a disposition write nothing and are not refused; a non-addressee, a non-member and a post with `reply: none` are refused; a queued wake holding only that post is withdrawn with no replacement; a wake that also holds another question, a completion, a notice or a reminder is replaced and still delivers those, with the completion's debt untouched; a sent wake is not recalled; reading alone withdraws nothing; `holdsIncoming` does not change; `board.status`, `board.read` and the snapshot name who has acknowledged, and a reply counts (row 152) | Test id: `packages/engine/test/board/wakes.test.ts`, "acknowledge" |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 3a.1 | Planners for the five commands and reads for `board.channels` and `board.status`, each planner returning events and its `reply` | Greenfield `packages/engine/src/board/commands.ts`; pattern `packages/engine/src/routing/questions.ts`, `ask`, and `packages/engine/src/commands/internal.ts`, `Plan`, `refused` |
-| 3a.2 | The wake builder and the merge and cleanup rules | Greenfield `packages/engine/src/board/wake.ts`; markers drawn as in `packages/engine/src/routing/envelope.ts`, `envelope`; `escapeLeadingSlash`; the engine's wrapping is edit E15 |
+| 3a.1 | Planners for the six commands and reads for `board.channels` and `board.status`, each planner returning events and its `reply` | Greenfield `packages/engine/src/board/commands.ts`; pattern `packages/engine/src/routing/questions.ts`, `ask`, and `packages/engine/src/commands/internal.ts`, `Plan`, `refused` |
+| 3a.2 | The wake builder, with its reminders, no-answer notices and fixed lines, the merge and cleanup rules, and the acknowledge cleanup | Greenfield `packages/engine/src/board/wake.ts`; markers drawn as in `packages/engine/src/routing/envelope.ts`, `envelope`; `escapeLeadingSlash`; the engine's wrapping is edit E15 |
 | 3a.3 | A test that the board's source rule is "withdraw": a queued wake is withdrawn when its target stops or crashes, and never returned (B5; row 126) | The source-rule table in `packages/engine/src/routing/deliveries.ts` (edit E16); the engine's rule for a `wait` source is `packages/engine/src/routing/deliveries.ts`, `movedOrWake` |
 
 **Risks:**
@@ -779,11 +783,18 @@ has an owed completion that has not failed twice, or while it is an
 addressee with no disposition of an open must-reply post that it has not
 read and that no queued or sent board wake carries to it (rows 90, 104).
 The condition reads the engine's delivery statuses from edit E19's input.
-An addressee that took its question, by a wake or by `board.read`, and
-ended its turn without replying is settled. The incoming condition (edit E20,
+It also holds while the addressee's turn has ended since it took a question and the
+reactor still owes it a reminder or a `no-answer`; once `no-answer` is written, it is
+settled (row 153). The incoming condition (edit E20,
 engine change B7, row 77): a blocking wait is cancelled with "request held" while its
-waiter is an addressee with no disposition of an open post that needs a
-reply.
+waiter is an addressee with no disposition, or at `no-answer`, of an open post that
+needs a reply.
+
+**A question that gets no answer (row 153).** The contract's section of that name is the
+rule. The reactor adds one reminder, one `no-answer` and one notice per post and target,
+each a level rule over the sequences above, so a restart finds them again. There is no
+timer. Its trigger is `TurnEnded` with `compact` false, which always follows the accept
+of its own delivery (`packages/engine/src/runner/AcpRunner.ts:271-276`).
 
 **Done when:**
 
@@ -794,19 +805,21 @@ reply.
 | 4.3 | A board wake returned through the engine's real failed-send path carries the sender `piece { namespace: "board" }` in its `DeliveryReturned` (edit E15; row 109); it is re-queued once with its completions and open must-reply posts; a second return resolves the addressee `undeliverable`, or marks a completion "delivery failed", after which the agent goes idle and no third wake is queued until `board.flush`; a wake accepted and then returned is not re-queued and counts toward nothing (row 110); a waiter on the target is not told "settled" between the return and the re-queue | Test id: `packages/engine/test/board/reactor.test.ts`, "returned wake" (fake agent's error step) |
 | 4.4 | An addressee removed from the channel, or losing the group label, is resolved `removed`, and a crash never is; its queued wake is rebuilt without that channel's posts; when a direct pair loses its last shared channel, its open question closes `unanswerable` and the asker is told; losing one of two shared channels changes nothing | Test id: `packages/engine/test/board/reactor.test.ts`, "leaving a channel" and "direct grant ends" |
 | 4.5 | The reactor run twice on the same state writes each resolution and close once; a reply committed between two runs is not overridden; with the service stopped between each triggering commit and the reactor's write (a return, a member removal, the end of a direct grant, a send-time withdrawal, a manager's stop), every duty is done once after the restart; with the board switched off while a direct grant ends, switching it on resolves the grant's questions (row 105); a manager that stops and is resumed before the reactor's next transaction, with the reactor held back, across a restart, and with the board switched off for both transitions, loses its seat for good, its old post is withdrawn, and the live and rebuilt views are equal; the seat's new holder is unaffected by a stop from before it took the seat; running the reactor again writes nothing more (row 143) | Test id: `packages/engine/test/board/reactor.test.ts`, "twice is once", "racing reply" and "restart at every step" |
-| 4.6 | An idle agent with an open post of its own that needs a reply is not settled; a paused or crashed one still resolves as the engine already does; an addressee that accepted its question, or read it with `board.read`, and ended its turn without replying is settled; an addressee whose only wake carrying a question was withdrawn at send is not settled until the reactor's next wake is queued (row 104) | Test id: `packages/engine/test/board/settled.test.ts` (with a pause control case) |
+| 4.6 | An idle agent with an open post of its own that needs a reply is not settled; a paused or crashed one still resolves as the engine already does; an addressee that accepted its question, or read it with `board.read`, and ended its turn without replying is not settled until the reactor has written `no-answer`, and is settled then; an addressee whose only wake carrying a question was withdrawn at send is not settled until the reactor's next wake is queued (row 104) | Test id: `packages/engine/test/board/settled.test.ts` (with a pause control case) |
 | 4.7 | A blocking wait whose waiter is asked a board question by the agent it waits on returns "request held", whether the question came before or after the wait opened; a waiter resolved `removed` from that question is no longer held | Test id: `packages/engine/test/board/settled.test.ts`, "no deadlock" (edit E20) |
 | 4.8 | With no board event in the log, neither board condition holds, so the engine's settled test and blocking waits behave as they did before engine changes B6 and B7 | Test id: `packages/engine/test/board/settled.test.ts`, "no board state"; `packages/engine/test/routing/waits.test.ts` and `acceptance/capability-05-wait.test.ts` keep their expectations |
 | 4.9 | A label removed from a busy agent with a queued group wake: the dispatcher's send-time check withdraws the wake, goes on to the agent's next queued delivery, the reactor rebuilds the wake without that channel's posts, and the agent never receives them; the same holds with the board switched off; with one requeued wake that passes and one fresh wake that fails, only the failing one is withdrawn; a queued completion carrying reply text from a channel its author has left is withdrawn and rebuilt without the text; a withdrawn wake that carried only posts needing no reply ends a parent's open wait on its idle target in the withdrawal's batch (row 118, lead ruling L30); when a reactor's withdrawal leaves a reloaded target with nothing queued or sent, the batch holds `StateChanged idle` from the first step of `withWaitChecks` and the board's code returns no such event, and when the same batch queues a replacement it holds no `StateChanged idle` (row 134) | Test id: `packages/engine/test/board/reactor.test.ts`, "send-time reach" (lead rulings L19, L22, L23) |
 | 4.10 | A reactor batch that would withdraw an engine delivery, or queue a wake with a post that fails reach, is refused by the piece batch path and nothing is written; the engine records one `CommandRefused { command: "board.reactor", reason, sourceSequence }` under `piece { namespace: "board" }`, and that refusal starts no further run; the reactor tries that duty again only after a later batch touches it; every reactor close, resolution and withdrawal is recorded with that caller, never the owner (rows 105, 119, 124) | Test id: `packages/engine/test/board/reactor.test.ts`, "write path" |
 | 4.11 | With recovery held open, the board's reactor writes nothing; after `recovery.whenReady` it runs once over the whole state, and an agent that recovery reloaded in the meantime gets no `gone`; it writes no first-start event; with the writer made to fail, it stops on `LogWriteFailed` and writes nothing more, and a restart does each duty once; a defect is logged at error level with no event text, and the reactor runs again after a pause (row 124) | Test id: `packages/engine/test/board/reactor.test.ts`, "start and failure" |
 | 4.12 | In normal running, the reactor and the planners never build a batch that check 2 of the piece batch path refuses: an owed completion whose author is crashed or stopped, and a question to one, queue no delivery and write no `CommandRefused`; the completion is queued after the crashed author's resume; a withdrawal of a wake whose target has stopped or crashed passes; `board.flush` for a stopped or crashed agent is refused with the engine's reason, and queues nothing (row 125) | Test id: `packages/engine/test/board/reactor.test.ts`, "state table" |
+| 4.13 | For an unacknowledged and for an acknowledged question: a turn end queues exactly one reminder, durable across a restart; the next turn end writes `no-answer`, the addressee is settled, and the asker stays unsettled and is told once; an owner asker gets one `board.no-answer` alert and a service asker reads `board.status`; a late reply makes it `replied`; a stop, crash or leaving moves it from `no-answer` to `gone` or `removed`; in `any` mode a close withdraws the others' reminders; in `all` mode `no-answer` keeps the post open; a compact turn counts for nothing; acknowledging does not withdraw a reminder; a reminder returned twice gives `undeliverable` (row 153) | Test id: `packages/engine/test/board/reactor.test.ts`, "no answer" |
+| 4.14 | No reminder goes to an addressee with an open post of its own, an owed completion or an open non-blocking wait, until that has ended and a further turn has ended; a paused or interrupted one gets none; two addressees that answer each other's notices write at most one reminder, one `no-answer` and one notice per post and target; running the reactor twice writes each once (row 153) | Test id: `packages/engine/test/board/reactor.test.ts`, "reminder bound" |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 3b.1 | The reactor's lifecycle and delivery rules, as level rules | Greenfield `packages/engine/src/board/reactor.ts`; the piece batch path `packages/engine/src/commands/pieceBatch.ts` (edit E23); its follower pattern `packages/engine/src/accounts/available.ts`, `followAvailability`, without its direct `append`; the engine's crash and resume rules in `packages/engine/src/routing/waits.ts` (suspended waits) and `packages/contracts/src/stateMachine.ts`, `commandOutcome` |
+| 3b.1 | The reactor's lifecycle and delivery rules, and the reminder, no-answer and notice rules, as level rules | Greenfield `packages/engine/src/board/reactor.ts`; the piece batch path `packages/engine/src/commands/pieceBatch.ts` (edit E23); its follower pattern `packages/engine/src/accounts/available.ts`, `followAvailability`, without its direct `append`; the engine's crash and resume rules in `packages/engine/src/routing/waits.ts` (suspended waits) and `packages/contracts/src/stateMachine.ts`, `commandOutcome` |
 | 3b.2 | The two conditions and their table entries (B6, B7) | Greenfield `packages/contracts/src/board/conditions.ts`; the tables of edits E19 and E20, in `packages/contracts/src/settled.ts` and `packages/engine/src/routing/waits.ts` |
 | 3b.3 | The reactor's place in the service (B8) | `packages/engine/src/service.ts`, where edit E6 starts piece reactors; today's followers start at `packages/engine/src/commands/CommandHandler.ts:179-181` |
 | 3c.1 | The reactor's membership, direct-grant and reach rules | `packages/engine/src/board/reactor.ts`; group membership from `packages/engine/src/views/apply.ts`, `AgentRow.groups` and `AgentRow.parent`; the interrupted test from `packages/engine/src/routing/waits.ts:55`; recovery in `packages/engine/src/recovery/restart.ts`, `reloadInterrupted` |
@@ -839,8 +852,8 @@ summary with no post text.
 |---|---|---|
 | 5.1 | Each board planner runs with caller identity, a receipt and one transaction, and a repeated request id acts once; each board read checks the caller's current access on every request and is never deduplicated (rows 107, 108) | Test id: `packages/engine/test/board/handler.test.ts`, "identity, receipts, one transaction" |
 | 5.2 | An invalid or stopped agent's token is refused for every board command | Test id: `packages/engine/test/board/handler.test.ts`, "bad credentials" |
-| 5.3 | Agents get `board.open`, `board.members`, `board.post`, `board.close`, `board.read`, `board.channels` and `board.status` as tools, and never `board.flush`; the pinned list of MCP tools names exactly those seven for the board (row 134) | Test ids: `packages/engine/test/board/tools.test.ts`; `packages/contracts/test/commands.test.ts` |
-| 5.4 | `shephrd --help` lists the eight `board` subcommands | Command: `./bin/shephrd --help`; `packages/cli/test/parity.test.ts` passes |
+| 5.3 | Agents get `board.open`, `board.members`, `board.post`, `board.close`, `board.acknowledge`, `board.read`, `board.channels` and `board.status` as tools, and never `board.flush`; the pinned list of MCP tools names exactly those eight for the board (rows 134, 152) | Test ids: `packages/engine/test/board/tools.test.ts`; `packages/contracts/test/commands.test.ts` |
+| 5.4 | `shephrd --help` lists the nine `board` subcommands | Command: `./bin/shephrd --help`; `packages/cli/test/parity.test.ts` passes |
 | 5.5 | A post from a service records the service's name as its author; no socket caller can set a service author | Test id: `packages/engine/test/board/handler.test.ts`, "service author" |
 | 5.6 | `board.status` answers the owner, a service, the agent's holder and the agent itself, and refuses anyone else; its reply holds ids, counts and states only, so a holder that is in none of the agent's channels gets no post text and no channel name; its default summary has a fixed size and carries both condition results and its sequence; its `detail` lists come in pages under 512 KiB encoded, so 3,072 incoming questions for one agent stay under the client API's 900 KiB page budget | Test id: `packages/engine/test/board/handler.test.ts`, "status access" |
 | 5.7 | A post from a logged-in web session records the owner as author (row 149) | Test id: `packages/engine/test/board/handler.test.ts`, "web post" |
@@ -852,12 +865,14 @@ summary with no post text.
 | 5.13 | `board.read` with `post` returns that one post, open or closed, with its channel id, author, `to`, reply mode, `replyTo` and state, to a member of its channel and to the owner; a non-member and an unknown id are refused; it marks only that post read, and no other (row 122) | Test id: `packages/engine/test/board/handler.test.ts`, "one post" |
 | 5.14 | A wake whose `PromptSent` encodes to over 256 KiB reaches `client.subscribe` as a `client.Oversized` marker, for the owner and for its target; `client.event` and `client.thread` return it whole to the owner, and to its target inside the data envelope; the engine's `subscribe` is unchanged; no board event is ever replaced by a marker (rows 127, 133) | Test id: `packages/engine/test/board/handler.test.ts`, "oversized wake" |
 | 5.15 | `openMatters` returns, for each open post that needs the owner's reply, the same key, kind, agent and subject that `boardAlertSources` gives for its `board.PostWritten`; it returns nothing for a closed post or a post that needs no owner's reply; it reads the rebuilt views, not the bounded snapshot section, so it is whole when the section is `truncated` (row 131) | Test id: `packages/engine/test/board/open-matters.test.ts` |
+| 5.16 | An agent's `board.read` reply is `{ requestId, data }`, with `data` built by `agentReadReply`: a fresh marker, an escaped leading slash, and the JSON of the owner's reply between the engine's lines; the MCP tool and the CLI return it unchanged; the owner and a service get the plain reply; a page of posts of 16,384 quotes closes at 512 KiB measured on the wrapped string, under the 900 KiB page budget (row 154) | Test id: `packages/engine/test/board/handler.test.ts`, "labelled page" |
+| 5.17 | `boardAlertSources` raises one `board.no-answer` alert, keyed `no-answer:<postId>`, from the `board.AddresseeResolved` of an owner's post, and ends it at `board.PostClosed`; `openMatters` returns the same for an open post in that state; the title comes from the fixed table (row 153) | Test id: `packages/engine/test/board/handler.test.ts`, "no-answer alert" |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 5.1 | The board's reads and snapshot entry (B9), with the largest section added to the client API's snapshot size fixture | `packages/engine/src/api/reads.ts` (edit E4) and `packages/engine/src/api/snapshot.ts` (edit E9); `packages/engine/test/client/snapshot-size.test.ts` |
+| 5.1 | The board's reads, with an agent's `board.read` wrapped by `agentReadReply` (row 154), and snapshot entry (B9), with the largest section added to the client API's snapshot size fixture | `packages/engine/src/api/reads.ts` (edit E4) and `packages/engine/src/api/snapshot.ts` (edit E9); `packages/engine/test/client/snapshot-size.test.ts` |
 | 5.2 | Tool descriptions and CLI summaries | `packages/mcp/src/tools.ts`, `descriptions`, and `packages/cli/src/commands/registry.ts`, `summaries` (edit E10) |
 | 5.3 | The "board disabled" switch | Greenfield `packages/engine/src/board/switch.ts`; a setting read at start-up |
 | 5.4 | `openMatters` and its line in the client API's table (B12) | Greenfield `packages/engine/src/board/openMatters.ts`; client API section 4, "The alert's life" |
@@ -925,6 +940,7 @@ gets no API request answered (row 149).
 | 7.3 | A reply sends one `board.post` with the post's channel id and `replyTo`; a double tap acts once; a closed post shows its state and no reply box; a refusal, such as "board disabled", shows the reason and keeps the typed reply | Test id: `packages/web/test/subjects/board.test.tsx`, "reply" |
 | 7.4 | End to end, in a real browser with the fake agent and a fake carrier: an agent posts a question to the owner; a notification arrives with no post text; following its link opens the author's thread and writes no `board.Read`; a tap reads the post; a reply closes the post `answered`; `client.AlertCleared` ends the alert; and the fake agent is woken once with its completion | Test id: `packages/web/e2e/board-alert.spec.ts` (Playwright; the client API's row 112 gives this test to the board's plan) |
 | 7.5 | A post that is open and needs the owner's reply before the alert reactor's first start gets a `baseline` alert through the board's real `openMatters`; it is never pushed; and the post's close clears it (row 131) | Test id: `packages/engine/test/board/alert-baseline.test.ts` |
+| 7.6 | The entry shows who has acknowledged a post and who has given no answer; a `board.no-answer` alert opens the addressee's thread with the same entry (rows 152, 153) | Test id: `packages/web/test/subjects/board.test.tsx`, "state" |
 
 **Tasks:**
 
@@ -1034,7 +1050,9 @@ lead's rulings (`attack/round-5-findings.md`, `final-round-rulings.md`, post
 (`password-login-rulings.md`, post #301), and the client API contract version
 15 (`668a341`, post #310); (r) the short final check's major finding
 (`attack/round-6-findings.md`, post #325), with the client API contract version
-16 (`220a433`, post #330).
+16 (`220a433`, post #330); (s) the owner's change before acceptance, its rulings
+(`owner-q12-change.md`, `q12-ack-rulings.md`, post #360), and the client API
+contract version 17 (`b38aa6f`).
 
 | Source item | Workstream | Status |
 |---|---|---|
@@ -1096,9 +1114,13 @@ lead's rulings (`attack/round-5-findings.md`, `final-round-rulings.md`, post
 | (o) Rulings 3, 5 and 6, rows 166, 171 and 172, `client.sequence` | row 139 | stated, with their text, not to change the board |
 | (p) R5-A1, C5-01, R5-L1, R5-TM-1 | WS-2 (2.1), WS-4 (4.1, 4.5) | folded in the lead's shape (row 143) |
 | (p) Re-anchor to engine `9e386b0` | conventions, B8, B13, task 3b.3, criterion 3.7 | done; no design changes (rows 144, 145) |
-| (p) R5-A2, C5-02, C5-03 | `attack/known-gaps.md` | minors, not folded, by the lead's ruling |
+| (p) C5-03 | `attack/known-gaps.md` | minor, not folded, by the lead's ruling |
+| (p) R5-A2, C5-02 | row (s) | closed by the owner's change (rows 152, 154) |
 | (q) One web password; no devices | contract, access; WS-2 (2.8), WS-5 (5.6, 5.7, 5.9), WS-7, B9, post-build check 8 | folded; no rule of the board changes (rows 149, 150) |
 | (r) R6-L1 | B13, WS-3 (3.7), contract's event section | folded (row 151) |
+| (s) Acknowledge | B5, B13, WS-1, WS-3 (3.16), WS-5 (5.3, 5.4), WS-7 (7.6) | planned (row 152) |
+| (s) A question that gets no answer | WS-1, WS-2 (the view), WS-3, WS-4 (4.6, 4.7, 4.13, 4.14), WS-5 (5.17) | planned (row 153) |
+| (s) Label the text, R5-A2 | WS-5 (5.16) | planned (row 154) |
 
 </details>
 
@@ -1179,5 +1201,6 @@ weekly allowance first; the planner cannot read it (known gap 1).
 | 5 | 0 / 4 / 3 | Four Codex Sol reviews of `a5e8eb3`, grade 7, no refusals. The four majors are one finding. Folded as plan v10 and contract v11 under the lead's ruling (post #266; row 143), with the engine re-anchored to `9e386b0` (rows 144, 145). Minors are not folded, by the lead's ruling, and are listed in `attack/known-gaps.md`. Details: `attack/round-5-findings.md`. |
 | Password login fold | none | Not a review round. Plan v10 (`attack/plan-v10.md`) and contract v11 (`attack/contract-v11.md`) became plan v11 and contract v12: the words about devices go, under the lead's rulings (post #301; rows 149, 150). |
 | 6 | 0 / 1 / 0 | One Codex Sol logic check of plan v11 (`attack/plan-v11.md`) and contract v12 (`attack/contract-v12.md`), grade 7, no refusals. Its major, R6-L1, is folded as plan v12 and contract v13 (row 151; `attack/round-6-findings.md`). |
+| Acknowledge fold | none | Not a review round. Plan v12 (`attack/plan-v12.md`) and contract v13 (`attack/contract-v13.md`) became plan v13 and contract v14, at the owner's request before accepting (post #360; rows 152 to 155). |
 
 </details>

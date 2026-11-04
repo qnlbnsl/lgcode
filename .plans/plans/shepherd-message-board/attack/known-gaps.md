@@ -1,8 +1,8 @@
 # Known gaps: shepherd-message-board
 
 Gaps the planner could not close before the freeze. Reviewers: these are
-already known; look for new problems. Updated for plan version 12, after
-the short final check (round 6).
+already known; look for new problems. Updated for plan version 13, after
+the owner's acknowledge change.
 
 1. **Vendor limits.** The planner cannot read each vendor's remaining
    weekly allowance. The lead checks it before launching any unit.
@@ -53,11 +53,10 @@ widening with the label (decided by row 45).
 The lead ruled that the final round folds majors only (post #266). These stay
 open for the build's units to read.
 
-- **R5-A2** (architecture). An agent's `board.read` page does not state the data
-  envelope that an agent's `client.thread` page has, so a post's text reaches
-  the reading agent unlabelled.
-- **C5-02** (critic). Reading a question does not remove its already-queued
-  duplicate wake, so the agent can spend one needless turn.
+- **Closed: R5-A2** (architecture). An agent's `board.read` page now has the data
+  envelope (row 154).
+- **Closed: C5-02** (critic). Reading still does not remove a queued wake, on purpose,
+  and acknowledging a post now does (row 152).
 - **Criterion 4.1's wording** (noted by the round 6 review, not filed). It calls a
   stopped author's result `withdrawn` even when a reply closes the post first. The
   first committed close stands, and no completion is owed, so the test should keep
