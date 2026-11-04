@@ -236,8 +236,7 @@ permission request, and reads the thread.
    side by side.
 6. **The web server, with its proxy table** (unit 5), then **the web page** (units 7a to 7c) and
    **the pane viewer** (unit 8). The page's situation view needs unit 3's reads,
-   so unit 3 comes first. The page and the viewer wait on the
-   owner's mock session.
+   so unit 3 comes first. The owner waived the mock session (decision 203).
 7. **The alert channel** (unit 6b). The owner sets the ntfy server and
    topic.
 8. **Remote access and the proof** (unit 11): the setup document and the automated
@@ -655,7 +654,7 @@ settings.
 | 7b.1 | Thread view, thread links, answering, prompting, and the subject panel with its fallback | Target `packages/web/src/thread/`; events from `ApiEvent` |
 | 7c.1 | Alerts and settings pages | Target `packages/web/src/admin/` |
 
-**Design artifact:** mock gate: owner session. The mock must decide: the
+**Design artifact:** none. The owner waived the mock session (decision 203). The builder decides these plainly, and the owner redoes the look later: the
 situation view's lanes and what each row shows; how a permission request's
 options are laid out on a phone, including "Allow always"; the login form; how a
 request's
@@ -663,7 +662,7 @@ whole text and its tool input stay visible before Allow, how the fixed warning
 looks, and how agent text is told apart from Shephrd's controls (rows 118, 132); how a long tool call or file change is
 folded; the thread view's prompt box; the subject panel; and the alerts and
 settings pages.
-No unit of WS-7 starts before the owner approves the mock.
+Function and wiring matter, so keep the look plain and spend no effort on styling. The safety criteria still hold.
 
 **Risks:**
 
@@ -674,7 +673,7 @@ No unit of WS-7 starts before the owner approves the mock.
 | A board alert cannot be answered from the page | Medium | The subject panel; the board's plan owns the end-to-end test (row 112). |
 | A double tap answers twice | Medium | Criterion 7.5. |
 | A link in an alert acts without the owner | Medium | Criterion 7.9. |
-| The page is unusable on a phone | Medium | Criterion 7.3; the mock gate. |
+| The page is unusable on a phone | Medium | Criterion 7.3. |
 | A slow link makes the page lose its stream for ever | High | Two connections and the chunk limit (criteria 7.14, 3.9). The remaining limit is in the known gaps. |
 
 **Verify:** criteria 7.1-7.14, and unit 7b's attack pass; environment QA: the owner's real phone in unit 11.
@@ -702,8 +701,8 @@ L4, row 46). Unit 8.
 | 8.1 | The Ink app over `packages/client` | Target `packages/viewer/src/`; client `packages/client/src/index.ts:connect` (l.117); control-character stripping per engine criterion 7.7 (`packages/cli/test/control-chars.test.ts`) |
 | 8.2 | The plugin action | `herdr-plugin.toml` (`[[actions]]`); post-build check PB-3 |
 
-**Design artifact:** mock gate: owner session, in the same session as
-WS-7. The mock must decide the pane's layout at Herdr's usual pane sizes
+**Design artifact:** none. The owner waived the mock session (decision 203).
+The builder decides plainly the pane's layout at Herdr's usual pane sizes
 its keys for moving, answering and prompting, and how a request's input or its
 warning shows before an answer.
 
@@ -979,10 +978,10 @@ at launch; this section names none (owner, 2026-10-16).
 | 5 Loopback web server, `webCaller`, the password login, the session, its settings and the proxy table | backend | client-api/backend | high | A new network entry point, with its one login and the browser checks. | yes | 2 |
 | 6a Alert reactor and alert events | backend | client-api/backend | medium | A reactor on the engine's reactor pattern, with fixed tables and a first-start scan. | no | 2 |
 | 6b `AlertSender`, delivery and the ntfy carrier with its token slot | backend | client-api/backend | medium | One interface and one outbound HTTP carrier, with durable retries and one secret slot. | yes | 6a |
-| 7a Web page: shell, login form, situation view | mobile-ui | client-api/mobile-ui | medium | A new screen set from an approved mock, on the client's browser entry. | no | 2, 3, 5, mock session |
-| 7b Web page: thread view, links, answer, prompt, subject panel | mobile-ui | client-api/mobile-ui | medium | Screens from the mock, rendering untrusted text as text. | yes | 7a |
-| 7c Web page: alerts and settings | mobile-ui | client-api/mobile-ui | medium | Screens from the mock over existing commands. | no | 7a, 6a |
-| 8 Pane viewer | mobile-ui | client-api/mobile-ui | medium | A terminal screen set over the client library. | no | 3, mock session |
+| 7a Web page: shell, login form, situation view | mobile-ui | client-api/mobile-ui | medium | A new screen set, plain look, on the client's browser entry. | no | 2, 3, 5 |
+| 7b Web page: thread view, links, answer, prompt, subject panel | mobile-ui | client-api/mobile-ui | medium | Plain screens, rendering untrusted text as text. | yes | 7a |
+| 7c Web page: alerts and settings | mobile-ui | client-api/mobile-ui | medium | Plain screens over existing commands. | no | 7a, 6a |
+| 8 Pane viewer | mobile-ui | client-api/mobile-ui | medium | A terminal screen set over the client library. | no | 3 |
 | 11 Setup document, phone flow and owner check | backend | client-api/backend | medium | One document, one end-to-end test and an owner step. | no | 6b, 7b, 5 |
 
 Load: 12 build units. Unit 10 is folded into units 5 and 11 (row 194). At the sheet's
