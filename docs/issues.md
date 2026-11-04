@@ -5879,3 +5879,83 @@ State: open.
 What happens: A lead's uncommitted changes do not reach a child's new worktree (tested).
 What should happen: Not decided. For the worktree plan.
 Why it matters: A child starts from older files than the lead sees.
+
+## 356. The recorder fake-agent test failed at the base commit in one environment
+
+Found: 2026-11-04, by the builder or test writer of unit r3p, during the foundation build.
+State: open, for the final review.
+
+What happens: The existing recorder fake-agent test failed during initialization at the base commit in this environment. The new tests use a synchronous transport double and do not repair that separate failure.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 357. The source boundary check for tables is not a full data-flow analysis
+
+Found: 2026-11-04, by the builder or test writer of unit a1a, during the foundation build.
+State: open, for the final review.
+
+What happens: The source boundary check masks guarded closures and recognizes direct indexed calls into the named tables. It is a supplemental guard, not a complete alias/data-flow analysis. Runtime throwing-reducer and snapshot cases supply independent behavior checks for the 1a tables.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 358. Criterion 2.3 says every reply carries a request identifier, but stream markers carry none
+
+Found: 2026-11-04, by the builder or test writer of unit a2, during the foundation build.
+State: open, for the final review.
+
+What happens: Criterion 2.3 says every reply carries a nonempty request identifier, but the specified checkpoint and oversized stream markers do not carry one. The tests require it on every command payload, unary reply and error, and do not add it to stream elements.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 359. The contract names no largest alert event or alert-list page
+
+Found: 2026-11-04, by the builder or test writer of unit a2, during the foundation build.
+State: open, for the final review.
+
+What happens: The contract does not state a concrete largest client alert event or alert-list page. The size tests cover the board’s encoded wake, its whole-event page, and the stated future board and roles event payload budgets. Complete maximum-page fixtures must be supplied when those pieces install their contracts.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 360. Concurrent service startup timed out once in the merge gate
+
+Found: 2026-11-04, by the builder or test writer of unit r1, during the foundation build.
+State: open, for the final review.
+
+What happens: The first full merge gate observed an intermittent concurrent-service startup timeout. The unchanged focused rerun and complete gate rerun both passed. The cause has not been established.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 361. A harness test rejects any adapter path containing `npx`, including random temporary folders
+
+Found: 2026-11-04, by the builder or test writer of unit b1, during the foundation build.
+State: open, for the final review.
+
+What happens: `packages/engine/test/runner/harnesses.test.ts:82` rejects any adapter path containing the substring `npx`, including its random temporary directory. The whole gate generated `/tmp/shephrd-harnesses-bQtnpx/`, causing a false positive. The isolated case passed on rerun. The lead should narrow the assertion to the executable or invocation.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 362. The board plan's engine-change table still says seven tools and eight events
+
+Found: 2026-11-04, by the builder or test writer of unit b1, during the foundation build.
+State: open, for the final review.
+
+What happens: The engine-change table's B1 and B2 prose still says seven board tools and eight board events. The current WS-1 criteria and v15 contract require eight agent tools and nine events, including acknowledgement and no-answer behavior. The tests follow the current criteria.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 363. An agent named `owner` shares its reader records with the human owner
+
+Found: 2026-11-04, by the builder or test writer of unit b2a, during the foundation build.
+State: open, for the final review.
+
+What happens: AgentId accepts the literal owner, but the required raw-agent-id-or-owner convention aliases that agent with the human owner in readState, dispositions, takenAt, and other reader-keyed records. A synthetic owner read advanced the position stored for an agent with id owner. The lead should settle whether to reserve that id or change the shared reader-key convention before building the consumers. This unit follows the frozen tests' stated convention and does not change contracts outside its scope.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 364. A web-down alert can be missed when the outage is disabled at once
+
+Found: 2026-11-04, by the builder or test writer of unit a5, during the foundation build.
+State: open, for the final review.
+
+What happens: The focused run intermittently observed no web-down alert when an outage was disabled immediately after its source event appeared. The unchanged isolated file and the full check both passed afterward. A timing race is suspected: the existing alert reactor evaluates a source against the current snapshot, so a rapid settings change can make that source already closed when consumed. This continuation did not change the reactor or the frozen assertion. The collector should retain this observation when assessing intermittent failures.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 365. An action record larger than the page budget cannot be read through `roles.actions.list`
+
+Found: 2026-11-04, by the builder or test writer of unit r2, during the foundation build.
+State: open, for the final review.
+
+What happens: The existing action-event schema permits an individual encoded record larger than the action page budget. The history read refuses an oversized singleton instead of sending an oversized page. Such a record cannot be reconstructed through `roles.actions.list` until the writer or schema bounds it, or a large-record retrieval path exists. The 266 focused tests pass with ordinary records, including the 500-record size fixture. This limitation is separate from A07's overlarge requested limit, which is fixed.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.

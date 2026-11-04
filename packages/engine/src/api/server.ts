@@ -48,7 +48,8 @@ const commandError = (requestId: unknown, reason = "command refused", command?: 
   // The role-file planner redacts its schema path and uses fixed reason text.
   // Preserve that owner's validation error without exposing other failures.
   _tag: "CommandError" as const, requestId, reason: reasons.has(reason)
-    || (command === "roles.role-file.set" && reason.startsWith("role file error: ")) ? reason : "command refused",
+    || (command === "roles.role-file.set" && reason.startsWith("role file error: "))
+    || (command === "roles.settings.set" && reason.startsWith("roles settings error: ")) ? reason : "command refused",
 });
 // Authentication refusals already carry a fixed public reason. Preserve it
 // across a generic read wrapper without returning arbitrary failure content.

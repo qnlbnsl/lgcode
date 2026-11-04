@@ -216,5 +216,5 @@ export const withWeb = async (
 
 export const rows = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
-  return yield* sql<{ caller: string; event_type: string; payload_json: string; request_id: string }>`SELECT caller, event_type, payload_json, request_id FROM events ORDER BY sequence`;
+  return yield* sql<{ caller: string; event_type: string; payload_json: string; request_id: string }>`SELECT caller, event_type, payload_json, request_id FROM events WHERE event_type != 'roles.SheepdogBaseline' ORDER BY sequence`;
 });

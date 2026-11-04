@@ -3,8 +3,8 @@ import type { ClientEnvelope } from "@shephrd/client/browser"
 import type { AgentId, Oversized } from "@shephrd/contracts"
 import { Content } from "./content.tsx"
 import { requestId, withClient } from "./client.ts"
-import { Request, requestOpen } from "./request.tsx"
-import { SubjectPanel } from "./subjects/index.tsx"
+import { PermissionAnswer, Request, requestOpen } from "./request.tsx"
+import { AlertSubjects } from "./subjects/alerts.tsx"
 import { DataText, visibleText } from "./text.tsx"
 import { watchThread, type ThreadState } from "./watch.ts"
 
@@ -86,7 +86,8 @@ export function Thread({ agentId, subject, onSessionExpired }: {
     <nav><a href="/">Situation</a></nav>
     <h2>Thread: {visibleText(agent?.name ?? agentId)}</h2>
     <p role="status">{state.connection}</p>
-    {subject !== undefined && <SubjectPanel agentId={agentId} subject={subject} />}
+    <AlertSubjects agentId={agentId} {...(subject === undefined ? {} : { subject })}
+      {...(state.snapshot === undefined ? {} : { sequence: state.snapshot.sequence })} />
     {!state.loaded && <p>Loading thread…</p>}
     {state.loaded && state.items.length === 0 && <p>No thread items.</p>}
     {state.items.map((item) => {
@@ -97,6 +98,7 @@ export function Thread({ agentId, subject, onSessionExpired }: {
         case "PromptSent": return <article aria-label="Sent prompt" key={`${item.sequence}:${event._tag}`}><p>Prompt</p><DataText text={event.text} /></article>
         case "PermissionRequested": case "QuestionAsked": return <Request key={`${item.sequence}:${event._tag}`} event={event}
           open={requestOpen(event, item.sequence, envelopes, state.snapshot)} items={envelopes} signal={controller.signal} />
+        case "PermissionAnswered": return <PermissionAnswer key={`${item.sequence}:${event._tag}`} event={event} items={envelopes} />
         default: return null
       }
     })}

@@ -76,10 +76,9 @@ it("1.44 a throwing reducer leaves its last view intact, preserves engine writes
     yield* log.append({ _tag: "owner" }, freshRequest(), "b".repeat(64), [asEvent({ _tag: "AccountAvailable", accountId: "account-a", cause: "owner cleared" })], {});
     const current = yield* views.snapshot;
     expect((current as unknown as { client: unknown }).client).toEqual(prior);
-    expect(current.sequence).toBe(2);
     expect((yield* compareViews()).differences).toEqual([]);
     const sql = yield* SqlClient.SqlClient;
-    expect(yield* sql`SELECT COUNT(*) AS n FROM events`).toEqual([{ n: 2 }]);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM events WHERE sequence <= ${current.sequence} AND event_type != 'roles.SheepdogBaseline'`).toEqual([{ n: 2 }]);
   }));
 });
 

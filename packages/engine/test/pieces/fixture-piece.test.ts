@@ -27,11 +27,12 @@ it("1.2/1.26 a real socket fixture command commits once, replays its batch reply
     const payload = { requestId: "fixture-once", id: "record-a", text: `before ${sensitive} after` };
     const first = yield* client["client.record"]!(payload);
     const resent = yield* client["client.record"]!(payload);
-    expect(first).toEqual({ requestId: "fixture-once", id: "record-a", sequence: 1 });
+    expect(first).toEqual({ requestId: "fixture-once", id: "record-a", sequence: expect.any(Number) });
     expect(resent).toEqual(first);
     const sql = yield* SqlClient.SqlClient;
-    const stored = yield* sql<{ event_type: string; payload_json: string }>`SELECT event_type, payload_json FROM events ORDER BY sequence`;
+    const stored = yield* sql<{ sequence: number; event_type: string; payload_json: string }>`SELECT sequence, event_type, payload_json FROM events WHERE event_type != 'roles.SheepdogBaseline' ORDER BY sequence`;
     expect(stored).toHaveLength(1);
+    expect(stored[0]!.sequence).toBe(first.sequence);
     expect(stored[0]!.event_type).toBe("client.FixtureRecorded");
     expect(JSON.parse(stored[0]!.payload_json)).toEqual({ _tag: "client.FixtureRecorded", id: "record-a", text: "before [REDACTED] after" });
     const receipts = yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE request_id = 'fixture-once'`;
@@ -40,7 +41,7 @@ it("1.2/1.26 a real socket fixture command commits once, replays its batch reply
     expect(receipts[0]!.result_json.includes(sensitive)).toBe(false);
     expect(yield* sql`SELECT id FROM client_fixture`).toEqual([{ id: "record-a" }]);
     const view = yield* (yield* Views).snapshot;
-    expect((view as unknown as { client: unknown }).client).toEqual({ records: [{ id: "record-a", text: "before [REDACTED] after", sequence: 1 }] });
+    expect((view as unknown as { client: unknown }).client).toEqual({ records: [{ id: "record-a", text: "before [REDACTED] after", sequence: first.sequence }] });
     expect((yield* compareViews()).differences).toEqual([]);
     expect(yield* client["debug.compare-views"]!({ requestId: "fixture-compare" })).toMatchObject({ equal: true, differences: [] });
   }), { redactor: redactor.layer });
