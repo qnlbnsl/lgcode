@@ -41,11 +41,14 @@ type Handlers = { readonly [R in RpcGroup.Rpcs<typeof CommandsRpcGroup> as R["_t
 const refused = (status: number, text: string) => HttpServerResponse.text(text, { status });
 const reasons = new Set([
   "command refused", "cannot reload", "no usable account", "invalid credential",
-  "request id reused", "recovering", "database read failed", "database write failed",
+  "request id reused", "recovering", "board disabled", "database read failed", "database write failed",
   "database write failed: busy", "database write failed: disk full", "database write failed: constraint",
 ]);
-const commandError = (requestId: unknown, reason = "command refused") => ({
-  _tag: "CommandError" as const, requestId, reason: reasons.has(reason) ? reason : "command refused",
+const commandError = (requestId: unknown, reason = "command refused", command?: string) => ({
+  // The role-file planner redacts its schema path and uses fixed reason text.
+  // Preserve that owner's validation error without exposing other failures.
+  _tag: "CommandError" as const, requestId, reason: reasons.has(reason)
+    || (command === "roles.role-file.set" && reason.startsWith("role file error: ")) ? reason : "command refused",
 });
 // Authentication refusals already carry a fixed public reason. Preserve it
 // across a generic read wrapper without returning arbitrary failure content.
@@ -165,7 +168,7 @@ export const application = (options: ApplicationOptions) => Effect.gen(function*
     const actor: Actor = agentId === undefined ? { _tag: "owner" } : { _tag: "agent", agentId };
     const handlers = yield* group.toHandlers(Effect.succeed(Object.fromEntries([...group.requests].map(([name, rpc]) => [name, (payload: { requestId: string; after: number }) => {
       const read = (Object.hasOwn(lists.reads, name) ? lists.reads[name] : undefined) as import("./reads.ts").ReadHandler | undefined;
-      if (read === undefined) return handler.execute(credential, name, payload).pipe(Effect.mapError((error) => commandError(payload.requestId, error.reason)));
+      if (read === undefined) return handler.execute(credential, name, payload).pipe(Effect.mapError((error) => commandError(payload.requestId, error.reason, name)));
       const prepare = authenticateRequest(payload.requestId).pipe(Effect.andThen(Effect.gen(function* () {
         if (name === "debug.compare-views" && credential._tag !== "owner") return yield* refuseCommand();
         if (!lists.access[name]?.includes(actor._tag)) return yield* refuseCommand();

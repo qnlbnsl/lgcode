@@ -27,7 +27,25 @@ const summaries: Record<CommandName, string> = {
   subscribe: "Print the event stream from a sequence.",
   "client.web.settings": "Read the web server settings and state.",
   "client.web.settings.set": "Change the web server settings.",
-  "debug.compare-views": "Compare the live views with a rebuild (test services only)."
+  "debug.compare-views": "Compare the live views with a rebuild (test services only).",
+  "board.open": "Open a plain channel or a channel bound to a group.",
+  "board.members": "Add or remove members of a plain channel.",
+  "board.post": "Write a post in a channel or to a direct target, and request replies when needed.",
+  "board.close": "Withdraw an open post.",
+  "board.acknowledge": "Mark an addressed post as taken up when you start responding.",
+  "board.read": "Read a page of posts and mark the returned posts as read.",
+  "board.channels": "List the channels you can read.",
+  "board.status": "Read board counts, reply obligations and delivery status.",
+  "board.flush": "Queue a board wake with an agent's unread posts and owed notices.",
+  "roles.orient": "Read your team and role advice.",
+  "roles.handoff": "Read an agent's handoff.",
+  "roles.role-file.set": "Load a role file from its content.",
+  "roles.role-file.get": "Read the loaded role file and its hash.",
+  "roles.settings.get": "Read the sheepdog settings.",
+  "roles.settings.set": "Change the sheepdog settings.",
+  "roles.snooze": "Snooze a group's team-idle notices.",
+  "roles.actions.list": "List the sheepdog's action records.",
+  "roles.record": "Record a sheepdog action (service only)."
 }
 
 export const isCommand = (name: string): name is CommandName => (commandNames as ReadonlyArray<string>).includes(name)
@@ -35,10 +53,10 @@ export const isCommand = (name: string): name is CommandName => (commandNames as
 // The longest command name that opens the arguments: "accounts set-secret"
 // before "accounts".
 export const matchCommand = (args: ReadonlyArray<string>): { readonly command: CommandName; readonly rest: ReadonlyArray<string> } | undefined => {
-  // Accept the canonical RPC name as well as the terminal's spaced spelling.
-  const canonical = commandNames.find((command) => args[0] === command)
-  if (canonical !== undefined && canonical.includes(".")) return { command: canonical, rest: args.slice(1) }
-  const candidates = commandNames.map((command) => ({ command, words: command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ") }))
+  const candidates = commandNames.flatMap((command) => [
+    { command, words: command.split(" ") },
+    { command, words: command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ") },
+  ])
     .sort((a, b) => b.words.length - a.words.length)
   for (const { command, words } of candidates) {
     if (words.every((word, index) => args[index] === word)) return { command, rest: args.slice(words.length) }
@@ -73,5 +91,8 @@ export const helpText = (command: CommandName): string => {
       "  <agent-id>...   The agents to wait for, with --block or --mode.")
   }
   if (command === "subscribe") options.splice(1, 0, "  --after <n>     Print events after this sequence (default 0).")
-  return [`Usage: shephrd ${command === "debug.compare-views" ? command : command.replaceAll(".", " ")} [options]`, "", summaries[command], owner, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
+  const invocation = command === "debug.compare-views" ? command : command.replaceAll(".", " ")
+  const usage = [`Usage: shephrd ${invocation} [options]`]
+  if (invocation !== command) usage.push(`       shephrd ${command} [options]`)
+  return [...usage, "", summaries[command], owner, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
 }

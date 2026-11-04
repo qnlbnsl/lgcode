@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+import { connect } from "node:net";
 import * as Effect from "effect/Effect";
 import { expect, it } from "vitest";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
@@ -5,11 +7,33 @@ import { http, login, post, upgrade, withWeb } from "../support/webRig.ts";
 
 registerRebuildCheck({ noLog: true });
 
+// node:http.request substitutes its own Host for an empty value. Preserve
+// the literal header on the wire for both static requests and upgrades.
+const emptyHostStatus = (port: number, origin: string, websocket: boolean) => Effect.promise(() => new Promise<number>((resolve, reject) => {
+  const socket = connect({ host: "127.0.0.1", port });
+  socket.once("error", reject);
+  socket.setTimeout(3_000, () => { socket.destroy(); reject(new Error("raw Host probe timed out")); });
+  socket.once("connect", () => socket.write(websocket
+    ? `GET /api HTTP/1.1\r\nHost: \r\nOrigin: ${origin}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: ${randomBytes(16).toString("base64")}\r\nSec-WebSocket-Version: 13\r\n\r\n`
+    : "GET / HTTP/1.1\r\nHost: \r\nConnection: close\r\n\r\n"));
+  let reply = "";
+  socket.on("data", (data) => {
+    reply += data.toString();
+    const status = /^HTTP\/1\.1 (\d{3})/.exec(reply)?.[1];
+    if (status !== undefined) { socket.destroy(); resolve(Number(status)); }
+  });
+}));
+
 for (const bad of ["localhost", "ipv6", "foreign", "wrong-port", "suffix", "userinfo", "missing"]) {
   it(`5.4 Host ${bad}: catches trusting a DNS name, IPv6, a near match or a missing Host`, async () => withWeb((ctx) => Effect.gen(function* () {
+    if (bad === "missing") {
+      expect(yield* emptyHostStatus(ctx.settings.port, ctx.origin, false)).toBe(403);
+      expect(yield* emptyHostStatus(ctx.settings.port, ctx.origin, true)).toBe(403);
+      return;
+    }
     const host = bad === "localhost" ? `localhost:${ctx.settings.port}` : bad === "ipv6" ? `[::1]:${ctx.settings.port}`
       : bad === "wrong-port" ? "127.0.0.1:1" : bad === "suffix" ? `${ctx.host}.evil.invalid`
-      : bad === "userinfo" ? `evil.invalid@${ctx.host}` : bad === "missing" ? "" : "evil.invalid";
+      : bad === "userinfo" ? `evil.invalid@${ctx.host}` : "evil.invalid";
     expect((yield* Effect.promise(() => http(ctx, "/", { headers: { Host: host, Origin: undefined } }))).status).toBe(403);
     expect((yield* upgrade(ctx, { Host: host })).status).toBe(403);
   })));

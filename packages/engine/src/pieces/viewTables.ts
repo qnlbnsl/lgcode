@@ -1,4 +1,5 @@
 import type { PieceNamespace } from "@shephrd/contracts";
+import { emptyRoleFile, reduceRoleFile } from "../roles/roleFile.ts";
 
 export interface PieceView {
   readonly empty: () => unknown;
@@ -13,5 +14,5 @@ export const pieceViews: Record<PieceNamespace, PieceView> = {
     if (event._tag === "client.WebServerDown") return { ...state, webDown: true };
     if (event._tag === "client.WebServerUp") return { ...state, webDown: false };
     return view;
-  } }, board: { empty, reduce }, roles: { empty, reduce },
+  } }, board: { empty, reduce }, roles: { empty: emptyRoleFile, reduce: reduceRoleFile },
 };

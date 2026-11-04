@@ -12,8 +12,7 @@ it("1a E2 tools derive new agent-callable piece commands but exclude streams and
     Rpc.make("subscribe", { payload: { requestId: Contracts.RequestId }, success: Schema.String, stream: true }),
     Rpc.make("set-secret", { payload: { requestId: Contracts.RequestId }, success: Schema.Void }),
   ).prefix("client.");
-  const ownerOnly = new Set(["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.web.settings", "client.web.settings.set"]);
-  const access = Object.fromEntries([...Contracts.CommandsRpcGroup.requests.keys()].map((name) => [name, ownerOnly.has(name) ? ["owner"] : ["owner", "agent"]]));
+  const access = { ...Contracts.commandAccess };
   vi.resetModules();
   vi.doMock("@shephrd/contracts", () => ({ ...Contracts, CommandsRpcGroup: Contracts.CommandsRpcGroup.merge(group), commandAccess: {
     ...access, "client.read": ["owner", "agent"], "client.subscribe": ["owner", "agent"], "client.set-secret": ["owner"],
@@ -22,6 +21,7 @@ it("1a E2 tools derive new agent-callable piece commands but exclude streams and
   await expect(loading, "The MCP consumer must accept the caller-kind table").resolves.toHaveProperty("toolNames");
   const tools = await loading;
   expect([...tools.toolNames].sort()).toEqual([
-    "answer", "ask", "client.read", "compact", "group", "pass-up", "prompt", "resume", "start", "stop", "wait",
+    "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
+    "board.open", "board.post", "board.read", "board.status", "client.read", "compact", "group", "pass-up", "prompt", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
 });

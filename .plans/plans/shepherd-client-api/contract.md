@@ -2402,7 +2402,8 @@ runner's copy, `environment: { ...process.env }` (l.104), never holds it.
 - **The redactor.** `explicitSecrets` (`service.ts:82`) gains the password, because a
   value there bypasses the gate on inferred secrets. `secrets()` also returns the
   current session token. A value under 8 characters is deleted from the environment and
-  is not registered, because the web server does not start with it.
+  stays registered, as SECURITY.md rule 6 requires at any length, although the web server
+  does not start with it (row 202).
 - Behaviour change: none while the variable is unset.
 - Tests: `packages/engine/test/client/web-password-environment.test.ts` starts the
   service with the variable set. A fake adapter records its environment, which holds

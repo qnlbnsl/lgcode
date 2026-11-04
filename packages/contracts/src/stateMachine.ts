@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema"
+import { boardEventTags } from "./board/events.ts"
 import { clientEventTags } from "./client/events.ts"
 import type { Event } from "./events.ts"
 import { EpochMilliseconds } from "./ids.ts"
@@ -81,7 +82,9 @@ export const keepInEveryState = <const T extends ReadonlyArray<string>>(tags: T)
   Object.fromEntries(tags.map((tag) => [tag, allStates("keep")])) as Record<T[number], Record<StateName, EventEffect>>
 // Explicit keys make every new event require a decision for all seven states.
 const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
+  ...keepInEveryState(boardEventTags),
   ...keepInEveryState(clientEventTags),
+  ...keepInEveryState(rolesEventTags),
   AgentStarted: allStates("invalid"),
   AgentStartFailed: { ...allStates("invalid"), starting: "stopped" },
   SessionOpened: { ...allStates("invalid"), starting: "idle" },
@@ -123,3 +126,4 @@ const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
   CommandRefused: allStates("keep")
 }
 export const eventEffect = (state: StateName, event: Event["_tag"]): EventEffect => eventTable[event][state]
+import { rolesEventTags } from "./roles/events.ts"
