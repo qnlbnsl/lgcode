@@ -41,6 +41,8 @@ import type { Runtime } from "./commands/internal.ts";
 import * as Views from "./views/Views.ts";
 import { serve as serveWeb } from "./client/web/server.ts";
 import { boardEnabledAtStartup, withBoardEnabled } from "./board/switch.ts";
+import { withinCapacityLimit } from "./roles/sheepdog/switch.ts";
+import { capacityHoldCount } from "./routing/deliveries.ts";
 
 const inTemporaryFolder = (folder: string): boolean => {
   try {
@@ -78,7 +80,9 @@ const pieceFollowers = (lists: EngineLists) => Layer.effectDiscard(Effect.gen(fu
 }));
 
 const handlerServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults">, lists: EngineLists) =>
-  pieceFollowers(lists).pipe(Layer.provideMerge(CommandHandler.layer(configuration, lists)));
+  pieceFollowers(lists).pipe(Layer.provideMerge(CommandHandler.layer({ ...configuration,
+    capacityHoldCondition: (id, snapshot) => withinCapacityLimit(snapshot, id, capacityHoldCount(snapshot, id)),
+  }, lists)));
 
 // Importing this module never starts the CLI or changes the process environment.
 export const buildServices = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults">, lists: EngineLists = engineLists) =>
