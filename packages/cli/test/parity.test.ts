@@ -1,5 +1,6 @@
-import { CommandsRpcGroup, ownerOnlyCommands } from "@shephrd/contracts";
+import { CommandsRpcGroup, commandAccess, ownerOnlyCommands } from "@shephrd/contracts";
 import { afterEach, expect, it } from "vitest";
+import { action, roleFile, roleFileContent, roleFileHash } from "../../contracts/test/roles/fixtures.ts";
 import {
   agentEnvironment, assertNoSecrets, chunk, cleanupUnit7b, fakeEngine, finishCli, mcpPeer, prepareRoot, serviceEnvironment, startCli, succeed, token,
 } from "../../testing/test/support/unit7b.ts";
@@ -46,9 +47,16 @@ for (const command of CommandsRpcGroup.requests.keys()) {
       "board.channels": { after: "cursor", limit: 20 },
       "board.status": { agentId: "member" },
       "board.flush": { agentId: "member" },
+      "roles.orient": {}, "roles.handoff": { agentId: "member" },
+      "roles.role-file.set": { content: roleFileContent }, "roles.role-file.get": {},
+      "roles.settings.get": {}, "roles.settings.set": { settings: { sheepdog: true, limits: { stallMinutes: 10 } } },
+      "roles.snooze": { group: "review", until: 1_900_000_000_000 },
+      "roles.actions.list": { agentId: "member", before: 100, limit: 20 },
+      "roles.record": { action: { _tag: "roles.StallSeen", ...action, agentId: "member" } },
     };
     expect(payloads[command], "new RPC needs a command dispatch fixture").toBeDefined();
     const payload = { requestId: `parity-${command}`, ...payloads[command] };
+    let expectedReply: unknown;
     const engine = await fakeEngine(root, { onRequest: (frame, socket) => {
       const base = { requestId: frame.payload.requestId };
       const replies: Record<string, unknown> = {
@@ -66,18 +74,29 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         "board.channels": { ...base, items: [], next: "next-cursor" },
         "board.status": { ...base, agentId: "member", unread: 1, incomingOpen: 1, ownOpen: 0, owed: 0, failedCompletions: 0, wakeQueued: true, wakeSent: false, holdsUnsettled: false, holdsIncoming: true, sequence: 100, disabled: false },
         "board.flush": { ...base, wakeId: "wake" },
+        "roles.orient": { ...base, name: "Member", kind: "worker", advice: "Report to your lead." },
+        "roles.handoff": { ...base, agentId: "member", text: "Continue the assigned work." },
+        "roles.role-file.set": { ...base, roleFileHash }, "roles.role-file.get": { ...base, file: roleFile, roleFileHash },
+        "roles.settings.get": { ...base, settings: { sheepdog: true, limits: { stallMinutes: 10 } } },
+        "roles.settings.set": base, "roles.snooze": base,
+        "roles.actions.list": { ...base, records: [], truncated: false },
+        "roles.record": { ...base, sequence: 101 },
       };
       if (frame.tag === "subscribe") {
         chunk(socket, frame, [{ sequence: 101, eventId: "parity-event", occurredAt: 1_800_000_000_000,
           caller: { _tag: "agent", agentId: "member" }, agentId: "member", event: { _tag: "TurnEnded", agentId: "member", compact: false } }]);
         succeed(socket, frame, undefined);
-      } else succeed(socket, frame, replies[frame.tag] ?? base);
+      } else {
+        expectedReply = replies[frame.tag] ?? base;
+        succeed(socket, frame, expectedReply);
+      }
     } });
-    const environment = (ownerOnlyCommands as ReadonlyArray<string>).includes(command) || command === "board.flush" ? serviceEnvironment(root) : agentEnvironment(root);
+    const environment = (commandAccess[command as keyof typeof commandAccess] as ReadonlyArray<string>).includes("agent") ? agentEnvironment(root) : serviceEnvironment(root);
     const child = startCli(root, [...commandWords(command), "--input", JSON.stringify(payload)], environment);
     expect(await finishCli(child)).toEqual({ code: 0, signal: null });
     expect(engine.requests).toHaveLength(1);
     expect(engine.requests[0]).toMatchObject({ _tag: "Request", tag: command, payload });
+    if (command.startsWith("roles.")) expect(JSON.parse(child.stdout())).toEqual(expectedReply);
     assertNoSecrets(child, [token]);
   });
 }
@@ -95,10 +114,11 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "compact", "group", "pass-up", "prompt", "resume", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "compact", "group", "pass-up", "prompt", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
-  for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", "board.flush", ...ownerOnlyCommands]) {
+  const nonAgent = Object.entries(commandAccess).filter(([, kinds]) => !(kinds as ReadonlyArray<string>).includes("agent")).map(([name]) => name);
+  for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", "board.flush", ...ownerOnlyCommands, ...nonAgent]) {
     expect(names).not.toContain(excluded);
   }
   assertNoSecrets(child, [token]);

@@ -15,5 +15,8 @@ it("X61 (T-6) catches a command recognition or top-level help inventory omitting
     const words = command.startsWith("board.") ? command.split(".") : command.split(" ");
     expect(matchCommand([...words, "--help"])).toEqual({ command, rest: ["--help"] });
     expect(lines).toContain(`  ${command}`);
+    if (command.startsWith("roles.")) {
+      expect(matchCommand([...command.split("."), "--help"])).toEqual({ command, rest: ["--help"] });
+    }
   }
 });

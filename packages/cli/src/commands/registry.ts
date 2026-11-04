@@ -34,7 +34,16 @@ const summaries: Record<CommandName, string> = {
   "board.read": "Read a page of posts and mark the returned posts as read.",
   "board.channels": "List the channels you can read.",
   "board.status": "Read board counts, reply obligations and delivery status.",
-  "board.flush": "Queue a board wake with an agent's unread posts and owed notices."
+  "board.flush": "Queue a board wake with an agent's unread posts and owed notices.",
+  "roles.orient": "Read your team and role advice.",
+  "roles.handoff": "Read an agent's handoff.",
+  "roles.role-file.set": "Load a role file from its content.",
+  "roles.role-file.get": "Read the loaded role file and its hash.",
+  "roles.settings.get": "Read the sheepdog settings.",
+  "roles.settings.set": "Change the sheepdog settings.",
+  "roles.snooze": "Snooze a group's team-idle notices.",
+  "roles.actions.list": "List the sheepdog's action records.",
+  "roles.record": "Record a sheepdog action (service only)."
 }
 
 export const isCommand = (name: string): name is CommandName => (commandNames as ReadonlyArray<string>).includes(name)
@@ -42,7 +51,10 @@ export const isCommand = (name: string): name is CommandName => (commandNames as
 // The longest command name that opens the arguments: "accounts set-secret"
 // before "accounts".
 export const matchCommand = (args: ReadonlyArray<string>): { readonly command: CommandName; readonly rest: ReadonlyArray<string> } | undefined => {
-  const candidates = commandNames.map((command) => ({ command, words: command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ") }))
+  const candidates = commandNames.flatMap((command) => [
+    { command, words: command.split(" ") },
+    { command, words: command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ") },
+  ])
     .sort((a, b) => b.words.length - a.words.length)
   for (const { command, words } of candidates) {
     if (words.every((word, index) => args[index] === word)) return { command, rest: args.slice(words.length) }
@@ -77,5 +89,8 @@ export const helpText = (command: CommandName): string => {
       "  <agent-id>...   The agents to wait for, with --block or --mode.")
   }
   if (command === "subscribe") options.splice(1, 0, "  --after <n>     Print events after this sequence (default 0).")
-  return [`Usage: shephrd ${command === "debug.compare-views" ? command : command.replaceAll(".", " ")} [options]`, "", summaries[command], owner, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
+  const invocation = command === "debug.compare-views" ? command : command.replaceAll(".", " ")
+  const usage = [`Usage: shephrd ${invocation} [options]`]
+  if (invocation !== command) usage.push(`       shephrd ${command} [options]`)
+  return [...usage, "", summaries[command], owner, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
 }

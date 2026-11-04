@@ -76,7 +76,13 @@ const expectedBoardTags = [
   "board.WakeBuilt",
   "board.Read",
 ]
-const expectedTags = [...expectedEngineTags, ...expectedBoardTags, ...expectedClientTags]
+const expectedRolesTags = [
+  "roles.RoleFileSet", "roles.SettingsChanged", "roles.Snoozed", "roles.SheepdogBaseline",
+  "roles.TeamIdleReported", "roles.StallSeen", "roles.ReplaceAdvised", "roles.RunawayReported",
+  "roles.CapacityRetried", "roles.CrashAdmitted", "roles.CrashRetried", "roles.GaveUp",
+  "roles.RoleAdviceBroken", "roles.CacheFlushed", "roles.CompactRequested", "roles.StallEnded"
+]
+const expectedTags = [...expectedEngineTags, ...expectedBoardTags, ...expectedClientTags, ...expectedRolesTags]
 
 const tagOf = (member: { readonly ast: SchemaAST.AST }): string => {
   const ast = member.ast
@@ -121,7 +127,7 @@ describe("event tags", () => {
     expect([...tags].sort()).toEqual([...expectedEngineTags].sort())
   })
 
-  it("contains exactly the engine, board and client events, each once", () => {
+  it("contains exactly the engine, board, client and roles events, each once", () => {
     const tags = members.map(tagOf)
     expect(tags).toHaveLength(expectedTags.length)
     expect(new Set(tags).size, "duplicate tags").toBe(tags.length)

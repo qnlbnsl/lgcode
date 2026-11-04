@@ -7,6 +7,7 @@ import { EventEnvelope, WaitMember } from "./events.ts"
 import { HarnessSettings, RunMode } from "./harnesses.ts"
 import { AccountId, AgentId, DeliveryId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
 import { PermissionLevel } from "./permission.ts"
+import { RolesRpcGroup, rolesAccess } from "./roles/commands.ts"
 
 export const engineCommandNames = [
   "start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group",
@@ -133,12 +134,13 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 ).merge(DebugRpcGroup)
 
 // Later pieces merge their prefixed groups here, in namespace order.
-export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(BoardRpcGroup)
+export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(BoardRpcGroup).merge(RolesRpcGroup)
 export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 
 // A new command requires an access decision at the composition point.
 export const commandAccess = {
   ...boardAccess,
+  ...rolesAccess,
   start: ["owner", "agent"], prompt: ["owner", "agent", "service"], answer: ["owner", "agent"],
   "pass-up": ["owner", "agent"], ask: ["owner", "agent"], wait: ["owner", "agent"],
   stop: ["owner", "agent"], resume: ["owner", "agent", "service"], compact: ["owner", "agent", "service"], group: ["owner", "agent"],
@@ -146,4 +148,4 @@ export const commandAccess = {
   harnesses: ["owner"], subscribe: ["owner", "agent", "service"], "debug.compare-views": ["owner"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>, ReadonlyArray<CallerKind>>
 export const ownerOnlyCommands = engineCommandNames.filter((name) => !(commandAccess[name] as ReadonlyArray<CallerKind>).includes("agent"))
-export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }, { namespace: "board", group: BoardRpcGroup }] as const
+export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }, { namespace: "board", group: BoardRpcGroup }, { namespace: "roles", group: RolesRpcGroup }] as const

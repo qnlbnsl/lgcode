@@ -11,6 +11,7 @@ import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
+import * as RpcSchema from "effect/rpc/RpcSchema";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import { followAvailability } from "../accounts/available.ts";
@@ -199,9 +200,41 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     const isBlockingWait = (name: string, rawPayload: unknown) => name === "wait" && typeof rawPayload === "object"
       && rawPayload !== null && (rawPayload as { readonly block?: unknown }).block === true;
 
+    // Direct callers use the same read table as the transport. A read always
+    // rechecks current credentials and access, and never creates a receipt.
+    const executeRead = (credential: Credential, name: string, rawPayload: unknown) => Effect.gen(function* () {
+      if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
+      const actor = yield* resolveCredential(credential, name);
+      const rpc = lists.commands.requests.get(name);
+      if (rpc === undefined || RpcSchema.isStreamSchema(rpc.successSchema) || !lists.access[name]?.includes(actor._tag)) return yield* refused();
+      const payload = yield* Effect.try({
+        try: () => Schema.decodeUnknownSync(Schema.toType(rpc.payloadSchema))(rawPayload) as Record<string, unknown>,
+        catch: () => refused(),
+      });
+      const snapshot = yield* views.snapshot;
+      const read = lists.reads[name]!({ runtime, actor, snapshot }, payload);
+      if (!Effect.isEffect(read)) return yield* refused();
+      const result = yield* (read as Effect.Effect<import("../api/reads.ts").ReadReply, unknown, EventLog | Views | SqlClient.SqlClient>);
+      const marks = result.marks ?? [];
+      if (marks.length > 0 || (result.deliveries?.length ?? 0) > 0 || Object.keys(result.sideRows ?? {}).length > 0) {
+        const namespace = pieceNamespace(name);
+        if (namespace === undefined) return yield* refused();
+        yield* log.transact((append) => Effect.gen(function* () {
+          const current = yield* views.snapshot;
+          const events = yield* checkPieceBatch(namespace, current, { events: marks, deliveries: result.deliveries, sideRows: result.sideRows }, actor, lists);
+          yield* append(actor, freshRequest(), "read marks", events, result.sideRows ?? {}, false);
+        }));
+      }
+      return result.reply;
+    }).pipe(
+      Effect.provideService(EventLog, log), Effect.provideService(Views, views), Effect.provideService(SqlClient.SqlClient, sql),
+      Effect.mapError((error) => error instanceof CommandRefused || error instanceof LogWriteFailed ? error : refused()),
+    );
+
     return CommandHandler.of({
       input: (actor) => views.snapshot.pipe(Effect.map((snapshot) => ({ runtime, actor, snapshot }))),
-      execute: (credential, name, rawPayload) => Effect.acquireUseRelease(preemptStart(credential, name, rawPayload), () => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
+      execute: (credential, name, rawPayload) => Object.hasOwn(lists.reads, name) ? executeRead(credential, name, rawPayload)
+        : Effect.acquireUseRelease(preemptStart(credential, name, rawPayload), () => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
         if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
         const step = isBlockingWait(name, rawPayload) ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : restore;
         const outcome = yield* step(log.transact((append) => Effect.gen(function* () {
