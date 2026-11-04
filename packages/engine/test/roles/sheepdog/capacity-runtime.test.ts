@@ -114,3 +114,17 @@ it.effect("a restart releases a persisted hold whose five-minute deadline passed
     expect((yield* snapshot).agents[worker.agentId]!.capacityHeld).toBe(false);
   }), true, false);
 }));
+
+it.effect("lowering the retry setting does not strand an existing hold or admit another one", () => run((runner) => Effect.gen(function* () {
+  const client = yield* socket;
+  const worker = yield* spawn(rig, runner);
+  const deliveryId = yield* send(runner, worker, "Finish the admitted attempt.");
+  yield* hold(runner, worker, deliveryId);
+  yield* client["roles.settings.set"]!({ requestId: "disable-future-retries", settings: { limits: { capacityRetries: 0 } } });
+  yield* pause(30);
+  yield* TestClock.adjust("5 minutes");
+  expect((yield* eventually(snapshot, (state) => state.deliveries[deliveryId]?.status === "sent")).agents[worker.agentId]!.capacityHeld).toBe(false);
+  yield* capacityReply(runner, worker, deliveryId);
+  expect(yield* eventually(gaveUps, (rows) => rows.length === 1)).toHaveLength(1);
+  expect((yield* alertLog).filter((row) => row.event._tag === "DeliveryHeld")).toHaveLength(1);
+}), false));

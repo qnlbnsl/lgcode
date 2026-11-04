@@ -57,7 +57,9 @@ export const capacityRule: SheepdogRule = {
     const count = capacityHoldCount(ctx.snapshot, held.event.agentId);
     const decision = capacityDecision({ event: held.event, now: yield* Clock.currentTimeMillis,
       heldAt: timer.dueAt - timer.delayMillis, releasedCount: count - 1,
-      capacityRetryLimit: limits.capacityRetries, backoffMillis: timer.delayMillis });
+      // A lower setting refuses future holds; it must not strand a hold the
+      // engine already admitted under the previous setting.
+      capacityRetryLimit: Math.max(limits.capacityRetries, count), backoffMillis: timer.delayMillis });
     if (decision._tag !== "release") return;
     const action = { _tag: "roles.CapacityRetried", agentId: held.event.agentId, triggerSequence: held.sequence,
       noticeRecipient: noticeRecipient(ctx.snapshot, held.event.agentId), occurrence: count } as const;
