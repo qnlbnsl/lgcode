@@ -90,6 +90,6 @@ scenario("3 atomic: when a command's last event cannot be written, none of its e
   runSql(w.root, "DROP TRIGGER planted_atomic");
   yield* w.boot();
   const history = yield* since(w.owner, 0);
-  expect(tagged(history, "PermissionMoved", child.agentId), "part of the failed command is in the log after the restart").toHaveLength(0);
-  expect(tagged(history, "OwnerNeeded", child.agentId)).toHaveLength(0);
+  expect(tagged(history, "PermissionMoved").filter(({ event }) => event._tag === "PermissionMoved" && event.permissionRequestId === id), "part of the failed command is in the log after the restart").toHaveLength(0);
+  expect(tagged(history, "OwnerNeeded").filter(({ event }) => event._tag === "OwnerNeeded" && event.subject?.id === id)).toHaveLength(0);
 }));

@@ -53,8 +53,9 @@ export const spawnInput = (
 });
 
 // Bounded setup with cleanup (issue 103). The caller holds the agent's send
-// lane, which serializes setups for one agent.
-const bounded = (runtime: Runtime, agentId: AgentId, timeoutMillis: number, setup: Effect.Effect<SessionInfo, RunnerRejected>) =>
+// lane, which serializes setups for one agent. A timeout stops the process
+// through the runner and fails with `RunnerRejected`.
+export const bounded = (runtime: Runtime, agentId: AgentId, timeoutMillis: number, setup: Effect.Effect<SessionInfo, RunnerRejected>) =>
   setup.pipe(
     Effect.timeoutOption(timeoutMillis),
     Effect.flatMap((result) => Option.isSome(result) ? Effect.succeed(result.value)

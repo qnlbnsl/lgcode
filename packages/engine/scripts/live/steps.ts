@@ -27,6 +27,19 @@ export const FLOW_STEPS = [
 export const FINAL_STEP = { id: "final", title: "the views rebuilt from the log equal the live views, and no secret appears in any event, reply or output" } as const;
 export const RECORDING_STEP = { id: "recording", title: "the fixtures of Claude Code and Codex are re-recorded without a failure" } as const;
 
+// L-1: every outcome is checked by the same routine with a live or fake driver.
+export const PROBE_STEPS = [
+  { id: "sandbox-mcp", title: "PB-A3: each real harness calls a Shephrd tool through its socket" },
+  { id: "permission-kinds", title: "SEC-PB-3: each observed permission option has a level and persistence" },
+  { id: "removed-variables", title: "SEC-PB-5 and SEC-PB-8: both variables removed; owner ancestry refuses, including core inheritance" },
+  { id: "state-read", title: "SEC-PB-6: each harness attempts the non-secret state canary read" },
+  { id: "slash-up", title: "SEC-PB-2: Codex child to Claude parent /compact arrives escaped and runs no command; no Codex parent receiver in this team" },
+  { id: "slash-down", title: "SEC-PB-7: Claude parent to Codex child /compact arrives escaped and runs no command; no Claude child receiver in this team" },
+  { id: "always-allow", title: "SEC-PB-4: offered persistent choices route to owner and their saved scopes are inspected" },
+  { id: "reload", title: "PB-A7, PB-A8, PB-A11, PB-A12: SIGKILL, reconnect, refuse old tokens, carry on and observe replay" },
+  { id: "token-scan", title: "PB-A4 and SEC-PB-1: run session files and process arguments contain no agent token" },
+] as const satisfies ReadonlyArray<StepSpec>;
+
 export const ALL_STEPS: ReadonlyArray<StepSpec> = [
-  STARTUP_HOOK_STEP, SERVICE_STEP, SETUP_STEP, ...FLOW_STEPS, FINAL_STEP, RECORDING_STEP,
+  STARTUP_HOOK_STEP, SERVICE_STEP, SETUP_STEP, ...FLOW_STEPS, ...PROBE_STEPS, FINAL_STEP, RECORDING_STEP,
 ];

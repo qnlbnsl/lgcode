@@ -23,7 +23,7 @@ const summaries: Record<CommandName, string> = {
   accounts: "List, add, set, disable or remove accounts.",
   "accounts set-secret": "Store an account's secret, read from standard input.",
   "accounts mark-available": "Mark an account available again.",
-  harnesses: "List or set harness settings.",
+  harnesses: "List, set or reset harness settings.",
   subscribe: "Print the event stream from a sequence.",
   "debug.compare-views": "Compare the live views with a rebuild (test services only)."
 }

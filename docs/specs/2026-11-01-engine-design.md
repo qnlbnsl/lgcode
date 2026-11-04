@@ -168,7 +168,7 @@ The commands are:
 | `compact` | The owner, or the agent's parent | Asks an agent to compact its context. |
 | `group` | The owner, or the agent's parent | Adds or removes an agent's group labels. |
 | `accounts` | The owner only | Adds, changes, disables or removes an account. |
-| `harnesses` | The owner only | Reads and changes each harness's settings: its run mode, its ACP adapter command, and how its permission modes map onto Shephrd's scale. |
+| `harnesses` | The owner only | Reads and changes each harness's settings: its run mode, its ACP adapter command, and how its permission modes map onto Shephrd's scale. The service loads the defaults itself on its first start, when its log holds no harness settings, and `harnesses reset` loads them again. An empty list of models or efforts means the list is not checked. |
 | `subscribe` | The owner, or any agent | Sends every event after a given sequence number, then each new event as it is written. |
 
 "The agent's parent" means the agent that started it. **Chosen in this spec:**
@@ -261,12 +261,35 @@ accounts for Codex or three Cursor accounts.
   directory (`CODEX_HOME` for Codex, `CLAUDE_CONFIG_DIR` for Claude Code), or
   its own API key (`CURSOR_API_KEY` for Cursor).
 - `HOME` is never changed, because that hides Claude Code's saved login.
+- The account's `home` field is passed through the harness's own variable,
+  and its `secret` field through the harness's key variable (`ANTHROPIC_API_KEY`
+  for Claude Code, `OPENAI_API_KEY` for Codex, `GEMINI_API_KEY` for Gemini,
+  `CURSOR_API_KEY` for Cursor). The mapping is keyed on the harness id and is
+  in `runner/harnesses.ts`. Harness settings record no adapter kind, so a
+  custom harness id, such as `custom-claude`, has no mapping.
+- A field the harness has no variable for is refused, never dropped. A `home`
+  on Gemini, Cursor or a custom harness id is refused, and so is a `secret` on
+  a custom harness id. The refusal is fixed text that names the field and the
+  harness id, such as `account home is not supported by harness gemini`, and
+  holds no secret. It is made when the account is added, set, or given a
+  secret, and again when the agent is started.
+- An account whose `home` and explicit `CLAUDE_CONFIG_DIR` or `CODEX_HOME` name
+  different folders is refused when it is set, and again when it is started.
+  The check compares the folders the child would get, so a `secret:` reference
+  is resolved through the secret store first. A reference to the same folder is
+  accepted, a reference to another folder is refused, and a reference that
+  cannot be resolved counts as different. The refusal text never holds the
+  resolved value. An explicit key variable in the environment wins over
+  `secret`.
 - An account can carry extra environment variables.
 - Secret values are stored as references, not plain text, and never reach
   the log or a client.
 - Codex accounts can share one set of sessions through T3 Code's "shadow home"
   arrangement, so a Codex thread can move to another account. Claude Code has
   no equivalent, so a Claude thread stays on its first account.
+- A Codex account that is not named `codex` gets a private login: its own
+  `auth.json` in a shadow home under the state folder, with the sessions shared
+  from its `home`. Only the account named `codex` uses `home` directly.
 
 `start` either names an account or asks for any account of that harness. With
 "any", the engine picks the usable account with the fewest running agents. An

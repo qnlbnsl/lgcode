@@ -58,7 +58,8 @@ export const authorization = (bearer: string): Record<string, string> => ({ Auth
 export const connect = (socketPath: string, bearer: string, options: { readonly headers?: Record<string, string> } = {}) =>
   Effect.gen(function* () {
     const headers = options.headers ?? { ...authorization(bearer), ...ancestryHeaders() };
-    const socket = yield* Socket.makeWebSocket(socketUrl(socketPath), { headers, openTimeout: 5_000 }).pipe(
+    // Suite load can delay the healthy client handshake while other subscriptions are active.
+    const socket = yield* Socket.makeWebSocket(socketUrl(socketPath), { headers, openTimeout: 30_000 }).pipe(
       Effect.provide(NodeSocket.layerWebSocketConstructorWS),
     );
     const protocol = yield* RpcClient.makeProtocolSocket({ retryTransientErrors: false }).pipe(

@@ -69,6 +69,34 @@ it.effect("6.5 E1: catches a second account sharing the first login, missing sha
   }));
 }).pipe(Effect.orDie));
 
+it.effect("A9 codex home: catches a Codex account whose `home` is ignored, so the child runs on the default login (the default account uses that home directly, another account shares sessions from it under a private login)", () => Effect.gen(function* () {
+  const ownHome = join(rig.root, "codex-own");
+  mkdirSync(join(ownHome, "sessions"), { recursive: true });
+  writeFileSync(join(ownHome, "auth.json"), '{"account":"own"}');
+  writeFileSync(join(ownHome, "sessions", "thread.jsonl"), '{"thread":"own"}\n');
+  const directEcho = echoFile(rig);
+  const sharedEcho = echoFile(rig);
+  const harness = harnessFor("codex", writeFakeAdapter(rig));
+  const direct = { ...accountFor("codex", {}, directEcho, {}, "codex"), home: ownHome };
+  const shared = { ...accountFor("codex", {}, sharedEcho, {}, "secondary"), home: ownHome };
+  yield* withEngine(rig, { harness, accounts: [direct, shared] }, () => Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    success(yield* call(ownerCredential, "start", startPayloadFor(harness, direct, rig.work)));
+    const directChild = yield* readEcho(directEcho);
+    expect(directChild.env.CODEX_HOME).toBe(ownHome);
+    expect(directChild.env.HOME).toBe(rig.home);
+    success(yield* call(ownerCredential, "start", startPayloadFor(harness, shared, rig.work)));
+    const sharedChild = yield* readEcho(sharedEcho);
+    const shadow = sharedChild.env.CODEX_HOME;
+    expect(shadow).toBeDefined();
+    if (shadow === undefined) return;
+    expect(shadow).not.toBe(ownHome);
+    expect(relative(rig.stateFolder, shadow)).not.toMatch(/^\.\.(?:\/|$)/);
+    expect(resolve(shadow, readlinkSync(join(shadow, "sessions")))).toBe(join(ownHome, "sessions"));
+    expect(existsSync(join(shadow, "auth.json")), "the home's own login must not be linked or copied").toBe(false);
+  }));
+}).pipe(Effect.orDie));
+
 it.effect("6b A4: catches a symlink ancestor moving the shadow home outside the state folder, spawning a child, or writing shared links outside", () => Effect.gen(function* () {
   const outside = join(rig.root, "outside-state");
   const shadow = join(outside, "shadow");

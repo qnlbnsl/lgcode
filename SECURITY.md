@@ -116,6 +116,13 @@ These rules apply to every change. A change that breaks one is a security bug.
 6. **Secrets never reach logs, the message board, or a client.** This covers
    API tokens, the web password, the session token, and the agent harnesses'
    own login tokens. Agents do not inherit the web password's variable.
+   Explicit secrets from `secrets.json`, resolved `secret:` variables,
+   harness login files, the web password, and owner and agent credentials stay
+   registered at any length.
+   A value inferred only from an inherited environment variable whose name
+   matches `KEY`, `TOKEN`, `SECRET` or `PASSWORD` is registered only at eight
+   or more characters when its trimmed text is nonempty, is neither `true`
+   nor `false`, and is not a plain number.
 7. **Text from an agent is data, not a command.** A message on the board
    cannot change permissions, teams, or settings unless the owner's
    credential approves it.

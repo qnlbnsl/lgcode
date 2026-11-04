@@ -13,11 +13,13 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as SqlClient from "effect/sql/SqlClient";
 
+import { makeCredentialRegistry } from "./accounts/credentialSource.ts";
 import * as SecretStore from "./accounts/SecretStore.ts";
 import { application, listen } from "./api/server.ts";
 import { serviceLog } from "./api/serviceLog.ts";
 import { prepareStateFolder, stateFolder } from "./api/stateFolder.ts";
 import * as CommandHandler from "./commands/CommandHandler.ts";
+import { isInferredSecretValue } from "./identity/inferredSecret.ts";
 import { redactingLoggerLayer } from "./identity/logger.ts";
 import { loadOwnerCredential } from "./identity/ownerCredential.ts";
 import { makeRedactor } from "./identity/redactor.ts";
@@ -27,6 +29,7 @@ import { migrate } from "./log/migrations.ts";
 import * as Restart from "./recovery/restart.ts";
 import { linuxProcessReader } from "./recovery/orphans.ts";
 import * as AcpRunner from "./runner/AcpRunner.ts";
+import { installedHarnessDefaults } from "./runner/harnesses.ts";
 import * as Views from "./views/Views.ts";
 
 // Capture the inherited token for redaction, then erase it before building
@@ -74,21 +77,31 @@ const program = Effect.scoped(Effect.gen(function* () {
   return yield* Effect.gen(function* () {
     yield* migrate;
     const registry = yield* Effect.acquireRelease(Effect.sync(() => new DatabaseSync(databasePath, { readOnly: true })), (database) => Effect.sync(() => database.close()));
-    const inheritedSecrets = [ownerCredential, ...[inheritedToken, ...Object.entries(process.env)
-      .filter(([name]) => /(?:KEY|TOKEN|SECRET|PASSWORD)/i.test(name)).map(([, value]) => value)]
+    // Explicit credentials keep every nonempty value. Only values inferred
+    // from inherited variable names need A4's length and scalar-value gate.
+    const explicitSecrets = [ownerCredential, ...[inheritedToken]
       .filter((value): value is string => value !== undefined && value.length > 0).map((value) => Redacted.make(value))];
+    const inheritedSecrets = Object.entries(process.env)
+      .filter(([name]) => /(?:KEY|TOKEN|SECRET|PASSWORD)/i.test(name))
+      .map(([, value]) => value)
+      .filter(isInferredSecretValue)
+      .map((value) => Redacted.make(value));
+    // Issue 223: the harness login stores the runner opens, re-read live.
+    const credentials = makeCredentialRegistry();
     const redactor = makeRedactor({
       secrets: () => {
+        const known = [...explicitSecrets, ...inheritedSecrets, ...credentials.secrets()];
         try {
           const values: unknown = JSON.parse(readFileSync(join(folder, "secrets.json"), "utf8"));
-          return [...inheritedSecrets, ...Object.values(values as Record<string, unknown>).filter((value): value is string => typeof value === "string").map((value) => Redacted.make(value))];
-        } catch { return inheritedSecrets; }
+          return [...known, ...Object.values(values as Record<string, unknown>).filter((value): value is string => typeof value === "string").map((value) => Redacted.make(value))];
+        } catch { return known; }
       },
       tokenHashes: () => new Set((registry.prepare("SELECT token_hash FROM agent_tokens UNION SELECT token_hash FROM devices").all() as Array<{ token_hash: string }>).map((row) => row.token_hash)),
     });
-    const configuration = { home: process.env.HOME ?? folder, stateFolder: folder, pluginRoot: fileURLToPath(new URL("../../..", import.meta.url)) };
+    const configuration = { home: process.env.HOME ?? folder, stateFolder: folder, pluginRoot: fileURLToPath(new URL("../../..", import.meta.url)),
+      harnessDefaults: installedHarnessDefaults(process.env.PATH ?? "") };
     const base = EventLog.layer.pipe(Layer.provideMerge(Views.layer));
-    const runner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: { ...process.env }, protocolLog }).pipe(
+    const runner = AcpRunner.layer({ socketPath, stateFolder: folder, environment: { ...process.env }, protocolLog, credentials }).pipe(
       Layer.provideMerge(SecretStore.layer({ stateFolder: folder })),
     );
     const recovery = Restart.layer(configuration).pipe(Layer.provideMerge(Layer.merge(base, runner)));
