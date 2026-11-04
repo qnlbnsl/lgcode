@@ -5375,3 +5375,507 @@ item instead of dropping the terminal or failing the drain.
 Add a runner-to-log test for the short explicit-secret collisions.
 The existing terminal tests use a long secret, and the existing structure
 tests exercise the event-log redactor without this publication step.
+
+## 300. `OwnerNeeded.reason` is free text with three producers
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: `OwnerNeeded.reason` is free text, written in three places: `routing/holders.ts:49`, `recovery/crash.ts:69` and `routing/deliveries.ts:194`. A client that maps reasons to alert kinds breaks without a sign if a reason string changes.
+What should happen: The client API plan pins the reasons with a contract test.
+Why it matters: A changed reason string would silently stop an owner alert from being raised.
+
+## 301. Effect's `RpcGroup.merge` silently replaces a command with the same name
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: In Effect 4.0.5, `RpcGroup.merge` replaces a command whose name is already present, and says nothing.
+What should happen: Composing several command groups needs a test that every command name is unique.
+Why it matters: A command could vanish from the served API without any error.
+
+## 302. A delivery's text is wrapped as data only for an agent sender
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: `packages/engine/src/routing/envelope.ts:23` wraps a delivery's text as data only when its sender is an agent (`sender._tag === "agent"`). A new sender kind, such as a service or a piece, would go out unwrapped.
+What should happen: The rule becomes "every sender but the owner". The client API contract's edit E15 makes that change.
+Why it matters: Unwrapped text from a new sender could be read by an agent as an instruction.
+
+## 303. The root `pnpm -r test` runs no tests, and the engine package has no `test` script
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: The root `pnpm -r test` passes without checking anything (client API row 111). The engine package has only a `typecheck` script, so `pnpm --filter @shephrd/engine test` also runs nothing. Tests run only through the root `vitest run`.
+What should happen: Not decided. The real gate is the root `pnpm check`.
+Why it matters: A passing test command that checks nothing gives false confidence.
+
+## 304. Question rows from a stopped or crashed asker stay open
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: Engine question rows from a stopped or crashed asker stay open in the views, and answering one queues a reply to a dead agent (client API row 107).
+What should happen: Not decided. Question closure stays with issue 113.
+Why it matters: The owner is shown questions nobody can receive an answer to.
+
+## 305. Secret collection at start-up deletes the secrets a piece keeps
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: `collectSecrets` deletes every secret that no account uses, so a piece cannot keep its own secret.
+What should happen: Client API edit E27 (row 94) lets a piece keep its secrets.
+Why it matters: A piece that needs a stored secret would lose it at the next start.
+
+## 306. `packages/client` imports Node modules at its root, so a browser cannot use it
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: The client package imports Node modules at its root.
+What should happen: Client API edit E26 (row 110) makes the package usable from a browser.
+Why it matters: The web page cannot use the shared client library.
+
+## 307. The client's stream dispatch calls `subscribe` for every streaming command
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: The stream dispatch in `packages/client` calls `subscribe` for every streaming command.
+What should happen: Client API edit E24 (row 109) dispatches each streaming command to its own call.
+Why it matters: A streaming command other than `subscribe` would read the wrong stream.
+
+## 308. The client's typed decoder rejects an unknown event tag
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: The client's typed Remote Procedure Call decoder rejects an unknown event tag before any handler sees it, so a newer server stops an older client's stream.
+What should happen: Client API edit E25 (row 109) lets a client pass an unknown tag through.
+Why it matters: Adding an event kind to the server would break every client that is not updated.
+
+## 309. Engine events have no size bound
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: One large engine event can exceed a message budget (client API row 105).
+What should happen: Not decided.
+Why it matters: An oversized event cannot be sent to a client.
+
+## 310. A phone alert can arrive twice
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: A phone alert can arrive twice, because delivery is at least once (client API row 106).
+What should happen: Not decided. The duplicate is accepted until a rule says otherwise.
+Why it matters: The owner may be alerted twice for one matter.
+
+## 311. ntfy's default access can leave topics open
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: The default access on an ntfy server can leave topics open, and Shephrd cannot check the owner's server (client API row 115). The setup document advises deny-all.
+What should happen: The owner sets deny-all on the ntfy server, as the setup document advises.
+Why it matters: Anyone who learns a topic name could read the owner's alerts or send false ones.
+
+## 312. The `accounts` read and `AccountChanged` carry environment values as entered
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: A plain value under a name that does not look like a secret reaches every client and the log (`contracts/src/accounts.ts:9-16`, client API row 141).
+What should happen: Not decided.
+Why it matters: A secret stored under an ordinary name would be written to the log and shown to clients.
+
+## 313. A permission request's row stays open after `stop`
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: A permission request's row stays open after `stop`, and a resumed session cannot answer it, because the hold belongs to the old process (client API row 144).
+What should happen: Edit E31 makes `stop` write `PermissionCancelled` with a withdrawal for the stopped agent's open requests, as a crash does (client API row 163). When unit 1b merges, the stop part of issue 74 is closed. Recovery's part is already done, and question closure stays with issue 113. A row left by an older log is closed by a restart.
+Why it matters: The owner sees a request that nobody can answer.
+
+## 314. A failing alert adds one event every 10 minutes
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: An alert that keeps failing adds one small event every 10 minutes while the carrier is down (client API row 131).
+What should happen: Not decided.
+Why it matters: A long outage grows the event log without end.
+
+## 315. The number of agents in `client.snapshot` is not capped
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: Stopped agents can grow the snapshot, and only a fixture test bounds the whole (client API row 137).
+What should happen: Not decided.
+Why it matters: A long-lived installation could exceed the snapshot's size budget.
+
+## 316. An answered question's withdrawal can strand a reloaded holder as working
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: A withdrawal for an answered question can leave a reloaded holder marked as working with nothing to send (`routing/questions.ts:27`, `recovery/reload.ts:84-98`).
+What should happen: Unit 1b fixes it through edit E17 (client API row 173).
+Why it matters: The agent never takes new work and the team stalls.
+
+## 317. `SecretStore.resolve` cannot tell a missing value from a failed read
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: `accounts/SecretStore.ts:66-72`: `resolve` returns nothing both for a missing value and for a failed read. The carrier treats both as a failed attempt (client API row 168).
+What should happen: Not decided.
+Why it matters: A caller cannot report the real cause of a failure.
+
+## 318. `project` gives a piece's reducer placeholder envelopes
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: `routing/waits.ts:28-31`: `project` gives a piece's reducer placeholder envelopes, with the caller owner and time zero. A reducer now reads only the event and the sequence (client API row 161).
+What should happen: Not decided.
+Why it matters: A reducer that reads more than the event and the sequence would see false values.
+
+## 319. A very large reply cannot reach a very slow link
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: A reply of about 3 mebibytes cannot reach a link of about 500 kilobits per second, because the link misses two heartbeats on the read connection (client API row 160).
+What should happen: Not decided.
+Why it matters: A client on a very slow link cannot read a very large reply.
+
+## 320. Another local user can hold the web server's loopback port while it is down
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: While the web server is down, another local user can hold its loopback port and serve a long-cached page (client API row 167).
+What should happen: The owner is told. Not otherwise decided.
+Why it matters: A browser could be shown a page that did not come from Shephrd.
+
+## 321. An agent that runs `shephrd client subscribe` reads events with no data envelope
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: This is how the engine's `subscribe` works today (client API row 166).
+What should happen: Not decided.
+Why it matters: Event text read by an agent is not marked as data, so it could be read as an instruction.
+
+## 322. `runner/translate.ts` drops the tool-call id from file-change content
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: A Codex diff cannot be joined to its permission request (client API R4-A2, C4-01, not folded).
+What should happen: Not decided.
+Why it matters: A client cannot show which request a changed file belongs to.
+
+## 323. A Herdr pane starts from Herdr's environment, not the engine's
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: A Herdr pane's command starts from Herdr's environment and not the engine's, so `SHEPHRD_WEB_PASSWORD` could reach it (client API row 188, TM-PB-6).
+What should happen: The interactive mode plan clears `SHEPHRD_WEB_PASSWORD` in a pane's command.
+Why it matters: An agent in a pane could read the owner's web password.
+
+## 324. The engine design still names paired devices and device credentials
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: `docs/specs/2026-11-01-engine-design.md` still names paired devices and device credentials.
+What should happen: Client API rows 184 and 189 replace those parts, so the design's text should be brought up to date.
+Why it matters: A reader of the design would build a pairing that was dropped.
+
+## 325. A board question's author looks settled to the engine
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: An agent that posts a question needing a reply, then ends its turn, counts as settled in `routing/waits.ts:settled`, so a `wait` on it ends early.
+What should happen: Not decided.
+Why it matters: A parent's wait ends before the question is answered.
+
+## 326. Board posts cannot be deleted or purged
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: A post's text stays in `board.PostWritten`, in every wake's `DeliveryQueued`, in the engine's `PromptSent`, in client caches and in harness session files. Command receipts copy every committed envelope, including post text and wake bodies. The log is append-only. A purge path is not planned (board review round 1, threat m3, and round 2, R2-TM-4).
+What should happen: Not decided. Any purge path must also cover the receipts table.
+Why it matters: A secret posted by mistake cannot be removed.
+
+## 327. No rule makes every piece size its events against the listener's limit
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: The network listener's 1 mebibyte message limit bounds piece events and read pages. The board caps a wake body at 256 kibibytes and a read page at 512 kibibytes, but nothing makes every piece do the same (board review round 1, threat M5).
+What should happen: Not decided.
+Why it matters: A piece event over the limit could not be sent.
+
+## 328. Channels are not a confidentiality boundary
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: Every agent runs as the owner's Unix user and can read the event log on disk, so any agent can read every channel's posts. SECURITY.md accepts this for now (board review round 1, threat m2).
+What should happen: Not decided. Accepted for now.
+Why it matters: A private channel is not private from other agents.
+
+## 329. The engine checks the permission ceiling at `start` but not at `prompt`
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: The engine's design states the rule for `prompt` too (`commands/prompt.ts`, `identity/ceiling.ts`) (board review round 2, logic m7).
+What should happen: The ceiling is checked at `prompt` as the design states.
+Why it matters: A prompt could ask for more than the ceiling allows.
+
+## 330. The agents view keeps only an agent's current mode
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: `ModeChanged` overwrites the start ceiling, which survives only in `AgentStarted`. A piece that needs the ceiling must keep it itself (board review round 2, threat S2).
+What should happen: Not decided.
+Why it matters: Each piece that needs the ceiling must repeat the bookkeeping.
+
+## 331. The board's view keeps every post's text in memory
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: Posts cannot be deleted, so the service's memory grows with board history (board review round 2, threat S1).
+What should happen: Not decided.
+Why it matters: A long-running service uses more memory without bound.
+
+## 332. Recovery leaves an interrupted agent with a session that cannot reload, and writes no event
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: A follower of the board must apply the `waits.ts` test itself (board review round 2, R2-A3).
+What should happen: Not decided.
+Why it matters: Each follower may judge the same agent differently.
+
+## 333. A hang in the middle of a turn is not caught by the board
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: A hang in the middle of a turn ends no turn, so the board's reminder for an unanswered question never fires. A turn's end sends one reminder, and the next marks the agent `no-answer` and tells the asker once (board contract v15, rows 153 and 156). Only the roles plan's sheepdog catches a hang, at its two-hour runaway limit (board review round 3, logic M4, threat T3-6).
+What should happen: Not decided. The owner accepted this as a stated limit on 2026-11-03.
+Why it matters: The asker waits up to two hours for an agent that has hung.
+
+## 334. Open questions that the owner writes have no per-author cap
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: The 64-question cap applies to agents only.
+What should happen: Not decided.
+Why it matters: The owner could fill the board with open questions.
+
+## 335. The dispatcher waited after a send-time withdrawal
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: The dispatcher waited instead of going on to the agent's next queued delivery (board review round 3, logic m4).
+What should happen: The client API contract's item 15 requires it to go on (ruling L23, `ced973b`), so the engine must be changed to match.
+Why it matters: An agent's queue stalls behind a delivery that was withdrawn.
+
+## 336. A refused duty is retried after every later batch that touches it
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: With the board's reactor written as level rules, a duty the engine keeps refusing is retried after each later batch that touches it, and each retry writes one `CommandRefused`.
+What should happen: Not decided.
+Why it matters: A defect that makes a reactor batch always fail would grow the log by one event per touching batch.
+
+## 337. The dispatcher wrote a send-time withdrawal without its wait checks
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: A parent's wait on an idle target could stay open (board review round 4, logic m7).
+What should happen: Client API v5 edit E18 requires the wait checks (lead ruling L30).
+Why it matters: A parent waits for a target that will never answer.
+
+## 338. Alerts for matters that exist before the alert reactor's first start are never raised
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: The alert reactor raises `baseline` alerts at its first start by a level scan over the current views, but a piece's alert source is a pure function of one envelope and offers no scan. An open board post that needs the owner's reply, if it exists before that first start, never gets an alert. This matters only if the board lands before the alert reactor (client API unit 6a).
+What should happen: Not decided.
+Why it matters: The owner would not be alerted to a question that was already waiting.
+
+## 339. A very full board wake is larger than 256 kibibytes in the log
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: A `DeliveryQueued` and a `PromptSent` can exceed 256 kibibytes, because the engine's envelope and the event's fields are added to a 256 kibibyte body. In `client.subscribe` they become `client.Oversized` markers, so the owner's phone must tap to see them.
+What should happen: Accepted (board row 127). Recorded so it does not look like a bug.
+Why it matters: Without this note the oversized markers look like a defect.
+
+## 340. A piece's ids are treated as text by the redactor unless the piece adds table entries
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: The engine's redactor at `9e386b0` has fixed structure tables (`log/redactionStructure.ts`) that name each id field. The client API contract v12 has no edit or table for a piece's ids.
+What should happen: The board adds its entries as B13. The roles and client API plans must do the same.
+Why it matters: A piece that forgets gets its ids redacted as text.
+
+## 341. A "model at capacity" error is returned to the sender as a failed delivery
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: A "model at capacity" or "529 overloaded" error is returned to the sender as a failed delivery (`packages/engine/src/runner/classify.ts:classifyError`, `routing/deliveries.ts:failed`), which wakes the parent with a prompt for each error.
+What should happen: Decision row 11, WS-7b, holds the delivery and releases it later.
+Why it matters: A capacity outage wakes parents again and again.
+
+## 342. No event records an agent's token or prompt-cache usage
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `runner/translate.ts` ignores every session update except message chunks, plan and tool calls.
+What should happen: Decision row 11, WS-7c, records usage.
+Why it matters: Compaction cannot be timed for Codex or other harnesses.
+
+## 343. A standing rule answered from outside the engine arrives after the request was delivered
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: The request has already been delivered to an idle holder, so the holder still pays a wake.
+What should happen: Decision row 11, WS-7a, answers it inside the engine.
+Why it matters: Each such request costs a full agent turn.
+
+## 344. The runner drops the tool `kind` and the permission request's own `rawInput`
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `packages/engine/src/runner/translate.ts:37-41` and `packages/engine/src/runner/AcpRunner.ts:400-416` drop them, so nothing in the log says which tool asked for a permission or exactly what it will run.
+What should happen: The roles plan's WS-7a proposes optional fields (row 53).
+Why it matters: A standing rule cannot match a request precisely.
+
+## 345. Resuming a crashed agent queues no carry-on for an unfinished delivery
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: A delivery the agent had accepted but not finished gets no carry-on (`packages/engine/src/commands/resume.ts:48`, `packages/engine/src/recovery/reload.ts:80-98`), so a reloaded agent sits idle.
+What should happen: The roles' crash rule sends its own carry-on prompt (row 42).
+Why it matters: The resumed agent does nothing until someone prompts it.
+
+## 346. The board marks a capacity-returned wake undeliverable within seconds
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: The board retries a returned wake once at once and then marks the addressee `undeliverable`, so a model-capacity outage ends a board addressee's part of a post within seconds.
+What should happen: The engine holds capacity errors (roles WS-7b). The board's planner should consider skipping the immediate retry for a capacity return.
+Why it matters: A short outage permanently fails board wakes.
+
+## 347. The recorded fixtures hold no tool call and no permission request
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `packages/testing/fixtures/claude.ndjson` and `codex.ndjson` hold neither, so no test can pin a harness's shell-permission shape from them.
+What should happen: The roles plan adds a recording task (2g).
+Why it matters: A permission matcher cannot be tested against real traffic.
+
+## 348. The runner-event batch is appended with the caller `owner`
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `packages/engine/src/commands/CommandHandler.ts:148` appends it as `owner`, and any failure in it drops the whole batch (lines 174 to 176). Anything an automatic answer writes there would be recorded as the owner's.
+What should happen: Not decided.
+Why it matters: The log would show an automatic answer as the owner's own.
+
+## 349. `TurnStarted` is declared but never written
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `TurnStarted` is declared in `packages/contracts/src/events.ts` (line 116) and nothing writes it.
+What should happen: Not decided.
+Why it matters: A reader that expects the event gets nothing.
+
+## 350. A `ThreadItem`'s tool input has no stated maximum
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: A single huge tool call makes a large event.
+What should happen: Not decided.
+Why it matters: One tool call can exceed a message budget.
+
+## 351. The ceiling's path resolver is synchronous
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `packages/engine/src/identity/ceiling.ts` uses `lstatSync`, so resolution on a slow or network file system blocks the event loop for every agent.
+What should happen: Not decided.
+Why it matters: One slow file system stalls all agents.
+
+## 352. One shared stream fiber carries every agent's runner events, and `answerPermission` is awaited inside it
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `packages/engine/src/commands/CommandHandler.ts:177` awaits `answerPermission` inside the shared fiber, so one slow adapter answer stalls the runner events of all agents.
+What should happen: Not decided.
+Why it matters: One slow agent delays every other agent.
+
+## 353. `isHarnessSettings` treats every path under a harness folder as a settings path
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `isHarnessSettings` at `packages/engine/src/identity/ceiling.ts:317-322` treats every path under a `.claude/`, `.codex/`, `.gemini/` or `.cursor/` folder as a settings path, without regard to case. Every file edit in a worktree under `.claude/worktrees/` goes to the owner (roles row 85).
+What should happen: Narrowing the test to the settings files and folders inside a harness folder would fix it, but it relaxes a protection, so it is the owner's decision. Foundry worktrees move to `<repo>/.worktrees/`, which avoids the problem.
+Why it matters: Every file edit by an agent in a Foundry worktree waits for the owner.
+
+## 354. `git clean -ffdX` at a repository root would remove all of `.worktrees/`
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: A dry run showed that `git clean -ffdX` at a repository root would remove all of `.worktrees/`, unmerged work included. The ignore line does not protect against it.
+What should happen: Not decided. For the worktree plan.
+Why it matters: Unmerged work in worktrees could be lost with one command.
+
+## 355. A new worktree starts from the last commit, so uncommitted changes do not reach a child
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: A lead's uncommitted changes do not reach a child's new worktree (tested).
+What should happen: Not decided. For the worktree plan.
+Why it matters: A child starts from older files than the lead sees.

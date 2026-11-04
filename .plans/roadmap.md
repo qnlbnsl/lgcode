@@ -1,6 +1,6 @@
 ---
 kind: roadmap
-updated: 2026-11-01
+updated: 2026-11-03
 ---
 
 # Roadmap
@@ -13,7 +13,7 @@ with every agent's conversation available as a thread.
 
 | Kind | Name | Overview |
 |---|---|---|
-| epic | shepherd-foundation | The four pieces that let Shephrd run the Foundry's teams on its own: the engine, the client API, the message board, and the foundry roles. The engine is planned and ready to build; the other three are not yet planned. |
+| epic | shepherd-foundation | The pieces that let Shephrd run the Foundry's teams on its own: the engine, the client API, the message board, and the foundry roles. The engine is built, and the plans for the other three are accepted and ready to build. A fifth plan, Git worktrees for agents, is next to be written. |
 
 ## Later
 
