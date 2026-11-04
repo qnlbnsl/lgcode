@@ -1,8 +1,8 @@
 # Known gaps: shepherd-message-board
 
 Gaps the planner could not close before the freeze. Reviewers: these are
-already known; look for new problems. Updated for plan version 13, after
-the owner's acknowledge change.
+already known; look for new problems. Updated for plan version 14, after
+the logic review of the acknowledge change (round 7).
 
 1. **Vendor limits.** The planner cannot read each vendor's remaining
    weekly allowance. The lead checks it before launching any unit.
@@ -61,6 +61,12 @@ open for the build's units to read.
   stopped author's result `withdrawn` even when a reply closes the post first. The
   first committed close stands, and no completion is owed, so the test should keep
   closure outcome and completion debt apart.
+- **A failure in a turn that a non-board delivery started** (found while folding R7-L1,
+  row 156). Only the return of an accepted board wake counts as a turn's end. If an agent
+  took a question and a carry-on or a prompt then fails with an ordinary error, the rule
+  waits for the agent's next turn's end, and a wait can end first. The roles plan's stall rule
+  sees the idle agent with an unanswered question. Closing it means folding every
+  delivery's accept, which the ruling did not ask for.
 - **C5-03** (critic). Criterion 6.6's diff starts at client API unit 1b's merge,
   so it also counts test changes from later client API units that this plan
   depends on.

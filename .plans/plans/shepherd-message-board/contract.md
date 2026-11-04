@@ -1,10 +1,9 @@
 # The message board's contract
 
-Status: **version 14, for the foundry-roles plan to build on.** Written by
-the board's planner on 2026-11-03. Version 13 is `attack/contract-v13.md`.
-This version adds `board.acknowledge`, a bounded rule for a question that gets
-no answer, and the data envelope on an agent's `board.read` page, at the owner's
-request (rows 152 to 155). It builds on the
+Status: **version 15, for the foundry-roles plan to build on.** Written by
+the board's planner on 2026-11-03. Version 14 is `attack/contract-v14.md`.
+This version counts a turn that fails after its wake was accepted as a turn's end,
+in the rule for a question that gets no answer (row 156). It builds on the
 client API contract version 17
 (`b38aa6f`), whose copy is `client-api-contract-v17.md` in this folder, and on
 the engine at `9e386b0` (row 144). A later change to this file goes to `plans-lead` as a
@@ -397,7 +396,8 @@ A post has:
   follows the completion rule above. A wake returned after it was accepted
   is not queued again, as the engine never re-queues an accepted delivery:
   its posts were read and its completions discharged at acceptance, and the
-  return counts toward nothing (row 110, which amends row 91).
+  return counts toward no limit (row 110, which amends row 91). It does count as
+  a turn's end ("A question that gets no answer", below; row 156).
 - **Leaving a channel.** When an agent leaves a channel, its still-queued
   board wakes are withdrawn and rebuilt without that channel's posts, in
   the same transaction, or in the reactor's batch for a group label
@@ -462,10 +462,21 @@ A post has:
 
 ## A question that gets no answer (row 153)
 
-The rule has no timer. Its trigger is the engine's `TurnEnded` with `compact` false,
-which the runner emits after the prompt reply that accepts the turn's delivery
-(`packages/engine/src/runner/AcpRunner.ts:271-276`), so a wake's accept always comes
-before its own turn's end. The same rule covers a post that was delivered and not
+The rule has no timer. Its trigger is a **turn's end**, which is either of two things
+in the log (row 156):
+
+- the engine's `TurnEnded` with `compact` false, which the runner emits after the
+  prompt reply that accepts the turn's delivery
+  (`packages/engine/src/runner/AcpRunner.ts:271-276`), so a wake's accept always comes
+  before its own turn's end;
+- a `DeliveryReturned` for a board wake whose `DeliveryAccepted` the view has already
+  folded. Only the engine's `failed` function returns an accepted delivery. It writes the
+  return and `StateChanged idle` in one batch, and the runner's later turn-end signal then
+  writes nothing, because the agent is no longer working
+  (`packages/engine/src/routing/deliveries.ts:81-97`, `:130-134`, `:171`).
+
+An accepted delivery is never sent again, and this changes nothing about that. The same
+rule covers a post that was delivered and not
 acknowledged, and one that was acknowledged and not answered.
 
 An addressee has **taken** a post once the post is read for it: a wake carrying it was
@@ -502,6 +513,24 @@ reply and no owed completion that has not failed twice. So a lead that has hande
 question on to its workers, or has an open non-blocking wait, is not reminded until
 that work has come back and a further turn has ended. A paused or interrupted agent
 is not idle, so nothing happens to it.
+
+**A capacity error and a lost turn.**
+
+- **An open capacity hold.** The engine writes `DeliveryHeld`, leaves an accepted wake
+  accepted and queues its carry-on, with no `DeliveryReturned` and no `TurnEnded` (roles
+  plan, 7.3). So a hold is not a turn's end. It uses no reminder and writes no
+  `no-answer`, and the engine's part of the settled test stays false until the release. A
+  reminder behind the hold waits there. The carry-on's `TurnEnded` then counts.
+- **A capacity error that returns the wake.** With the sheepdog off, or at its give-up, the
+  hold is over and the agent is idle, so this is a return like any other, whatever its
+  `cause`. The rule goes on. The asker is told, and a late reply still counts.
+- **A pause, or an interrupt that reloads.** The accepted wake stays accepted, and a carry-on
+  follows, so its `TurnEnded` counts (`packages/engine/src/recovery/reload.ts:85-99`).
+- **A stop, a crash, or an interrupt that cannot reload.** These are `gone` by the existing
+  rows, and they end the rule.
+- **The limit.** A failure in a turn that a non-board delivery started, such as a
+  carry-on or a prompt, is not a turn's end, because the view does not fold those deliveries.
+  The agent's next turn's end counts. See `attack/known-gaps.md`.
 
 **How each case meets the rule.**
 
@@ -738,7 +767,8 @@ board source (to learn the wake's delivery id, row 132), `DeliveryAccepted` and
 `DeliveryReturned` for board wakes, `AgentStarted`, `AgentGrouped`,
 `AgentStopped` (to drop owed completions and record the stop's sequence),
 `AgentCrashed` and `AgentReloadFailed` (to record that sequence), `TurnEnded` with
-`compact` false (to record each agent's last turn end, row 153), and the
+`compact` false (to record each agent's last turn's end, with the return of an accepted
+board wake, rows 153, 156), and the
 `StateChanged` out of `stopped` (to restart read state) (rows 114, 143).
 
 The board asks for its wakes by returning delivery requests, which the

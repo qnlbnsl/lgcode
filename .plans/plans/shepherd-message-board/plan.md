@@ -350,7 +350,7 @@ edit EN: a direct edit to the engine that the client API plan's units 1a
 and 1b make, and that the board then adds its own entries to. "The piece
 batch path" is edit E23: every batch a planner, a read's marks or the
 reactor produces passes its checks before it is written. The board's own
-contract is `contract.md`, version 14 (rows 121 to 155). "Ancestor" means by the
+contract is `contract.md`, version 15 (rows 121 to 156). "Ancestor" means by the
 engine's fixed `parent` links, never by holder availability (lead ruling
 L18). "Ceiling" means the permission an agent was started with, from its
 `AgentStarted` (row 73). Greenfield anchors give
@@ -529,7 +529,7 @@ channel, author, text, `to`, reply mode, `replyTo`, each addressee's
 disposition and deciding reply, who has acknowledged, the sequence at which it took
 the post, whether its reminder was accepted and at what sequence, replies, status open
 or closed with its outcome); owed completions and no-answer notices per agent; each
-agent's last `TurnEnded` with `compact` false (row 153); return counts per post or
+agent's last turn's end, from `TurnEnded` with `compact` false or the return of an accepted board wake (rows 153, 156); return counts per post or
 completion and target, counting only wakes returned without an accept
 (rows 91, 110); each agent's ceiling, from its `AgentStarted` (row 73);
 the set of stopped agents, from `AgentStopped` and the change out of
@@ -793,8 +793,11 @@ needs a reply.
 **A question that gets no answer (row 153).** The contract's section of that name is the
 rule. The reactor adds one reminder, one `no-answer` and one notice per post and target,
 each a level rule over the sequences above, so a restart finds them again. There is no
-timer. Its trigger is `TurnEnded` with `compact` false, which always follows the accept
-of its own delivery (`packages/engine/src/runner/AcpRunner.ts:271-276`).
+timer. Its trigger is a turn's end: `TurnEnded` with `compact` false, which always follows
+the accept of its own delivery (`packages/engine/src/runner/AcpRunner.ts:271-276`), or the
+`DeliveryReturned` of an accepted board wake, which the engine's `failed` writes with
+`StateChanged idle` and no `TurnEnded` (`packages/engine/src/routing/deliveries.ts:130-134`;
+row 156). This needs no engine change.
 
 **Done when:**
 
@@ -805,14 +808,14 @@ of its own delivery (`packages/engine/src/runner/AcpRunner.ts:271-276`).
 | 4.3 | A board wake returned through the engine's real failed-send path carries the sender `piece { namespace: "board" }` in its `DeliveryReturned` (edit E15; row 109); it is re-queued once with its completions and open must-reply posts; a second return resolves the addressee `undeliverable`, or marks a completion "delivery failed", after which the agent goes idle and no third wake is queued until `board.flush`; a wake accepted and then returned is not re-queued and counts toward nothing (row 110); a waiter on the target is not told "settled" between the return and the re-queue | Test id: `packages/engine/test/board/reactor.test.ts`, "returned wake" (fake agent's error step) |
 | 4.4 | An addressee removed from the channel, or losing the group label, is resolved `removed`, and a crash never is; its queued wake is rebuilt without that channel's posts; when a direct pair loses its last shared channel, its open question closes `unanswerable` and the asker is told; losing one of two shared channels changes nothing | Test id: `packages/engine/test/board/reactor.test.ts`, "leaving a channel" and "direct grant ends" |
 | 4.5 | The reactor run twice on the same state writes each resolution and close once; a reply committed between two runs is not overridden; with the service stopped between each triggering commit and the reactor's write (a return, a member removal, the end of a direct grant, a send-time withdrawal, a manager's stop), every duty is done once after the restart; with the board switched off while a direct grant ends, switching it on resolves the grant's questions (row 105); a manager that stops and is resumed before the reactor's next transaction, with the reactor held back, across a restart, and with the board switched off for both transitions, loses its seat for good, its old post is withdrawn, and the live and rebuilt views are equal; the seat's new holder is unaffected by a stop from before it took the seat; running the reactor again writes nothing more (row 143) | Test id: `packages/engine/test/board/reactor.test.ts`, "twice is once", "racing reply" and "restart at every step" |
-| 4.6 | An idle agent with an open post of its own that needs a reply is not settled; a paused or crashed one still resolves as the engine already does; an addressee that accepted its question, or read it with `board.read`, and ended its turn without replying is not settled until the reactor has written `no-answer`, and is settled then; an addressee whose only wake carrying a question was withdrawn at send is not settled until the reactor's next wake is queued (row 104) | Test id: `packages/engine/test/board/settled.test.ts` (with a pause control case) |
+| 4.6 | An idle agent with an open post of its own that needs a reply is not settled; a paused or crashed one still resolves as the engine already does; an addressee that accepted its question, or read it with `board.read`, and ended its turn without replying is not settled until the reactor has written `no-answer`, and is settled then; an addressee whose only wake carrying a question was withdrawn at send is not settled until the reactor's next wake is queued (row 104); an addressee whose accepted wake carrying a question, or whose accepted reminder, is returned by an ordinary error is not settled until the reactor has queued its reminder or written `no-answer`, and an open capacity hold changes neither (row 156) | Test id: `packages/engine/test/board/settled.test.ts` (with a pause control case) |
 | 4.7 | A blocking wait whose waiter is asked a board question by the agent it waits on returns "request held", whether the question came before or after the wait opened; a waiter resolved `removed` from that question is no longer held | Test id: `packages/engine/test/board/settled.test.ts`, "no deadlock" (edit E20) |
 | 4.8 | With no board event in the log, neither board condition holds, so the engine's settled test and blocking waits behave as they did before engine changes B6 and B7 | Test id: `packages/engine/test/board/settled.test.ts`, "no board state"; `packages/engine/test/routing/waits.test.ts` and `acceptance/capability-05-wait.test.ts` keep their expectations |
 | 4.9 | A label removed from a busy agent with a queued group wake: the dispatcher's send-time check withdraws the wake, goes on to the agent's next queued delivery, the reactor rebuilds the wake without that channel's posts, and the agent never receives them; the same holds with the board switched off; with one requeued wake that passes and one fresh wake that fails, only the failing one is withdrawn; a queued completion carrying reply text from a channel its author has left is withdrawn and rebuilt without the text; a withdrawn wake that carried only posts needing no reply ends a parent's open wait on its idle target in the withdrawal's batch (row 118, lead ruling L30); when a reactor's withdrawal leaves a reloaded target with nothing queued or sent, the batch holds `StateChanged idle` from the first step of `withWaitChecks` and the board's code returns no such event, and when the same batch queues a replacement it holds no `StateChanged idle` (row 134) | Test id: `packages/engine/test/board/reactor.test.ts`, "send-time reach" (lead rulings L19, L22, L23) |
 | 4.10 | A reactor batch that would withdraw an engine delivery, or queue a wake with a post that fails reach, is refused by the piece batch path and nothing is written; the engine records one `CommandRefused { command: "board.reactor", reason, sourceSequence }` under `piece { namespace: "board" }`, and that refusal starts no further run; the reactor tries that duty again only after a later batch touches it; every reactor close, resolution and withdrawal is recorded with that caller, never the owner (rows 105, 119, 124) | Test id: `packages/engine/test/board/reactor.test.ts`, "write path" |
 | 4.11 | With recovery held open, the board's reactor writes nothing; after `recovery.whenReady` it runs once over the whole state, and an agent that recovery reloaded in the meantime gets no `gone`; it writes no first-start event; with the writer made to fail, it stops on `LogWriteFailed` and writes nothing more, and a restart does each duty once; a defect is logged at error level with no event text, and the reactor runs again after a pause (row 124) | Test id: `packages/engine/test/board/reactor.test.ts`, "start and failure" |
 | 4.12 | In normal running, the reactor and the planners never build a batch that check 2 of the piece batch path refuses: an owed completion whose author is crashed or stopped, and a question to one, queue no delivery and write no `CommandRefused`; the completion is queued after the crashed author's resume; a withdrawal of a wake whose target has stopped or crashed passes; `board.flush` for a stopped or crashed agent is refused with the engine's reason, and queues nothing (row 125) | Test id: `packages/engine/test/board/reactor.test.ts`, "state table" |
-| 4.13 | For an unacknowledged and for an acknowledged question: a turn end queues exactly one reminder, durable across a restart; the next turn end writes `no-answer`, the addressee is settled, and the asker stays unsettled and is told once; an owner asker gets one `board.no-answer` alert and a service asker reads `board.status`; a late reply makes it `replied`; a stop, crash or leaving moves it from `no-answer` to `gone` or `removed`; in `any` mode a close withdraws the others' reminders; in `all` mode `no-answer` keeps the post open; a compact turn counts for nothing; acknowledging does not withdraw a reminder; a reminder returned twice gives `undeliverable` (row 153) | Test id: `packages/engine/test/board/reactor.test.ts`, "no answer" |
+| 4.13 | For an unacknowledged and for an acknowledged question: a turn end queues exactly one reminder, durable across a restart; the next turn end writes `no-answer`, the addressee is settled, and the asker stays unsettled and is told once; an owner asker gets one `board.no-answer` alert and a service asker reads `board.status`; a late reply makes it `replied`; a stop, crash or leaving moves it from `no-answer` to `gone` or `removed`; in `any` mode a close withdraws the others' reminders; in `all` mode `no-answer` keeps the post open; a compact turn counts for nothing; acknowledging does not withdraw a reminder; a reminder returned twice gives `undeliverable` (row 153); an ordinary error after the question's accept queues the one reminder, and an ordinary error after the reminder's accept writes `no-answer`, each with no resend of the accepted wake and with the same result after a restart; an open capacity hold queues no reminder and writes no `no-answer`, and the carry-on's turn end then counts; a capacity error that returns the wake counts as a turn's end (row 156) | Test id: `packages/engine/test/board/reactor.test.ts`, "no answer" |
 | 4.14 | No reminder goes to an addressee with an open post of its own, an owed completion or an open non-blocking wait, until that has ended and a further turn has ended; a paused or interrupted one gets none; two addressees that answer each other's notices write at most one reminder, one `no-answer` and one notice per post and target; running the reactor twice writes each once (row 153) | Test id: `packages/engine/test/board/reactor.test.ts`, "reminder bound" |
 
 **Tasks:**
@@ -1021,6 +1024,28 @@ gets no API request answered (row 149).
     `javascript:` link and Markdown, read through the board's panel in a
     real browser, runs nothing, and opening the alert's link writes no
     `board.Read` (row 122).
+21. PB-R7-1. Through the real runner-event handler, an ordinary error after a wake's accept,
+    with and without an acknowledgement, before and after the reminder's accept, and a
+    restart after each error batch: the log, the rebuilt view, `board.status`, the engine's
+    wait and the owner's helper agree, with no early settling and no reminder held for ever.
+22. PB-R7-2. A kill between the reminder's building, queueing, accept, turn's end,
+    `no-answer`, the notice's queueing and its accept, with each reactor run repeated: at most
+    one accepted reminder and one notice per post and target, with late replies and races
+    with a stop, a crash and a leaving, and rebuilt views equal to live ones.
+23. PB-R7-3. Acknowledging an original-only wake, a mixed wake, a returned wake and a wake
+    behind a capacity hold: the question goes, other duties and the hold stay, no reminder is
+    removed, no sent wake is recalled, and the engine's and the owner's waits are right at
+    every complete batch, in both reply modes.
+24. PB-R7-4. Each deferral condition held open, then finished with its response turn: no
+    early reminder or `no-answer`. The mutual-question case runs with the sheepdog on, as a
+    control, with no other board reminder rule.
+25. PB-R7-5. The owner's wait across a turn's end and `board.AddresseeResolved`, with a status
+    result and a stream at one sequence; live and first-start `board.no-answer` alerts for a
+    post with several silent addressees: one key, the intended thread, cleared at the close.
+26. PB-R7-6. The final encoded `{ requestId, data }` frame, with escaping and the envelope,
+    for pages of quotes, backslashes, control characters and multibyte text: the 512 KiB cap
+    and the 900 KiB budget hold, cursors and marks cover only the returned items, and
+    `agentReadReply`, fresh markers and unchanged tool and CLI output hold.
 
 </details>
 
@@ -1052,7 +1077,8 @@ lead's rulings (`attack/round-5-findings.md`, `final-round-rulings.md`, post
 (`attack/round-6-findings.md`, post #325), with the client API contract version
 16 (`220a433`, post #330); (s) the owner's change before acceptance, its rulings
 (`owner-q12-change.md`, `q12-ack-rulings.md`, post #360), and the client API
-contract version 17 (`b38aa6f`).
+contract version 17 (`b38aa6f`); (t) the logic review of that change and the lead's
+ruling (`attack/round-7-findings.md`, `q12-r7-ruling.md`, post #365).
 
 | Source item | Workstream | Status |
 |---|---|---|
@@ -1121,6 +1147,8 @@ contract version 17 (`b38aa6f`).
 | (s) Acknowledge | B5, B13, WS-1, WS-3 (3.16), WS-5 (5.3, 5.4), WS-7 (7.6) | planned (row 152) |
 | (s) A question that gets no answer | WS-1, WS-2 (the view), WS-3, WS-4 (4.6, 4.7, 4.13, 4.14), WS-5 (5.17) | planned (row 153) |
 | (s) Label the text, R5-A2 | WS-5 (5.16) | planned (row 154) |
+| (t) R7-L1 | WS-2 (the view), WS-4 (4.6, 4.13), contract's rule | folded (row 156) |
+| (t) PB-R7-1 to PB-R7-6 | Post-build checks 21 to 26 | proposed (row 156) |
 
 </details>
 
@@ -1202,5 +1230,6 @@ weekly allowance first; the planner cannot read it (known gap 1).
 | Password login fold | none | Not a review round. Plan v10 (`attack/plan-v10.md`) and contract v11 (`attack/contract-v11.md`) became plan v11 and contract v12: the words about devices go, under the lead's rulings (post #301; rows 149, 150). |
 | 6 | 0 / 1 / 0 | One Codex Sol logic check of plan v11 (`attack/plan-v11.md`) and contract v12 (`attack/contract-v12.md`), grade 7, no refusals. Its major, R6-L1, is folded as plan v12 and contract v13 (row 151; `attack/round-6-findings.md`). |
 | Acknowledge fold | none | Not a review round. Plan v12 (`attack/plan-v12.md`) and contract v13 (`attack/contract-v13.md`) became plan v13 and contract v14, at the owner's request before accepting (post #360; rows 152 to 155). |
+| 7 | 0 / 1 / 0 | One Codex Sol logic review of the acknowledge change, grade 7, no refusals. Its major, R7-L1, is folded as plan v14 and contract v15 (row 156; `attack/round-7-findings.md`), with plan v13 and contract v14 kept as `attack/plan-v13.md` and `attack/contract-v14.md`. No further review, by the lead's ruling. |
 
 </details>
