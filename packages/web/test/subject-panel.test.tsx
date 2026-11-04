@@ -7,7 +7,6 @@ it("7.13 names an unsupported subject and explains that it is answered from a te
   expect(container.textContent).toMatch(/answered from a terminal/i) // catches a fallback that offers no actionable next step
 })
 
-// enable-in: b6 — the board plan adds its known-namespace subject entry in B11.
 it("7.13 uses a known namespace table entry when the board entry is installed", async () => {
   const container = await mountThread([], {}, "/thread/worker-1?subject=board:post-42")
   expect(container.textContent).toContain("Board post")

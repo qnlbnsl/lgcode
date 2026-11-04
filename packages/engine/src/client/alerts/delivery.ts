@@ -25,7 +25,7 @@ const threadLink = (row: AlertRow, web: ClientView["webSettings"]): string | und
   try {
     const url = new URL(web.publicAddress);
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== "/") return undefined;
-    return `${url.origin}/threads/${encodeURIComponent(row.agentId)}`;
+    return `${url.origin}/#/thread/${encodeURIComponent(row.agentId)}`;
   } catch { return undefined; }
 };
 const payload = (row: AlertRow, snapshot: Snapshot): AlertPayload => {

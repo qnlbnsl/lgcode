@@ -4,7 +4,7 @@ import type { AgentId, Oversized } from "@shephrd/contracts"
 import { Content } from "./content.tsx"
 import { requestId, withClient } from "./client.ts"
 import { Request, requestOpen } from "./request.tsx"
-import { SubjectPanel } from "./subjects/index.tsx"
+import { AlertSubjects } from "./subjects/alerts.tsx"
 import { DataText, visibleText } from "./text.tsx"
 import { watchThread, type ThreadState } from "./watch.ts"
 
@@ -86,7 +86,8 @@ export function Thread({ agentId, subject, onSessionExpired }: {
     <nav><a href="/">Situation</a></nav>
     <h2>Thread: {visibleText(agent?.name ?? agentId)}</h2>
     <p role="status">{state.connection}</p>
-    {subject !== undefined && <SubjectPanel agentId={agentId} subject={subject} />}
+    <AlertSubjects agentId={agentId} {...(subject === undefined ? {} : { subject })}
+      {...(state.snapshot === undefined ? {} : { sequence: state.snapshot.sequence })} />
     {!state.loaded && <p>Loading thread…</p>}
     {state.loaded && state.items.length === 0 && <p>No thread items.</p>}
     {state.items.map((item) => {
