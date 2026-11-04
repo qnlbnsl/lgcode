@@ -134,7 +134,7 @@ each get an attack pass.
 
 Full log → `decisions.md`. The design decisions →
 `docs/specs/2026-11-03-client-api-design.md`. The contract the other two
-plans build on is `contract.md`, version 13.
+plans build on is `contract.md`, version 14.
 
 ## Workstreams
 
@@ -287,7 +287,7 @@ Conventions for every unit. Paths are relative to the Shephrd repository
 root. Anchors are at engine commit `9e386b0`, and `scouting.md` records the first scouting at `8ff4c9b`. "Rows" are
 rows of this plan's `decisions.md`; "engine rows" are rows of
 `.plans/plans/shepherd-engine/decisions.md`. "The contract" is
-`contract.md` in this folder, version 13; where a
+`contract.md` in this folder, version 14; where a
 unit and the contract disagree, the unit reports it to the lead. A test id
 is a Vitest file path, run from the repository root with
 `pnpm vitest run <path>`; Playwright tests run with
@@ -302,7 +302,7 @@ Security Policy, a header that tells the browser which scripts may run),
 TTL (time to live), QA (a manual check on a real host or device).
 
 Engine edits (rows 63, 64, 67): units 1a and 1b edit the engine directly,
-as contract section 6 lists, edits E1 to E23 and E27 to E31. Existing engine behaviour
+as contract section 6 lists, edits E1 to E23, E27 to E31 and E33. Existing engine behaviour
 changes only where section 6 names the change. An existing test changes
 only where section 6 names it, and then only as section 6 says. The check,
 for every unit that touches `packages/engine`, `packages/contracts`,
@@ -317,7 +317,7 @@ Purpose: make the engine's closed lists into lists that pieces 2 to 4 edit
 directly, and build once the caller, delivery and wait rules that carry the
 security properties, so the record always names the real actor. Units: 1a
 the lists; 1b the callers and the delivery and wait rules. Contract
-section 6, edits E1 to E23 and E27 to E31.
+section 6, edits E1 to E23, E27 to E31 and E33.
 
 **Done when:**
 
@@ -368,6 +368,7 @@ section 6, edits E1 to E23 and E27 to E31.
 | 1.43 | A withdrawal that leaves its target in the reloaded state, with nothing queued or sent, writes `StateChanged idle` in the same batch before the wait checks, and a wait on it closes; it holds for a dispatcher's withdrawal and a reactor's; it holds for any batch with a `DeliveryWithdrawn`, including the engine's own, such as an answered question's delivery to a reloaded holder | Test id: `packages/engine/test/routing/withdraw-reloaded.test.ts` (real recovery events) |
 | 1.44 | One piece's throw cannot stop the engine: a fixture piece throws from its reducer, its reach check, hold-unsettled, request-held, source rule, secret keep list and `snapshotFor`, and each gives contract section 1's fallback; the log holds no event text from the failure; commands and `stop` still run, an adapter's request is still recorded, a queue behind a throwing reach check goes on, a restart finishes, nothing is deleted by a throwing keep list, and the rebuild check passes after a throwing reducer; a boundary test finds no direct call into a table; `guardPiece` covers table functions only, and the roles' matcher and capacity-hold condition are the two named exceptions, tested by the roles plan | Test id: `packages/engine/test/pieces/throwing-piece.test.ts`; boundary test in the same file; the rebuild check |
 | 1.45 | `stop` writes `PermissionCancelled` with the reason "agent stopped", and a withdrawal, for each open request the stopped agent asked; questions stay open; it moves what the agent held; after a resume no stale row remains, an owner's wait is not ended by one, and a parent's wait closes; `failure-4-no-answerer` keeps its expectations | Test id: `packages/engine/test/commands/stop-cancels-requests.test.ts`; `packages/engine/test/acceptance/failure-4-no-answerer.test.ts` (unchanged expectations) |
+| 1.46 | A registered secret inside `service`, `rule`, `namespace`, a delivery source's `namespace`, or an envelope's `device` leaves the id unchanged in the event and the receipt, and the fold still finds it; the same secret in text is still redacted | Test id: `packages/engine/test/log/client-identities.test.ts` |
 
 **Tasks:**
 
@@ -396,6 +397,7 @@ section 6, edits E1 to E23 and E27 to E31.
 | 1b.11 | E29: the permission request's tool fields, for every tool kind | `runner/AcpRunner.ts:569-574`, `cleanStructure` l.173; `runner/Runner.ts:58`; `events.ts:121`; `views/apply.ts:216` |
 | 1b.12 | E29's delivery: the holder's text, the fixed words, the row's `action` part for a move, and the fake agent's new fields | `routing/holders.ts` (`routedDelivery` l.45-55, `move` l.88); `routing/permissions.ts:22-30`; `views/apply.ts:216-230`; `packages/testing/src/fakeAgent.ts:293-294` |
 | 1b.13 | E31: `stop` cancels the asker's open requests. E17's reloaded-state rule moves into `withWaitChecks`' first step | `commands/stop.ts:10-18`; `recovery/crash.ts:58-63`; `routing/waits.ts:110` |
+| 1b.14 | E33's first part: the entries for `Caller`, `Sender`, a piece's source and `device` | `packages/engine/src/log/redactionStructure.ts` (`actor` l.13, `delivery` l.19, `receiptStructure` l.31) |
 
 **Design artifact:** none.
 
@@ -418,7 +420,7 @@ section 6, edits E1 to E23 and E27 to E31.
 | A piece's view drifts from the log | Medium | Pieces' views join the rebuild check (criterion 1.2). |
 | The unit is too big for one build | Medium | Split into 1a and 1b, each with its own criteria. |
 
-**Verify:** criteria 1.1-1.45; environment QA: none.
+**Verify:** criteria 1.1-1.46; environment QA: none.
 
 **Rollout detail:** rollout step 3. Unit 1a merges before 1b starts. The
 board and roles plans start their engine-facing units only after 1b merges.
@@ -443,6 +445,7 @@ installs its events. Each later unit installs the commands it handles (row 172).
 | 2.7 | Through the public client connection, against a fixture server, `subscribe` and `client.subscribe` each call their own RPC; a filter survives a dropped connection; the cursor advances on an event, a checkpoint and an oversized marker; a client that subscribes opens two connections, carries every other command on the read connection and reconnects each on its own, and a client that never subscribes opens one, on the Unix socket and in the browser | Test id: `packages/client/test/stream-dispatch.test.ts`; `packages/client/test/two-connections.test.ts`; `packages/client/test/concurrent-reconnect.test.ts` (unary expectations unchanged) |
 | 2.8 | `core.ts` and `browser.ts` reach no `node:` import; the root entry still gives the command-line tool, the MCP server and the pane viewer today's behaviour | Test id: `packages/client/test/entry-boundaries.test.ts`; existing client tests with unchanged expectations |
 | 2.9 | Every `client` command's definition has the access in contract section 5, and every `client` event is `owner-only`; through the visibility function, an agent caller never sees an alert | Test id: `packages/contracts/test/client/access-table.test.ts`; `packages/engine/test/client/client-visibility.test.ts` |
+| 2.10 | A registered secret inside `alertId`, `key` or a subject's `namespace` leaves it unchanged in the event and the receipt; the same secret in a title is still redacted; a fixture alert source cannot put free text in a `key` | Test id: `packages/engine/test/log/client-identities.test.ts` |
 
 **Tasks:**
 
@@ -453,6 +456,7 @@ installs its events. Each later unit installs the commands it handles (row 172).
 | 2.3 | E24 and E25: stream dispatch by tag, and the tolerant wire group at the RPC boundary | `packages/client/src/index.ts` (`RpcClient.make` l.97, `subscribe` helper l.190-212, `CommandsRpcGroup.requests` l.218); Effect `rpc/RpcClient.ts:733-755`, l.811-818; target `packages/contracts/src/wire.ts` |
 | 2.5 | E26: the client library's three modules, with the root re-exporting Node's | `packages/client/src/index.ts` (l.1-3, l.19-22, l.32, l.120-138); targets `packages/client/src/core.ts`, `node.ts`, `browser.ts` |
 | 2.4 | The size-limit test over each piece's stated maxima | Target `packages/contracts/test/size-limits.test.ts` |
+| 2.7 | E33's second part: `alertId`, `key` and a subject's `namespace` | `packages/engine/src/log/redactionStructure.ts` (`eventStructure` l.23, `receiptStructure` l.31) |
 | 2.6 | E32: two connections from a client that subscribes | `packages/client/src/index.ts` (`connect` l.142-174, `subscribe` helper l.190-212); Effect `rpc/RpcClient.ts:350`, l.577-581 |
 
 **Design artifact:** none.
@@ -468,7 +472,7 @@ installs its events. Each later unit installs the commands it handles (row 172).
 | A browser build pulls in Node code | Medium | Criterion 2.8, and unit 7a's production build. |
 | A unit merges commands with no handlers, so the exact handler check fails or invites a stub | Medium | Unit 2 installs no command, and each later unit installs its own (row 172). |
 
-**Verify:** criteria 2.1-2.9; environment QA: none.
+**Verify:** criteria 2.1-2.10; environment QA: none.
 
 **Rollout detail:** rollout step 4.
 
@@ -1048,5 +1052,6 @@ gap).
 | 3 | 0 / 9 / 18 | Six reviews of `a7f1c9f`, grades 6 to 7, no refusals. The nine majors are five distinct ones. All folded as contract v11 and rows 158 to 175. Every finding, its fix and its criterion are in `attack/round-3-findings.md`, whose first section puts each major's fold plainly for the owner. The owner decides whether another round runs. |
 | v12 | — | No review round, by the lead's note. `client.event`'s reply names its envelope, a capacity hold keeps an agent unsettled, and `guardPiece` names its two exceptions (rows 176 to 178). |
 | 4 | 0 / 1 / 5 | Four Codex Sol reviews of `8a34e59`, by the owner's Codex-only final round, no refusals. The major and the re-anchor item are folded as contract v13 and rows 179 to 181, and the plan is re-anchored to engine `9e386b0`. The other three minors are in `attack/known-gaps.md`, not folded, by the manager's rule. |
+| v14 | — | No review round, by the lead's ruling. New edit E33 lists this plan's id fields in the engine's redaction structure (row 182). |
 
 </details>

@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v13, final round folded, re-anchored to engine 9e386b0
-version: 13
+status: v14, redaction check added, anchored to engine 9e386b0
+version: 14
 updated: 2026-11-03
 ---
 
@@ -2459,6 +2459,34 @@ The library does not reconnect a stream while a recovery read is running.
   subscribes. `packages/client/test/oversized-state.test.ts` gains the cases in
   criterion 3.9.
 
+### The engine's list of id fields
+
+**E33. This plan's id fields survive redaction** (row 182). At `9e386b0`,
+`packages/engine/src/log/redactionStructure.ts` names the fields that hold ids, and
+every other string gets value redaction. So a registered secret that occurs inside an id
+that is not listed would change that id in the log, and a fold or a key match would lose
+track of it. This plan adds these entries, and no others:
+
+| Structure | Entry | Why | Unit |
+| --- | --- | --- | --- |
+| `actor` | `service`, `rule`, `namespace` | `Caller` and `Sender` gain these (edits E11, E14, E15), in `sender`, `answeredBy`, `caller` and the rest of `actor`'s places. | 1b |
+| `delivery.source` | `namespace` | A piece's source is `{ namespace, id }` (edit E16). `id` is already listed. | 1b |
+| `receiptStructure`'s envelopes | `device` | An envelope gains `device` (edit E12). | 1b |
+| `eventStructure` | `alertId`, `key` | The client's alert events. | 2 |
+| `subject` | `namespace` | An alert's subject can be a piece's. `id` is already listed. | 2 |
+| `receiptStructure` | `alertId` | A planner's reply may name it. | 2 |
+
+An entry skips redaction, so a field listed here must never hold free text. `alertId`
+is engine-generated. `service`, `namespace` and `rule` are fixed names and rule ids. A
+`key` is built only from ids, sequences and fixed words, and an alert source's result
+can name no other part of it. A title, an alert's reason, a carrier's server and the
+fields of edit E29 stay text, and `toolCallId` stays text as today.
+
+- Behaviour change: none for the engine's own events.
+- Tests: `packages/engine/test/log/client-identities.test.ts` registers a secret that
+  occurs inside each listed field, in an event and in a receipt. Each id is unchanged,
+  and the same secret in a title or in `toolInput` is still redacted.
+
 ### What the later plans then add
 
 - **The client API's later units** add the `client` group, events, reads,
@@ -2479,12 +2507,12 @@ with an attack pass, before any piece unit:
 - **Unit 1a, the lists:** edits E1 to E10, E21, E22 and E30. The guard comes first,
   and each later table's edit calls it.
 - **Unit 1b, the callers and the delivery and wait rules:** edits E11 to
-  E20, E23, E27, E28, E29 and E31. It changes the prompt renderer and the dispatcher, which carry the
+  E20, E23, E27, E28, E29, E31 and the first part of E33. It changes the prompt renderer and the dispatcher, which carry the
   security properties, so its attack pass covers lead rulings L13 and L16
   to L25 by name.
 
 Edits E24, E25, E26 and E32 change the client library, not the engine, and are part
-of unit 2. Unit 2 defines the client group's schemas, and it installs the group's
+of unit 2, with the second part of E33. Unit 2 defines the client group's schemas, and it installs the group's
 events. It does not install the group's commands into `CommandsRpcGroup`, because
 every command there must have its handler (edit E3). Each unit installs the commands
 it handles, so the exact handler check stays true with no stub (row 172).
