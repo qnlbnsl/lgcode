@@ -17,6 +17,8 @@ import { refused, type Input, type Payload, type Plan } from "./internal.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
 import { setWebSettings } from "../client/settings.ts";
 import { setRoleFile } from "../roles/roleFile.ts";
+import { setSettings, snooze } from "../roles/sheepdog/settings.ts";
+import { record } from "../roles/sheepdog/record.ts";
 
 type Planner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<Plan, ReturnType<typeof refused> | LogWriteFailed>;
 const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan: Planner): Planner => (input, payload) => Effect.gen(function* () {
@@ -33,9 +35,9 @@ export const planners = {
   "roles.role-file.set": (input, payload) => setRoleFile(input, payload as Payload<"roles.role-file.set">),
   // Their implementation units replace these refusals; each declared command
   // already has exactly one execution kind and cannot accidentally run elsewhere.
-  "roles.settings.set": () => Effect.fail(refused()),
-  "roles.snooze": () => Effect.fail(refused()),
-  "roles.record": () => Effect.fail(refused()),
+  "roles.settings.set": (input, payload) => setSettings(input, payload as Payload<"roles.settings.set">),
+  "roles.snooze": (input, payload) => snooze(input, payload as Payload<"roles.snooze">),
+  "roles.record": (input, payload) => record(input, payload as Payload<"roles.record">),
   release: (input, payload) => release(input, payload as Payload<"release">),
   start: (input, payload) => start(input, payload as Payload<"start">),
   prompt: targeted("prompt", (input, payload) => Effect.succeed(prompt(input, payload as Payload<"prompt">))),

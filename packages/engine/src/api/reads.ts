@@ -12,6 +12,7 @@ import { getRoleFile } from "../roles/roleFile.ts";
 import { listActions } from "../roles/actions.ts";
 import { orient } from "../roles/orient.ts";
 import { handoff } from "../roles/handoff.ts";
+import { getSettings } from "../roles/sheepdog/settings.ts";
 export { agentReadReply } from "../client/reads/index.ts";
 
 export interface ReadReply { readonly reply: Record<string, unknown>; readonly marks?: ReadonlyArray<Event>; readonly deliveries?: ReadonlyArray<import("../routing/pieceDelivery.ts").DeliveryRequest>; readonly sideRows?: import("../log/EventLog.ts").SideRows }
@@ -23,7 +24,7 @@ export const reads = {
   "roles.role-file.get": getRoleFile,
   "roles.orient": orient,
   "roles.handoff": handoff,
-  "roles.settings.get": () => Effect.fail(refused()),
+  "roles.settings.get": getSettings,
   "roles.actions.list": listActions,
   subscribe: (input: Input, payload: Record<string, unknown>) => subscribe(payload.after as number).pipe(
     Stream.filterEffect((envelope) => input.runtime.views.snapshot.pipe(

@@ -18,6 +18,7 @@ it("6.16 first start scans only open engine and piece matters in one baseline ba
   try {
     await withAlerts(() => Effect.gen(function* () {
       yield* registerRebuildCheck();
+      yield* eventually(eventsOf("roles.SheepdogBaseline"), (rows) => rows.length === 1);
       yield* seedAgent({ id: "worker", state: "working" });
       yield* permission(); yield* question();
       yield* question("worker", "closed");

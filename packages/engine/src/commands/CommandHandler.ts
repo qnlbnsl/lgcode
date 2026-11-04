@@ -22,6 +22,7 @@ import { crashEvents } from "../recovery/crash.ts";
 import { Restart } from "../recovery/service.ts";
 import { Runner, RunnerEvent } from "../runner/Runner.ts";
 import { dispatchCommitted, deliveryUpdate, promptReply, turnEnded } from "../routing/deliveries.ts";
+import { settingsRefusal } from "../roles/sheepdog/settings.ts";
 import { holderAbove } from "../routing/holders.ts";
 import { preempt, withLane } from "../routing/lanes.ts";
 import { permissionRequested } from "../routing/permissions.ts";
@@ -254,7 +255,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
               }
               return Schema.decodeUnknownSync(Schema.toType(rpc.payloadSchema))(value) as Record<string, unknown>;
             },
-            catch: () => refused(),
+            catch: (error) => name === "roles.settings.set" ? settingsRefusal(error) : refused(),
           });
           const { requestId: id, ...body } = payload;
           const requestId = id as RequestId;

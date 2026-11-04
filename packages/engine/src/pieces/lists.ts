@@ -15,6 +15,8 @@ import { openMatters as boardOpenMatters, alertSource as boardAlertSource } from
 import type { LogWriteFailed } from "../log/EventLog.ts";
 import { pieceViews, type PieceView } from "./viewTables.ts";
 import { snapshotFor as rolesSnapshotFor } from "../roles/snapshot.ts";
+import { openMatters as rolesOpenMatters, alertSource as rolesAlertSource } from "../roles/openMatters.ts";
+import { sheepdogLoop } from "../roles/sheepdog/loop.ts";
 
 import { alertDelivery } from "../client/alerts/delivery.ts";
 import { carrierKeep, carrierPlanners } from "../client/alerts/token.ts";
@@ -54,14 +56,17 @@ const absent = () => undefined;
 export const engineLists: EngineLists = {
   commandGroups, eventGroups, commands: CommandsRpcGroup, event: Event, envelope: EventEnvelope,
   reach, sourceRules, holdUnsettled, requestHeld, secretKeep: { client: carrierKeep, board: () => [], roles: () => [] },
-  services: {}, secretCommands: ["accounts set-secret", "client.alerts.carrier.set-token"],
+  services: {
+    "roles.sheepdog": ["subscribe", "client.event", "prompt", "compact", "resume", "release", "roles.record", "board.post", "board.flush", "board.status"],
+    "roles.standing-rules": [],
+  }, secretCommands: ["accounts set-secret", "client.alerts.carrier.set-token"],
   access: commandAccess,
   planners: { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners },
   reads: { ...reads, ...alertReads, ...boardReads },
   views: pieceViews,
   migrations: { client: [], board: [], roles: [] }, visibility: eventVisibility, pieceVisibility: {},
   snapshotSections: { client: absent, board: boardSnapshotFor, roles: rolesSnapshotFor },
-  alertSources: { client: absent, board: boardAlertSource, roles: absent },
-  openMatters: { client: () => [], board: boardOpenMatters, roles: () => [] },
-  reactors: { client: Effect.all([alertReactor, alertDelivery], { concurrency: "unbounded", discard: true }), board: boardReactor },
+  alertSources: { client: absent, board: boardAlertSource, roles: rolesAlertSource },
+  openMatters: { client: () => [], board: boardOpenMatters, roles: rolesOpenMatters },
+  reactors: { client: Effect.all([alertReactor, alertDelivery], { concurrency: "unbounded", discard: true }), board: boardReactor, roles: sheepdogLoop },
 } satisfies EngineLists;
