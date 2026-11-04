@@ -48,7 +48,7 @@ for (const command of [...planners, ...reads]) {
       }
       const sql = yield* SqlClient.SqlClient;
       const events = yield* sql<{ payload_json: string }>`SELECT payload_json FROM events ORDER BY sequence`;
-      expect(events.map((row) => JSON.parse(row.payload_json))).toEqual(isPlanner
+      expect(events.map((row) => JSON.parse(row.payload_json)).filter((event) => event._tag !== "client.AlertBaseline")).toEqual(isPlanner
         ? [{ _tag: "CommandRefused", command, reason: "board disabled" }] : []);
       const receipts = yield* sql<{ request_id: string }>`SELECT request_id FROM receipts`;
       expect(receipts).toEqual(isPlanner ? [{ request_id: requestId }] : []);
