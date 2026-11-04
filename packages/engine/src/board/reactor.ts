@@ -10,7 +10,7 @@ import type { EngineLists } from "../pieces/lists.ts";
 import { Restart } from "../recovery/service.ts";
 import { project } from "../routing/waits.ts";
 import { Views } from "../views/Views.ts";
-import { own, successorManager } from "./access.ts";
+import { canCarryPost, leftChannelAfter, own, successorManager } from "./access.ts";
 import { outcome } from "./outcome.ts";
 import { activeWakes, boardView, buildWake, completionOwed, isUnread, noAnswerDue, readerKey, refreshWakes, reminderDue } from "./wake.ts";
 
@@ -58,15 +58,19 @@ export const lifecycleBatch = (snapshot: Snapshot, target: AgentId, lists?: Engi
   }
   for (const original of Object.values(boardView(state).posts)) {
     if (original.status !== "open") continue;
-    if (original.author._tag === "agent" && original.author.agentId === target && stoppedAfter(state, target, original.sequence)) {
-      append({ _tag: "board.PostClosed", postId: original.postId, outcome: "withdrawn", closer, completionOwed: false });
-      continue;
+    if (original.author._tag === "agent" && original.author.agentId === target) {
+      const stopped = stoppedAfter(state, target, original.sequence);
+      if (stopped || leftChannelAfter(state, target, original)) {
+        append({ _tag: "board.PostClosed", postId: original.postId, outcome: "withdrawn", closer, completionOwed: !stopped });
+        continue;
+      }
     }
     if (original.reply === "none") continue;
     const addressee = original.to.find((to) => to._tag === "agent" && to.agentId === target);
     const disposition = own(original.dispositions, target);
     if (addressee !== undefined && (disposition === undefined || disposition === "no-answer")) {
       const resolution = gone(state, target, original) ? "gone"
+        : leftChannelAfter(state, target, original) || !canCarryPost(state, target, original.postId) ? "removed"
         : disposition !== undefined ? undefined
         : (own(original.returns ?? {}, target) ?? 0) >= 2 ? "undeliverable"
         : noAnswerDue(state, target, original) ? "no-answer" : undefined;
@@ -105,6 +109,20 @@ const touchedTargets = (snapshot: Snapshot, batch: ReadonlyArray<EventEnvelope>)
     if (post.author._tag === "agent") touch(post.author.agentId, sequence);
     for (const to of post.to) if (to._tag === "agent") touch(to.agentId, sequence);
   };
+  const channelTargets = (channelId: string, sequence: number) => {
+    for (const post of Object.values(boardView(snapshot).posts)) {
+      if (post.channelId === channelId) postTargets(post.postId, sequence);
+    }
+  };
+  // A membership change can end a direct pair's last shared channel. Its
+  // other participant needs a scan even when its question was already read.
+  const directTargets = (id: AgentId, sequence: number) => {
+    for (const channel of Object.values(boardView(snapshot).channels)) {
+      if (channel.kind === "direct" && channel.members.some((member) => member._tag === "agent" && member.agentId === id)) {
+        channelTargets(channel.channelId, sequence);
+      }
+    }
+  };
   for (const { event, sequence } of batch) {
     if (event._tag === "CommandRefused") continue;
     if ("agentId" in event) touch(event.agentId, sequence);
@@ -115,7 +133,16 @@ const touchedTargets = (snapshot: Snapshot, batch: ReadonlyArray<EventEnvelope>)
       if (event._tag === "board.PostWritten" && event.replyToPostId !== undefined) postTargets(event.replyToPostId, sequence);
     } else if (event._tag === "board.Read") {
       for (const id of event.postIds) postTargets(id, sequence);
-    } else if (event._tag === "board.ManagerChanged" && event.manager._tag === "agent") touch(event.manager.agentId, sequence);
+    } else if (event._tag === "board.ChannelMembersChanged") {
+      channelTargets(event.channelId, sequence);
+      for (const member of [...event.membersAdded, ...event.membersRemoved]) {
+        if (member._tag === "agent") { touch(member.agentId, sequence); directTargets(member.agentId, sequence); }
+      }
+    } else if (event._tag === "board.ManagerChanged") {
+      channelTargets(event.channelId, sequence);
+      if (event.manager._tag === "agent") { touch(event.manager.agentId, sequence); directTargets(event.manager.agentId, sequence); }
+    }
+    if (event._tag === "AgentGrouped" || event._tag === "AgentStopped") directTargets(event.agentId, sequence);
   }
   return targets;
 };

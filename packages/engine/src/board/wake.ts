@@ -9,7 +9,7 @@ import type { PiecePlan, Snapshot } from "../commands/internal.ts";
 import { escapeLeadingSlash } from "../routing/envelope.ts";
 import { project } from "../routing/waits.ts";
 import type { EngineLists } from "../pieces/lists.ts";
-import { canCarryCompletion, canCarryPost, own } from "./access.ts";
+import { canCarryCompletion, canCarryPost, leftChannelAfter, own } from "./access.ts";
 import { outcome } from "./outcome.ts";
 import type { BoardFold } from "./view.ts";
 
@@ -82,7 +82,7 @@ const renderCompletion = (snapshot: Snapshot, completion: BoardCompletion): stri
   const { replies, ...metadata } = completion;
   const post = own(boardView(snapshot).posts, completion.postId)!;
   const reason = completion.outcome !== "withdrawn" ? ""
-    : post.author._tag === "agent" && !canCarryCompletion(snapshot, post.author.agentId, post.postId, true)
+    : post.author._tag === "agent" && leftChannelAfter(snapshot, post.author.agentId, post)
       ? "\nThe author was removed from the channel." : "\nThe post was withdrawn.";
   const omitted = completion.totalReplies - replies.length;
   return `Completion ${JSON.stringify(metadata)}${reason}`

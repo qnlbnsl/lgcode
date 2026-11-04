@@ -740,9 +740,7 @@ for (const mode of ["any", "all"] as const) {
 }
 
 for (const reason of ["removed", "stopped"] as const) {
-  // Membership departure is unit 3c; stopping the author is unit 3b.
-  // enable-in: b3c (removed case only)
-  it.live.skipIf(reason === "removed")(`3.3 outcome table continuation: author ${reason} withdraws with ${reason === "removed" ? "one reason-bearing completion" : "no completion"}`, () => run((c) => Effect.gen(function* () {
+  it.live(`3.3 outcome table continuation: author ${reason} withdraws with ${reason === "removed" ? "one reason-bearing completion" : "no completion"}`, () => run((c) => Effect.gen(function* () {
     const id = yield* postAs(c.lead!);
     if (reason === "removed") success(yield* call(ownerCredential, "board.members", { channelId: "room", add: [], remove: ["lead"] }));
     else success(yield* call(ownerCredential, "stop", { agentId: "lead" }));

@@ -1,6 +1,6 @@
-import { comparePermission, type Actor, type Caller } from "@shephrd/contracts";
+import { comparePermission, type Actor, type AgentId, type Caller } from "@shephrd/contracts";
 import type { BoardAddressee, BoardAuthor, ReplyMode } from "@shephrd/contracts/board/ids";
-import type { BoardView } from "@shephrd/contracts/board/view";
+import type { BoardPostView, BoardView } from "@shephrd/contracts/board/view";
 import type { Snapshot } from "../commands/internal.ts";
 
 export interface PostAccess {
@@ -53,6 +53,18 @@ export const channelMembers = (snapshot: Snapshot, channelId: string): ReadonlyA
 };
 const member = (snapshot: Snapshot, channelId: string, author: BoardAuthor): boolean =>
   channelMembers(snapshot, channelId).some((candidate) => same(candidate, author));
+
+// Rejoining cannot erase a departure after a post. Group anchors and current
+// managers do not need the label, so losing it is not a departure for them.
+export const leftChannelAfter = (snapshot: Snapshot, id: AgentId, post: BoardPostView): boolean => {
+  const view = board(snapshot);
+  const channel = own(view.channels, post.channelId);
+  if (channel === undefined || !member(snapshot, post.channelId, { _tag: "agent", agentId: id })) return true;
+  if (channel.kind === "plain") return (own(own(view.lastMemberLeft, post.channelId) ?? {}, id) ?? 0) > post.sequence;
+  if (channel.kind !== "group" || channel.group === undefined || channel.anchorAgentId === id
+    || (channel.manager?._tag === "agent" && channel.manager.agentId === id)) return false;
+  return (own(own(view.lastLabelLeft, id) ?? {}, channel.group) ?? 0) > post.sequence;
+};
 
 const unavailable = (snapshot: Snapshot, id: string): boolean => {
   const agent = own(snapshot.agents, id);
