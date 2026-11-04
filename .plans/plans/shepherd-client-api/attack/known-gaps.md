@@ -93,9 +93,12 @@ close it. "Rows" are rows of `decisions.md` in this folder.
   large reply from costing the stream its acknowledgement. But a WebSocket sends a
   message whole, and a heartbeat waits behind it. So an event or a snapshot large
   enough to miss two heartbeats on the read connection is still unreadable on that
-  link. With a 25-second heartbeat, at 500 kilobits per second, that is about 3
-  mebibytes. The reconnect retries with a growing pause, and PB-15 measures it on the
-  owner's phone (row 160).
+  link. The shortest effective timeout is the server's two missed 25-second heartbeats,
+  50 seconds. The browser's read connection has a 50-second ping timeout of its own,
+  checked on a 25-second tick, so it is no shorter. At 500 kilobits per second, 50
+  seconds is about 3 mebibytes. A shorter `heartbeatSeconds` setting lowers this, and the
+  client's fixed ping values do not follow it. The reconnect retries with a growing
+  pause, and PB-15 measures it on the owner's phone (rows 160, 179).
 - **The connection cap serves 16 subscribing pages.** Each page holds two connections
   out of 32. With more than 16 pages open, each new connection closes the oldest, so
   the pages keep displacing one another (row 160).
@@ -119,6 +122,19 @@ close it. "Rows" are rows of `decisions.md` in this folder.
   document says that a `client.web-down` alert means the page must not be opened.
   Authentication closes it, and the later pairing plan considers a proxy upstream that
   is a Unix socket with a group permission. **The lead tells the owner** (row 167).
+
+## Round minors, not folded
+
+By the manager's rule for the final round, only the majors and the re-anchor item were
+folded. These minors of round 4 stay open.
+
+- **R4-A2, architect, and C4-01, critic.** The Codex diff join has no persisted tool-call
+  id, because `runner/translate.ts` drops it from file-change content. So edit E29's join
+  by `toolCallId` cannot find a Codex diff, and criterion 7.12's Codex-shaped case can show
+  only the locations and the fixed warning until an optional id is added to file-change
+  content.
+- **C4-02, critic.** Device attribution does not name the later writes from `start`: its
+  `SessionOpened` and `AgentStartFailed` batches carry only the actor.
 
 ## Where the same-machine guard fails
 

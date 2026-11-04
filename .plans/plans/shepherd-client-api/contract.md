@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v12, two lines added with no review round
-version: 12
+status: v13, final round folded, re-anchored to engine 9e386b0
+version: 13
 updated: 2026-11-03
 ---
 
@@ -39,7 +39,7 @@ means the `shephrd` command-line tool.
 
 ## The pieces edit the engine directly
 
-The engine, as built at commit `8ff4c9b`, has no way for another piece to add
+The engine, as built at commit `9e386b0`, has no way for another piece to add
 a command or an event. Its server, client library, command-line tool and
 command handler each list the engine's sixteen commands by hand, and its
 event union is closed (scouting, scout 1, items 1 and 2). The engine also
@@ -222,7 +222,7 @@ piece's batch against its state table, as it checks its own.
     describe one sequence, and a kill cannot leave half of them (row 136).
   - **A failed write.** On `LogWriteFailed`, the reactor stops at the
     unhandled event and does not advance. The writer has latched by then
-    (`EventLog.ts:141-143`), so every later write fails too. A restart
+    (`EventLog.ts:142-144`), so every later write fails too. A restart
     resumes from the recorded position. A reactor never logs a warning and
     moves on past an event.
   - **A defect.** A defect in a reactor is logged at error level with no
@@ -308,7 +308,7 @@ calls no command.
 These rules apply to the four kinds:
 
 - **A device has the owner's rights, except for three commands.** The
-  engine already treats a device as the owner (`CommandHandler.ts:207`).
+  engine already treats a device as the owner (`CommandHandler.ts:246`).
   The owner chose three commands that work only at the computer, over the
   engine's Unix socket with the owner credential (row 82). Each is tagged
   **computer-only** in the access table, and the web server also refuses
@@ -805,7 +805,7 @@ which means settled, resolved or owner-held, it does this:
    piece's lists when a piece has them, otherwise `client.sequence`.
 3. If L is below S, the commit has not yet reached the views. That gap lasts only
    from a commit to its publication, in one step of the writer
-   (`log/EventLog.ts:136-140`), and a catch-up page can show it. So the helper
+   (`log/EventLog.ts:137-141`), and a catch-up page can show it. So the helper
    reads again.
 4. If L is above S, it applies the stream up to L, and no further.
 5. It decides again on the state at L. It ends the wait only on a state at a
@@ -1144,7 +1144,7 @@ rules (rows 93, 94):
 
 - **One logical slot.** No setting holds a secret reference. The carrier has
   one token slot in the engine's `secrets.json`, so the redactor knows the value
-  (`service.ts:81-85`). Each value in it has a fresh name,
+  (`service.ts:92-98`). Each value in it has a fresh name,
   `secret:client.alerts.carrier.<generation>`, built only by one function in
   `packages/contracts`, and the `client.AlertCarrierTokenSet` event selects the
   active one (row 138). The carrier resolves only that name, with one exception,
@@ -1156,7 +1156,7 @@ rules (rows 93, 94):
   `client.AlertCarrierTokenSet`. The boundary test allows exactly this one path.
 - **The other direction is closed too** (row 138). An account's planner refuses
   an environment value under the reserved prefix `secret:client.`, and the runner
-  refuses to resolve one (`runner/AcpRunner.ts:219-227`). So an agent can never
+  refuses to resolve one (`runner/AcpRunner.ts:323-331`). So an agent can never
   read the token through its environment, and an account can never keep a cleared
   token alive.
 - **Written, never read back.** `client.alerts.carrier.set-token` writes the
@@ -1168,7 +1168,7 @@ rules (rows 93, 94):
   returns the value. A client sees only whether a token is set.
 - **The write order** (row 138). The planner stores the new value under its fresh
   name, then commits the event, as `setSecret` does
-  (`commands/accounts.ts:38-50`). A failed log write leaves an unselected value,
+  (`commands/accounts.ts:68-82`). A failed log write leaves an unselected value,
   and the earlier token stays active and working. Start-up collection removes the
   unselected value.
 - **Bound to its server.** `client.AlertCarrierTokenSet { origin, generation }`
@@ -1294,6 +1294,16 @@ and publish to it, including a fake alert with a lookalike link.
     before the chunk is acknowledged, on one receive loop). Plain HTTP reads were not
     chosen, because the later pairing plan's credential is carried on the WebSocket.
     Edit E32 gives the shape.
+  - **The read connection has its own ping timeout** (row 179). Effect's RPC client
+    pings every 5 seconds by default, and it counts only a decoded frame as a sign of
+    life (Effect 4.0.5, `rpc/RpcClient.ts:1062-1064`, l.1249-1250). A 1 MiB reply takes
+    about 17 seconds at 500 kilobits per second, and no frame is decoded until it has
+    all arrived. So the default would drop the read connection during the reply, and
+    recovery would repeat for ever. The browser's read connection therefore sets
+    `pingInterval` to 25 seconds and `pingTimeout` to 50 seconds, which match the
+    default heartbeat and its two misses. The stream connection keeps Effect's default,
+    because a chunk of at most 256 KiB takes about 4 seconds on that link, so a stream
+    that stops is still found quickly.
   - **The stream connection may close during a recovery.** A slow `client.event`
     can outlast the stream queue. The stream connection then misses its five seconds
     and closes. That costs a reconnect and never the read. The client finishes the
@@ -1465,7 +1475,7 @@ units. Engine edits are reviewed like engine units, with an attack pass
 
 Each edit below names its files, what it changes in the engine's current
 behaviour, and the existing tests it updates. "Existing tests" means the
-tests at engine commit `8ff4c9b`. A test "keeps its expectations" when only
+tests at engine commit `9e386b0`. A test "keeps its expectations" when only
 its imports, fixtures or setup change.
 
 The piece namespaces are one fixed list, `PieceNamespace`, which is
@@ -1522,7 +1532,7 @@ does not compile.
   `service` (row 75).
 - A device is checked as a device. The command handler reads the caller
   kind from the wire credential (`CommandHandler.ts:45`) before it maps a
-  device to the owner actor (`CommandHandler.ts:207`). The host-only list
+  device to the owner actor (`CommandHandler.ts:246`). The host-only list
   (row 55) is then a matter of leaving `device` out of a command's entry.
   Today every engine command that the owner may call, a device may call
   too, so no engine command changes.
@@ -1530,7 +1540,7 @@ does not compile.
   (`server.ts:163-165`), so a device is refused it (row 99).
 - The access check at `CommandHandler.ts:70` (`owners.has(name) &&
   actor._tag !== "owner"`) becomes a lookup of the caller kind in the
-  table. It moves out of `planCommand` to before the receipt lookup (l.238),
+  table. It moves out of `planCommand` to before the receipt lookup (l.277),
   because a device shares the owner's receipts. So a caller without access
   can never get a stored reply by presenting a request id and body (row 100).
   An agent's access refusal is written as today, with a receipt under its own
@@ -1563,19 +1573,19 @@ in the group is in exactly one of this table and the read table (edit E4),
 and a test asserts this. Section 1, "How a piece's command runs", gives the
 rule for which table a command belongs to.
 
-- **The reply.** `Plan` (`packages/engine/src/commands/internal.ts:41`)
+- **The reply.** `Plan` (`packages/engine/src/commands/internal.ts:43`)
   gains one field, `reply`, a function from the committed, redacted batch
   of envelopes to the command's reply. The handler passes it to the
-  receipt writer in place of `replyFor` (`CommandHandler.ts:269`), so the
+  receipt writer in place of `replyFor` (`CommandHandler.ts:308`), so the
   receipt stores that reply. The handler then decodes the stored reply
-  against the command's success schema, as it does today (l.249). A resent
-  request returns the stored reply (l.254), with no second write. A piece's
+  against the command's success schema, as it does today (l.288). A resent
+  request returns the stored reply (l.293), with no second write. A piece's
   planner must set `reply`. An engine planner leaves it unset, and the
   handler keeps using `replyFor` (l.97) for it.
 - **`afterCommit` stays for the engine's planners** (row 102). It does two
   different things today, and both stay. It runs an external action after the
   commit: `start` starts the runner and records its session
-  (`commands/start.ts:53-79`), `stop` stops it (`commands/stop.ts:20`),
+  (`commands/start.ts:59-103`), `stop` stops it (`commands/stop.ts:20`),
   `resume` reloads and dispatches (`commands/resume.ts:45-56`), and `answer`
   delivers the selected option (`routing/permissions.ts:49-54`). For the
   blocking `wait` alone, it also replaces the immediate reply with a later
@@ -1585,7 +1595,7 @@ rule for which table a command belongs to.
 - **What a reply may hold.** Identifiers, counts and fixed values taken from
   the planner's own batch. Never text from an event, and never a record
   read from the views. The receipt writer already redacts the reply
-  (`EventLog.ts:210-220`).
+  (`EventLog.ts:211-221`).
 - Behaviour change: none for the engine's commands. The engine's fourteen
   transactional commands map to the same planners, the same replies and the
   same after-commit actions as today.
@@ -1611,14 +1621,14 @@ its reply, and it is never deduplicated.
   namespace, such as `board.Read`. The read builds its reply from one views
   snapshot, then writes the marks through the piece batch path (edit E23),
   as the calling caller, under a fresh internal request id, with no receipt
-  (the writer's existing `receiptResult: false`, `EventLog.ts:210`). The
+  (the writer's existing `receiptResult: false`, `EventLog.ts:211`). The
   reply is returned to the caller and stored nowhere. A resent request
   computes a fresh page and writes its marks again, so marks must be safe
   to write twice, such as a read watermark that only moves forward.
-- The server's hard-wired group (l.85) and handler type (l.38) follow
+- The server's hard-wired group (l.86) and handler type (l.39) follow
   `CommandsRpcGroup`, which now includes every piece.
-- `debug.compare-views` stays behind the debug flag in this table (l.85,
-  l.163-165). The web server refuses it by name (row 99).
+- `debug.compare-views` stays behind the debug flag in this table (l.86,
+  l.164-166). The web server refuses it by name (row 99).
 - Behaviour change: none for the engine's commands.
 - Tests updated: `packages/engine/test/api/compare-views-rpc.test.ts` and
   `subscribe-visibility.test.ts` keep their expectations. A new test,
@@ -1630,7 +1640,7 @@ its reply, and it is never deduplicated.
 `Event` union (l.88) becomes the engine's events plus each piece's union,
 defined in `packages/contracts/src/<namespace>/events.ts`. The envelope
 stays one schema, `EventEnvelope` (l.184). The log writer's decode
-(`EventLog.ts`, near l.182) needs no edit of its own. Every engine view
+(`EventLog.ts`, near l.183) needs no edit of its own. Every engine view
 ignores a piece's tags. That includes the threads view: `threadAgent`
 (`views/apply.ts:122-123`) tests for a field by name, and it is limited to
 engine tags, so an event such as `client.AlertRaised`, which has an `agentId`,
@@ -1692,7 +1702,7 @@ more code, and "the log is the whole truth" holds for every piece.
 piece's migrations after the engine's. A piece's migrations create only
 tables named `<namespace>_*`, and a test asserts this. Side rows that a
 piece writes in the command transaction go through `sideRows`
-(`EventLog.ts:199-204`), which gains one entry per piece table.
+(`EventLog.ts:200-205`), which gains one entry per piece table.
 
 - Behaviour change: none for the engine's tables.
 - Tests updated: `packages/engine/test/log/append.test.ts` and
@@ -1739,7 +1749,7 @@ value from `views.snapshot` and builds every part of the reply from it. Its
 sequence is that value's own `sequence` (`views/apply.ts:342`), and it never
 reads the log's head. A SQL read transaction could not make the two agree,
 because the views are an in-memory reference published after the commit
-(`views/Views.ts:41-44`, `EventLog.ts:136-140`) (row 103). The reply is built
+(`views/Views.ts:41-44`, `EventLog.ts:137-141`) (row 103). The reply is built
 after the value is read, and holds no writer permit. Every piece's section and
 the wait-state section (section 3) use the same value. A section table, typed over `PieceNamespace`,
 holds each piece's `snapshotFor(caller, view)`, which returns the piece's
@@ -1775,9 +1785,9 @@ by a piece's own reactors, through the piece batch path (edit E23). A read's
 marks are written under the calling caller. The `piece` variant has no
 credential, no access entry, and calls no command.
 
-- **The receipts key.** `callerKey` (`EventLog.ts:116`) gains
+- **The receipts key.** `callerKey` (`EventLog.ts:117`) gains
   `service:<name>` and `piece:<namespace>`, without the rule. The handler's
-  own copy of the key (`CommandHandler.ts:237`) is replaced by a call to
+  own copy of the key (`CommandHandler.ts:276`) is replaced by a call to
   `callerKey`.
 - Behaviour change: the envelope's `caller` schema widens. Every existing
   envelope still decodes.
@@ -1786,7 +1796,7 @@ credential, no access entry, and calls no command.
 
 **E12. The acting device.** `EventEnvelope` gains one optional field,
 `device`, holding a `DeviceId`. The command handler sets it from the device
-credential and keeps `caller: owner` (`CommandHandler.ts:207`). This keeps
+credential and keeps `caller: owner` (`CommandHandler.ts:246`). This keeps
 every engine rule that tests for the owner working for a device with no
 edit of its own (row 66).
 
@@ -1799,20 +1809,32 @@ edit of its own (row 66).
   never produce it. `execute` treats it as access kind `device`, verifies
   nothing, maps it to the owner actor, and sets `device: open-web`. The
   per-connection credential recheck (`server.ts:119-127`) does not apply to it.
+- **The second credential branch** (row 180). `preemptStart`
+  (`CommandHandler.ts:202-229`), which `execute` runs first (l.237), resolves the
+  caller again before a `stop` queues for the lane. Its last branch assumes that any
+  other credential holds an agent token (l.216). Both places use one resolver. An
+  open-web caller follows the owner's authorized path, so a stop from the web cancels a
+  start whose setup is still running. An invalid device credential still cannot
+  preempt. The in-process service path cannot preempt either, because no service may
+  call `stop`. The existing holder and credential checks stay.
 - **The reserved id** (row 154). `open-web` is refused as the id of a real
   device, by `DeviceAdded`'s event schema and by the `sideRows.devices` insert
-  (`EventLog.ts:202-205`). So no real credential can ever be recorded under it,
+  (`EventLog.ts:203-206`). So no real credential can ever be recorded under it,
   and a test does not need the later pairing plan. The envelope's `device` field
   still accepts it.
 - **The caller's kind reaches a planner** (rows 95, 139). `Input`
-  (`commands/internal.ts:36-40`) gains `callerKind`, which `execute` sets before
-  it maps a device to the owner actor (`CommandHandler.ts:205-207`).
+  (`commands/internal.ts:38-42`) gains `callerKind`, which `execute` sets before
+  it maps a device to the owner actor (`CommandHandler.ts:244-246`).
 - Behaviour change: an envelope written for a device carries `device`.
 - Tests updated: `packages/engine/test/commands/handler.test.ts` gains a
   device case and an open-web case. `packages/engine/test/api/auth.test.ts`
   gains a case that no credential maps to it.
   `packages/engine/test/api/per-request-credential.test.ts` keeps its
   expectations. New test: `packages/engine/test/client/web-caller-path.test.ts`.
+  `packages/engine/test/commands/start-setup.test.ts` keeps its owner-stop (l.55) and
+  invalid-device (l.83) expectations, and gains an open-web stop of a setup that never
+  returns: prompt cancellation, one `AgentStopped`, no later `SessionOpened`, and no
+  later spawn.
 
 **E11 and E12 together: one durable form of the caller and the device**
 (lead's round 4, S4; row 71). Today the `events` table stores only the
@@ -1826,9 +1848,9 @@ The edits are:
   have neither, and decode as today. `events.caller` keeps the receipts key
   form: `owner`, `agent:<id>`, `service:<name>` or `piece:<namespace>`.
 - **The append path.** `append` (`EventLog.ts`, the `commit` function,
-  l.145) takes the full `Caller` and the optional device, in place of an
+  l.146) takes the full `Caller` and the optional device, in place of an
   `Actor`. It writes `caller`, `caller_rule` and `device_id` for every
-  event of the batch, and builds the live envelope (l.182) from the same
+  event of the batch, and builds the live envelope (l.183) from the same
   values.
 - **One row decoder.** `decodeRow` (`log/subscribe.ts:36`) reads the three
   columns and rebuilds the full caller and the device. It accepts each of
@@ -1863,7 +1885,7 @@ code:
   in-process call in the same module, because `subscribe` is a read and not a
   handler command (row 126);
 - `resume` passes its caller to `reload`, whose later writes run after the
-  commit (`commands/resume.ts:47`, `recovery/reload.ts:104`, l.134, l.138).
+  commit (`commands/resume.ts:47`, `recovery/reload.ts:105`, l.135, l.139).
   `reload`'s parameter changes from `Actor` to `Caller`, with the optional acting
   device beside it, so a service's resume records the service on those writes,
   and a device's resume records the device, on both success and a failed reload
@@ -1908,7 +1930,7 @@ fields, and no others (lead's round 4, S5; row 72):
   the delivery (`routing/deliveries.ts:46`).
 
 The planners that set a sender from the caller (`commands/prompt.ts:10`,
-`commands/compact.ts:8`, `commands/start.ts:44`, `routing/questions.ts:30`)
+`commands/compact.ts:8`, `commands/start.ts:46`, `routing/questions.ts:30`)
 map a service caller to `service { service }`. The prompt text function,
 `agentText` (`routing/envelope.ts:22-23`), today wraps only an agent's
 text (`sender._tag === "agent"`). It changes to wrap every sender except
@@ -1965,7 +1987,7 @@ can never withdraw a sent or accepted delivery, another piece's delivery,
 or the engine's.
 
 A withdrawal can strand an agent. After a reload, `reloadedEvents` writes
-`StateChanged working` ahead of a requeued delivery (`recovery/reload.ts:73-74,
+`StateChanged working` ahead of a requeued delivery (`recovery/reload.ts:74-75,
 86, 98`), and only a sent delivery and a later turn end clear it. So when any batch
 holds a `DeliveryWithdrawn` that leaves its target in that
 reloaded state with nothing queued or sent, the same batch writes `StateChanged
@@ -2087,7 +2109,7 @@ that needs its reply and has no disposition for it (lead ruling L22).
 **E21. A paged read of one agent's events,** from a sequence number, for
 `client.thread` and `client.subscribe`'s agent filter. It is a new function in
 `packages/engine/src/log/`. The existing agent column misses a
-`DeliveryQueued`, whose target is inside the delivery (`EventLog.ts:175`,
+`DeliveryQueued`, whose target is inside the delivery (`EventLog.ts:176`,
 issue 31), so a read by that column would differ from the engine's `threads`
 view (row 125). So a new engine migration adds a nullable column,
 `thread_agent_id`, indexed, and fills old rows: the agent column, or the
@@ -2146,7 +2168,7 @@ read (row 122). The path refuses a reactor's batch before `recovery.whenReady`
    projected with the batch.
 5. **Wait checks.** `withWaitChecks` (`routing/waits.ts:110`) is applied to
    the batch, as it is for the engine's planners today
-   (`CommandHandler.ts:269`).
+   (`CommandHandler.ts:308`).
 
 Each batch is written under one caller and one request id:
 
@@ -2262,7 +2284,7 @@ The handler's two special cases for `accounts set-secret`
 (`CommandHandler.ts`, the label and the body hash) become a lookup in a
 `secretCommands` table, so `client.alerts.carrier.set-token` gets the same
 treatment. Its planner stores the value under a fresh name before committing, as
-`setSecret` does (`commands/accounts.ts:38-50`), so a failed write leaves the
+`setSecret` does (`commands/accounts.ts:68-82`), so a failed write leaves the
 earlier token active.
 
 - Behaviour change: an account's environment value under `secret:client.` is
@@ -2301,13 +2323,17 @@ stays in edit E12, because row 139 also uses it.
 
 **E29. A permission request carries its action** (rows 132, 162, 174). The owner and
 every other approver approve the action, not a title. Today `event.description` is
-`redactText(tool.title ?? "Permission requested")` (`runner/AcpRunner.ts:411`), and
-the event holds no input (l.416). So `permissionRequested` and `PermissionRequested`
+`redactText(tool.title ?? "Permission requested", processEntry.covered)`
+(`runner/AcpRunner.ts:569`), and
+the event holds no input (l.574). So `permissionRequested` and `PermissionRequested`
 (`events.ts:121`) gain optional fields from the request's own tool call, for every
 tool kind:
 
 - `toolKind`, the protocol's `kind`;
 - `toolInput`, its `rawInput` after the engine's redaction, at most 8 KiB encoded. The
+  redaction is the runner's `cleanStructure(value, processEntry.covered)`
+  (`runner/AcpRunner.ts:173`), which `locations` uses too. So the coverage check holds,
+  and a field named `_tag` in the input gets no exemption (row 181). The
   redaction runs before the cut, so a secret across the boundary cannot survive it;
 - `locations`, its file paths and lines after the same redaction, at most 16 entries
   and 2 KiB encoded;
@@ -2416,6 +2442,14 @@ connection records. `reads` carries every command that is not a stream, as today
 on its own, and a dropped read connection does not restart the stream. This holds on
 the Unix socket and in the browser, because the queue that stalls a read is the RPC
 client's. A client that never subscribes opens one connection, as today.
+
+The browser's `reads` record passes `pingInterval: "25 seconds"` and `pingTimeout:
+"50 seconds"` to `RpcClient.makeProtocolSocket` (`packages/client/src/index.ts:91`).
+Effect's timeout is measured from the last decoded frame, and checked on a ping tick
+(Effect 4.0.5, `rpc/RpcClient.ts:1249-1270`). The browser's `stream` record and every
+Node.js record keep Effect's default. A Unix socket's reply is not held back by a slow
+link, so the command-line tool, the MCP server and the pane viewer change nothing
+(row 179).
 
 The library does not reconnect a stream while a recovery read is running.
 
