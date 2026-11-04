@@ -18,16 +18,18 @@ it("R01 catches restarting subscribe at zero/the original cursor after a mid-cat
   const connect = await loadClient();
   const root = prepareRoot();
   const starts: Array<number> = [];
+  let firstStreamConnection: number | undefined;
   const engine = await fakeEngine(root, {
     onRequest: (frame, socket, connection) => {
+      if (frame.tag === "subscribe") firstStreamConnection ??= connection;
       starts.push(frame.payload.after);
       const available = [101, 102, 103, 104].filter((sequence) => sequence > Number(frame.payload.after));
-      const values = (connection === 1 ? available.slice(0, 2) : available).map(event);
+      const values = (connection === firstStreamConnection ? available.slice(0, 2) : available).map(event);
       if (values.length > 0) chunk(socket, frame, values);
       else succeed(socket, frame, undefined);
     },
     // Ack is the named protocol barrier that the first chunk was consumed.
-    onAck: (socket, connection) => { if (connection === 1) socket.close(1013, "subscription backlog"); },
+    onAck: (socket, connection) => { if (connection === firstStreamConnection) socket.close(1013, "subscription backlog"); },
   });
   const received = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
     const client = yield* connect({ environment: agentEnvironment(root) });

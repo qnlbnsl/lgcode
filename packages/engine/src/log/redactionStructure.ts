@@ -23,15 +23,15 @@ const delivery: RedactionStructure = { fields: {
 export const eventStructure: RedactionStructure = { fields: {
   agentId: identity, accountId: identity, deliveryId: identity,
   roleFileHash: identity, noticeRecipient: identity, postId: identity,
-  permissionRequestId: identity, questionId: identity, waitId: identity,
+  permissionRequestId: identity, questionId: identity, waitId: identity, alertId: identity, alertKey: identity,
   account, harness, parent: actor, sender: actor, holder: actor, answeredBy: actor, from: actor, to: actor,
   toolInput: { freeText: true },
-  delivery, firstPromptDelivery: delivery, subject: { fields: { id: identity } },
+  delivery, firstPromptDelivery: delivery, subject: { fields: { id: identity, namespace: identity } },
   member, members: { elements: member }, process: { fields: { bootId: identity } },
 } };
 
 export const receiptStructure: RedactionStructure = { fields: {
-  requestId: identity, agentId: identity, deliveryId: identity, questionId: identity, waitId: identity,
+  requestId: identity, agentId: identity, deliveryId: identity, questionId: identity, waitId: identity, alertId: identity,
   roleFileHash: identity,
   accounts: { elements: account }, harnesses: { elements: harness }, members: { elements: member },
   envelopes: { elements: { fields: {

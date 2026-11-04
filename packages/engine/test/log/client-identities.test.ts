@@ -55,3 +55,44 @@ it("1.46 receipt identity exemptions survive the real writer while free-text key
     expect(JSON.parse(rows[0]!.result_json)).toMatchObject([{ caller, event: { answeredBy: caller } }]);
   }), { redactor: redactor.layer });
 });
+
+it("2.10 alert identities and a piece subject namespace survive event redaction while title, key and toolInput stay text", async () => {
+  registerRebuildCheck({ noLog: true });
+  const word = randomBytes(16).toString("hex");
+  const redactor = makeRedactor({ secrets: () => [Redacted.make(word), Redacted.make("board")], tokenHashes: () => new Set() });
+  const alertId = `alert-${word}`;
+  const alertKey = `permission:${word}`;
+  const cleaned = await Effect.runPromise(Effect.gen(function* () {
+    const service = yield* Redactor;
+    return yield* service.redact({ _tag: "client.AlertRaised", alertId, alertKey,
+      kind: "approval", title: word, sourceSequence: 1,
+      subject: { _tag: "piece", namespace: "board", id: "post-id" }, key: word, toolInput: word,
+    } as unknown as Event);
+  }).pipe(Effect.provide(redactor.layer))) as unknown as Record<string, any>;
+  // Boolean checks keep a registered synthetic value out of failure reports.
+  expect(cleaned.alertId === alertId, "alertId was redacted").toBe(true);
+  expect(cleaned.alertKey === alertKey, "alertKey was redacted").toBe(true);
+  expect(cleaned.subject.namespace === "board", "subject namespace was redacted").toBe(true);
+  expect(cleaned.title).toBe("[REDACTED]");
+  expect(cleaned.key).toBe("[REDACTED]");
+  expect(cleaned.toolInput).toBe("[REDACTED]");
+});
+
+it("2.10 an alertId in a stored planner receipt is preserved without exempting a free-text key", async () => {
+  const lists = await rulesFixture();
+  const word = randomBytes(16).toString("hex");
+  const alertId = `alert-${word}`;
+  const redactor = makeRedactor({ secrets: () => [Redacted.make(word)], tokenHashes: () => new Set() });
+  await withFixture(lists, () => Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    const log = yield* EventLog;
+    const requestId = freshRequest();
+    yield* log.append({ _tag: "owner" }, requestId, "alert-receipt", [], {}, () => ({ requestId, alertId, key: word, title: word }));
+    const sql = yield* SqlClient.SqlClient;
+    const rows = yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE request_id = ${requestId}`;
+    const reply = JSON.parse(rows[0]!.result_json).reply;
+    expect(reply.alertId === alertId, "receipt alertId was redacted").toBe(true);
+    expect(reply.key).toBe("[REDACTED]");
+    expect(reply.title).toBe("[REDACTED]");
+  }), { redactor: redactor.layer });
+});
