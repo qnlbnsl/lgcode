@@ -287,15 +287,15 @@ uses no `herdr agent` command, `collect.sh` or `board-waker.sh`.
 
 **Sources this plan builds on.** "CAPI §n" is the client API contract,
 `.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api` at
-`8a34e59`, copied here as `client-api-contract-v12.md` (v12: v3's rework
+`5f08c31`, copied here as `client-api-contract-v13.md` (v13: v3's rework
 under lead ruling L26, v4's round 4 shared fixes S1 to S6 under lead ruling
 L29, v5's waiting and reactor changes under lead ruling L30, v6's service
 rights without `answer`, v7's design talk 1, v8's review round 1, and v9's
 two points from the board's question 7 under lead ruling L31, v10's review
-round 2, v11's review round 3, and v12's two lines from this plan's rows 122 and 129; the shared engine edits E1 to E32 in its
+round 2, v11's review round 3, v12's two lines from this plan's rows 122 and 129, and v13's final-round fold and engine re-anchor; the shared engine edits E1 to E32 in its
 section 6, and lead rulings L15, L16,
 L19, L22 and L23; decision rows 21, 32, 33, 52, 55, 80, 95 to 101, 103 to
-135). Edit E28 is pending the owner's question 6, and either answer leaves
+136). Edit E28 is pending the owner's question 6, and either answer leaves
 this plan unchanged (row 108). "Board" is
 the message board contract v10, `.plans/plans/shepherd-message-board/contract.md`
 on `worker/plans-board` at `da88bc0`, v6's rework under L26 with the
@@ -1370,7 +1370,7 @@ seven needs; (H) decisions.md; (I) lead rulings L17 and L19 to L27.
 | E: capacity-retry.sh | WS-4d, WS-7b | mapped (rows 57, 75) |
 | F: items 1 to 6 | WS-1, WS-6, WS-3, WS-2 and WS-3, WS-4, — | roster, thread, service caller, `roles.` commands and alert kinds used as given; subscribe filters not needed in-process |
 | G: needs 1, 3, 4, 5, 6, 7 accepted; 2 refused | WS-3, WS-4, WS-5 | accepted needs used as given, with v8's `board.status` detail lists and its condition lists with no agent; work state derived (rows 25, 55) |
-| H: rows 1 to 135 | all | each row names its workstream in its own text |
+| H: rows 1 to 136 | all | each row names its workstream in its own text |
 | I: L17 (service direct pair; no engine-prompt fallback) | WS-3 | mapped (row 34) |
 | I: L19, L22, L23 (reach check at queue and send, with the delivery) | — | the roles register no reach check; the sheepdog's notices pass the board's (rows 52, 55) |
 | I: L20 (standing-rule matching, including opt-in prefix) | WS-2, WS-7a | mapped (rows 35, 67, 79) |
@@ -1468,7 +1468,7 @@ either would run out (known gap 1).
 | client API v11 | — | Folded client API contract v11 at `3bd2358` (board #241, `artifacts/api-v11-for-pieces.md`), with no review round: the lead's exact text on tool pins, the one batch, `guardPiece`, the fields and the delivered text, and `stop`. Checked against the sheepdog and the hold: a stopped or crashed agent adds no "waits on" link, and a hold can empty. Found while folding: the reducer may hold no envelope time, and `locations` has no cut flag (rows 119 to 128). Frozen as `attack/plan-v12.md`. |
 | board v10 | — | Cited board contract v10 at `c053fda` (board #247), and aligned with its criterion 6.7: an open capacity hold keeps its agent unsettled even once its queue is empty, which reverses row 126, and unit 11b names the held cases. The roles view learns a wake's delivery id from `DeliveryQueued`, because `board.WakeBuilt` now names its source id (rows 129 to 131). Frozen as `attack/plan-v13.md`. |
 | client API v12 | — | Cited client API contract v12 at `8a34e59` and board at `da88bc0`, whose contract stays v10 (board #259). V12 states this plan's two lines: `client.event`'s reply carries the envelope, and `capacityHeld` is in an owner's snapshot and not in an agent's. The use of `capacityHeld` was checked (row 132). Frozen as `attack/plan-v14.md`. |
-| 5 | 0 / 3 / 4 | Grades 7, 7, 8 and 10, no refusals (`attack/round-5-findings.md`). Three majors, two issues, folded: the hand-off reads the real prompt events, and an admitted crash retry survives a restart. The four minors are not folded, by the manager's rule, and are listed in `attack/known-gaps.md`. Anchors moved to engine `9e386b0`; no drift changed a design (rows 133 to 135). Frozen as `attack/plan-v15.md`. |
+| 5 | 0 / 3 / 4 | Grades 7, 7, 8 and 10, no refusals (`attack/round-5-findings.md`). Three majors, two issues, folded: the hand-off reads the real prompt events, and an admitted crash retry survives a restart. The four minors are not folded, by the manager's rule, and are listed in `attack/known-gaps.md`. Anchors moved to engine `9e386b0`; no drift changed a design (rows 133 to 135). Cites client API contract v13 at `5f08c31` (row 136). Frozen as `attack/plan-v15.md`. |
 
 
 
