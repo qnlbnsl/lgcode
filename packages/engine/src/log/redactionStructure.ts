@@ -22,6 +22,7 @@ const delivery: RedactionStructure = { fields: {
 
 export const eventStructure: RedactionStructure = { fields: {
   agentId: identity, accountId: identity, deliveryId: identity,
+  roleFileHash: identity, noticeRecipient: identity, postId: identity,
   permissionRequestId: identity, questionId: identity, waitId: identity,
   account, harness, parent: actor, sender: actor, holder: actor, answeredBy: actor, from: actor, to: actor,
   toolInput: { freeText: true },
@@ -31,6 +32,7 @@ export const eventStructure: RedactionStructure = { fields: {
 
 export const receiptStructure: RedactionStructure = { fields: {
   requestId: identity, agentId: identity, deliveryId: identity, questionId: identity, waitId: identity,
+  roleFileHash: identity,
   accounts: { elements: account }, harnesses: { elements: harness }, members: { elements: member },
   envelopes: { elements: { fields: {
     eventId: identity, requestId: identity, agentId: identity, caller: actor, event: eventStructure,

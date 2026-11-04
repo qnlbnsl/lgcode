@@ -4,6 +4,7 @@ import { HarnessSettings, RunMode } from "./harnesses.ts"
 import { AccountId, AgentId, BootId, DeliveryId, EpochMilliseconds, EventId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
 import { PermissionLevel } from "./permission.ts"
 import { LifecycleState } from "./stateMachine.ts"
+import { RolesEvent } from "./roles/events.ts"
 
 export const Actor = Schema.Union([
   Schema.TaggedStruct("owner", {}),
@@ -222,7 +223,12 @@ export const EngineEvent = Schema.Union([
   Schema.TaggedStruct("CommandRefused", { command: Schema.NonEmptyString, reason: Schema.String, sourceSequence: Schema.optionalKey(EventSequence) })
 ])
 // Later pieces merge their event unions here, in namespace order.
-export const Event = EngineEvent
+// Keep the complete payload union, but widen its member list. Effect 4.0.5's
+// toTaggedUnion recursively flattens tuples and exceeds TypeScript's depth
+// limit with this many events. Use the individual piece union for typed cases.
+export const Event = Schema.Union<ReadonlyArray<typeof EngineEvent.members[number] | typeof RolesEvent.members[number]>>([
+  ...EngineEvent.members, ...RolesEvent.members,
+])
 export type Event = typeof Event.Type
 
 export const EventEnvelope = Schema.Struct({
@@ -236,4 +242,4 @@ export const EventEnvelope = Schema.Struct({
 })
 export type EventEnvelope = typeof EventEnvelope.Type
 
-export const eventGroups = [{ namespace: "engine", events: EngineEvent }] as const
+export const eventGroups = [{ namespace: "engine", events: EngineEvent }, { namespace: "roles", events: RolesEvent }] as const
