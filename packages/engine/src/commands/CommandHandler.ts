@@ -31,6 +31,7 @@ import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { checkPieceBatch, pieceNamespace } from "./pieceBatch.ts";
 import { SecretStore } from "./SecretStore.ts";
 import { loadFirstDefaults } from "./harnesses.ts";
+import { webSettingsCommitted } from "../client/settings.ts";
 import { CommandRefused, freshRequest, readHarnesses, refused, type Input, type Runtime, type Snapshot } from "./internal.ts";
 
 export { CommandRefused } from "./internal.ts";
@@ -281,6 +282,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           return { ...(yield* decodeReceipt(written[0].result_json)), afterCommit: plan.afterCommit };
         })));
         if (outcome.failure !== undefined) return yield* outcome.failure;
+        if (name === "client.web.settings.set") yield* webSettingsCommitted(views);
         const late = outcome.afterCommit === undefined ? undefined : yield* step(outcome.afterCommit);
         return late ?? outcome.reply!;
       })).pipe(

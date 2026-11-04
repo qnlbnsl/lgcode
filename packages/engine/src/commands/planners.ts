@@ -15,6 +15,8 @@ import { stop } from "./stop.ts";
 import { refused, type Input, type Payload, type Plan } from "./internal.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
 
+import { setWebSettings } from "../client/settings.ts";
+
 type Planner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<Plan, ReturnType<typeof refused> | LogWriteFailed>;
 const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan: Planner): Planner => (input, payload) => Effect.gen(function* () {
   const { actor, snapshot } = input;
@@ -26,6 +28,7 @@ const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan
   return yield* plan(input, payload);
 });
 export const planners = {
+  "client.web.settings.set": setWebSettings,
   start: (input, payload) => start(input, payload as Payload<"start">),
   prompt: targeted("prompt", (input, payload) => Effect.succeed(prompt(input, payload as Payload<"prompt">))),
   answer: (input, payload) => answer(input, payload as Payload<"answer">),

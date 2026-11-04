@@ -12,7 +12,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
     const child = startCli(prepareRoot(), [...command.split(" "), "--help"]);
     expect(await finishCli(child)).toEqual({ code: 0, signal: null });
     expect(child.stdout()).toMatch(/usage|options|arguments/i);
-    expect(child.stdout()).toContain(command);
+    expect(child.stdout()).toContain(command.startsWith("client.web.") ? command.replaceAll(".", " ") : command);
     expect(child.stdout()).not.toContain("not built yet");
     assertNoSecrets(child, [token]);
   });
@@ -34,6 +34,8 @@ for (const command of CommandsRpcGroup.requests.keys()) {
       stop: { agentId: "member" }, resume: { agentId: "member", fresh: true }, compact: { agentId: "member" },
       group: { agentId: "member", add: ["review"], remove: ["build"] },
       accounts: { operation: "list" }, "accounts mark-available": { accountId: "account" },
+      "client.web.settings": {},
+      "client.web.settings.set": { settings: { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false } },
       harnesses: { operation: "list" }, subscribe: { after: 100 }, "debug.compare-views": {},
     };
     expect(payloads[command], "new RPC needs a command dispatch fixture").toBeDefined();
@@ -45,6 +47,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         compact: { ...base, deliveryId: "delivery" }, ask: { ...base, questionId: "question" },
         wait: { ...base, waitId: "wait", members: [{ agentId: "member", reason: "settled" }], outcome: "satisfied" },
         accounts: { ...base, accounts: [] }, harnesses: { ...base, harnesses: [] },
+        "client.web.settings": { ...base, enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false, serverState: "running" },
         "debug.compare-views": { ...base, sequence: 100, equal: true, differences: [] },
       };
       if (frame.tag === "subscribe") {

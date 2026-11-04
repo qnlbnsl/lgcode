@@ -25,6 +25,8 @@ const summaries: Record<CommandName, string> = {
   "accounts mark-available": "Mark an account available again.",
   harnesses: "List, set or reset harness settings.",
   subscribe: "Print the event stream from a sequence.",
+  "client.web.settings": "Read the web server settings and state.",
+  "client.web.settings.set": "Change the web server settings.",
   "debug.compare-views": "Compare the live views with a rebuild (test services only)."
 }
 
@@ -33,6 +35,9 @@ export const isCommand = (name: string): name is CommandName => (commandNames as
 // The longest command name that opens the arguments: "accounts set-secret"
 // before "accounts".
 export const matchCommand = (args: ReadonlyArray<string>): { readonly command: CommandName; readonly rest: ReadonlyArray<string> } | undefined => {
+  // Accept the canonical RPC name as well as the terminal's spaced spelling.
+  const canonical = commandNames.find((command) => args[0] === command)
+  if (canonical !== undefined && canonical.includes(".")) return { command: canonical, rest: args.slice(1) }
   const candidates = commandNames.map((command) => ({ command, words: command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ") }))
     .sort((a, b) => b.words.length - a.words.length)
   for (const { command, words } of candidates) {
