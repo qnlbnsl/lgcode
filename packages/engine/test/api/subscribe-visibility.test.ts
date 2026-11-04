@@ -16,7 +16,6 @@ import { rolesSamples } from "../../../contracts/test/roles/fixtures.ts";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Redacted from "effect/Redacted";
-import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 import * as Server from "../../src/api/server.ts";
@@ -25,6 +24,7 @@ import {
   appendSetup, eventOf, makeFakeSecrets, makeRig, provideRig, readLog, removeRig, seedAccount, seedAgent, seedHarness,
 } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
+import { samples as boardEvents } from "../../../contracts/test/board/fixtures.ts";
 import { ancestryHeaders, authorization, connect, requestFrame, upgrade } from "../support/socketClient.ts";
 
 const ownerSecret = randomBytes(32).toString("base64url");
@@ -33,8 +33,9 @@ const ownerSecret = randomBytes(32).toString("base64url");
 // production module from widening the requirement type.
 const live = (name: string, test: () => Effect.Effect<unknown, unknown, any>, timeout: number) =>
   it.live(name, () => test() as Effect.Effect<void, unknown, never>, timeout);
-const tags = Object.keys(Event.pipe(Schema.toTaggedUnion("_tag")).cases).sort();
-const agentBearing = new Set(tags.filter((tag) => "agentId" in (Event.pipe(Schema.toTaggedUnion("_tag")).cases as Record<string, { fields: object }>)[tag]!.fields));
+const tags = Event.members.map((member) => member.fields._tag.schema.literal).sort();
+const agentBearing = new Set(Event.members.filter((member) => "agentId" in member.fields)
+  .map((member) => member.fields._tag.schema.literal));
 
 const owner = { _tag: "owner" } as const;
 const permissionOption = { id: "once", name: "Allow once", kind: "allow_once", level: "read-only", persistent: false };
@@ -51,6 +52,7 @@ const parents: Record<string, string> = { "agent-child": "agent-self", "agent-gr
 // `n` makes its identifiers unique. Terminal events for the subscriber itself
 // are left out (`terminal`), because they would end its own access.
 const samples: Record<string, (a: string, n: string) => Record<string, unknown>> = {
+  ...Object.fromEntries(boardEvents.map(({ _tag, ...payload }) => [_tag, () => payload])),
   ...rolesSamples,
   AgentStarted: (a) => ({ agentId: a, name: `n-${a}`, role: "worker", groups: [], parent: parents[a] === undefined ? owner : { _tag: "agent", agentId: parents[a] }, harness: "first", account: "primary", permission: "ask", folder: "/tmp", runMode: "acp" }),
   AgentStartFailed: (a) => ({ agentId: a, reason: "agent start failed" }),
