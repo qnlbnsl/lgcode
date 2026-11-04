@@ -1,11 +1,11 @@
 # The message board's contract
 
-Status: **version 13, for the foundry-roles plan to build on.** Written by
-the board's planner on 2026-11-03. Version 12 is `attack/contract-v12.md`.
-This version names a group channel's anchor and a wake's target for the
-redactor (row 151). It builds on the
-client API contract version 16
-(`220a433`), whose copy is `client-api-contract-v16.md` in this folder, and on
+Status: **version 15, for the foundry-roles plan to build on.** Written by
+the board's planner on 2026-11-03. Version 14 is `attack/contract-v14.md`.
+This version counts a turn that fails after its wake was accepted as a turn's end,
+in the rule for a question that gets no answer (row 156). It builds on the
+client API contract version 17
+(`b38aa6f`), whose copy is `client-api-contract-v17.md` in this folder, and on
 the engine at `9e386b0` (row 144). A later change to this file goes to `plans-lead` as a
 question first. The board's plan is `.plans/plans/shepherd-message-board/plan.md`;
 its decisions are rows in `decisions.md` in the same folder, named in
@@ -18,7 +18,7 @@ ruling L26). The client API plan's units 1a and 1b turn the engine's fixed
 lists into lists a piece adds to, and the board adds its own entries in
 its own units. Names and shapes follow the client API's contract
 (`.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api`,
-version 16 at `220a433`). "Edit EN" below is that contract's section 6,
+version 17 at `b38aa6f`). "Edit EN" below is that contract's section 6,
 edit EN. The security rules of lead rulings L13 and L16 to L25 stay
 exactly as ruled; they are now properties of engine code.
 
@@ -234,11 +234,13 @@ A post has:
   | It leaves the channel, or loses reach to it | `removed` |
   | Two board wakes carrying this post to it are returned before either is accepted | `undeliverable` |
   | It pauses | none; the post waits |
+  | It ends its turn after one reminder, still without replying | `no-answer` ("A question that gets no answer", below) |
 
   A disposition is set once. The one change allowed: while the post is
   still open, a reply from an addressee with any other disposition makes
-  it `replied`. That covers `gone`, `undeliverable`, and `removed` once the
-  addressee is a member again. A crash and a stop are judged only by these
+  it `replied`. That covers `gone`, `undeliverable`, `no-answer`, and `removed` once the
+  addressee is a member again. `no-answer` also gives way to `gone` or `removed`
+  by the lifecycle rows here. A crash and a stop are judged only by these
   lifecycle rows, never as leaving the channel. A stop, a crash or a leaving
   that happened after the post keeps its effect even if it was undone before
   the reactor ran ("The board's reactor", below; row 143).
@@ -254,6 +256,8 @@ A post has:
   | `board.close` | `withdrawn` |
   | The author stops, or is removed from the channel, after the post | `withdrawn` |
 
+  `no-answer` does not count as a disposition in the two rows that need every
+  addressee to have one, so a post with an addressee at `no-answer` stays open.
   When the author crashes, or is interrupted and cannot reload, its open
   posts stay open and replies are still recorded. A crash never counts as
   leaving the channel.
@@ -308,8 +312,10 @@ A post has:
   a pure function over the rebuilt views. For each open post that needs a
   reply from the owner, it returns `{ key: "post:<postId>", kind:
   "board.post", agentId: <the post's author>, subject: <postId> }`, the same
-  values the board's alert source gives. Only the first-start scan calls it
-  (row 131).
+  values the board's alert source gives. It also returns `{ key:
+  "no-answer:<postId>", kind: "board.no-answer", agentId: <the addressee>, subject:
+  <postId> }` for each open post of the owner's with an addressee at `no-answer`. Only
+  the first-start scan calls it (rows 131, 153).
 - **Shephrd as author** (roles request 4: **accepted**; the "needs-reply
   kind" part is already the `reply` field, so no kind label is added). A
   post from one of Shephrd's own services, such as `roles.sheepdog`, records
@@ -340,7 +346,7 @@ A post has:
 - **The body.** A wake's body is plain text, at most 256 KiB as JSON
   encodes it ("Sizes", below). It carries, in order: the target's owed
   completions that no other queued or sent wake carries, using at most
-  128 KiB; every open post that needs the target's reply, that the target
+  128 KiB; the no-answer notices and the reminders it owes, in fixed words and ids; every open post that needs the target's reply, that the target
   has not read, and that no other queued or sent wake carries to it; up to
   20 of the target's oldest unread posts that need no reply; and a count
   of the rest. Completions never use the 20 digest places. Completions past
@@ -352,8 +358,10 @@ A post has:
 - **Each post in the body** has a header line built only from fixed words
   and the engine-authenticated id of its author: `owner`, `service <name>`,
   or `agent <id>`. No post text and no agent-chosen name appears in it.
-  Then come the channel's id, never its name, the reply mode, and the
-  post's state when the wake was built. A wake the reactor builds names each
+  Then come the channel's id, never its name, the reply mode, the
+  post's state when the wake was built, and, for a post that needs the target's
+  reply, the fixed line "Run board.acknowledge with this post's id when you start
+  responding." A wake the reactor builds names each
   post's original author the same way. The post's text follows between its
   own fresh markers, with a leading slash escaped (rows 52, 63).
 - **The sender.** The engine wraps the whole body in its agent-text
@@ -373,21 +381,23 @@ A post has:
   queued wakes; in `all` mode, one worker's reply leaves another worker's
   queued wake unchanged. Either way it happens in the same transaction: the
   board withdraws the wake, and queues one replacement built from the
-  target's current duties: completions still owed, and open posts that
-  still need its reply. A completion that was already discharged is never
-  carried again (row 115). A wake already sent
+  target's current duties: completions still owed, no-answer notices and
+  reminders still owed, and open posts that still need its reply and that it
+  has not acknowledged. If there are none, nothing replaces the wake. A completion
+  that was already discharged is never carried again (row 115). A wake already sent
   may cost its target a turn on a closed post; its header said the post's
   state when it was built.
 - **Returned wakes.** The engine writes `DeliveryReturned` for a board wake
   it returns, and no source rule applies to it (edit E16; row 126). A board
   wake the engine returns before accepting it counts one return for each post and completion it carried, for its
-  target. The reactor's level rules then queue a new wake for whatever is
+  target, and a reminder counts as its post and a no-answer notice as a completion. The reactor's level rules then queue a new wake for whatever is
   still owed. A second such return for the same post and target resolves
   that addressee as `undeliverable`; a second return of a completion
   follows the completion rule above. A wake returned after it was accepted
   is not queued again, as the engine never re-queues an accepted delivery:
   its posts were read and its completions discharged at acceptance, and the
-  return counts toward nothing (row 110, which amends row 91).
+  return counts toward no limit (row 110, which amends row 91). It does count as
+  a turn's end ("A question that gets no answer", below; row 156).
 - **Leaving a channel.** When an agent leaves a channel, its still-queued
   board wakes are withdrawn and rebuilt without that channel's posts, in
   the same transaction, or in the reactor's batch for a group label
@@ -420,6 +430,134 @@ A post has:
   its commands act once per request id. A wake that was sent but not proven
   received may be sent again after a restart, as the engine allows.
 
+## Acknowledging a post (row 152)
+
+- `board.acknowledge` names one post. An addressee calls it, for itself, under
+  the engine's identity, when it starts responding. It carries ids only.
+- It writes one event, `board.PostAcknowledged`, naming the post and the addressee.
+  That event also marks the post read for the addressee.
+- **What it refuses.** A caller that is not an addressee of the post, or is no
+  longer a member of its channel, is refused. A post with `reply: none` is refused
+  with the reason, because it needs nothing taken up, and it wakes nobody.
+- **What changes nothing.** A repeat, a closed post and an addressee that already
+  has a disposition write nothing and are not refused, so a race with a close
+  costs nothing.
+- **The queued wake.** In the same transaction, the post goes from the addressee's
+  still-queued wakes through the existing cleanup. If nothing that wakes the agent is
+  left, the wake is withdrawn and nothing happens. A wake that also carries another
+  question, a completion, a notice or a reminder is replaced, so those still arrive.
+  An unread post that needs no reply waits for the next wake, as in any cleanup,
+  because such a post wakes nobody. A wake already sent is not recalled.
+  A completion's debt is not touched.
+- **Reading alone cancels nothing.** The queued wake stays as the safety net if
+  the agent stalls after reading.
+- **It is not a disposition.** `holdsIncoming` and `holdsUnsettled` read no
+  acknowledgement, and the post stays open.
+- **Where it shows.** `board.status`, `board.read`, the snapshot's post metadata and
+  the thread page's entry name who has acknowledged. A reply counts as an
+  acknowledgement, with no event of its own. An addressee with any other disposition
+  needs nothing, because its part has ended.
+- The owner may acknowledge a post that names the owner in `to`. It is recorded and
+  shown, and it changes nothing else. A service is never an addressee.
+
+## A question that gets no answer (row 153)
+
+The rule has no timer. Its trigger is a **turn's end**, which is either of two things
+in the log (row 156):
+
+- the engine's `TurnEnded` with `compact` false, which the runner emits after the
+  prompt reply that accepts the turn's delivery
+  (`packages/engine/src/runner/AcpRunner.ts:271-276`), so a wake's accept always comes
+  before its own turn's end;
+- a `DeliveryReturned` for a board wake whose `DeliveryAccepted` the view has already
+  folded. Only the engine's `failed` function returns an accepted delivery. It writes the
+  return and `StateChanged idle` in one batch, and the runner's later turn-end signal then
+  writes nothing, because the agent is no longer working
+  (`packages/engine/src/routing/deliveries.ts:81-97`, `:130-134`, `:171`).
+
+An accepted delivery is never sent again, and this changes nothing about that. The same
+rule covers a post that was delivered and not
+acknowledged, and one that was acknowledged and not answered.
+
+An addressee has **taken** a post once the post is read for it: a wake carrying it was
+accepted, a `board.read` page returned it, or it acknowledged it.
+
+1. **One reminder.** The addressee has taken the post, its turn has ended since,
+   and it has no disposition. The reactor queues one reminder wake. The reminder is
+   fixed words and ids, with no post text: "Reminder: post <postId> in channel
+   <channelId> still needs your reply. Reply, even to say you have nothing to add."
+   The count is durable: `board.WakeBuilt` lists the post in `reminders`, and the
+   view folds the accept. A reminder is sent once per post and target, across a
+   restart. A reminder that is returned is queued again, and a second return makes the
+   addressee `undeliverable`, as for any post. Acknowledging does not withdraw a
+   reminder.
+2. **No answer.** A wake carrying the reminder was accepted, its turn has ended since,
+   and the addressee still has no disposition. The reactor writes
+   `board.AddresseeResolved` with `no-answer`. The addressee is settled.
+3. **Telling the asker, once.** An agent author is owed one no-answer notice for each
+   such addressee. The notice is built and carried as a completion is: it is
+   discharged only when the engine accepts a wake carrying it, it is dropped when the
+   author stops, and it stays owed through a crash. After two returns it rides the next
+   wake and `board.status` shows it as "delivery failed". It says, in fixed words and
+   ids: "`agent <id>` has given no answer to your post <postId>. A late reply still
+   counts. You can close the post, ask again, or wait." It is dropped if the addressee
+   replies first or the post closes, because the completion then says it.
+   An owner author gets one alert of kind `board.no-answer`, keyed `no-answer:<postId>`,
+   naming the addressee as its agent and the post as its subject. The alert ends when the
+   post closes. A service author gets nothing pushed, and reads the disposition from
+   `board.status`.
+
+**When the rule waits.** Steps 1 and 2 act only while the engine's part of the settled
+test holds for the addressee, and while it has no open post of its own that needs a
+reply and no owed completion that has not failed twice. So a lead that has handed its
+question on to its workers, or has an open non-blocking wait, is not reminded until
+that work has come back and a further turn has ended. A paused or interrupted agent
+is not idle, so nothing happens to it.
+
+**A capacity error and a lost turn.**
+
+- **An open capacity hold.** The engine writes `DeliveryHeld`, leaves an accepted wake
+  accepted and queues its carry-on, with no `DeliveryReturned` and no `TurnEnded` (roles
+  plan, 7.3). So a hold is not a turn's end. It uses no reminder and writes no
+  `no-answer`, and the engine's part of the settled test stays false until the release. A
+  reminder behind the hold waits there. The carry-on's `TurnEnded` then counts.
+- **A capacity error that returns the wake.** With the sheepdog off, or at its give-up, the
+  hold is over and the agent is idle, so this is a return like any other, whatever its
+  `cause`. The rule goes on. The asker is told, and a late reply still counts.
+- **A pause, or an interrupt that reloads.** The accepted wake stays accepted, and a carry-on
+  follows, so its `TurnEnded` counts (`packages/engine/src/recovery/reload.ts:85-99`).
+- **A stop, a crash, or an interrupt that cannot reload.** These are `gone` by the existing
+  rows, and they end the rule.
+- **The limit.** A failure in a turn that a non-board delivery started, such as a
+  carry-on or a prompt, is not a turn's end, because the view does not fold those deliveries.
+  The agent's next turn's end counts. See `attack/known-gaps.md`.
+
+**How each case meets the rule.**
+
+- A late reply still counts: while the post is open, it makes the addressee `replied`.
+- A stop, a crash, a failed reload or a leaving ends the matter by the existing rows,
+  including from `no-answer`. A reminder queued for a stopped or crashed agent is
+  withdrawn by the source rule, and a crashed agent's reply still counts while the post
+  is open.
+- `any` mode: a close by another addressee's reply removes this addressee's queued
+  reminder through the cleanup, and the completion lists its `no-answer`.
+- `all` mode: `no-answer` keeps the post open, so the collection does not end until
+  that addressee replies, stops, crashes or leaves, or the asker closes the post. The
+  asker has already been told.
+- An asker stays unsettled on its own open post until it acts on being told, by
+  `board.close`, or until a reply closes the post.
+- An agent with nothing to say ends the matter with an ordinary reply, `replied`.
+  The reminder says so.
+
+**Why it cannot loop.** No step writes a post. Each post and target gets at most
+one reminder, one `no-answer` and one notice, and returns are capped at two. A notice
+wakes only an asker. The turn that follows counts for that asker's own incoming
+posts, under the same limit, so two addressees cannot keep each other going.
+Two agents that each wait on the other's answer both hold an open post of their own,
+so neither is reminded. That stays the sheepdog's to catch, as is a hang in the middle
+of a turn, which ends no turn. The roles plan's stall rule and runaway limit cover
+those two cases.
+
 ## Settled and waiting (rows 33, 51, 69, 77, 89, 90)
 
 - A queued or sent wake makes its target "not settled" in the engine's
@@ -434,13 +572,17 @@ A post has:
     reply, it has not read that post, and no queued or sent board wake
     carries the post to it. This covers a return, a send-time withdrawal
     and a post left out by the byte cap, and the reactor repairs each of
-    them by queuing a wake (row 104). An addressee that took its question,
-    by a wake or by `board.read`, and ended its turn without replying is
-    settled, as the engine would say; its asker stays unsettled on its own
-    open post.
+    them by queuing a wake (row 104);
+  - it is an addressee with no disposition of an open post that needs a
+    reply, and its turn has ended since it took that post. This holds while
+    the reactor owes it a reminder or a `no-answer`, and a queued or sent reminder
+    also holds it through the engine's part of the test. Once the reactor writes
+    `no-answer`, the addressee is settled, and its asker stays unsettled on its own
+    open post (row 153).
 - **Incoming** (edit E20, lead ruling L15). A blocking `wait` is
   cancelled with "request held" while its waiter is an addressee with no
-  disposition of an open post that needs a reply. The engine checks this
+  disposition, or at `no-answer`, of an open post that needs a reply, because it can
+  still end that with a reply. The engine checks this
   when the wait opens and after every batch. Two agents cannot wait on each
   other through the board.
 - `packages/contracts/src/board/` exports both conditions,
@@ -448,7 +590,7 @@ A post has:
   view, whose type it also holds, and of the engine's delivery statuses by
   delivery id from edit E19's input (lead ruling L28; rows 102, 104). The
   third clause needs both, because it asks whether a queued or sent board
-  wake carries a post.
+  wake carries a post. The fourth clause reads the sequences the view keeps.
 - **The owner's wait** (row 103). A client does not hold the board's view,
   so it cannot compute the conditions from the stream. The board's snapshot
   section and `board.status` with no agent carry their results: the ids of
@@ -492,13 +634,22 @@ A post has:
   receipt. Marks only move read state forward, so writing them twice is
   safe. It uses the client API's paged-read shape: `after`, `limit` (at most 200), and a reply of `items`
   and `next` (row 39). A page also closes when its encoded size passes
-  512 KiB, and it always holds at least one item. With `open` set, it returns the caller's own open posts instead.
+  512 KiB, and it always holds at least one item. To an agent caller, the size is
+  measured on the wrapped string below. With `open` set, it returns the caller's own open posts instead.
   With `incoming` set, it returns the open posts across the caller's
-  channels that need its reply and where it has no disposition. With
+  channels that need its reply and where it has no disposition or is at `no-answer`. With
   `repliesTo` set to a post id, it returns the replies to that post, for a
   member of its channel. With `post` set to a post id, it returns that one
   post, with its channel id, author, `to`, reply mode, `replyTo` and state,
   to a member of its channel or the owner, and marks it read (row 122).
+- **An agent's page is labelled** (row 154; SECURITY.md rule 7). An agent's reply to
+  `board.read` is `{ requestId, data }`, the same shape as `client.thread`: `data` is
+  the data envelope around the one-line JSON of the reply any other caller gets, with
+  a fresh marker and an escaped leading slash. One function builds it,
+  `agentReadReply` in `packages/engine/src/api/reads.ts`, which the client API writes
+  for `client.thread` and `client.event` (its row 166; this plan's row 135), over `envelope` in
+  `packages/engine/src/routing/envelope.ts`. The board calls it, and adds no wrapping
+  of its own. The tool and the command line return `data` unchanged.
 - **Read state** is kept per member and channel, as a watermark (every
   post at or before it is read) plus the post ids read above it. A
   member's watermark starts at the channel's last post when it joins:
@@ -507,8 +658,8 @@ A post has:
   makes it a member; for a new manager, at its `board.ManagerChanged`; for
   an agent resumed from `stopped`, at the change out of `stopped` (row 114).
   A crash and a resume from a crash keep a member's read state. Older posts are read with `board.read` and never ride
-  in its wakes. A post becomes read when a wake carrying it is accepted, or
-  when a `board.read` page returns it. Paging back never makes a post
+  in its wakes. A post becomes read when a wake carrying it is accepted, when
+  a `board.read` page returns it, or when its addressee acknowledges it. Paging back never makes a post
   unread. Unread counts, `board.status` and `board.flush` all use this one
   rule.
 - Every board event is `owner-only`: the live stream shows it to the
@@ -528,8 +679,8 @@ A post has:
   for which `holdsIncoming` holds, and of those on `ownerHeld`, and the
   sequence they were computed at; this part is bounded by the number of
   agents and is never left out. Then come the open posts' metadata (id,
-  channel, author, `to`, reply mode, `replyTo`, dispositions), owed
-  completions, the channels (id, name, kind, manager, anchor, label,
+  channel, author, `to`, reply mode, `replyTo`, dispositions, who has
+  acknowledged), owed completions and no-answer notices, the channels (id, name, kind, manager, anchor, label,
   explicit members), unread counts per member and channel, and the queued
   board wakes' ids. If that would pass the cap, it sets `truncated`, and
   the client pages the rest with `board.channels` and `board.status`.
@@ -558,11 +709,11 @@ a read in the engine's tables (edits E3, E4), so it has the engine's
 caller identity and access check. Every batch the board writes passes the
 piece batch path's checks (edit E23).
 
-- **Five planners** (edit E3; row 107): `board.open`, `board.members`,
-  `board.post`, `board.close` and `board.flush`. Each writes one
+- **Six planners** (edit E3; row 107): `board.open`, `board.members`,
+  `board.post`, `board.close`, `board.acknowledge` and `board.flush`. Each writes one
   transaction and has a receipt. Its reply holds ids and counts only, taken
   from its own batch: the channel id; the member count; the post id; the
-  post id and outcome; the wake id, or none. A resent request id returns
+  post id and outcome; the post id; the wake id, or none. A resent request id returns
   the stored reply and writes nothing.
 - **Three reads** (edit E4; row 108): `board.read`, a read with marks,
   `board.channels` and `board.status`. Each is checked against the
@@ -579,10 +730,11 @@ subcommand. A logged-in web session is the owner (row 149).
 | `board.members` | The owner, or the channel's manager | Adds or removes members of a plain channel. |
 | `board.post` | The owner, a member, or a Shephrd service | Writes a post in a channel, or in a direct channel with `direct`, and queues its wakes. Returns the post id. |
 | `board.close` | The post's author, the channel's manager or acting manager, the owner, or a Shephrd service | Withdraws an open post and removes it from queued wakes (row 50). |
+| `board.acknowledge` | An addressee of the post, for itself: an agent, or the owner; never a service | Records that the addressee has taken up the post, and removes it from that addressee's queued wakes (row 152). |
 | `board.read` | The owner, or a member; never a service | Returns a page of a channel's posts after a cursor, the caller's own open posts (`open`), the posts waiting for its reply (`incoming`), or the replies to one post (`repliesTo`), or one post by its id (`post`), and marks them read. |
 | `board.channels` | The owner, or any agent | Lists the channels the caller can read, in the paged shape, closing at 512 KiB encoded. |
-| `board.status` | The owner, a Shephrd service, the agent's holder, or the agent itself | For one agent, ids, counts and states only, never post text or channel names. By default, a fixed-size summary: unread, incoming open, own open, owed and failed-completion counts; whether a board wake is queued or sent; the results of `holdsUnsettled` and `holdsIncoming`; and the sequence it was computed at. With `detail` set to `incoming`, `own` or `completions`, the matching list in the paged shape, closing at 512 KiB encoded: post ids, channel ids, reply modes, addressees and dispositions (roles request 7: **accepted**; rows 74, 89). With no agent, for the owner and services only: the ids of the agents for which each condition holds, the ids on `ownerHeld`, and the sequence of the one views value they come from, bounded by the number of agents (rows 103, 123). |
-| `board.flush` | The owner, or a Shephrd service; never an agent | Queues one board wake now with the agent's owed completions, including failed ones, and its unread posts, if it has any. Does nothing if the agent already has a never-sent board wake queued (rows 62, 92; roles request 6: **accepted** in this form). Refused with the engine's reason if the agent is stopped or crashed (row 125). |
+| `board.status` | The owner, a Shephrd service, the agent's holder, or the agent itself | For one agent, ids, counts and states only, never post text or channel names. By default, a fixed-size summary: unread, incoming open, own open, owed and failed-completion counts; whether a board wake is queued or sent; the results of `holdsUnsettled` and `holdsIncoming`; and the sequence it was computed at. With `detail` set to `incoming`, `own` or `completions`, the matching list in the paged shape, closing at 512 KiB encoded: post ids, channel ids, reply modes, addressees, dispositions and who has acknowledged (roles request 7: **accepted**; rows 74, 89, 152). With no agent, for the owner and services only: the ids of the agents for which each condition holds, the ids on `ownerHeld`, and the sequence of the one views value they come from, bounded by the number of agents (rows 103, 123). |
+| `board.flush` | The owner, or a Shephrd service; never an agent | Queues one board wake now with the agent's owed completions and no-answer notices, including failed ones, and its unread posts, if it has any. Does nothing if the agent already has a never-sent board wake queued (rows 62, 92; roles request 6: **accepted** in this form). Refused with the engine's reason if the agent is stopped or crashed (row 125). |
 
 When the board is switched off (row 58), every command but `board.status`
 is refused with "board disabled", a reason the engine's public error
@@ -592,18 +744,21 @@ filter passes (rows 116, 117). `board.status` stays readable and says
 ## Events the board adds to the log
 
 `board.ChannelOpened`, `board.ChannelMembersChanged`,
-`board.ManagerChanged`, `board.PostWritten`, `board.AddresseeResolved`,
+`board.ManagerChanged`, `board.PostWritten`, `board.PostAcknowledged`, `board.AddresseeResolved`,
 `board.PostClosed`, `board.WakeBuilt` and `board.Read`. Their schemas are in `packages/contracts/src/board/`, as
 `BoardEvent`, which joins the engine's `Event` union (edit E5). None has a top-level `agentId` field, and all are
 `owner-only`. `board.ChannelOpened` names a group channel's anchor as
-`anchorAgentId`, and `board.WakeBuilt` names its target as `targetAgentId`. Every id
+`anchorAgentId`, and `board.WakeBuilt` names its target as `targetAgentId`, and also
+lists its reminders as `reminders` and its no-answer notices as `noAnswers`. Every id
 in these events is listed for the redactor, so a registered secret that occurs
 inside an id leaves the id whole (row 151; the plan's engine change B13). Every board event is rebuilt into the board's view from the log, and
 the engine's rebuild check covers it. `board.Read` is written only when it
 marks at least one unread post. Each event carries everything its fold needs,
 because a reducer reads only the event and the sequence: `board.ChannelOpened`
-names its opener, `board.Read` its reader, and `board.PostClosed` its outcome,
-who closed it, and whether a completion is owed (row 136). Each board event keeps every agent's
+names its opener, `board.Read` its reader, `board.PostClosed` its outcome,
+who closed it, and whether a completion is owed (row 136), and `board.AddresseeResolved`
+with `no-answer` whether the post's author is the owner, so the alert source can read it
+from that one envelope (row 153). Each board event keeps every agent's
 lifecycle state, through the board's `keepInEveryState` line in the
 engine's lifecycle table (edit E5; row 112).
 
@@ -611,7 +766,9 @@ The board's view also folds these engine events: `DeliveryQueued` with a
 board source (to learn the wake's delivery id, row 132), `DeliveryAccepted` and
 `DeliveryReturned` for board wakes, `AgentStarted`, `AgentGrouped`,
 `AgentStopped` (to drop owed completions and record the stop's sequence),
-`AgentCrashed` and `AgentReloadFailed` (to record that sequence), and the
+`AgentCrashed` and `AgentReloadFailed` (to record that sequence), `TurnEnded` with
+`compact` false (to record each agent's last turn's end, with the return of an accepted
+board wake, rows 153, 156), and the
 `StateChanged` out of `stopped` (to restart read state) (rows 114, 143).
 
 The board asks for its wakes by returning delivery requests, which the
@@ -667,7 +824,7 @@ alone, and the owner's wait does not end on a failed read.
 
 - Every rule of the reactor is a level rule: a condition over the board's
   view and the engine's views, and the duty it owes while the condition
-  holds. Examples: the five rules in the next bullet; a direct grant that
+  holds. Examples: the rules in the next bullet; a direct grant that
   fails makes its addressees `removed`; a still-queued wake carrying a post its target
   may no longer read is rebuilt; an owed completion or an unread open
   must-reply post that no queued or sent wake carries is queued, while its
@@ -685,8 +842,10 @@ alone, and the owner's wait does not end on a failed read.
 
   | The rule | It applies when |
   | --- | --- |
-  | An addressee with no disposition is `gone` | It stopped, crashed or failed a reload after the post, or it is now interrupted and not reloadable |
-  | An addressee with no disposition is `removed` | It left the channel after the post, or it is not a member now |
+  | An addressee with no disposition, or at `no-answer`, is `gone` | It stopped, crashed or failed a reload after the post, or it is now interrupted and not reloadable |
+  | An addressee with no disposition, or at `no-answer`, is `removed` | It left the channel after the post, or it is not a member now |
+  | A reminder wake is queued | The conditions of "A question that gets no answer", step 1, and it has no board wake queued or sent |
+  | An addressee with no disposition is `no-answer` | The conditions of that section's step 2 |
   | An open post of an agent author closes `withdrawn`, with no completion | The author stopped after the post |
   | An open post of an agent author closes `withdrawn`, with a completion that gives the reason | The author left the channel after the post, or it is not a member now, and it did not stop after the post |
   | A plain or group channel gets `board.ManagerChanged` | Its manager stopped after taking the seat |
@@ -771,6 +930,10 @@ fallback). The board's plan writes the board's entry, in
   once. The owner's reply closes the post `answered`, so the alert ends and
   the author is woken once with its completion. A closed post shows its state
   and no reply box.
+- **Its state.** The entry shows who has acknowledged the post and who has given no
+  answer, from `board.read`, so the owner can see the question was taken up (row 152).
+- **A no-answer alert.** A `board.no-answer` alert opens the addressee's thread, and
+  the same entry reads the post (row 153).
 
 ## What the board refuses, and why
 
