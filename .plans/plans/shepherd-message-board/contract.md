@@ -1,11 +1,11 @@
 # The message board's contract
 
-Status: **version 12, for the foundry-roles plan to build on.** Written by
-the board's planner on 2026-11-03. Version 11 is `attack/contract-v11.md`.
-This version follows the owner's choice of one web password (rows 149, 150):
-the words about devices go, and no rule of the board changes. It builds on the
-client API contract version 15
-(`668a341`), whose copy is `client-api-contract-v15.md` in this folder, and on
+Status: **version 13, for the foundry-roles plan to build on.** Written by
+the board's planner on 2026-11-03. Version 12 is `attack/contract-v12.md`.
+This version names a group channel's anchor and a wake's target for the
+redactor (row 151). It builds on the
+client API contract version 16
+(`220a433`), whose copy is `client-api-contract-v16.md` in this folder, and on
 the engine at `9e386b0` (row 144). A later change to this file goes to `plans-lead` as a
 question first. The board's plan is `.plans/plans/shepherd-message-board/plan.md`;
 its decisions are rows in `decisions.md` in the same folder, named in
@@ -18,7 +18,7 @@ ruling L26). The client API plan's units 1a and 1b turn the engine's fixed
 lists into lists a piece adds to, and the board adds its own entries in
 its own units. Names and shapes follow the client API's contract
 (`.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api`,
-version 15 at `668a341`). "Edit EN" below is that contract's section 6,
+version 16 at `220a433`). "Edit EN" below is that contract's section 6,
 edit EN. The security rules of lead rulings L13 and L16 to L25 stay
 exactly as ruled; they are now properties of engine code.
 
@@ -595,7 +595,10 @@ filter passes (rows 116, 117). `board.status` stays readable and says
 `board.ManagerChanged`, `board.PostWritten`, `board.AddresseeResolved`,
 `board.PostClosed`, `board.WakeBuilt` and `board.Read`. Their schemas are in `packages/contracts/src/board/`, as
 `BoardEvent`, which joins the engine's `Event` union (edit E5). None has a top-level `agentId` field, and all are
-`owner-only`. Every one is rebuilt into the board's view from the log, and
+`owner-only`. `board.ChannelOpened` names a group channel's anchor as
+`anchorAgentId`, and `board.WakeBuilt` names its target as `targetAgentId`. Every id
+in these events is listed for the redactor, so a registered secret that occurs
+inside an id leaves the id whole (row 151; the plan's engine change B13). Every board event is rebuilt into the board's view from the log, and
 the engine's rebuild check covers it. `board.Read` is written only when it
 marks at least one unread post. Each event carries everything its fold needs,
 because a reducer reads only the event and the sequence: `board.ChannelOpened`

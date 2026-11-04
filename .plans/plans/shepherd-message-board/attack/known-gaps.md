@@ -1,8 +1,8 @@
 # Known gaps: shepherd-message-board
 
 Gaps the planner could not close before the freeze. Reviewers: these are
-already known; look for new problems. Updated for plan version 11, after
-the password login fold.
+already known; look for new problems. Updated for plan version 12, after
+the short final check (round 6).
 
 1. **Vendor limits.** The planner cannot read each vendor's remaining
    weekly allowance. The lead checks it before launching any unit.
@@ -58,6 +58,10 @@ open for the build's units to read.
   the reading agent unlabelled.
 - **C5-02** (critic). Reading a question does not remove its already-queued
   duplicate wake, so the agent can spend one needless turn.
+- **Criterion 4.1's wording** (noted by the round 6 review, not filed). It calls a
+  stopped author's result `withdrawn` even when a reply closes the post first. The
+  first committed close stands, and no completion is owed, so the test should keep
+  closure outcome and completion debt apart.
 - **C5-03** (critic). Criterion 6.6's diff starts at client API unit 1b's merge,
   so it also counts test changes from later client API units that this plan
   depends on.
