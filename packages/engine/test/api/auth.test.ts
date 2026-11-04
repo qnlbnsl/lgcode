@@ -81,6 +81,13 @@ live("7.2 an upgrade with no credential, or with an Authorization header that is
     yield* expectRefused(socket, { Authorization: `Token ${ownerSecret}`, ...ancestryHeaders() }, ownerSecret);
   })));
 
+live("5.13 the Unix socket never treats a web session-shaped cookie as a host credential", () =>
+  withServer(({ socket }) => Effect.gen(function* () {
+    yield* expectRefused(socket, { ...ancestryHeaders(), Cookie: `session=${randomBytes(32).toString("base64url")}` });
+    const valid = yield* promise(() => upgradeStatus(socket, { ...authorization(ownerSecret), ...ancestryHeaders() }));
+    expect(valid.status).toBe(101);
+  })));
+
 live("7.2 a malformed credential is refused with 401, and the refusal body never repeats it (breaks if a near-miss owner credential, a bad checksum or a truncated token is accepted, or the body echoes the value)", () =>
   withServer(({ socket }) => Effect.gen(function* () {
     const token = Redacted.value(mintAgentToken().token);
