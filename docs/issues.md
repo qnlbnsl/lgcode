@@ -5959,3 +5959,35 @@ State: open, for the final review.
 
 What happens: The existing action-event schema permits an individual encoded record larger than the action page budget. The history read refuses an oversized singleton instead of sending an oversized page. Such a record cannot be reconstructed through `roles.actions.list` until the writer or schema bounds it, or a large-record retrieval path exists. The 266 focused tests pass with ordinary records, including the 500-record size fixture. This limitation is separate from A07's overlarge requested limit, which is fixed.
 Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 366. The transcript fallback schedules nothing for a long Claude project folder
+
+Found: 2026-11-04, by the builder or test writer of unit r9, during the foundation build.
+State: open, for the final review.
+
+What happens: The transcript fallback refuses a Claude project-folder key longer than 200 characters, because Claude Code hashes such keys in its own way. Shephrd then schedules nothing rather than guess a path. An agent in such a folder gets no cache timing from this fallback.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 367. The board restart acceptance case failed once in a full check
+
+Found: 2026-11-04, by the builder or test writer of unit r12, during the foundation build.
+State: open, for the final review.
+
+What happens: The first full `pnpm check` for unit r12 failed the board restart's sent-wake case, because no reminder wake was present. All three cases passed in an isolated rerun, and the next full check passed with no source change. Unit b5 had already repaired a startup race in this area, at an earlier commit, so that repair did not remove every timing dependency.
+Why it matters: An intermittent failure can block a merge, and it may hide a real readiness or scheduling fault. It waits for the final review.
+
+## 368. A lead can be reported stalled while its workers work
+
+Found: 2026-11-04, by the builder or test writer of unit r13, during the foundation build.
+State: open, for the final review.
+
+What happens: The roles plan's owed-reply exception in section WS-4 lets an idle orchestrator's assignment stall its lead while that lead's workers work, when the orchestrator reaches no busy work outside that lead. Section WS-8 says without qualification that the lead is not reported stalled while its workers work. The acceptance fixture tests the owner-authored case, and production behaviour was left as it is.
+Why it matters: The two plan sections disagree, so the final review should decide which one holds.
+
+## 369. The live-check scripts depend on the order of their imports
+
+Found: 2026-11-04, by the builder or test writer of unit r14, during the foundation build.
+State: open, for the final review.
+
+What happens: Importing the existing live driver before the existing live runner causes a circular module initialization error for `pieceViews` under plain Node.js. The new script `packages/engine/scripts/live-check-roles.ts` imports the runner first, as `live-check.ts` does, and its help and dry-run checks pass. The cycle itself is still there.
+Why it matters: A reordered import would stop both owner-run checks from starting. It waits for the final review.
