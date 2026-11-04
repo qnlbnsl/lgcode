@@ -1,6 +1,8 @@
 import type { Actor, EventEnvelope, WaitMember } from "./events.ts"
 import { eventEffect } from "./stateMachine.ts"
 import type { PieceNamespace } from "./namespaces.ts"
+import { holdsIncoming, holdsUnsettled } from "./board/conditions.ts"
+import type { BoardView } from "./board/view.ts"
 
 export interface SettledInput {
   readonly agents: Readonly<Record<string, { readonly state: { readonly _tag: string }; readonly reloadable?: boolean; readonly capacityHeld?: boolean }>>
@@ -11,8 +13,12 @@ export interface SettledInput {
 }
 export type HoldCondition = (state: SettledInput, agentId: string, pieceView: unknown) => boolean
 const never = () => false
-export const holdUnsettled = { client: never, board: never, roles: never } satisfies Record<PieceNamespace, HoldCondition>
-export const requestHeld = { client: never, board: never, roles: never } satisfies Record<PieceNamespace, HoldCondition>
+export const holdUnsettled = {
+  client: never, board: (state, id, view) => holdsUnsettled(id, view as BoardView, state.deliveries), roles: never
+} satisfies Record<PieceNamespace, HoldCondition>
+export const requestHeld = {
+  client: never, board: (_state, id, view) => holdsIncoming(id, view as BoardView), roles: never
+} satisfies Record<PieceNamespace, HoldCondition>
 export const holds = (state: SettledInput, id: string): boolean =>
   [...Object.values(state.requests), ...Object.values(state.questions)].some((row) => row.status === "open" && row.holder._tag === "agent" && row.holder.agentId === id)
 export const settled = (state: SettledInput, id: string): boolean =>

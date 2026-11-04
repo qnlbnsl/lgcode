@@ -104,14 +104,43 @@ const noticeKey = (notice: { readonly postId: string; readonly addressee: BoardA
   JSON.stringify([notice.postId, notice.addressee._tag, readerKey(notice.addressee)]);
 
 export const reminderDue = (snapshot: Snapshot, target: string, post: BoardPostView): boolean => {
-  const board = boardView(snapshot);
   const taken = own(post.takenAt, target);
   return post.status === "open" && post.reply !== "none" && post.to.some((to) => to._tag === "agent" && to.agentId === target)
     && own(post.dispositions, target) === undefined && taken !== undefined
-    && (own(board.lastTurnEnd, target) ?? 0) > taken && own(post.reminderAcceptedAt, target) === undefined
-    && settled(snapshot, target)
-    && !Object.values(board.posts).some((row) => row.status === "open" && row.reply !== "none" && row.author._tag === "agent" && row.author.agentId === target)
-    && !Object.values(board.completions).some((row) => row.authorAgentId === target && row.returns < 2);
+    && answerTurnEnded(snapshot, target, taken) && own(post.reminderAcceptedAt, target) === undefined;
+};
+
+// An old turn end cannot become a new reminder merely because other work
+// finished. These boundaries are already durable in the engine's threads and
+// the board's closure index; no reactor position or pending-duty list is needed.
+const answerTurnEnded = (snapshot: Snapshot, target: string, since: number): boolean => {
+  const board = boardView(snapshot);
+  if (!settled(snapshot, target)
+    || Object.values(board.posts).some((post) => post.status === "open" && post.reply !== "none" && post.author._tag === "agent" && post.author.agentId === target)
+    || Object.values(board.completions).some((debt) => debt.authorAgentId === target && debt.returns < 2)) return false;
+  let boundary = since;
+  const closures = (board as Partial<BoardFold>).closures ?? {};
+  for (const post of Object.values(board.posts)) {
+    if (post.author._tag === "agent" && post.author.agentId === target && post.reply !== "none") {
+      boundary = Math.max(boundary, own(closures, post.postId)?.sequence ?? 0);
+    }
+  }
+  for (const { event, sequence } of own(snapshot.threads, target) ?? []) {
+    if (event._tag === "SessionOpened" || event._tag === "AgentInterrupted" || event._tag === "DeliveryAccepted"
+      || event._tag === "DeliveryReleased" || event._tag === "PermissionAnswered" || event._tag === "PermissionCancelled"
+      || event._tag === "QuestionAnswered"
+      || (event._tag === "StateChanged" && (event.state._tag === "paused" || event.state._tag === "starting"))
+      || ((event._tag === "WaitSatisfied" || event._tag === "WaitCancelled") && own(snapshot.waits, event.waitId)?.blocking === false)) {
+      boundary = Math.max(boundary, sequence);
+    }
+  }
+  return (own(board.lastTurnEnd, target) ?? 0) > boundary;
+};
+
+export const noAnswerDue = (snapshot: Snapshot, target: string, post: BoardPostView): boolean => {
+  const accepted = own(post.reminderAcceptedAt, target);
+  return post.status === "open" && post.reply !== "none" && own(post.dispositions, target) === undefined
+    && accepted !== undefined && answerTurnEnded(snapshot, target, accepted);
 };
 
 export interface BuiltWake { readonly event: Extract<Event, { _tag: "board.WakeBuilt" }>; readonly delivery: DeliveryRequest }
@@ -183,6 +212,7 @@ export const buildWake = (snapshot: Snapshot, target: AgentId, options: {
   let omittedNotices = 0;
   for (const post of posts) {
     if (post.reply !== "none" || !isUnread(snapshot, { _tag: "agent", agentId: target }, post)
+      || (post.author._tag === "agent" && post.author.agentId === target)
       || reservedPosts.has(post.postId) || !canCarryPost(snapshot, target, post.postId)) continue;
     const text = postText(post, post.status);
     if (noticeCount === 20 || omittedNotices > 0 || !fits(text)) { omittedNotices++; continue; }
