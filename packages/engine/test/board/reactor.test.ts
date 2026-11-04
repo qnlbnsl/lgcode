@@ -607,8 +607,12 @@ it.live("4.4 a plain-channel author who leaves has the post withdrawn with a com
   success(yield* call(c.lead!, "board.members", { channelId: "room", add: [], remove: ["worker"] }));
   yield* catchUp;
   expect((yield* boardState).posts[id]?.outcome).toBe("withdrawn");
-  expect((yield* boardState).completions[id]).toMatchObject({ author: agent("worker") });
-  expect(yield* queued("worker")).toEqual([]);
+  expect((yield* boardState).completions[id]).toMatchObject({ authorAgentId: "worker" });
+  const completions = yield* queued("worker");
+  expect(completions).toHaveLength(1);
+  const wake = yield* wakeFor(completions[0]!.id);
+  expect(wake.completions).toEqual([id]);
+  expect(wake.completionReplyText).toEqual([]);
 })));
 
 it.live("4.4 losing a group label resolves a question even when the agent remains online", () => run((c) => Effect.gen(function* () {
