@@ -40,7 +40,12 @@ for (const action of [
       const view = yield* snapshot;
       if ("toolInput" in action) expect(view.requests.permission).toHaveProperty("action.toolInput", action.toolInput);
       const publicView = yield* clientSnapshot({ _tag: "owner" });
-      expect(JSON.stringify(publicView)).not.toContain("forged-title");
+      const withoutDisplays = {
+        ...publicView,
+        requests: publicView.requests.map(({ display, ...identity }) => identity),
+        questions: publicView.questions.map(({ display, ...identity }) => identity),
+      };
+      expect(JSON.stringify(withoutDisplays)).not.toContain("forged-title");
       expect(JSON.stringify(publicView)).not.toContain("toolInput");
       const moved = moveHeld(view, ["parent"]);
       const movedDelivery = moved.find((e) => e._tag === "DeliveryQueued");

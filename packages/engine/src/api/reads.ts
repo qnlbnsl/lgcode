@@ -1,4 +1,4 @@
-import type { Event, EventEnvelope } from "@shephrd/contracts";
+import type { Event, ClientStreamItem } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import type { Input } from "../commands/internal.ts";
@@ -6,12 +6,14 @@ import { refused } from "../commands/internal.ts";
 import { subscribe } from "../log/subscribe.ts";
 import { compareViews } from "../views/compare.ts";
 import { visibleTo } from "./visibility.ts";
+import { clientReads } from "../client/reads/index.ts";
 import { getRoleFile } from "../roles/roleFile.ts";
 
 export interface ReadReply { readonly reply: Record<string, unknown>; readonly marks?: ReadonlyArray<Event>; readonly deliveries?: ReadonlyArray<import("../routing/pieceDelivery.ts").DeliveryRequest>; readonly sideRows?: import("../log/EventLog.ts").SideRows }
 export type ReadHandler = (input: Input, payload: Record<string, unknown>) =>
-  Effect.Effect<ReadReply, any, any> | Stream.Stream<EventEnvelope, any, any>;
-export const reads: Record<string, ReadHandler> = {
+  Effect.Effect<ReadReply, any, any> | Stream.Stream<ClientStreamItem, any, any>;
+export const reads = {
+  ...clientReads,
   "roles.role-file.get": getRoleFile,
   "roles.orient": () => Effect.fail(refused()),
   "roles.handoff": () => Effect.fail(refused()),
