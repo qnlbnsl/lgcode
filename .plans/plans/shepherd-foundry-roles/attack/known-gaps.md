@@ -23,3 +23,12 @@
 21. Taken together, gaps 14, 17 and 18 and the unrecorded Gemini and Cursor harnesses mean that, on today's evidence, no harness qualifies for standing rules. Lead ruling L27 (row 81) makes the recordings decide: standing rules are built only for a harness that qualifies, and otherwise deferred.
 22. The engine's settings test treats every path under a `.claude/`, `.codex/`, `.gemini/` or `.cursor/` folder as a settings path, so a team whose worktrees sit under `.claude/worktrees/` gets every file edit sent to the owner, and no standing-rule match. The plan fails closed there and tells teams to keep worktrees outside such folders (row 85); narrowing the engine's test is an issue for the lead, because it touches a settings rule.
 23. While the web server is open, `roles.rules.add` being computer-only is also a guard and not a boundary. A web caller can start an agent or set a harness's adapter, and that program can read the owner credential, so it could add a rule over the Unix socket. The client API contract states this in section 2, under SECURITY.md rule 2's suspension (row 117).
+
+## Round minors, not folded
+
+These are from round 5, under the manager's rule for the final fold.
+
+- **R5-C1:** a delayed first-use record can reopen the alert of a rule that was disabled in between.
+- **R5-C2:** the build table keeps unit 4 as an unconditional dependency of units 12 and 13, and leaves out unit 11c as a dependency of unit 9.
+- **R5-C3:** a client has no read to recover snoozes that were cut from the bounded snapshot.
+- **R5-L2:** criterion 4.3 says both that a lead asked a question while a sibling works is not stalled and that it is nudged; the exception in row 88 is the intended one.
