@@ -58,6 +58,8 @@ const setup = (busy = false) => Effect.gen(function* () {
   const service = startService(root, { env: { SHEPHRD_TEST_DEBUG: "1" } });
   yield* waitServing(root, service);
   const owner = yield* ownerClient(root);
+  // These cases observe stable crash states, independently of automatic recovery.
+  yield* owner["roles.settings.set"]({ requestId: requestId(), settings: { limits: { crashRetries: 0 } } } as never);
   const before = yield* head(owner);
   const parent = yield* startFakeAgent(root, owner, owner, {
     name: "Wait caller", script: busy ? workingScript : { turns: [] },
@@ -219,6 +221,7 @@ it("W05 catches mapping interrupted to success or letting it override a crash/st
   await run(Effect.gen(function* () {
     yield* waitServing(root, first);
     const owner = yield* ownerClient(root);
+    yield* owner["roles.settings.set"]({ requestId: requestId(), settings: { limits: { crashRetries: 0 } } } as never);
     parent = yield* startFakeAgent(root, owner, owner, { script: { turns: [] } });
     const identity = yield* agentToken(parent);
     parentPid = identity.pid;
