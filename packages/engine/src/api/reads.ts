@@ -8,6 +8,8 @@ import { compareViews } from "../views/compare.ts";
 import { visibleTo } from "./visibility.ts";
 import { clientReads } from "../client/reads/index.ts";
 import { getRoleFile } from "../roles/roleFile.ts";
+import { listActions } from "../roles/actions.ts";
+import { orient } from "../roles/orient.ts";
 
 export interface ReadReply { readonly reply: Record<string, unknown>; readonly marks?: ReadonlyArray<Event>; readonly deliveries?: ReadonlyArray<import("../routing/pieceDelivery.ts").DeliveryRequest>; readonly sideRows?: import("../log/EventLog.ts").SideRows }
 export type ReadHandler = (input: Input, payload: Record<string, unknown>) =>
@@ -15,10 +17,10 @@ export type ReadHandler = (input: Input, payload: Record<string, unknown>) =>
 export const reads = {
   ...clientReads,
   "roles.role-file.get": getRoleFile,
-  "roles.orient": () => Effect.fail(refused()),
+  "roles.orient": orient,
   "roles.handoff": () => Effect.fail(refused()),
   "roles.settings.get": () => Effect.fail(refused()),
-  "roles.actions.list": () => Effect.fail(refused()),
+  "roles.actions.list": listActions,
   subscribe: (input: Input, payload: Record<string, unknown>) => subscribe(payload.after as number).pipe(
     Stream.filterEffect((envelope) => input.runtime.views.snapshot.pipe(
       Effect.map((view) => visibleTo(input.actor, envelope, view, input.runtime.lists)),

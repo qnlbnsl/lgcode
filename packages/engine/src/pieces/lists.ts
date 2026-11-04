@@ -11,6 +11,7 @@ import { reads, type ReadHandler } from "../api/reads.ts";
 import { boardPlaceholderPlanners, boardPlaceholderReads } from "../board/placeholders.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
 import { pieceViews, type PieceView } from "./viewTables.ts";
+import { snapshotFor as rolesSnapshotFor } from "../roles/snapshot.ts";
 
 import { alertReactor, type AlertSourceResult } from "../client/alerts/reactor.ts";
 import { alertPlanners, alertReads } from "../client/alerts/commands.ts";
@@ -53,7 +54,7 @@ export const engineLists: EngineLists = {
   reads: { ...reads, ...alertReads, ...boardPlaceholderReads },
   views: pieceViews,
   migrations: { client: [], board: [], roles: [] }, visibility: eventVisibility, pieceVisibility: {},
-  snapshotSections: { client: absent, board: absent, roles: absent },
+  snapshotSections: { client: absent, board: absent, roles: rolesSnapshotFor },
   alertSources: { client: absent, board: absent, roles: absent },
   openMatters: { client: () => [], board: () => [], roles: () => [] },
   reactors: { client: alertReactor },
