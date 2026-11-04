@@ -18,9 +18,13 @@ const invalid: Record<string, Batch> = {
   "refused reach": { events: [], deliveries: [{ target: "target", sourceId: "post", body: "Data." }], reply },
   "queue to stopped agent": { events: [], deliveries: [{ target: "stopped", sourceId: "post", body: "Data." }], reply },
 };
+const isolatedRules = async () => {
+  const lists = await rulesFixture();
+  return { ...lists, reads: { ...lists.reads } };
+};
 for (const [broken, bad] of Object.entries(invalid)) for (const kind of ["planner", "read", "reactor"] as const) {
   it(`1.32 ${kind}/${broken}: catches a partial commit or the wrong refusal record`, async () => {
-    const base = await rulesFixture();
+    const base = await isolatedRules();
     base.reach.client = () => broken !== "refused reach";
     const batch: Batch = { ...bad, events: [record("must-rollback"), ...bad.events], sideRows: { client_fixture: [{ id: "must-rollback" }] } };
     const lists = planWith(base, () => batch);
@@ -63,7 +67,7 @@ for (const [broken, bad] of Object.entries(invalid)) for (const kind of ["planne
 
 it("1.32 reactor: catches building outside the transaction, owner attribution or writing a receipt", async () => {
   const { writePieceBatch } = await requiredModule<PieceBatches>("commands/pieceBatch.ts");
-  const lists = await rulesFixture();
+  const lists = await isolatedRules();
   await useRules(lists, () => Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const before = (yield* snapshot).sequence;
@@ -78,7 +82,7 @@ it("1.32 reactor: catches building outside the transaction, owner attribution or
 
 it("1.36 the piece batch path refuses a reactor before recovery is ready and writes nothing", async () => {
   const { writePieceBatch } = await requiredModule<PieceBatches>("commands/pieceBatch.ts");
-  const lists = await rulesFixture();
+  const lists = await isolatedRules();
   const recovery = Layer.succeed(Restart, { ready: Effect.succeed(false), whenReady: Effect.never, recover: Effect.void, returnAccount: () => Effect.void });
   await withFixture(lists, () => Effect.gen(function* () {
     yield* registerRebuildCheck();

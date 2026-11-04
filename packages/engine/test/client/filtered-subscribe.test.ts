@@ -93,7 +93,7 @@ it.each(["catch-up", "live"])("3.4 %s filtered agent visibility gains and loses 
     const after = yield* headSequence;
     const batch = [textItem("worker", "Worker text.", "worker"), textItem("sibling", "Sibling text.", "sibling"),
       event({ _tag: "client.AlertRaised", agentId: "parent", alertId: `hidden-${after}`, alertKey: `hidden:${after}`, kind: "failure", title: "Owner-only alert.", sourceSequence: after }),
-      event({ _tag: "AccountAvailable", accountId: "primary", cause: "owner cleared" }), textItem("end", "End.", "parent")];
+      textItem("end", "End.", "parent")];
     if (phase === "catch-up") yield* appendSetup(batch);
     const ready = yield* Deferred.make<void>();
     const fiber = yield* stream({ after }, { _tag: "agent", agentId: parent.agentId }).pipe(

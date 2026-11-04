@@ -8,7 +8,8 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 const run = <A>(program: Effect.Effect<A, any, any>) => runReadRig(program, registerRebuildCheck());
 
 it("3.3 a 501-event thread pages at 500, includes nested DeliveryQueued, and omits next on the final page", async () => run(Effect.gen(function* () {
-  yield* seedAgent({ id: "agent-a" });
+  // Keep the queued delivery pending so this fixture has exactly 501 events.
+  yield* seedAgent({ id: "agent-a", state: "working" });
   const views = yield* Views;
   const after = (yield* views.snapshot).sequence;
   yield* appendSetup(Array.from({ length: 499 }, (_, i) => textItem(`item-${i}`, `line ${i}`)));
