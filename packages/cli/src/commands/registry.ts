@@ -10,6 +10,10 @@ export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>
 export const commandNames: ReadonlyArray<CommandName> = [...CommandsRpcGroup.requests.keys()] as Array<CommandName>
 
 const summaries: Record<CommandName, string> = {
+  "client.alerts.list": "List alerts.",
+  "client.alerts.dismiss": "Dismiss an alert.",
+  "client.alerts.settings": "Read alert settings.",
+  "client.alerts.settings.set": "Change an alert kind's push setting.",
   start: "Start an agent.",
   prompt: "Send a prompt to an agent.",
   answer: "Answer a permission request or a question that was passed to you.",
