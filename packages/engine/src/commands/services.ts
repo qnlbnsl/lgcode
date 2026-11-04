@@ -4,13 +4,23 @@ import * as Stream from "effect/Stream";
 import * as Option from "effect/Option";
 import { Restart } from "../recovery/service.ts";
 import { CommandHandler } from "./CommandHandler.ts";
-import { refused } from "./internal.ts";
+import { readHarnesses, refused } from "./internal.ts";
 import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { pieceNamespace } from "./pieceBatch.ts";
 const permitted = (service: string, name: string, lists: EngineLists): boolean =>
   Object.hasOwn(lists.services, service) && lists.services[service]?.includes(name) === true
   && lists.access[name]?.includes("service") === true
   && (pieceNamespace(name) !== undefined || ["prompt", "compact", "resume", "release", "subscribe"].includes(name));
+// Cache timing needs the engine's configured home and the owner's harness
+// lifetimes. Keep the raw runtime, SQL and account credentials inside the
+// engine boundary; this helper exposes only these nonsecret settings.
+export const serviceCacheSettings = (caller: Extract<Caller, { _tag: "service" }>, lists: EngineLists = engineLists) => Effect.gen(function* () {
+  if (caller.service !== "roles.sheepdog" || !permitted(caller.service, "client.event", lists)) return yield* refused();
+  const input = yield* (yield* CommandHandler).input(caller);
+  return { home: input.runtime.home, harnesses: (yield* readHarnesses(input.runtime)).map((harness) => ({
+    id: harness.id, cacheLifetime: harness.cacheLifetime,
+  })) };
+});
 export const executeService = (caller: Extract<Caller, { _tag: "service" }>, name: string, payload: Record<string, unknown>, lists: EngineLists = engineLists) => Effect.gen(function* () {
   if (!permitted(caller.service, name, lists)) return yield* refused();
   return yield* (yield* CommandHandler).execute(caller, name, payload);

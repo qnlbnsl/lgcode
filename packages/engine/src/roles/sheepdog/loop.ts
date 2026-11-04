@@ -11,6 +11,7 @@ import type { EngineLists } from "../../pieces/lists.ts";
 import { Restart } from "../../recovery/service.ts";
 import { Views } from "../../views/Views.ts";
 import type { RolesView } from "../view.ts";
+import { makeCacheRule } from "./cacheRule.ts";
 import { endStallForTurn, resendUnread, sheepdogCaller } from "./notices.ts";
 import { baselineRequestId } from "./requests.ts";
 import { capacityRule } from "./rules/capacity.ts";
@@ -154,4 +155,4 @@ export const makeSheepdogLoop = (rules: ReadonlyArray<SheepdogRule>): Effect.Eff
   }
 }));
 
-export const sheepdogLoop = makeSheepdogLoop([capacityRule]);
+export const sheepdogLoop = Effect.suspend(() => makeSheepdogLoop([capacityRule, makeCacheRule()]));
