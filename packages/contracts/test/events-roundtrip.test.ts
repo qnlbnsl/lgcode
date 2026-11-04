@@ -68,6 +68,28 @@ const tagOf = (member: { readonly ast: SchemaAST.AST }): string => {
 const members = Event.members
 const byTag = new Map(members.map((member) => [tagOf(member), member] as const))
 
+describe("TurnEnded usage (foundry roles 7c)", () => {
+  const decode = Schema.decodeUnknownSync(Event)
+  const encode = Schema.encodeSync(Event)
+  // The plan specifies the values, but not their wire names. These tests
+  // propose ACP token names and optional numeric request/lifetime fields.
+  const samples = [
+    ["U06a old event", { _tag: "TurnEnded", agentId: "agent-usage", compact: false }],
+    ["U06b reported context only", { _tag: "TurnEnded", agentId: "agent-usage", compact: false, usage: { used: 0 } }],
+    ["U06c last request and cache lifetimes", { _tag: "TurnEnded", agentId: "agent-usage", compact: true, usage: {
+      used: 1_234, requestStartedAt: 1_798_761_600_123, inputTokens: 17, cachedReadTokens: 31,
+      cachedWriteTokens: 120, cachedWrite5mTokens: 20, cachedWrite1hTokens: 100,
+    } }],
+  ] as const
+  for (const [name, wire] of samples) {
+    it(`${name}: decoding and JSON round-trip preserve reported fields without requiring absent ones (catches stripping usage, losing the split or making new fields mandatory)`, () => {
+      const decoded = decode(wire)
+      expect(decoded).toEqual(wire)
+      expect(decode(JSON.parse(JSON.stringify(encode(decoded))))).toEqual(wire)
+    })
+  }
+})
+
 describe("event tags", () => {
   // Catches: an event dropped from, added to, or renamed in the union; two members sharing a tag
   // (the second would never decode).

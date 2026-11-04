@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
-import { comparePermission, DeliveryId, Event, type PermissionLevel, type SessionReference } from "@shephrd/contracts";
+import { comparePermission, DeliveryId, Event, type PermissionLevel, type SessionReference, type TurnUsage } from "@shephrd/contracts";
 import { AcpClient, layerChildProcess } from "@shephrd/t3-effect-acp/client";
 import { AcpRequestError } from "@shephrd/t3-effect-acp/errors";
 import type { AgentCapabilities } from "@shephrd/t3-effect-acp/schema-v1";
@@ -72,6 +72,7 @@ interface Turn {
   text: string;
   error?: string;
   resetAt?: number;
+  usage?: TurnUsage;
 }
 interface Process {
   readonly input: Spawn;
@@ -107,6 +108,19 @@ interface Process {
   sent?: Deferred.Deferred<void, RunnerRejected>;
 }
 const rejected = (reason: string) => new RunnerRejected({ reason });
+const tokenCount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+// The pinned ACP Usage has only these input counters. Do not infer request
+// times or cache lifetimes from arbitrary _meta. In particular, Claude 0.99.1
+// reports a turn tally here, not a verified last-request snapshot.
+const terminalUsage = (value: unknown): TurnUsage | undefined => {
+  if (typeof value !== "object" || value === null) return undefined;
+  const source = value as Record<string, unknown>;
+  const usage: Record<string, number> = {};
+  for (const key of ["inputTokens", "cachedReadTokens", "cachedWriteTokens"] as const) {
+    if (tokenCount(source[key])) usage[key] = source[key];
+  }
+  return Object.keys(usage).length === 0 ? undefined : usage;
+};
 const recordTurnError = (turn: Turn, error: unknown) => {
   turn.error = JSON.stringify(error);
   const resetAt = resetTimeFromError(error);
@@ -273,7 +287,9 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         ...(classification === "out-of-usage" && turn.error !== undefined && turn.resetAt !== undefined ? { resetAt: turn.resetAt } : {}) }
         : turn.error !== undefined ? { _tag: "error", error: clean } : { _tag: "success" } });
     if (entry.turn === turn) delete entry.turn;
-    yield* emit({ _tag: "turnEnded", ...identity(entry), deliveryId: turn.deliveryId });
+    yield* emit({ _tag: "turnEnded", ...identity(entry), deliveryId: turn.deliveryId,
+      ...(turn.usage === undefined ? {} : { usage: turn.usage }),
+    });
   });
   const setMode = (entry: Process, permission: PermissionLevel) => Effect.gen(function* () {
     const mode = entry.input.harness.permissionMapping[permission];
@@ -485,9 +501,18 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           }
           return;
         }
+        if (update.sessionUpdate === "usage_update") {
+          // Replay and updates outside a turn must never seed the next turn.
+          if (!current.loading && current.turn !== undefined && !current.turn.ended && tokenCount(update.used)) {
+            current.turn.usage = { ...current.turn.usage, used: update.used };
+          }
+          return;
+        }
         if (update.sessionUpdate === "state_update" && update.state === "idle") {
           yield* drainMessages(current, true);
-          if (current.turn !== undefined) {
+          if (!current.loading && current.turn !== undefined && !current.turn.ended) {
+            const usage = terminalUsage(update.usage);
+            if (usage !== undefined) current.turn.usage = { ...current.turn.usage, ...usage };
             current.turn.idle = true;
             // ACP v2 puts the prompt's terminal error in its idle update;
             // the raw request reply is only an acknowledgement.
@@ -678,7 +703,12 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       Effect.result, Effect.flatMap((reply) => Effect.gen(function* () {
         if (reply._tag === "Failure") yield* Deferred.fail(sent, rejected("prompt send failed"));
         if (entry.stopped || entry.dead) return;
-        const response = reply._tag === "Success" ? reply.success as { error?: unknown } : undefined;
+        const response = reply._tag === "Success" ? reply.success as { error?: unknown; usage?: unknown } : undefined;
+        // ACP v1 delivers its terminal usage on the prompt reply instead.
+        if (entry.version === 1) {
+          const usage = terminalUsage(response?.usage);
+          if (usage !== undefined) turn.usage = { ...turn.usage, ...usage };
+        }
         const error = reply._tag === "Failure" ? reply.failure : response?.error;
         if (error !== undefined) recordTurnError(turn, error);
         turn.replied = true;
