@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
+import { AlertRpcGroup } from "./client/commands.ts"
 import { BoardRpcGroup, boardAccess } from "./board/commands.ts"
 import { Account } from "./accounts.ts"
 import { EventEnvelope, WaitMember } from "./events.ts"
@@ -136,11 +137,14 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 
 // Later pieces merge their prefixed groups here, in namespace order.
 export const ClientReadsRpcGroup = ClientRpcGroup.omit("client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", "client.web.settings", "client.web.settings.set")
-export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(BoardRpcGroup).merge(ClientReadsRpcGroup).merge(RolesRpcGroup)
+const InstalledClientRpcGroup = ClientReadsRpcGroup.merge(AlertRpcGroup)
+export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(BoardRpcGroup).merge(InstalledClientRpcGroup).merge(RolesRpcGroup)
 export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 
 // A new command requires an access decision at the composition point.
 export const commandAccess = {
+  "client.alerts.list": ["owner"], "client.alerts.dismiss": ["owner"],
+  "client.alerts.settings": ["owner"], "client.alerts.settings.set": ["owner"],
   ...boardAccess,
   ...rolesAccess,
   start: ["owner", "agent"], prompt: ["owner", "agent", "service"], answer: ["owner", "agent"],
@@ -153,4 +157,4 @@ export const commandAccess = {
   "client.event": clientCommandAccess["client.event"], "client.sequence": clientCommandAccess["client.sequence"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>, ReadonlyArray<CallerKind>>
 export const ownerOnlyCommands = [...CommandsRpcGroup.requests.keys()].filter((name) => !(commandAccess[name as keyof typeof commandAccess] as ReadonlyArray<CallerKind>).includes("agent"))
-export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }, { namespace: "board", group: BoardRpcGroup }, { namespace: "client", group: ClientReadsRpcGroup }, { namespace: "roles", group: RolesRpcGroup }] as const
+export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }, { namespace: "board", group: BoardRpcGroup }, { namespace: "client", group: InstalledClientRpcGroup }, { namespace: "roles", group: RolesRpcGroup }] as const
