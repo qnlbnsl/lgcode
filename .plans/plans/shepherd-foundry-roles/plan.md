@@ -292,8 +292,8 @@ rights without `answer`, v7's design talk 1, v8's review round 1, and v9's
 two points from the board's question 7 under lead ruling L31, v10's review
 round 2, v11's review round 3, v12's two lines from this plan's rows 122 and 129, v13's final-round fold and engine re-anchor, v14's redaction check, and v15's one password login; the shared engine edits E1 to E34 in its
 section 6, and lead rulings L15, L16,
-L19, L22 and L23; decision rows 21, 32, 33, 52, 55, 80, 95 to 101, 103 to 139). Edit E28 is removed, because the owner answered question 6 no, which leaves this plan unchanged (rows 108, 139). "Board" is
-the message board contract v11, `.plans/plans/shepherd-message-board/contract.md` on `worker/plans-board` at `5c631b2`, v6's rework under L26 with the board's round 4 fold, its final round's fold and its folds of the client API contract up to v13, of which v8's two additions the lead approved as ruling L31 (lead rulings L17, L21, L24, L28, L30 and L31; rows 29, 31, 33, 34, 55, 94, 102, 109, 130, 137); round 2 reviewed v4 at `bcc33e1`. Both build on the
+L19, L22 and L23; decision rows 21, 32, 33, 52, 55, 80, 95 to 101, 103 to 140). Edit E28 is removed, because the owner answered question 6 no, which leaves this plan unchanged (rows 108, 139). "Board" is
+the message board contract v12, `.plans/plans/shepherd-message-board/contract.md` on `worker/plans-board` at `46d0fbb`, v6's rework under L26 with the board's round 4 fold, its final round's fold, its one-password edit and its folds of the client API contract up to v15, of which v8's two additions the lead approved as ruling L31 (lead rulings L17, L21, L24, L28, L30 and L31; rows 29, 31, 33, 34, 55, 94, 102, 109, 130, 137, 140); round 2 reviewed v4 at `bcc33e1`. Both build on the
 shared engine edits of CAPI §6, which the client API plan's first unit
 makes directly in the engine, under the owner's answer of 2026-11-03 and
 lead ruling L26 (row 80). Lead rulings L20 and L25 govern standing rules
@@ -849,7 +849,7 @@ into it.
 Each rule is a pure function from the roles view, the engine's views, the
 board's status (its fixed-size summary, and its `incoming` and `own`
 detail lists, and, with no agent, the ids of the agents for which each
-board condition holds and the sequence they were computed at, Board v11)
+board condition holds and the sequence they were computed at, Board v12)
 and the clock to a list of actions, so each is
 tested alone.
 
@@ -955,7 +955,7 @@ one automatic retry holds across a restart.
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
 | 4a | Team idle rule over engine groups, per top agent and per holder, with the "busy" test, which counts a usage-limit pause as busy (row 74) | target `packages/engine/src/roles/sheepdog/rules/teamIdle.ts`; groups from `AgentStarted.groups` and `AgentGrouped` (`packages/contracts/src/events.ts:Event`); `FOUNDRY/scripts/team-idle-watch.sh` l.13-14 ("Only 'working' counts as busy") |
-| 4b | Stall state machine, with its counter per post and addressee (row 37), and the transitive "waits on" and "waiting on others" tests (rows 56, 74) | target `rules/stall.ts`; Board v11, `board.status` with `detail` `incoming` and `own`, and with no agent for the condition lists (Board row 103), and its pure-function export from `packages/engine/src/board/` ("For Shephrd's own services"); the shared settled test in `packages/contracts/src/settled.ts` (CAPI E19), which replaced `routing/waits.ts:settled`: the sheepdog applies its engine part itself, from the engine's deliveries with their status, and the board's part through `board.status` with no agent, whose lists carry the sequence they were computed at; it decides only when both agree at one sequence, as the client wait helper does (CAPI §3, lead ruling L30; row 100) |
+| 4b | Stall state machine, with its counter per post and addressee (row 37), and the transitive "waits on" and "waiting on others" tests (rows 56, 74) | target `rules/stall.ts`; Board v12, `board.status` with `detail` `incoming` and `own`, and with no agent for the condition lists (Board row 103), and its pure-function export from `packages/engine/src/board/` ("For Shephrd's own services"); the shared settled test in `packages/contracts/src/settled.ts` (CAPI E19), which replaced `routing/waits.ts:settled`: the sheepdog applies its engine part itself, from the engine's deliveries with their status, and the board's part through `board.status` with no agent, whose lists carry the sequence they were computed at; it decides only when both agree at one sequence, as the client wait helper does (CAPI §3, lead ruling L30; row 100) |
 | 4c | Runaway rule from `DeliverySent`, `TurnEnded`, pauses, permission requests and blocking waits (`packages/engine/src/routing/waits.ts` l.162-170); worker age rule from `AgentStarted` | target `rules/runaway.ts`; `packages/engine/src/routing/deliveries.ts` l.248 (`DeliverySent`); `FOUNDRY/scripts/context-keeper.sh` (`WORKER_MAX_MIN`) |
 | 4d | Capacity rule over `DeliveryHeld`: release timer, and the give-up triggered by `DeliveryReturned` with `cause: "capacity"`; the hold condition reads the engine's own count (7.3, rows 75, 89) | target `rules/capacity.ts`; WS-7b's `DeliveryHeld` and `DeliveryReleased`; `FOUNDRY/scripts/capacity-retry.sh` (5-minute backoff, 12 retries) |
 | 4e | Crash rule: the check for a new admission, `roles.CrashAdmitted` and its fold, one `resume`, the carry-on prompt, the continuation of an admitted retry, then give up, with `engineAlertOpen` (row 134) | target `rules/crash.ts`; `AgentCrashed` from `packages/engine/src/recovery/crash.ts:64`; `packages/engine/src/commands/resume.ts` l.26, l.51-54; `packages/engine/src/recovery/reload.ts:reloadedEvents`; CAPI §4 (the engine's `failure` alert and when it clears) |
@@ -1354,7 +1354,7 @@ seven needs; (H) decisions.md; (I) lead rulings L17 and L19 to L27.
 | E: capacity-retry.sh | WS-4d, WS-7b | mapped (rows 57, 75) |
 | F: items 1 to 6 | WS-1, WS-6, WS-3, WS-2 and WS-3, WS-4, — | roster, thread, service caller, `roles.` commands and alert kinds used as given; subscribe filters not needed in-process |
 | G: needs 1, 3, 4, 5, 6, 7 accepted; 2 refused | WS-3, WS-4, WS-5 | accepted needs used as given, with v8's `board.status` detail lists and its condition lists with no agent; work state derived (rows 25, 55) |
-| H: rows 1 to 139 | all | each row names its workstream in its own text |
+| H: rows 1 to 140 | all | each row names its workstream in its own text |
 | I: L17 (service direct pair; no engine-prompt fallback) | WS-3 | mapped (row 34) |
 | I: L19, L22, L23 (reach check at queue and send, with the delivery) | — | the roles register no reach check; the sheepdog's notices pass the board's (rows 52, 55) |
 | I: L20 (standing-rule matching, including opt-in prefix) | WS-2, WS-7a | mapped (rows 35, 67, 79) |
@@ -1456,6 +1456,7 @@ either would run out (known gap 1).
 | redaction | — | Lead ruling on board #279, no separate round. The roles' id fields join the redactor's tables in task 1b, and criterion 1.8 tests them (row 137). Cites board contract v11 at `5c631b2`, and client API contract v13 stays cited at `5f08c31`, with its copy unchanged. Frozen as `attack/plan-v16.md`. |
 | client API v14 | — | Cited client API contract v14 at `a780da1` (board #289), with the copy refreshed. Its edit E33 owns the `actor` entries, so this plan dropped them. Two exempt fields were renamed to follow its row 183 (row 138). Frozen as `attack/plan-v17.md`. |
 | client API v15 | — | The owner replaced pairing and device credentials with one web password. Cited client API contract v15 at `668a341` (board #310), with the copy refreshed, and carried out the lead's rulings: device access and `deviceId` go, `roles.rules.add` works from a logged-in dashboard, and `client.lasting-setting` goes (row 139). Frozen as `attack/plan-v18.md`. |
+| board v12 | — | Cited board contract v12 at `46d0fbb` (board #315). Its diff from v11 removes only device words and re-cites the client API contract (row 140). Frozen as `attack/plan-v19.md`. |
 
 
 
