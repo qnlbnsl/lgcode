@@ -13,6 +13,7 @@ import { Views } from "../../views/Views.ts";
 import type { RolesView } from "../view.ts";
 import { endStallForTurn, resendUnread, sheepdogCaller } from "./notices.ts";
 import { baselineRequestId } from "./requests.ts";
+import { capacityRule } from "./rules/capacity.ts";
 import { releaseHolds, sheepdogEnabled } from "./switch.ts";
 import { boardTimer, crossedTimers, makeTimerReader, type ArmedTimer, type TimerOrigin } from "./timers.ts";
 
@@ -153,4 +154,4 @@ export const makeSheepdogLoop = (rules: ReadonlyArray<SheepdogRule>): Effect.Eff
   }
 }));
 
-export const sheepdogLoop = makeSheepdogLoop([]);
+export const sheepdogLoop = makeSheepdogLoop([capacityRule]);
