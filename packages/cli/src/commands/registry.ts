@@ -10,6 +10,9 @@ export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>> | "cli
 export const commandNames: ReadonlyArray<CommandName> = [...CommandsRpcGroup.requests.keys()] as Array<CommandName>
 
 const summaries: Record<CommandName, string> = {
+  "client.alerts.carrier.set": "Change the alert carrier.",
+  "client.alerts.carrier.set-token": "Store the carrier token from standard input, after confirming the server.",
+  "client.alerts.carrier.clear-token": "Clear the carrier token.",
   "client.alerts.list": "List alerts.",
   "client.alerts.dismiss": "Dismiss an alert.",
   "client.alerts.settings": "Read alert settings.",
@@ -30,6 +33,8 @@ const summaries: Record<CommandName, string> = {
   "accounts mark-available": "Mark an account available again.",
   harnesses: "List, set or reset harness settings.",
   subscribe: "Print the event stream from a sequence.",
+  "client.web.settings": "Read the web server settings and state.",
+  "client.web.settings.set": "Change the web server settings.",
   "debug.compare-views": "Compare the live views with a rebuild (test services only).",
   "client.snapshot": "Read client.snapshot, the current team and its sequence.",
   "client.roster": "Read client.roster, filtered by group, role or parent.",
@@ -91,6 +96,11 @@ export const helpText = (command: CommandName): string => {
       "Pipe it in, or type it at the prompt. One final newline is removed."
     ].join("\n") + "\n"
   }
+  if (command === "client.alerts.carrier.set-token") return [
+    "Usage: shephrd client alerts carrier set-token", "       shephrd client.alerts.carrier.set-token", "", summaries[command], owner,
+    "Takes no arguments. Type yes to confirm the displayed server, then supply the token on standard input.",
+    "The token is never echoed or accepted in --input."
+  ].join("\n") + "\n"
   const options = [
     "Options:",
     "  --input <json>  The command's payload as one JSON object. A requestId is added when absent.",

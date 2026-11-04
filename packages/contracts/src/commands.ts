@@ -1,14 +1,13 @@
 import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
-import { AlertRpcGroup } from "./client/commands.ts"
 import { BoardRpcGroup, boardAccess } from "./board/commands.ts"
 import { Account } from "./accounts.ts"
 import { EventEnvelope, WaitMember } from "./events.ts"
 import { HarnessSettings, RunMode } from "./harnesses.ts"
 import { AccountId, AgentId, DeliveryId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
+import { AlertRpcGroup, ClientRpcGroup, clientCommandAccess } from "./client/commands.ts"
 import { PermissionLevel } from "./permission.ts"
-import { ClientRpcGroup, clientCommandAccess } from "./client/commands.ts"
 import { RolesRpcGroup, rolesAccess } from "./roles/commands.ts"
 
 export const engineCommandNames = [
@@ -137,15 +136,23 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 ).merge(DebugRpcGroup)
 
 // Later pieces merge their prefixed groups here, in namespace order.
+export const WebRpcGroup = ClientRpcGroup.omit(
+  "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence",
+  "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
+  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"
+)
 export const ClientReadsRpcGroup = ClientRpcGroup.omit("client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", "client.web.settings", "client.web.settings.set")
-const InstalledClientRpcGroup = ClientReadsRpcGroup.merge(AlertRpcGroup)
+const InstalledClientRpcGroup = ClientReadsRpcGroup.merge(AlertRpcGroup).merge(WebRpcGroup)
 export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(BoardRpcGroup).merge(InstalledClientRpcGroup).merge(RolesRpcGroup)
 export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 
 // A new command requires an access decision at the composition point.
 export const commandAccess = {
+  "client.web.settings": ["owner"], "client.web.settings.set": ["owner"],
   "client.alerts.list": ["owner"], "client.alerts.dismiss": ["owner"],
   "client.alerts.settings": ["owner"], "client.alerts.settings.set": ["owner"],
+  "client.alerts.carrier.set": ["owner"], "client.alerts.carrier.set-token": ["owner"],
+  "client.alerts.carrier.clear-token": ["owner"],
   ...boardAccess,
   ...rolesAccess,
   start: ["owner", "agent"], prompt: ["owner", "agent", "service"], answer: ["owner", "agent"],

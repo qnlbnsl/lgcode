@@ -32,7 +32,7 @@ const queueWake = (target: AgentId, sourceId: string, withdraw?: string) => Effe
   yield* writePieceBatch({ namespace: "board", kind: "reactor", sourceSequence: before, build: () => ({
     events: [
       ...(withdraw === undefined ? [] : [eventOf({ _tag: "DeliveryWithdrawn", agentId: target, deliveryId: withdraw, reason: "wake replaced" })]),
-      eventOf({ _tag: "board.WakeBuilt", wakeId: sourceId, targetAgentId: target, carried: [], mustReply: [], completions: [], reminders: [], noAnswers: [] }),
+      eventOf({ _tag: "board.WakeBuilt", wakeId: sourceId, targetAgentId: target, carried: [], mustReply: [], completions: [], completionReplyText: [], reminders: [], noAnswers: [] }),
     ],
     deliveries: [{ target, sourceId, body: "Board wake data." }],
   }) }, lists);

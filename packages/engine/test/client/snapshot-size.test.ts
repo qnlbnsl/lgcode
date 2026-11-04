@@ -3,6 +3,8 @@ import { expect, it } from "vitest";
 import { appendSetup, seedAgent } from "../support/handlerRig.ts";
 import { run as runReadRig, snapshotFor, event, permissionFor, questionFor, bytes } from "./support/readRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
+import { action, fileEvent } from "../roles/fixtures.ts";
+import { rolesActionKinds } from "@shephrd/contracts";
 
 const run = <A>(program: Effect.Effect<A, any, any>) => runReadRig(program, registerRebuildCheck());
 
@@ -19,8 +21,14 @@ it("3.1 a 200-agent, 100-request team with full display text stays below 4 MiB a
     event({ _tag: "DeliverySent", agentId: `agent-${i}`, deliveryId: `held-${i}`, method: "acp" }),
     event({ _tag: "DeliveryHeld", agentId: `agent-${i}`, deliveryId: `held-${i}`, reason: "capacity" }),
   ]).flat());
+  yield* appendSetup([fileEvent(), ...Array.from({ length: 200 }, (_, i) => rolesActionKinds.map((kind) => action(kind, {
+    agentId: `agent-${i}`, noticeRecipient: "lead", ...(kind === "GaveUp" ? { engineAlertOpen: true } : {}),
+  }))).flat()]);
   const reply = yield* snapshotFor();
   expect(reply.agents.filter((row: any) => row.capacityHeld === true)).toHaveLength(200);
+  expect(reply.roles, "1d's roles summary must count toward the aggregate 4 MiB snapshot budget").toBeDefined();
+  expect(bytes(reply.roles)).toBeLessThanOrEqual(128 * 1024);
+  expect(reply.roles.agents.items.length).toBeGreaterThan(0);
   expect(reply.agents).toHaveLength(201);
   expect(reply.requests).toHaveLength(100);
   expect(reply.questions).toHaveLength(100);

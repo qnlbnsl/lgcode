@@ -15,6 +15,7 @@ import { start } from "./start.ts";
 import { stop } from "./stop.ts";
 import { refused, type Input, type Payload, type Plan } from "./internal.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
+import { setWebSettings } from "../client/settings.ts";
 import { setRoleFile } from "../roles/roleFile.ts";
 
 type Planner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<Plan, ReturnType<typeof refused> | LogWriteFailed>;
@@ -28,6 +29,7 @@ const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan
   return yield* plan(input, payload);
 });
 export const planners = {
+  "client.web.settings.set": setWebSettings,
   "roles.role-file.set": (input, payload) => setRoleFile(input, payload as Payload<"roles.role-file.set">),
   // Their implementation units replace these refusals; each declared command
   // already has exactly one execution kind and cannot accidentally run elsewhere.

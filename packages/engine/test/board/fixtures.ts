@@ -43,7 +43,7 @@ export const resolve = (postId: string, disposition: string, overrides: Record<s
 });
 export const wake = (wakeId: string, overrides: Record<string, unknown> = {}) => event({
   _tag: "board.WakeBuilt", wakeId, targetAgentId: "worker", carried: [], mustReply: [],
-  completions: [], reminders: [], noAnswers: [], ...overrides,
+  completions: [], completionReplyText: [], reminders: [], noAnswers: [], ...overrides,
 });
 export const queue = (wakeId: string, deliveryId = `delivery-${wakeId}`, target = "worker") => event({
   _tag: "DeliveryQueued", delivery: {

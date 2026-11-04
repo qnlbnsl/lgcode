@@ -24,7 +24,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
 // Full payload parity has a compact escape hatch: every non-secret RPC accepts
 // --input JSON. Friendly wait/subscribe flags are separately exercised.
 for (const command of CommandsRpcGroup.requests.keys()) {
-  if (command === "accounts set-secret") continue; // S01 checks its stdin-only dispatch.
+  if (command === "accounts set-secret" || command === "client.alerts.carrier.set-token") continue; // Dedicated tests check stdin-only dispatch.
   it(`P03 ${command} catches a registered CLI command dispatching the wrong RPC or dropping payload fields`, async () => {
     const root = prepareRoot();
     const payloads: Record<string, Record<string, unknown>> = {
@@ -32,6 +32,8 @@ for (const command of CommandsRpcGroup.requests.keys()) {
       "client.alerts.dismiss": { alertId: "alert-1" },
       "client.alerts.settings": {},
       "client.alerts.settings.set": { kind: "approval", push: false },
+      "client.alerts.carrier.set": { carrier: { _tag: "ntfy", server: "https://push.example", topic: "owner_alerts" } },
+      "client.alerts.carrier.clear-token": {},
       start: { name: "Parity agent", role: "worker", harness: "fake", account: { _tag: "any" }, permission: "ask", folder: root.work, groups: ["review"], model: "small", effort: "low", prompt: "Check parity." },
       prompt: { agentId: "member", text: "A prompt with spaces." },
       answer: { kind: "question", id: "question", text: "The answer." },
@@ -41,6 +43,8 @@ for (const command of CommandsRpcGroup.requests.keys()) {
       release: { agentId: "member" }, stop: { agentId: "member" }, resume: { agentId: "member", fresh: true }, compact: { agentId: "member" },
       group: { agentId: "member", add: ["review"], remove: ["build"] },
       accounts: { operation: "list" }, "accounts mark-available": { accountId: "account" },
+      "client.web.settings": {},
+      "client.web.settings.set": { settings: { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false } },
       harnesses: { operation: "list" }, subscribe: { after: 100 }, "debug.compare-views": {},
       "client.snapshot": {}, "client.roster": { group: "review", role: "worker", parent: "lead" },
       "client.thread": { agentId: "member", after: 100, limit: 500 },
@@ -74,6 +78,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         compact: { ...base, deliveryId: "delivery" }, ask: { ...base, questionId: "question" },
         wait: { ...base, waitId: "wait", members: [{ agentId: "member", reason: "settled" }], outcome: "satisfied" },
         accounts: { ...base, accounts: [] }, harnesses: { ...base, harnesses: [] },
+        "client.web.settings": { ...base, enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false, serverState: "running" },
         "debug.compare-views": { ...base, sequence: 100, equal: true, differences: [] },
         "client.snapshot": { ...base, sequence: 100, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 },
         "client.roster": { ...base, agents: [] }, "client.thread": { ...base, items: [] },
@@ -93,7 +98,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         "roles.role-file.set": { ...base, roleFileHash }, "roles.role-file.get": { ...base, file: roleFile, roleFileHash },
         "roles.settings.get": { ...base, settings: { sheepdog: true, limits: { stallMinutes: 10 } } },
         "roles.settings.set": base, "roles.snooze": base,
-        "roles.actions.list": { ...base, records: [], truncated: false },
+        "roles.actions.list": { ...base, items: [] },
         "roles.record": { ...base, sequence: 101 },
       };
       if (frame.tag === "subscribe" || frame.tag === "client.subscribe") {

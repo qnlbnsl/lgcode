@@ -2,7 +2,7 @@ import { clientPieceView } from "../client/alerts/view.ts";
 import type { Event, EventSequence, PieceNamespace } from "@shephrd/contracts";
 import type { BoardView } from "@shephrd/contracts/board/view";
 import { boardAfter, emptyBoard } from "../board/view.ts";
-import { emptyRoleFile, reduceRoleFile } from "../roles/roleFile.ts";
+import { emptyRoles, apply as applyRoles, type RolesView } from "../roles/view.ts";
 
 export interface PieceView {
   readonly empty: () => unknown;
@@ -16,5 +16,5 @@ export const pieceViews: Record<PieceNamespace, PieceView> = {
       event: event as Event, sequence: sequence as EventSequence,
     }),
   },
-  roles: { empty: emptyRoleFile, reduce: reduceRoleFile },
+  roles: { empty: emptyRoles, reduce: (view, event, sequence) => applyRoles(view as RolesView, event as Event, sequence) },
 };

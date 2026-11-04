@@ -16,12 +16,16 @@ export interface ClientView {
   readonly push: Readonly<Record<AlertKind, boolean>>;
   readonly carrier: CarrierSettings;
   readonly tokenSet: boolean;
+  readonly generation: number;
+  readonly token?: { readonly origin: string; readonly carrierGeneration: string } | undefined;
+  readonly retiredTokens: readonly string[];
+  readonly delivery: Readonly<Record<string, { readonly generation: number; readonly delivered: boolean; readonly attempt: number; readonly failureSequence?: number }>>;
   readonly webSettings: WebSettings;
   readonly webDown: boolean;
 }
 export const emptyClientView = (): ClientView => ({
   alerts: Object.create(null), push: { ...alertPushDefaults }, carrier: { _tag: "none" },
-  tokenSet: false, webSettings: { ...defaultWebSettings }, webDown: false,
+  tokenSet: false, generation: 0, retiredTokens: [], delivery: Object.create(null), webSettings: { ...defaultWebSettings }, webDown: false,
 });
 export const clientView = (value: unknown): ClientView => value as ClientView;
 const reduce = (view: ClientView, event: Event, sequence: number): ClientView => {
@@ -40,9 +44,22 @@ const reduce = (view: ClientView, event: Event, sequence: number): ClientView =>
       break;
     }
     case "client.AlertSettingsChanged": return { ...view, push: { ...view.push, [event.kind]: event.push } };
-    case "client.AlertCarrierChanged": return { ...view, carrier: event.carrier };
-    case "client.AlertCarrierTokenSet": return { ...view, tokenSet: true };
-    case "client.AlertCarrierTokenCleared": return { ...view, tokenSet: false };
+    case "client.AlertCarrierChanged": return { ...view, carrier: event.carrier, generation: sequence, delivery: Object.create(null) };
+    case "client.AlertCarrierTokenSet":
+    case "client.AlertCarrierTokenCleared": {
+      const delivery = Object.fromEntries(Object.entries(view.delivery).filter(([, mark]) => mark.delivered)
+        .map(([id, mark]) => [id, { ...mark, generation: sequence }]));
+      return { ...view, generation: sequence, delivery, tokenSet: event._tag === "client.AlertCarrierTokenSet",
+        token: event._tag === "client.AlertCarrierTokenSet" ? { origin: event.origin, carrierGeneration: event.carrierGeneration } : undefined,
+        retiredTokens: view.token === undefined ? view.retiredTokens : [...view.retiredTokens, view.token.carrierGeneration] };
+    }
+    case "client.AlertDelivered":
+    case "client.AlertDeliveryFailed":
+      if (event.generation !== view.generation) return view;
+      return { ...view, delivery: { ...view.delivery, [event.alertId]: {
+        generation: event.generation, attempt: event.attempt, delivered: event._tag === "client.AlertDelivered",
+        ...(event._tag === "client.AlertDeliveryFailed" ? { failureSequence: sequence } : {}),
+      } } };
     case "client.WebSettingsChanged": return { ...view, webSettings: event.settings,
       webDown: event.settings.enabled && view.webDown };
     case "client.WebServerDown": return { ...view, webDown: true };
