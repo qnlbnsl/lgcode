@@ -5,14 +5,15 @@ import { boardLimits } from "@shephrd/contracts/board/limits";
 import type { BoardCompletion } from "@shephrd/contracts/board/schemas";
 import type { BoardPostView, BoardView, BoardWakeView } from "@shephrd/contracts/board/view";
 import * as Schema from "effect/Schema";
-import type { Snapshot } from "../commands/internal.ts";
-import type { DeliveryRequest } from "../routing/pieceDelivery.ts";
+import type { PiecePlan, Snapshot } from "../commands/internal.ts";
 import { escapeLeadingSlash } from "../routing/envelope.ts";
 import { project } from "../routing/waits.ts";
 import type { EngineLists } from "../pieces/lists.ts";
 import { canCarryCompletion, canCarryPost, own } from "./access.ts";
 import { outcome } from "./outcome.ts";
 import type { BoardFold } from "./view.ts";
+
+type DeliveryRequest = NonNullable<PiecePlan["deliveries"]>[number];
 
 export const boardView = (snapshot: Snapshot): BoardView => snapshot.board as BoardView;
 export const sameAuthor = (a: BoardAuthor, b: BoardAuthor): boolean => a._tag === b._tag && (
