@@ -344,7 +344,7 @@ export const withAcpRunner = <A, E>(rig: RunnerRig, options: RunnerOptions, body
       runner, events, eventsAfter: (count) => events.slice(count), waitFor: waiter(events), logLines: lines, secrets,
     });
   }).pipe(
-    Effect.provide(runnerLayer(rig, options, secrets)),
+    Effect.provide(runnerLayer(rig, options, secrets).pipe(Layer.provide(redactor.layer))),
     Effect.provide(loggerFor(redactor.redactText, lines)),
     Effect.scoped,
   );
