@@ -348,7 +348,7 @@ export const applyWith = (state: State, envelope: EventEnvelope, views: Readonly
   for (const namespace of pieceNamespaces) {
     pieces[namespace] = guardPiece("views", namespace, () => views[namespace].reduce(state[namespace], event, envelope.sequence), state[namespace]);
   }
-  return {
+  const next: State = {
     ...pieces,
     sequence: envelope.sequence,
     agents: agentsAfter(state, event),
@@ -361,6 +361,11 @@ export const applyWith = (state: State, envelope: EventEnvelope, views: Readonly
     deliveries: deliveriesAfter(state, event),
     accounts: accountsAfter(state, event),
   };
+  for (const namespace of pieceNamespaces) {
+    const observe = views[namespace].observe;
+    if (observe !== undefined) pieces[namespace] = guardPiece("views", namespace, () => observe(next, event, envelope.sequence), next[namespace]);
+  }
+  return { ...next, ...pieces };
 };
 
 export const apply = (state: State, envelope: EventEnvelope): State => applyWith(state, envelope);

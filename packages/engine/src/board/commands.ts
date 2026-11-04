@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { type AgentId, type Event, type EventEnvelope } from "@shephrd/contracts";
 import { ChannelId, PostId, type BoardAddressee, type BoardAuthor } from "@shephrd/contracts/board/ids";
-import { holdsIncoming, holdsUnsettled, ownerHeld } from "@shephrd/contracts/board/conditions";
+import { holdsIncoming, holdsUnsettled } from "@shephrd/contracts/board/conditions";
 import type { BoardPostView } from "@shephrd/contracts/board/view";
 import { BoardChannelName, BoardPostText } from "@shephrd/contracts/board/schemas";
 import * as Effect from "effect/Effect";
@@ -11,6 +11,7 @@ import { refused, type Input, type Payload, type PiecePlan } from "../commands/i
 import { holderAbove } from "../routing/holders.ts";
 import { project } from "../routing/waits.ts";
 import { canAddMember, canClose, canManage, canOpenGroup, canPost, canRead, channelMembers, directGrant, own } from "./access.ts";
+import { boardStatus } from "./status.ts";
 import { outcome } from "./outcome.ts";
 import { activeWakes, boardView, buildWake, completionOwed, encodedBytes, isUnread, neverSentWake, postDispositions, readerKey, refreshWakes, sameAuthor } from "./wake.ts";
 
@@ -235,10 +236,8 @@ const status = (input: Input, raw: Record<string, unknown>): Effect.Effect<ReadR
   const disabled = input.runtime.lists?.boardEnabled === false;
   if (payload.agentId === undefined) {
     if (actor._tag !== "owner" && actor._tag !== "service") return yield* refused();
-    const ids = Object.keys(snapshot.agents);
-    return { reply: { requestId: payload.requestId, sequence: snapshot.sequence, disabled,
-      holdsUnsettled: disabled ? [] : ids.filter((id) => holdsUnsettled(id, board, snapshot.deliveries)),
-      holdsIncoming: disabled ? [] : ids.filter((id) => holdsIncoming(id, board)), ownerHeld: disabled ? [] : ownerHeld(board) } };
+    const { posts: _posts, ...conditions } = boardStatus(snapshot, !disabled);
+    return { reply: { requestId: payload.requestId, ...conditions } };
   }
   const id = payload.agentId;
   if (own(snapshot.agents, id) === undefined) return yield* refused("agent not found");

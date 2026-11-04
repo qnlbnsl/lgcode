@@ -10,6 +10,7 @@ import type { Snapshot } from "../../commands/internal.ts";
 import type { EngineLists } from "../../pieces/lists.ts";
 import { Restart } from "../../recovery/service.ts";
 import { Views } from "../../views/Views.ts";
+import { stallRule } from "./rules/stallRule.ts";
 import type { RolesView } from "../view.ts";
 import { makeCacheRule } from "./cacheRule.ts";
 import { endStallForTurn, resendUnread, sheepdogCaller } from "./notices.ts";
@@ -156,4 +157,4 @@ export const makeSheepdogLoop = (rules: ReadonlyArray<SheepdogRule>): Effect.Eff
   }
 }));
 
-export const sheepdogLoop = Effect.suspend(() => makeSheepdogLoop([...makeRules(), capacityRule, makeCacheRule()]));
+export const sheepdogLoop = Effect.suspend(() => makeSheepdogLoop([...makeRules(), capacityRule, stallRule, makeCacheRule()]));

@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema"
 import * as Tuple from "effect/Tuple"
 import { AgentId, EpochMilliseconds, EventSequence } from "../ids.ts"
+import { PostId } from "../board/ids.ts"
 import { RoleFileHash, RolesSettings } from "./schema.ts"
 
 export const rolesActionKinds = [
@@ -34,8 +35,8 @@ const actionEvent = <const Kind extends typeof rolesActionKinds[number], Fields 
 
 export const RolesAction = Schema.Union([
   actionEvent("TeamIdleReported", { group: Schema.String }),
-  actionEvent("StallSeen", {}),
-  actionEvent("ReplaceAdvised", {}),
+  actionEvent("StallSeen", { stalledPostId: Schema.optionalKey(PostId) }),
+  actionEvent("ReplaceAdvised", { stalledPostId: Schema.optionalKey(PostId) }),
   actionEvent("RunawayReported", {}),
   actionEvent("CapacityRetried", {}),
   actionEvent("CrashAdmitted", {}),

@@ -20,7 +20,7 @@ export const sanitizeName = (name: string): string => name.replace(/[^\p{L}\p{N}
 const fixedText: Record<RolesAction["_tag"], string> = {
   "roles.StallSeen": "Work is waiting. Check the board and carry on, or report what is blocking it.",
   "roles.StallEnded": "Work has resumed.",
-  "roles.ReplaceAdvised": "This agent has stalled repeatedly. Review its work and consider replacing it.",
+  "roles.ReplaceAdvised": "This agent has stalled repeatedly. Review its work and use roles.handoff to prepare a replacement.",
   "roles.RunawayReported": "This agent has passed its running limit. Review its work and consider a hand-off.",
   "roles.GaveUp": "Automatic recovery has ended. Review this agent and decide how to continue.",
   "roles.CrashAdmitted": "Automatic crash recovery has been admitted.",
@@ -31,7 +31,15 @@ const fixedText: Record<RolesAction["_tag"], string> = {
   "roles.CacheFlushed": "The queued board notice has been flushed.",
   "roles.CompactRequested": "Context compaction was requested.",
 };
-export const noticeText = (kind: RolesAction["_tag"], name: string): string => `${fixedText[kind]} Agent: ${sanitizeName(name) || "Unnamed agent"}.`;
+export const noticeText = (
+  kind: RolesAction["_tag"], name: string,
+  action?: Pick<RolesAction, "agentId" | "noticeRecipient" | "occurrence">,
+): string => {
+  const text = kind === "roles.StallSeen" && action?.occurrence === 2 && action.noticeRecipient !== action.agentId
+    ? "This agent has stalled twice on the same open post. Review the unanswered work and help it continue."
+    : fixedText[kind];
+  return `${text} Agent: ${sanitizeName(name) || "Unnamed agent"}.`;
+};
 export const shouldFlush = (kind: RolesAction["_tag"]): boolean => [
   "roles.StallSeen", "roles.ReplaceAdvised", "roles.GaveUp", "roles.CrashRetried", "roles.TeamIdleReported", "roles.RunawayReported",
 ].includes(kind);
@@ -90,7 +98,7 @@ export const sendNotice = (action: NoticeAction, rule: string, lists: EngineList
         requestId: id("post"), direct: { _tag: "agent", agentId: action.noticeRecipient }, to: [{ _tag: "agent", agentId: action.noticeRecipient }], reply: "none",
         text: action._tag === "roles.GaveUp" && action.cause === "capacity"
           ? `Capacity recovery has ended. Move the work to another model. Agent: ${sanitizeName(shared?.name ?? own(snapshot.agents, action.agentId)?.name ?? "Unnamed agent") || "Unnamed agent"}.`
-          : noticeText(action._tag, shared?.name ?? own(snapshot.agents, action.agentId)?.name ?? "Unnamed agent"),
+          : noticeText(action._tag, shared?.name ?? own(snapshot.agents, action.agentId)?.name ?? "Unnamed agent", action),
       }, lists).pipe(Effect.result);
       if (post._tag === "Failure") {
         if (post.failure._tag === "LogWriteFailed") return yield* post.failure;
