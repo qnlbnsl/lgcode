@@ -2,7 +2,7 @@
 
 1. Gate 10 load line: the planner cannot read either vendor's remaining weekly allowance; launch counts are estimates, and the lead checks limits before launching.
 2. Closed by the owner's answer of 2026-11-03 and lead rulings L26 and L27 (rows 80, 81): the plans edit the engine directly, WS-7 is no longer pending, and standing rules are built only for a qualifying harness.
-3. Both contracts are written (client API v14 `a780da1`, board v11 at `5c631b2`, both reworked under L26), but neither is built; the roles depend on the engine's in-process service path (CAPI E13) accepting piece commands such as `board.post` (post-build check 3), and on the board's reach check allowing L17's service-and-agent direct pair. Round 4's four shared findings (post-id replies, reads versus rights, the lifecycle table for piece events, and the caller surviving a log read) are settled in the client API contract and folded (rows 95 to 101, 103 to 108). 
+3. Both contracts are written (client API v15 `668a341`, board v11 at `5c631b2`, both reworked under L26), but neither is built; the roles depend on the engine's in-process service path (CAPI E13) accepting piece commands such as `board.post` (post-build check 3), and on the board's reach check allowing L17's service-and-agent direct pair. Round 4's four shared findings (post-id replies, reads versus rights, the lifecycle table for piece events, and the caller surviving a log read) are settled in the client API contract and folded (rows 95 to 101, 103 to 108). 
 4. The scopes `roles/backend`, `roles/contracts` and `roles/docs-research` do not exist; the lead runs the scoping skill before launch.
 5. A harness whose adapter reports no usage on `TurnEnded` (WS-7c) gets timed compaction only if it is Claude and its transcript can be found (post-build check 2).
 6. Closed by row 80: WS-7b is built, so a capacity error with the sheepdog on holds the agent's queue. With the sheepdog off, it returns to its sender as before this plan.
@@ -10,7 +10,7 @@
 8. Agents run as the owner's user and can read and write Shephrd's state folder, including its database (engine decision row 47, accepted by the owner on 2026-11-01). Standing rules live in the event log, so an agent able to write the database could add one; this is the same accepted risk, not a new one.
 9. The Foundry skill lives in the Founder OS repository; rewriting its Steps 3 to 5 and 8 is rollout step 6, outside this plan's units.
 10. `client.roster` gives counts of open requests and questions, not their contents, so `orient` shows counts only.
-11. Closed by row 103: `roles.rules.add` is computer-only, with access `owner` alone, so no device can add a rule.
+11. Closed by row 139: there are no device credentials, so no device can add a rule. `roles.rules.add` has access `owner`, and a logged-in dashboard is the owner.
 12. Closed by lead ruling L17 (row 34): the sheepdog posts direct notices; the engine-prompt fallback is dropped.
 13. WS-7a is built only for a harness that qualifies (lead ruling L27, row 81); without a qualifying harness, standing rules are deferred.
 14. Claude Code's shell input names no working folder, so Claude agents get no standing-rule matches in this version, with no exception. This is fail-closed by design (row 67); a launch setting that pins the shell's folder is a feature idea in the result file. Claude's adapter also reports Bash and PowerShell through one reporter, with the command as the title and no discriminator field, so Claude may stay `unsupported` even with its folder pinned (row 79).
@@ -22,7 +22,7 @@
 20. WS-7a resolves paths, following symbolic links, before the request's transaction. A link created after that and before the command runs is not caught. This is narrower than the alias case it closes, and an agent able to create it at that moment could also edit the files the command runs (row 79).
 21. Taken together, gaps 14, 17 and 18 and the unrecorded Gemini and Cursor harnesses mean that, on today's evidence, no harness qualifies for standing rules. Lead ruling L27 (row 81) makes the recordings decide: standing rules are built only for a harness that qualifies, and otherwise deferred.
 22. The engine's settings test treats every path under a `.claude/`, `.codex/`, `.gemini/` or `.cursor/` folder as a settings path, so a team whose worktrees sit under `.claude/worktrees/` gets every file edit sent to the owner, and no standing-rule match. The plan fails closed there and tells teams to keep worktrees outside such folders (row 85); narrowing the engine's test is an issue for the lead, because it touches a settings rule.
-23. While the web server is open, `roles.rules.add` being computer-only is also a guard and not a boundary. A web caller can start an agent or set a harness's adapter, and that program can read the owner credential, so it could add a rule over the Unix socket. The client API contract states this in section 2, under SECURITY.md rule 2's suspension (row 117).
+23. The web password is a boundary against the network, and it is not a boundary against an agent on the owner's Unix user. Such an agent can read the password from the engine's environment through `/proc`, or the owner credential on disk, and so add a rule as the owner. SECURITY.md states this limit next to the existing own-user limit (row 139).
 
 ## Round minors, not folded
 
