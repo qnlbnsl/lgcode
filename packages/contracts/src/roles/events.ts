@@ -55,7 +55,9 @@ export const RolesActionRecord = RolesAction.mapMembers(Tuple.map(Schema.fieldsA
   sequence: EventSequence, noticeRead: Schema.optionalKey(Schema.Boolean),
 }))).check(Schema.makeFilter(Schema.is(RolesAction)))
 export type RolesActionRecord = typeof RolesActionRecord.Type
-export const SheepdogBaseline = Schema.TaggedStruct("roles.SheepdogBaseline", { position: EventSequence, on: Schema.Boolean })
+export const SheepdogBaseline = Schema.TaggedStruct("roles.SheepdogBaseline", {
+  position: EventSequence, on: Schema.Boolean, boardOn: Schema.optionalKey(Schema.Boolean),
+})
 export const SheepdogRecord = Schema.Union([RolesAction, SheepdogBaseline])
 export type SheepdogRecord = typeof SheepdogRecord.Type
 export const RolesEvent = Schema.Union([

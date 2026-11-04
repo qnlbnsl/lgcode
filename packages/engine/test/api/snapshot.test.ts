@@ -100,6 +100,8 @@ it("1.7 before, during and after COMMIT/publication, snapshot plus catch-up incl
     yield* registerRebuildCheck();
     const log = yield* EventLog;
     const views = yield* Views;
+    // Let the required startup write finish before holding a fixture commit.
+    yield* subscribe(0).pipe(Stream.filter((row) => row.event._tag === "roles.SheepdogBaseline"), Stream.take(1), Stream.runDrain);
     yield* log.append(owner, freshRequest(), "1".repeat(64), [asEvent({ _tag: "client.FixtureRecorded", id: "a", text: "A" })], {});
     const before = yield* snapshot(owner, lists);
     const entered = yield* Deferred.make<void>();
@@ -111,18 +113,18 @@ it("1.7 before, during and after COMMIT/publication, snapshot plus catch-up incl
       const writing = yield* log.append(owner, freshRequest(), "2".repeat(64), [asEvent({ _tag: "client.FixtureRecorded", id: "b", text: "B" })], {}).pipe(Effect.forkScoped);
       yield* Deferred.await(entered);
       const during = yield* snapshot(owner, lists).pipe(Effect.timeout(2_000));
-      expect(before.sequence).toBe(1);
-      expect(during.sequence).toBe(1);
+      expect(before.sequence).toBe(2);
+      expect(during.sequence).toBe(2);
       const catchUp = yield* subscribe(during.sequence).pipe(Stream.take(1), Stream.runCollect);
-      expect(catchUp.map((envelope) => envelope.sequence)).toEqual([2]);
+      expect(catchUp.map((envelope) => envelope.sequence)).toEqual([3]);
       const ids = [...during.client!.records.map((row) => row.id), ...catchUp.map((row) => (row.event as unknown as { id: string }).id)];
       expect(ids).toEqual(["a", "b"]);
       yield* Deferred.succeed(release, undefined);
       yield* Fiber.join(writing);
       const after = yield* snapshot(owner, lists);
-      expect(after.sequence).toBe(2);
+      expect(after.sequence).toBe(3);
       expect(after.client!.records).toEqual([
-        { id: "a", text: "A", sequence: 1 }, { id: "b", text: "B", sequence: 2 },
+        { id: "a", text: "A", sequence: 2 }, { id: "b", text: "B", sequence: 3 },
       ]);
     }).pipe(Effect.ensuring(Deferred.succeed(release, undefined)), Effect.ensuring(Effect.sync(() => spy.mockRestore())));
   }));

@@ -40,14 +40,17 @@ export const makeSheepdogLoop = (rules: ReadonlyArray<SheepdogRule>): Effect.Eff
   const lists = views.lists!;
   let snapshot = yield* views.snapshot;
   const firstStart = (snapshot.roles as RolesView).baseline === undefined;
-  const baseline = (position: number, on: boolean, first = false) => executeService(sheepdogCaller, "roles.record", {
-    requestId: baselineRequestId(first ? undefined : position), action: { _tag: "roles.SheepdogBaseline", position, on },
+  let recordedBoardOn = (snapshot.roles as RolesView).boardClock?.on ?? lists.boardEnabled !== false;
+  const baseline = (position: number, on: boolean, first = false, requestId = baselineRequestId(first ? undefined : position), boardOn = recordedBoardOn) => executeService(sheepdogCaller, "roles.record", {
+    requestId, action: { _tag: "roles.SheepdogBaseline", position, on, boardOn },
   }, lists).pipe(Effect.as(true), Effect.catchTag("CommandRefused", () => Effect.logError("sheepdog baseline refused").pipe(Effect.as(false))));
   if (firstStart) {
     if (!(yield* baseline(snapshot.sequence, sheepdogEnabled(snapshot), true))) return;
     snapshot = yield* views.snapshot;
   }
   const initial = snapshot.roles as RolesView;
+  const startupHead = snapshot.sequence;
+  let boardTransition = initial.boardClock !== undefined && initial.boardClock.on !== (lists.boardEnabled !== false);
   let on = initial.baseline!.on;
   let cursor = initial.position;
   const baselinePosition = initial.baseline!.position;
@@ -85,10 +88,11 @@ export const makeSheepdogLoop = (rules: ReadonlyArray<SheepdogRule>): Effect.Eff
   const timers = (restarting: boolean) => Effect.gen(function* () {
     if (!on) { nextDeadline = Infinity; return; }
     const ctx = yield* context();
-    const floor = (ctx.snapshot.roles as RolesView).baseline!.firstSequence;
+    const state = ctx.snapshot.roles as RolesView;
+    const floor = state.baseline!.firstSequence;
     const owners = rules.flatMap((rule) => (rule.timers?.(ctx) ?? []).map((origin) => ({ rule, origin })));
-    const origins = owners.map(({ origin }) => origin).filter((origin) => lists.boardEnabled !== false || !boardTimer(origin.rule));
-    const armed = yield* reader.arm(origins, floor);
+    const origins = owners.map(({ origin }) => origin).filter((origin) => !boardTimer(origin.rule) || lists.boardEnabled !== false && !boardTransition);
+    const armed = yield* reader.arm(origins, floor, Math.max(floor, state.boardClock?.sequence ?? floor));
     const now = yield* Clock.currentTimeMillis;
     const keys = new Set(armed.map((timer) => JSON.stringify([timer.key, timer.originSequence, timer.delayMillis])));
     for (const key of attempted) if (!keys.has(key)) attempted.delete(key);
@@ -134,6 +138,16 @@ export const makeSheepdogLoop = (rules: ReadonlyArray<SheepdogRule>): Effect.Eff
       for (const rule of rules) if (rule.onEvent !== undefined) yield* rule.onEvent(yield* context(), envelope);
     }
     cursor = envelope.sequence;
+    // The board switch is a startup setting, so it has no stream event of its
+    // own. Record it only after catch-up reaches the captured head. This
+    // preserves every pending event and gives re-enabled board clocks a
+    // durable origin without resetting capacity clocks or the first baseline.
+    if (boardTransition && cursor >= startupHead) {
+      recordedBoardOn = lists.boardEnabled !== false;
+      yield* baseline(cursor, on, false, `roles:board-baseline:${cursor}:${recordedBoardOn}`, recordedBoardOn);
+      boardTransition = false;
+      rearming = true;
+    }
     // Event-triggered work re-evaluates deadlines without waiting a full tick.
     yield* timers(rearming);
   }

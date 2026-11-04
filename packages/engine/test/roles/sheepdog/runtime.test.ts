@@ -4,6 +4,7 @@ import { it } from "@effect/vitest";
 import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import { rolesActionKinds, type EventEnvelope, type RolesAction } from "@shephrd/contracts";
 import * as Deferred from "effect/Deferred";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
@@ -141,6 +142,26 @@ it.effect("a board-off notice records board-off without posting and its status r
   }));
 });
 
+it.effect("a socket snooze silences its idle group until the clock passes without silencing another group", () => {
+  const lists = listsWith();
+  return run(lists, Effect.gen(function* () {
+    yield* setup; yield* settled(0);
+    const client = yield* socket(lists);
+    yield* client["roles.snooze"]!({ requestId: "snooze-idle", group: "idle", until: (yield* Clock.currentTimeMillis) + 600_000 });
+    const trigger = (yield* current).sequence;
+    const idle = { _tag: "roles.TeamIdleReported", agentId: "worker", noticeRecipient: "lead", group: "idle",
+      triggerSequence: trigger, sourceSequence: trigger, occurrence: 1 } as const;
+    yield* sendNotice(idle as any, "team-idle", lists);
+    expect((yield* alertLog).filter((row) => row.event._tag === "board.PostWritten")).toHaveLength(0);
+    yield* sendNotice({ ...idle, group: "other" } as any, "team-idle", lists);
+    expect((yield* alertLog).filter((row) => row.event._tag === "board.PostWritten")).toHaveLength(1);
+    yield* TestClock.adjust("10 minutes");
+    yield* sendNotice(idle as any, "team-idle", lists);
+    expect((yield* alertLog).filter((row) => row.event._tag === "board.PostWritten")).toHaveLength(2);
+    expect((yield* roles).actions.filter((record) => record._tag === "roles.TeamIdleReported")).toHaveLength(2);
+  }));
+});
+
 it.effect("recovery holds the first baseline and all rule work; the first start never admits a historical crash", () => Effect.gen(function* () {
   yield* run(quiet, setup.pipe(Effect.andThen(appendSetup([eventOf({ _tag: "AgentCrashed", agentId: "worker", exitCode: 1, signal: null, stderr: "untrusted error" })]))));
   const ready = yield* Deferred.make<void>();
@@ -227,6 +248,48 @@ it.effect("timer work uses the originating event time and fires under TestClock 
     yield* TestClock.adjust("20 minutes"); expect(fired).toHaveLength(1);
   }));
 });
+
+it.effect("board re-enable persists a new board clock without resetting counts or capacity clocks", () => Effect.gen(function* () {
+  let origin = 0;
+  yield* run(listsWith(), Effect.gen(function* () {
+    yield* settled(0); yield* setup;
+    origin = (yield* appendSetup([eventOf({ _tag: "roles.Snoozed", group: "clock", until: 3_600_000 })]))[0]!.sequence;
+    yield* executeService(sheepdogCaller, "roles.record", { requestId: "prior-stall", action: {
+      _tag: "roles.StallSeen", agentId: "worker", noticeRecipient: "owner", triggerSequence: origin,
+      sourceSequence: origin, occurrence: 2, notice: "board-off",
+    } });
+  }));
+  yield* run({ ...listsWith(), boardEnabled: false }, Effect.gen(function* () {
+    const view = yield* eventually(roles, (view) => view.boardClock?.on === false);
+    expect(view.agents.worker!.stallCount).toBe(2);
+  }));
+  yield* TestClock.adjust("11 minutes");
+  const fired: string[] = [];
+  const rule: SheepdogRule = {
+    timers: () => ["stall", "team-idle", "capacity", "notice-cache"].map((kind) => ({ key: kind, rule: kind as any, originSequence: origin, delayMillis: 600_000 })),
+    onTimer: (_ctx, timer) => Effect.sync(() => { fired.push(timer.key); }),
+  };
+  let boardSequence = 0;
+  yield* run(listsWith([rule]), Effect.gen(function* () {
+    const view = yield* eventually(roles, (view) => view.boardClock?.on === true);
+    boardSequence = view.boardClock!.sequence;
+    yield* eventually(Effect.sync(() => fired.length), (count) => count === 1);
+    expect(fired).toEqual(["capacity"]);
+    expect(view.agents.worker!.stallCount).toBe(2);
+    yield* TestClock.adjust("5 minutes");
+    expect(fired).toEqual(["capacity"]);
+  }));
+  fired.length = 0;
+  yield* run(listsWith([rule]), Effect.gen(function* () {
+    yield* eventually(Effect.sync(() => fired.length), (count) => count === 1);
+    expect((yield* roles).boardClock!.sequence).toBe(boardSequence);
+    yield* TestClock.adjust("4 minutes"); expect(fired).toEqual(["capacity"]);
+    yield* TestClock.adjust("1 minute");
+    yield* eventually(Effect.sync(() => fired.length), (count) => count === 4);
+    expect(fired).toEqual(["capacity", "stall", "team-idle", "notice-cache"]);
+    expect((yield* roles).agents.worker!.stallCount).toBe(2);
+  }));
+}));
 
 it.effect("switch-off releases each open hold once and refuses new holds until enabled", () => Effect.gen(function* () {
   yield* run(quiet, Effect.gen(function* () {
@@ -435,3 +498,25 @@ it.effect("owner notices reach the real alert list with the fixed title and no s
   expect(alert.subject).toBeUndefined();
   expect((yield* alertLog).filter((row) => row.event._tag === "board.PostWritten")).toEqual([]);
 })));
+
+it.effect("two idle groups sharing a top agent keep distinct receipts and each unread notice is rerouted once", () => {
+  const lists: EngineLists = { ...quiet, planners: { ...quiet.planners, "board.flush": () => Effect.fail(refused()) } };
+  return run(lists, Effect.gen(function* () {
+    yield* setup;
+    const [trigger] = yield* appendSetup([eventOf({ _tag: "roles.Snoozed", group: "trigger", until: 3_600_000 })]);
+    for (const group of ["first", "second"]) {
+      const { notice: _notice, ...record } = action(trigger!, trigger!.sequence, "lead" as RolesAction["noticeRecipient"]);
+      yield* sendNotice({ ...record, _tag: "roles.TeamIdleReported", group }, "team-idle", lists);
+    }
+    expect((yield* roles).actions).toHaveLength(2);
+    const posts = (yield* alertLog).filter((row) => row.event._tag === "board.PostWritten");
+    expect(posts).toHaveLength(2);
+    expect(new Set(posts.map((row) => row.requestId)).size).toBe(2);
+    yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId: "lead", exitCode: 1, signal: null, stderr: "private error" })]);
+    yield* resendUnread((yield* current).sequence, lists);
+    yield* resendUnread((yield* current).sequence, lists);
+    const records = (yield* roles).actions;
+    expect(records).toHaveLength(4);
+    expect(records.filter((row) => row.noticeRecipient === "owner").map((row) => row._tag === "roles.TeamIdleReported" ? row.group : undefined)).toEqual(["first", "second"]);
+  }));
+});

@@ -32,12 +32,15 @@ export const makeTimerReader = (lists: EngineLists) => {
     remember(envelope);
     return envelope.occurredAt;
   });
-  const arm = (origins: ReadonlyArray<TimerOrigin>, floorSequence: number) => Effect.gen(function* () {
+  const arm = (origins: ReadonlyArray<TimerOrigin>, floorSequence: number, boardFloorSequence = floorSequence) => Effect.gen(function* () {
     const floor = yield* time(floorSequence);
+    const boardFloor = origins.some((origin) => boardTimer(origin.rule)) ? yield* time(boardFloorSequence) : floor;
     const armed: ArmedTimer[] = [];
-    for (const origin of origins) armed.push({ ...origin, dueAt: deadline(Math.max(floor, yield* time(origin.originSequence)), origin.delayMillis) });
+    for (const origin of origins) armed.push({ ...origin, dueAt: deadline(Math.max(
+      boardTimer(origin.rule) ? boardFloor : floor, yield* time(origin.originSequence),
+    ), origin.delayMillis) });
     // Do not let long-lived service subscriptions retain the whole log.
-    const keep = new Set([floorSequence, ...origins.map((origin) => origin.originSequence)]);
+    const keep = new Set([floorSequence, boardFloorSequence, ...origins.map((origin) => origin.originSequence)]);
     for (const sequence of times.keys()) if (!keep.has(sequence)) times.delete(sequence);
     return armed;
   });

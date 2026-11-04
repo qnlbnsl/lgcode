@@ -1,5 +1,6 @@
 import type { RolesAction, RolesActionRecord, EventEnvelope } from "@shephrd/contracts";
 import type { BoardView } from "@shephrd/contracts/board/view";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import type { Snapshot } from "../../commands/internal.ts";
 import { executeService } from "../../commands/services.ts";
@@ -7,7 +8,7 @@ import { holderAbove } from "../../routing/holders.ts";
 import { Views } from "../../views/Views.ts";
 import type { EngineLists } from "../../pieces/lists.ts";
 import type { RolesView } from "../view.ts";
-import { actionRequestId } from "./requests.ts";
+import { actionRequestId, actionSubject } from "./requests.ts";
 
 export const sheepdogCaller = { _tag: "service", service: "roles.sheepdog" } as const;
 const own = <T>(rows: Readonly<Record<string, T>>, id: string): T | undefined => Object.hasOwn(rows, id) ? rows[id] : undefined;
@@ -60,14 +61,17 @@ export const deliveryIsSheepdogTurn = (snapshot: Snapshot, id: string): boolean 
 
 export type NoticeAction = RolesAction extends infer A ? A extends RolesAction ? Omit<A, "notice" | "postId"> : never : never;
 export const recordAction = (action: RolesAction, rule: string, lists: EngineLists) => executeService(sheepdogCaller, "roles.record", {
-  requestId: actionRequestId({ rule, subject: action.agentId, triggerSequence: action.triggerSequence,
+  requestId: actionRequestId({ rule, subject: actionSubject(action), triggerSequence: action.triggerSequence,
     kind: `${action._tag}.record`, recipient: action.noticeRecipient, occurrence: action.occurrence }), action,
 }, lists).pipe(Effect.catchTag("CommandRefused", () => Effect.logError("sheepdog action record refused")));
 
 // The command replies carry the post id and receipts preserve it across a
 // crash between posting, flushing and recording. No agent prose enters text.
 export const sendNotice = (action: NoticeAction, rule: string, lists: EngineLists) => Effect.gen(function* () {
-  const id = (kind: string) => actionRequestId({ rule, subject: action.agentId, triggerSequence: action.triggerSequence,
+  const snapshot = yield* (yield* Views).snapshot;
+  if (action._tag === "roles.TeamIdleReported"
+    && (own((snapshot.roles as RolesView).snoozes, action.group) ?? -Infinity) > (yield* Clock.currentTimeMillis)) return;
+  const id = (kind: string) => actionRequestId({ rule, subject: actionSubject(action), triggerSequence: action.triggerSequence,
     kind: `${action._tag}.${kind}`, recipient: action.noticeRecipient, occurrence: action.occurrence });
   let postId: string | undefined;
   let notice: "sent" | "board-off" = "sent";
@@ -75,7 +79,6 @@ export const sendNotice = (action: NoticeAction, rule: string, lists: EngineList
     const status = yield* executeService(sheepdogCaller, "board.status", { requestId: id("status") }, lists);
     if (status.disabled === true) notice = "board-off";
     else {
-      const snapshot = yield* (yield* Views).snapshot;
       const post = yield* executeService(sheepdogCaller, "board.post", {
         requestId: id("post"), direct: { _tag: "agent", agentId: action.noticeRecipient }, to: [{ _tag: "agent", agentId: action.noticeRecipient }], reply: "none",
         text: noticeText(action._tag, own(snapshot.agents, action.agentId)?.name ?? "Unnamed agent"),
@@ -101,7 +104,7 @@ export const resendUnread = (sourceSequence: number, lists: EngineLists) => Effe
   const snapshot = yield* (yield* Views).snapshot;
   const latest = new Map<string, RolesActionRecord>();
   for (const record of (snapshot.roles as RolesView).actions) latest.set(JSON.stringify([
-    record._tag, record.agentId, record.triggerSequence, record.occurrence,
+    record._tag, actionSubject(record), record.triggerSequence, record.occurrence,
   ]), record);
   for (const record of latest.values()) {
     const recipient = record.noticeRecipient;

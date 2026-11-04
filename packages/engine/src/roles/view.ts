@@ -28,6 +28,7 @@ export interface RolesView extends RoleFileState {
   readonly agents: Readonly<Record<string, AgentRoles>>;
   readonly position: number;
   readonly baseline?: { readonly position: number; readonly on: boolean; readonly sequence: number; readonly firstSequence: number };
+  readonly boardClock?: { readonly on: boolean; readonly sequence: number };
   readonly wakes: Readonly<Record<string, Wake>>;
   readonly deliveryWakes: Readonly<Record<string, string>>;
 }
@@ -97,6 +98,8 @@ export const apply = (view: RolesView, event: Event, sequence: number): RolesVie
     case "roles.SheepdogBaseline": return {
       ...view, position: Math.max(view.position, event.position),
       baseline: { position: event.position, on: event.on, sequence, firstSequence: view.baseline?.firstSequence ?? sequence },
+      ...(event.boardOn === undefined ? {} : { boardClock: { on: event.boardOn,
+        sequence: view.boardClock === undefined || view.boardClock.on !== event.boardOn ? sequence : view.boardClock.sequence } }),
       agents: event.on ? view.agents : Object.fromEntries(Object.entries(view.agents).map(([id, agent]) => [id, closeCrash(agent)])),
     };
     case "AgentStarted": return { ...view, agents: { ...view.agents, [event.agentId]: {

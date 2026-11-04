@@ -58,7 +58,7 @@ it("1.27 a resent read recomputes its page and marks without writing a receipt o
     ]);
     const sql = yield* SqlClient.SqlClient;
     expect(yield* sql`SELECT COUNT(*) AS n FROM events WHERE event_type = 'client.FixtureRead'`).toEqual([{ n: 2 }]);
-    expect(yield* sql`SELECT COUNT(*) AS n FROM receipts`).toEqual([{ n: 0 }]);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM receipts WHERE NOT (caller = 'service:roles.sheepdog' AND request_id = 'roles:baseline')`).toEqual([{ n: 0 }]);
   }));
 });
 
