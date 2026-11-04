@@ -988,8 +988,8 @@ that commits after the scan is a later event in the stream, so it closes the
 baseline alert as usual.
 
 1. **Raise.** When a source asks for an alert, the reactor writes
-   `client.AlertRaised { alertId, key, kind, agentId?, subject?, title,
-   sourceSequence, baseline? }`. The `key` names what the alert is about,
+   `client.AlertRaised { alertId, alertKey, kind, agentId?, subject?, title,
+   sourceSequence, baseline? }`. The `alertKey` is the source's `key`. It names what the alert is about,
    such as `permission:<id>`, `question:<id>`, `crash:<agentId>:<sequence>`,
    `account:<id>:sign-in`, `account:<id>:usage` or
    `agent-account:<agentId>`. Only one alert is open for each key at a time.
@@ -2472,20 +2472,23 @@ track of it. This plan adds these entries, and no others:
 | `actor` | `service`, `rule`, `namespace` | `Caller` and `Sender` gain these (edits E11, E14, E15), in `sender`, `answeredBy`, `caller` and the rest of `actor`'s places. | 1b |
 | `delivery.source` | `namespace` | A piece's source is `{ namespace, id }` (edit E16). `id` is already listed. | 1b |
 | `receiptStructure`'s envelopes | `device` | An envelope gains `device` (edit E12). | 1b |
-| `eventStructure` | `alertId`, `key` | The client's alert events. | 2 |
+| `eventStructure` | `alertId`, `alertKey` | The client's alert events. | 2 |
 | `subject` | `namespace` | An alert's subject can be a piece's. `id` is already listed. | 2 |
 | `receiptStructure` | `alertId` | A planner's reply may name it. | 2 |
 
 An entry skips redaction, so a field listed here must never hold free text. `alertId`
 is engine-generated. `service`, `namespace` and `rule` are fixed names and rule ids. A
-`key` is built only from ids, sequences and fixed words, and an alert source's result
-can name no other part of it. A title, an alert's reason, a carrier's server and the
+`alertKey` is built only from ids, sequences and fixed words, and an alert source's
+`key` can name no other part of it. The event's field is not named `key`, because the
+table exempts a field by its name across all events, and a generic name would exempt a
+later event's free text (row 183). A title, an alert's reason, a carrier's server and the
 fields of edit E29 stay text, and `toolCallId` stays text as today.
 
 - Behaviour change: none for the engine's own events.
 - Tests: `packages/engine/test/log/client-identities.test.ts` registers a secret that
   occurs inside each listed field, in an event and in a receipt. Each id is unchanged,
-  and the same secret in a title or in `toolInput` is still redacted.
+  and the same secret in a title, in `toolInput` or in a top-level field named `key` is
+  still redacted.
 
 ### What the later plans then add
 

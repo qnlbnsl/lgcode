@@ -445,7 +445,7 @@ installs its events. Each later unit installs the commands it handles (row 172).
 | 2.7 | Through the public client connection, against a fixture server, `subscribe` and `client.subscribe` each call their own RPC; a filter survives a dropped connection; the cursor advances on an event, a checkpoint and an oversized marker; a client that subscribes opens two connections, carries every other command on the read connection and reconnects each on its own, and a client that never subscribes opens one, on the Unix socket and in the browser | Test id: `packages/client/test/stream-dispatch.test.ts`; `packages/client/test/two-connections.test.ts`; `packages/client/test/concurrent-reconnect.test.ts` (unary expectations unchanged) |
 | 2.8 | `core.ts` and `browser.ts` reach no `node:` import; the root entry still gives the command-line tool, the MCP server and the pane viewer today's behaviour | Test id: `packages/client/test/entry-boundaries.test.ts`; existing client tests with unchanged expectations |
 | 2.9 | Every `client` command's definition has the access in contract section 5, and every `client` event is `owner-only`; through the visibility function, an agent caller never sees an alert | Test id: `packages/contracts/test/client/access-table.test.ts`; `packages/engine/test/client/client-visibility.test.ts` |
-| 2.10 | A registered secret inside `alertId`, `key` or a subject's `namespace` leaves it unchanged in the event and the receipt; the same secret in a title is still redacted; a fixture alert source cannot put free text in a `key` | Test id: `packages/engine/test/log/client-identities.test.ts` |
+| 2.10 | A registered secret inside `alertId`, `alertKey` or a subject's `namespace` leaves it unchanged in the event and the receipt; the same secret in a title or in a top-level field named `key` is still redacted; a fixture alert source cannot put free text in its `key` | Test id: `packages/engine/test/log/client-identities.test.ts` |
 
 **Tasks:**
 
@@ -456,7 +456,7 @@ installs its events. Each later unit installs the commands it handles (row 172).
 | 2.3 | E24 and E25: stream dispatch by tag, and the tolerant wire group at the RPC boundary | `packages/client/src/index.ts` (`RpcClient.make` l.97, `subscribe` helper l.190-212, `CommandsRpcGroup.requests` l.218); Effect `rpc/RpcClient.ts:733-755`, l.811-818; target `packages/contracts/src/wire.ts` |
 | 2.5 | E26: the client library's three modules, with the root re-exporting Node's | `packages/client/src/index.ts` (l.1-3, l.19-22, l.32, l.120-138); targets `packages/client/src/core.ts`, `node.ts`, `browser.ts` |
 | 2.4 | The size-limit test over each piece's stated maxima | Target `packages/contracts/test/size-limits.test.ts` |
-| 2.7 | E33's second part: `alertId`, `key` and a subject's `namespace` | `packages/engine/src/log/redactionStructure.ts` (`eventStructure` l.23, `receiptStructure` l.31) |
+| 2.7 | E33's second part: `alertId`, `alertKey` and a subject's `namespace` | `packages/engine/src/log/redactionStructure.ts` (`eventStructure` l.23, `receiptStructure` l.31) |
 | 2.6 | E32: two connections from a client that subscribes | `packages/client/src/index.ts` (`connect` l.142-174, `subscribe` helper l.190-212); Effect `rpc/RpcClient.ts:350`, l.577-581 |
 
 **Design artifact:** none.
