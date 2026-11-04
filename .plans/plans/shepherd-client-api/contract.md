@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v15, one password login, one user, anchored to engine 9e386b0
-version: 15
+status: v16, final check folded, anchored to engine 9e386b0
+version: 16
 updated: 2026-11-03
 ---
 
@@ -1744,6 +1744,10 @@ real log holds one, and this removes a second owner path that nothing fills.
   lose their device cases and keep the rest. `views/compare-views.test.ts` moves its
   sample events to `AccountChanged`. `commands/start-setup.test.ts` keeps its owner-stop
   case (l.55), and its invalid-device case becomes an invalid agent token (l.83-91).
+  `api/per-request-credential.test.ts` loses its device cases and keeps its agent and
+  owner checks. `log/append.test.ts` drops its devices count (l.180) and keeps its
+  journal-mode check. `identity/redactor-structure.test.ts` loses its `DeviceRevoked`
+  fixture (l.74) and keeps the rest (row 197).
   `api/auth.test.ts` gains a case that a `shp_d_` bearer gets HTTP 401.
 
 **E11: one durable form of the caller** (lead's round 4, S4; row 71). Today the

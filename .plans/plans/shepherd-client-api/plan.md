@@ -123,7 +123,7 @@ view each get an attack pass.
 
 Full log → `decisions.md`. The design decisions →
 `docs/specs/2026-11-03-client-api-design.md`. The contract the other two
-plans build on is `contract.md`, version 15.
+plans build on is `contract.md`, version 16.
 
 ## Workstreams
 
@@ -267,7 +267,7 @@ Conventions for every unit. Paths are relative to the Shephrd repository
 root. Anchors are at engine commit `9e386b0`, and `scouting.md` records the first scouting at `8ff4c9b`. "Rows" are
 rows of this plan's `decisions.md`; "engine rows" are rows of
 `.plans/plans/shepherd-engine/decisions.md`. "The contract" is
-`contract.md` in this folder, version 15; where a
+`contract.md` in this folder, version 16; where a
 unit and the contract disagree, the unit reports it to the lead. A test id
 is a Vitest file path, run from the repository root with
 `pnpm vitest run <path>`; Playwright tests run with
@@ -844,6 +844,21 @@ Post-build checks (code-level worries a plan cannot settle):
   stream, confirm that reads stay bounded and that the reactor keeps running.
 - TM-PB-6, for the interactive mode plan: a Herdr pane starts from Herdr's
   environment, so that plan must clear `SHEPHRD_WEB_PASSWORD` in the pane's command.
+- TM5-PB-1: exercise the route list through the real router, with malformed paths, `GET`
+  and `HEAD` under `/api`, recovery and invalid cookies. No private file falls back to
+  static, and no command is dispatched before the cookie check.
+- TM5-PB-2: race a logout with an upgrade and an active stream, on both connections. The
+  old token authorizes no surviving connection or later command. When another client logs
+  out, the page returns to the login form and removes the private state it was showing.
+  Check a restart and a settings change too.
+- TM5-PB-3: check the password's and the session token's redaction with the real service
+  logger, against rejected login bodies, cookie headers, protocol diagnostics, receipts and
+  adapter output, and again after the token is replaced.
+- TM5-PB-4: run the client, board and roles plans' identity collision checks together,
+  through the real event and receipt writers and then a rebuild. Include both forms of
+  `to`, service rule ids, alert subjects, role-file hashes, harness-id arrays, and a secret
+  in tool-input keys and `_tag`. Each id keeps its joins, and text stays redacted, also
+  under the shared names `key`, `hash` and `recipient`.
 
 </details>
 
@@ -996,5 +1011,6 @@ gap).
 | 4 | 0 / 1 / 5 | Four Codex Sol reviews of `8a34e59`, by the owner's Codex-only final round, no refusals. The major and the re-anchor item are folded as contract v13 and rows 179 to 181, and the plan is re-anchored to engine `9e386b0`. The other three minors are in `attack/known-gaps.md`, not folded, by the manager's rule. |
 | v14 | — | No review round, by the lead's ruling. New edit E33 lists this plan's id fields in the engine's redaction structure (row 182). |
 | v15 | — | No review round, by the lead's ruling. The owner's answer: question 6 is no, and login is one password. The plan loses pairing, devices, the guard, the computer-only list and the lasting-setting alert (rows 184 to 196). |
+| 5 | 0 / 1 / 0 | The lead's final check of contract v15: two Sol reviews, `attack/round-5-architect-sol.md` (grade 7, one major) and `attack/round-5-threat-model-sol.md` (grade 10, ship), no refusals. The major, R5-A1, is folded as contract v16 and row 197: E12's test list gains three files. |
 
 </details>
