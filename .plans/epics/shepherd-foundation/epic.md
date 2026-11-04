@@ -21,7 +21,8 @@ scripts to start, watch, approve or wake its agents.
 - The Foundry skill's Steps 3 to 5 and 8 run through Shephrd alone, with no
   `herdr agent` command and no `collect.sh` or `board-waker.sh`.
 - The owner answers a permission request and reads a thread from a phone,
-  through the owner's own reverse proxy to the loopback web server.
+  after logging in with the password, through the owner's own reverse proxy
+  to the loopback web server.
 - A message on the board wakes only the agent that needs to answer it.
 
 ## Plans
