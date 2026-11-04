@@ -27,6 +27,7 @@ const expectedCommands = [
   "wait",
   "stop",
   "resume",
+  "release",
   "compact",
   "group",
   "accounts",
@@ -47,7 +48,7 @@ const expectedOwnerOnly = ["accounts", "accounts set-secret", "accounts mark-ava
   "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]
 
-const expectedMcpOffered = ["start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group"]
+const expectedMcpOffered = ["start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "release", "compact", "group"]
 const boardCommands = ["board.open", "board.members", "board.post", "board.close", "board.acknowledge", "board.read", "board.channels", "board.status", "board.flush"]
 const boardTools = boardCommands.filter((name) => name !== "board.flush")
 
@@ -76,7 +77,7 @@ const rpcFor = (name: string) => {
 
 describe("command lists", () => {
   // Catches: a command dropped, renamed or added in `commandNames` (the list is exact, with no duplicates).
-  it("lists exactly the sixteen commands of row 55", () => {
+  it("lists the engine commands, including capacity release", () => {
     expect(commandNames).toHaveLength(expectedCommands.length)
     expect(sorted(commandNames)).toEqual(sorted(expectedCommands))
     expect(new Set(commandNames).size).toBe(commandNames.length)
@@ -96,13 +97,13 @@ describe("command lists", () => {
     for (const name of alertCommands) expect(commandAccess[name as keyof typeof commandAccess]).toEqual(["owner"])
     for (const name of expectedCommands) {
       const kinds = commandAccess[name as keyof typeof commandAccess]
-      expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["prompt", "compact", "resume", "subscribe"].includes(name) ? ["owner", "agent", "service"] : ["owner", "agent"])
+      expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["prompt", "compact", "resume", "release", "subscribe"].includes(name) ? ["owner", "agent", "service"] : ["owner", "agent"])
     }
   })
 
   // Catches: a secret-setting command offered to agents. Row 55 asserts the MCP list against an
   // explicit list; this derives it the way unit 7 will (agent-callable, minus the stream).
-  it("offers ten engine, eight board, four client and two roles tools, excluding streams, board.flush and alerts", () => {
+  it("offers eleven engine, eight board, four client and two roles tools, excluding streams, board.flush and alerts", () => {
     const offered = [...CommandsRpcGroup.requests.keys()].filter((name) => ((commandAccess as Record<string, ReadonlyArray<string>>)[name] ?? []).includes("agent") && name !== "subscribe" && name !== "client.subscribe")
     expect(sorted(offered)).toEqual(sorted([...expectedMcpOffered, ...boardTools, ...clientTools, ...rolesTools]))
     for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", ...alertCommands]) {

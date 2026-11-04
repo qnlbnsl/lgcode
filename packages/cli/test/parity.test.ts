@@ -38,7 +38,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
       "pass-up": { subject: { _tag: "question", id: "question" } },
       ask: { text: "A question?" },
       wait: { members: ["member"], mode: "all", block: false },
-      stop: { agentId: "member" }, resume: { agentId: "member", fresh: true }, compact: { agentId: "member" },
+      release: { agentId: "member" }, stop: { agentId: "member" }, resume: { agentId: "member", fresh: true }, compact: { agentId: "member" },
       group: { agentId: "member", add: ["review"], remove: ["build"] },
       accounts: { operation: "list" }, "accounts mark-available": { accountId: "account" },
       harnesses: { operation: "list" }, subscribe: { after: 100 }, "debug.compare-views": {},

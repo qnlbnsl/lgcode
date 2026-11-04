@@ -13,7 +13,14 @@ it("3.1 a 200-agent, 100-request team with full display text stays below 4 MiB a
     permissionFor(`p-${i}`, { agentId: `agent-${i}`, description: "\"\\\n界".repeat(2000), options: Array.from({ length: 20 }, (_, j) => ({ id: `option-${j}`, name: "界".repeat(500), kind: "allow_once", level: "ask", persistent: false })) }),
     questionFor(`q-${i}`, { agentId: `agent-${i}`, text: "界".repeat(2000) }),
   ]);
+  // WS-7b: include the hold flag on every agent in the encoded size budget.
+  yield* appendSetup(Array.from({ length: 200 }, (_, i) => [
+    event({ _tag: "DeliveryQueued", delivery: { id: `held-${i}`, target: `agent-${i}`, sender: { _tag: "owner" }, content: { _tag: "prompt", text: "Work." } } }),
+    event({ _tag: "DeliverySent", agentId: `agent-${i}`, deliveryId: `held-${i}`, method: "acp" }),
+    event({ _tag: "DeliveryHeld", agentId: `agent-${i}`, deliveryId: `held-${i}`, reason: "capacity" }),
+  ]).flat());
   const reply = yield* snapshotFor();
+  expect(reply.agents.filter((row: any) => row.capacityHeld === true)).toHaveLength(200);
   expect(reply.agents).toHaveLength(201);
   expect(reply.requests).toHaveLength(100);
   expect(reply.questions).toHaveLength(100);
