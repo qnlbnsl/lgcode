@@ -14,12 +14,7 @@ close it. "Rows" are rows of `decisions.md` in this folder.
   (row 78).
 - **Each vendor's remaining weekly allowance is unknown.** The planner
   cannot read it. The lead checks each vendor's limit before launching the
-  51 launches in the sizing section.
-- **The owner's question 6 is pending.** The plan folds the recommended
-  answer: from a device caller, the engine refuses a persistent or
-  always-allow option (row 95, edit E28, criterion 1.41). The other answer
-  removes that one edit and that one criterion. AGENTS.md rule 5 changes only
-  after the owner answers.
+  48 launches in the sizing section.
 - **Row 51 is widened.** No owner quote backs the exclusion of the VS Code
   extension, so the row stays open until the lead cites one or the owner
   confirms it. The plan builds no extension (row 121).
@@ -29,39 +24,30 @@ close it. "Rows" are rows of `decisions.md` in this folder.
 
 ## Gaps the owner accepted
 
-- **The web server is open.** Until authentication is added, any agent on
-  the machine that gets past the guard, and anyone who reaches the owner's
-  proxy, can act with the owner's control through the web server
-  (row 80, SECURITY.md rule 2, suspended). That includes answering
-  permission requests and starting agents with full access.
+- **An agent on the same user can read the password.** Agents run as the owner's
+  Unix user, so an agent can read the engine's first environment through
+  `/proc/<pid>/environ`, and then log in. The password protects against the network.
+  It is not a boundary against an agent until the own-user setup exists (rows 78, 188,
+  SECURITY.md).
+- **There are no rate limits or lockouts.** The owner chose this (row 184). The setup
+  document asks for a long string.
+- **A logout signs out every client,** because there is one token. So does a restart
+  (row 186).
 - **Shephrd has no Unix user of its own.** Any agent can read Shephrd's
   state folder, including the stored account keys (row 78).
-- **A caller of the open web server can change the alert carrier's server
-  and topic,** and so redirect or silence alerts. Such a caller could already
-  answer requests, so this adds no new power (row 88). The token does not
-  follow a change of server (row 93). The alert about a carrier change also goes
-  to the old carrier, and the alert about a token clear goes out with the cleared
-  value. Each has up to five attempts, as a best effort: a restart can remove the
-  value first, and on a deny-all server the send then fails (rows 139, 164).
+- **A logged-in session can change the alert carrier's server and topic,** and so
+  redirect or silence alerts. A session is the owner. The token does not follow a
+  change of server (rows 88, 93).
 
 ## Gaps the plan names and leaves open
 
-- **Lasting settings stay open to the web.** A harness's adapter path and
-  arguments, an account's environment and secrets, the carrier's server and
-  topic, and the roles' role file and settings can all be changed by a web
-  caller, and they outlast the moment's access. None grants more than the open
-  server already gives, so none moved to the computer-only list. A change
-  raises a `client.lasting-setting` alert, whose push a device caller cannot
-  switch off, and nothing prevents the change. A device caller's dismiss closes
-  the alert on the page only: it does not stop the first send, and it does not
-  delete the notification from the phone. The computer's list still shows it. A
-  send still needs a working carrier, so a caller who breaks the carrier first can
-  delay the warning (rows 98, 139, 165).
-- **A same-user proxy can look like a local browser.** With proxy mode on, a
-  proxy running as the owner's user that adds no forwarded address and rewrites
-  `Host` cannot be told from a browser on the host. The setup document requires
-  both forwarded headers and recommends the proxy's own user, and PB-2 fails on
-  a missing header. Nothing stops an owner running such a proxy (row 133).
+- **A dashboard can lock itself out.** Turning the web server off, or changing the
+  public address, closes its own connection, and only the owner's terminal can set it
+  back (row 195).
+- **A cookie is not scoped to a port.** Two engines on one host replace each other's
+  cookie, and any local program that the browser visits on `127.0.0.1` receives it.
+  The first costs a login. The second is the local-program limit that rule 2 of
+  SECURITY.md already states.
 - **A failing alert writes to the log.** An open alert keeps retrying at the
   10-minute cap for as long as it stays open, so it adds one small event every 10
   minutes while the carrier is down (row 131).
@@ -115,13 +101,13 @@ close it. "Rows" are rows of `decisions.md` in this folder.
   and the wrapping covers `client.thread`, `client.event` and the tools. An agent that
   runs `shephrd client subscribe` reads the events as the engine's own `subscribe`
   gives them today (row 166).
-- **A squatter on the loopback port.** While the web server is down, another local
-  user can bind `127.0.0.1` at its port. In proxy mode, it then serves the phone a page
-  with a long cache lifetime under the real public address, and the cached page later
-  passes every check against the real server. SECURITY.md states this, and the setup
-  document says that a `client.web-down` alert means the page must not be opened.
-  Authentication closes it, and the later pairing plan considers a proxy upstream that
-  is a Unix socket with a group permission. **The lead tells the owner** (row 167).
+- **A squatter on the loopback port.** While the web server is down, or never started
+  because the variable is not set, another local user can bind `127.0.0.1` at its port.
+  It can then show a fake login form and capture the password. In proxy mode, it can also
+  serve the phone a page with a long cache lifetime under the real public address. SECURITY.md
+  states this. The setup document says that a `client.web-down` alert means the page must
+  not be opened, and a missing variable raises no alert. **The lead tells the owner** (rows
+  167, 187).
 
 ## Round minors, not folded
 
@@ -133,33 +119,10 @@ folded. These minors of round 4 stay open.
   by `toolCallId` cannot find a Codex diff, and criterion 7.12's Codex-shaped case can show
   only the locations and the fixed warning until an optional id is added to file-change
   content.
-- **C4-02, critic.** Device attribution does not name the later writes from `start`: its
-  `SessionOpened` and `AgentStartFailed` batches carry only the actor.
-
-## Where the same-machine guard fails
-
-The guard of row 84 is a guard, not a security boundary. SECURITY.md says
-so. A deliberate agent gets past it in these ways:
-
-- It starts a process that leaves its process tree, for example with
-  `setsid` and a double fork, so the process has no agent ancestor.
-- It asks a program that is not its descendant to connect for it, such as
-  a user service manager, a scheduled job, or a terminal outside its tree.
-- It reaches the web server through the proxy from another machine or
-  network namespace whose address is inside the allowed client networks and
-  is not one of the host's own.
-- Its adapter dies, so an orphaned process no longer has a recorded ancestor
-  (`packages/engine/src/api/ancestry.ts:33-36`).
-
-If the host hides other processes' `/proc/<pid>/fd` links, the guard
-refuses every same-user peer, including the owner's own browser on the
-host. Post-build check PB-4 confirms this on the owner's host.
-
 ## Facts the planner could not verify
 
 - **The owner's real proxy.** Caddy's documentation answers how its defaults
-  treat `X-Forwarded-For`, `X-Forwarded-Proto` and `Host`, but the owner said
-  "a caddy or something". Post-build check PB-2 tests the real one (rows 89,
-  113).
+  treat `X-Forwarded-Proto` and `Host`, but the owner said
+  "a caddy or something". Post-build check PB-2 tests the real one (row 113).
 - **The owner's ntfy server.** Post-build check PB-5 confirms that it honours
   the sequence id and the delete by it.

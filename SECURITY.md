@@ -21,8 +21,8 @@ Include these details:
 - The impact: what an attacker can read, change, or run.
 - A minimal reproduction.
 
-Redact message boards, local paths, credentials, API tokens, pairing links,
-and raw provider responses before you send anything.
+Redact message boards, local paths, credentials, API tokens, the web password,
+session cookies, and raw provider responses before you send anything.
 
 ## What Shephrd protects, and what it does not
 
@@ -45,11 +45,17 @@ planned. On 2026-11-03 the owner approved building remote access before it,
 so that Shephrd is in use sooner. Until it is built, any agent can read
 Shephrd's state folder, including the stored account keys.
 
+Agents can also read the web password. Agents run as the owner's user, so an
+agent can read the engine's first environment through `/proc`, even though the
+engine deletes the variable and agents do not inherit it. The password protects
+against the network. It is not a boundary against an agent on the same user
+until the own-user setup exists. The owner accepted this limit on 2026-11-03.
+
 The part of Shephrd that needs the most care is its client API, because it
 lets a web page, a desktop app, or a phone control agents that can run
 commands on the host. Anyone who can reach that API with a valid credential
-can, in effect, run code on the machine. While the loopback web server is
-open (rule 2 below), no credential is needed there at all.
+can, in effect, run code on the machine. On the web server, that credential is
+one password.
 
 ## Harnesses with no deny-read or deny-write rule
 
@@ -80,50 +86,35 @@ These rules apply to every change. A change that breaks one is a security bug.
 1. **The API listens on the loopback address by default.** Listening on any
    other address is an explicit setting that the owner turns on.
 2. **Every API request is authenticated, including on loopback.** There is no
-   unauthenticated mode.
+   unauthenticated mode. The engine's Unix socket uses the owner credential and
+   agent tokens. The web server uses one password, which the service reads from
+   the local environment variable `SHEPHRD_WEB_PASSWORD`, and the session that a
+   correct password earns. A logged-in session is the owner. If the variable is
+   not set, the web server does not start. Only the login route and the page's
+   static files, which hold no data, are served with no session.
 
-   **Suspended for the loopback web server.** The owner suspended this rule
-   for the loopback web server on 2026-11-03, until authentication is added
-   ("b. for now just leave it be. i want to start using it. only me on my
-   network so does not matter"). The engine's Unix socket keeps its
-   authentication unchanged. The risk the owner accepted: every agent on the
-   machine can reach the open server on `127.0.0.1`, and so can anyone who
-   reaches the owner's proxy. Either can act with the owner's full control.
-   Over the open web server, an approval needs no credential, so rule 7's
-   "unless the owner's credential approves it" does not hold there.
-   An agent stuck on an approval could approve itself, or start agents with
-   full access, which bypasses the permission ceiling and the ancestry
-   check. Two limits stay in force while it is open. First, three commands
-   work only over the engine's Unix socket with the owner credential, never
-   through the web server: creating a pairing code, changing the web
-   server's settings, and adding a standing permission rule. This first limit
-   is also a guard and not a boundary while the server is open, because a web
-   caller can start an agent or set an adapter, and that program can read the
-   owner credential. Second, the web
-   server refuses a connection from a process that descends from an agent.
-   That second check stops accidents and simple misuse, not a hostile agent:
-   an agent can start a process outside its own process tree, or ask
-   another program to connect for it. The web server also refuses another
-   user's process, unless proxy mode is on and it is the proxy's user, which
-   the owner names at the computer. In proxy mode, it refuses a public request
-   whose forwarded client address is missing or outside the networks the owner
-   allowed at the computer. The loopback port has a limit of its own. While the
-   web server is down, another local user can bind `127.0.0.1` at its port,
-   because that needs no rights. In proxy mode, the proxy then sends the phone's
-   requests to that program, which can serve a page with a long cache lifetime
-   under the real public address. The cached page later runs against the real
-   server and passes these checks. `docs/remote-access.md` says that a
-   `client.web-down` alert means the page must not be opened. Authentication,
-   with pairing, ends this suspension.
-3. **A new device is paired with a short-lived, single-use pairing code.**
-   A pairing code is never reusable and never stored in plain text.
-4. **Each device gets its own credential, and each credential can be revoked
-   on its own.** Revoking one phone does not sign out every client.
+   The loopback port has a limit of its own. While the web server is down, or
+   when it never started, another local user can bind `127.0.0.1` at its port,
+   because that needs no rights. That program can show a fake login form and
+   capture the password. In proxy mode, the proxy sends the phone's requests to
+   it, and it can serve a page with a long cache lifetime under the real public
+   address. `docs/remote-access.md` says that a `client.web-down` alert means the
+   page must not be opened. A local program can also send any header, so the
+   `Host` and `Origin` checks stop web pages and not local programs.
+3. **The password is checked in constant time and is not kept by the browser.**
+   A login carries it in the request body, never in a URL. One person uses
+   Shephrd, and the owner chose no rate limits and no lockouts on 2026-11-03.
+4. **A session is one random token per engine start, held in memory only.**
+   Logging out replaces the token, which signs out every client. Changing the
+   password means restarting the engine, which also ends the session. A browser
+   holds the token in an `HttpOnly`, `SameSite=Strict` cookie, which is `Secure`
+   through the proxy.
 5. **Remote access goes over an encrypted channel**, such as TLS, a Tailscale
    tailnet, or an SSH tunnel. Shephrd does not offer plain HTTP to a
    non-loopback address.
 6. **Secrets never reach logs, the message board, or a client.** This covers
-   API tokens, pairing codes, and the agent harnesses' own login tokens.
+   API tokens, the web password, the session token, and the agent harnesses'
+   own login tokens. Agents do not inherit the web password's variable.
 7. **Text from an agent is data, not a command.** A message on the board
    cannot change permissions, teams, or settings unless the owner's
    credential approves it.

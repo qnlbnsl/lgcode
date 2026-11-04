@@ -96,6 +96,8 @@ credential is added. Opening a link never runs a command by itself.
 
 ## Decision 5: the web server is open for now
 
+**Replaced by decision 7.**
+
 **The owner's exact words:** "b. for now just leave it be. i want to start
 using it. only me on my network so does not matter"
 
@@ -120,6 +122,8 @@ states the risk above.
 
 ## The owner's condition on the open web server
 
+**Replaced by decision 7.** The seam for pairing is removed.
+
 **The owner's exact words:** "like make it in a way that we can add pairing
 without major refactors"
 
@@ -139,6 +143,8 @@ Adding pairing later then means changing that one function and adding the
 pairing commands, not reworking every route.
 
 ## Decision 6: three commands work only at the computer
+
+**Replaced by decision 7.** No command is computer-only.
 
 **The owner's exact words:** "yes."
 
@@ -163,6 +169,8 @@ from a lead's ruling for the owner to review (row 142).
 phone.
 
 ## The guard against agents on the same machine
+
+**Removed by decision 7.**
 
 The owner's reason for an open server, "only me on my network", covers the
 network but not the agents on the same machine. The lead asked the planner
@@ -228,10 +236,38 @@ misuse, not a hostile agent. It adds no authentication, as the owner
 deferred authentication. The real fix is authentication, with pairing, which
 slots into the same function.
 
+## Decision 7: login is one password, and one person uses Shephrd
+
+**The owner's exact words:** "no. We are making this as if the login was already there. We're just not making the pairing and the login logic yet. That's all. Even if we'd go with the pairing logic, I have a pretty simple way of doing it, which is essentially just a password. That's it, because, thinking about it, we don't need multi-user capabilities. Only one person is using this. That's it. In fact, that's what we should just do: read a local environment variable, which is just a long string or a password, and then on the dashboard you just enter that password. We already have this thing behind a proxy. It's not being exposed to the web. We can have the firewall isolate the machine or the web server further, but I think just a single password would be fine. We don't need rate limits or anything. Most tools don't even do that. When we get to the mobile app part and whatnot, then we can think about something, but even then, let's just look at what Home Assistant does, right? Pretty simple, and it also has remote access."
+
+**Decision.** The owner answered question 6 no, so the engine refuses no answer
+from the web server. Login is one password. The service reads it from the local
+environment variable `SHEPHRD_WEB_PASSWORD`, and the dashboard asks for it. This
+replaces pairing codes and per-device credentials, and nothing is kept for them.
+
+**What it changes.**
+
+- A login carries the password in the request body, and the server compares it
+  in constant time. On a match, the reply sets a session cookie.
+- The session is one random token per engine start, held in memory only. There is
+  no session table, no user, no expiry timer and no renewal. A logout replaces the
+  token, and a restart or a changed password means logging in again.
+- A logged-in session is the owner. No command is computer-only.
+- If the variable is not set, the web server does not start, and the engine says
+  why. The engine and its Unix socket run as normal.
+- There are no rate limits and no lockouts.
+- Loopback-only binding, the `Host` and `Origin` check, and the Unix socket's own
+  authentication all stay.
+- The password never reaches a log, the board or a client, and agents do not
+  inherit the variable. An agent on the owner's Unix user can still read the
+  engine's first environment through `/proc`. The password protects against the
+  network, and it is not a boundary against an agent until the own-user setup
+  exists.
+
+The plan's rows 184 to 196 hold the details.
+
 ## What stays open
 
-- When authentication and pairing are added, and when Shephrd's own Unix
-  user is built. The owner deferred both to "once it is up and running".
-- Whether the phone may choose "Allow always" while the web server has no
-  login. This is the owner's question 6, and the plan folds the recommended
-  answer, marked pending (row 95).
+- When Shephrd's own Unix user is built. The owner deferred it to "once it is up
+  and running".
+- Login for a mobile app. It starts by looking at what Home Assistant does.
