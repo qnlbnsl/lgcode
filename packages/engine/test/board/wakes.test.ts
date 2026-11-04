@@ -762,9 +762,16 @@ it.live("3.8 byte cap continuation: incoming returns carried and omitted questio
   const ids: string[] = [];
   for (let i = 0; i < 12; i++) ids.push(yield* postAs(c.lead!, { text: "\\".repeat(16384) }));
   yield* appendSetup([channel({ channelId: "private-room", name: "Private", opener: owner, manager: owner, members: [owner, agent("fourth")] }), post("private-question", { channelId: "private-room", author: owner, to: [agent("fourth")] })]);
-  const page = yield* readPage(c.worker!, { incoming: true, limit: 200 });
-  expect(page.items.map((row: { postId: string }) => row.postId)).toEqual(ids);
-  expect(JSON.stringify(page)).not.toContain("private-question");
+  const collected: string[] = [];
+  let after: string | undefined;
+  for (let index = 0; index < 20; index++) {
+    const page = yield* readPage(c.worker!, { incoming: true, limit: 200, ...(after === undefined ? {} : { after }) });
+    collected.push(...page.items.map((row: { postId: string }) => row.postId));
+    expect(JSON.stringify(page)).not.toContain("private-question");
+    after = page.next;
+    if (after === undefined) break;
+  }
+  expect(collected).toEqual(ids);
 })));
 
 it.live("3.8 byte cap continuation: omitted questions arrive after acceptance and turn end without posting or flushing", () => run((c) => Effect.gen(function* () {

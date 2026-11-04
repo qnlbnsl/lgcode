@@ -168,6 +168,6 @@ it.live("5.6 board.status exposes only bounded ids and counts to owner, service,
     after = result.next;
     if (after === undefined) break;
   }
-  expect(ids).toHaveLength(3_073);
-  expect(new Set(ids).size).toBe(3_073);
+  expect(ids).toHaveLength(3_074);
+  expect(new Set(ids).size).toBe(3_074);
 })));
