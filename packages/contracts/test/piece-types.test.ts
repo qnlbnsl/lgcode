@@ -52,7 +52,7 @@ it("1.5/1.22 tables reject missing visibility and namespace entries, and a piece
     let status = 0;
     try {
       output = execFileSync(join(root, "node_modules/.bin/tsc"), [
-        "--noEmit", "--strict", "--exactOptionalPropertyTypes", "--skipLibCheck", "--target", "ESNext",
+        "--ignoreConfig", "--noEmit", "--strict", "--exactOptionalPropertyTypes", "--skipLibCheck", "--target", "ESNext",
         "--module", "NodeNext", "--moduleResolution", "NodeNext", "--allowImportingTsExtensions",
         "--types", "node", "--typeRoots", join(root, "node_modules/@types"), fixture,
       ], { cwd: root, encoding: "utf8", timeout: 60_000, stdio: "pipe" });

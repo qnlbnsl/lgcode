@@ -3,6 +3,7 @@ import { join } from "node:path";
 import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import type { EventEnvelope } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
+import * as PubSub from "effect/PubSub";
 import * as SqlClient from "effect/sql/SqlClient";
 import { expect, it } from "vitest";
 import { EventLog } from "../../src/log/EventLog.ts";
@@ -27,7 +28,16 @@ it("1.10 owner pages equal the rebuilt thread, with a queued delivery on the nex
     yield* appendSetup([textEvent("one"), textEvent("two"), asEvent({ _tag: "DeliveryQueued", delivery: {
       id: "queued", target: "worker", sender: owner, content: { _tag: "prompt", text: "Queued." },
     } }), textEvent("three")]);
-    const expected = (yield* (yield* Views).snapshot).threads.worker!;
+    const views = yield* Views;
+    // Subscribe before checking the views so a racing commit cannot be missed.
+    yield* Effect.scoped(Effect.gen(function* () {
+      const committed = yield* (yield* EventLog).subscribeCommitted;
+      while (!(yield* views.snapshot).threads.worker?.some(({ event }) =>
+        event._tag === "DeliverySent" && event.agentId === "worker" && event.deliveryId === "queued")) {
+        yield* PubSub.takeAll(committed);
+      }
+    })).pipe(Effect.timeout(10_000));
+    const expected = (yield* views.snapshot).threads.worker!;
     const found: EventEnvelope[] = [];
     let after = 0;
     for (let attempts = 0; attempts < 10; attempts++) {
