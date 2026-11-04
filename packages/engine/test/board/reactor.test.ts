@@ -582,9 +582,61 @@ it.live("4.11 an empty whole-state scan writes no first-start marker or replay w
   expect(yield* logAfter(before)).toEqual([]);
 })));
 
-// Membership and send-time reach belong to the following reactor unit.
-// enable-in: b3c
-it.skip("4.9 send-time reach continuation: a removed group post is withdrawn while the next engine delivery is sent", () => run((c, runner) => Effect.gen(function* () {
+it.live("4.4 leaving a plain channel resolves the target and withdraws its queued post", () => run((c) => Effect.gen(function* () {
+  const id = yield* postAs(c.lead!);
+  success(yield* call(c.lead!, "board.members", { channelId: "room", add: [], remove: ["worker"] }));
+  yield* catchUp;
+  expect((yield* boardState).posts[id]?.dispositions.worker).toBe("removed");
+  expect((yield* boardState).posts[id]?.outcome).toBe("unanswerable");
+  expect(yield* queued("worker")).toEqual([]);
+  expect((yield* boardState).completions[id]).toBeDefined();
+})));
+
+it.live("4.4 leaving and rejoining before the reactor still resolves the older question", () => run((c) => Effect.gen(function* () {
+  const old = yield* postAs(c.lead!);
+  success(yield* call(c.lead!, "board.members", { channelId: "room", add: [], remove: ["worker"] }));
+  success(yield* call(c.lead!, "board.members", { channelId: "room", add: ["worker"], remove: [] }));
+  yield* catchUp;
+  expect((yield* boardState).posts[old]?.dispositions.worker).toBe("removed");
+  const fresh = yield* postAs(c.lead!);
+  expect((yield* boardState).posts[fresh]?.dispositions.worker).toBeUndefined();
+})));
+
+it.live("4.4 a plain-channel author who leaves has the post withdrawn with a completion", () => run((c) => Effect.gen(function* () {
+  const id = yield* postAs(c.worker!, { to: [agent("other")] });
+  success(yield* call(c.lead!, "board.members", { channelId: "room", add: [], remove: ["worker"] }));
+  yield* catchUp;
+  expect((yield* boardState).posts[id]?.outcome).toBe("withdrawn");
+  expect((yield* boardState).completions[id]).toMatchObject({ author: agent("worker") });
+  expect(yield* queued("worker")).toEqual([]);
+})));
+
+it.live("4.4 losing a group label resolves a question even when the agent remains online", () => run((c) => Effect.gen(function* () {
+  yield* appendSetup([channel({ channelId: "group", kind: "group", group: "review", anchorAgentId: "lead", members: [agent("lead")] })]);
+  yield* change({ _tag: "AgentGrouped", agentId: "worker", groups: ["review"] });
+  const id = yield* postAs(c.lead!, { channelId: "group" });
+  yield* change({ _tag: "AgentGrouped", agentId: "worker", groups: [] });
+  yield* catchUp;
+  expect((yield* snapshot).agents.worker?.state._tag).toBe("idle");
+  expect((yield* boardState).posts[id]?.dispositions.worker).toBe("removed");
+})));
+
+it.live("4.4 a direct grant ends only after the last shared channel is lost", () => run((c) => Effect.gen(function* () {
+  yield* appendSetup([channel({ channelId: "second", name: "Second" })]);
+  const first = success(yield* call(c.other!, "board.post", { direct: agent("worker"), text: "First direct question.", to: [agent("worker")], reply: "all" })).postId as string;
+  const second = success(yield* call(c.other!, "board.post", { direct: agent("worker"), text: "Second direct question.", to: [agent("worker")], reply: "all" })).postId as string;
+  success(yield* call(c.lead!, "board.members", { channelId: "room", add: [], remove: ["worker"] }));
+  yield* catchUp;
+  expect((yield* boardState).posts[first]?.dispositions.worker).toBeUndefined();
+  expect((yield* boardState).posts[second]?.dispositions.worker).toBeUndefined();
+  success(yield* call(c.lead!, "board.members", { channelId: "second", add: [], remove: ["worker"] }));
+  yield* catchUp;
+  expect((yield* boardState).posts[second]?.dispositions.worker).toBe("removed");
+  expect((yield* boardState).posts[second]?.outcome).toBe("unanswerable");
+})));
+
+// The dispatcher must skip a wake withdrawn by the send-time reach check.
+it.live("4.9 send-time reach continuation: a removed group post is withdrawn while the next engine delivery is sent", () => run((c, runner) => Effect.gen(function* () {
   yield* appendSetup([channel({ channelId: "group", kind: "group", group: "review", anchorAgentId: "lead", members: [agent("lead")] })]);
   yield* change({ _tag: "AgentGrouped", agentId: "worker", groups: ["review"] });
   const id = yield* postAs(c.lead!, { channelId: "group" });
