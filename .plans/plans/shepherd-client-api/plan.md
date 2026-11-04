@@ -1,6 +1,6 @@
 ---
 topic: shepherd-client-api
-status: ready for review
+status: ready
 tier: L
 created: 2026-11-03
 updated: 2026-11-03

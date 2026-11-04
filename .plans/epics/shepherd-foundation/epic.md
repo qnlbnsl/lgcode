@@ -30,9 +30,10 @@ scripts to start, watch, approve or wake its agents.
 | Order | Plan slug | What it delivers | State |
 |---|---|---|---|
 | 1 | shepherd-engine | The engine: agents over ACP, the event log, commands, permissions, waits, accounts, and one authenticated API. | linked |
-| 2 | shepherd-client-api | Phone alerts, remote access through the owner's proxy, the web page behind one password, and a thread viewer in a Herdr pane. | planned |
-| 3 | shepherd-message-board | Channels, direct messages and wake rules, behind one delivery interface. | planned |
-| 4 | shepherd-foundry-roles | The orchestrator, team leads, workers, standing permission rules and the sheepdog. | planned |
+| 2 | shepherd-client-api | Phone alerts, remote access through the owner's proxy, the web page behind one password, and a thread viewer in a Herdr pane. | linked |
+| 3 | shepherd-message-board | Channels, direct messages and wake rules, behind one delivery interface. | linked |
+| 4 | shepherd-foundry-roles | The orchestrator, team leads, workers, standing permission rules and the sheepdog. | linked |
+| 5 | shepherd-worktrees | Git worktrees for agents under `<repo>/.worktrees/`, through an option on the agent `start` command, with safe clean-up. | planned |
 
 `planned` — named slice, no `.plans/plans/<slug>/plan.md` yet.
 `linked` — that plan exists and its `epic:` is this slug.
@@ -46,6 +47,22 @@ scripts to start, watch, approve or wake its agents.
 
 ## Choices
 
+- 2026-11-03: the owner accepted the three later plans: the client API at
+  `b38aa6f` (contract version 17), the message board at `ea7aea5` (contract
+  version 15) and the foundry roles at `57b2822`. Git worktrees become their
+  own plan, `shepherd-worktrees`. The owner's words on the worktree design:
+  "Regarding the worktrees, I would use a folder within the repo, like a
+  scratch folder, like a `.worktrees` folder that gets ignored."
+- 2026-11-03: `AGENTS.md` rule 7 changed. The owner's words: "I don't know why
+  agents.md still says that, but when I say "don't commit and push," it's
+  specifically to dev. Update agents.md and take that rollout. It's not really
+  needed anymore, especially with autonomous coding, merging work trees, and
+  all of that. When it's within a team, agents get full authority for that.
+  It's only when we take that completed work and we are trying to merge it
+  into dev, like that PR, that I have to approve it." This repository has no
+  `dev` branch, so the rule says "base branch". `engine` counts as a team
+  branch, so the manager merges into it, and moving `engine` into `master`
+  goes to the owner.
 - 2026-10-30: the owner split Shephrd into four pieces and chose to build the
   engine first, then the client API, the message board and the foundry roles.
   The engine comes first because the other three are built on its

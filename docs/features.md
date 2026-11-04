@@ -97,6 +97,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   hand-off that Shephrd builds from the work brief, the worker's posts, the
   files it touched and the commands it ran, with no model turn spent. See
   research item 5.
+- **Role rules enforced** (idea). The command handler refuses an action that a role's rules forbid, such as a worker starting an agent or asking the owner. It reads a role table that the team's definition supplies. Version 1 only advises and reports (roles decision row 10).
+- **Pin Claude Code's shell folder at launch** (idea). A launch setting, such as `CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR`, would keep Claude Code's shell in the session folder. Standing rules could then match Claude agents, whose shell input names no folder (roles round 2, N5).
 
 ## 2. The message board
 
@@ -127,6 +129,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   with a reason, when the agent it waits on is stuck on a question or an
   approval. The command line exits with 0 for done, 1 for failed, and 2 for
   waiting on an answer. See research item 7.
+- **Post kinds** (idea). A label on each post, such as question, blocked, hand-off, done or decision, for filtering and for the dashboard. It was left out of the board's first plan, because the wake rule needs only "needs a reply" (board decisions row 14).
+- **No acknowledgement-only posts** (idea). Refuse a reply that needs no reply to a post that needed none, to stop "thanks" posts. This is item 10 of the Synapse list, and it is not in the board's first plan.
 
 ## 3. Threads
 
@@ -211,6 +215,11 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   | `subscribe` | `lookout` |
   | `debug.compare-views` | `debug headcount` |
   | `mcp` | `dog` |
+- **Filtered live updates** (idea). A subscription for phones that is filtered by agent and by event kind, with checkpoints that keep the cursor moving.
+- **One password login** (planned). The service reads the password from the environment variable `SHEPHRD_WEB_PASSWORD`, and the dashboard asks for it. One person uses Shephrd, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
+- **Phone alerts through one sender** (idea). Phone alerts go through one sender interface, `AlertSender`, with ntfy as the first carrier. A later carrier, such as Expo's push service for the phone app, slots in behind it (client API row 83).
+- **Mobile login** (later). Starts by looking at what Home Assistant does.
+- **VS Code extension** (later). One of the last things, along with the mobile app, by the owner's answer of 2026-11-03.
 
 ## 5. The sheepdog
 
@@ -240,6 +249,8 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
 - **Runaway work** (idea). Work that runs far past its expected length is
   reported to the lead, and can continue in a fresh agent with a built
   hand-off.
+- **Cache lifetime setting** (idea). A per-harness `cacheLifetime` setting, five minutes or one hour, for timing compaction when the adapter does not report which cache lifetime it wrote (roles round 1).
+- **"Compact me when I am next idle"** (idea). An agent asks the sheepdog to compact it after its current turn. This replaces the Foundry's `want-<name>` file for the context-keeper.
 
 ## 6. Source control
 
