@@ -11,7 +11,8 @@ import { chmodSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, it } from "@effect/vitest";
-import { Event, type EventEnvelope } from "@shephrd/contracts";
+import { Event, eventVisibility, type EventEnvelope } from "@shephrd/contracts";
+import { rolesSamples } from "../../../contracts/test/roles/fixtures.ts";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Redacted from "effect/Redacted";
@@ -50,6 +51,7 @@ const parents: Record<string, string> = { "agent-child": "agent-self", "agent-gr
 // `n` makes its identifiers unique. Terminal events for the subscriber itself
 // are left out (`terminal`), because they would end its own access.
 const samples: Record<string, (a: string, n: string) => Record<string, unknown>> = {
+  ...rolesSamples,
   AgentStarted: (a) => ({ agentId: a, name: `n-${a}`, role: "worker", groups: [], parent: parents[a] === undefined ? owner : { _tag: "agent", agentId: parents[a] }, harness: "first", account: "primary", permission: "ask", folder: "/tmp", runMode: "acp" }),
   AgentStartFailed: (a) => ({ agentId: a, reason: "agent start failed" }),
   SessionOpened: (a, n) => ({ agentId: a, session: { _tag: "acp", sessionId: `s-${n}` }, protocolVersion: 2, reloadable: true }),
@@ -158,7 +160,7 @@ live("7.3 for every event type, an agent's subscribe returns exactly the events 
     const visible = new Set<string>([self.agentId, child.agentId]);
 
     const expectedAfter = (after: number) => readLog.pipe(Effect.map((rows) => rows
-      .filter((row) => row.sequence > after && "agentId" in row.event && visible.has((row.event as { agentId: string }).agentId))
+      .filter((row) => row.sequence > after && String(eventVisibility[row.event._tag]) !== "owner-only" && "agentId" in row.event && visible.has((row.event as { agentId: string }).agentId))
       .map((row) => row.sequence)));
 
     // Catch-up: everything already in the log.
@@ -170,6 +172,11 @@ live("7.3 for every event type, an agent's subscribe returns exactly the events 
     const rows = yield* readLog;
     for (const tag of tags) {
       const ofTag = rows.filter((row) => row.event._tag === tag);
+      if (String(eventVisibility[tag as keyof typeof eventVisibility]) === "owner-only") {
+        expect([tag, ofTag.length > 0]).toEqual([tag, true]);
+        expect(replay.some((row) => row.event._tag === tag), tag).toBe(false);
+        continue;
+      }
       if (agentBearing.has(tag)) {
         expect([tag, ofTag.some((row) => visible.has((row.event as { agentId: string }).agentId))]).toEqual([tag, true]);
         expect([tag, ofTag.some((row) => !visible.has((row.event as { agentId: string }).agentId))]).toEqual([tag, true]);
