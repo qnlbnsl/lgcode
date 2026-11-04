@@ -108,7 +108,7 @@ These rules apply to every change. A change that breaks one is a security bug.
    Logging out replaces the token, which signs out every client. Changing the
    password means restarting the engine, which also ends the session. A browser
    holds the token in an `HttpOnly`, `SameSite=Strict` cookie, which is `Secure`
-   through the proxy.
+   on a public request when the public address is `https`.
 5. **An encrypted channel for remote access is the owner's setup**, such as TLS, a
    Tailscale tailnet, or an SSH tunnel. Shephrd serves plain HTTP on loopback and
    does not offer it to a non-loopback address. The owner's words, on 2026-11-03:
