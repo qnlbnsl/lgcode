@@ -82,6 +82,7 @@ export const keepInEveryState = <const T extends ReadonlyArray<string>>(tags: T)
 // Explicit keys make every new event require a decision for all seven states.
 const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
   ...keepInEveryState(clientEventTags),
+  ...keepInEveryState(rolesEventTags),
   AgentStarted: allStates("invalid"),
   AgentStartFailed: { ...allStates("invalid"), starting: "stopped" },
   SessionOpened: { ...allStates("invalid"), starting: "idle" },
@@ -123,3 +124,4 @@ const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
   CommandRefused: allStates("keep")
 }
 export const eventEffect = (state: StateName, event: Event["_tag"]): EventEffect => eventTable[event][state]
+import { rolesEventTags } from "./roles/events.ts"

@@ -5,6 +5,7 @@ import { HarnessSettings, RunMode } from "./harnesses.ts"
 import { AccountId, AgentId, BootId, DeliveryId, EpochMilliseconds, EventId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
 import { PermissionLevel } from "./permission.ts"
 import { LifecycleState } from "./stateMachine.ts"
+import { RolesEvent } from "./roles/events.ts"
 
 export const Actor = Schema.Union([
   Schema.TaggedStruct("owner", {}),
@@ -225,8 +226,8 @@ export const EngineEvent = Schema.Union([
 // Later pieces merge their event unions here, in namespace order.
 // Keep each member type while avoiding Effect's tuple-recursion limit as the
 // shared event list grows. Engine-only field schemas are exported directly.
-const eventMembers: ReadonlyArray<typeof EngineEvent.members[number] | typeof ClientEvent.members[number]> = [
-  ...EngineEvent.members, ...ClientEvent.members
+const eventMembers: ReadonlyArray<typeof EngineEvent.members[number] | typeof ClientEvent.members[number] | typeof RolesEvent.members[number]> = [
+  ...EngineEvent.members, ...ClientEvent.members, ...RolesEvent.members
 ]
 export const Event = Schema.Union(eventMembers)
 export type Event = typeof Event.Type
@@ -242,4 +243,8 @@ export const EventEnvelope = Schema.Struct({
 })
 export type EventEnvelope = typeof EventEnvelope.Type
 
-export const eventGroups = [{ namespace: "engine", events: EngineEvent }, { namespace: "client", events: ClientEvent }] as const
+export const eventGroups = [
+  { namespace: "engine", events: EngineEvent },
+  { namespace: "client", events: ClientEvent },
+  { namespace: "roles", events: RolesEvent }
+] as const

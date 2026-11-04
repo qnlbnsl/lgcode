@@ -50,5 +50,7 @@ export const descriptions: Record<ToolName, string> = {
   stop: "Stop an agent.",
   resume: "Resume a stopped or crashed agent; fresh true starts a new session.",
   compact: "Ask an agent to compact its context.",
-  group: "Add or remove an agent's group memberships."
+  group: "Add or remove an agent's group memberships.",
+  "roles.orient": "Read your team and role advice.",
+  "roles.handoff": "Read a handoff for an agent you may manage."
 }

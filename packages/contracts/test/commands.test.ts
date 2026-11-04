@@ -10,6 +10,7 @@ import {
   engineCommandNames as commandNames,
   CommandsRpcGroup,
   DebugRpcGroup,
+  EngineCommandsRpcGroup,
   ownerOnlyCommands,
   ServiceRpcGroup
 } from "../src/commands.ts"
@@ -76,10 +77,10 @@ describe("command lists", () => {
     expect(new Set(ownerOnlyCommands).size).toBe(ownerOnlyCommands.length)
   })
 
-  // Catches: a command with no access tag, a tag naming something else, or a tag that
-  // disagrees with the owner-only list (two sources of truth that drift apart).
-  it("assigns caller kinds to every command, agreeing with the owner-only list", () => {
-    expect(sorted(Object.keys(commandAccess))).toEqual(sorted(expectedCommands))
+  // Piece groups have their own exact access tests. The engine's entries
+  // retain their existing callers as namespaced commands join the table.
+  it("preserves caller kinds for every engine command, agreeing with the owner-only list", () => {
+    expect(sorted(Object.keys(commandAccess).filter((name) => expectedCommands.includes(name)))).toEqual(sorted(expectedCommands))
     for (const name of expectedCommands) {
       const kinds = commandAccess[name as keyof typeof commandAccess]
       expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["prompt", "compact", "resume", "subscribe"].includes(name) ? ["owner", "agent", "service"] : ["owner", "agent"])
@@ -98,9 +99,11 @@ describe("command lists", () => {
 })
 
 describe("command RPC group", () => {
-  // Catches: a command with no `Rpc` (the API cannot serve it) or an `Rpc` for a command not in the list.
-  it("has one Rpc per command, tagged with the command name", () => {
-    expect(sorted([...CommandsRpcGroup.requests.keys()])).toEqual(sorted(expectedCommands))
+  // Catches a dropped or renamed engine command after piece groups join.
+  // unique.test.ts checks the complete inventory against all declarations.
+  it("keeps every engine Rpc tagged with its command name when pieces join", () => {
+    expect(sorted([...EngineCommandsRpcGroup.requests.keys()])).toEqual(sorted(expectedCommands))
+    expect([...CommandsRpcGroup.requests.keys()]).toEqual(expect.arrayContaining(expectedCommands))
     for (const name of expectedCommands) expect(rpcFor(name)._tag).toBe(name)
   })
 
@@ -154,18 +157,19 @@ describe("the groups the service serves (fix round 1, item 4)", () => {
   const debugCommand = "debug.compare-views"
   const withoutDebug = expectedCommands.filter((name) => name !== debugCommand)
 
-  // Catches: the production group being only a comment: `ServiceRpcGroup` missing, or still holding the
-  // debug command (row 74: it is served only behind the test flag), or missing another command.
-  it("ServiceRpcGroup has the 15 commands and not debug.compare-views", () => {
+  // Catches a missing served command or debug being served in production.
+  it("ServiceRpcGroup serves every declared command except debug.compare-views", () => {
     expect(ServiceRpcGroup, "ServiceRpcGroup export").toBeDefined()
-    expect(ServiceRpcGroup.requests.size).toBe(15)
     expect(ServiceRpcGroup.requests.has(debugCommand)).toBe(false)
-    expect(sorted([...ServiceRpcGroup.requests.keys()])).toEqual(sorted(withoutDebug))
+    expect([...ServiceRpcGroup.requests.keys()]).toEqual(expect.arrayContaining(withoutDebug))
+    expect(sorted([...ServiceRpcGroup.requests.keys()])).toEqual(
+      sorted([...CommandsRpcGroup.requests.keys()].filter((name) => name !== debugCommand))
+    )
   })
 
   // Catches: the full inventory (the CLI and clients) losing the debug command when the service group was cut.
-  it("CommandsRpcGroup keeps all 16 commands", () => {
-    expect(CommandsRpcGroup.requests.size).toBe(16)
+  it("CommandsRpcGroup keeps all 16 engine commands as pieces join", () => {
+    expect([...CommandsRpcGroup.requests.keys()]).toEqual(expect.arrayContaining(expectedCommands))
     expect(CommandsRpcGroup.requests.has(debugCommand)).toBe(true)
   })
 

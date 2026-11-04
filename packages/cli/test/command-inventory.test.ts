@@ -14,5 +14,8 @@ it("X61 (T-6) catches a command recognition or top-level help inventory omitting
   for (const command of CommandsRpcGroup.requests.keys()) {
     expect(matchCommand([...command.split(" "), "--help"])).toEqual({ command, rest: ["--help"] });
     expect(lines).toContain(`  ${command}`);
+    if (command.startsWith("roles.")) {
+      expect(matchCommand([...command.split("."), "--help"])).toEqual({ command, rest: ["--help"] });
+    }
   }
 });
