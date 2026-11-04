@@ -1,5 +1,8 @@
 import { expect, it } from "vitest";
 import { missedDeadlineAction } from "../../../src/roles/sheepdog/timers.ts";
+import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
+
+registerRebuildCheck({ noLog: true });
 
 it.each([
   ["stall", "recheck"], ["team-idle", "recheck"], ["capacity", "recheck"], ["notice-cache", "drop"],

@@ -2,6 +2,9 @@ import * as Schema from "effect/Schema";
 import { expect, it } from "vitest";
 import { RolesSettings } from "@shephrd/contracts";
 import { resolveSettings } from "../../../src/roles/sheepdog/settings.ts";
+import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
+
+registerRebuildCheck({ noLog: true });
 
 it("ST01 supplies the documented default limits when no override is set", () => {
   expect(resolveSettings({}, undefined)).toEqual({

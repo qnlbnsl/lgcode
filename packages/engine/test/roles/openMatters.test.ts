@@ -2,10 +2,13 @@ import { expect, it } from "vitest";
 import { emptyViews } from "../../src/views/apply.ts";
 import { openMatters } from "../../src/roles/openMatters.ts";
 import { action, start, fold, event } from "./fixtures.ts";
+import { registerRebuildCheck } from "../support/rebuildCheck.ts";
+
+registerRebuildCheck({ noLog: true });
 
 it("OM01 returns an open owner stall with the same identity as the alert", () => {
   const views = fold([start(), action("StallSeen")]);
-  expect(openMatters(views)).toEqual([{ key: "stall:worker", kind: "roles.stall", agentId: "worker", subject: "worker" }]);
+  expect(openMatters(views)).toEqual([{ key: "stall:worker", kind: "roles.stall", agentId: "worker" }]);
 });
 
 it("OM02 omits records that were never addressed to the owner", () => {

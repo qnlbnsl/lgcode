@@ -2,6 +2,9 @@ import { expect, it } from "vitest";
 import { pieceViews } from "../../../src/pieces/viewTables.ts";
 import { emptyViews } from "../../../src/views/apply.ts";
 import { event, envelopes } from "../fixtures.ts";
+import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
+
+registerRebuildCheck({ noLog: true });
 
 it("S01 rebuilds the sheepdog baseline position from its event sequence", () => {
   const baseline = event({ _tag: "roles.SheepdogBaseline", position: 4, on: true });

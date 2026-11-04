@@ -1,5 +1,8 @@
 import { expect, it } from "vitest";
 import { engineLists } from "../../../src/pieces/lists.ts";
+import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
+
+registerRebuildCheck({ noLog: true });
 
 it("K01 registers the sheepdog service with only its planned command rights", () => {
   expect(engineLists.services["roles.sheepdog"]).toEqual([

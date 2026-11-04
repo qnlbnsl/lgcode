@@ -1,6 +1,9 @@
 import * as Schema from "effect/Schema";
 import { expect, it } from "vitest";
 import { RolesSettings } from "@shephrd/contracts";
+import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
+
+registerRebuildCheck({ noLog: true });
 
 it("W01 the owner can turn both roles services off in the settings shape", () => {
   const settings = Schema.decodeUnknownSync(RolesSettings)({ sheepdog: false, standingRules: false });
