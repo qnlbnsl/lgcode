@@ -91,9 +91,9 @@ const react = (envelope: EventEnvelope, snapshot: Snapshot, lists: EngineLists):
   return [...clears, ...raises(sources, snapshot, envelope.sequence)];
 };
 
-// The service runs this under its recovery gate and restarts defects from
-// the view's durable source position. LogWriteFailed stops the follower.
-export const alertReactor = Effect.gen(function* () {
+// Startup can await this same idempotent initialization before returning a
+// listener. The writer permit serializes it with the background follower.
+export const initializeAlerts = Effect.gen(function* () {
   const views = yield* Views;
   const lists = views.lists!;
   yield* writePieceBatch({ namespace: "client", kind: "reactor", sourceSequence: 0, build: (snapshot) => {
@@ -107,6 +107,14 @@ export const alertReactor = Effect.gen(function* () {
     }
     return { events: [{ _tag: "client.AlertBaseline", position: snapshot.sequence }, ...raises(sources, snapshot, snapshot.sequence, true)] };
   } }, lists);
+});
+
+// The service runs this under its recovery gate and restarts defects from
+// the view's durable source position. LogWriteFailed stops the follower.
+export const alertReactor = Effect.gen(function* () {
+  const views = yield* Views;
+  const lists = views.lists!;
+  yield* initializeAlerts;
   const position = clientView((yield* views.snapshot).client).position!;
   yield* subscribe(position).pipe(Stream.runForEach((envelope) => writePieceBatch({
     namespace: "client", kind: "reactor", sourceSequence: envelope.sequence,

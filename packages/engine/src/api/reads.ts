@@ -6,6 +6,7 @@ import { refused } from "../commands/internal.ts";
 import { subscribe } from "../log/subscribe.ts";
 import { compareViews } from "../views/compare.ts";
 import { visibleTo } from "./visibility.ts";
+import { readWebSettings } from "../client/settings.ts";
 import { clientReads } from "../client/reads/index.ts";
 import { getRoleFile } from "../roles/roleFile.ts";
 
@@ -14,6 +15,7 @@ export type ReadHandler = (input: Input, payload: Record<string, unknown>) =>
   Effect.Effect<ReadReply, any, any> | Stream.Stream<ClientStreamItem, any, any>;
 export const reads = {
   ...clientReads,
+  "client.web.settings": readWebSettings,
   "roles.role-file.get": getRoleFile,
   "roles.orient": () => Effect.fail(refused()),
   "roles.handoff": () => Effect.fail(refused()),

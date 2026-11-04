@@ -29,6 +29,8 @@ const summaries: Record<CommandName, string> = {
   "accounts mark-available": "Mark an account available again.",
   harnesses: "List, set or reset harness settings.",
   subscribe: "Print the event stream from a sequence.",
+  "client.web.settings": "Read the web server settings and state.",
+  "client.web.settings.set": "Change the web server settings.",
   "debug.compare-views": "Compare the live views with a rebuild (test services only).",
   "client.snapshot": "Read client.snapshot, the current team and its sequence.",
   "client.roster": "Read client.roster, filtered by group, role or parent.",

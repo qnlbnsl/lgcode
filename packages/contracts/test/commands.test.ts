@@ -43,9 +43,11 @@ const clientReads = ["client.snapshot", "client.roster", "client.thread", "clien
 // three named ones plus the two that change accounts and harness settings as a whole (`accounts`,
 // `harnesses`). `subscribe` is agent-callable (criterion 7.3: an agent's `subscribe` sees its own
 // events) but is not offered as an MCP tool because a stream cannot be a tool.
+const expectedWebCommands = ["client.web.settings", "client.web.settings.set"]
+const expectedApiCommands = [...expectedCommands, ...expectedWebCommands]
 const expectedOwnerOnly = ["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "board.flush",
   "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record",
-  "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]
+  "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", ...expectedWebCommands]
 
 const expectedMcpOffered = ["start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group"]
 const boardCommands = ["board.open", "board.members", "board.post", "board.close", "board.acknowledge", "board.read", "board.channels", "board.status", "board.flush"]
@@ -55,8 +57,8 @@ const rolesCommands = ["roles.orient", "roles.handoff", "roles.role-file.set", "
 const rolesTools = ["roles.orient", "roles.handoff"]
 const clientTools = ["client.snapshot", "client.roster", "client.thread", "client.event"]
 const alertCommands = ["client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]
-const testedCommands = [...expectedCommands, ...alertCommands]
-const expectedRpcCommands = [...expectedCommands, ...boardCommands, ...clientReads, ...alertCommands, ...rolesCommands]
+const testedCommands = [...expectedApiCommands, ...alertCommands]
+const expectedRpcCommands = [...testedCommands, ...boardCommands, ...clientReads, ...rolesCommands]
 
 const sorted = (values: ReadonlyArray<string>) => [...values].sort()
 
@@ -94,7 +96,7 @@ describe("command lists", () => {
   it("assigns caller kinds to every command, agreeing with the owner-only list", () => {
     expect(sorted(Object.keys(commandAccess))).toEqual(sorted(expectedRpcCommands))
     for (const name of alertCommands) expect(commandAccess[name as keyof typeof commandAccess]).toEqual(["owner"])
-    for (const name of expectedCommands) {
+    for (const name of expectedApiCommands) {
       const kinds = commandAccess[name as keyof typeof commandAccess]
       expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["prompt", "compact", "resume", "subscribe"].includes(name) ? ["owner", "agent", "service"] : ["owner", "agent"])
     }
@@ -184,7 +186,7 @@ describe("the groups the service serves (fix round 1, item 4)", () => {
   })
 
   // Catches: the full inventory (the CLI and clients) losing the debug command when the service group was cut.
-  it("CommandsRpcGroup keeps every pinned engine, client read, alert, board and roles command", () => {
+  it("CommandsRpcGroup keeps every pinned engine, web, client read, alert, board and roles command", () => {
     expect(CommandsRpcGroup.requests.size).toBe(expectedRpcCommands.length)
     expect([...CommandsRpcGroup.requests.keys()]).toEqual(expect.arrayContaining(expectedCommands))
     expect(CommandsRpcGroup.requests.has(debugCommand)).toBe(true)
