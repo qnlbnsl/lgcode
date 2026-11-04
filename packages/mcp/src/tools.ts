@@ -50,5 +50,9 @@ export const descriptions: Record<ToolName, string> = {
   stop: "Stop an agent.",
   resume: "Resume a stopped or crashed agent; fresh true starts a new session.",
   compact: "Ask an agent to compact its context.",
-  group: "Add or remove an agent's group memberships."
+  group: "Add or remove an agent's group memberships.",
+  "client.snapshot": "Read the visible team snapshot.",
+  "client.roster": "List visible agents by group, role or parent.",
+  "client.thread": "Read one page of an agent's thread as a data envelope.",
+  "client.event": "Read one visible event by sequence as a data envelope."
 }

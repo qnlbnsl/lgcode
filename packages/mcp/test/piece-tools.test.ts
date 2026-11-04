@@ -22,6 +22,6 @@ it("1a E2 tools derive new agent-callable piece commands but exclude streams and
   await expect(loading, "The MCP consumer must accept the caller-kind table").resolves.toHaveProperty("toolNames");
   const tools = await loading;
   expect([...tools.toolNames].sort()).toEqual([
-    "answer", "ask", "client.read", "compact", "group", "pass-up", "prompt", "resume", "start", "stop", "wait",
+    "answer", "ask", "client.event", "client.read", "client.roster", "client.sequence", "client.snapshot", "client.thread", "compact", "group", "pass-up", "prompt", "resume", "start", "stop", "wait",
   ]);
 });

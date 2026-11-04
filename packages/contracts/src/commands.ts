@@ -6,6 +6,7 @@ import { EventEnvelope, WaitMember } from "./events.ts"
 import { HarnessSettings, RunMode } from "./harnesses.ts"
 import { AccountId, AgentId, DeliveryId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
 import { PermissionLevel } from "./permission.ts"
+import { ClientRpcGroup, clientCommandAccess } from "./client/commands.ts"
 
 export const engineCommandNames = [
   "start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group",
@@ -132,7 +133,8 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 ).merge(DebugRpcGroup)
 
 // Later pieces merge their prefixed groups here, in namespace order.
-export const CommandsRpcGroup = EngineCommandsRpcGroup
+export const ClientReadsRpcGroup = ClientRpcGroup.omit("client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", "client.web.settings", "client.web.settings.set")
+export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(ClientReadsRpcGroup)
 export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 
 // A new command requires an access decision at the composition point.
@@ -141,7 +143,10 @@ export const commandAccess = {
   "pass-up": ["owner", "agent"], ask: ["owner", "agent"], wait: ["owner", "agent"],
   stop: ["owner", "agent"], resume: ["owner", "agent", "service"], compact: ["owner", "agent", "service"], group: ["owner", "agent"],
   accounts: ["owner"], "accounts set-secret": ["owner"], "accounts mark-available": ["owner"],
-  harnesses: ["owner"], subscribe: ["owner", "agent", "service"], "debug.compare-views": ["owner"]
+  harnesses: ["owner"], subscribe: ["owner", "agent", "service"], "debug.compare-views": ["owner"],
+  "client.snapshot": clientCommandAccess["client.snapshot"], "client.roster": clientCommandAccess["client.roster"],
+  "client.thread": clientCommandAccess["client.thread"], "client.subscribe": clientCommandAccess["client.subscribe"],
+  "client.event": clientCommandAccess["client.event"], "client.sequence": clientCommandAccess["client.sequence"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>, ReadonlyArray<CallerKind>>
-export const ownerOnlyCommands = engineCommandNames.filter((name) => !(commandAccess[name] as ReadonlyArray<CallerKind>).includes("agent"))
-export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }] as const
+export const ownerOnlyCommands = [...CommandsRpcGroup.requests.keys()].filter((name) => !(commandAccess[name as keyof typeof commandAccess] as ReadonlyArray<CallerKind>).includes("agent"))
+export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }, { namespace: "client", group: ClientReadsRpcGroup }] as const

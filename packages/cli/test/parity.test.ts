@@ -35,6 +35,10 @@ for (const command of CommandsRpcGroup.requests.keys()) {
       group: { agentId: "member", add: ["review"], remove: ["build"] },
       accounts: { operation: "list" }, "accounts mark-available": { accountId: "account" },
       harnesses: { operation: "list" }, subscribe: { after: 100 }, "debug.compare-views": {},
+      "client.snapshot": {}, "client.roster": { group: "review", role: "worker", parent: "lead" },
+      "client.thread": { agentId: "member", after: 100, limit: 500 },
+      "client.event": { sequence: 101 }, "client.sequence": {},
+      "client.subscribe": { after: 100, filter: { agents: ["member"], kinds: ["TurnEnded"] } },
     };
     expect(payloads[command], "new RPC needs a command dispatch fixture").toBeDefined();
     const payload = { requestId: `parity-${command}`, ...payloads[command] };
@@ -46,8 +50,12 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         wait: { ...base, waitId: "wait", members: [{ agentId: "member", reason: "settled" }], outcome: "satisfied" },
         accounts: { ...base, accounts: [] }, harnesses: { ...base, harnesses: [] },
         "debug.compare-views": { ...base, sequence: 100, equal: true, differences: [] },
+        "client.snapshot": { ...base, sequence: 100, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 },
+        "client.roster": { ...base, agents: [] }, "client.thread": { ...base, items: [] },
+        "client.sequence": { ...base, sequence: 100 },
+        "client.event": { ...base, envelope: { sequence: 101, eventId: "parity-event", occurredAt: 1_800_000_000_000, caller: { _tag: "owner" }, agentId: "member", event: { _tag: "TurnEnded", agentId: "member", compact: false } } },
       };
-      if (frame.tag === "subscribe") {
+      if (frame.tag === "subscribe" || frame.tag === "client.subscribe") {
         chunk(socket, frame, [{ sequence: 101, eventId: "parity-event", occurredAt: 1_800_000_000_000,
           caller: { _tag: "agent", agentId: "member" }, agentId: "member", event: { _tag: "TurnEnded", agentId: "member", compact: false } }]);
         succeed(socket, frame, undefined);
@@ -74,7 +82,7 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // Row 55's explicit allow-list is intentional: adding a new agent command
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
-    "answer", "ask", "compact", "group", "pass-up", "prompt", "resume", "start", "stop", "wait",
+    "answer", "ask", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "prompt", "resume", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
   for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", ...ownerOnlyCommands]) {

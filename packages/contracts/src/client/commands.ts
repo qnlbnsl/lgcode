@@ -11,7 +11,7 @@ import { WebServerState, WebSettings } from "./settings.ts"
 const request = { requestId: RequestId }
 const Ack = Schema.Struct(request)
 const Refused = Schema.TaggedStruct("CommandError", { ...request, reason: Schema.String })
-const page = { after: EventSequence, limit: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 500 })) }
+const page = { after: EventSequence, limit: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)) }
 const AgentData = Schema.Struct({ ...request, data: Schema.String })
 export const ThreadPage = Schema.Struct({
   ...request, items: Schema.Array(EventEnvelope), next: Schema.optionalKey(EventSequence)

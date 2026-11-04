@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import type { Socket } from "node:net";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import { CommandsRpcGroup, type Actor, type AgentId } from "@shephrd/contracts";
+import { CommandsRpcGroup, type Actor, type AgentId, type EventEnvelope } from "@shephrd/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -133,15 +133,32 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
     }
     const { protocol, httpEffect } = yield* RpcServer.makeProtocolWithHttpEffectWebsocket.pipe(Effect.provide(RpcSerialization.layerJson));
     const pending = new Map<string, number>();
+    const filteredStreams = new Set<string>();
     const boundedProtocol: RpcServer.Protocol["Service"] = {
       ...protocol,
       run: (receive) => protocol.run((clientId, message) => {
+        if (message._tag === "Request" && message.tag === "client.subscribe") filteredStreams.add(String(message.id));
         if (message._tag === "Ack" || message._tag === "Interrupt") pending.delete(String(message.requestId));
+        if (message._tag === "Interrupt") filteredStreams.delete(String(message.requestId));
         return receive(clientId, message);
       }),
       send: (clientId, message, transferables) => {
         if (message._tag === "Chunk") pending.set(String(message.requestId), Date.now());
-        if (message._tag === "Exit") pending.delete(String(message.requestId));
+        if (message._tag === "Exit") { pending.delete(String(message.requestId)); filteredStreams.delete(String(message.requestId)); }
+        if (message._tag === "Chunk" && filteredStreams.has(String(message.requestId))) {
+          // The handler emits singletons. Measure the real encoded wrapper as
+          // well, so an event just below the item limit still fits its frame.
+          return Effect.forEach(message.values, (value) => {
+            let item = value;
+            const frame = () => ({ ...message, values: [item] as [unknown] });
+            if (Buffer.byteLength(JSON.stringify(frame())) > 256 * 1024 && typeof value === "object" && value !== null && "event" in value) {
+              const row = value as EventEnvelope;
+              item = { _tag: "client.Oversized", sequence: row.sequence, tag: row.event._tag,
+                ...(row.agentId === undefined ? {} : { agentId: row.agentId }), bytes: Buffer.byteLength(JSON.stringify(row)) };
+            }
+            return protocol.send(clientId, frame(), transferables);
+          }, { discard: true });
+        }
         return protocol.send(clientId, message, transferables);
       },
     };
