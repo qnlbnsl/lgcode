@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
-import { comparePermission, DeliveryId, Event, type PermissionLevel, type SessionReference, type TurnUsage } from "@shephrd/contracts";
+import { comparePermission, DeliveryId, ThreadContent, type PermissionLevel, type SessionReference, type TurnUsage } from "@shephrd/contracts";
 import { AcpClient, layerChildProcess } from "@shephrd/t3-effect-acp/client";
 import { AcpRequestError } from "@shephrd/t3-effect-acp/errors";
 import type { AgentCapabilities } from "@shephrd/t3-effect-acp/schema-v1";
@@ -213,7 +213,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     }
     return yield* redactText(clean);
   }));
-  const threadContent = Event.pipe(Schema.toTaggedUnion("_tag")).cases.ThreadItem.fields.content;
+  const threadContent = ThreadContent;
   const emit = (event: RunnerEvent) => Queue.offer(events, event).pipe(Effect.asVoid);
   // Records one replayed update for the load's result. Breaks in a row are
   // kept as one, so a long replay of other content stays small.

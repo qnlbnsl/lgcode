@@ -1,5 +1,5 @@
 import {
-  AgentId, DeliveryId, EpochMilliseconds, Event, PermissionActionFields, PermissionOption, PermissionRequestId, TurnUsage,
+  AgentId, DeliveryId, EpochMilliseconds, ThreadContent, PermissionActionFields, PermissionOption, PermissionRequestId, TurnUsage,
   type Account, type Delivery, type HarnessSettings, type PermissionLevel, type SessionReference,
 } from "@shephrd/contracts";
 import * as Context from "effect/Context";
@@ -79,7 +79,7 @@ export const RunnerEvent = Schema.Union([
     // the user's content (row 66).
     role: Schema.optionalKey(Schema.Literals(["user", "agent"])),
     text: Schema.String,
-    content: Schema.optionalKey(Event.pipe(Schema.toTaggedUnion("_tag")).cases.ThreadItem.fields.content),
+    content: Schema.optionalKey(ThreadContent),
   }),
   Schema.TaggedStruct("modeReported", {
     agentId: AgentId, incarnation: Schema.NonEmptyString, mode: Schema.String,

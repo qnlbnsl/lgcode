@@ -1,7 +1,9 @@
+import { clientEventVisibility } from "./client/events.ts"
 import type { Event } from "./events.ts"
 
 export type VisibilityClass = "agent-scoped" | "owner-only" | "piece-decided"
 export const eventVisibility = {
+  ...clientEventVisibility,
   AgentStarted: "agent-scoped",
   AgentStartFailed: "agent-scoped",
   SessionOpened: "agent-scoped",
