@@ -432,8 +432,7 @@ event checked against that 900 KiB page budget (CAPI row 137; row 116). An
 event over 256 KiB reaches `client.subscribe` as a marker, and the client
 reads it with `client.event`.
 The roles' largest event is `roles.RoleFileSet` and their largest page is a
-`roles.rules.list` page, so each fits without a marker or a byte cut: a role file of at most 64 KiB, so `roles.RoleFileSet` stays
-under 72 KiB; a rule of at most 2 KiB, measured on its encoded form and
+`roles.rules.list` page, so each fits without a marker or a byte cut: a role file of at most 64 KiB, whose encoded `roles.RoleFileSet` must also stay under 200 KiB, because escaping can more than double a file's size (row 145); a rule of at most 2 KiB, measured on its encoded form and
 checked as a whole, because its fields at their separate maxima do not fit
 together (2a, row 70), and at most 500 rules, so a `roles.rules.list` page
 of at most 200 rules stays under 400 KiB; a `roles.actions.list` page of at most 500
