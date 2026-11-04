@@ -18,6 +18,7 @@ import {
   alive, fakeHarness, makeServiceRoot, peekEcho, startService, stopAllServices, waitFor, writeFakeAdapter,
   type Echo, type ServiceProcess, type ServiceRoot,
 } from "./serviceProcess.ts";
+import { waitForBoardRecovery } from "./boardRecovery.ts";
 
 // Unit 8b: the acceptance harness (plan tasks 8b.1 and 8b.2, criteria 8.3 to
 // 8.5). A scenario starts the real service (`src/service.ts`) as a child
@@ -104,7 +105,8 @@ export interface World {
   // Adds every token a fake agent has recorded so far to `secrets`.
   readonly collectTokens: () => void;
   // Starts a service on this root (again, after a kill) and waits until it
-  // serves. Replaces `service` and `owner`.
+  // serves and the board's immediately actionable recovery work completes.
+  // Replaces `service` and `owner`.
   readonly boot: (options?: { readonly env?: Record<string, string | undefined> }) => Effect.Effect<ServiceProcess, unknown, Scope.Scope>;
   readonly kill: (signal?: NodeJS.Signals) => Effect.Effect<{ readonly code: number | null; readonly signal: NodeJS.Signals | null }>;
   readonly reopenOwner: () => Effect.Effect<Client, unknown, Scope.Scope>;
@@ -234,6 +236,7 @@ export const scenario = (
       yield* waitServing(root, service);
       for (const form of readOwnerCredentialFrom(root.state)) secrets.add(form);
       owner = yield* reopenOwner();
+      if (incarnations.length > 1) yield* waitForBoardRecovery(Effect.suspend(() => owner!["client.snapshot"]({ requestId: requestId() } as never)));
       return service;
     });
     const world: World = {
