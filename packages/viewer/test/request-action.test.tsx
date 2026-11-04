@@ -53,7 +53,7 @@ it("R82 catches omitting matching thread tool items when a request has no input"
   expect(context).not.toContain("Unrelated");
 });
 
-it("R83 catches missing the fixed warning when request input is hidden or cut", async () => {
+it("R83 catches missing fixed warnings when request input is unavailable, hidden, or cut", async () => {
   expect(typeof requestView.readRequestContext, "viewer must read request context before answer").toBe("function");
   const event = vi.fn(async () => ({ envelope: { event: { _tag: "PermissionRequested" } } }));
   const thread = vi.fn(async () => ({ items: [] }));
@@ -64,9 +64,13 @@ it("R83 catches missing the fixed warning when request input is hidden or cut", 
   const truncated = await requestView.readRequestContext({ event, thread }, {
     agentId: "worker-1", sequence: 14, toolCallId: "tool-1", inputTruncated: true,
   });
+  const unavailable = await requestView.readRequestContext({ event, thread }, {
+    agentId: "worker-1", sequence: 14, toolCallId: "tool-1",
+  });
 
   expect(redacted).toContain("Part of the action's input is hidden");
   expect(truncated).toContain("The action's input is cut at 8 KiB.");
+  expect(unavailable).toContain("The action's input is not visible.");
 });
 
 it("R84 catches agent-controlled terminal sequences reaching the pane output", async () => {
