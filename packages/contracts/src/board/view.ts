@@ -7,7 +7,8 @@ import type { BoardCompletion } from "./schemas.ts"
 export type BoardChannelView = Extract<BoardEvent, { _tag: "board.ChannelOpened" }> & {
   readonly seatSequence: EventSequence
 }
-export type BoardPostView = Extract<BoardEvent, { _tag: "board.PostWritten" }> & {
+export type BoardPostView = Omit<Extract<BoardEvent, { _tag: "board.PostWritten" }>, "replyToPostId"> & {
+  readonly replyTo?: PostId
   readonly sequence: EventSequence
   readonly status: "open" | "closed"
   readonly outcome?: BoardCompletion["outcome"]

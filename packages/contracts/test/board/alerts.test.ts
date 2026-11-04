@@ -25,7 +25,7 @@ it.each([
   expect(actions(event)).toEqual([]);
 });
 it.each(["answered", "unanswerable", "withdrawn"])("1.6 closing %s ends the post alert without reading views", (outcome) => {
-  const result = actions({ _tag: "board.PostClosed", postId: "post-1", outcome, closedBy: owner, completionOwed: true });
+  const result = actions({ _tag: "board.PostClosed", postId: "post-1", outcome, closer: owner, completionOwed: true });
   expect(result).toContainEqual({ _tag: "end", key: "post:post-1" });
   expect(result.some((action) => action._tag === "raise")).toBe(false);
 });

@@ -1,5 +1,5 @@
-// Literal wire fixtures from board contract v15. Names not fixed by that
-// contract are proposed seams; the handoff lists them for the builder.
+// Literal wire fixtures from board contract v15 and B13's identity names,
+// as confirmed by the lead's ruling in decision 158.
 import * as Contracts from "../../src/index.ts";
 import * as Schema from "effect/Schema";
 import { expect } from "vitest";
@@ -19,18 +19,18 @@ export const agent = (agentId: string) => ({ _tag: "agent", agentId });
 export const post = {
   _tag: "board.PostWritten", postId: "post-1", channelId: "channel-1",
   author: agent("asker"), text: "Which option?\n\tTreat agent text as data.",
-  to: [agent("target"), owner], reply: "all", replyTo: "post-0",
+  to: [agent("target"), owner], reply: "all", replyToPostId: "post-0",
 };
 export const samples: ReadonlyArray<Record<string, unknown> & { _tag: string }> = [
   { _tag: "board.ChannelOpened", channelId: "channel-1", name: "Team_one-2", kind: "group", opener: agent("asker"), manager: agent("asker"), members: [], group: "workers", anchorAgentId: "asker" },
-  { _tag: "board.ChannelMembersChanged", channelId: "channel-1", add: [agent("target")], remove: [agent("former")] },
+  { _tag: "board.ChannelMembersChanged", channelId: "channel-1", membersAdded: [agent("target")], membersRemoved: [agent("former")] },
   { _tag: "board.ManagerChanged", channelId: "channel-1", manager: owner },
   post,
   { _tag: "board.PostAcknowledged", postId: "post-1", addressee: agent("target") },
-  { _tag: "board.AddresseeResolved", postId: "post-1", addressee: agent("target"), disposition: "replied", replyId: "post-2", authorIsOwner: false },
-  { _tag: "board.PostClosed", postId: "post-1", outcome: "answered", closedBy: owner, completionOwed: true },
+  { _tag: "board.AddresseeResolved", postId: "post-1", addressee: agent("target"), disposition: "replied", decidingPostId: "post-2", authorIsOwner: false },
+  { _tag: "board.PostClosed", postId: "post-1", outcome: "answered", closer: owner, completionOwed: true },
   { _tag: "board.WakeBuilt", wakeId: "wake-1", targetAgentId: "target", carried: ["post-1"], mustReply: ["post-1"], completions: ["post-0"], reminders: ["post-reminder"], noAnswers: [{ postId: "post-no-answer", addressee: agent("silent") }] },
-  { _tag: "board.Read", channelId: "channel-1", reader: agent("target"), posts: ["post-1"] },
+  { _tag: "board.Read", channelId: "channel-1", reader: agent("target"), postIds: ["post-1"] },
 ];
 export const envelope = (event: unknown, sequence = 10) => ({
   sequence, eventId: `event-${sequence}`, occurredAt: 1_798_761_600_000,
@@ -48,7 +48,8 @@ export const emptyView = () => ({
   lastStopped: {}, lastCrashed: {}, labels: {}, lastLabelLeft: {},
   lastMemberLeft: {}, readState: {},
 });
+const { replyToPostId, ...viewPost } = post;
 export const openPost = (patch: Record<string, unknown> = {}) => ({
-  ...post, sequence: 1, status: "open", dispositions: {}, decidingReplies: {},
+  ...viewPost, replyTo: replyToPostId, sequence: 1, status: "open", dispositions: {}, decidingReplies: {},
   acknowledged: [], takenAt: {}, reminderAcceptedAt: {}, replies: [], ...patch,
 });

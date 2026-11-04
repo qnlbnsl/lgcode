@@ -15,7 +15,6 @@ import { Event, type EventEnvelope } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Redacted from "effect/Redacted";
-import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 import * as Server from "../../src/api/server.ts";
@@ -33,8 +32,9 @@ const ownerSecret = randomBytes(32).toString("base64url");
 // production module from widening the requirement type.
 const live = (name: string, test: () => Effect.Effect<unknown, unknown, any>, timeout: number) =>
   it.live(name, () => test() as Effect.Effect<void, unknown, never>, timeout);
-const tags = Object.keys(Event.pipe(Schema.toTaggedUnion("_tag")).cases).sort();
-const agentBearing = new Set(tags.filter((tag) => "agentId" in (Event.pipe(Schema.toTaggedUnion("_tag")).cases as Record<string, { fields: object }>)[tag]!.fields));
+const tags = Event.members.map((member) => member.fields._tag.schema.literal).sort();
+const agentBearing = new Set(Event.members.filter((member) => "agentId" in member.fields)
+  .map((member) => member.fields._tag.schema.literal));
 
 const owner = { _tag: "owner" } as const;
 const permissionOption = { id: "once", name: "Allow once", kind: "allow_once", level: "read-only", persistent: false };

@@ -80,8 +80,8 @@ it("1.11 a board.read page filled to 512 KiB of encoded items fits the 900 KiB R
   const schema = command!.successSchema;
   const items: Array<Record<string, unknown>> = [];
   for (let i = 0; ; i++) {
-    const { _tag: _tag, ...fields } = post;
-    const item = { ...fields, postId: `post-${i}`, text: '\\"\n'.repeat(5_000), sequence: i + 1, status: "open", acknowledged: [], dispositions: [] };
+    const { _tag: _tag, replyToPostId, ...fields } = post;
+    const item = { ...fields, replyTo: replyToPostId, postId: `post-${i}`, text: '\\"\n'.repeat(5_000), sequence: i + 1, status: "open", acknowledged: [], dispositions: [] };
     if (Buffer.byteLength(JSON.stringify([...items, item])) > 512 * 1024) break;
     items.push(item);
   }

@@ -6,13 +6,15 @@ import {
 
 afterEach(cleanupUnit7b);
 
+const commandWords = (command: string) => command.startsWith("board.") ? command.split(".") : command.split(" ");
+
 // Inventory comes from the RPC group, never from a second CLI-maintained list.
 for (const command of CommandsRpcGroup.requests.keys()) {
   it(`P01 ${command} (7.5) catches omitting this RPC's shephrd subcommand/help registration`, async () => {
-    const child = startCli(prepareRoot(), [...command.split(" "), "--help"]);
+    const child = startCli(prepareRoot(), [...commandWords(command), "--help"]);
     expect(await finishCli(child)).toEqual({ code: 0, signal: null });
     expect(child.stdout()).toMatch(/usage|options|arguments/i);
-    expect(child.stdout()).toContain(command);
+    expect(child.stdout()).toContain(commandWords(command).join(" "));
     expect(child.stdout()).not.toContain("not built yet");
     assertNoSecrets(child, [token]);
   });
@@ -35,6 +37,15 @@ for (const command of CommandsRpcGroup.requests.keys()) {
       group: { agentId: "member", add: ["review"], remove: ["build"] },
       accounts: { operation: "list" }, "accounts mark-available": { accountId: "account" },
       harnesses: { operation: "list" }, subscribe: { after: 100 }, "debug.compare-views": {},
+      "board.open": { name: "Review", group: "review", anchorAgentId: "member" },
+      "board.members": { channelId: "channel", add: ["member"], remove: ["former"] },
+      "board.post": { channelId: "channel", text: "Which option?", to: [{ _tag: "agent", agentId: "member" }], reply: "all", replyTo: "earlier-post" },
+      "board.close": { postId: "post" },
+      "board.acknowledge": { postId: "post" },
+      "board.read": { channelId: "channel", after: "cursor", limit: 20 },
+      "board.channels": { after: "cursor", limit: 20 },
+      "board.status": { agentId: "member" },
+      "board.flush": { agentId: "member" },
     };
     expect(payloads[command], "new RPC needs a command dispatch fixture").toBeDefined();
     const payload = { requestId: `parity-${command}`, ...payloads[command] };
@@ -46,6 +57,15 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         wait: { ...base, waitId: "wait", members: [{ agentId: "member", reason: "settled" }], outcome: "satisfied" },
         accounts: { ...base, accounts: [] }, harnesses: { ...base, harnesses: [] },
         "debug.compare-views": { ...base, sequence: 100, equal: true, differences: [] },
+        "board.open": { ...base, channelId: "channel" },
+        "board.members": { ...base, memberCount: 1 },
+        "board.post": { ...base, postId: "post" },
+        "board.close": { ...base, postId: "post", outcome: "withdrawn" },
+        "board.acknowledge": { ...base, postId: "post" },
+        "board.read": { ...base, data: "Board data." },
+        "board.channels": { ...base, items: [], next: "next-cursor" },
+        "board.status": { ...base, agentId: "member", unread: 1, incomingOpen: 1, ownOpen: 0, owed: 0, failedCompletions: 0, wakeQueued: true, wakeSent: false, holdsUnsettled: false, holdsIncoming: true, sequence: 100, disabled: false },
+        "board.flush": { ...base, wakeId: "wake" },
       };
       if (frame.tag === "subscribe") {
         chunk(socket, frame, [{ sequence: 101, eventId: "parity-event", occurredAt: 1_800_000_000_000,
@@ -53,8 +73,8 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         succeed(socket, frame, undefined);
       } else succeed(socket, frame, replies[frame.tag] ?? base);
     } });
-    const environment = (ownerOnlyCommands as ReadonlyArray<string>).includes(command) ? serviceEnvironment(root) : agentEnvironment(root);
-    const child = startCli(root, [...command.split(" "), "--input", JSON.stringify(payload)], environment);
+    const environment = (ownerOnlyCommands as ReadonlyArray<string>).includes(command) || command === "board.flush" ? serviceEnvironment(root) : agentEnvironment(root);
+    const child = startCli(root, [...commandWords(command), "--input", JSON.stringify(payload)], environment);
     expect(await finishCli(child)).toEqual({ code: 0, signal: null });
     expect(engine.requests).toHaveLength(1);
     expect(engine.requests[0]).toMatchObject({ _tag: "Request", tag: command, payload });
@@ -74,10 +94,11 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // Row 55's explicit allow-list is intentional: adding a new agent command
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
-    "answer", "ask", "compact", "group", "pass-up", "prompt", "resume", "start", "stop", "wait",
+    "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
+    "board.open", "board.post", "board.read", "board.status", "compact", "group", "pass-up", "prompt", "resume", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
-  for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", ...ownerOnlyCommands]) {
+  for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", "board.flush", ...ownerOnlyCommands]) {
     expect(names).not.toContain(excluded);
   }
   assertNoSecrets(child, [token]);

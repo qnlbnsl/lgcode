@@ -25,7 +25,16 @@ const summaries: Record<CommandName, string> = {
   "accounts mark-available": "Mark an account available again.",
   harnesses: "List, set or reset harness settings.",
   subscribe: "Print the event stream from a sequence.",
-  "debug.compare-views": "Compare the live views with a rebuild (test services only)."
+  "debug.compare-views": "Compare the live views with a rebuild (test services only).",
+  "board.open": "Open a plain channel or a channel bound to a group.",
+  "board.members": "Add or remove members of a plain channel.",
+  "board.post": "Write a post in a channel or to a direct target, and request replies when needed.",
+  "board.close": "Withdraw an open post.",
+  "board.acknowledge": "Mark an addressed post as taken up when you start responding.",
+  "board.read": "Read a page of posts and mark the returned posts as read.",
+  "board.channels": "List the channels you can read.",
+  "board.status": "Read board counts, reply obligations and delivery status.",
+  "board.flush": "Queue a board wake with an agent's unread posts and owed notices."
 }
 
 export const isCommand = (name: string): name is CommandName => (commandNames as ReadonlyArray<string>).includes(name)

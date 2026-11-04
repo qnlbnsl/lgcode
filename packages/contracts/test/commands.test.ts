@@ -102,8 +102,8 @@ describe("command lists", () => {
 describe("command RPC group", () => {
   // Catches: a command with no `Rpc` (the API cannot serve it) or an `Rpc` for a command not in the list.
   it("has one Rpc per command, tagged with the command name", () => {
-    expect(sorted([...CommandsRpcGroup.requests.keys()])).toEqual(sorted(expectedCommands))
-    for (const name of expectedCommands) expect(rpcFor(name)._tag).toBe(name)
+    expect(sorted([...CommandsRpcGroup.requests.keys()])).toEqual(sorted([...expectedCommands, ...boardCommands]))
+    for (const name of [...expectedCommands, ...boardCommands]) expect(rpcFor(name)._tag).toBe(name)
   })
 
   // Catches: a request that carries no request id (a retried request could not be matched to its
