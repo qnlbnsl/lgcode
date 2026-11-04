@@ -32,11 +32,10 @@ export interface EventRow {
   readonly payload_json: string;
 }
 
-const decodeEnvelope = Schema.decodeUnknownSync(EventEnvelope);
-export const decodeRow = (row: EventRow) => Effect.try({
+export const decodeRowWith = (row: EventRow, envelope: Schema.Codec<EventEnvelope, unknown> = EventEnvelope) => Effect.try({
   try: () => {
     if (row.caller !== "owner" && !row.caller.startsWith("agent:")) throw new Error("invalid caller");
-    return decodeEnvelope({
+    return Schema.decodeUnknownSync(envelope)({
       sequence: row.sequence,
       eventId: row.event_id,
       occurredAt: row.occurred_at,
@@ -44,11 +43,13 @@ export const decodeRow = (row: EventRow) => Effect.try({
       requestId: row.request_id,
       ...(row.agent_id === null ? {} : { agentId: row.agent_id }),
       event: JSON.parse(row.payload_json),
-    });
+    }) as EventEnvelope;
   },
   // Decode errors can include stored values, so expose only a fixed reason.
   catch: () => new LogReadFailed({ reason: "stored event is unreadable" }),
 });
+
+export const decodeRow = (row: EventRow) => decodeRowWith(row);
 
 export const PAGE_SIZE = 512;
 
@@ -86,7 +87,7 @@ export const subscribe = (after: number): Stream.Stream<
   ).pipe(Effect.map((page) => [
     page,
     page.length === PAGE_SIZE ? Option.some(page[page.length - 1]!.sequence) : Option.none<number>(),
-  ] as const))).pipe(Stream.mapEffect(decodeRow));
+  ] as const))).pipe(Stream.mapEffect((row) => decodeRowWith(row, log.lists?.envelope)));
 
   // Anything committed before the head read belongs to replay, including
   // events already buffered by the subscription. Later publishes are ordered

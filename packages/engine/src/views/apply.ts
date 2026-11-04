@@ -1,9 +1,11 @@
 import {
   EventSequence as EventSequenceSchema, eventEffect,
   type Account, type Actor, type AgentId, type Delivery, type Event, type EventEnvelope, type EventSequence, type LifecycleState,
-  type PermissionOption, type SessionReference, type WaitMember,
+  pieceNamespaces, EngineEvent, type PieceNamespace, type PermissionOption, type SessionReference, type WaitMember,
 } from "@shephrd/contracts";
 import * as Schema from "effect/Schema";
+import { guardPiece } from "../pieces/guardPiece.ts";
+import { pieceViews, type PieceView } from "../pieces/viewTables.ts";
 
 // The eight views. Every record keeps the plain data the log holds, so a
 // client can read it without the log. Nothing here is a second source of
@@ -89,7 +91,10 @@ interface DeviceRow {
   readonly revoked: boolean;
 }
 
-interface State {
+export interface State {
+  readonly client: unknown;
+  readonly board: unknown;
+  readonly roles: unknown;
   readonly sequence: EventSequence;
   readonly agents: Readonly<Record<string, AgentRow>>;
   readonly threads: Readonly<Record<string, ReadonlyArray<EventEnvelope>>>;
@@ -111,7 +116,10 @@ type Keyed<T> = Readonly<Record<string, T>>;
 
 const keyed = <T>(): Keyed<T> => Object.create(null) as Keyed<T>;
 
-export const emptyViews = (): State => ({
+export const emptyViews = (views: Readonly<Record<PieceNamespace, PieceView>> = pieceViews): State => ({
+  client: guardPiece("views", "client", () => views.client.empty(), undefined),
+  board: guardPiece("views", "board", () => views.board.empty(), undefined),
+  roles: guardPiece("views", "roles", () => views.roles.empty(), undefined),
   sequence: zero, agents: keyed(), threads: keyed(), requests: keyed(), questions: keyed(), waits: keyed(),
   deliveries: keyed(), accounts: keyed(), devices: keyed(),
 });
@@ -119,8 +127,9 @@ export const emptyViews = (): State => ({
 // The agent whose thread an event belongs to. `DeliveryQueued` names its
 // agent only inside the delivery, so the log's agent column misses it
 // (issue 31). Account, device and harness events belong to no thread.
-const threadAgent = (event: Event): AgentId | undefined =>
-  event._tag === "DeliveryQueued" ? event.delivery.target : "agentId" in event ? event.agentId : undefined;
+const engineTags = new Set(Object.keys(EngineEvent.pipe(Schema.toTaggedUnion("_tag")).cases));
+export const threadAgent = (event: Event): AgentId | undefined =>
+  !engineTags.has(event._tag) ? undefined : event._tag === "DeliveryQueued" ? event.delivery.target : "agentId" in event ? event.agentId : undefined;
 
 const lookup = <T>(record: Keyed<T>, key: string): T | undefined =>
   Object.hasOwn(record, key) ? record[key] : undefined;
@@ -335,10 +344,15 @@ const devicesAfter = (state: State, event: Event): State["devices"] => {
 
 // Pure and total: it returns a new state, changes neither input, and never
 // fails. Live updates and `rebuild` both run exactly this function.
-export const apply = (state: State, envelope: EventEnvelope): State => {
+export const applyWith = (state: State, envelope: EventEnvelope, views: Readonly<Record<PieceNamespace, PieceView>> = pieceViews): State => {
   const event = envelope.event;
   const owner = threadAgent(event);
+  const pieces = { client: state.client, board: state.board, roles: state.roles };
+  for (const namespace of pieceNamespaces) {
+    pieces[namespace] = guardPiece("views", namespace, () => views[namespace].reduce(state[namespace], event, envelope.sequence), state[namespace]);
+  }
   return {
+    ...pieces,
     sequence: envelope.sequence,
     agents: agentsAfter(state, event),
     threads: owner === undefined
@@ -352,3 +366,5 @@ export const apply = (state: State, envelope: EventEnvelope): State => {
     devices: devicesAfter(state, event),
   };
 };
+
+export const apply = (state: State, envelope: EventEnvelope): State => applyWith(state, envelope);

@@ -7,19 +7,14 @@ import { HarnessSettings, RunMode } from "./harnesses.ts"
 import { AccountId, AgentId, DeliveryId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
 import { PermissionLevel } from "./permission.ts"
 
-export const commandNames = [
+export const engineCommandNames = [
   "start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group",
   "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "subscribe", "debug.compare-views"
 ] as const
-type CommandName = typeof commandNames[number]
-
-export const ownerOnlyCommands = [
-  "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views"
-] as const satisfies ReadonlyArray<CommandName>
-const owners: ReadonlySet<CommandName> = new Set(ownerOnlyCommands)
-export const commandAccess = Object.fromEntries(commandNames.map((name) => [
-  name, owners.has(name) ? "owner-only" : "agent-callable"
-])) as Record<CommandName, "agent-callable" | "owner-only">
+// Compatibility for clients that still import the original engine inventory.
+export const commandNames = engineCommandNames
+type CommandName = typeof engineCommandNames[number]
+export type CallerKind = "owner" | "agent" | "service"
 
 const request = { requestId: RequestId }
 const target = { ...request, agentId: AgentId }
@@ -41,7 +36,7 @@ export const DebugRpcGroup = RpcGroup.make(Rpc.make("debug.compare-views", {
   error: Refused
 }))
 
-export const CommandsRpcGroup = RpcGroup.make(
+export const EngineCommandsRpcGroup = RpcGroup.make(
   Rpc.make("start", {
     payload: {
       ...request,
@@ -136,4 +131,17 @@ export const CommandsRpcGroup = RpcGroup.make(
   })
 ).merge(DebugRpcGroup)
 
+// Later pieces merge their prefixed groups here, in namespace order.
+export const CommandsRpcGroup = EngineCommandsRpcGroup
 export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
+
+// A new command requires an access decision at the composition point.
+export const commandAccess = {
+  start: ["owner", "agent"], prompt: ["owner", "agent"], answer: ["owner", "agent"],
+  "pass-up": ["owner", "agent"], ask: ["owner", "agent"], wait: ["owner", "agent"],
+  stop: ["owner", "agent"], resume: ["owner", "agent"], compact: ["owner", "agent"], group: ["owner", "agent"],
+  accounts: ["owner"], "accounts set-secret": ["owner"], "accounts mark-available": ["owner"],
+  harnesses: ["owner"], subscribe: ["owner", "agent"], "debug.compare-views": ["owner"]
+} satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>, ReadonlyArray<CallerKind>>
+export const ownerOnlyCommands = engineCommandNames.filter((name) => !(commandAccess[name] as ReadonlyArray<CallerKind>).includes("agent"))
+export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }] as const

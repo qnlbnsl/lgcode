@@ -85,7 +85,7 @@ const account = { accountId: AccountId }
 
 // Event payloads only. Sequence, time and caller belong to the log envelope.
 // All text must pass through the engine's redactor before the log writer.
-export const Event = Schema.Union([
+export const EngineEvent = Schema.Union([
   Schema.TaggedStruct("AgentStarted", {
     ...agent,
     name: Schema.NonEmptyString,
@@ -179,6 +179,8 @@ export const Event = Schema.Union([
   // Keep this minimal: a refused request may contain a secret-setting value.
   Schema.TaggedStruct("CommandRefused", { command: Schema.NonEmptyString, reason: Schema.String })
 ])
+// Later pieces merge their event unions here, in namespace order.
+export const Event = EngineEvent
 export type Event = typeof Event.Type
 
 export const EventEnvelope = Schema.Struct({
@@ -191,3 +193,5 @@ export const EventEnvelope = Schema.Struct({
   event: Event
 })
 export type EventEnvelope = typeof EventEnvelope.Type
+
+export const eventGroups = [{ namespace: "engine", events: EngineEvent }] as const

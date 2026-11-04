@@ -1,16 +1,13 @@
+import * as RpcSchema from "effect/rpc/RpcSchema"
 import * as Schema from "effect/Schema"
 import { CommandsRpcGroup, commandAccess } from "@shephrd/contracts"
 
-// Row 55: an explicit allow-list. A new agent command is reviewed before it
-// becomes a tool; owner-only commands and the event stream never appear.
-export const toolNames = [
-  "answer", "ask", "compact", "group", "pass-up", "prompt", "resume", "start", "stop", "wait"
-] as const
+// The contract test pins the exact derived list, including future piece tools.
+export const toolNames = [...CommandsRpcGroup.requests].filter(([name, rpc]) =>
+  (commandAccess[name as keyof typeof commandAccess] as ReadonlyArray<string>).includes("agent")
+  && !RpcSchema.isStreamSchema(rpc.successSchema) && name !== "accounts set-secret"
+).map(([name]) => name).sort()
 export type ToolName = typeof toolNames[number]
-
-for (const name of toolNames) {
-  if (commandAccess[name] !== "agent-callable") throw new Error(`${name} is not an agent-callable command`)
-}
 
 type JsonObject = Record<string, any>
 

@@ -71,7 +71,7 @@ export const compareViews = (expected?: EventSequence): Effect.Effect<
   if (expected !== undefined && expected !== head) {
     return yield* new CompareHeadMismatch({ requested: expected, head });
   }
-  const rebuilt = yield* rebuild(head);
+  const rebuilt = yield* rebuild(head, views.lists);
   const differences: Array<Difference> = [];
   diff(live, rebuilt, [], differences);
   return { sequence: head, differences };

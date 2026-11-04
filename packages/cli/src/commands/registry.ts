@@ -1,4 +1,4 @@
-import { CommandsRpcGroup, ownerOnlyCommands } from "@shephrd/contracts"
+import { CommandsRpcGroup, commandAccess, type CallerKind } from "@shephrd/contracts"
 import type * as Rpc from "effect/rpc/Rpc"
 import type * as RpcGroup from "effect/rpc/RpcGroup"
 
@@ -33,15 +33,16 @@ export const isCommand = (name: string): name is CommandName => (commandNames as
 // The longest command name that opens the arguments: "accounts set-secret"
 // before "accounts".
 export const matchCommand = (args: ReadonlyArray<string>): { readonly command: CommandName; readonly rest: ReadonlyArray<string> } | undefined => {
-  for (const words of [2, 1]) {
-    const name = args.slice(0, words).join(" ")
-    if (args.length >= words && isCommand(name)) return { command: name, rest: args.slice(words) }
+  const candidates = commandNames.map((command) => ({ command, words: command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ") }))
+    .sort((a, b) => b.words.length - a.words.length)
+  for (const { command, words } of candidates) {
+    if (words.every((word, index) => args[index] === word)) return { command, rest: args.slice(words.length) }
   }
   return undefined
 }
 
 export const helpText = (command: CommandName): string => {
-  const owner = (ownerOnlyCommands as ReadonlyArray<string>).includes(command)
+  const owner = commandAccess[command] !== undefined && !(commandAccess[command] as ReadonlyArray<CallerKind>).includes("agent")
     ? "This command is for the owner's terminal; an agent's identity is refused.\n" : ""
   if (command === "accounts set-secret") {
     return [
@@ -67,5 +68,5 @@ export const helpText = (command: CommandName): string => {
       "  <agent-id>...   The agents to wait for, with --block or --mode.")
   }
   if (command === "subscribe") options.splice(1, 0, "  --after <n>     Print events after this sequence (default 0).")
-  return [`Usage: shephrd ${command} [options]`, "", summaries[command], owner, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
+  return [`Usage: shephrd ${command === "debug.compare-views" ? command : command.replaceAll(".", " ")} [options]`, "", summaries[command], owner, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
 }

@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   commandAccess,
-  commandNames,
+  engineCommandNames as commandNames,
   CommandsRpcGroup,
   DebugRpcGroup,
   ownerOnlyCommands,
@@ -78,19 +78,18 @@ describe("command lists", () => {
 
   // Catches: a command with no access tag, a tag naming something else, or a tag that
   // disagrees with the owner-only list (two sources of truth that drift apart).
-  it("tags every command agent-callable or owner-only, agreeing with the owner-only list", () => {
+  it("assigns caller kinds to every command, agreeing with the owner-only list", () => {
     expect(sorted(Object.keys(commandAccess))).toEqual(sorted(expectedCommands))
     for (const name of expectedCommands) {
-      const tag = (commandAccess as Record<string, string>)[name]
-      expect(["agent-callable", "owner-only"], name).toContain(tag)
-      expect(tag === "owner-only", `${name} owner-only tag vs list`).toBe(expectedOwnerOnly.includes(name))
+      const kinds = commandAccess[name as keyof typeof commandAccess]
+      expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["owner", "agent"])
     }
   })
 
   // Catches: a secret-setting command offered to agents. Row 55 asserts the MCP list against an
   // explicit list; this derives it the way unit 7 will (agent-callable, minus the stream).
   it("leaves exactly ten commands for the MCP server once subscribe and the owner-only ones are removed", () => {
-    const offered = commandNames.filter((name) => commandAccess[name] === "agent-callable" && name !== "subscribe")
+    const offered = commandNames.filter((name) => (commandAccess[name] as ReadonlyArray<string>).includes("agent") && name !== "subscribe")
     expect(sorted(offered)).toEqual(sorted(expectedMcpOffered))
     for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views"]) {
       expect(offered, excluded).not.toContain(excluded)

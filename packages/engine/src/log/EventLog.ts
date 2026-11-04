@@ -15,6 +15,8 @@ import * as Semaphore from "effect/Semaphore";
 import * as SqlClient from "effect/sql/SqlClient";
 import { isSqlError, type SqlError } from "effect/sql/SqlError";
 
+import { engineLists, type EngineLists } from "../pieces/lists.ts";
+import { threadAgent } from "../views/apply.ts";
 import * as Views from "../views/Views.ts";
 import * as Redactor from "./Redactor.ts";
 import { fieldStructure, receiptStructure, type RedactionStructure } from "./redactionStructure.ts";
@@ -60,6 +62,7 @@ export interface DeviceRow {
 // revokes every agent token, for start-up recovery (decision row 52, step 4).
 // A revoked row's `revoked_at` is the batch's `occurredAt`.
 export interface SideRows {
+  readonly [table: `${"client" | "board" | "roles"}_${string}`]: ReadonlyArray<Readonly<Record<string, unknown>>> | undefined;
   readonly revokeAgentTokens?: ReadonlyArray<AgentId> | "all";
   readonly agentTokens?: ReadonlyArray<AgentTokenRow>;
   readonly revokeDevices?: ReadonlyArray<DeviceId>;
@@ -76,6 +79,7 @@ type Append = (
 export class EventLog extends Context.Service<
   EventLog,
   {
+    readonly lists?: EngineLists;
     readonly append: Append;
     // Check metadata with the same redactor instance that protects appends.
     readonly redactText: (text: string) => Effect.Effect<string>;
@@ -91,8 +95,7 @@ export class EventLog extends Context.Service<
   }
 >()("shephrd/engine/log/EventLog") {}
 
-const Envelopes = Schema.Array(EventEnvelope);
-const decodeEnvelopes = Schema.decodeUnknownSync(Envelopes);
+
 
 // SQLite's primary result code for a full disk.
 const SQLITE_FULL = 13;
@@ -119,7 +122,9 @@ const callerKey = (actor: Actor): string => actor._tag === "owner" ? "owner" : `
 // Pattern: T3 Code apps/server/src/orchestration-v2/EventSink.ts
 // (`sql.withTransaction`, lines 716 and 781; MIT licence). The shape was
 // reused, no code.
-export const layer = Layer.effect(EventLog, Effect.gen(function* () {
+export const makeLayer = (lists: EngineLists = engineLists) => Layer.effect(EventLog, Effect.gen(function* () {
+  const Envelopes = Schema.Array(lists.envelope);
+  const decodeEnvelopes = (value: unknown) => Schema.decodeUnknownSync(Envelopes)(value) as ReadonlyArray<EventEnvelope>;
   const sql = yield* SqlClient.SqlClient;
   const redactor = yield* Redactor.Redactor;
   const views = yield* Views.Views;
@@ -175,15 +180,15 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
         const eventId = randomUUID();
         const agentId = "agentId" in event ? event.agentId : undefined;
         const rows = yield* sql<{ sequence: number }>`
-          INSERT INTO events (event_id, caller, request_id, agent_id, event_type, occurred_at, payload_json)
-          VALUES (${eventId}, ${caller}, ${requestId}, ${agentId ?? null}, ${event._tag}, ${occurredAt}, ${JSON.stringify(event)})
+          INSERT INTO events (event_id, caller, request_id, agent_id, thread_agent_id, event_type, occurred_at, payload_json)
+          VALUES (${eventId}, ${caller}, ${requestId}, ${agentId ?? null}, ${threadAgent(event) ?? null}, ${event._tag}, ${occurredAt}, ${JSON.stringify(event)})
           RETURNING sequence`;
         const row = rows[0];
         if (row === undefined) return yield* Effect.fail(new LogWriteFailed({ reason: "event insert returned no sequence" }));
-        envelopes.push(Schema.decodeUnknownSync(EventEnvelope)({
+        envelopes.push(Schema.decodeUnknownSync(lists.envelope)({
           sequence: row.sequence, eventId, occurredAt, caller: actor, requestId,
           ...(agentId === undefined ? {} : { agentId }), event,
-        }));
+        }) as EventEnvelope);
       }
       if (sideRows.revokeAgentTokens === "all") {
         yield* sql`UPDATE agent_tokens SET revoked_at = ${occurredAt} WHERE revoked_at IS NULL`;
@@ -207,6 +212,16 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
       for (const row of sideRows.processes ?? []) {
         yield* sql`INSERT INTO processes (agent_id, group_id, boot_id, start_time, user_id, executable)
           VALUES (${row.agentId}, ${row.groupId}, ${row.bootId}, ${row.startTime}, ${row.userId}, ${row.executable})`;
+      }
+      // Names are fixed by migrations. Values stay bound parameters, and every
+      // side row shares this transaction with its events and receipt.
+      for (const [table, rows] of Object.entries(sideRows)) {
+        if (!/^(client|board|roles)_[A-Za-z0-9_]+$/.test(table)) continue;
+        if (!Array.isArray(rows)) return yield* new LogWriteFailed({ reason: "invalid piece side rows" });
+        for (const row of rows) {
+          if (row === null || typeof row !== "object") return yield* new LogWriteFailed({ reason: "invalid piece side row" });
+          yield* sql`INSERT INTO ${sql(table)} ${sql.insert(row as Record<string, unknown>)}`;
+        }
       }
       if (receiptResult !== false) {
         const result = receiptResult === undefined ? envelopes
@@ -281,6 +296,7 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
     transact((write) => write(...args));
 
   return EventLog.of({
+    lists,
     append,
     redactText: redactor.redactText,
     transact,
@@ -288,3 +304,5 @@ export const layer = Layer.effect(EventLog, Effect.gen(function* () {
     withWriterPermit: writer.withPermits(1),
   });
 }));
+
+export const layer = Layer.unwrap(Effect.sync(() => makeLayer()));
