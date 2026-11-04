@@ -24,6 +24,7 @@ import {
   appendSetup, eventOf, makeFakeSecrets, makeRig, provideRig, readLog, removeRig, seedAccount, seedAgent, seedHarness,
 } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
+import { samples as boardEvents } from "../../../contracts/test/board/fixtures.ts";
 import { ancestryHeaders, authorization, connect, requestFrame, upgrade } from "../support/socketClient.ts";
 
 const ownerSecret = randomBytes(32).toString("base64url");
@@ -50,6 +51,7 @@ const parents: Record<string, string> = { "agent-child": "agent-self", "agent-gr
 // `n` makes its identifiers unique. Terminal events for the subscriber itself
 // are left out (`terminal`), because they would end its own access.
 const samples: Record<string, (a: string, n: string) => Record<string, unknown>> = {
+  ...Object.fromEntries(boardEvents.map(({ _tag, ...payload }) => [_tag, () => payload])),
   AgentStarted: (a) => ({ agentId: a, name: `n-${a}`, role: "worker", groups: [], parent: parents[a] === undefined ? owner : { _tag: "agent", agentId: parents[a] }, harness: "first", account: "primary", permission: "ask", folder: "/tmp", runMode: "acp" }),
   AgentStartFailed: (a) => ({ agentId: a, reason: "agent start failed" }),
   SessionOpened: (a, n) => ({ agentId: a, session: { _tag: "acp", sessionId: `s-${n}` }, protocolVersion: 2, reloadable: true }),

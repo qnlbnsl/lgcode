@@ -44,6 +44,8 @@ const expectedCommands = [
 const expectedOwnerOnly = ["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views"]
 
 const expectedMcpOffered = ["start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group"]
+const boardCommands = ["board.open", "board.members", "board.post", "board.close", "board.acknowledge", "board.read", "board.channels", "board.status", "board.flush"]
+const boardTools = boardCommands.filter((name) => name !== "board.flush")
 
 const sorted = (values: ReadonlyArray<string>) => [...values].sort()
 
@@ -79,7 +81,7 @@ describe("command lists", () => {
   // Catches: a command with no access tag, a tag naming something else, or a tag that
   // disagrees with the owner-only list (two sources of truth that drift apart).
   it("assigns caller kinds to every command, agreeing with the owner-only list", () => {
-    expect(sorted(Object.keys(commandAccess))).toEqual(sorted(expectedCommands))
+    expect(sorted(Object.keys(commandAccess))).toEqual(sorted([...expectedCommands, ...boardCommands]))
     for (const name of expectedCommands) {
       const kinds = commandAccess[name as keyof typeof commandAccess]
       expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["prompt", "compact", "resume", "subscribe"].includes(name) ? ["owner", "agent", "service"] : ["owner", "agent"])
@@ -88,9 +90,9 @@ describe("command lists", () => {
 
   // Catches: a secret-setting command offered to agents. Row 55 asserts the MCP list against an
   // explicit list; this derives it the way unit 7 will (agent-callable, minus the stream).
-  it("leaves exactly ten commands for the MCP server once subscribe and the owner-only ones are removed", () => {
-    const offered = commandNames.filter((name) => (commandAccess[name] as ReadonlyArray<string>).includes("agent") && name !== "subscribe")
-    expect(sorted(offered)).toEqual(sorted(expectedMcpOffered))
+  it("offers the ten engine tools and eight board tools, excluding board.flush", () => {
+    const offered = [...CommandsRpcGroup.requests.keys()].filter((name) => ((commandAccess as Record<string, ReadonlyArray<string>>)[name] ?? []).includes("agent") && name !== "subscribe")
+    expect(sorted(offered)).toEqual(sorted([...expectedMcpOffered, ...boardTools]))
     for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views"]) {
       expect(offered, excluded).not.toContain(excluded)
     }
@@ -156,16 +158,16 @@ describe("the groups the service serves (fix round 1, item 4)", () => {
 
   // Catches: the production group being only a comment: `ServiceRpcGroup` missing, or still holding the
   // debug command (row 74: it is served only behind the test flag), or missing another command.
-  it("ServiceRpcGroup has the 15 commands and not debug.compare-views", () => {
+  it("ServiceRpcGroup has the 15 engine commands and nine board commands, without debug.compare-views", () => {
     expect(ServiceRpcGroup, "ServiceRpcGroup export").toBeDefined()
-    expect(ServiceRpcGroup.requests.size).toBe(15)
+    expect(ServiceRpcGroup.requests.size).toBe(24)
     expect(ServiceRpcGroup.requests.has(debugCommand)).toBe(false)
-    expect(sorted([...ServiceRpcGroup.requests.keys()])).toEqual(sorted(withoutDebug))
+    expect(sorted([...ServiceRpcGroup.requests.keys()])).toEqual(sorted([...withoutDebug, ...boardCommands]))
   })
 
   // Catches: the full inventory (the CLI and clients) losing the debug command when the service group was cut.
-  it("CommandsRpcGroup keeps all 16 commands", () => {
-    expect(CommandsRpcGroup.requests.size).toBe(16)
+  it("CommandsRpcGroup keeps all 16 engine commands and nine board commands", () => {
+    expect(CommandsRpcGroup.requests.size).toBe(25)
     expect(CommandsRpcGroup.requests.has(debugCommand)).toBe(true)
   })
 

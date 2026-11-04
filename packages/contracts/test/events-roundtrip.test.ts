@@ -16,6 +16,15 @@ import { LifecycleState } from "../src/stateMachine.ts"
 // the list it checks from the code under test. Plan wording -> tag:
 // "command refused" -> CommandRefused, "agent reload failed" -> AgentReloadFailed, and so on.
 const expectedTags = [
+  "board.ChannelOpened",
+  "board.ChannelMembersChanged",
+  "board.ManagerChanged",
+  "board.PostWritten",
+  "board.PostAcknowledged",
+  "board.AddresseeResolved",
+  "board.PostClosed",
+  "board.WakeBuilt",
+  "board.Read",
   "AgentStarted",
   "AgentStartFailed",
   "SessionOpened",
@@ -93,7 +102,7 @@ describe("TurnEnded usage (foundry roles 7c)", () => {
 describe("event tags", () => {
   // Catches: an event dropped from, added to, or renamed in the union; two members sharing a tag
   // (the second would never decode).
-  it("are exactly the 41 events (task 3d's 39, row 70's AgentStartFailed and AccountOutOfUsage), each once", () => {
+  it("are exactly the engine inventory and nine board events, each once", () => {
     const tags = members.map(tagOf)
     expect(tags).toHaveLength(expectedTags.length)
     expect(new Set(tags).size, "duplicate tags").toBe(tags.length)
