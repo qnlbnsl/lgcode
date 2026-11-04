@@ -3,7 +3,7 @@ import type { ClientEnvelope } from "@shephrd/client/browser"
 import type { AgentId, Oversized } from "@shephrd/contracts"
 import { Content } from "./content.tsx"
 import { requestId, withClient } from "./client.ts"
-import { Request, requestOpen } from "./request.tsx"
+import { PermissionAnswer, Request, requestOpen } from "./request.tsx"
 import { AlertSubjects } from "./subjects/alerts.tsx"
 import { DataText, visibleText } from "./text.tsx"
 import { watchThread, type ThreadState } from "./watch.ts"
@@ -98,6 +98,7 @@ export function Thread({ agentId, subject, onSessionExpired }: {
         case "PromptSent": return <article aria-label="Sent prompt" key={`${item.sequence}:${event._tag}`}><p>Prompt</p><DataText text={event.text} /></article>
         case "PermissionRequested": case "QuestionAsked": return <Request key={`${item.sequence}:${event._tag}`} event={event}
           open={requestOpen(event, item.sequence, envelopes, state.snapshot)} items={envelopes} signal={controller.signal} />
+        case "PermissionAnswered": return <PermissionAnswer key={`${item.sequence}:${event._tag}`} event={event} items={envelopes} />
         default: return null
       }
     })}

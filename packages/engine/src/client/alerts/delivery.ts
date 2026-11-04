@@ -25,6 +25,8 @@ const threadLink = (row: AlertRow, web: ClientView["webSettings"]): string | und
   try {
     const url = new URL(web.publicAddress);
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== "/") return undefined;
+    // Navigate to the static entry document. The page reads its thread
+    // route from the hash, which stays in the browser during navigation.
     return `${url.origin}/#/thread/${encodeURIComponent(row.agentId)}`;
   } catch { return undefined; }
 };
