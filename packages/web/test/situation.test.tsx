@@ -1,5 +1,6 @@
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
+import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import { afterEach, expect, it, vi } from "vitest"
@@ -54,10 +55,11 @@ afterEach(async () => {
 })
 
 it("7.2 places snapshot agents in needs you, working and idle lanes, then applies a newer stream state", async () => {
-  const subscribe = vi.fn(() => Stream.fromIterable([envelope(8)]))
+  const stateChanged = await Effect.runPromise(Deferred.make<ReturnType<typeof envelope>>())
+  const subscribe = vi.fn(() => Stream.fromEffect(Deferred.await(stateChanged)))
   browserClient.client = {
-    snapshot: () => Effect.succeed(snapshot),
-    subscribe
+    "client.snapshot": () => Effect.succeed(snapshot),
+    "client.subscribe": subscribe
   }
   const container = await mount()
 
@@ -67,7 +69,7 @@ it("7.2 places snapshot agents in needs you, working and idle lanes, then applie
   expect(container.querySelector('[aria-label="Idle"]')?.textContent).toContain("idle-agent") // catches idle agents treated as active
 
   // A stream state transition is authoritative over the snapshot's lane.
-  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+  await act(async () => { await Effect.runPromise(Deferred.succeed(stateChanged, envelope(8))) })
   expect(subscribe).toHaveBeenCalledWith(expect.objectContaining({ after: 7 }))
   expect(container.querySelector('[aria-label="Working"]')?.textContent).toContain("idle-agent") // catches ignoring live state transitions
 })
@@ -79,7 +81,7 @@ it("7.2 resumes a dropped stream from its last applied cursor", async () => {
       Stream.fail(new Error("connection dropped"))
     ))
     .mockImplementation(() => Stream.fromIterable([{ _tag: "client.Checkpoint", sequence: 8 }]))
-  browserClient.client = { snapshot: () => Effect.succeed(snapshot), subscribe }
+  browserClient.client = { "client.snapshot": () => Effect.succeed(snapshot), "client.subscribe": subscribe }
   const container = await mount()
 
   await vi.waitFor(() => expect(subscribe.mock.calls.length).toBeGreaterThanOrEqual(2))

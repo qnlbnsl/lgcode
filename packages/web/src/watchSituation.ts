@@ -1,5 +1,5 @@
-import { connect, type Client, type ClientEnvelope } from "@shephrd/client/browser"
-import { displayedState, type ClientSnapshot, type ClientStreamItem, type EventSequence, type RequestId } from "@shephrd/contracts"
+import { connect } from "@shephrd/client/browser"
+import { displayedState, type ClientSnapshot, type EventSequence, type RequestId } from "@shephrd/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 
@@ -8,21 +8,6 @@ interface Observer {
   readonly onSnapshot: (snapshot: ClientSnapshot) => void
   readonly onConnection: (state: ConnectionState) => void
   readonly onSessionExpired: () => void
-}
-type Item = ClientEnvelope | Exclude<ClientStreamItem, { readonly event: unknown }>
-interface SituationReads {
-  readonly snapshot: (payload: { readonly requestId: RequestId }) => Effect.Effect<ClientSnapshot, unknown>
-  readonly subscribe: (payload: { readonly requestId: RequestId; readonly after: EventSequence }) => Stream.Stream<Item, unknown>
-}
-
-// The view uses short read names. Prefer the wire's client namespace, including
-// over the engine's unfiltered `subscribe`, when a full browser client is given.
-const reads = (client: Client): SituationReads => {
-  const short = client as unknown as SituationReads
-  return {
-    snapshot: client["client.snapshot"] ?? short.snapshot,
-    subscribe: client["client.subscribe"] ?? short.subscribe
-  }
 }
 const requestId = () => crypto.randomUUID() as RequestId
 
@@ -50,10 +35,10 @@ export async function watchSituation(observer: Observer, signal: AbortSignal): P
   const program = Effect.gen(function* () {
     while (!ended) {
       yield* Effect.scoped(Effect.gen(function* () {
-        const client = reads(yield* connect({ url: `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api` }))
+        const client = yield* connect({ url: `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api` })
         const refresh = (minimum = 0) => Effect.gen(function* () {
           for (;;) {
-            const snapshot = yield* client.snapshot({ requestId: requestId() })
+            const snapshot = yield* client["client.snapshot"]({ requestId: requestId() })
             if (snapshot.sequence >= minimum) {
               publish(snapshot)
               return
@@ -65,7 +50,7 @@ export async function watchSituation(observer: Observer, signal: AbortSignal): P
         })
         if (current === undefined) yield* refresh()
         if (!signal.aborted) observer.onConnection("Live")
-        yield* client.subscribe({ requestId: requestId(), after }).pipe(Stream.runForEach((item) => Effect.gen(function* () {
+        yield* client["client.subscribe"]({ requestId: requestId(), after }).pipe(Stream.runForEach((item) => Effect.gen(function* () {
           if (item.sequence <= after) return
           if ("event" in item) {
             if (item.event._tag === "StateChanged" && current !== undefined) {
