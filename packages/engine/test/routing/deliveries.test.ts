@@ -21,6 +21,20 @@ import {
 let rig: Rig;
 beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
+
+it.live("U08: the handler and delivery planner persist the last request's start and cache lifetime split (catches RunnerEvent decode or the planner stripping normalized usage)", () =>
+  deliveryRig(rig, (runner) => Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    const target = yield* spawn(rig, runner);
+    const deliveryId = yield* send(runner, target, "use normalized request usage");
+    const usage = { requestStartedAt: 1_798_761_600_123, inputTokens: 17, cachedReadTokens: 31,
+      cachedWriteTokens: 120, cachedWrite5mTokens: 20, cachedWrite1hTokens: 100 };
+    yield* runner.emitRaw({ _tag: "turnEnded", agentId: target.agentId,
+      incarnation: incarnationOf(target.token), deliveryId, usage });
+    const rows = yield* eventually(readLog, (rows) => tagged(rows, "TurnEnded").length === 1);
+    expect(tagged(rows, "TurnEnded")).toHaveLength(1);
+    expect(tagged(rows, "TurnEnded")[0]).toHaveProperty("usage", usage);
+  })));
 const run = <A, E, R>(body: Parameters<typeof deliveryRig<A, E, R>>[1], redactor?: Layer.Layer<Redactor.Redactor>) =>
   deliveryRig(rig, (runner) => Effect.gen(function* () { yield* registerRebuildCheck(); return yield* body(runner); }), redactor).pipe(Effect.orDie);
 
