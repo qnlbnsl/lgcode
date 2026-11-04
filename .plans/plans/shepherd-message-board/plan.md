@@ -1,6 +1,6 @@
 ---
 topic: shepherd-message-board
-status: ready
+status: accepted
 tier: M
 created: 2026-11-03
 updated: 2026-11-03

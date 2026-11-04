@@ -1,6 +1,6 @@
 ---
 topic: shepherd-foundry-roles
-status: ready
+status: accepted
 tier: L
 created: 2026-11-03
 updated: 2026-11-03
