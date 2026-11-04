@@ -219,6 +219,11 @@ it("H10 admits an orchestrator while the lead is paused and refuses the same req
   expect(yield* headSequence).toBe(before);
   yield* request(context.owner, "accounts mark-available", { accountId: "primary" });
   expect(["idle", "working"]).toContain(yield* eventually(stateOf(lead.agentId), (state) => state === "idle" || state === "working"));
+  // Recovery dispatch can follow the state change. Observe its committed
+  // send through the public log before measuring whether these reads write.
+  const recoveredDeliverySent = yield* eventually(rows(context, lead).pipe(Effect.map((all) => all.some((row) =>
+    row.sequence > before && row.event._tag === "DeliverySent" && row.event.agentId === lead.agentId))), Boolean);
+  expect(recoveredDeliverySent, "the recovered lead's delivery must be sent before the read-only baseline").toBe(true);
   const recovered = yield* headSequence;
   yield* refused(root.client, "roles.handoff", { agentId: worker.agentId, requestId: "repeat-rights-check" });
   expect((yield* handoff(lead.client, worker)).body.firstPrompt).toContain("WORKER ORIGINAL BRIEF");
