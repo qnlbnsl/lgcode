@@ -42,6 +42,8 @@ const expectedEngineTags = [
   "DeliverySent",
   "DeliveryAccepted",
   "DeliveryRequeued",
+  "DeliveryHeld",
+  "DeliveryReleased",
   "DeliveryReturned",
   "DeliveryWithdrawn",
   "AgentCrashed",
@@ -120,7 +122,7 @@ describe("TurnEnded usage (foundry roles 7c)", () => {
 describe("event tags", () => {
   // Catches: an event dropped from, added to, or renamed in the union; two members sharing a tag
   // (the second would never decode).
-  it("keeps exactly the unchanged engine event inventory, each once", () => {
+  it("keeps exactly the engine event inventory, including capacity hold and release, each once", () => {
     const tags = EngineEvent.members.map(tagOf)
     expect(tags).toHaveLength(expectedEngineTags.length)
     expect(new Set(tags).size, "duplicate engine tags").toBe(tags.length)

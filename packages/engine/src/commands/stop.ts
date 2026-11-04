@@ -13,6 +13,10 @@ export const stop = ({ runtime, snapshot }: Input, agent: Agent): Plan => {
   ]);
   const stopped: ReadonlyArray<Event> = [
     ...cancelled,
+    // A question stays open after its asker stops, but its unsent notice
+    // must not be delivered later when a held queue is released.
+    ...Object.values(snapshot.questions).filter((row) => row.agentId === agent.agentId && row.status === "open")
+      .flatMap((row) => withdrawQueued(snapshot, row.deliveryId)),
     { _tag: "AgentStopped", agentId: agent.agentId },
     ...moveHeld(project(snapshot, cancelled, runtime.lists), [agent.agentId]),
     ...Object.values(snapshot.waits).filter((wait) => wait.agentId === agent.agentId && wait.status === "open").map((wait) => ({

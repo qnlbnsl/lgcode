@@ -14,11 +14,11 @@ import { classifyError } from "../../src/runner/classify.ts";
 // reply and an out-of-usage reply apart, per harness, and the proof that the
 // real runner uses it by default. Account pauses themselves are unit 6b's;
 // these tests look only at the kind the classifier gives and at the runner's
-// pause outcome.
+// distinct capacity or pause outcome.
 
 registerRebuildCheck({ noLog: true });
 
-interface Sample { readonly harness: string; readonly kind: "signed-out" | "out-of-usage"; readonly text: string; readonly file: string }
+interface Sample { readonly harness: string; readonly kind: "signed-out" | "out-of-usage" | "capacity"; readonly text: string; readonly file: string }
 
 const errorsFolder = fixturePath("errors");
 const samples: ReadonlyArray<Sample> = readdirSync(errorsFolder)
@@ -48,17 +48,17 @@ const unrelated = [
 ] as const;
 
 describe("6.9 the fixtures cover what the task names", () => {
-  it("every harness with a fixture has both kinds, so the per-harness cases below are not silently empty (breaks if a fixture is renamed or removed)", () => {
+  it("every harness has usage and sign-in fixtures, with sourced capacity coverage, so the per-harness cases below are not silently empty (breaks if a fixture is renamed or removed)", () => {
     expect(harnesses).toEqual(["claude", "codex", "cursor", "gemini"]);
     for (const harness of harnesses) {
-      expect(samples.filter((sample) => sample.harness === harness).map((sample) => sample.kind).sort()).toEqual(["out-of-usage", "signed-out"]);
+      expect(samples.filter((sample) => sample.harness === harness).map((sample) => sample.kind).sort()).toEqual(harness === "claude" ? ["capacity", "out-of-usage", "signed-out"] : ["out-of-usage", "signed-out"]);
     }
   });
 });
 
-describe("6.9 the classifier tells the two errors apart, per harness", () => {
+describe("6.9 the classifier distinguishes capacity, usage and sign-in errors per harness", () => {
   for (const sample of samples) {
-    it(`${sample.file}: the recorded ${sample.kind} reply classifies as ${sample.kind} for ${sample.harness} (breaks if the matcher for this harness is missing, or gives the other kind)`, () => {
+    it(`${sample.file}: the sourced ${sample.kind} reply classifies as ${sample.kind} for ${sample.harness} (breaks if the matcher for this harness is missing, or gives the other kind)`, () => {
       expect(classifyError({ harness: sample.harness, text: sample.text })).toBe(sample.kind);
     });
   }
@@ -119,13 +119,15 @@ const turnReply = (context: { readonly runner: any; readonly events: ReadonlyArr
     return yield* context.waitFor((event: any) => event._tag === "promptReply" && event.deliveryId === delivery.id, before);
   }) as Effect.Effect<unknown, unknown, never>;
 
-live("6.9 the real runner, with no classifier passed in, turns each recorded out-of-usage reply into a pause and each recorded signed-out reply into a signed-out pause, not an error or a crash (breaks if the runner's default classifier is missing or is not the one in runner/classify.ts)", () =>
+live("6.9 the real runner uses each sourced capacity, usage and sign-in sample to select its own capacity or pause outcome (breaks if the runner's default classifier is missing or is not the one in runner/classify.ts)", () =>
   // No `classifyError` option is given: the default must be the real one.
   withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
     for (const sample of samples) {
       const echo = echoFile(rig);
       const name = sample.file.replace(/\.json$/, "");
-      const script = sample.kind === "out-of-usage"
+      const script = sample.kind === "capacity"
+        ? { turns: [[{ step: "rpc_error", message: sample.text }]] }
+        : sample.kind === "out-of-usage"
         ? { turns: [[{ step: "out_of_usage", message: sample.text, resetsAt: "2026-11-02T00:00:00Z" }]] }
         // The fake agent's signed-out step carries a message; the runner
         // wraps it as {"code":-32000,"message":...} like the real adapters.
@@ -133,7 +135,7 @@ live("6.9 the real runner, with no classifier passed in, turns each recorded out
       const spawn = yield* spawnFor(rig, harnessFor(sample.harness, writeFakeAdapter(rig, `adapter-${name}`)), accountFor(sample.harness, script, echo, {}, `account-${name}`));
       yield* context.runner.start(spawn.input);
       const reply = yield* turnReply(context, spawn, "go");
-      expect({ sample: sample.file, outcome: (reply as any).outcome._tag, reason: (reply as any).outcome.reason }).toEqual({ sample: sample.file, outcome: "pause", reason: sample.kind });
+      expect({ sample: sample.file, outcome: (reply as any).outcome._tag, reason: (reply as any).outcome.reason }).toEqual({ sample: sample.file, outcome: sample.kind === "capacity" ? "capacity" : "pause", reason: sample.kind === "capacity" ? undefined : sample.kind });
       expect(context.events.filter((event) => event._tag === "exited" && event.agentId === spawn.agentId)).toEqual([]);
       expect(alive((yield* readEcho(echo)).pid)).toBe(true);
     }

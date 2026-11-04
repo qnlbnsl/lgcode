@@ -31,6 +31,7 @@ interface AgentRow {
   // Fix round 1, F8 and row 67: true from the sending of a compact delivery
   // until that turn ends or the agent stops working.
   readonly compacting: boolean;
+  readonly capacityHeld: boolean;
 }
 
 interface RequestRow {
@@ -183,7 +184,7 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
       ...(event.model === undefined ? {} : { model: event.model }),
       ...(event.effort === undefined ? {} : { effort: event.effort }),
       permission: event.permission, folder: event.folder, runMode: event.runMode, state: { _tag: "starting" },
-      compacting: false,
+      compacting: false, capacityHeld: false,
     });
     case "SessionOpened": return change(state.agents, event.agentId, (row) => ({
       ...row, state: nextState(row.state, event), session: event.session,
@@ -198,6 +199,8 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
       const compacting = next._tag === "working" && lookup(state.deliveries, event.deliveryId)?.content._tag === "compact";
       return next === row.state && compacting === row.compacting ? row : { ...row, state: next, compacting };
     });
+    case "DeliveryHeld":
+    case "DeliveryReleased":
     case "AgentStartFailed":
     case "TurnStarted":
     case "TurnEnded":
@@ -208,7 +211,10 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
     case "AgentStopped": return change(state.agents, event.agentId, (row) => {
       const next = nextState(row.state, event);
       const compacting = row.compacting && event._tag !== "TurnEnded" && next._tag === "working";
-      return next === row.state && compacting === row.compacting ? row : { ...row, state: next, compacting };
+      const capacityHeld = event._tag === "DeliveryHeld" ? true
+        : event._tag === "DeliveryReleased" || event._tag === "AgentStopped" || event._tag === "AgentCrashed" ? false : row.capacityHeld;
+      return next === row.state && compacting === row.compacting && capacityHeld === row.capacityHeld
+        ? row : { ...row, state: next, compacting, capacityHeld };
     });
     default: return state.agents;
   }

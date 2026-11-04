@@ -96,6 +96,10 @@ export const makeFakeSecrets = (): FakeSecrets => {
 export interface Fakes {
   readonly runner: FakeRunner;
   readonly secrets: FakeSecrets;
+  // WS-7b: the production default declines until the roles condition exists.
+  // Tests inject only that pure policy; planning, dispatch and writes stay real.
+  readonly capacityHoldCondition?: (agentId: AgentId, snapshot: import("../../src/commands/internal.ts").Snapshot) => unknown;
+  readonly lists?: import("../../src/pieces/lists.ts").EngineLists;
   // The harness defaults the service loads on a first start and on
   // `harnesses reset`. A rig that leaves it out has none (fix round 1, N-1).
   readonly harnessDefaults?: Effect.Effect<ReadonlyArray<HarnessSettings>>;
@@ -112,16 +116,17 @@ export interface Fakes {
 export const provideRig = <A, E, R>(
   rig: Rig, fakes: Fakes, program: Effect.Effect<A, E, R>,
 ) => {
-  const baseLog = EventLog.layer.pipe(
-    Layer.provideMerge(Views.layer), Layer.provide(fakes.redactor ?? Redactor.layer),
+  const baseLog = EventLog.makeLayer(fakes.lists).pipe(
+    Layer.provideMerge(Views.makeLayer(fakes.lists)), Layer.provide(fakes.redactor ?? Redactor.layer),
   );
   const log = fakes.wrapLog === undefined ? baseLog : Layer.effect(EventLog.EventLog,
     Effect.map(EventLog.EventLog, fakes.wrapLog),
   ).pipe(Layer.provideMerge(baseLog));
   const services = CommandHandler.layer({
     home: rig.home, stateFolder: rig.stateFolder, pluginRoot: rig.pluginRoot,
+    ...(fakes.capacityHoldCondition === undefined ? {} : { capacityHoldCondition: fakes.capacityHoldCondition }),
     ...(fakes.harnessDefaults === undefined ? {} : { harnessDefaults: fakes.harnessDefaults }),
-  }).pipe(
+  }, fakes.lists).pipe(
     Layer.provideMerge(log),
     Layer.provide(Layer.merge(fakes.runner.layer, fakes.secrets.layer)),
   );

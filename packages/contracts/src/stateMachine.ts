@@ -111,6 +111,8 @@ const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
   DeliverySent: { ...allStates("invalid"), idle: "working", working: "keep" },
   DeliveryAccepted: allStates("keep"),
   DeliveryRequeued: allStates("keep"),
+  DeliveryHeld: { ...allStates("invalid"), working: "idle" },
+  DeliveryReleased: allStates("keep"),
   DeliveryReturned: allStates("keep"),
   DeliveryWithdrawn: allStates("keep"),
   AgentCrashed: { ...allStates("invalid"), starting: "crashed", working: "crashed", idle: "crashed", paused: "crashed" },
