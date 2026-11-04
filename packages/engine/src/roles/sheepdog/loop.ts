@@ -12,8 +12,10 @@ import { Restart } from "../../recovery/service.ts";
 import { Views } from "../../views/Views.ts";
 import { stallRule } from "./rules/stallRule.ts";
 import type { RolesView } from "../view.ts";
+import { makeCacheRule } from "./cacheRule.ts";
 import { endStallForTurn, resendUnread, sheepdogCaller } from "./notices.ts";
 import { baselineRequestId } from "./requests.ts";
+import { capacityRule } from "./rules/capacity.ts";
 import { releaseHolds, sheepdogEnabled } from "./switch.ts";
 import { boardTimer, crossedTimers, makeTimerReader, type ArmedTimer, type TimerOrigin } from "./timers.ts";
 
@@ -154,4 +156,4 @@ export const makeSheepdogLoop = (rules: ReadonlyArray<SheepdogRule>): Effect.Eff
   }
 }));
 
-export const sheepdogLoop = makeSheepdogLoop([stallRule]);
+export const sheepdogLoop = Effect.suspend(() => makeSheepdogLoop([capacityRule, stallRule, makeCacheRule()]));

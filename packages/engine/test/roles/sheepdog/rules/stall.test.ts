@@ -75,19 +75,22 @@ it("ST06 resets the episode count after an ordinary board post by the addressee"
 it("ST07 does not treat tool calls or board.acknowledge as progress", () => {
   const result = evaluate(input({ episode: { post: post("p", "lead", ["worker"]), addressee: "worker", elapsed: 600_000, occurrence: 1 },
     threadItems: [{ agentId: "worker", kind: "tool-call" }], acknowledged: [{ postId: "p", agentId: "worker" }] }));
-  expect(tags(result)).toEqual(["roles.StallSeen"]);
+  expect(tags(result)).toEqual(["roles.StallSeen", "roles.StallSeen"]);
   expect(result[0]).toMatchObject({ occurrence: 2 });
+  expect(result[1]).toMatchObject({ occurrence: 2 });
 });
 
 it("ST08-ST18 leaves no-answer and a post in the sheepdog nudge turn unresolved and does not count either as progress", () => {
   const noAnswer = evaluate(input({ episode: { post: post("p", "lead", ["worker"]), addressee: "worker", elapsed: 600_000, occurrence: 1 },
     status: { disabled: false, incoming: [{ postId: "p", addressee: "worker", disposition: "no-answer" }], own: [], holdsIncoming: [], holdsUnsettled: [] } }));
-  expect(tags(noAnswer)).toEqual(["roles.StallSeen"]);
+  expect(tags(noAnswer)).toEqual(["roles.StallSeen", "roles.StallSeen"]);
   expect(noAnswer[0]).toMatchObject({ occurrence: 2 });
+  expect(noAnswer[1]).toMatchObject({ occurrence: 2 });
   const nudgeTurnPost = evaluate(input({ episode: { post: post("p", "lead", ["worker"]), addressee: "worker", elapsed: 600_000, occurrence: 1 },
     recentPosts: [{ author: "worker", source: "agent", sheepdogTurn: true }] }));
-  expect(tags(nudgeTurnPost)).toEqual(["roles.StallSeen"]);
+  expect(tags(nudgeTurnPost)).toEqual(["roles.StallSeen", "roles.StallSeen"]);
   expect(nudgeTurnPost[0]).toMatchObject({ occurrence: 2 });
+  expect(nudgeTurnPost[1]).toMatchObject({ occurrence: 2 });
 });
 
 it("ST08 resets the episode count when the tracked post closes", () => {
