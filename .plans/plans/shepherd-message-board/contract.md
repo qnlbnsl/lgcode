@@ -4,8 +4,8 @@ Status: **version 11, for the foundry-roles plan to build on.** Written by
 the board's planner on 2026-11-03. Version 10 is `attack/contract-v10.md`.
 This version folds the one major finding of the final review round, under
 the lead's ruling (post #266; row 143): a stop, a crash or a leaving keeps its
-effect after it is undone. It builds on the client API contract version 12
-(`8a34e59`), whose copy is `client-api-contract-v12.md` in this folder, and on
+effect after it is undone. It builds on the client API contract version 13
+(`5f08c31`), whose copy is `client-api-contract-v13.md` in this folder, and on
 the engine at `9e386b0` (row 144). A later change to this file goes to `plans-lead` as a
 question first. The board's plan is `.plans/plans/shepherd-message-board/plan.md`;
 its decisions are rows in `decisions.md` in the same folder, named in
@@ -18,7 +18,7 @@ ruling L26). The client API plan's units 1a and 1b turn the engine's fixed
 lists into lists a piece adds to, and the board adds its own entries in
 its own units. Names and shapes follow the client API's contract
 (`.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api`,
-version 12 at `8a34e59`). "Edit EN" below is that contract's section 6,
+version 13 at `5f08c31`). "Edit EN" below is that contract's section 6,
 edit EN. The security rules of lead rulings L13 and L16 to L25 stay
 exactly as ruled; they are now properties of engine code.
 

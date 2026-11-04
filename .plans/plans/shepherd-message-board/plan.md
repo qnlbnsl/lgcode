@@ -343,8 +343,8 @@ root. The recorded engine commit is `9e386b0` (row 144). Engine anchors come fro
 `scouting.md` (scans at `8ff4c9b`) and the round-1 reviews
 (`attack/round-1-*.md`), and every named file was re-checked at `9e386b0`. "The client API contract" is
 `.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api`,
-version 12 at `8a34e59`, copied to `client-api-contract-v12.md` in this folder
-(rows 121, 128, 129, 135, 142). "Edit EN" is that contract's section 6,
+version 13 at `5f08c31`, copied to `client-api-contract-v13.md` in this folder
+(rows 121, 128, 129, 135, 142, 146). "Edit EN" is that contract's section 6,
 edit EN: a direct edit to the engine that the client API plan's units 1a
 and 1b make, and that the board then adds its own entries to. "The piece
 batch path" is edit E23: every batch a planner, a read's marks or the
