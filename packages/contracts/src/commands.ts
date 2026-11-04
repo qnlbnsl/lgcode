@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
+import { AlertRpcGroup } from "./client/commands.ts"
 import { Account } from "./accounts.ts"
 import { EventEnvelope, WaitMember } from "./events.ts"
 import { HarnessSettings, RunMode } from "./harnesses.ts"
@@ -132,11 +133,13 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 ).merge(DebugRpcGroup)
 
 // Later pieces merge their prefixed groups here, in namespace order.
-export const CommandsRpcGroup = EngineCommandsRpcGroup
+export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(AlertRpcGroup)
 export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 
 // A new command requires an access decision at the composition point.
 export const commandAccess = {
+  "client.alerts.list": ["owner"], "client.alerts.dismiss": ["owner"],
+  "client.alerts.settings": ["owner"], "client.alerts.settings.set": ["owner"],
   start: ["owner", "agent"], prompt: ["owner", "agent", "service"], answer: ["owner", "agent"],
   "pass-up": ["owner", "agent"], ask: ["owner", "agent"], wait: ["owner", "agent"],
   stop: ["owner", "agent"], resume: ["owner", "agent", "service"], compact: ["owner", "agent", "service"], group: ["owner", "agent"],
@@ -144,4 +147,4 @@ export const commandAccess = {
   harnesses: ["owner"], subscribe: ["owner", "agent", "service"], "debug.compare-views": ["owner"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>, ReadonlyArray<CallerKind>>
 export const ownerOnlyCommands = engineCommandNames.filter((name) => !(commandAccess[name] as ReadonlyArray<CallerKind>).includes("agent"))
-export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }] as const
+export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }, { namespace: "client", group: AlertRpcGroup }] as const

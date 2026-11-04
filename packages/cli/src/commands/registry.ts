@@ -10,6 +10,10 @@ export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>
 export const commandNames: ReadonlyArray<CommandName> = [...CommandsRpcGroup.requests.keys()] as Array<CommandName>
 
 const summaries: Record<CommandName, string> = {
+  "client.alerts.list": "List alerts.",
+  "client.alerts.dismiss": "Dismiss an alert.",
+  "client.alerts.settings": "Read alert settings.",
+  "client.alerts.settings.set": "Change an alert kind's push setting.",
   start: "Start an agent.",
   prompt: "Send a prompt to an agent.",
   answer: "Answer a permission request or a question that was passed to you.",
@@ -36,6 +40,7 @@ export const matchCommand = (args: ReadonlyArray<string>): { readonly command: C
   const candidates = commandNames.map((command) => ({ command, words: command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ") }))
     .sort((a, b) => b.words.length - a.words.length)
   for (const { command, words } of candidates) {
+    if (command.includes(".") && args[0] === command) return { command, rest: args.slice(1) }
     if (words.every((word, index) => args[index] === word)) return { command, rest: args.slice(words.length) }
   }
   return undefined
@@ -68,5 +73,6 @@ export const helpText = (command: CommandName): string => {
       "  <agent-id>...   The agents to wait for, with --block or --mode.")
   }
   if (command === "subscribe") options.splice(1, 0, "  --after <n>     Print events after this sequence (default 0).")
-  return [`Usage: shephrd ${command === "debug.compare-views" ? command : command.replaceAll(".", " ")} [options]`, "", summaries[command], owner, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
+  const alias = command.startsWith("client.") ? [`Alias: shephrd ${command} [options]`] : []
+  return [`Usage: shephrd ${command === "debug.compare-views" ? command : command.replaceAll(".", " ")} [options]`, ...alias, "", summaries[command], owner, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
 }
