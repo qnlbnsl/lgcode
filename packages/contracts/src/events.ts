@@ -50,6 +50,25 @@ export const WaitMember = Schema.Struct({
 })
 export type WaitMember = typeof WaitMember.Type
 
+// Usage is an optional numeric snapshot, never raw adapter metadata. `used`
+// is the latest reported context size. Terminal counters retain the adapter's
+// scope, which can cover the whole turn. They do not prove last-request usage.
+const TokenCount = Schema.Int.check(
+  Schema.isGreaterThanOrEqualTo(0),
+  Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER)
+)
+export const TurnUsage = Schema.Struct({
+  used: Schema.optionalKey(TokenCount),
+  inputTokens: Schema.optionalKey(TokenCount),
+  cachedReadTokens: Schema.optionalKey(TokenCount),
+  cachedWriteTokens: Schema.optionalKey(TokenCount),
+  // These normalized request fields are absent unless a source reports them.
+  requestStartedAt: Schema.optionalKey(EpochMilliseconds),
+  cachedWrite5mTokens: Schema.optionalKey(TokenCount),
+  cachedWrite1hTokens: Schema.optionalKey(TokenCount)
+})
+export type TurnUsage = typeof TurnUsage.Type
+
 const ProcessIdentity = Schema.Struct({
   groupId: Schema.Int.check(Schema.isGreaterThanOrEqualTo(2)),
   bootId: BootId,
@@ -114,7 +133,7 @@ export const EngineEvent = Schema.Union([
     ...agent, itemId: Schema.NonEmptyString, content: ThreadContent, replay: Schema.Boolean
   }),
   Schema.TaggedStruct("TurnStarted", { ...agent }),
-  Schema.TaggedStruct("TurnEnded", { ...agent, compact: Schema.Boolean }),
+  Schema.TaggedStruct("TurnEnded", { ...agent, compact: Schema.Boolean, usage: Schema.optionalKey(TurnUsage) }),
   Schema.TaggedStruct("StateChanged", { ...agent, state: LifecycleState }),
   Schema.TaggedStruct("ModeChanged", { ...agent, mode: Schema.String, level: PermissionLevel }),
   Schema.TaggedStruct("ModeRefused", { ...agent, mode: Schema.String, ceiling: PermissionLevel, reason: Schema.String }),

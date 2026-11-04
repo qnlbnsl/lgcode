@@ -93,7 +93,9 @@ export const turnEnded = (snapshot: Snapshot, event: Extract<RunnerEvent, { _tag
   const { agentId, deliveryId } = event;
   if (currentTurn(snapshot, agentId) !== deliveryId) return [];
   const compact = snapshot.deliveries[deliveryId]?.content._tag === "compact";
-  return [{ _tag: "TurnEnded", agentId, compact }, ...passAtTurnEnd(snapshot, agentId)];
+  return [{ _tag: "TurnEnded", agentId, compact,
+    ...(event.usage === undefined ? {} : { usage: event.usage }),
+  }, ...passAtTurnEnd(snapshot, agentId)];
 };
 
 const sentTo = (snapshot: Snapshot, agentId: string, deliveryId: string): Row | undefined => {
