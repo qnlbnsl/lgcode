@@ -80,5 +80,8 @@ export const helpText = (command: CommandName): string => {
       "  <agent-id>...   The agents to wait for, with --block or --mode.")
   }
   if (command === "subscribe") options.splice(1, 0, "  --after <n>     Print events after this sequence (default 0).")
-  return [`Usage: shephrd ${command === "debug.compare-views" ? command : command.replaceAll(".", " ")} [options]`, "", summaries[command], owner, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
+  const invocation = command === "debug.compare-views" ? command : command.replaceAll(".", " ")
+  const usage = [`Usage: shephrd ${invocation} [options]`]
+  if (invocation !== command) usage.push(`       shephrd ${command} [options]`)
+  return [...usage, "", summaries[command], owner, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
 }

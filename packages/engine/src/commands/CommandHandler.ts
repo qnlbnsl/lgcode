@@ -233,7 +233,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
 
     return CommandHandler.of({
       input: (actor) => views.snapshot.pipe(Effect.map((snapshot) => ({ runtime, actor, snapshot }))),
-      execute: (credential, name, rawPayload) => Object.hasOwn(lists.reads, name) ? executeRead(credential, name, rawPayload)
+      execute: (credential, name, rawPayload) => Object.hasOwn(lists.reads, name) && !Object.hasOwn(lists.planners, name) ? executeRead(credential, name, rawPayload)
         : Effect.acquireUseRelease(preemptStart(credential, name, rawPayload), () => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
         if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
         const step = isBlockingWait(name, rawPayload) ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : restore;
