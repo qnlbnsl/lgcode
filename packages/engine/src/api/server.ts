@@ -47,6 +47,11 @@ const reasons = new Set([
 const commandError = (requestId: unknown, reason = "command refused") => ({
   _tag: "CommandError" as const, requestId, reason: reasons.has(reason) ? reason : "command refused",
 });
+// Authentication refusals already carry a fixed public reason. Preserve it
+// across a generic read wrapper without returning arbitrary failure content.
+const readError = (requestId: unknown, error: unknown) => commandError(requestId,
+  typeof error === "object" && error !== null && "reason" in error && typeof error.reason === "string"
+    ? error.reason : "command refused");
 
 // This listener can be opened before migrations or recovery. Its only
 // initial response, including to an unauthenticated upgrade, is recovering.
@@ -163,7 +168,7 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
       })));
       if (RpcSchema.isStreamSchema(rpc.successSchema)) return Stream.unwrap(prepare.pipe(Effect.map((input) =>
         read(input, payload) as Stream.Stream<unknown, unknown, Services>
-      ))).pipe(Stream.mapError(() => commandError(payload.requestId)), Stream.provideService(EventLog, boundedLog));
+      ))).pipe(Stream.mapError((error) => readError(payload.requestId, error)), Stream.provideService(EventLog, boundedLog));
       return prepare.pipe(Effect.flatMap((input) => read(input, payload) as Effect.Effect<import("./reads.ts").ReadReply, unknown, Services>),
         Effect.flatMap((result) => Effect.gen(function* () {
           const marks = result.marks ?? [];
@@ -175,7 +180,7 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
             yield* log.append(actor, freshRequest(), "read marks", marks, {}, false);
           }
           return result.reply;
-        })), Effect.mapError(() => commandError(payload.requestId)));
+        })), Effect.mapError((error) => readError(payload.requestId, error)));
     }])) as unknown as Handlers));
     yield* RpcServer.make(group).pipe(Effect.provide(handlers), Effect.provideService(RpcServer.Protocol, boundedProtocol), Effect.forkScoped);
     return yield* Effect.raceFirst(httpEffect, Deferred.await(invalidated).pipe(Effect.as(HttpServerResponse.empty())));
