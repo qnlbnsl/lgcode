@@ -1,8 +1,8 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v14, redaction check added, anchored to engine 9e386b0
-version: 14
+status: v15, one password login, one user, anchored to engine 9e386b0
+version: 15
 updated: 2026-11-03
 ---
 
@@ -14,7 +14,7 @@ This document fixes the surface that Shephrd's message board (piece 3) and
 foundry roles (piece 4) build on. It covers seven things:
 
 1. How a piece adds its own commands and events.
-2. The four kinds of caller, and what each may do.
+2. The three kinds of caller, and what each may do.
 3. How a client subscribes, reads, and what it sees.
 4. How an "owner needed" event becomes an alert.
 5. Request ids, cursors and the transports.
@@ -23,11 +23,11 @@ foundry roles (piece 4) build on. It covers seven things:
 
 The owner settled the client API's design questions in design talk 1 on
 2026-11-03. The decisions are in `docs/specs/2026-11-03-client-api-design.md`
-(rows 76 to 90). This contract follows them: a loopback web server that is
-open for now, alerts through ntfy behind one sender interface, and three
-commands that work only at the computer. Version 8 folds review round 1
-(rows 91 to 128). One of its rules, edit E28, is pending the owner's
-question 6 (row 95).
+(rows 76 to 90). This contract follows them where the owner has not changed them
+since: a loopback web server, and alerts through ntfy behind one sender interface.
+Version 8 folds review round 1 (rows 91 to 128). Version 15 follows the owner's
+later choice: login is one password, one person uses Shephrd, and a logged-in
+session is the owner (rows 184 to 196).
 
 The decision log is `decisions.md` in this folder. Row numbers below refer to
 it. The engine anchors are in `scouting.md`. Everything here is a plan; none
@@ -116,8 +116,8 @@ A piece adds itself to the engine's own lists, which section 6 makes:
    `packages/contracts/src/events.ts`, each with a namespaced `_tag`. The
    envelope stays one schema, `EventEnvelope`.
 3. **Its access entries** join the access table: for every command, the set
-   of caller kinds that may call it, out of `owner`, `device`, `agent` and
-   `service` (section 2).
+   of caller kinds that may call it, out of `owner`, `agent` and `service`
+   (section 2).
 4. **Its visibility entries** join the visibility table: for every event
    tag, its visibility class (section 3).
 5. **Its alert sources** join the alert source list, if it has any
@@ -167,9 +167,9 @@ A piece's handler never writes to the database itself. A planner is in the
 engine's planner table, and it runs inside the engine's command
 transaction, as the engine's own planners do:
 
-1. The engine identifies the caller and checks the access table, before it
-   looks at any receipt (edit E2, row 100).
-2. The engine checks the request id against the receipts.
+1. The engine identifies the caller and checks the request id against that
+   caller's receipts.
+2. The engine checks the access table (edit E2).
 3. The piece's planner reads a consistent snapshot of the views, the
    engine's and its own, and returns the events to write and its reply
    function (edit E3).
@@ -192,7 +192,7 @@ piece's batch against its state table, as it checks its own.
   start-up and is included in the engine's rebuild check, so "the log is the
   whole truth" holds for every piece.
 - **Side tables.** A piece that must keep a value outside the log, such as
-  a hashed pairing code, keeps it in its own tables, named `<namespace>_*`,
+  a hash of a one-time value, keeps it in its own tables, named `<namespace>_*`,
   created by its own migrations, which it adds to the engine's migration
   list.
 - **Reactors.** A piece may react to committed events, for example piece
@@ -291,86 +291,84 @@ paged read follows one shape:
   against the caller's current access on every request, and is not
   deduplicated. A resent request computes a fresh page.
 
-## 2. The four kinds of caller
+## 2. The three kinds of caller
 
 | Kind | Credential | Reaches Shephrd through | May call |
 | --- | --- | --- | --- |
-| Owner | The owner credential file in the state folder | The engine's Unix socket only, with the engine's ancestry check | Every command whose access includes `owner` |
-| Web caller (a device) | None while the web server is open (row 80). Pairing will later give each device its own credential, prefix `shp_d_` | The loopback web server (piece 2) | Every command whose access includes `device` |
+| Owner | At the computer, the owner credential file in the state folder. Through the web server, the session cookie that the password earns (row 186) | The engine's Unix socket, with the engine's ancestry check, or the loopback web server (piece 2) | Every command whose access includes `owner` |
 | Agent | Its own agent token, prefix `shp_a_` | The engine's Unix socket only, through MCP or the CLI | Every command whose access includes `agent`, under the engine's tree rules |
 | Service | None. A service exists only inside Shephrd's own process | The engine's in-process command path only | The fixed list under "Services" below, and any piece command whose access includes `service` |
 
-The log also names a fifth caller, `piece { namespace }`, on the batches a
+The log also names a fourth caller, `piece { namespace }`, on the batches a
 piece's own reactors write (edits E11 and E23). It is not a kind of caller
 in the sense of this table: it has no credential, no access entry, and
 calls no command.
 
-These rules apply to the four kinds:
+These rules apply to the three kinds:
 
-- **A device has the owner's rights, except for three commands.** The
-  engine already treats a device as the owner (`CommandHandler.ts:246`).
-  The owner chose three commands that work only at the computer, over the
-  engine's Unix socket with the owner credential (row 82). Each is tagged
-  **computer-only** in the access table, and the web server also refuses
-  them by name. AGENTS.md rule 5 is narrowed for these three:
-  - `client.pair.create`, creating a pairing code. The name is reserved in
-    the computer-only list now, and the later pairing plan builds it.
-  - `client.web.settings.set`, changing the web server's settings.
-  - `roles.rules.add`, adding a standing permission rule. The roles plan
-    defines it with access `owner` alone and cites this list.
-- **The carrier token also leaves out `device`.** The command that writes
-  the alert carrier's token, `client.alerts.carrier.set-token`, has access
-  `owner` alone, by lead ruling (rows 93, 94). It is not on the web server's
-  named list, and it is listed for the owner because it narrows AGENTS.md
-  rule 5 further.
-- **Every exception to AGENTS.md rule 5, in one place** (row 142). A web or
-  phone client cannot do these:
-  1. Create a pairing code, by the owner's choice (row 82).
-  2. Change the web server's settings, by the owner's choice (row 82).
-  3. Add a standing permission rule, by the owner's choice (row 82).
-  4. Write the alert carrier's token, by the lead's ruling (row 94).
-  5. Run `debug.compare-views`, as today (row 99).
-  6. Switch off the push of `client.lasting-setting`, by the lead's ruling
-     (row 139).
-  7. Give a persistent answer, only if the owner chooses edit E28 (row 95).
-
-  While the web server is open, "computer-only" is also a guard and not a
-  boundary. A web caller can start an agent or set a harness's adapter, and
-  that program can read the owner credential.
-- **The answers a web caller may not give, pending the owner** (row 95, edit
-  E28). The engine refuses `answer` from a device caller for a persistent or
-  always-allow option. On a settings-write request, it accepts from a device
-  caller only a non-persistent reject option. So the phone can answer
-  "Allow once" and "Deny" on an ordinary request, and "Deny" on a
-  settings-write request. The owner's question 6 decides this rule.
-- **Every web server request is a web caller, decided in one place.** The
-  web server is open for now (row 80, SECURITY.md rule 2 suspended for it
-  by the owner). One function, `webCaller`, decides the caller of every
-  request. While the server is open it answers the web caller: access kind
-  `device`, actor owner, and the envelope field `device: open-web`, a
-  reserved id that is never minted for a real device. So the log always
-  shows that an act came through the web server. Its path into the command
-  handler is one in-process credential shape that only `webCaller` can
-  build, with no wire or disk form (edit E12, row 96). Pairing later changes
-  only this function (row 81). The engine's Unix socket keeps its
-  authentication unchanged.
-- **The web server refuses the host's own credentials.** A request that
-  presents the owner credential or an agent token is refused there, because
-  the owner's proof rests on the Unix socket and its ancestry check, and
-  agents always run on the host.
-- **The web server refuses an agent's process, and other users' processes.**
-  At connection open, `webCaller` finds the loopback peer's process and
-  refuses it when any process holding that socket descends from an agent,
-  by the engine's ancestry rule (row 84). A peer owned by another user id
-  passes only in proxy mode, and only when it matches the computer-only
-  "proxy user id" setting (row 92). A same-user peer that cannot be found is
-  refused. The checks of the next two rules run first, so a refused
-  connection costs no process scan (row 119). This is a guard against
-  accidents and simple misuse, not a security boundary.
+- **One person uses Shephrd, and a logged-in session is the owner** (rows 184,
+  186). A valid session has exactly the owner's rights, with no list of
+  exceptions. So the web server's settings and standing rules work from a
+  logged-in dashboard, and AGENTS.md rule 5 holds as written. The envelope's
+  `caller` is `owner`, the receipts are the owner's, and no field says which
+  client acted. Every engine rule that tests for the owner, such as who holds a
+  request and who may answer it, needs no edit of its own. The engine refuses no
+  answer from the web server, because the owner answered question 6 no (row 95).
+- **The login is one password** (rows 184, 185). The service reads it from the
+  local environment variable `SHEPHRD_WEB_PASSWORD` (edit E34). A login is
+  `POST /api/login`, with the password in a JSON body of at most 4 KiB and never
+  in a URL. The server hashes both values with SHA-256 and compares the hashes
+  with `timingSafeEqual`, in constant time, because that function throws on inputs of
+  different lengths. On a match, the reply sets the session token in a cookie
+  that is `HttpOnly`, `SameSite=Strict` and `Path=/`, and `Secure` when the request
+  is public (section 5). The cookie has no `Max-Age`. A wrong password gets HTTP
+  401 and writes no event. The password itself is not stored in the browser. There
+  are no rate limits and no lockouts, by the owner's choice.
+- **A session is one token per engine start** (row 186). The token is 32 random
+  bytes, held in memory only. There is no session table, no user, no expiry timer
+  and no renewal. `POST /api/logout` replaces the token and closes every web
+  connection, so a logout signs out every client. A restart or a changed password
+  means logging in again, and changing the password means restarting the engine.
+- **One place decides the caller** (row 186). One function, `webCaller`, decides
+  the caller of every web server request. A valid cookie makes it answer the
+  command handler's existing `{ _tag: "owner" }` credential
+  (`CommandHandler.ts:45-48`), so the handler and `preemptStart` gain no branch.
+  Without a valid cookie, every API request and WebSocket upgrade gets HTTP 401
+  before any RPC message. Only `POST /api/login` and the static files, which hold no
+  data, are served without one. The engine's Unix socket keeps its authentication
+  unchanged.
+- **What the browser does** (row 186). The browser sends the cookie on the
+  WebSocket upgrade by itself, so the page sets no credential header. The cookie is
+  `HttpOnly`, so the page asks `POST /api/session`, which answers HTTP 204 with a
+  valid cookie and HTTP 401 without one, and it then shows the login form or the
+  dashboard. A tap on a phone alert is a navigation from outside the site, so the
+  browser leaves the cookie off that first request. That costs nothing, because the
+  page's static files need no session, and the page's own requests carry the cookie.
+- **The web server reads no other credential.** A bearer or a cookie that holds the
+  owner credential or an agent token earns nothing there, so such a request gets HTTP
+  401. The owner credential's proof rests on the Unix socket and its ancestry check,
+  and agents always run on the host.
+- **If the variable is not set, the web server does not start** (row 187). An unset
+  or empty variable, or a value under 8 characters, counts as not set. The engine and
+  its Unix socket run as normal. The engine says why in its log, and in the
+  `serverState` field of `client.web.settings` (section 5). This is not an outage,
+  so it writes no `client.WebServerDown` and raises no alert. The floor of 8 is the
+  length the engine already uses for inferred secrets
+  (`identity/inferredSecret.ts:4`). A shorter registered secret would be replaced
+  inside ordinary text, and a request id that happened to hold it would be refused
+  (`CommandHandler.ts:272`).
+- **The password stays secret** (row 188). SECURITY.md rule 6 applies to it, and to
+  the session token. Neither reaches a log, the board or a client, and both are
+  registered with the redactor. Agents do not inherit the variable (edit E34). One
+  limit is accepted. Agents run as the owner's Unix user, so an agent can still read
+  the engine's first environment through `/proc/<pid>/environ`, which deleting a
+  variable does not change. The password protects against the network. It is not a
+  boundary against an agent on the same user until the own-user setup exists (row 78).
 - **Only Shephrd's own page may drive the web server** (row 90). A
   request is accepted only when its `Host` names the web server, and, for
   anything but a `GET` or `HEAD` of a static file, its `Origin` names the
-  page. The allowed name is `127.0.0.1` at the web server's port, plus, in
+  page. This covers the login request. The allowed name is `127.0.0.1` at the web
+  server's port, plus, in
   proxy mode only, the public address setting. `localhost` is not allowed,
   because the web server binds only `127.0.0.1`, and another local program
   can hold `[::1]` at the same port and serve a page with that origin
@@ -380,15 +378,15 @@ These rules apply to the four kinds:
   stops a web page in the owner's browser and DNS rebinding. It does not
   stop a local program, which can send any header.
 - **Remote access comes through the owner's proxy.** The web server binds
-  loopback only, also in proxy mode (row 76). Proxy mode has four
-  computer-only settings: the public address, the allowed client networks,
-  the proxy user id, and whether it is on (rows 91, 92). Section 5,
-  "The web server's settings", gives the full table. Outside proxy mode, a
-  request that carries a forwarded header is refused, and a peer that matches
-  the proxy user id is always judged as public (row 133).
-- **`debug.compare-views` is the owner's terminal only.** Its access is
-  `owner`. It stays behind the engine's debug flag, and the web server
-  refuses it by name (row 99).
+  loopback only, also in proxy mode (row 76). Proxy mode has two settings: whether
+  it is on, and the public address. A public request must carry
+  `X-Forwarded-Proto: https`, because a password now crosses the proxy (row 113).
+  Outside proxy mode, a request that carries a forwarded header is refused. Section
+  5, "The web server's settings", gives the full table (row 193).
+- **`debug.compare-views` is not on the web server** (rows 99, 195). It exists only
+  under the engine's debug flag, which needs a test variable and a temporary folder
+  (`service.ts:69`). The web server always serves `ServiceRpcGroup`, which leaves it
+  out (`commands.ts:139`), so no list has to name it.
 - **The pane viewer is the owner.** The thread viewer in a Herdr pane uses
   the owner credential over the Unix socket, exactly as the owner's terminal
   does (lead ruling L4, row 7).
@@ -419,24 +417,12 @@ These rules apply to the four kinds:
   L16). The text is still wrapped as data
   (section 6, edit E15).
 - **The engine's own commands keep their access.** `accounts`, `accounts
-  set-secret`, `accounts mark-available` and `harnesses` stay owner-only,
-  which includes devices. `debug.compare-views` stays with the owner
+  set-secret`, `accounts mark-available` and `harnesses` stay owner-only.
+  `debug.compare-views` stays with the owner
   credential alone, as `server.ts:163-165` has it today. `ask`,
   and `wait` stay agent-only, and owner choice A10 makes `wait` agents-only
-  (row 4). `pass-up` stays open to the owner and a device for an agent-held
+  (row 4). `pass-up` stays open to the owner for an agent-held
   row, as `routing/holders.ts:108-114` has it (row 149).
-- **A device acts as the owner, and the log also says which device.**
-  Today a device's command is recorded with the caller "owner" (scout 1,
-  item 4), and that stays by choice: the envelope's `caller` is still
-  `owner`, and a device's receipts stay in the owner's scope. Every engine
-  rule that tests for the owner, such as who holds a request and who may
-  answer it, then treats a device exactly as the owner with no edit of its
-  own. Edit E12 adds one optional envelope field, `device`, holding the
-  device's id, so the owner can see which phone answered a request (rows
-  33, 66). An envelope written by the owner's terminal has no `device`
-  field. A piece that records an author, such as the board's
-  post author, records the owner and reuses this field for the device; it
-  adds no field of its own.
 
 ### Services
 
@@ -484,16 +470,15 @@ fixed rights: the foundry roles' sheepdog and their standing-rule answerer
 1. **Snapshot.** The client calls `client.snapshot`. It returns the current
    picture and the sequence number it was taken at: agents and their
    displayed states, open permission requests and questions in the rows
-   below, open alerts, accounts as names and flags with no values, devices
-   without credentials, and each piece's
+   below, open alerts, accounts as names and flags with no values, and each piece's
    own snapshot section under its namespace (row 15). A piece supplies its
    section through a per-caller function, `snapshotFor(caller, view)`, in
    the engine's snapshot section table (edit E9), which may leave the
    section out (lead ruling L15). The board's section is a
-   bounded summary with no post text for the owner, devices and services,
+   bounded summary with no post text for the owner and services,
    and absent for an agent (lead ruling L23). An agent's snapshot holds no
-   account, device or alert section, and its request and question rows are
-   identity rows alone (row 166). For the owner, devices and
+   account or alert section, and its request and question rows are
+   identity rows alone (row 166). For the owner and
    services, the snapshot also holds an engine wait-state section: the open
    deliveries (id, target, status and source kind, with no text) and the
    open non-blocking waits (the waiter and the wait id). Each agent entry
@@ -518,7 +503,7 @@ hold, not by a fixture:
   questions.** It holds a preview of at most 512 bytes, at most 8 options, each
   with its id, kind, persistent flag and a name cut to 128 bytes, the count of
   all the options, `settingsWrite`, `toolKind`, and the whole event's encoded
-  size. An owner, a device and a service get it, and an agent does not (row 166).
+  size. The owner and a service get it, and an agent does not (row 166).
 - **The 4 KiB is a budget, not a sum** (row 171). The builder measures the display
   part as encoded, escaping included, and it never passes 4 KiB. So all the parts
   together are at most about 2 MiB, by construction. Three rules keep it honest:
@@ -536,7 +521,7 @@ hold, not by a fixture:
   and 128 bytes, as an alert does, with the fixed fields of `client.roster`.
 - **`capacityHeld`** (row 177) is one more field of an agent entry, added by roles
   unit 11b. It is true while the agent has an open capacity hold, and the wait helper
-  reads it. An owner, a device and a service get it, and an agent's snapshot leaves it
+  reads it. The owner and a service get it, and an agent's snapshot leaves it
   out, as it leaves out `reloadable`. It fits the size cap: it is one boolean of about
   20 encoded bytes, so on the 200-agent fixture it adds about 4 KiB to a cap of 4 MiB,
   about 0.1 percent. The snapshot's size test sets it on every agent once it exists.
@@ -631,19 +616,19 @@ Every event has one visibility class, set by the piece that owns it:
 
 | Class | Who sees it |
 | --- | --- |
-| `agent-scoped` | The owner, every device and every service. An agent sees it only when the envelope's `agentId` names an agent it may read, by the read rule above. |
-| `owner-only` | The owner, every device and every service. Never an agent. |
-| `piece-decided` | The owner, every device and every service. An agent sees it when the owning piece's pure rule says so, given the caller, the envelope and the views. |
+| `agent-scoped` | The owner and every service. An agent sees it only when the envelope's `agentId` names an agent it may read, by the read rule above. |
+| `owner-only` | The owner and every service. Never an agent. |
+| `piece-decided` | The owner and every service. An agent sees it when the owning piece's pure rule says so, given the caller, the envelope and the views. |
 
 The engine's own events keep their current behaviour. Every engine event is
 `agent-scoped`. An `agent-scoped` envelope with no `agentId` is hidden from
-agents, so an engine event without one is seen only by the owner, devices
+agents, so an engine event without one is seen only by the owner
 and services, as today (issue 164 stands, edit E8).
 
 Every event tag has a declared class. The visibility table is typed over
 the whole event union, so an event added without a class does not compile
 (edit E8). A piece that has no reason to choose writes `owner-only`. The
-board's events are `owner-only` (row 34): owner devices see them in their live
+board's events are `owner-only` (row 34): the owner sees them in the live
 stream, and agents read the board through the board's own commands, not
 through `subscribe`. The client API never widens the engine's agent filter
 for another piece's events. `piece-decided` stays available to any piece
@@ -675,9 +660,9 @@ they are not deduplicated, and both use the same visibility rule as
 - its folder, its ACP session id, and its start time.
 
 The request may filter by group, by role, and by parent. Access is
-`owner`, `device`, `agent` and `service`:
+`owner`, `agent` and `service`:
 
-- The owner, every device and every service see every agent.
+- The owner and every service see every agent.
 - An agent sees every agent it may read, by the read rule. Its own entry
   names its parent, so `orient` can answer "who is my parent" without
   seeing the parent's record.
@@ -693,7 +678,7 @@ The request may filter by group, by role, and by parent. Access is
 from a sequence number, one page at a time. A page holds at most 500
 events, closes at the byte budget in section 5, and returns the cursor for
 the next page. It follows the paged-read shape in section 1. Access is
-`owner`, `device`, `agent` and `service`, with the same visibility rule.
+`owner`, `agent` and `service`, with the same visibility rule.
 To an agent caller, a page goes inside the data envelope of edit E15, with a
 fresh marker and an escaped leading slash, so the longest text an agent reads
 has the same protection as a delivery (row 140, SECURITY.md rule 7).
@@ -715,7 +700,7 @@ remote caller must not be able to choose a path on the host.
 **`client.event`** (row 137) reads one event whole by its sequence, under the
 same visibility rule. It is how a client recovers an event that the filtered
 stream replaced with a marker, including one that belongs to no thread, such
-as `HarnessChanged`. Its access is `owner`, `device`, `service` and `agent`.
+as `HarnessChanged`. Its access is `owner`, `service` and `agent`.
 
 The reply carries the event with its envelope, including `occurredAt` and the
 sequence (row 176). So a piece can read an event's time here, which a reducer may not
@@ -736,7 +721,7 @@ then leaves that event out.
 **`client.sequence`** (row 159) returns `{ requestId, sequence }`, the sequence of
 the current views value, and nothing else. Views publish whole batches, so the
 sequence is always at a batch's end. It is the wait helper's small read. Its access
-is `owner`, `device` and `service`. An agent has the engine's own `wait`.
+is `owner` and `service`. An agent has the engine's own `wait`.
 
 ### Events a client does not know
 
@@ -754,9 +739,9 @@ unknown values (edit E25, row 109). It then decodes known events above that
 boundary. The engine keeps its strict `EventEnvelope` for everything it
 writes, stores and rebuilds.
 
-### Waiting, for owners and devices
+### Waiting, for the owner
 
-There is no `wait` command for the owner or a device (row 4, lead ruling L1).
+There is no `wait` command for the owner (row 4, lead ruling L1).
 The client library offers a helper, `waitForAgents`, that takes a set of
 agents and "any" or "all". It takes a snapshot, subscribes, and finishes by
 the same member rule the engine uses for agent waits, which is more than
@@ -856,7 +841,7 @@ applies the stream up to their sequence and decides again. It ends the
 wait only when the engine's part and every piece's lists agree at one
 sequence. No timer and no polling are added. So the helper needs a
 caller whose snapshot holds those sections and who may make those reads:
-the owner, a device or a service. The owner's terminal waits with a new
+the owner or a service. The owner's terminal waits with a new
 subcommand, `shephrd client wait`, which runs this helper over
 `subscribe`. The engine's own `shephrd wait` stays agents-only, by owner
 choice A10, and its A10 test keeps its expectations.
@@ -930,46 +915,8 @@ setting. Its defaults are:
 | `roles.rule-first-use` | A standing permission rule is used for the first time | Yes. An automatic allow is security-relevant, so the owner sees its first use. |
 
 The engine's own kinds (`approval`, `question`, `failure`, `account`) are
-pushed by default. The client API adds two kinds of its own, both pushed by
-default: `client.lasting-setting` (row 98) and `client.web-down` (row 113).
-
-Some settings outlast a moment's access but stay open to the web server,
-because they grant no access and widen no exposure beyond what a caller who
-reaches the server already has: a harness's adapter path and arguments, an
-account's environment and secrets, the alert carrier's server, topic and token
-removal, each kind's push setting, and the roles' role file and settings
-(row 98). A caller who changes one can make later agent starts run other code,
-and the change stays after that caller is gone. So none moves to the
-computer-only list, and a change that arrives with `device: open-web` raises a
-`client.lasting-setting` alert. It is a pure source over `HarnessChanged`,
-`AccountChanged`, `client.AlertCarrierChanged`, `client.AlertSettingsChanged`,
-`client.AlertCarrierTokenCleared` and the roles' two events, keyed by sequence,
-and it ends only when dismissed. Three rules keep the caller it watches from
-hiding it (row 139):
-
-- **A device caller cannot switch off its push.** `client.alerts.settings.set`
-  refuses a change to this kind's setting from a device caller.
-- **A carrier change also goes through the old carrier.** The alert about
-  `client.AlertCarrierChanged` is also sent once to the previous server and
-  topic, with the previous token when one was set. It has up to five attempts on
-  the same schedule, and the old token's value is removed only after they end.
-  This is a best effort: a restart may remove the old value first, and on a
-  deny-all server the send then fails.
-- **A token clear warns with the cleared value** (row 164). The alert about
-  `client.AlertCarrierTokenCleared` is sent with the cleared value, up to five
-  attempts, and the value is removed only after they end. Otherwise one clear would
-  silence the phone on the deny-all server that the setup document recommends. A
-  restart has the same limit as above.
-- **A device caller's dismiss does not stop the first send** (row 165). For this
-  kind, a dismiss from a device caller closes the alert on the page only. It does not
-  cancel the send: the alert keeps its attempts, up to five in all, until one
-  succeeds. It does not call `clear`. It does not stop the warning attempts above. A
-  dismiss from the owner's terminal works as it does for any kind.
-- **The terminal shows dismissed records.** `shephrd client alerts list --all`
-  shows every such alert, open or dismissed, with the device that dismissed it.
-  So dismissing one from the web does not hide it from the computer.
-
-The later pairing plan reviews every such record when the server closes.
+pushed by default. The client API adds one kind of its own, pushed by default:
+`client.web-down` (row 113).
 
 ### The alert's life
 
@@ -1019,7 +966,6 @@ reactor runs after each batch that touches the subject (row 107):
 | `account:<id>:usage` | The account's row is gone, or its status is no longer `out-of-usage`. |
 | `agent-account:<agentId>` | The agent is stopped, or next reaches idle or working. |
 | A piece's kind | The end its own source declares. |
-| `client.lasting-setting` | Only when dismissed. |
 | `client.web-down` | The web server binds, or `enabled` is turned off. |
 
 This answers issue 65 without an engine change: an alert ends when its
@@ -1055,9 +1001,7 @@ and it can arrive twice (rows 106, 83).
   for alerts not yet delivered: the view carries an alert's delivered mark into
   the new generation. So a repaired token recovers a waiting alert, and a
   delivered one is not sent again.
-- **Pending is derived from the log.** An alert is pending when it is open, or
-  is a `client.lasting-setting` alert that a device caller dismissed and that still
-  has attempts left (row 165), when it
+- **Pending is derived from the log.** An alert is pending when it is open, when it
   is not `baseline`, its kind is pushed by the setting read at send time, a
   carrier is set, and it has no delivered mark in the current generation. So a
   restart finds its work from the views after `recovery.whenReady`.
@@ -1077,8 +1021,7 @@ and it can arrive twice (rows 106, 83).
   delays another's raise, clear or send, and no send runs inside the writer
   transaction.
 - **A cleared alert is not sent.** An alert that clears during backoff is
-  skipped. The one exception is a device caller's dismiss of a
-  `client.lasting-setting` alert (row 165).
+  skipped.
 - **Still failing.** The fifth failure in a generation, and each one after
   it, is recorded with `final: true`. This is only a mark: the clients show the
   alert as still failing, and the retries go on. A failed send never stops the
@@ -1131,14 +1074,14 @@ A name is cut to 64 characters. A team holds at most 8 labels and at most
 
 The link opens the thread, and the owner answers there (row 79). It never
 answers by itself, and opening it runs no command. The link is built from
-the page's public address, which is one of the web server's settings and
-so works only at the computer (row 88). An alert has a link only while proxy
+the page's public address, which is one of the web server's settings
+(row 88). An alert has a link only while proxy
 mode is on and a public address is set (row 113).
 
 ### The alert carrier's settings and its token
 
 The carrier's server and topic are alert settings with no default value in
-code (row 77). The owner and the web caller may change them (row 88). The
+code (row 77). The owner may change them (row 88). The
 owner's server address is a value the owner sets. The token works by these
 rules (rows 93, 94):
 
@@ -1147,24 +1090,21 @@ rules (rows 93, 94):
   (`service.ts:92-98`). Each value in it has a fresh name,
   `secret:client.alerts.carrier.<generation>`, built only by one function in
   `packages/contracts`, and the `client.AlertCarrierTokenSet` event selects the
-  active one (row 138). The carrier resolves only that name, with one exception,
+  active one (row 138). The carrier resolves only that name,
   and a boundary test checks that nothing in the client folder resolves any other.
   So an account's key can never be sent as the token.
-- **The one exception** (row 164). For the warning about a carrier change or a token
-  clear, and for no other alert, the carrier may resolve the name just cleared. It
-  sends that value only to the origin in that value's own
-  `client.AlertCarrierTokenSet`. The boundary test allows exactly this one path.
 - **The other direction is closed too** (row 138). An account's planner refuses
   an environment value under the reserved prefix `secret:client.`, and the runner
   refuses to resolve one (`runner/AcpRunner.ts:323-331`). So an agent can never
   read the token through its environment, and an account can never keep a cleared
   token alive.
 - **Written, never read back.** `client.alerts.carrier.set-token` writes the
-  slot, at the computer, with access `owner` alone. It takes a redacted value, a
+  slot, with access `owner`. It takes a redacted value, a
   nonce, and the origin the owner means. The planner refuses it when that origin
   is not the current server's, or when no server is set. The command-line form is
   `shephrd client alerts carrier set-token`, which prints the current server,
-  asks the owner to confirm it, and reads the value from standard input. No read
+  asks the owner to confirm it, and reads the value from standard input. The
+  page's settings form sends the same command. No read
   returns the value. A client sees only whether a token is set.
 - **The write order** (row 138). The planner stores the new value under its fresh
   name, then commits the event, as `setSecret` does
@@ -1177,18 +1117,17 @@ rules (rows 93, 94):
   does clearing the server with "none", so a later `client.alerts.settings` never
   says that a token is set when collection has removed it (row 168). The
   carrier sends the token only when the recorded origin equals the current
-  server's, apart from the exception above.
+  server's.
 - **A missing value is a failed attempt** (row 168). An active reference with no
   value in the store is never a send with no token. It is a failed attempt, and the
   clients show it as "token missing".
-- **Removing a value** (row 130). After a clear or a rotation commits, and after
-  any warning attempts that need the value have ended, the alert
+- **Removing a value** (row 130). After a clear or a rotation commits, the alert
   worker calls the engine's dedicated `removeCarrierValue(generation)`. It removes
   that one name and nothing else, so it cannot touch an account's secret, or a
   newer token, which has its own name. A crash before it runs is covered by
   start-up collection, which is the only collection there is (edit E27).
 - **Rotation and revocation.** Running `set-token` again rotates the token.
-  `client.alerts.carrier.clear-token`, with access `owner` and `device`, removes
+  `client.alerts.carrier.clear-token`, with access `owner`, removes
   it. Revoking it at the ntfy server is the owner's step, and a revoked token only
   makes attempts fail until a new one is set. Neither path puts a value in a log.
 - **It survives restarts.** Edit E27 keeps the active value through start-up
@@ -1218,8 +1157,7 @@ and publish to it, including a fake alert with a lookalike link.
 - Every command payload carries `requestId`. Clients mint a random UUID
   (universally unique identifier) for each action the owner takes, such as
   one tap on Allow, and reuse it on every resend of that action.
-- Receipts are kept per caller: the owner (which includes every device,
-  as today), each agent, and each service.
+- Receipts are kept per caller: the owner, each agent, and each service.
 - The same caller sending the same id with the same body gets the first
   reply again, and nothing acts twice. The same id with a different body is
   refused with "request id reused".
@@ -1246,7 +1184,7 @@ and publish to it, including a fake alert with a lookalike link.
 **Transports** (row 36):
 
 - **Every command on every transport.** The engine's Unix socket and piece
-  2's loopback web server both serve the whole `CommandsRpcGroup`,
+  2's loopback web server both serve the whole `ServiceRpcGroup`,
   generically. A
   piece's command needs no transport code of its own. The engine's socket
   already dispatches every command in its group this way
@@ -1292,7 +1230,8 @@ and publish to it, including a fake alert with a lookalike link.
     a read cannot stall behind a stream queue that has stopped being drained
     (Effect 4.0.5, `rpc/RpcClient.ts:350`, l.577-581: the 16-item queue is offered to
     before the chunk is acknowledged, on one receive loop). Plain HTTP reads were not
-    chosen, because the later pairing plan's credential is carried on the WebSocket.
+    chosen, because the web server would then need a second RPC transport, with its own
+    size and heartbeat rules, for no gain.
     Edit E32 gives the shape.
   - **The read connection has its own ping timeout** (row 179). Effect's RPC client
     pings every 5 seconds by default, and it counts only a decoded frame as a sign of
@@ -1335,22 +1274,25 @@ change, and `client.alerts.dismiss` is never an MCP tool.
 
 | Command | Kind | Access | Purpose |
 | --- | --- | --- | --- |
-| `client.snapshot` | read | owner, device, agent, service | The current picture (section 3). |
-| `client.roster` | read | owner, device, agent, service | The agents (section 3). |
-| `client.thread` | read | owner, device, agent, service | One agent's thread (section 3). |
-| `client.subscribe` | read, stream | owner, device, agent, service | The filtered stream (section 3). A stream is never an MCP tool. |
-| `client.event` | read | owner, device, agent, service | One event whole, by sequence (section 3). To an agent, in the data envelope. |
-| `client.sequence` | read | owner, device, service | The current views value's sequence (section 3). The wait helper's small read. |
-| `client.alerts.list` | read | owner, device | Open and cleared alerts, paged. |
-| `client.alerts.dismiss` | planner | owner, device | Clears one alert. |
-| `client.alerts.settings` | read | owner, device | Each kind's push setting, the carrier's server and topic, and whether a token is set. Never the token. |
-| `client.alerts.settings.set` | planner | owner, device | Changes one kind's push setting. A device caller is refused for `client.lasting-setting` (row 139). |
-| `client.alerts.carrier.set` | planner | owner, device | Changes the carrier's server and topic, or clears them with "none". |
+| `client.snapshot` | read | owner, agent, service | The current picture (section 3). |
+| `client.roster` | read | owner, agent, service | The agents (section 3). |
+| `client.thread` | read | owner, agent, service | One agent's thread (section 3). |
+| `client.subscribe` | read, stream | owner, agent, service | The filtered stream (section 3). A stream is never an MCP tool. |
+| `client.event` | read | owner, agent, service | One event whole, by sequence (section 3). To an agent, in the data envelope. |
+| `client.sequence` | read | owner, service | The current views value's sequence (section 3). The wait helper's small read. |
+| `client.alerts.list` | read | owner | Open and cleared alerts, paged. |
+| `client.alerts.dismiss` | planner | owner | Clears one alert. |
+| `client.alerts.settings` | read | owner | Each kind's push setting, the carrier's server and topic, and whether a token is set. Never the token. |
+| `client.alerts.settings.set` | planner | owner | Changes one kind's push setting. |
+| `client.alerts.carrier.set` | planner | owner | Changes the carrier's server and topic, or clears them with "none". |
 | `client.alerts.carrier.set-token` | planner, secret-setting | owner | Writes the token slot, for the origin it names. Lead ruling, rows 93, 94 and 138. |
-| `client.alerts.carrier.clear-token` | planner | owner, device | Removes the token. |
-| `client.web.settings` | read | owner, device | The web server's settings. |
-| `client.web.settings.set` | planner | owner, **computer-only** | Changes the web server's settings. |
-| `client.pair.create` | reserved | owner, **computer-only** | Not built. The later pairing plan builds it. |
+| `client.alerts.carrier.clear-token` | planner | owner | Removes the token. |
+| `client.web.settings` | read | owner | The web server's settings, and `serverState`. |
+| `client.web.settings.set` | planner | owner | Changes the web server's settings. |
+
+`POST /api/login`, `POST /api/logout` and `POST /api/session` are HTTP routes and not
+commands, because a login has no session yet, and only the web server has a cookie to
+replace or check. Each is a `POST` so that a browser sends an `Origin` with it.
 
 The client's events are `client.AlertBaseline`, `client.AlertRaised`,
 `client.AlertDelivered`, `client.AlertDeliveryFailed`, `client.AlertCleared`,
@@ -1367,7 +1309,7 @@ value outside the log, in its slot (section 4).
 ### The web server's settings
 
 The settings are one record, changed only by `client.web.settings.set`
-(rows 82, 88, 91, 92, 113). Any change closes every web connection, so each
+(rows 88, 113, 193). Any change closes every web connection, so each
 client is judged again under the new settings when it reconnects (row 140):
 
 | Setting | Default | Meaning |
@@ -1375,33 +1317,30 @@ client is judged again under the new settings when it reconnects (row 140):
 | `enabled` | On | Off closes the web server at once. Alerts keep running. |
 | `port` | 8787 | The loopback port. A change applies at the next service start. |
 | `heartbeatSeconds` | 25 | The heartbeat interval. |
-| `proxyMode` | Off | Whether the settings below apply. |
+| `proxyMode` | Off | Whether the public address applies. |
 | `publicAddress` | None | The page's address through the proxy, in one canonical form: `https://host` or `https://host:port`, in lower case, with no path and no default port. A form that is not `https` is refused. |
-| `allowedClientNetworks` | None | The networks a remote client may come from, such as the WireGuard network. |
-| `proxyUserId` | None | The user id a proxy runs as, when it is not the owner's. |
 
-The command refuses proxy mode on without a public address and at least one
-allowed client network. So a request reaches these rows only with all of them
-set:
+The command refuses proxy mode on without a public address. A logged-in dashboard
+that turns `enabled` off, or changes the public address, loses its own connection,
+and the owner's terminal can set it back (row 195).
 
-A peer is **public** when proxy mode is on and either its user id matches
-`proxyUserId`, or its request names the public address or carries a forwarded
-header. A peer that matches `proxyUserId` under another user id is always public,
-and the loopback rows never apply to it (row 133).
+`client.web.settings` also returns `serverState`, which is not a setting. It is
+`running`, `off`, `port-taken` or `no-password` (row 187).
 
-| Proxy mode | Peer and request | Last `X-Forwarded-For` entry | `X-Forwarded-Proto` | Result |
-| --- | --- | --- | --- | --- |
-| Off | Any request with a forwarded header | Any | Any | Refused, HTTP 403 |
-| Off | Names loopback, with no forwarded header | None | None | Accepted, after the guard |
-| Off | Names the public address | None | None | Refused, HTTP 403 |
-| On | Public | Missing | Any | Refused |
-| On | Public | One of the host's own addresses | Any | Refused |
-| On | Public | Outside the allowed networks | Any | Refused |
-| On | Public | Inside the allowed networks | Not `https` | Refused |
-| On | Public, and names neither the public address in `Host` nor in `Origin` | Inside the allowed networks | `https` | Refused |
-| On | Public, with an `Origin` that is not the public address | Inside the allowed networks | `https` | Refused |
-| On | Public, names the public address in `Host` or `Origin`, and any `Origin` is the public address | Inside the allowed networks | `https` | Accepted, after the guard |
-| On | Same user, names loopback, with no forwarded header | None | None | Accepted, after the guard, as a local browser |
+A request is **public** when proxy mode is on and the request names the public
+address or carries a forwarded header. "Accepted" in this table means that the request
+goes on to `webCaller`, where the cookie decides, or to the login route:
+
+| Proxy mode | Request | `X-Forwarded-Proto` | Result |
+| --- | --- | --- | --- |
+| Off | Any request with a forwarded header | Any | Refused, HTTP 403 |
+| Off | Names loopback, with no forwarded header | None | Accepted |
+| Off | Names the public address | None | Refused, HTTP 403 |
+| On | Public | Not `https` | Refused |
+| On | Public, and names neither the public address in `Host` nor in `Origin` | `https` | Refused |
+| On | Public, with an `Origin` that is not the public address | `https` | Refused |
+| On | Public, names the public address in `Host` or `Origin`, and any `Origin` is the public address | `https` | Accepted |
+| On | Names loopback, with no forwarded header | None | Accepted, as a local browser |
 
 The "or" exists for a proxy that rewrites `Host`, and that case needs only a public
 `Origin`. So a public request with `Host` set to the public address and a loopback
@@ -1409,18 +1348,9 @@ The "or" exists for a proxy that rewrites `Host`, and that case needs only a pub
 
 The forwarded headers are `X-Forwarded-For`, `X-Forwarded-Proto`,
 `X-Forwarded-Host` and `Forwarded`. A local program that forges one outside proxy
-mode only refuses itself. `docs/remote-access.md` requires the proxy to set both
-`X-Forwarded-For` and `X-Forwarded-Proto`, and recommends that it run as its own
-user. One limit remains, in the known gaps: with proxy mode on, a same-user proxy
-that adds no forwarded address and rewrites `Host` cannot be told from a local
-browser. Post-build check PB-2 treats a missing header on the owner's proxy as a
-failed check.
-
-Addresses are compared in a normal form, with IPv4-mapped IPv6 forms and zone
-suffixes removed. The last entry is the one the proxy adds. Caddy's
-documentation, read 2026-11-03, says that it "sets or augments" the header,
-ignores incoming values by default, and passes `Host` through. Post-build
-check PB-2 tests this on the owner's own proxy.
+mode only refuses itself. `docs/remote-access.md` requires the proxy to set
+`X-Forwarded-Proto`. Post-build check PB-2 treats a missing header on the owner's
+proxy as a failed check, and tests what the owner's own proxy sends.
 
 The web server answers HTTP 503 during recovery, as the engine's socket does
 (`server.ts:99`). If its port cannot be bound, the engine keeps running without
@@ -1452,6 +1382,8 @@ touches (row 116):
 | `secrets.json`, mode 0600 | Account keys and the carrier token, not encrypted | An account's by start-up collection, and the token by its own removal (edit E27). |
 | The ntfy server's cache | An alert's five fields | By the server's own retention, 12 hours by ntfy's default, and by the carrier's best-effort `clear`. |
 | The phone's notifications | An alert's five fields | By the carrier's best-effort `clear`, or the owner. |
+| The service's environment, set by the owner | The web password | By the owner, with an engine restart (row 188). |
+| The browser's cookies | The session token, never the password | When the browser session ends, at logout, or at the engine's next start, when the token stops working. |
 | The browser's memory | The snapshot and the threads it read | When the page closes. The page keeps no thread data in browser storage. |
 | The browser's file cache | The page's static files only | By the browser. |
 | A thread export file, mode 0600 | One agent's thread | By the owner. |
@@ -1460,8 +1392,8 @@ touches (row 116):
 | The proxy's access log | Each request's address, path and time | By the owner, in the proxy's settings. Shephrd cannot reach it. |
 
 `docs/remote-access.md` has a "lost phone" section: remove the phone's
-WireGuard peer, and rotate the ntfy token. While the server is open, there is
-nothing on the page to sign out of.
+WireGuard peer, change the password and restart the engine, which ends every
+session, and rotate the ntfy token.
 
 ## 6. The shared engine edits (the client API plan's first unit)
 
@@ -1516,36 +1448,25 @@ and adds one `.merge` line here in its own unit. `ServiceRpcGroup` stays
   `rpc/RpcGroup.ts:269-276`). A negative fixture shows that a duplicate fails
   (row 155).
 
-**E2. Access by caller kind, checked before the receipts.** In `commands.ts`, `ownerOnlyCommands` (l.16)
+**E2. Access by caller kind.** In `commands.ts`, `ownerOnlyCommands` (l.16)
 and `commandAccess` (l.20), whose values are "agent-callable" or
 "owner-only", become one table. It maps every command in the group to the
-caller kinds that may call it, out of `owner`, `device`, `agent` and
-`service`. It is typed over the whole group, so a command without an entry
-does not compile.
+caller kinds that may call it, out of `owner`, `agent` and `service`. It is
+typed over the whole group, so a command without an entry does not compile.
 
 - The engine's commands keep today's access exactly. An owner-only command
-  gets `owner` and `device`. An agent-callable command gets `owner`,
-  `device` and `agent`. The planners of `ask` and `wait` keep refusing the
-  owner as they do today. The planner of `pass-up` refuses only when the holder
-  is already the owner, as today (row 149). Edit E13 adds `service` to
-  `subscribe`, `prompt`, `compact` and `resume`. `answer` gets no
-  `service` (row 75).
-- A device is checked as a device. The command handler reads the caller
-  kind from the wire credential (`CommandHandler.ts:45`) before it maps a
-  device to the owner actor (`CommandHandler.ts:246`). The host-only list
-  (row 55) is then a matter of leaving `device` out of a command's entry.
-  Today every engine command that the owner may call, a device may call
-  too, so no engine command changes.
+  gets `owner`. An agent-callable command gets `owner` and `agent`. The planners
+  of `ask` and `wait` keep refusing the owner as they do today. The planner of
+  `pass-up` refuses only when the holder is already the owner, as today (row 149).
+  Edit E13 adds `service` to `subscribe`, `prompt`, `compact` and `resume`.
+  `answer` gets no `service` (row 75).
 - `debug.compare-views` gets `owner` alone, which is today's answer
-  (`server.ts:163-165`), so a device is refused it (row 99).
+  (`server.ts:163-165`, row 99).
 - The access check at `CommandHandler.ts:70` (`owners.has(name) &&
-  actor._tag !== "owner"`) becomes a lookup of the caller kind in the
-  table. It moves out of `planCommand` to before the receipt lookup (l.277),
-  because a device shares the owner's receipts. So a caller without access
-  can never get a stored reply by presenting a request id and body (row 100).
-  An agent's access refusal is written as today, with a receipt under its own
-  key. A device's access refusal writes `CommandRefused` with no receipt, so
-  it can never be replayed to the owner.
+  actor._tag !== "owner"`) becomes a lookup of the caller kind in the table. It
+  stays where it is, after the receipt lookup (row 190). Each caller has its own
+  receipts, so no caller can get another's stored reply. A refusal is written as
+  today, with a receipt under the caller's own key.
 - The MCP tool list (`packages/mcp/src/tools.ts:7`) offers the commands
   whose entry includes `agent`, less every stream and the secret-setting
   commands (row 97). The derived list is pinned as an exact list in
@@ -1553,15 +1474,12 @@ does not compile.
   plan updates the pin in its own unit (row 140). The client group's entries in the
   pin are `client.snapshot`, `client.roster`, `client.thread` and `client.event`
   (row 158).
-- Behaviour change: none for the engine's commands, except that a device's
-  access refusal has no receipt, and no engine command refuses a device today.
+- Behaviour change: none for the engine's commands.
 - Tests updated: in `commands.test.ts`, "tags every command agent-callable
   or owner-only" is rewritten for the caller-kind table.
   `packages/cli/test/parity.test.ts` (P02) reads the new table.
-  `packages/engine/test/commands/authorization.test.ts` keeps its
-  expectations and gains device and service cases, and a case that a device
-  replaying an owner-only request id and body is refused.
-  `packages/engine/test/api/compare-views-rpc.test.ts` gains a device case.
+  `packages/engine/test/commands/authorization.test.ts` loses its device rows, keeps
+  its other expectations, and gains service cases.
 
 **E3. A planner table instead of the `supported` set.** In
 `packages/engine/src/commands/CommandHandler.ts`, the hard-coded
@@ -1794,78 +1712,68 @@ credential, no access entry, and calls no command.
 - Tests updated: `events-roundtrip.test.ts` and
   `packages/engine/test/log/receipts.test.ts` gain service and piece cases.
 
-**E12. The acting device.** `EventEnvelope` gains one optional field,
-`device`, holding a `DeviceId`. The command handler sets it from the device
-credential and keeps `caller: owner` (`CommandHandler.ts:246`). This keeps
-every engine rule that tests for the owner working for a device with no
-edit of its own (row 66).
+**E12. The engine's device credentials go** (row 189). One person uses Shephrd,
+through one password, and the product is not yet in use. Nothing in the engine's
+source writes `DeviceAdded` or a `sideRows.devices` row today; only tests do. So no
+real log holds one, and this removes a second owner path that nothing fills.
 
-- **The open web caller's path** (row 96). `Credential`
-  (`CommandHandler.ts:45-48`) gains one in-process shape,
-  `{ _tag: "open-web" }`. A value of it can be built only by the exported
-  constructor in `packages/engine/src/client/web/webCaller.ts`, and a
-  boundary test checks that nothing else imports that constructor. It has no
-  wire or disk form, and the socket's `authenticate` (`server.ts:87-96`) can
-  never produce it. `execute` treats it as access kind `device`, verifies
-  nothing, maps it to the owner actor, and sets `device: open-web`. The
-  per-connection credential recheck (`server.ts:119-127`) does not apply to it.
-- **The second credential branch** (row 180). `preemptStart`
-  (`CommandHandler.ts:202-229`), which `execute` runs first (l.237), resolves the
-  caller again before a `stop` queues for the lane. Its last branch assumes that any
-  other credential holds an agent token (l.216). Both places use one resolver. An
-  open-web caller follows the owner's authorized path, so a stop from the web cancels a
-  start whose setup is still running. An invalid device credential still cannot
-  preempt. The in-process service path cannot preempt either, because no service may
-  call `stop`. The existing holder and credential checks stay.
-- **The reserved id** (row 154). `open-web` is refused as the id of a real
-  device, by `DeviceAdded`'s event schema and by the `sideRows.devices` insert
-  (`EventLog.ts:203-206`). So no real credential can ever be recorded under it,
-  and a test does not need the later pairing plan. The envelope's `device` field
-  still accepts it.
-- **The caller's kind reaches a planner** (rows 95, 139). `Input`
-  (`commands/internal.ts:38-42`) gains `callerKind`, which `execute` sets before
-  it maps a device to the owner actor (`CommandHandler.ts:244-246`).
-- Behaviour change: an envelope written for a device carries `device`.
-- Tests updated: `packages/engine/test/commands/handler.test.ts` gains a
-  device case and an open-web case. `packages/engine/test/api/auth.test.ts`
-  gains a case that no credential maps to it.
-  `packages/engine/test/api/per-request-credential.test.ts` keeps its
-  expectations. New test: `packages/engine/test/client/web-caller-path.test.ts`.
-  `packages/engine/test/commands/start-setup.test.ts` keeps its owner-stop (l.55) and
-  invalid-device (l.83) expectations, and gains an open-web stop of a setup that never
-  returns: prompt cancellation, one `AgentStopped`, no later `SessionOpened`, and no
-  later spawn.
+- **What goes.** `packages/engine/src/identity/devices.ts`. `Credential`'s `device`
+  shape, with its branches in `preemptStart` and `execute`
+  (`CommandHandler.ts:18`, l.47, l.212-214, l.244-246). `authenticate`'s last branch
+  (`api/server.ts:26`, l.94-95), so a bearer that is neither the owner credential nor
+  an agent token is refused. `DeviceAdded`, `DeviceRevoked` and `DeviceId`
+  (`events.ts:177-178`, `ids.ts:18-19`, `stateMachine.ts:118-119`). `DeviceRow`,
+  `sideRows.devices` and `revokeDevices` (`EventLog.ts:48-50`, l.65-66, l.200-205,
+  l.236-240). The devices view (`views/apply.ts:86-87`, l.101, l.116, l.326-332,
+  l.352). `deviceId` in `log/redactionStructure.ts:24`. `shp_d_` in
+  `identity/credential.ts:25` and `identity/redactor.ts:77`.
+- **The table goes by a new migration.** A new engine migration drops `devices`, and
+  `service.ts:99` reads its token hashes from `agent_tokens` alone.
+- **`preemptStart` keeps its rule.** The owner's path is unchanged, so a stop from a
+  logged-in session cancels a start whose setup is still running. An invalid agent
+  token still cannot preempt.
+- Behaviour change: a `shp_d_` bearer is refused as any unknown string is. Nothing
+  issues one today.
+- Tests updated: `packages/engine/test/support/handlerRig.ts` and
+  `support/viewFixtures.ts` lose their device helpers.
+  `commands/authorization.test.ts`, `commands/handler.test.ts`,
+  `identity/owner-credential.test.ts`, `identity/redactor.test.ts`,
+  `identity/redactor-fix-1.test.ts`, `views/apply.test.ts`, `views/rebuild.test.ts`,
+  `api/auth.test.ts`, `api/subscribe-visibility.test.ts`,
+  `routing/permissions.test.ts` and `packages/contracts/test/events-roundtrip.test.ts`
+  lose their device cases and keep the rest. `views/compare-views.test.ts` moves its
+  sample events to `AccountChanged`. `commands/start-setup.test.ts` keeps its owner-stop
+  case (l.55), and its invalid-device case becomes an invalid agent token (l.83-91).
+  `api/auth.test.ts` gains a case that a `shp_d_` bearer gets HTTP 401.
 
-**E11 and E12 together: one durable form of the caller and the device**
-(lead's round 4, S4; row 71). Today the `events` table stores only the
-receipts key in `events.caller` (`migrations.ts:16`), and the log reader
-rebuilds the caller from that string alone (`log/subscribe.ts:36-38`). So
-a service's rule and a device's id would be lost on every read of the log.
-The edits are:
+**E11: one durable form of the caller** (lead's round 4, S4; row 71). Today the
+`events` table stores only the receipts key in `events.caller`
+(`migrations.ts:16`), and the log reader rebuilds the caller from that string alone
+(`log/subscribe.ts:36-38`). So a service's rule would be lost on every read of the
+log. The edits are:
 
-- **The migration.** A new engine migration adds two nullable columns to
-  `events`: `caller_rule` (a standing rule's id) and `device_id`. Old rows
-  have neither, and decode as today. `events.caller` keeps the receipts key
+- **The migration.** A new engine migration adds one nullable column to
+  `events`: `caller_rule` (a standing rule's id). Old rows
+  have none, and decode as today. `events.caller` keeps the receipts key
   form: `owner`, `agent:<id>`, `service:<name>` or `piece:<namespace>`.
 - **The append path.** `append` (`EventLog.ts`, the `commit` function,
-  l.146) takes the full `Caller` and the optional device, in place of an
-  `Actor`. It writes `caller`, `caller_rule` and `device_id` for every
+  l.146) takes the full `Caller`, in place of an
+  `Actor`. It writes `caller` and `caller_rule` for every
   event of the batch, and builds the live envelope (l.183) from the same
   values.
-- **One row decoder.** `decodeRow` (`log/subscribe.ts:36`) reads the three
-  columns and rebuilds the full caller and the device. It accepts each of
+- **One row decoder.** `decodeRow` (`log/subscribe.ts:36`) reads the two
+  columns and rebuilds the full caller. It accepts each of
   the four key forms and refuses any other. Catch-up (`log/subscribe.ts`),
   the rebuild (`views/rebuild.ts:26`) and the paged agent read (edit E21)
-  all select the three columns and call this one decoder.
-- **Equality.** For every caller kind, with and without a rule and a
-  device, the live envelope, the catch-up envelope and the rebuilt envelope
-  are equal.
-- Behaviour change: the `events` table gains two columns. Every existing
-  row still decodes, with no rule and no device.
+  all select the two columns and call this one decoder.
+- **Equality.** For every caller kind, with and without a rule, the live envelope,
+  the catch-up envelope and the rebuilt envelope are equal.
+- Behaviour change: the `events` table gains one column. Every existing
+  row still decodes, with no rule.
 - Tests updated: `packages/engine/test/log/append.test.ts`,
   `log/subscribe-gapless.test.ts`, `log/receipts.test.ts` and
-  `packages/engine/test/views/rebuild.test.ts` gain service, rule, piece
-  and device cases. A new test, `packages/engine/test/log/caller-durable.test.ts`,
+  `packages/engine/test/views/rebuild.test.ts` gain service, rule and piece
+  cases. A new test, `packages/engine/test/log/caller-durable.test.ts`,
   compares live, catch-up and rebuilt envelopes, including after a restart.
 
 **E13. The in-process service path and its rights.** A new module,
@@ -1886,16 +1794,15 @@ code:
   handler command (row 126);
 - `resume` passes its caller to `reload`, whose later writes run after the
   commit (`commands/resume.ts:47`, `recovery/reload.ts:105`, l.135, l.139).
-  `reload`'s parameter changes from `Actor` to `Caller`, with the optional acting
-  device beside it, so a service's resume records the service on those writes,
-  and a device's resume records the device, on both success and a failed reload
-  (rows 126, 152);
+  `reload`'s parameter changes from `Actor` to `Caller`, so a service's resume
+  records the service on those writes, on both success and a failed reload
+  (row 126);
 - `answer` is refused for every service (row 75), because no service calls
   it: a standing rule's answer is written inside the engine's permission
   transaction instead (edit E14);
 - everything else is refused.
 
-- Behaviour change: none for the owner, devices and agents.
+- Behaviour change: none for the owner and agents.
 - Tests updated: `packages/engine/test/api/auth.test.ts` keeps its
   expectations and gains a case that no credential maps to a service. A new
   test, `packages/engine/test/commands/service-caller.test.ts`, covers each
@@ -2114,9 +2021,8 @@ issue 31), so a read by that column would differ from the engine's `threads`
 view (row 125). So a new engine migration adds a nullable column,
 `thread_agent_id`, indexed, and fills old rows: the agent column, or the
 delivery's target for a `DeliveryQueued`. `append` fills it from `threadAgent`,
-which is exported from `views/apply.ts`. The read selects the caller and
-device columns and decodes each row with the one row decoder of edits E11
-and E12. It applies the visibility function to each row, so an agent still
+which is exported from `views/apply.ts`. The read selects the caller
+columns and decodes each row with the one row decoder of edit E11. It applies the visibility function to each row, so an agent still
 does not see an envelope with no `agentId` (issue 164 stands).
 
 - Behaviour change: the `events` table gains one column.
@@ -2178,7 +2084,6 @@ Each batch is written under one caller and one request id:
 | A read's marks | The calling caller | A fresh internal id | None |
 | A reactor's | `piece { namespace }` | A fresh internal id | None |
 
-A read's marks carry the acting device too, as a planner's events do (row 152).
 A piece's background worker, such as the alert delivery worker or the web server's
 outage record, writes through the reactor's row (row 151).
 
@@ -2251,14 +2156,14 @@ cannot use it. It splits into three modules, with one package:
   checks. The root entry re-exports it, so the command-line tool, the MCP server
   and the pane viewer change nothing.
 - `packages/client/src/browser.ts`: a connection over a browser WebSocket,
-  through Effect's `layerWebSocketConstructorGlobal`, with the one credential
-  module (criterion 7.1).
+  through Effect's `layerWebSocketConstructorGlobal`. It sets no credential,
+  because the browser sends the session cookie on the upgrade (criterion 7.1).
 
 - Behaviour change: none for Node callers.
 - Tests: a boundary test checks that `core.ts` and `browser.ts` reach no
   `node:` import. Unit 7a's production build is the real proof.
 
-### Secrets and the web caller's answers
+### Secrets
 
 **E27. Secret collection keeps a piece's own slot, and secret-setting commands
 are a table** (row 94). `collectSecrets` (`recovery/restart.ts:139-147`) keeps
@@ -2299,27 +2204,8 @@ earlier token active.
   that the account's secret survives and resolves. It also clears and at once
   sets a token, and shows that the new value survives.
 
-**E28. The web caller's answers. Pending the owner's question 6** (row 95).
-Fold as the recommended answer. If the owner chooses the other answer, this edit
-and criterion 1.41 are removed, and nothing else depends on them. `callerKind`
-stays in edit E12, because row 139 also uses it.
-
-- `answer` (`routing/permissions.ts:35-44`) refuses, for `callerKind: device`,
-  an option that is persistent by its flag or its kind (`ceiling.ts:387-394`,
-  `permissionForOptionKind`), and an option of an unknown kind. On a request
-  with `settingsWrite`, it accepts from that caller only a non-persistent
-  reject option.
-- The refused request stays open, so the owner can finish it at the computer.
-- The refusal's reason is "option not allowed from the web". It joins the list at
-  `api/server.ts:41-45`, so the page can explain it, and the page has a state for
-  a request whose options are all refused for it (row 153).
-- `pass-up` is not a persistent answer, so this edit leaves it open to a device.
-- The later pairing plan decides whether a paired device keeps this rule.
-- Behaviour change: a device caller loses those answers. The owner's terminal
-  and agents are unchanged.
-- Tests updated: `packages/engine/test/routing/permissions.test.ts` keeps its
-  expectations and gains a case for each option kind, for a device caller and
-  for the owner.
+**E28. Removed by version 15.** The owner answered question 6 no, so the engine
+refuses no answer from the web server (rows 95, 184).
 
 **E29. A permission request carries its action** (rows 132, 162, 174). The owner and
 every other approver approve the action, not a title. Today `event.description` is
@@ -2471,7 +2357,6 @@ track of it. This plan adds these entries, and no others:
 | --- | --- | --- | --- |
 | `actor` | `service`, `rule`, `namespace` | `Caller` and `Sender` gain these (edits E11, E14, E15), in `sender`, `answeredBy`, `caller` and the rest of `actor`'s places. | 1b |
 | `delivery.source` | `namespace` | A piece's source is `{ namespace, id }` (edit E16). `id` is already listed. | 1b |
-| `receiptStructure`'s envelopes | `device` | An envelope gains `device` (edit E12). | 1b |
 | `eventStructure` | `alertId`, `alertKey` | The client's alert events. | 2 |
 | `subject` | `namespace` | An alert's subject can be a piece's. `id` is already listed. | 2 |
 | `receiptStructure` | `alertId` | A planner's reply may name it. | 2 |
@@ -2489,6 +2374,32 @@ fields of edit E29 stay text, and `toolCallId` stays text as today.
   occurs inside each listed field, in an event and in a receipt. Each id is unchanged,
   and the same secret in a title, in `toolInput` or in a top-level field named `key` is
   still redacted.
+
+### The web password
+
+**E34. The web password leaves the process before anything can spawn** (row 188).
+This edit belongs to unit 5. In `service.ts`, beside `inheritedToken` (l.37-38), the
+service captures `SHEPHRD_WEB_PASSWORD` and deletes it from `process.env`. So the
+runner's copy, `environment: { ...process.env }` (l.104), never holds it.
+
+- **The ACP path.** It already drops the variable, and the new test pins that:
+  `buildBaseEnvironment` copies only named parent variables and refuses an account
+  variable under `SHEPHRD_` (`runner/baseEnvironment.ts:13-17`), and `AcpRunner`
+  spawns with `extendEnv: false` (`runner/AcpRunner.ts:379`).
+- **Interactive mode.** The engine has only the mode's name today
+  (`packages/contracts/src/harnesses.ts:5`), and no spawn path. The delete covers any
+  child the engine spawns. A Herdr pane is started by Herdr, from Herdr's environment.
+  So `docs/remote-access.md` tells the owner to set the variable on the service alone,
+  and the interactive mode plan must clear it in the pane's command.
+- **The redactor.** `explicitSecrets` (`service.ts:82`) gains the password, because a
+  value there bypasses the gate on inferred secrets. `secrets()` also returns the
+  current session token. A value under 8 characters is deleted from the environment and
+  is not registered, because the web server does not start with it.
+- Behaviour change: none while the variable is unset.
+- Tests: `packages/engine/test/client/web-password-environment.test.ts` starts the
+  service with the variable set. A fake adapter records its environment, which holds
+  neither the name nor the value. `runner/baseEnvironment.test.ts` gains a case for the
+  name.
 
 ### What the later plans then add
 
@@ -2510,7 +2421,7 @@ with an attack pass, before any piece unit:
 - **Unit 1a, the lists:** edits E1 to E10, E21, E22 and E30. The guard comes first,
   and each later table's edit calls it.
 - **Unit 1b, the callers and the delivery and wait rules:** edits E11 to
-  E20, E23, E27, E28, E29, E31 and the first part of E33. It changes the prompt renderer and the dispatcher, which carry the
+  E20, E23, E27, E29, E31 and the first part of E33. It changes the prompt renderer and the dispatcher, which carry the
   security properties, so its attack pass covers lead rulings L13 and L16
   to L25 by name.
 
@@ -2518,7 +2429,8 @@ Edits E24, E25, E26 and E32 change the client library, not the engine, and are p
 of unit 2, with the second part of E33. Unit 2 defines the client group's schemas, and it installs the group's
 events. It does not install the group's commands into `CommandsRpcGroup`, because
 every command there must have its handler (edit E3). Each unit installs the commands
-it handles, so the exact handler check stays true with no stub (row 172).
+it handles, so the exact handler check stays true with no stub (row 172). Edit E34
+is part of unit 5, because the web server is what reads the password.
 
 ## 7. What the other pieces asked for, and where each is answered
 
@@ -2535,8 +2447,8 @@ The foundry roles planner listed six needs, in
 | --- | --- | --- |
 | 1 | A roster query | Taken in as `client.roster` (section 3, row 25). Refused in part: an agent sees only the agents it may read by the read rule (section 3, lead ruling L29), not its whole subtree, so the roster never shows more than `subscribe` does. |
 | 2 | A thread read, and an export to a file | Taken in as `client.thread`, a paged read (section 3, row 26). The export is a client-side command that writes the caller's own file. The service never writes a file for a caller. |
-| 3 | A narrow caller kind for Shephrd's own services (the sheepdog, the standing-rule answerer) | Taken in as the service caller, in-process only, with the lead's narrow rights (section 2, "Services", row 27). Unit 1 edits the engine to add it (section 6, edits E11, E13 and E14). A scoped device credential was not used: it would put a token for an in-process service on disk for no gain. The roles plan adds `release` for the sheepdog in its own unit (row 120). |
-| 4 | Owner commands for the roles' settings: standing rules, the sheepdog's thresholds, snoozing one group | Taken in as a rule, not as commands: piece 4 defines them in its own `roles.` group with access `owner` and `device` (section 1). Adding a standing rule creates an automatic allow that outlives a moment's access, so `roles.rules.add` is **computer-only**: its access entry is `owner` alone, and the web server refuses it by name (section 2, rows 29, 82). The roles' two setting events also raise `client.lasting-setting` when they come through the open web server (row 98). |
+| 3 | A narrow caller kind for Shephrd's own services (the sheepdog, the standing-rule answerer) | Taken in as the service caller, in-process only, with the lead's narrow rights (section 2, "Services", row 27). Unit 1 edits the engine to add it (section 6, edits E11, E13 and E14). A scoped credential was not used: it would put a token for an in-process service on disk for no gain. The roles plan adds `release` for the sheepdog in its own unit (row 120). |
+| 4 | Owner commands for the roles' settings: standing rules, the sheepdog's thresholds, snoozing one group | Taken in as a rule, not as commands: piece 4 defines them in its own `roles.` group with access `owner` (section 1). `roles.rules.add` works from a logged-in dashboard, as the owner, and stays refused for agents and services (rows 29, 186). |
 | 5 | Alert kinds the roles raise | Taken in: four namespaced kinds with default phone settings (section 4, row 28). A notice for a lead stays on the board. |
 | 6 | Subscribe filters by group and by event kind | Taken in: `client.subscribe` filters by agent, group and event kind (section 3, row 30). |
 
@@ -2551,7 +2463,7 @@ The message board planner listed six needs, in section R1 of
 | 2 | Board events in the owner's live stream, not widened for agents | Taken in: board events are `owner-only`; the client API never widens the agent filter for them (section 3, row 34). |
 | 3 | An alert for a post addressed to the owner, ideally with a `post` subject on `OwnerNeeded` | Taken in through an alert source, kind `board.post`, keyed by the post. A tap opens the post's author's thread, with the post in the subject panel, whose board entry the board's plan writes (section 4, rows 35, 112). Refused in part: no `post` subject on `OwnerNeeded`, because the alert source gives the same result, and the board does not write `OwnerNeeded` at all, so one matter raises one alert. |
 | 4 | Paged reads with a cursor | Taken in: one paged-read shape for every piece (section 1, "Paged reads", row 32). |
-| 5 | The owner posts from any device as the owner, reusing any device field | Taken in: the caller stays `owner`; the envelope's optional `device` field records the device, and the board adds no field of its own (section 2, row 33). |
+| 5 | The owner posts from any client as the owner | Taken in: the caller stays `owner`, and the board adds no field of its own (section 2, row 186). |
 | 6 | A transport message limit of at least a 16,384-character post plus its envelope | Taken in: the web server's inbound limit is 1 mebibyte, and each piece's largest event and page is checked against the budgets (lead ruling L15, row 105); the engine's socket keeps its current behaviour (section 5, rows 36, 58). |
 
 The board's delivery source for posts, from its question Q1, is section 6,
@@ -2561,10 +2473,5 @@ edit E16.
 
 These are left to later plans:
 
-- Authentication and pairing for the web server, including how a browser
-  presents its device credential. The owner deferred both (rows 80, 86).
-  They slot into `webCaller` and do not change what the other pieces build
-  on.
+- Login for a mobile app. It starts by looking at what Home Assistant does (row 196).
 - Shephrd's own Unix user (row 78).
-- Whether a web caller may give a lasting answer. The owner's question 6 decides
-  it, and edit E28 is written as the recommended answer (row 95).

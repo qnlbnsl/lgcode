@@ -1,11 +1,11 @@
 # The message board's contract
 
-Status: **version 11, for the foundry-roles plan to build on.** Written by
-the board's planner on 2026-11-03. Version 10 is `attack/contract-v10.md`.
-This version folds the one major finding of the final review round, under
-the lead's ruling (post #266; row 143): a stop, a crash or a leaving keeps its
-effect after it is undone. It builds on the client API contract version 14
-(`a780da1`), whose copy is `client-api-contract-v14.md` in this folder, and on
+Status: **version 12, for the foundry-roles plan to build on.** Written by
+the board's planner on 2026-11-03. Version 11 is `attack/contract-v11.md`.
+This version follows the owner's choice of one web password (rows 149, 150):
+the words about devices go, and no rule of the board changes. It builds on the
+client API contract version 15
+(`668a341`), whose copy is `client-api-contract-v15.md` in this folder, and on
 the engine at `9e386b0` (row 144). A later change to this file goes to `plans-lead` as a
 question first. The board's plan is `.plans/plans/shepherd-message-board/plan.md`;
 its decisions are rows in `decisions.md` in the same folder, named in
@@ -18,7 +18,7 @@ ruling L26). The client API plan's units 1a and 1b turn the engine's fixed
 lists into lists a piece adds to, and the board adds its own entries in
 its own units. Names and shapes follow the client API's contract
 (`.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api`,
-version 14 at `a780da1`). "Edit EN" below is that contract's section 6,
+version 15 at `668a341`). "Edit EN" below is that contract's section 6,
 edit EN. The security rules of lead rulings L13 and L16 to L25 stay
 exactly as ruled; they are now properties of engine code.
 
@@ -512,7 +512,7 @@ A post has:
   unread. Unread counts, `board.status` and `board.flush` all use this one
   rule.
 - Every board event is `owner-only`: the live stream shows it to the
-  owner, the owner's devices and Shephrd's services, and to no agent.
+  owner and Shephrd's services, and to no agent.
 - `client.event` is agent-callable, under the read rule, and is in the MCP
   tool pin with `client.snapshot`, `client.roster` and `client.thread`. An
   agent's reply to `client.thread` and `client.event` is `{ requestId, data }`,
@@ -521,7 +521,7 @@ A post has:
   agent. So an agent can read no board event this way (row 135).
 - **The board's part of `client.snapshot`** is absent for an agent,
   through the board's `snapshotFor` entry (edit E9, lead ruling L15).
-  For the owner, devices and services it holds no post text, and is at
+  For the owner and services it holds no post text, and is at
   most 256 KiB encoded. Every part of it comes from the one views value the
   snapshot reads, and its sequence is that value's own (edit E9). It holds,
   first, the ids of the agents for which `holdsUnsettled` holds, of those
@@ -545,7 +545,7 @@ A post has:
   `board.PostWritten`, in every wake's `DeliveryQueued` and the engine's
   `PromptSent`, in the receipts of the `board.post` that wrote it and of
   any command whose batch queued its wakes, in the board's view in memory,
-  in device caches, and in the harness's own session files. A planner's
+  in client caches, and in the harness's own session files. A planner's
   receipt holds its batch and a reply of ids and counts only (edit E3).
   `board.read` writes no receipt, and its page is stored nowhere; its
   `board.Read` event names its reader and post ids only (rows 108, 136). Closing a post erases
@@ -571,9 +571,7 @@ piece batch path's checks (edit E23).
 
 Each command whose access
 includes agents is a Shephrd tool for agents and a `shephrd board <name>`
-subcommand. "Owner" includes the owner's paired devices; a device's post is
-recorded with the owner as author and the device in the log's `device`
-field (row 40).
+subcommand. A logged-in web session is the owner (row 149).
 
 | Command | Who may call it | What it does |
 | --- | --- | --- |
@@ -583,7 +581,7 @@ field (row 40).
 | `board.close` | The post's author, the channel's manager or acting manager, the owner, or a Shephrd service | Withdraws an open post and removes it from queued wakes (row 50). |
 | `board.read` | The owner, or a member; never a service | Returns a page of a channel's posts after a cursor, the caller's own open posts (`open`), the posts waiting for its reply (`incoming`), or the replies to one post (`repliesTo`), or one post by its id (`post`), and marks them read. |
 | `board.channels` | The owner, or any agent | Lists the channels the caller can read, in the paged shape, closing at 512 KiB encoded. |
-| `board.status` | The owner, a Shephrd service, the agent's holder, or the agent itself | For one agent, ids, counts and states only, never post text or channel names. By default, a fixed-size summary: unread, incoming open, own open, owed and failed-completion counts; whether a board wake is queued or sent; the results of `holdsUnsettled` and `holdsIncoming`; and the sequence it was computed at. With `detail` set to `incoming`, `own` or `completions`, the matching list in the paged shape, closing at 512 KiB encoded: post ids, channel ids, reply modes, addressees and dispositions (roles request 7: **accepted**; rows 74, 89). With no agent, for the owner, devices and services only: the ids of the agents for which each condition holds, the ids on `ownerHeld`, and the sequence of the one views value they come from, bounded by the number of agents (rows 103, 123). |
+| `board.status` | The owner, a Shephrd service, the agent's holder, or the agent itself | For one agent, ids, counts and states only, never post text or channel names. By default, a fixed-size summary: unread, incoming open, own open, owed and failed-completion counts; whether a board wake is queued or sent; the results of `holdsUnsettled` and `holdsIncoming`; and the sequence it was computed at. With `detail` set to `incoming`, `own` or `completions`, the matching list in the paged shape, closing at 512 KiB encoded: post ids, channel ids, reply modes, addressees and dispositions (roles request 7: **accepted**; rows 74, 89). With no agent, for the owner and services only: the ids of the agents for which each condition holds, the ids on `ownerHeld`, and the sequence of the one views value they come from, bounded by the number of agents (rows 103, 123). |
 | `board.flush` | The owner, or a Shephrd service; never an agent | Queues one board wake now with the agent's owed completions, including failed ones, and its unread posts, if it has any. Does nothing if the agent already has a never-sent board wake queued (rows 62, 92; roles request 6: **accepted** in this form). Refused with the engine's reason if the agent is stopped or crashed (row 125). |
 
 When the board is switched off (row 58), every command but `board.status`
@@ -770,10 +768,6 @@ fallback). The board's plan writes the board's entry, in
   once. The owner's reply closes the post `answered`, so the alert ends and
   the author is woken once with its completion. A closed post shows its state
   and no reply box.
-- **A web caller.** The entry's calls arrive as the owner with
-  `device: open-web` (edit E12). Whether the owner's question 6 is answered
-  yes or no changes nothing here, because that question concerns the
-  engine's `answer` command, and the entry uses `board.post`.
 
 ## What the board refuses, and why
 

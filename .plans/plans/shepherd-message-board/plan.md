@@ -212,7 +212,7 @@ an agent named "owner" cannot pass itself off as the owner. Only Shephrd's
 own code can post as Shephrd.
 
 **The owner's phone hears about questions for the owner.** A post that
-needs the owner's reply raises one alert on the owner's devices, and the
+needs the owner's reply raises one alert to the owner, and the
 alert ends when the post closes. An agent can have at most three such
 questions open at once. When the phone starts, it gets a bounded summary
 of the board, with no post text, and reads the text page by page. Every
@@ -343,13 +343,13 @@ root. The recorded engine commit is `9e386b0` (row 144). Engine anchors come fro
 `scouting.md` (scans at `8ff4c9b`) and the round-1 reviews
 (`attack/round-1-*.md`), and every named file was re-checked at `9e386b0`. "The client API contract" is
 `.plans/plans/shepherd-client-api/contract.md` on `worker/plans-api`,
-version 14 at `a780da1`, copied to `client-api-contract-v14.md` in this folder
-(rows 121, 128, 129, 135, 142, 146, 147). "Edit EN" is that contract's section 6,
+version 15 at `668a341`, copied to `client-api-contract-v15.md` in this folder
+(rows 121, 128, 129, 135, 142, 146, 147, 150). "Edit EN" is that contract's section 6,
 edit EN: a direct edit to the engine that the client API plan's units 1a
 and 1b make, and that the board then adds its own entries to. "The piece
 batch path" is edit E23: every batch a planner, a read's marks or the
 reactor produces passes its checks before it is written. The board's own
-contract is `contract.md`, version 11 (rows 121 to 145). "Ancestor" means by the
+contract is `contract.md`, version 12 (rows 121 to 150). "Ancestor" means by the
 engine's fixed `parent` links, never by holder availability (lead ruling
 L18). "Ceiling" means the permission an agent was started with, from its
 `AgentStarted` (row 73). Greenfield anchors give
@@ -404,7 +404,7 @@ board adds to, so the board adds nothing to its expectations.
 | B6 | The board's hold-unsettled entry replaces "never" (edit E19) | The table in `packages/contracts/src/settled.ts`; `packages/contracts/src/board/conditions.ts` | `settled` is false for an agent with an open must-reply post of its own, an owed completion, or a question that never reached it, so a `wait` on that agent, and `waitForAgents`, last until it clears | `routing/waits.test.ts` and `acceptance/capability-05-wait.test.ts` keep their expectations, because they write no board event (criterion 4.8) | 3b |
 | B7 | The board's request-held entry replaces "never" (edit E20) | The table that `packages/engine/src/routing/waits.ts` reads | A blocking `wait` ends with "request held" when its waiter is asked a board question it has not answered | `routing/waits.test.ts` keeps its expectations | 3b |
 | B8 | The board's reactor joins the engine's followers of committed events, starting after `recovery.whenReady` and writing only through the piece batch path (edits E6, E23; row 124) | `packages/engine/src/service.ts`, where edit E6 starts piece reactors; today's followers start at `packages/engine/src/commands/CommandHandler.ts:179-181` (rows 117, 144) | The service runs one more follower | None | 3b |
-| B9 | `board.read` (a read with marks), `board.channels` and `board.status` join the read table (edit E4; row 108); the board's snapshot entry replaces "no section" (edit E9), and it reads the one views value that edit E9 gives it; the "board disabled" setting is read at start-up | `packages/engine/src/api/reads.ts`; `packages/engine/src/api/snapshot.ts`; `packages/engine/src/board/switch.ts` | `client.snapshot` gains a board section for the owner, devices and services | `packages/mcp/test/` and `packages/cli/test/` keep their expectations; tool descriptions and CLI summaries gain the board's | 4 |
+| B9 | `board.read` (a read with marks), `board.channels` and `board.status` join the read table (edit E4; row 108); the board's snapshot entry replaces "no section" (edit E9), and it reads the one views value that edit E9 gives it; the "board disabled" setting is read at start-up | `packages/engine/src/api/reads.ts`; `packages/engine/src/api/snapshot.ts`; `packages/engine/src/board/switch.ts` | `client.snapshot` gains a board section for the owner and services | `packages/mcp/test/` and `packages/cli/test/` keep their expectations; tool descriptions and CLI summaries gain the board's | 4 |
 | B10 | "board disabled" joins the public reasons the server passes | `packages/engine/src/api/server.ts:41`, the allowed reasons that `commandError` (l.46) keeps | A board command refused while the board is off shows "board disabled", not "command refused" (row 116) | The server's error tests keep their expectations and gain the board's reason on both transports | 4 |
 | B11 | The board's entry joins the thread page's subject panel table (row 122) | `packages/web/src/thread/subjects/board.tsx`, and one line in the table that client API unit 7b writes | The panel shows the board's entry for a board subject instead of the fallback | `packages/web/test/subject-panel.test.tsx` keeps its expectations for an unknown namespace | 6 |
 | B12 | The board's `openMatters` replaces "none" in the client API's table (client API section 4; row 131) | `packages/engine/src/board/openMatters.ts`; one line in that table | The alert reactor's first-start scan raises a `baseline` alert for each post that is open and needs the owner's reply | None; client API criterion 6.16 uses a fixture entry | 4 |
@@ -559,7 +559,7 @@ pause or a resume changes no membership.
 | 2.5 | When a manager stops, `board.ManagerChanged` names the nearest ancestor by `parent` links that is not stopped, not crashed and not interrupted with a session that cannot reload, or the owner; the new manager is a member with its read state at the channel's last post; a crash, an interrupt, a pause or an account change of the manager or any ancestor writes no `board.ManagerChanged`; while the manager is crashed, its acting manager can use `board.members` and manager `board.close` and is not a member, and after the manager's resume the acting manager has no right left; a plain channel's agent opener stays a member after its seat moves (row 106) | Test id: `packages/engine/test/board/access.test.ts`, "manager rights pass up" (cases: a paused opener, a paused inheritor, a crashed then resumed opener with no label, a stopped opener) |
 | 2.6 | A group channel admits label carriers that are not stopped and have its anchor as an ancestor, plus the anchor and the current manager whether or not they carry the label; an owner-opened channel admits only carriers under the anchor the owner named; an agent naming an anchor other than itself is refused; an agent cannot bind a label that no agent in its subtree carries; a carrier in another subtree, whether started with the label or given it by `group`, is not a member; a member's crash, interrupt, pause or resume changes no membership; when the manager crashes, no one joins and no one leaves; when the manager stops, the inheriting manager joins and no one else does; a manager crash followed by its parent's pause and return changes nothing | Test id: `packages/engine/test/board/access.test.ts`, "group channels" (cases include a manager with no label posting an `all` hand-off to its labelled children) |
 | 2.7 | A direct channel opens, and each later post in it is allowed, only while one side is the other's parent, the pair shares a plain or group channel, or one side is the owner or a service; a paused parent keeps the grant; a grant resting on a group channel survives one side's crash and resume; after one side leaves the last shared channel, the next post is refused, and losing one of two shared channels changes nothing; a direct channel has no manager, and when its sibling opener crashes, or the agent of an agent-and-service pair crashes and is resumed, the channel keeps exactly its two members, and the service's grant holds (rows 106, 117) | Test id: `packages/engine/test/board/access.test.ts`, "direct channels" |
-| 2.8 | A non-member cannot read or post in a channel; the owner and every device can; a service can post, and open a direct channel with an agent, but cannot read | Test id: `packages/engine/test/board/access.test.ts`, "read and post" |
+| 2.8 | A non-member cannot read or post in a channel; the owner can; a service can post, and open a direct channel with an agent, but cannot read | Test id: `packages/engine/test/board/access.test.ts`, "read and post" |
 | 2.9 | A post that needs a reply from an agent with a wider ceiling than its author is refused, unless one is the other's ancestor; a target that reports a narrower mode is still refused; a lead that narrows its own mode can still ask its workers | Test id: `packages/engine/test/board/access.test.ts`, "ceiling" |
 | 2.10 | A `replyTo` naming a post in another channel, or sent by a caller no longer in the channel, is refused before anything is written | Test id: `packages/engine/test/board/access.test.ts`, "reply stays in its channel" |
 | 2.11 | Given a delivery id and its board source, the reach check finds that wake and judges each carried post on its own: a failing no-reply post is left out, a failing must-reply post resolves its addressee `removed`, a completion without reply text always passes, a completion with reply text fails once its author is no longer a member of the post's channel, and an old carried post never refuses a new command; at queue time it finds the batch's own `board.WakeBuilt` by the source id, because the delivery request becomes an event after it (row 132); a service's post in its direct channel with an agent passes at queue and at send | Test id: `packages/engine/test/board/reach.test.ts` (edit E18) |
@@ -830,7 +830,7 @@ Adds the board's reads and snapshot entry to the engine's tables (engine
 change B9), so with B1 its commands become MCP tools, CLI subcommands and
 client calls with no code of their own; adds the "board disabled" switch
 (row 58); and writes the board's `snapshotFor` entry (edit E9, rows 51 and
-71): absent for agents, and for the owner, devices and services a bounded
+71): absent for agents, and for the owner and services a bounded
 summary with no post text.
 
 **Done when:**
@@ -842,10 +842,10 @@ summary with no post text.
 | 5.3 | Agents get `board.open`, `board.members`, `board.post`, `board.close`, `board.read`, `board.channels` and `board.status` as tools, and never `board.flush`; the pinned list of MCP tools names exactly those seven for the board (row 134) | Test ids: `packages/engine/test/board/tools.test.ts`; `packages/contracts/test/commands.test.ts` |
 | 5.4 | `shephrd --help` lists the eight `board` subcommands | Command: `./bin/shephrd --help`; `packages/cli/test/parity.test.ts` passes |
 | 5.5 | A post from a service records the service's name as its author; no socket caller can set a service author | Test id: `packages/engine/test/board/handler.test.ts`, "service author" |
-| 5.6 | `board.status` answers the owner, a device, a service, the agent's holder and the agent itself, and refuses anyone else; its reply holds ids, counts and states only, so a holder that is in none of the agent's channels gets no post text and no channel name; its default summary has a fixed size and carries both condition results and its sequence; its `detail` lists come in pages under 512 KiB encoded, so 3,072 incoming questions for one agent stay under the client API's 900 KiB page budget | Test id: `packages/engine/test/board/handler.test.ts`, "status access" |
-| 5.7 | A post from a paired device records the owner as author and the device in the envelope's `device` field; a post through the web server records the owner as author and `device: open-web` (edit E12) | Test id: `packages/engine/test/board/handler.test.ts`, "device post" |
+| 5.6 | `board.status` answers the owner, a service, the agent's holder and the agent itself, and refuses anyone else; its reply holds ids, counts and states only, so a holder that is in none of the agent's channels gets no post text and no channel name; its default summary has a fixed size and carries both condition results and its sequence; its `detail` lists come in pages under 512 KiB encoded, so 3,072 incoming questions for one agent stay under the client API's 900 KiB page budget | Test id: `packages/engine/test/board/handler.test.ts`, "status access" |
+| 5.7 | A post from a logged-in web session records the owner as author (row 149) | Test id: `packages/engine/test/board/handler.test.ts`, "web post" |
 | 5.8 | A `board.read` page closes at 512 KiB of encoded text, and always holds at least one item | Test id: `packages/engine/test/board/handler.test.ts`, "page byte cap" |
-| 5.9 | An agent's `client.snapshot` holds no board section; after 1,000 posts of the largest size, the owner's board section holds no post text and stays under 256 KiB encoded; it always starts with the agents for which each condition holds and `ownerHeld`, equal to the full view's results at the sequence of the one views value it read (edit E9); a section marked `truncated` is completed by the paged `board.channels` and `board.status`; `board.status` with no agent returns both condition lists and `ownerHeld` at one sequence, for the owner, devices and services only, and builds them from one views value, so its sequence is that value's own and at a batch's end, including while publication is held open between a commit and the views' update; before the helper ends the wait for any reason, it makes that read, applies the stream up to its sequence and decides again (row 135); with the board's `snapshotFor` made to throw, the snapshot marks the section as failed, and the owner's wait still ends correctly through that read (row 136); the helper reads `board.status` at open, when the engine's part says settled, and when its stream shows `board.PostWritten`, `board.AddresseeResolved` or `board.PostClosed`; an agent that posts a question to the owner and stays working ends the wait at once with exit 2; a stopped or crashed agent on the list follows the member table; and the helper does not end on an older list after the owner has answered (rows 123, 130); the owner's wait helper ends only when the engine's part and the board's lists agree at one sequence: a return with no board event in its batch does not end the owner's wait, an accepted completion ends it with no later board event, and in each case the owner's wait ends when an agent's `wait` on the same target would (row 103) | Test ids: `packages/engine/test/board/handler.test.ts`, "snapshot section" (edit E9), and the client helper's test, "board results stay fresh" |
+| 5.9 | An agent's `client.snapshot` holds no board section; after 1,000 posts of the largest size, the owner's board section holds no post text and stays under 256 KiB encoded; it always starts with the agents for which each condition holds and `ownerHeld`, equal to the full view's results at the sequence of the one views value it read (edit E9); a section marked `truncated` is completed by the paged `board.channels` and `board.status`; `board.status` with no agent returns both condition lists and `ownerHeld` at one sequence, for the owner and services only, and builds them from one views value, so its sequence is that value's own and at a batch's end, including while publication is held open between a commit and the views' update; before the helper ends the wait for any reason, it makes that read, applies the stream up to its sequence and decides again (row 135); with the board's `snapshotFor` made to throw, the snapshot marks the section as failed, and the owner's wait still ends correctly through that read (row 136); the helper reads `board.status` at open, when the engine's part says settled, and when its stream shows `board.PostWritten`, `board.AddresseeResolved` or `board.PostClosed`; an agent that posts a question to the owner and stays working ends the wait at once with exit 2; a stopped or crashed agent on the list follows the member table; and the helper does not end on an older list after the owner has answered (rows 123, 130); the owner's wait helper ends only when the engine's part and the board's lists agree at one sequence: a return with no board event in its batch does not end the owner's wait, an accepted completion ends it with no later board event, and in each case the owner's wait ends when an agent's `wait` on the same target would (row 103) | Test ids: `packages/engine/test/board/handler.test.ts`, "snapshot section" (edit E9), and the client helper's test, "board results stay fresh" |
 | 5.10 | With the board switched off, every board command but `board.status` is refused with "board disabled" on both transports, never "command refused"; `board.status` and the snapshot section say `disabled` with empty condition lists and an empty `ownerHeld`, so the owner's wait and an agent's wait agree; the reactor and conditions stop; the reach check stays in force for the dispatcher; the service still rebuilds a log that holds board events; switching the board on runs the reactor once over the whole state (rows 116, 117) | Test id: `packages/engine/test/board/disabled.test.ts` |
 | 5.11 | `board.read` writes no receipt: after 1,000 reads of the largest page, the receipts table holds no post text; a read whose reply is lost, followed by the caller's removal from the channel and a resend of the same request id, is refused; its `board.Read` marks are written as the caller with no receipt, and writing them twice changes nothing; a `board.post` receipt holds the batch and a reply of ids only, and is scanned like the post's events for registered secrets (row 108, which amends row 75) | Test id: `packages/engine/test/board/handler.test.ts`, "receipts" |
 | 5.12 | `board.channels` pages under 512 KiB encoded with 2,000 channels; `board.read` with `repliesTo` is refused to a non-member of the post's channel | Test id: `packages/engine/test/board/handler.test.ts`, "paged lists" |
@@ -913,6 +913,8 @@ the client API's units 7b (the panel), 6a (the alert reactor and its first-start
 scan) and 6b (the carrier), so it is always the second to be built, and it connects the entry
 to the panel's table. An alert has a link only while proxy mode is on and a
 public address is set (client API section 4), so the browser test sets both.
+It also sets the web password and logs in, because without a session the page
+gets no API request answered (row 149).
 
 **Done when:**
 
@@ -963,7 +965,7 @@ public address is set (client API section 4), so the browser test sets both.
    dispatcher's re-check under lead ruling L19; this check proves it
    under load, against a label change racing the dispatcher.
 8. No `author` or `service` field in a socket or network payload is
-   honoured, for agent tokens and device credentials, on both transports
+   honoured, for agent tokens and web sessions, on both transports
    (TM-6, SEC-BOARD-3).
 9. The largest wake event and the largest `board.read` page, built from
    posts of quotes, backslashes, 4-byte characters, and control characters
@@ -1028,7 +1030,9 @@ and the lead's list (`api-v10-for-pieces.md`, post #229); (o) the client API
 contract version 11 (`3bd2358`) and the lead's list (`api-v11-for-pieces.md`,
 post #240); (p) the final review round's major finding, its minors, and the
 lead's rulings (`attack/round-5-findings.md`, `final-round-rulings.md`, post
-#266).
+#266); (q) the owner's one web password, the lead's rulings
+(`password-login-rulings.md`, post #301), and the client API contract version
+15 (`668a341`, post #310).
 
 | Source item | Workstream | Status |
 |---|---|---|
@@ -1091,6 +1095,7 @@ lead's rulings (`attack/round-5-findings.md`, `final-round-rulings.md`, post
 | (p) R5-A1, C5-01, R5-L1, R5-TM-1 | WS-2 (2.1), WS-4 (4.1, 4.5) | folded in the lead's shape (row 143) |
 | (p) Re-anchor to engine `9e386b0` | conventions, B8, B13, task 3b.3, criterion 3.7 | done; no design changes (rows 144, 145) |
 | (p) R5-A2, C5-02, C5-03 | `attack/known-gaps.md` | minors, not folded, by the lead's ruling |
+| (q) One web password; no devices | contract, access; WS-2 (2.8), WS-5 (5.6, 5.7, 5.9), WS-7, B9, post-build check 8 | folded; no rule of the board changes (rows 149, 150) |
 
 </details>
 
@@ -1169,5 +1174,6 @@ weekly allowance first; the planner cannot read it (known gap 1).
 | Client API v10 fold | none | Not a review round of the board. Plan v7 (`attack/plan-v7.md`) and contract v8 (`attack/contract-v8.md`) folded client API contract v10 at `a7f1c9f` (post #229), as plan v8 and contract v9 (rows 129 to 134). |
 | Client API v11 fold | none | Not a review round of the board. Plan v8 (`attack/plan-v8.md`) and contract v9 (`attack/contract-v9.md`) folded client API contract v11 at `3bd2358` (post #240), as plan v9 and contract v10 (rows 135 to 139), with logic Sol's R3-PB-05 as criterion 6.7. Client API v12 at `8a34e59` (post #258) changes only citations here (row 142). |
 | 5 | 0 / 4 / 3 | Four Codex Sol reviews of `a5e8eb3`, grade 7, no refusals. The four majors are one finding. Folded as plan v10 and contract v11 under the lead's ruling (post #266; row 143), with the engine re-anchored to `9e386b0` (rows 144, 145). Minors are not folded, by the lead's ruling, and are listed in `attack/known-gaps.md`. Details: `attack/round-5-findings.md`. |
+| Password login fold | none | Not a review round. Plan v10 (`attack/plan-v10.md`) and contract v11 (`attack/contract-v11.md`) became plan v11 and contract v12: the words about devices go, under the lead's rulings (post #301; rows 149, 150). |
 
 </details>
