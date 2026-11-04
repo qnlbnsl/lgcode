@@ -50,6 +50,8 @@ scenario("6 undeliverable: messages for a busy agent wait behind its turn, are n
 }));
 
 scenario("6 undeliverable: messages still queued for an agent that then crashes go back to their sender as not delivered, the sender is told, the message being worked on is not returned, and a later message is refused (breaks if a crash drops queued messages silently, returns the one already taken, or leaves the sender unaware)", (w) => Effect.gen(function* () {
+  // Keep the child crashed while checking the later prompt's refusal.
+  yield* w.owner["roles.settings.set"]({ requestId: requestId(), settings: { limits: { crashRetries: 0 } } } as never);
   const boss = yield* w.start(w.owner, { name: "Boss", role: "lead", permission: "edit", prompt: "Start." });
   yield* eventsUntil(w.owner, 0, "the boss's first turn", isTag("TurnEnded", boss.agentId));
   const bossClient = yield* w.asAgent((yield* w.token(boss)).token);

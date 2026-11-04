@@ -17,6 +17,7 @@ import { baselineRequestId } from "./requests.ts";
 import { capacityRule } from "./rules/capacity.ts";
 import { releaseHolds, sheepdogEnabled } from "./switch.ts";
 import { boardTimer, crossedTimers, makeTimerReader, type ArmedTimer, type TimerOrigin } from "./timers.ts";
+import { makeRules } from "./rules/runtime.ts";
 
 export interface RuleContext {
   readonly snapshot: Snapshot;
@@ -155,4 +156,4 @@ export const makeSheepdogLoop = (rules: ReadonlyArray<SheepdogRule>): Effect.Eff
   }
 }));
 
-export const sheepdogLoop = Effect.suspend(() => makeSheepdogLoop([capacityRule, makeCacheRule()]));
+export const sheepdogLoop = Effect.suspend(() => makeSheepdogLoop([...makeRules(), capacityRule, makeCacheRule()]));

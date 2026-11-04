@@ -5,9 +5,9 @@ import { executeService } from "../../commands/services.ts";
 import type { EngineLists } from "../../pieces/lists.ts";
 import { sheepdogCaller } from "./notices.ts";
 
-export type TimerRule = "stall" | "team-idle" | "capacity" | "notice-cache" | "compact-cache";
+export type TimerRule = "stall" | "team-idle" | "capacity" | "notice-cache" | "compact-cache" | "runaway";
 export const missedDeadlineAction = (rule: TimerRule): "recheck" | "drop" => rule === "notice-cache" || rule === "compact-cache" ? "drop" : "recheck";
-export const boardTimer = (rule: TimerRule): boolean => rule !== "capacity" && rule !== "compact-cache";
+export const boardTimer = (rule: TimerRule): boolean => rule === "stall" || rule === "team-idle" || rule === "notice-cache";
 export interface TimerOrigin {
   readonly key: string;
   readonly rule: TimerRule;

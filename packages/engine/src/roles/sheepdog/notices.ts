@@ -21,10 +21,10 @@ const fixedText: Record<RolesAction["_tag"], string> = {
   "roles.StallSeen": "Work is waiting. Check the board and carry on, or report what is blocking it.",
   "roles.StallEnded": "Work has resumed.",
   "roles.ReplaceAdvised": "This agent has stalled repeatedly. Review its work and consider replacing it.",
-  "roles.RunawayReported": "This agent has passed its running limit. Review its current turn.",
+  "roles.RunawayReported": "This agent has passed its running limit. Review its work and consider a hand-off.",
   "roles.GaveUp": "Automatic recovery has ended. Review this agent and decide how to continue.",
   "roles.CrashAdmitted": "Automatic crash recovery has been admitted.",
-  "roles.CrashRetried": "This agent was resumed after a crash. Check that its work continues.",
+  "roles.CrashRetried": "This agent was resumed after a crash. Your posts to it resolved as gone. Post them again if still needed. Do not replace it unless automatic recovery gives up.",
   "roles.CapacityRetried": "A capacity hold has been released for another attempt.",
   "roles.TeamIdleReported": "The team has no running work. Check the board and carry on, or report what is blocking it.",
   "roles.RoleAdviceBroken": "This agent's role advice needs review.",
@@ -60,6 +60,11 @@ export const deliveryIsSheepdogTurn = (snapshot: Snapshot, id: string): boolean 
 };
 
 export type NoticeAction = RolesAction extends infer A ? A extends RolesAction ? Omit<A, "notice" | "postId"> : never : never;
+export const idleNoticeIdentity = (snapshot: Snapshot, group: string) => ({
+  subject: JSON.stringify(["group", group]),
+  name: Object.values(snapshot.agents).filter((agent) => agent.groups.includes(group))
+    .sort((a, b) => a.agentId.localeCompare(b.agentId))[0]?.name ?? "Unnamed agent",
+});
 export const recordAction = (action: RolesAction, rule: string, lists: EngineLists) => executeService(sheepdogCaller, "roles.record", {
   requestId: actionRequestId({ rule, subject: actionSubject(action), triggerSequence: action.triggerSequence,
     kind: `${action._tag}.record`, recipient: action.noticeRecipient, occurrence: action.occurrence }), action,
@@ -67,11 +72,13 @@ export const recordAction = (action: RolesAction, rule: string, lists: EngineLis
 
 // The command replies carry the post id and receipts preserve it across a
 // crash between posting, flushing and recording. No agent prose enters text.
-export const sendNotice = (action: NoticeAction, rule: string, lists: EngineLists) => Effect.gen(function* () {
+export const sendNotice = (action: NoticeAction, rule: string, lists: EngineLists,
+  shared?: { readonly subject: string; readonly name: string },
+) => Effect.gen(function* () {
   const snapshot = yield* (yield* Views).snapshot;
   if (action._tag === "roles.TeamIdleReported"
     && (own((snapshot.roles as RolesView).snoozes, action.group) ?? -Infinity) > (yield* Clock.currentTimeMillis)) return;
-  const id = (kind: string) => actionRequestId({ rule, subject: actionSubject(action), triggerSequence: action.triggerSequence,
+  const id = (kind: string) => actionRequestId({ rule, subject: shared?.subject ?? actionSubject(action), triggerSequence: action.triggerSequence,
     kind: `${action._tag}.${kind}`, recipient: action.noticeRecipient, occurrence: action.occurrence });
   let postId: string | undefined;
   let notice: "sent" | "board-off" = "sent";
@@ -82,8 +89,8 @@ export const sendNotice = (action: NoticeAction, rule: string, lists: EngineList
       const post = yield* executeService(sheepdogCaller, "board.post", {
         requestId: id("post"), direct: { _tag: "agent", agentId: action.noticeRecipient }, to: [{ _tag: "agent", agentId: action.noticeRecipient }], reply: "none",
         text: action._tag === "roles.GaveUp" && action.cause === "capacity"
-          ? `Capacity recovery has ended. Move the work to another model. Agent: ${sanitizeName(own(snapshot.agents, action.agentId)?.name ?? "Unnamed agent") || "Unnamed agent"}.`
-          : noticeText(action._tag, own(snapshot.agents, action.agentId)?.name ?? "Unnamed agent"),
+          ? `Capacity recovery has ended. Move the work to another model. Agent: ${sanitizeName(shared?.name ?? own(snapshot.agents, action.agentId)?.name ?? "Unnamed agent") || "Unnamed agent"}.`
+          : noticeText(action._tag, shared?.name ?? own(snapshot.agents, action.agentId)?.name ?? "Unnamed agent"),
       }, lists).pipe(Effect.result);
       if (post._tag === "Failure") {
         if (post.failure._tag === "LogWriteFailed") return yield* post.failure;
@@ -115,7 +122,8 @@ export const resendUnread = (sourceSequence: number, lists: EngineLists) => Effe
     const next = noticeRecipient(snapshot, record.agentId);
     if (next === recipient) continue;
     const { sequence: _sequence, noticeRead: _read, notice: _notice, postId: _postId, ...action } = record;
-    yield* sendNotice({ ...action, noticeRecipient: next, sourceSequence: sourceSequence as NoticeAction["sourceSequence"] }, "notice-reroute", lists);
+    yield* sendNotice({ ...action, noticeRecipient: next, sourceSequence: sourceSequence as NoticeAction["sourceSequence"] }, "notice-reroute", lists,
+      action._tag === "roles.TeamIdleReported" ? idleNoticeIdentity(snapshot, action.group) : undefined);
   }
 });
 
