@@ -6,6 +6,12 @@ form { display: grid; gap: 0.75rem; max-width: 24rem; }
 input, button { min-width: 0; max-width: 100%; min-height: 44px; font: inherit; }
 input { width: 100%; }
 ul { padding-left: 1.25rem; }
+textarea { width: 100%; max-width: 100%; min-width: 0; min-height: 6rem; font: inherit; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; min-width: 0; max-width: 100%; }
+.agent-data { unicode-bidi: isolate; }
+article, .request-controls { min-width: 0; margin-block: 1rem; padding: 0.75rem; border: 1px solid; }
+.request-controls { border-width: 3px; }
+.request-options { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 nav { display: flex; flex-wrap: wrap; gap: 1rem; }
 a { display: inline-block; min-height: 44px; padding-block: 0.75rem; }
 fieldset { min-width: 0; margin: 0; }
