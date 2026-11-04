@@ -10,6 +10,7 @@ import { planners } from "../commands/planners.ts";
 import { reads, type ReadHandler } from "../api/reads.ts";
 import { boardPlaceholderReads } from "../board/placeholders.ts";
 import { boardPlanners, boardReads } from "../board/commands.ts";
+import { boardReactor } from "../board/reactor.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
 import { pieceViews, type PieceView } from "./viewTables.ts";
 import { snapshotFor as rolesSnapshotFor } from "../roles/snapshot.ts";
@@ -60,5 +61,5 @@ export const engineLists: EngineLists = {
   snapshotSections: { client: absent, board: absent, roles: rolesSnapshotFor },
   alertSources: { client: absent, board: absent, roles: absent },
   openMatters: { client: () => [], board: () => [], roles: () => [] },
-  reactors: { client: Effect.all([alertReactor, alertDelivery], { concurrency: "unbounded", discard: true }) },
+  reactors: { client: Effect.all([alertReactor, alertDelivery], { concurrency: "unbounded", discard: true }), board: boardReactor },
 } satisfies EngineLists;

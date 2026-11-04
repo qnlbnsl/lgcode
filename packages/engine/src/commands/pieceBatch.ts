@@ -51,7 +51,7 @@ export const checkPieceBatch = (namespace: PieceNamespace, snapshot: Snapshot, b
 export const writePieceBatch = (input: {
   readonly namespace: PieceNamespace;
   readonly kind: "reactor";
-  readonly sourceSequence: number;
+  readonly sourceSequence: number | ((snapshot: Snapshot) => number);
   readonly build: (snapshot: Snapshot) => PieceBatch;
 }, lists: EngineLists = engineLists) => Effect.gen(function* () {
   const log = yield* EventLog;
@@ -61,11 +61,15 @@ export const writePieceBatch = (input: {
   yield* log.transact((append) => Effect.gen(function* () {
     const snapshot = yield* views.snapshot;
     const batch = input.build(snapshot);
+    // A level scan with no duty is a read. Running wait checks for it would
+    // make an unrelated target's scan write engine events of its own.
+    if (batch.events.length === 0 && (batch.deliveries?.length ?? 0) === 0 && Object.keys(batch.sideRows ?? {}).length === 0) return;
     const caller = { _tag: "piece", namespace: input.namespace } as const;
     // Reactors have no calling owner or agent at the reach boundary.
     const checked = yield* checkPieceBatch(input.namespace, snapshot, batch, undefined, lists).pipe(Effect.result);
     if (checked._tag === "Failure") {
-      yield* append(caller, freshRequest(), randomUUID(), [{ _tag: "CommandRefused", command: `${input.namespace}.reactor`, reason: checked.failure.reason, sourceSequence: input.sourceSequence as EventSequence }], {}, false);
+      const sourceSequence = typeof input.sourceSequence === "number" ? input.sourceSequence : input.sourceSequence(snapshot);
+      yield* append(caller, freshRequest(), randomUUID(), [{ _tag: "CommandRefused", command: `${input.namespace}.reactor`, reason: checked.failure.reason, sourceSequence: sourceSequence as EventSequence }], {}, false);
     } else {
       yield* append(caller, freshRequest(), randomUUID(), checked.success, batch.sideRows ?? {}, false);
     }
