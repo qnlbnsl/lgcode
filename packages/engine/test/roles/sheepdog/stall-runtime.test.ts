@@ -85,6 +85,9 @@ it.effect("socket assignments emit two complete nudges, persist the holder notic
     expect((yield* roles).actions.filter((row) => row._tag === "roles.StallSeen").map((row) => [row.occurrence, row.noticeRecipient])).toEqual([
       [1, "worker"], [2, "worker"], [2, "lead"],
     ]);
+    const holderNotice = (yield* roles).actions.find((row) => row._tag === "roles.StallSeen" && row.noticeRecipient === "lead");
+    expect((yield* alertLog).find((row) => row.event._tag === "board.PostWritten" && row.event.postId === holderNotice?.postId)?.event)
+      .toMatchObject({ text: expect.stringContaining("stalled twice on the same open post") });
   }));
   yield* run(noFlush, Effect.gen(function* () {
     expect((yield* roles).stalls[stallKey(postId, "worker")]?.occurrence).toBe(2);
