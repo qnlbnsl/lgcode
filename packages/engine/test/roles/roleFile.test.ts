@@ -89,6 +89,52 @@ it("F06 UTF-8 bytes: refuses an oversized file even when its character count is 
   await refusedAt(content);
 });
 
+const encodedRoleFileEventBytes = (content: string) => Buffer.byteLength(JSON.stringify({
+  _tag: "roles.RoleFileSet", content, roleFileHash: createHash("sha256").update(content).digest("hex"),
+}));
+
+it("F06 decision 145: the encoded event guard rejects control-character content below 64 KiB only above 200 KiB", async () => {
+  const load = await loader();
+  const budget = 200 * 1024;
+  const overhead = encodedRoleFileEventBytes(roleFileContent);
+  const remaining = budget - overhead;
+  // Raw control bytes exercise the ingress wire budget before JSON parsing.
+  // They are deliberately not a valid document; escaped controls are tested below.
+  const boundary = roleFileContent + "\u0000".repeat(Math.floor(remaining / 6)) + " ".repeat(remaining % 6);
+  expect(Buffer.byteLength(boundary)).toBeLessThan(64 * 1024);
+  expect(encodedRoleFileEventBytes(boundary)).toBe(budget);
+  const atLimit = await Effect.runPromise(load(boundary).pipe(Effect.result));
+  expect(atLimit).toMatchObject({ _tag: "Failure", failure: { reason: "invalid role file JSON" } });
+  expect(encodedRoleFileEventBytes(`${boundary} `)).toBe(budget + 1);
+  const overLimit = await Effect.runPromise(load(`${boundary} `).pipe(Effect.result));
+  expect(overLimit).toMatchObject({ _tag: "Failure", failure: { path: [], reason: "encoded role-file event exceeds 200 KiB" } });
+});
+
+it("F06 decision 145: valid escaped control-character advice within both bounds remains data", async () => {
+  const load = await loader();
+  const file = { ...roleFile, roles: { builder: { advice: "\u0000\u0001\b".repeat(2000), limits: {} } } };
+  const content = JSON.stringify(file).padEnd(64 * 1024, " ");
+  expect(Buffer.byteLength(content)).toBe(64 * 1024);
+  expect(encodedRoleFileEventBytes(content)).toBeLessThan(200 * 1024);
+  expect((await Effect.runPromise(load(content))).file).toEqual(file);
+});
+
+it("F06 decision 145: an oversized encoded replacement leaves the committed file and hash intact", async () => {
+  await withFixture(await loadLists(), () => Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    success(yield* call({ _tag: "owner" }, "roles.role-file.set", { content: roleFileContent }));
+    const before = success(yield* call({ _tag: "owner" }, "roles.role-file.get", {}));
+    const content = roleFileContent.padEnd(64 * 1024, "\u0000");
+    expect(Buffer.byteLength(content)).toBe(64 * 1024);
+    expect(encodedRoleFileEventBytes(content)).toBeGreaterThan(200 * 1024);
+    const rejected = yield* call({ _tag: "owner" }, "roles.role-file.set", { content });
+    expect(failureOf(rejected)?.reason).toContain("encoded role-file event exceeds 200 KiB");
+    const after = success(yield* call({ _tag: "owner" }, "roles.role-file.get", {}));
+    expect(after).toMatchObject({ file: before.file, roleFileHash: before.roleFileHash });
+    expect((yield* readLog).filter((row) => String(row.event._tag) === "roles.RoleFileSet")).toHaveLength(1);
+  }));
+});
+
 // Decision 73 narrows decision 48's original crash retry range to 0 or 1.
 const bounds = [
   ["crashRetries", 0, 1], ["capacityRetries", 0, 12], ["capacityBackoffMinutes", 1, 60],

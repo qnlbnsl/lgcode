@@ -2,6 +2,7 @@ import * as Schema from "effect/Schema"
 
 export const rolesMaxima = {
   roleFileBytes: 64 * 1024,
+  roleFileEventBytes: 200 * 1024,
   actionPageItems: 500,
   actionPageBytes: 256 * 1024,
   handoffBytes: 64 * 1024,

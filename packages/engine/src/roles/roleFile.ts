@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { RoleFile, rolesMaxima } from "@shephrd/contracts";
+import { RoleFile, RolesEvent, rolesMaxima } from "@shephrd/contracts";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
@@ -16,9 +16,17 @@ export interface LoadedRoleFile { readonly file: RoleFile; readonly roleFileHash
 const issues = SchemaIssue.makeFormatterStandardSchemaV1({
   leafHook: () => "invalid role file value", checkHook: () => "invalid role file value",
 });
+const encodeEvent = Schema.encodeSync(RolesEvent);
 export const loadRoleFile = (content: string): Effect.Effect<LoadedRoleFile, RoleFileError> => Effect.gen(function* () {
   if (Buffer.byteLength(content, "utf8") > rolesMaxima.roleFileBytes) {
     return yield* new RoleFileError({ path: [], reason: "role file exceeds 64 KiB" });
+  }
+  const roleFileHash = createHash("sha256").update(content, "utf8").digest("hex");
+  // Decision 145 bounds the actual event encoding as well as the input.
+  // Run this before parsing so control-character input cannot evade the budget.
+  const encoded = encodeEvent({ _tag: "roles.RoleFileSet", content, roleFileHash });
+  if (Buffer.byteLength(JSON.stringify(encoded), "utf8") > rolesMaxima.roleFileEventBytes) {
+    return yield* new RoleFileError({ path: [], reason: "encoded role-file event exceeds 200 KiB" });
   }
   const value = yield* Effect.try({
     try: (): unknown => JSON.parse(content),
@@ -31,7 +39,7 @@ export const loadRoleFile = (content: string): Effect.Effect<LoadedRoleFile, Rol
       reason: "invalid role file value",
     })),
   );
-  return { file, roleFileHash: createHash("sha256").update(content, "utf8").digest("hex") };
+  return { file, roleFileHash };
 });
 
 // This unit stores only the loaded file. The roles-view unit extends this fold.

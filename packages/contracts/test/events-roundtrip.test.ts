@@ -1,12 +1,12 @@
 // Unit 3, criterion 3.2: every event round-trips through its encoded (wire) form unchanged, and the
-// set of event tags is exactly the list of task 3d.
+// engine tags are exactly task 3d's list; pieces retain their declarations.
 import { it as effectIt } from "@effect/vitest"
 import * as Option from "effect/Option"
 import * as Schema from "effect/Schema"
 import * as SchemaAST from "effect/SchemaAST"
 import { describe, expect, it } from "vitest"
 
-import { Event, EventEnvelope } from "../src/events.ts"
+import { EngineEvent, Event, EventEnvelope, eventGroups } from "../src/events.ts"
 import { EventId } from "../src/ids.ts"
 import { LifecycleState } from "../src/stateMachine.ts"
 
@@ -67,6 +67,8 @@ const tagOf = (member: { readonly ast: SchemaAST.AST }): string => {
 
 const members = Event.members
 const byTag = new Map(members.map((member) => [tagOf(member), member] as const))
+const declaredTags = (schema: Schema.Top): ReadonlyArray<string> => "members" in schema
+  ? (schema.members as ReadonlyArray<Schema.Top>).flatMap(declaredTags) : [tagOf(schema)]
 
 describe("TurnEnded usage (foundry roles 7c)", () => {
   const decode = Schema.decodeUnknownSync(Event)
@@ -91,13 +93,21 @@ describe("TurnEnded usage (foundry roles 7c)", () => {
 })
 
 describe("event tags", () => {
-  // Catches: an event dropped from, added to, or renamed in the union; two members sharing a tag
+  // Catches: an engine event dropped, added, or renamed; two members sharing a tag
   // (the second would never decode).
-  it("are exactly the 41 events (task 3d's 39, row 70's AgentStartFailed and AccountOutOfUsage), each once", () => {
-    const tags = members.map(tagOf)
+  it("keeps exactly the declared engine inventory, each tag once", () => {
+    const tags = EngineEvent.members.map(tagOf)
     expect(tags).toHaveLength(expectedTags.length)
     expect(new Set(tags).size, "duplicate tags").toBe(tags.length)
     expect([...tags].sort()).toEqual([...expectedTags].sort())
+  })
+
+  it("keeps every constituent event declaration in the combined union, each tag once", () => {
+    const declarations = eventGroups.flatMap(({ events }) => declaredTags(events))
+    const combined = declaredTags(Event)
+    expect(new Set(declarations).size, "duplicate constituent tags").toBe(declarations.length)
+    expect(new Set(combined).size, "duplicate combined tags").toBe(combined.length)
+    expect([...combined].sort()).toEqual([...declarations].sort())
   })
 
   // Catches: the union decoding a tag nobody defined (a newer or malicious writer's event would be
