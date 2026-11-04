@@ -50,7 +50,8 @@ const boardTools = boardCommands.filter((name) => name !== "board.flush")
 
 const rolesCommands = ["roles.orient", "roles.handoff", "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record"]
 const rolesTools = ["roles.orient", "roles.handoff"]
-const alertCommands = ["client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]
+const alertCommands = ["client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
+  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"]
 const testedCommands = [...expectedCommands, ...alertCommands]
 const expectedRpcCommands = [...expectedCommands, ...alertCommands, ...boardCommands, ...rolesCommands]
 

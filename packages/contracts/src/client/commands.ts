@@ -48,7 +48,7 @@ export const ClientRpcGroup = RpcGroup.make(
   Rpc.make("alerts.carrier.set", { payload: { ...request, carrier: CarrierSettings }, success: Ack, error: Refused }),
   Rpc.make("alerts.carrier.set-token", {
     payload: { ...request, origin: Schema.NonEmptyString, nonce: Schema.NonEmptyString,
-      value: Schema.RedactedFromValue(Schema.NonEmptyString, { label: "carrier token" }) },
+      value: Schema.RedactedFromValue(Schema.NonEmptyString, { label: "secret value" }) },
     success: Ack, error: Refused
   }),
   Rpc.make("alerts.carrier.clear-token", { payload: request, success: Ack, error: Refused }),
@@ -65,9 +65,8 @@ export const clientCommandAccess = {
   "client.alerts.carrier.clear-token": ["owner"], "client.web.settings": ["owner"], "client.web.settings.set": ["owner"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof ClientRpcGroup>>, ReadonlyArray<CallerKind>>
 
-// Unit 6a installs only the commands whose handlers are implemented.
+// The alert units install their implemented commands.
 export const AlertRpcGroup = ClientRpcGroup.omit(
   "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence",
-  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token",
   "client.web.settings", "client.web.settings.set"
 )

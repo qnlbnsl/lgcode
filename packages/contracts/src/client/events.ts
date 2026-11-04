@@ -21,7 +21,7 @@ export const ClientEvent = Schema.Union([
     title: Schema.String, sourceSequence: EventSequence, baseline: Schema.optionalKey(Schema.Boolean)
   }),
   Schema.TaggedStruct("client.AlertDelivered", attempt),
-  Schema.TaggedStruct("client.AlertDeliveryFailed", { ...attempt, reason: Schema.String }),
+  Schema.TaggedStruct("client.AlertDeliveryFailed", { ...attempt, reason: Schema.String, final: Schema.optionalKey(Schema.Boolean) }),
   Schema.TaggedStruct("client.AlertCleared", {
     alertId: AlertId, cause: Schema.NonEmptyString, sourceSequence: Schema.optionalKey(EventSequence)
   }),

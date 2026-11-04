@@ -142,6 +142,8 @@ export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 export const commandAccess = {
   "client.alerts.list": ["owner"], "client.alerts.dismiss": ["owner"],
   "client.alerts.settings": ["owner"], "client.alerts.settings.set": ["owner"],
+  "client.alerts.carrier.set": ["owner"], "client.alerts.carrier.set-token": ["owner"],
+  "client.alerts.carrier.clear-token": ["owner"],
   ...boardAccess,
   ...rolesAccess,
   start: ["owner", "agent"], prompt: ["owner", "agent", "service"], answer: ["owner", "agent"],

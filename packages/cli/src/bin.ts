@@ -4,6 +4,7 @@ import { UsageError, parseArguments } from "./commands/parse.ts"
 import { err, out } from "./commands/output.ts"
 import { commandNames, helpText, matchCommand } from "./commands/registry.ts"
 import { runCommand } from "./commands/run.ts"
+import { setCarrierToken } from "./commands/carrierToken.ts"
 import { setSecret } from "./commands/setSecret.ts"
 import { serveDetach } from "./serve.ts"
 
@@ -46,6 +47,7 @@ const main = (argv: ReadonlyArray<string>, environment: Readonly<Record<string, 
     if (matched === undefined) { err(`shephrd: unknown command ${JSON.stringify(first.slice(0, 40))}; see shephrd --help\n`); return 2 }
     const { command, rest } = matched
     if (rest.includes("--help") || rest.includes("-h")) { out(helpText(command)); return 0 }
+    if (command === "client.alerts.carrier.set-token") return yield* setCarrierToken(rest, environment)
     if (command === "accounts set-secret") return yield* setSecret(rest, environment)
     let parsed
     try { parsed = parseArguments(command, rest) } catch (error) {

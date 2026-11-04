@@ -65,5 +65,6 @@ export const parseArguments = (command: CommandName, args: ReadonlyArray<string>
     if (!Number.isInteger(sequence) || sequence < 0) throw new UsageError("--after must be a whole number from 0")
     return { help, block, payload: { requestId: randomUUID(), after: sequence } }
   }
+  if (command === "client.alerts.carrier.clear-token") return { help, block, payload: { requestId: randomUUID() } }
   throw new UsageError(`${command} needs --input '<JSON payload>'; see shephrd ${command} --help`)
 }
