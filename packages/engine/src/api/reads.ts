@@ -12,6 +12,7 @@ import { getRoleFile } from "../roles/roleFile.ts";
 import { listActions } from "../roles/actions.ts";
 import { orient } from "../roles/orient.ts";
 import { handoff } from "../roles/handoff.ts";
+export { agentReadReply } from "../client/reads/index.ts";
 
 export interface ReadReply { readonly reply: Record<string, unknown>; readonly marks?: ReadonlyArray<Event>; readonly deliveries?: ReadonlyArray<import("../routing/pieceDelivery.ts").DeliveryRequest>; readonly sideRows?: import("../log/EventLog.ts").SideRows }
 export type ReadHandler = (input: Input, payload: Record<string, unknown>) =>

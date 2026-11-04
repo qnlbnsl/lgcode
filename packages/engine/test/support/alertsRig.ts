@@ -20,12 +20,8 @@ import { eventually, snapshot } from "./routingRig.ts";
 
 // These two configurable tables are the only new seams requested by 6a's
 // tests. They contain fixture declarations, never an alert implementation.
-export type SourceResult = (AlertSourceRequest & { readonly _tag: "raise" })
-  | { readonly _tag: "end"; readonly key: string } | undefined;
-export type AlertLists = EngineLists & {
-  readonly alertSources?: Readonly<Partial<Record<PieceNamespace, (envelope: EventEnvelope) => SourceResult>>>;
-  readonly openMatters?: Readonly<Partial<Record<PieceNamespace, (views: any) => ReadonlyArray<AlertSourceRequest>>>>;
-};
+export type SourceResult = import("../../src/client/alerts/reactor.ts").AlertSourceResult;
+export type AlertLists = EngineLists;
 
 export const quietLists = (lists: AlertLists = engineLists): AlertLists => {
   const { client: _client, ...reactors } = lists.reactors;

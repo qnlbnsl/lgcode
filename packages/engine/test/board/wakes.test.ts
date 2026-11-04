@@ -758,8 +758,7 @@ for (const reason of ["removed", "stopped"] as const) {
   })));
 }
 
-// enable-in: b4
-it.skip("3.8 byte cap continuation: incoming returns carried and omitted questions and excludes another channel", () => run((c) => Effect.gen(function* () {
+it.live("3.8 byte cap continuation: incoming returns carried and omitted questions and excludes another channel", () => run((c) => Effect.gen(function* () {
   const ids: string[] = [];
   for (let i = 0; i < 12; i++) ids.push(yield* postAs(c.lead!, { text: "\\".repeat(16384) }));
   yield* appendSetup([channel({ channelId: "private-room", name: "Private", opener: owner, manager: owner, members: [owner, agent("fourth")] }), post("private-question", { channelId: "private-room", author: owner, to: [agent("fourth")] })]);
@@ -796,8 +795,7 @@ it.live("3.8 byte cap continuation: omitted questions arrive after acceptance an
   expect(holdsUnsettled("worker", state.board as never, state.deliveries)).toBe(false);
 })));
 
-// enable-in: b4
-it.skip("3.13 completion size continuation: repliesTo pages every repeated reply without truncation or duplication", () => run((c) => Effect.gen(function* () {
+it.live("3.13 completion size continuation: repliesTo pages every repeated reply without truncation or duplication", () => run((c) => Effect.gen(function* () {
   const id = yield* postAs(c.lead!, { to: [agent("worker"), agent("other")] });
   const rows: Event[] = [];
   for (let i = 0; i < 2048; i++) rows.push(post(`paged-${i}`, { author: agent("worker"), replyToPostId: id, reply: "none", to: [], text: "Repeated reply." }));
@@ -815,8 +813,7 @@ it.skip("3.13 completion size continuation: repliesTo pages every repeated reply
   expect(ids).toEqual(Array.from({ length: 2048 }, (_, i) => `paged-${i}`));
 })));
 
-// enable-in: b4
-it.skip("3.16 acknowledge continuation: status and read expose the same acknowledged identity without changing incoming", () => run((c) => Effect.gen(function* () {
+it.live("3.16 acknowledge continuation: status and read expose the same acknowledged identity without changing incoming", () => run((c) => Effect.gen(function* () {
   const id = yield* postAs(c.lead!);
   success(yield* call(c.worker!, "board.acknowledge", { postId: id }));
   const status = success(yield* call(c.worker!, "board.status", { agentId: "worker", detail: "incoming" }));

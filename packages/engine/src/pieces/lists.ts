@@ -1,6 +1,6 @@
 import {
   CommandsRpcGroup, Event, EventEnvelope, commandAccess, commandGroups, eventGroups, eventVisibility,
-  holdUnsettled, requestHeld, type HoldCondition, type AlertSourceRequest, type Caller, type CallerKind, type PieceNamespace, type VisibilityClass,
+  holdUnsettled, requestHeld, type HoldCondition, type Caller, type CallerKind, type PieceNamespace, type VisibilityClass,
 } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import type * as Schema from "effect/Schema";
@@ -8,22 +8,24 @@ import type * as RpcGroup from "effect/rpc/RpcGroup";
 import type { Input, Plan, Snapshot, CommandRefused } from "../commands/internal.ts";
 import { planners } from "../commands/planners.ts";
 import { reads, type ReadHandler } from "../api/reads.ts";
-import { boardPlaceholderReads } from "../board/placeholders.ts";
 import { boardPlanners, boardReads } from "../board/commands.ts";
 import { boardReactor } from "../board/reactor.ts";
+import { snapshotFor as boardSnapshotFor } from "../board/snapshot.ts";
+import { openMatters as boardOpenMatters, alertSource as boardAlertSource } from "../board/openMatters.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
 import { pieceViews, type PieceView } from "./viewTables.ts";
 import { snapshotFor as rolesSnapshotFor } from "../roles/snapshot.ts";
 
 import { alertDelivery } from "../client/alerts/delivery.ts";
 import { carrierKeep, carrierPlanners } from "../client/alerts/token.ts";
-import { alertReactor, type AlertSourceResult } from "../client/alerts/reactor.ts";
+import { alertReactor, type AlertSourceResult, type PieceAlertSourceRequest } from "../client/alerts/reactor.ts";
 import { alertPlanners, alertReads } from "../client/alerts/commands.ts";
 
 import { reach, sourceRules, type ReachInput } from "../routing/reach.ts";
 
 export interface Migration { readonly id: number; readonly statements: ReadonlyArray<string> }
 export interface EngineLists {
+  readonly boardEnabled?: boolean;
   readonly reach: Readonly<Record<PieceNamespace, (input: ReachInput) => boolean>>;
   readonly sourceRules: Readonly<Record<PieceNamespace, () => "withdraw" | "return">>;
   readonly holdUnsettled: Readonly<Record<PieceNamespace, HoldCondition>>;
@@ -45,7 +47,7 @@ export interface EngineLists {
   readonly pieceVisibility: Readonly<Record<string, (caller: Caller, envelope: EventEnvelope, view: Snapshot) => boolean>>;
   readonly snapshotSections: Readonly<Record<PieceNamespace, (caller: Caller, view: Snapshot) => unknown>>;
   readonly alertSources?: Readonly<Partial<Record<PieceNamespace, (envelope: EventEnvelope) => AlertSourceResult>>>;
-  readonly openMatters?: Readonly<Partial<Record<PieceNamespace, (views: Snapshot) => ReadonlyArray<AlertSourceRequest>>>>;
+  readonly openMatters?: Readonly<Partial<Record<PieceNamespace, (views: Snapshot) => ReadonlyArray<PieceAlertSourceRequest>>>>;
   readonly reactors: Readonly<Partial<Record<PieceNamespace, Effect.Effect<void, unknown, any>>>>;
 }
 const absent = () => undefined;
@@ -55,11 +57,11 @@ export const engineLists: EngineLists = {
   services: {}, secretCommands: ["accounts set-secret", "client.alerts.carrier.set-token"],
   access: commandAccess,
   planners: { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners },
-  reads: { ...reads, ...alertReads, ...boardPlaceholderReads, ...boardReads },
+  reads: { ...reads, ...alertReads, ...boardReads },
   views: pieceViews,
   migrations: { client: [], board: [], roles: [] }, visibility: eventVisibility, pieceVisibility: {},
-  snapshotSections: { client: absent, board: absent, roles: rolesSnapshotFor },
-  alertSources: { client: absent, board: absent, roles: absent },
-  openMatters: { client: () => [], board: () => [], roles: () => [] },
+  snapshotSections: { client: absent, board: boardSnapshotFor, roles: rolesSnapshotFor },
+  alertSources: { client: absent, board: boardAlertSource, roles: absent },
+  openMatters: { client: () => [], board: boardOpenMatters, roles: () => [] },
   reactors: { client: Effect.all([alertReactor, alertDelivery], { concurrency: "unbounded", discard: true }), board: boardReactor },
 } satisfies EngineLists;

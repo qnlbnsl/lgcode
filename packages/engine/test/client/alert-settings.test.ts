@@ -7,7 +7,7 @@ import { awaitRaised, eventsOf, question, withAlerts } from "../support/alertsRi
 const defaults = [
   { kind: "approval", push: true }, { kind: "question", push: true },
   { kind: "failure", push: true }, { kind: "account", push: true }, { kind: "other", push: true },
-  { kind: "client.web-down", push: true }, { kind: "board.post", push: true },
+  { kind: "client.web-down", push: true }, { kind: "board.post", push: true }, { kind: "board.no-answer", push: true },
   { kind: "roles.stall", push: true }, { kind: "roles.replace", push: true },
   { kind: "roles.runaway", push: false }, { kind: "roles.rule-first-use", push: true },
 ];

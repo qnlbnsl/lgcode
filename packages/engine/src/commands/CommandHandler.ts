@@ -258,6 +258,8 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           });
           const { requestId: id, ...body } = payload;
           const requestId = id as RequestId;
+          // The rollback switch also refuses requests with an old receipt.
+          if (name.startsWith("board.") && lists.boardEnabled === false) return yield* refused("board disabled");
           // Identifiers bypass event-text redaction. Reject a secret-bearing
           // id before looking up a receipt or planning even a refusal event.
           if ((yield* log.redactText(requestId)) !== requestId) return yield* refused();
