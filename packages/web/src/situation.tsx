@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { displayedState, type ClientSnapshot, type RosterEntry } from "@shephrd/contracts"
 import { watchSituation, type ConnectionState } from "./watchSituation.ts"
+import { threadHref } from "./thread/links.ts"
 
 function lane(agent: RosterEntry): "Needs you" | "Working" | "Idle" {
   if (agent.openPermissionRequests > 0 || agent.openQuestionsAsked > 0
@@ -33,7 +34,7 @@ export function Situation({ onSessionExpired }: { readonly onSessionExpired: () 
         <h3>{name} ({agents.length})</h3>
         {snapshot === undefined ? <p>Loading agents…</p> : agents.length === 0 ? <p>No agents.</p> : <ul>
           {agents.map((agent) => <li key={agent.agentId}>
-            <strong>{agent.name}</strong>
+            <a href={threadHref(agent.agentId)}><strong>{agent.name}</strong></a>
             <p>{displayedState(agent)} · {agent.role} · {agent.harness}</p>
             {agent.groups.length > 0 && <p>Groups: {agent.groups.join(", ")}</p>}
             {(agent.openPermissionRequests > 0 || agent.openQuestionsAsked > 0) && <p>

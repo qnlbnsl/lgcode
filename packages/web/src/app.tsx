@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Situation } from "./situation.tsx"
+import type { AgentId } from "@shephrd/contracts"
+import { Thread } from "./thread/index.tsx"
+import { threadLocation } from "./thread/links.ts"
 
 type Session = "checking" | "login" | "owner" | "unavailable"
 
@@ -9,6 +12,24 @@ export function App() {
   const [busy, setBusy] = useState(false)
   const [probe, setProbe] = useState(0)
   const action = useRef<AbortController | undefined>(undefined)
+  const [href, setHref] = useState(() => location.href)
+  const route = threadLocation(href)
+  const agentId = route.agentId as AgentId | undefined
+  const subject = route.subject
+  const sessionExpired = () => {
+    setMessage("Your session ended. Log in again.")
+    setSession("login")
+  }
+
+  useEffect(() => {
+    const navigate = () => setHref(location.href)
+    window.addEventListener("hashchange", navigate)
+    window.addEventListener("popstate", navigate)
+    return () => {
+      window.removeEventListener("hashchange", navigate)
+      window.removeEventListener("popstate", navigate)
+    }
+  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -93,9 +114,7 @@ export function App() {
       <input id="password" name="password" type="password" autoComplete="off" required disabled={busy} />
       <button type="submit" disabled={busy}>{busy ? "Logging in…" : "Log in"}</button>
     </form>}
-    {session === "owner" && <Situation onSessionExpired={() => {
-      setMessage("Your session ended. Log in again.")
-      setSession("login")
-    }} />}
+    {session === "owner" && (agentId === undefined ? <Situation onSessionExpired={sessionExpired} />
+      : <Thread key={agentId} agentId={agentId} {...(subject === undefined ? {} : { subject })} onSessionExpired={sessionExpired} />)}
   </main>
 }
