@@ -27,7 +27,7 @@ export const ClientEvent = Schema.Union([
   }),
   Schema.TaggedStruct("client.AlertSettingsChanged", { kind: AlertKind, push: Schema.Boolean }),
   Schema.TaggedStruct("client.AlertCarrierChanged", { carrier: CarrierSettings }),
-  Schema.TaggedStruct("client.AlertCarrierTokenSet", { origin: Schema.NonEmptyString, generation: CarrierTokenGeneration }),
+  Schema.TaggedStruct("client.AlertCarrierTokenSet", { origin: Schema.NonEmptyString, carrierGeneration: CarrierTokenGeneration }),
   Schema.TaggedStruct("client.AlertCarrierTokenCleared", {}),
   Schema.TaggedStruct("client.WebSettingsChanged", { settings: WebSettings }),
   Schema.TaggedStruct("client.WebServerDown", { reason: Schema.String }),
