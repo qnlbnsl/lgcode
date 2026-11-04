@@ -74,7 +74,7 @@ The lead's commit also holds issue and feature entries drafted by a Claude Sonne
 
 - The owner's choice on `isHarnessSettings` is issue 353.
 - A hang in the middle of a turn is caught only at the sheepdog's two-hour runaway limit. The owner accepted this as a limit.
-- `shepherd-worktrees` is the next plan to write.
+- `shepherd-worktrees` is on hold by the owner until the build is running.
 - Standing rules depend on recordings the owner runs for each harness, and on today's evidence no harness qualifies.
 
 No security issue is outstanding from this run. No commit broke a repository rule.
