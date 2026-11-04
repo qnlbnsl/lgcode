@@ -28,6 +28,10 @@ for (const command of CommandsRpcGroup.requests.keys()) {
   it(`P03 ${command} catches a registered CLI command dispatching the wrong RPC or dropping payload fields`, async () => {
     const root = prepareRoot();
     const payloads: Record<string, Record<string, unknown>> = {
+      "client.alerts.list": { after: 0, limit: 1, status: "open" },
+      "client.alerts.dismiss": { alertId: "alert-1" },
+      "client.alerts.settings": {},
+      "client.alerts.settings.set": { kind: "approval", push: false },
       start: { name: "Parity agent", role: "worker", harness: "fake", account: { _tag: "any" }, permission: "ask", folder: root.work, groups: ["review"], model: "small", effort: "low", prompt: "Check parity." },
       prompt: { agentId: "member", text: "A prompt with spaces." },
       answer: { kind: "question", id: "question", text: "The answer." },
@@ -38,6 +42,10 @@ for (const command of CommandsRpcGroup.requests.keys()) {
       group: { agentId: "member", add: ["review"], remove: ["build"] },
       accounts: { operation: "list" }, "accounts mark-available": { accountId: "account" },
       harnesses: { operation: "list" }, subscribe: { after: 100 }, "debug.compare-views": {},
+      "client.snapshot": {}, "client.roster": { group: "review", role: "worker", parent: "lead" },
+      "client.thread": { agentId: "member", after: 100, limit: 500 },
+      "client.event": { sequence: 101 }, "client.sequence": {},
+      "client.subscribe": { after: 100, filter: { agents: ["member"], kinds: ["TurnEnded"] } },
       "board.open": { name: "Review", group: "review", anchorAgentId: "member" },
       "board.members": { channelId: "channel", add: ["member"], remove: ["former"] },
       "board.post": { channelId: "channel", text: "Which option?", to: [{ _tag: "agent", agentId: "member" }], reply: "all", replyTo: "earlier-post" },
@@ -60,11 +68,17 @@ for (const command of CommandsRpcGroup.requests.keys()) {
     const engine = await fakeEngine(root, { onRequest: (frame, socket) => {
       const base = { requestId: frame.payload.requestId };
       const replies: Record<string, unknown> = {
+        "client.alerts.list": { ...base, items: [], next: 10 },
+        "client.alerts.settings": { ...base, kinds: [{ kind: "approval", push: false }], carrier: { _tag: "none" }, tokenSet: false },
         start: { ...base, agentId: "member" }, prompt: { ...base, deliveryId: "delivery" },
         compact: { ...base, deliveryId: "delivery" }, ask: { ...base, questionId: "question" },
         wait: { ...base, waitId: "wait", members: [{ agentId: "member", reason: "settled" }], outcome: "satisfied" },
         accounts: { ...base, accounts: [] }, harnesses: { ...base, harnesses: [] },
         "debug.compare-views": { ...base, sequence: 100, equal: true, differences: [] },
+        "client.snapshot": { ...base, sequence: 100, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 },
+        "client.roster": { ...base, agents: [] }, "client.thread": { ...base, items: [] },
+        "client.sequence": { ...base, sequence: 100 },
+        "client.event": { ...base, envelope: { sequence: 101, eventId: "parity-event", occurredAt: 1_800_000_000_000, caller: { _tag: "owner" }, agentId: "member", event: { _tag: "TurnEnded", agentId: "member", compact: false } } },
         "board.open": { ...base, channelId: "channel" },
         "board.members": { ...base, memberCount: 1 },
         "board.post": { ...base, postId: "post" },
@@ -82,7 +96,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         "roles.actions.list": { ...base, records: [], truncated: false },
         "roles.record": { ...base, sequence: 101 },
       };
-      if (frame.tag === "subscribe") {
+      if (frame.tag === "subscribe" || frame.tag === "client.subscribe") {
         chunk(socket, frame, [{ sequence: 101, eventId: "parity-event", occurredAt: 1_800_000_000_000,
           caller: { _tag: "agent", agentId: "member" }, agentId: "member", event: { _tag: "TurnEnded", agentId: "member", compact: false } }]);
         succeed(socket, frame, undefined);
@@ -114,11 +128,11 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "compact", "group", "pass-up", "prompt", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "prompt", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
   const nonAgent = Object.entries(commandAccess).filter(([, kinds]) => !(kinds as ReadonlyArray<string>).includes("agent")).map(([name]) => name);
-  for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", "board.flush", ...ownerOnlyCommands, ...nonAgent]) {
+  for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", "board.flush", "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", ...ownerOnlyCommands, ...nonAgent]) {
     expect(names).not.toContain(excluded);
   }
   assertNoSecrets(child, [token]);

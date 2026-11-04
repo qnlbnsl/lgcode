@@ -1,6 +1,6 @@
 import {
   CommandsRpcGroup, Event, EventEnvelope, commandAccess, commandGroups, eventGroups, eventVisibility,
-  holdUnsettled, requestHeld, type HoldCondition, type Caller, type CallerKind, type PieceNamespace, type VisibilityClass,
+  holdUnsettled, requestHeld, type HoldCondition, type AlertSourceRequest, type Caller, type CallerKind, type PieceNamespace, type VisibilityClass,
 } from "@shephrd/contracts";
 import type * as Effect from "effect/Effect";
 import type * as Schema from "effect/Schema";
@@ -11,6 +11,9 @@ import { reads, type ReadHandler } from "../api/reads.ts";
 import { boardPlaceholderPlanners, boardPlaceholderReads } from "../board/placeholders.ts";
 import type { LogWriteFailed } from "../log/EventLog.ts";
 import { pieceViews, type PieceView } from "./viewTables.ts";
+
+import { alertReactor, type AlertSourceResult } from "../client/alerts/reactor.ts";
+import { alertPlanners, alertReads } from "../client/alerts/commands.ts";
 
 import { reach, sourceRules, type ReachInput } from "../routing/reach.ts";
 
@@ -36,6 +39,8 @@ export interface EngineLists {
   readonly visibility: Readonly<Record<string, VisibilityClass>>;
   readonly pieceVisibility: Readonly<Record<string, (caller: Caller, envelope: EventEnvelope, view: Snapshot) => boolean>>;
   readonly snapshotSections: Readonly<Record<PieceNamespace, (caller: Caller, view: Snapshot) => unknown>>;
+  readonly alertSources?: Readonly<Partial<Record<PieceNamespace, (envelope: EventEnvelope) => AlertSourceResult>>>;
+  readonly openMatters?: Readonly<Partial<Record<PieceNamespace, (views: Snapshot) => ReadonlyArray<AlertSourceRequest>>>>;
   readonly reactors: Readonly<Partial<Record<PieceNamespace, Effect.Effect<void, unknown, any>>>>;
 }
 const absent = () => undefined;
@@ -44,9 +49,12 @@ export const engineLists: EngineLists = {
   reach, sourceRules, holdUnsettled, requestHeld, secretKeep: { client: () => [], board: () => [], roles: () => [] },
   services: {}, secretCommands: ["accounts set-secret"],
   access: commandAccess,
-  planners: { ...planners, ...boardPlaceholderPlanners },
-  reads: { ...reads, ...boardPlaceholderReads },
+  planners: { ...planners, ...alertPlanners, ...boardPlaceholderPlanners },
+  reads: { ...reads, ...alertReads, ...boardPlaceholderReads },
   views: pieceViews,
   migrations: { client: [], board: [], roles: [] }, visibility: eventVisibility, pieceVisibility: {},
-  snapshotSections: { client: absent, board: absent, roles: absent }, reactors: {},
+  snapshotSections: { client: absent, board: absent, roles: absent },
+  alertSources: { client: absent, board: absent, roles: absent },
+  openMatters: { client: () => [], board: () => [], roles: () => [] },
+  reactors: { client: alertReactor },
 } satisfies EngineLists;

@@ -37,9 +37,9 @@ export const BoardEvent = Schema.Union([
     wakeId: WakeId, targetAgentId: AgentId,
     carried: Schema.Array(PostId), mustReply: Schema.Array(PostId), completions: Schema.Array(PostId),
     // Exactly the completions whose captured payload contains reply text.
-    // An explicit empty array identifies a metadata-only replacement. Missing
-    // on legacy events means the reach check must assume replies were captured.
-    completionReplyText: Schema.optionalKey(Schema.Array(PostId)),
+    // An empty array identifies a metadata-only replacement. Reach checks
+    // use this captured manifest, never the post's current replies.
+    completionReplyText: Schema.Array(PostId),
     reminders: Schema.Array(PostId),
     noAnswers: Schema.Array(Schema.Struct({ postId: PostId, addressee: BoardAddressee }))
   }),

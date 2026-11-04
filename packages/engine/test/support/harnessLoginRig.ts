@@ -131,13 +131,14 @@ export const boundaryText = (events: ReadonlyArray<EventEnvelope>): string => {
 };
 
 export const inspectBoundaries = (root: ServiceRoot, owner: Client, received: ReadonlyArray<EventEnvelope>, service: ServiceProcess, agentId: string) => Effect.gen(function* () {
-  const rows = rowsIn(root);
+  // This RPC captures the real live snapshot under the writer permit and
+  // compares every field with a rebuild. Scan through that same durable head:
+  // a reactor may append an alert after the agent's terminal event, including
+  // while this request is in flight. Later events belong to a later snapshot.
+  const comparison = yield* owner["debug.compare-views"]({ requestId: requestId() } as never) as Effect.Effect<{ sequence: number; equal: boolean; differences: ReadonlyArray<string> }, unknown>;
+  const rows = rowsIn(root).filter((row) => row.sequence <= comparison.sequence);
   const envelopes = yield* Effect.forEach(rows, decodeRow);
   const projected = envelopes.reduce(apply, emptyViews());
-  // This RPC captures the real live snapshot under the writer permit and
-  // compares every field with a rebuild. Together with the durable head check
-  // it proves the scanned projection equals the service's live thread view.
-  const comparison = yield* owner["debug.compare-views"]({ requestId: requestId() } as never) as Effect.Effect<{ sequence: number; equal: boolean; differences: ReadonlyArray<string> }, unknown>;
   return {
     comparison, head: rows.at(-1)?.sequence ?? 0,
     // Positive controls must come from adapter ThreadItems, not the account

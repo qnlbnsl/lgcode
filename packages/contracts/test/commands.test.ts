@@ -36,13 +36,16 @@ const expectedCommands = [
   "subscribe",
   "debug.compare-views"
 ]
+const clientReads = ["client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence"]
 
 // Row 55 names `accounts set-secret`, `accounts mark-available` and `debug.compare-views` outright
 // and says every other owner-only command is excluded too. Reading: the owner-only commands are the
 // three named ones plus the two that change accounts and harness settings as a whole (`accounts`,
 // `harnesses`). `subscribe` is agent-callable (criterion 7.3: an agent's `subscribe` sees its own
 // events) but is not offered as an MCP tool because a stream cannot be a tool.
-const expectedOwnerOnly = ["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views"]
+const expectedOwnerOnly = ["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "board.flush",
+  "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record",
+  "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]
 
 const expectedMcpOffered = ["start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "compact", "group"]
 const boardCommands = ["board.open", "board.members", "board.post", "board.close", "board.acknowledge", "board.read", "board.channels", "board.status", "board.flush"]
@@ -50,6 +53,10 @@ const boardTools = boardCommands.filter((name) => name !== "board.flush")
 
 const rolesCommands = ["roles.orient", "roles.handoff", "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record"]
 const rolesTools = ["roles.orient", "roles.handoff"]
+const clientTools = ["client.snapshot", "client.roster", "client.thread", "client.event"]
+const alertCommands = ["client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]
+const testedCommands = [...expectedCommands, ...alertCommands]
+const expectedRpcCommands = [...expectedCommands, ...boardCommands, ...clientReads, ...alertCommands, ...rolesCommands]
 
 const sorted = (values: ReadonlyArray<string>) => [...values].sort()
 
@@ -85,7 +92,8 @@ describe("command lists", () => {
   // Catches: a command with no access tag, a tag naming something else, or a tag that
   // disagrees with the owner-only list (two sources of truth that drift apart).
   it("assigns caller kinds to every command, agreeing with the owner-only list", () => {
-    expect(sorted(Object.keys(commandAccess))).toEqual(sorted([...expectedCommands, ...boardCommands, ...rolesCommands]))
+    expect(sorted(Object.keys(commandAccess))).toEqual(sorted(expectedRpcCommands))
+    for (const name of alertCommands) expect(commandAccess[name as keyof typeof commandAccess]).toEqual(["owner"])
     for (const name of expectedCommands) {
       const kinds = commandAccess[name as keyof typeof commandAccess]
       expect(kinds).toEqual(expectedOwnerOnly.includes(name) ? ["owner"] : ["prompt", "compact", "resume", "subscribe"].includes(name) ? ["owner", "agent", "service"] : ["owner", "agent"])
@@ -94,10 +102,10 @@ describe("command lists", () => {
 
   // Catches: a secret-setting command offered to agents. Row 55 asserts the MCP list against an
   // explicit list; this derives it the way unit 7 will (agent-callable, minus the stream).
-  it("offers the ten engine tools, eight board tools and two roles tools, excluding board.flush", () => {
-    const offered = [...CommandsRpcGroup.requests.keys()].filter((name) => ((commandAccess as Record<string, ReadonlyArray<string>>)[name] ?? []).includes("agent") && name !== "subscribe")
-    expect(sorted(offered)).toEqual(sorted([...expectedMcpOffered, ...boardTools, ...rolesTools]))
-    for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views"]) {
+  it("offers ten engine, eight board, four client and two roles tools, excluding streams, board.flush and alerts", () => {
+    const offered = [...CommandsRpcGroup.requests.keys()].filter((name) => ((commandAccess as Record<string, ReadonlyArray<string>>)[name] ?? []).includes("agent") && name !== "subscribe" && name !== "client.subscribe")
+    expect(sorted(offered)).toEqual(sorted([...expectedMcpOffered, ...boardTools, ...clientTools, ...rolesTools]))
+    for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", ...alertCommands]) {
       expect(offered, excluded).not.toContain(excluded)
     }
   })
@@ -106,15 +114,15 @@ describe("command lists", () => {
 describe("command RPC group", () => {
   // Catches: a command with no `Rpc` (the API cannot serve it) or an `Rpc` for a command not in the list.
   it("has one Rpc per command, tagged with the command name", () => {
-    expect(sorted([...CommandsRpcGroup.requests.keys()])).toEqual(sorted([...expectedCommands, ...boardCommands, ...rolesCommands]))
+    expect(sorted([...CommandsRpcGroup.requests.keys()])).toEqual(sorted(expectedRpcCommands))
     expect(sorted([...EngineCommandsRpcGroup.requests.keys()])).toEqual(sorted(expectedCommands))
     expect([...CommandsRpcGroup.requests.keys()]).toEqual(expect.arrayContaining(expectedCommands))
-    for (const name of [...expectedCommands, ...boardCommands, ...rolesCommands]) expect(rpcFor(name)._tag).toBe(name)
+    for (const name of expectedRpcCommands) expect(rpcFor(name)._tag).toBe(name)
   })
 
   // Catches: a request that carries no request id (a retried request could not be matched to its
   // reply, and the idempotency of writes is lost), or one where the id is optional.
-  it.each(expectedCommands)("%s: every variant of the request carries a required request id", (name) => {
+  it.each(testedCommands)("%s: every variant of the request carries a required request id", (name) => {
     const variants = variantsOf(rpcFor(name).payloadSchema.ast)
     expect(variants.length, "payload must be a struct or a union of structs").toBeGreaterThan(0)
     for (const properties of variants) {
@@ -126,7 +134,7 @@ describe("command RPC group", () => {
 
   // Catches: a request id typed as anything (a number, an empty string) instead of the shared
   // `RequestId` shape: a non-empty string.
-  it.each(expectedCommands)("%s: the request id accepts a non-empty string and rejects other values", (name) => {
+  it.each(testedCommands)("%s: the request id accepts a non-empty string and rejects other values", (name) => {
     for (const properties of variantsOf(rpcFor(name).payloadSchema.ast)) {
       const id = properties.find((property) => property.name === "requestId")!
       const decode = Schema.decodeUnknownSync(Schema.make<Schema.Codec<string>>(id.type))
@@ -138,7 +146,7 @@ describe("command RPC group", () => {
 
   // Catches: a reply that does not echo the request id, so a client cannot pair a reply with its
   // request. `subscribe` is exempt: its reply is a stream of events (checked below).
-  it.each(expectedCommands.filter((name) => name !== "subscribe"))(
+  it.each(testedCommands.filter((name) => name !== "subscribe"))(
     "%s: every variant of the reply carries a request id",
     (name) => {
       const variants = variantsOf(rpcFor(name).successSchema.ast)
@@ -152,7 +160,7 @@ describe("command RPC group", () => {
   // Catches: `subscribe` modelled as a single reply (a client would get one snapshot and no live
   // events), or any other command accidentally modelled as a stream (it would never complete).
   it("makes subscribe, and only subscribe, a streaming command", () => {
-    for (const name of expectedCommands) {
+    for (const name of testedCommands) {
       expect(RpcSchema.isStreamSchema(rpcFor(name).successSchema), name).toBe(name === "subscribe")
     }
   })
@@ -160,24 +168,24 @@ describe("command RPC group", () => {
 
 describe("the groups the service serves (fix round 1, item 4)", () => {
   const debugCommand = "debug.compare-views"
-  const withoutDebug = expectedCommands.filter((name) => name !== debugCommand)
+  const withoutDebug = expectedRpcCommands.filter((name) => name !== debugCommand)
 
   // Catches: the production group being only a comment: `ServiceRpcGroup` missing, or still holding the
   // debug command (row 74: it is served only behind the test flag), or missing another command.
-  it("ServiceRpcGroup has the 15 engine commands, nine board commands and nine roles commands, without debug.compare-views", () => {
+  it("ServiceRpcGroup has every pinned non-debug command, without debug.compare-views", () => {
     expect(ServiceRpcGroup, "ServiceRpcGroup export").toBeDefined()
-    expect(ServiceRpcGroup.requests.size).toBe(33)
+    expect(ServiceRpcGroup.requests.size).toBe(withoutDebug.length)
     expect(ServiceRpcGroup.requests.has(debugCommand)).toBe(false)
     expect([...ServiceRpcGroup.requests.keys()]).toEqual(expect.arrayContaining(withoutDebug))
     expect(sorted([...ServiceRpcGroup.requests.keys()])).toEqual(
       sorted([...CommandsRpcGroup.requests.keys()].filter((name) => name !== debugCommand))
     )
-    expect(sorted([...ServiceRpcGroup.requests.keys()])).toEqual(sorted([...withoutDebug, ...boardCommands, ...rolesCommands]))
+    expect(sorted([...ServiceRpcGroup.requests.keys()])).toEqual(sorted(withoutDebug))
   })
 
   // Catches: the full inventory (the CLI and clients) losing the debug command when the service group was cut.
-  it("CommandsRpcGroup keeps all 16 engine commands, nine board commands and nine roles commands", () => {
-    expect(CommandsRpcGroup.requests.size).toBe(34)
+  it("CommandsRpcGroup keeps every pinned engine, client read, alert, board and roles command", () => {
+    expect(CommandsRpcGroup.requests.size).toBe(expectedRpcCommands.length)
     expect([...CommandsRpcGroup.requests.keys()]).toEqual(expect.arrayContaining(expectedCommands))
     expect(CommandsRpcGroup.requests.has(debugCommand)).toBe(true)
   })

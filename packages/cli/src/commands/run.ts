@@ -1,6 +1,8 @@
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import { connect } from "@shephrd/client"
+import { waitForAgents } from "@shephrd/client/waitForAgents"
+import { exportThread } from "./threadExport.ts"
 import { type CommandName } from "./registry.ts"
 import { type Parsed } from "./parse.ts"
 import { describeFailure, err, formatEvent, out } from "./output.ts"
@@ -17,9 +19,16 @@ export const runCommand = (
 ): Effect.Effect<number> =>
   Effect.scoped(Effect.gen(function* () {
     const client = yield* connect({ environment })
+    if (command === "client.wait") return reportWait(yield* waitForAgents(client, parsed.payload as unknown as Parameters<typeof waitForAgents>[1]).pipe(Effect.onInterrupt(() => cancelled)))
+    if (command === "thread.export") {
+      yield* exportThread(client, parsed.payload!.agentId as string, parsed.out!)
+      return 0
+    }
     const call = (client as any)[command] as (payload: unknown) => any
-    if (command === "subscribe") {
-      yield* Stream.runForEach(call(parsed.payload) as Stream.Stream<any, unknown>, (envelope) => Effect.sync(() => out(formatEvent(envelope))))
+    if (command === "subscribe" || command === "client.subscribe") {
+      yield* Stream.runForEach(call(parsed.payload) as Stream.Stream<any, unknown>, (envelope) => Effect.sync(() => out(
+        envelope.event === undefined ? `${sanitizeJson(envelope)}\n` : formatEvent(envelope)
+      )))
       return 0
     }
     if (command === "wait") {
@@ -28,8 +37,8 @@ export const runCommand = (
       )
       return reportWait(reply)
     }
-    const reply = yield* (call(parsed.payload) as Effect.Effect<unknown, unknown>)
-    out(`${sanitizeJson(reply, 2)}\n`)
+    const reply = yield* (call(parsed.payload) as Effect.Effect<any, unknown>)
+    out(typeof reply?.data === "string" ? `${reply.data}\n` : `${sanitizeJson(reply, 2)}\n`)
     return 0
   })).pipe(
     // A failure that is not a typed one (an invalid payload, say) is a defect.

@@ -26,6 +26,7 @@ export const eventStructure: RedactionStructure = { fields: {
   permissionRequestId: identity, questionId: identity, waitId: identity, alertId: identity, alertKey: identity,
   account, harness, parent: actor, sender: actor, holder: actor, answeredBy: actor, from: actor, to: actor,
   toolInput: { freeText: true },
+  completionReplyText: { elements: identity },
   delivery, firstPromptDelivery: delivery, subject: { fields: { id: identity, namespace: identity } },
   member, members: { elements: member }, process: { fields: { bootId: identity } },
 } };

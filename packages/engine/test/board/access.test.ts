@@ -36,7 +36,7 @@ it("2.5 manager rights pass up: catches permanent inheritance or membership on a
   const events = [...tree, group(), post("question", { channelId: "group", author: agent("worker") })];
   const before = snapshot(...events);
   const crashed = snapshot(...events, crash("lead"));
-  const resumed = snapshot(...events, crash("lead"), session("lead", true));
+  const resumed = snapshot(...events, crash("lead"), state("lead", { _tag: "starting" }), session("lead", true));
   const rules = await access();
   expect(rules.canManage(crashed, agent("root"), "group")).toBe(true);
   expect(rules.canClose(crashed, agent("root"), "question")).toBe(true);

@@ -14,12 +14,6 @@ export const boardReach = ({ snapshot, source, target, deliveryId }: ReachInput)
 
   // Reminders carry post text too. No-answer notices contain metadata only.
   if (![...wake.carried, ...wake.mustReply, ...wake.reminders].every((id) => canCarryPost(snapshot, target, id))) return false;
-  if (wake.completionReplyText?.some((id) => !wake.completions.includes(id))) return false;
-  return wake.completions.every((id) => {
-    // Old log entries have no content manifest. Conservatively treat any
-    // recorded reply as captured text; a replacement must supply its manifest.
-    const includesText = wake.completionReplyText === undefined
-      ? (own(board.posts, id)?.replies.length ?? 0) > 0 : wake.completionReplyText.includes(id);
-    return canCarryCompletion(snapshot, target, id, includesText);
-  });
+  if (wake.completionReplyText.some((id) => !wake.completions.includes(id))) return false;
+  return wake.completions.every((id) => canCarryCompletion(snapshot, target, id, wake.completionReplyText.includes(id)));
 };

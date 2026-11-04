@@ -42,7 +42,7 @@ export async function access(): Promise<BoardAccess> {
 }
 
 export const spawn = (id: string, parent = "lead", groups: ReadonlyArray<string> = [], permission: PermissionLevel = "edit") =>
-  event({ ...start(id, groups, parent), permission, ...(id === "root" || id === "stranger" ? { parent: owner } : {}) });
+  event({ ...start(id, groups, parent), permission, parent: id === "root" || id === "stranger" ? owner : agent(parent) });
 export const tree = [spawn("root"), spawn("lead", "root"), spawn("worker", "lead", ["review"]),
   spawn("other", "lead", ["review"]), spawn("new-child"), spawn("grandchild", "worker"),
   spawn("sibling", "root", ["review"]), spawn("cousin", "sibling", ["review"]), spawn("stranger")];

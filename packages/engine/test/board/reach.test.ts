@@ -134,7 +134,7 @@ it("2.11 metadata-only completion: catches losing a completion when its author l
 const answered = [...tree, plain, post("done", { author: agent("worker"), to: [agent("other")] }),
   post("reply", { author: agent("other"), reply: "none", to: [], replyToPostId: "done" }),
   resolve("done", "replied", { addressee: agent("other"), decidingPostId: "reply" }), close("done"),
-  wake("completion", { completions: ["done"] }), queue("completion")];
+  wake("completion", { completions: ["done"], completionReplyText: ["done"] }), queue("completion")];
 
 it("2.11 completion with reply text: catches leaking a captured reply after author membership is removed", () => {
   expect(judge(snapshot(...answered), "completion")).toBe(true);

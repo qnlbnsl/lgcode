@@ -1,4 +1,4 @@
-import type { Actor, EventEnvelope } from "@shephrd/contracts";
+import type { Caller, EventEnvelope } from "@shephrd/contracts";
 import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -9,7 +9,7 @@ import { Views } from "../views/Views.ts";
 import { decodeRowWith, LogReadFailed, SubscribeInvalidCursor, type EventRow } from "./subscribe.ts";
 
 const budget = 900 * 1024;
-export const agentRead = (input: { readonly caller: Actor; readonly agentId: string; readonly after: number; readonly limit: number }, lists: EngineLists = engineLists) => Effect.gen(function* () {
+export const agentRead = (input: { readonly caller: Caller; readonly agentId: string; readonly after: number; readonly limit: number }, lists: EngineLists = engineLists) => Effect.gen(function* () {
   if (!Number.isSafeInteger(input.after) || input.after < 0) return yield* new SubscribeInvalidCursor({ after: input.after });
   const view = yield* (yield* Views).snapshot;
   if (!mayReadAgent(input.caller, input.agentId, view)) return yield* refused();

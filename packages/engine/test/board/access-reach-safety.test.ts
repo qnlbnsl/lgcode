@@ -12,10 +12,7 @@ import { close, queue, resolve, wake } from "./fixtures.ts";
 
 registerRebuildCheck({ noLog: true });
 
-// Explicitly record the intended structural link. The frozen access fixture's
-// start helper otherwise makes lead a child of the owner, ignoring its parent.
-const nestedTree = tree.map((row) => row._tag === "AgentStarted" && row.agentId === "lead"
-  ? event({ ...row, parent: agent("root") }) : row);
+const nestedTree = tree;
 
 it("uses recorded parent links for manager inheritance, even through a paused ancestor", () => {
   const initial = snapshot(...nestedTree, plain);
@@ -45,7 +42,9 @@ it("does not treat SessionOpened alone as a lifecycle transition out of crashed"
 });
 
 it("does not invent an ancestor from unrelated agents in the roster", () => {
-  const actual = snapshot(...tree, plain, stop("lead"));
+  const ownerTree = tree.map((row) => row._tag === "AgentStarted" && row.agentId === "lead"
+    ? event({ ...row, parent: owner }) : row);
+  const actual = snapshot(...ownerTree, plain, stop("lead"));
   expect(actual.agents["lead"]?.parent).toEqual(owner);
   expect(successorManager(actual, "room")).toEqual(owner);
 });
@@ -70,7 +69,7 @@ it("replays an explicit metadata-only replacement and sends it after membership 
   expect(judge(queued)).toBe(true); // Send, after joining the delivery id.
 });
 
-it("does not let a manifest omit another completion's captured text", () => {
+it("rejects captured text after removal and manifest entries outside completions", () => {
   const view = snapshot(...answered, membersChanged("room", ["worker"]),
     wake("completion", { completions: ["done"], completionReplyText: ["done"] }), queue("completion"));
   expect(judge(view)).toBe(false);
