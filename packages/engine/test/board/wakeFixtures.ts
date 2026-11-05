@@ -34,7 +34,9 @@ export const wakeFor = (deliveryId: string) => boardState.pipe(Effect.map((state
 // external harness and secret store are fake. A separate notification channel
 // parks the handler's automatic followers; the program still gets the real log
 // and can run its dispatcher or reactor explicitly at a chosen boundary.
-export const provideBoard = <A, E, R>(rig: Rig, program: Effect.Effect<A, E, R> | ((runner: FakeRunner) => Effect.Effect<A, E, R>), secrets: ReadonlyArray<string> = []) => Effect.gen(function* () {
+export const provideBoard = <A, E, R>(rig: Rig, program: Effect.Effect<A, E, R> | ((runner: FakeRunner) => Effect.Effect<A, E, R>), secrets: ReadonlyArray<string> = [], options: {
+  readonly capacityHoldCondition?: (id: import("@shephrd/contracts").AgentId, snapshot: import("../../src/commands/internal.ts").Snapshot) => unknown;
+} = {}) => Effect.gen(function* () {
   const runner = yield* makeFakeRunner();
   const lists = { ...engineLists, services: { ...engineLists.services,
     "test.board": ["board.post", "board.close", "board.status", "board.flush"],
@@ -46,7 +48,7 @@ export const provideBoard = <A, E, R>(rig: Rig, program: Effect.Effect<A, E, R> 
     const parked = yield* PubSub.unbounded<EventEnvelope>();
     return { ...real, subscribeCommitted: PubSub.subscribe(parked) };
   })).pipe(Layer.provide(log));
-  const services = CommandHandler.layer(rig, lists).pipe(
+  const services = CommandHandler.layer({ ...rig, ...options }, lists).pipe(
     Layer.provide(quietNotifications), Layer.provideMerge(log),
     Layer.provide(Layer.merge(runner.layer, makeFakeSecrets().layer)),
   );

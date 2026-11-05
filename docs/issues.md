@@ -2839,6 +2839,26 @@ says "not covered". A file is named only when it exists in
 `packages/engine/test` and its test titles speak about the clause. Its
 assertions were matched by title, not audited line by line.
 
+The foundation review also identified board-specific proof gaps in records
+FR-047, FR-062, FR-063, FR-072, FR-076, FR-101, FR-112, and FR-122.
+The collection and restart scenarios now correlate board manifests with
+delivery identifiers and count through an independent completed prompt.
+The acknowledgement matrix uses actual questions, returned deliveries,
+capacity holds, and both wait modes.
+The recovered withdrawal matrix invokes the dispatcher, reactor, and answer
+command, and checks the order within each committed batch.
+The error matrix sends authenticated current-incarnation events through the
+runner handler and reopens the database after each error.
+The deferral matrix covers both stages and runs a mutual-question control
+with the sheepdog active.
+The alert matrix covers reverse resolution order, a fresh baseline from
+rebuilt state, and an owner wait whose status and stream are offset.
+The recovery matrices cover complete committed checkpoints, actual service
+kills, repeated reactor runs, and later replies and lifecycle changes.
+These checks live in `packages/engine/test/board/` and
+`packages/engine/test/acceptance/board-*.test.ts`.
+They do not close the other omissions listed below.
+
 | Clause not checked by the acceptance suite | Covered at a lower level by |
 |---|---|
 | Protected folder relationships, forbidden home, state and install folders, worktree boundaries | `identity/ceiling.test.ts`, `identity/ceiling-fix-1.test.ts`, `commands/authorization.test.ts` |
@@ -5540,11 +5560,19 @@ Why it matters: A long-lived installation could exceed the snapshot's size budge
 ## 316. An answered question's withdrawal can strand a reloaded holder as working
 
 Found: 2026-11-03, while planning the client API plan.
-State: open.
+State: fixed in the central withdrawal guard, with producer integration verified on 2026-11-05.
 
 What happens: A withdrawal for an answered question can leave a reloaded holder marked as working with nothing to send (`routing/questions.ts:27`, `recovery/reload.ts:84-98`).
 What should happen: Unit 1b fixes it through edit E17 (client API row 173).
 Why it matters: The agent never takes new work and the team stalls.
+
+The central withdrawal repair is now exercised through the real answer
+command, dispatcher, and board reactor in
+`packages/engine/test/board/recovered-withdrawals.test.ts`.
+Each case reconstructs the reloaded state and opens an engine wait.
+The final withdrawal, idle transition, and wait resolution must share a
+request identifier and appear in that order.
+Queued and sent controls retain the open wait.
 
 ## 317. `SecretStore.resolve` cannot tell a missing value from a failed read
 
@@ -6990,3 +7018,49 @@ collision outcome.
 What remains: Choose the collision policy before changing transfers. The
 opening fix prevents new collisions within an existing manager's namespace.
 It does not refuse required transfers or invent a new channel name.
+
+## 426. Board recovery polling reads public dispositions as a keyed object
+
+Found: 2026-11-05, while fixing foundation review record FR-097.
+State: fixed in the board recovery acceptance helper.
+
+What happens: The owner snapshot publishes an array of addressee and
+disposition rows.
+The recovery helper indexed that array by an agent identifier.
+A terminal recipient already resolved as gone therefore looked unresolved.
+An all-reply collection with another pending recipient could keep boot
+waiting until its deadline.
+
+What changed: The helper consumes the public `BoardPost` disposition type
+and finds the matching addressee in its array.
+The regression uses the actual snapshot producer with a crashed or
+non-reloadable gone recipient and another pending, blocked recipient.
+Both cases failed with the recovery timeout before the fix.
+The helper still treats no-answer as provisional and waits for actionable
+notifications.
+Blocked notifications and failed or truncated snapshot sections retain
+their existing behavior.
+
+
+## 427. An idle reload suppresses a completed board response
+
+Found: 2026-11-05, while extending the recovery checkpoints for FR-112.
+State: fixed.
+
+What happened: A service killed after an original or reminder response ended,
+but before the reactor committed its next duty, reloaded the idle agent.
+The new interruption, starting state and session-open events hid the earlier
+response turn.
+Recovery queued no carry-on for that idle agent, so the pending reminder or
+no-answer disposition needed an unrelated prompt to progress.
+The actual service kill regression failed at all three completed-response
+checkpoints before the fix.
+
+What changed: The board recognizes the complete idle reload sequence in its
+durable thread and preserves the earlier completed response.
+A working or paused interruption still requires a later response turn.
+An incomplete reload remains unsettled.
+The contract now distinguishes idle and working reloads.
+The deferral matrix distinguishes a working interruption from an idle reload.
+The process checkpoints cover the already completed idle response.
+The regression kills the real service at complete transaction boundaries.

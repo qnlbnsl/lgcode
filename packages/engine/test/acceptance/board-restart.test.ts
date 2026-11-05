@@ -4,7 +4,7 @@ import { afterEach, expect } from "@effect/vitest";
 import type { Event } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 
-import { eventsUntil, isTag, requestId, scenario, since, stopAllServices, tagged } from "../support/acceptance.ts";
+import { drainAgent, eventsUntil, isTag, requestId, scenario, since, stopAllServices, tagged } from "../support/acceptance.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 registerRebuildCheck({ noLog: true });
@@ -32,10 +32,10 @@ scenario("6.5 a queued board wake that was not sent before a service restart is 
   yield* w.kill("SIGKILL");
   yield* w.boot();
   yield* w.token(target, prior.pid);
-  const afterRestart = yield* w.watermark();
   writeFileSync(gate, "go");
-  const sent = yield* eventsUntil(w.owner, afterRestart, "the queued board wake to be sent after restart", (row) =>
-    row.event._tag === "DeliverySent" && (row.event as unknown as { deliveryId: string }).deliveryId === deliveryId, 20_000);
+  yield* eventsUntil(w.owner, before, "the queued board wake to be accepted after restart", (row) =>
+    row.event._tag === "DeliveryAccepted" && row.event.deliveryId === deliveryId, 20_000);
+  const sent = yield* drainAgent(w.owner, target.agentId, before);
   expect(tagged(sent, "DeliverySent").filter((row) => (row.event as unknown as { deliveryId: string }).deliveryId === deliveryId)).toHaveLength(1);
 }));
 

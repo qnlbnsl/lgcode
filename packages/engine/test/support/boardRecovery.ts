@@ -1,6 +1,6 @@
 import type { ClientSnapshot } from "@shephrd/contracts";
-import type { BoardAddressee } from "@shephrd/contracts/board/ids";
 import type { BoardOwedCompletion } from "@shephrd/contracts/board/view";
+import type { BoardPost } from "@shephrd/contracts/board/schemas";
 import * as Effect from "effect/Effect";
 
 type Agent = Pick<ClientSnapshot["agents"][number], "agentId" | "state" | "account" | "reloadable" | "capacityHeld">;
@@ -13,11 +13,7 @@ interface RecoverySnapshot {
 interface RecoveryBoard {
   readonly disabled: boolean;
   readonly truncated: boolean;
-  readonly posts: ReadonlyArray<{
-    readonly reply: string;
-    readonly to: ReadonlyArray<BoardAddressee>;
-    readonly dispositions: Readonly<Record<string, string>>;
-  }>;
+  readonly posts: ReadonlyArray<Pick<BoardPost, "reply" | "to" | "dispositions">>;
   readonly completions: ReadonlyArray<BoardOwedCompletion>;
   readonly noAnswers: ReadonlyArray<BoardOwedCompletion>;
 }
@@ -39,7 +35,7 @@ export const waitForBoardRecovery = <E, R>(read: Effect.Effect<RecoverySnapshot,
     const agents = new Map(snapshot.agents.map((agent) => [agent.agentId as string, agent]));
     const unresolved = board.posts.some((post) => post.reply !== "none" && post.to.some((target) => {
       if (target._tag !== "agent") return false;
-      const disposition = post.dispositions[target.agentId];
+      const disposition = post.dispositions.find((row) => row.addressee._tag === "agent" && row.addressee.agentId === target.agentId)?.disposition;
       if (disposition !== undefined && disposition !== "no-answer") return false;
       const agent = agents.get(target.agentId);
       return agent?.state._tag === "stopped" || agent?.state._tag === "crashed"

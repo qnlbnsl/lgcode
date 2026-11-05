@@ -18,6 +18,7 @@ import { agentIdOf, appendSetup, eventOf, makeFakeSecrets, makeRig, removeRig, s
 import type { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { currentIncarnation, makeFakeRunner, seedFakeProcess, type FakeRunner } from "../support/fakeRunner.ts";
 import { eventually, pause } from "../support/routingRig.ts";
+import { boardOwnerClient } from "../support/boardWait.ts";
 import { appendDelivery, boardState, change, provideBoard, queued, seedBoard, snapshot } from "./wakeFixtures.ts";
 
 export { it, eventually, pause };
@@ -27,15 +28,16 @@ export const reactorRig = (register: () => ReturnType<typeof registerRebuildChec
   beforeEach(() => { rig = makeRig(); credentials = {}; vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); removeRig(rig); });
   return {
+    ownerClient: () => boardOwnerClient(rig),
     run: <A, E, R>(body: (c: Record<string, Credential>, runner: FakeRunner) => Effect.Effect<A, E, R>, states: Parameters<typeof seedBoard>[0] = {}) =>
       provideBoard(rig, (runner) => Effect.gen(function* () {
         yield* register();
         credentials = yield* seedBoard(states);
         return yield* body(credentials, runner);
       })).pipe(Effect.orDie),
-    reopen: <A, E, R>(body: Effect.Effect<A, E, R>) => provideBoard(rig, Effect.gen(function* () {
+    reopen: <A, E, R>(body: Effect.Effect<A, E, R> | ((runner: FakeRunner) => Effect.Effect<A, E, R>)) => provideBoard(rig, (runner) => Effect.gen(function* () {
       yield* register();
-      return yield* body;
+      return yield* typeof body === "function" ? body(runner) : body;
     })).pipe(Effect.orDie),
     withoutBoard: <A, E, R>(body: Effect.Effect<A, E, R>) => provideBoard(rig, Effect.gen(function* () {
       yield* register();
@@ -51,6 +53,7 @@ export const reactorRig = (register: () => ReturnType<typeof registerRebuildChec
       readonly reactor?: Effect.Effect<void, unknown, any>;
       readonly recovery?: Layer.Layer<Restart>;
       readonly logger?: Layer.Layer<never>;
+      readonly sheepdog?: boolean;
     } = {}) => Effect.gen(function* () {
       const runner = yield* makeFakeRunner();
       // Reopening the database changes the fake transport object. Register the
@@ -60,7 +63,8 @@ export const reactorRig = (register: () => ReturnType<typeof registerRebuildChec
         if (credential._tag === "agent") seedFakeProcess(transport, agentIdOf(id), Redacted.value(credential.token), true);
       }
       const registered = registeredReactor();
-      const lists = { ...engineLists, reactors: { board: options.reactor ?? registered } };
+      const lists = { ...engineLists, reactors: { board: options.reactor ?? registered,
+        ...(options.sheepdog ? { roles: engineLists.reactors.roles } : {}) } };
       const base = buildServices(rig, lists).pipe(Layer.provideMerge(runner.layer),
         Layer.provideMerge(makeFakeSecrets().layer), Layer.provideMerge(redactorLayer));
       const services = options.recovery === undefined ? base : base.pipe(Layer.provideMerge(options.recovery));
