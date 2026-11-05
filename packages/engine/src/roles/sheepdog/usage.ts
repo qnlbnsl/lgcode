@@ -44,7 +44,12 @@ const openTranscript = (path: string): number => {
   } finally { closeSync(directory); }
 };
 
-export const readTranscriptUsage = (path: string, sessionId: string): RequestUsage | undefined => {
+export interface RequestWindow {
+  readonly startedAt: number;
+  readonly endedAt: number;
+  readonly requestStartedAt?: number | undefined;
+}
+export const readTranscriptUsage = (path: string, sessionId: string, window?: RequestWindow): RequestUsage | undefined => {
   if (!sessionFormat.test(sessionId) || !isAbsolute(path) || basename(path) !== `${sessionId}.jsonl`) return;
   let fd: number;
   try { fd = openTranscript(path); } catch { return; }
@@ -66,17 +71,32 @@ export const readTranscriptUsage = (path: string, sessionId: string): RequestUsa
     let lastWriteLifetimeMinutes: number | undefined;
     for (const line of rows) {
       let row: Record<string, unknown> | undefined;
-      try { row = object(JSON.parse(line)); } catch { continue; }
+      try { row = object(JSON.parse(line)); } catch {
+        if (line.trim() !== "") latest = undefined;
+        continue;
+      }
+      // A later request or incomplete assistant row invalidates an earlier
+      // result, including another request in the same turn.
+      if (row?.type === "user") { latest = undefined; continue; }
       if (row?.type !== "assistant") continue;
+      latest = undefined;
+      if (row.sessionId !== undefined && row.sessionId !== sessionId) continue;
       const usage = object(object(row.message)?.usage);
       if (usage === undefined) continue;
       const split = object(usage.cache_creation);
       const five = count(split?.ephemeral_5m_input_tokens);
       const hour = count(split?.ephemeral_1h_input_tokens);
+      const timestamp = typeof row.timestamp === "string" ? Date.parse(row.timestamp) : NaN;
+      // A bounded parse can retain independently valid counters. Scheduling
+      // additionally requires proof of a current request with usable context.
+      if (window !== undefined && (!Number.isFinite(timestamp) || timestamp < 0
+        || count(usage.input_tokens) === undefined || timestamp > window.endedAt)) continue;
+      const readOnly = (five === 0 && hour === 0) || (split === undefined && count(usage.cache_creation_input_tokens) === 0);
       const writtenLifetime = (five ?? 0) > 0 ? 5 : (hour ?? 0) > 0 ? 60 : undefined;
       if (writtenLifetime !== undefined) lastWriteLifetimeMinutes = writtenLifetime;
       else if ((count(usage.cache_creation_input_tokens) ?? 0) > 0) lastWriteLifetimeMinutes = undefined;
-      const timestamp = typeof row.timestamp === "string" ? Date.parse(row.timestamp) : NaN;
+      if (window !== undefined && (timestamp < window.startedAt || timestamp > window.endedAt
+        || (window.requestStartedAt !== undefined && timestamp !== window.requestStartedAt))) continue;
       latest = {
         ...(Number.isFinite(timestamp) && timestamp >= 0 ? { requestStartedAt: timestamp } : {}),
         ...(count(usage.input_tokens) === undefined ? {} : { inputTokens: count(usage.input_tokens) }),
@@ -84,7 +104,7 @@ export const readTranscriptUsage = (path: string, sessionId: string): RequestUsa
         ...(count(usage.cache_creation_input_tokens) === undefined ? {} : { cachedWriteTokens: count(usage.cache_creation_input_tokens) }),
         ...(five === undefined ? {} : { cachedWrite5mTokens: five }),
         ...(hour === undefined ? {} : { cachedWrite1hTokens: hour }),
-        ...(writtenLifetime === undefined && lastWriteLifetimeMinutes !== undefined ? { lastWriteLifetimeMinutes } : {}),
+        ...(readOnly && lastWriteLifetimeMinutes !== undefined ? { lastWriteLifetimeMinutes } : {}),
       };
     }
     return latest;

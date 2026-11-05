@@ -24,8 +24,9 @@ export const cacheLifetime = (input: CacheExpiryInput): number | undefined => {
 };
 export const cacheExpiry = (input: CacheExpiryInput): number | undefined => {
   const requestStart = input.requestStartedAt ?? input.transcript?.requestStartedAt;
-  const start = requestStart !== undefined && (input.turnEndedAt === undefined || requestStart <= input.turnEndedAt)
-    ? requestStart : input.turnStartedAt;
+  if (requestStart !== undefined && ((input.turnStartedAt !== undefined && requestStart < input.turnStartedAt)
+    || (input.turnEndedAt !== undefined && requestStart > input.turnEndedAt))) return;
+  const start = requestStart ?? input.turnStartedAt;
   if (start === undefined || !Number.isFinite(start) || start < 0) return;
   const minutes = cacheLifetime(input);
   if (minutes !== undefined && [5, 60].includes(minutes)) return start + minutes * 60_000;

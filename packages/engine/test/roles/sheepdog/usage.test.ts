@@ -56,6 +56,42 @@ it("U04 reads a bounded tail and returns no usage when the transcript is missing
     mkdirSync(join(folder, "nested"));
     writeFileSync(transcript, `${"x".repeat(1_000_000)}\n${usageRow}\n`);
     expect(readTranscriptUsage(transcript, sessionId)).toMatchObject({ inputTokens: 100, cachedReadTokens: 200 });
-    expect(readTranscriptUsage(join(folder, "missing.jsonl"), sessionId)).toBeUndefined();
+    expect(readTranscriptUsage(join(folder, "nested", `${sessionId}.jsonl`), sessionId)).toBeUndefined();
+  } finally { rmSync(folder, { recursive: true, force: true }); }
+});
+
+
+it.each(["missing", "malformed", "partial", "future", "pending-request", "incomplete-json", "missing-usage"])(
+  "U05 rejects stale high usage when the current request is %s", (current) => {
+    const folder = mkdtempSync(join(tmpdir(), "shephrd-current-usage-"));
+    try {
+      const transcript = join(folder, `${sessionId}.jsonl`);
+      const startedAt = Date.parse("2026-11-04T12:01:00.000Z");
+      const endedAt = startedAt + 60_000;
+      const row = { type: "assistant", timestamp: new Date(startedAt).toISOString(), message: {
+        usage: { input_tokens: 200_000, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 10 } },
+      } };
+      const latest = current === "missing" ? "" : current === "incomplete-json" ? '{"type":"assistant",'
+        : current === "missing-usage" ? JSON.stringify({ ...row, message: {} }) : current === "malformed" ? JSON.stringify({ ...row, timestamp: "invalid" })
+        : current === "partial" ? JSON.stringify({ ...row, message: { usage: { cache_creation_input_tokens: 0 } } })
+        : current === "future" ? JSON.stringify({ ...row, timestamp: new Date(endedAt + 1).toISOString() })
+        : JSON.stringify({ type: "user", timestamp: new Date(startedAt + 1).toISOString(), message: { content: "Next request" } });
+      writeFileSync(transcript, `${usageRow}\n${["pending-request", "incomplete-json", "missing-usage"].includes(current) ? JSON.stringify(row) + "\n" : ""}${latest}\n`);
+      expect(readTranscriptUsage(transcript, sessionId, { startedAt, endedAt })).toBeUndefined();
+    } finally { rmSync(folder, { recursive: true, force: true }); }
+  },
+);
+
+it("U06 a proven current read-only request inherits the earlier write lifetime", () => {
+  const folder = mkdtempSync(join(tmpdir(), "shephrd-current-read-"));
+  try {
+    const transcript = join(folder, `${sessionId}.jsonl`);
+    const startedAt = Date.parse("2026-11-04T12:01:00.000Z");
+    writeFileSync(transcript, `${usageRow}\n${JSON.stringify({ type: "assistant", timestamp: new Date(startedAt).toISOString(), message: {
+      usage: { input_tokens: 100, cache_read_input_tokens: 200_000,
+        cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 } },
+    } })}\n`);
+    expect(readTranscriptUsage(transcript, sessionId, { startedAt, endedAt: startedAt + 60_000 }))
+      .toMatchObject({ requestStartedAt: startedAt, inputTokens: 100, cachedReadTokens: 200_000, lastWriteLifetimeMinutes: 5 });
   } finally { rmSync(folder, { recursive: true, force: true }); }
 });

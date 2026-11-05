@@ -17,6 +17,11 @@ import { engineLists, type EngineLists } from "../../../src/pieces/lists.ts";
 import { layer as redactor } from "../../../src/log/Redactor.ts";
 import { buildServices } from "../../../src/service.ts";
 import { transcriptPath } from "../../../src/roles/sheepdog/usage.ts";
+import type { TimerOrigin } from "../../../src/roles/sheepdog/timers.ts";
+import { makeCacheRule } from "../../../src/roles/sheepdog/cacheRule.ts";
+import { Views } from "../../../src/views/Views.ts";
+import { EventLog } from "../../../src/log/EventLog.ts";
+import { withLane } from "../../../src/routing/lanes.ts";
 import { sheepdogLoop } from "../../../src/roles/sheepdog/loop.ts";
 import type { RolesView } from "../../../src/roles/view.ts";
 import { fixtureClient } from "../../support/fixturePiece.ts";
@@ -303,4 +308,200 @@ it.effect.each(["default", "account-home", "account-environment"] as const)(
     expect(yield* waitCompact(runner)).toBe(1);
     expect(JSON.stringify(yield* alertLog)).not.toContain("PRIVATE ACTIVATION TRANSCRIPT");
   }), { ...engineLists, reactors: {} }),
+);
+
+
+const cacheContext = (view: Effect.Success<typeof snapshot>, lists = engineLists) => ({
+  snapshot: view, lists, sourceSequence: view.sequence, firstStart: false, baselinePosition: 0,
+});
+const armedCacheTimer = (timer: TimerOrigin) => ({ ...timer, dueAt: timer.absoluteDueAt! });
+const quietLists = { ...engineLists, reactors: {} };
+
+it.effect("FR-024 posts after status captured zero are flushed from the acceptance snapshot", () => {
+  let onStatus = () => Effect.void as Effect.Effect<unknown, unknown, any>;
+  const actual = engineLists.reads["board.status"]!;
+  const lists = { ...quietLists, reads: { ...engineLists.reads, "board.status": (input, payload) => {
+    const reply = actual(input, payload);
+    return Effect.isEffect(reply) ? reply.pipe(Effect.tap(() => onStatus())) : reply;
+  } } } satisfies EngineLists;
+  return run((runner, client) => Effect.gen(function* () {
+    const who = yield* start(runner, client);
+    yield* turn(runner, client, who, "unread-race", warm);
+    const rule = makeCacheRule();
+    const context = cacheContext(yield* snapshot, lists);
+    yield* rule.onStart!(context);
+    const timer = rule.timers!(context)[0]!;
+    onStatus = () => Effect.gen(function* () {
+      for (const n of [1, 2]) yield* client["board.post"]!({ requestId: `racing-post-${n}`, direct: { _tag: "agent", agentId: who.agentId },
+        to: [{ _tag: "agent", agentId: who.agentId }], text: `New notice ${n}`, reply: "none" });
+    });
+    yield* TestClock.adjust("58 minutes");
+    yield* rule.onTimer!(context, armedCacheTimer(timer));
+    const rows = yield* alertLog;
+    const wake = rows.find((row) => row.event._tag === "board.WakeBuilt");
+    expect(wake?.event._tag === "board.WakeBuilt" && wake.event.carried).toHaveLength(2);
+    expect(runner.callsOf("compact")).toHaveLength(0);
+  }), lists);
+});
+
+it.effect.each(["queue", "hold", "turn", "session"] as const)(
+  "FR-021 rejects %s changes after the final read but before writer acceptance", (change) => run((runner, client) => Effect.gen(function* () {
+    const who = yield* start(runner, client);
+    yield* turn(runner, client, who, "acceptance-race", warm);
+    const rule = makeCacheRule();
+    const context = cacheContext(yield* snapshot, quietLists);
+    yield* rule.onStart!(context);
+    const timer = rule.timers!(context)[0]!;
+    const views = yield* Views;
+    let injected = false;
+    // Only the rule receives this read wrapper. The command's captured Views
+    // still reads the actual state inside the writer transaction.
+    const racingViews = { ...views, snapshot: views.snapshot.pipe(Effect.tap(() => Effect.gen(function* () {
+      if (injected) return;
+      injected = true;
+      if (change === "queue") yield* client.prompt!({ requestId: "queued-after-read", agentId: who.agentId, text: "New work" });
+      else if (change === "hold") yield* appendSetup([eventOf({ _tag: "DeliveryHeld", agentId: who.agentId, deliveryId: "empty-hold", reason: "capacity" })]);
+      else if (change === "turn") yield* turn(runner, client, who, "new-after-read", warm);
+      else {
+        yield* client.stop!({ requestId: "stop-after-read", agentId: who.agentId });
+        runner.script("start", () => Effect.succeed({ session: { _tag: "acp", sessionId: "fresh-session" }, protocolVersion: 2, reloadable: true }));
+        yield* client.resume!({ requestId: "fresh-after-read", agentId: who.agentId, fresh: true });
+      }
+    }))) };
+    yield* TestClock.adjust("58 minutes");
+    const fire = rule.onTimer!(context, armedCacheTimer(timer)).pipe(Effect.provideService(Views, racingViews));
+    if (change === "queue") yield* withLane(yield* EventLog, who.agentId)(fire);
+    else yield* fire;
+    expect(injected).toBe(true);
+    expect((yield* alertLog).filter((row) => row.event._tag === "DeliveryQueued" && row.event.delivery.content._tag === "compact")).toHaveLength(0);
+  }), quietLists),
+);
+
+it.effect.each([false, true])("FR-031 fresh sessions cannot reuse old usage on late lifetime settings (restart: %s)", (restart) => run((runner, client) => Effect.gen(function* () {
+  const who = yield* start(runner, client);
+  yield* turn(runner, client, who, "old-session-usage", { used: 200_000 });
+  yield* client.stop!({ requestId: "old-session-stop", agentId: who.agentId });
+  runner.script("start", () => Effect.succeed({ session: { _tag: "acp", sessionId: "distinct-session" }, protocolVersion: 2, reloadable: true }));
+  yield* client.resume!({ requestId: "new-session-resume", agentId: who.agentId, fresh: true });
+  const reply = yield* client.harnesses!({ requestId: "late-harness", operation: "list" });
+  const harness = (reply.harnesses as Array<Record<string, unknown>>).find((row) => row.id === "first")!;
+  const rule = makeCacheRule();
+  yield* rule.onStart!(cacheContext(yield* snapshot, quietLists));
+  yield* client.harnesses!({ requestId: "late-lifetime", operation: "set", harness: { ...harness, cacheLifetime: 60 } });
+  const context = cacheContext(yield* snapshot, quietLists);
+  if (restart) yield* rule.onStart!(context);
+  else yield* rule.onEvent!(context, (yield* alertLog).findLast((row) => row.event._tag === "HarnessChanged")!);
+  expect(rule.timers!(context)).toHaveLength(0);
+  yield* TestClock.adjust("58 minutes");
+  expect(runner.callsOf("compact")).toHaveLength(0);
+}), quietLists));
+
+it.effect("FR-060 unknown lifetime does not schedule or act with valid unsplit context", () => run((runner, client) => Effect.gen(function* () {
+  const who = yield* start(runner, client);
+  yield* turn(runner, client, who, "unknown-lifetime", { used: 200_000 });
+  const rule = makeCacheRule();
+  const context = cacheContext(yield* snapshot);
+  yield* rule.onStart!(context);
+  expect(rule.timers!(context)).toHaveLength(0);
+  yield* TestClock.adjust("2 hours");
+  yield* pause(80);
+  expect(runner.callsOf("compact")).toHaveLength(0);
+  expect((yield* alertLog).filter((row) => row.event._tag === "roles.CompactRequested" || row.event._tag === "roles.CacheFlushed")).toHaveLength(0);
+})));
+
+it.effect.each(["expired", "queue", "turn", "session", "settings"] as const)(
+  "FR-021 delayed automatic compact is withdrawn after %s invalidation", (change) => run((runner, client) => Effect.gen(function* () {
+    const who = yield* start(runner, client);
+    yield* turn(runner, client, who, "delayed-cache", warm);
+    const rule = makeCacheRule();
+    const context = cacheContext(yield* snapshot, quietLists);
+    yield* rule.onStart!(context);
+    const timer = rule.timers!(context)[0]!;
+    const log = yield* EventLog;
+    let automatic = "";
+    // The ordinary engine send lane models a delayed reservation, without
+    // replacing dispatch or its writer transaction.
+    yield* withLane(log, who.agentId)(Effect.gen(function* () {
+      yield* TestClock.adjust("58 minutes");
+      yield* rule.onTimer!(context, armedCacheTimer(timer));
+      automatic = Object.values((yield* snapshot).deliveries).find((row) => row.content._tag === "compact")!.id;
+      if (change === "expired") yield* TestClock.adjust("2 minutes");
+      else if (change === "queue") yield* client.prompt!({ requestId: "priority-work", agentId: who.agentId, text: "Ordinary work" });
+      else if (change === "turn") yield* appendSetup([eventOf({ _tag: "TurnEnded", agentId: who.agentId, compact: false, usage: warm })]);
+      else if (change === "session") yield* appendSetup([eventOf({ _tag: "SessionOpened", agentId: who.agentId,
+        session: { _tag: "acp", sessionId: "new-during-delay" }, protocolVersion: 2, reloadable: true })]);
+      else yield* client["roles.settings.set"]!({ requestId: "disable-during-delay", settings: { sheepdog: false } });
+      expect(runner.callsOf("compact")).toHaveLength(0);
+    }));
+    const view = yield* eventually(snapshot, (view) => view.deliveries[automatic]?.status !== "queued");
+    expect(view.deliveries[automatic]?.status).toBe("withdrawn");
+    expect(runner.callsOf("compact")).toHaveLength(0);
+    if (change === "queue") {
+      yield* eventually(snapshot, (view) => Object.values(view.deliveries).some((row) => row.content._tag === "prompt" && row.status === "sent"));
+      expect(runner.callsOf("prompt").at(-1)?.input.delivery.content).toMatchObject({ _tag: "prompt", text: expect.stringContaining("Ordinary work") });
+    }
+  }), quietLists),
+);
+
+it.effect("FR-021 delayed automatic flush expires while an owner flush remains deliverable", () => run((runner, client) => Effect.gen(function* () {
+  const who = yield* start(runner, client);
+  yield* turn(runner, client, who, "delayed-flush", warm);
+  yield* client["board.post"]!({ requestId: "pending-notice", direct: { _tag: "agent", agentId: who.agentId },
+    to: [{ _tag: "agent", agentId: who.agentId }], text: "The durable notice.", reply: "none" });
+  const rule = makeCacheRule();
+  const context = cacheContext(yield* snapshot, quietLists);
+  yield* rule.onStart!(context);
+  let automatic = "";
+  yield* withLane(yield* EventLog, who.agentId)(Effect.gen(function* () {
+    yield* TestClock.adjust("58 minutes");
+    yield* rule.onTimer!(context, armedCacheTimer(rule.timers!(context)[0]!));
+    automatic = Object.values((yield* snapshot).deliveries).find((row) => row.cache?.action === "flush")!.id;
+    yield* TestClock.adjust("2 minutes");
+  }));
+  const withdrawn = yield* eventually(snapshot, (view) => view.deliveries[automatic]?.status === "withdrawn");
+  expect(withdrawn.deliveries[automatic]?.status).toBe("withdrawn");
+  yield* client["board.flush"]!({ requestId: "owner-flush-after-expiry", agentId: who.agentId });
+  const sent = yield* eventually(snapshot, (view) => Object.values(view.deliveries).some((row) => row.id !== automatic && row.source?._tag === "piece" && row.source.namespace === "board" && row.status === "sent"));
+  expect(Object.values(sent.deliveries).some((row) => row.id !== automatic && row.status === "sent" && row.cache === undefined)).toBe(true);
+  expect(runner.callsOf("prompt").at(-1)?.input.delivery.content).toMatchObject({ _tag: "prompt", text: expect.stringContaining("The durable notice.") });
+}), quietLists));
+
+it.effect("FR-021 owner compaction keeps its queue semantics beyond a cache deadline", () => run((runner, client) => Effect.gen(function* () {
+  const who = yield* start(runner, client);
+  yield* turn(runner, client, who, "before-manual-compact", warm);
+  yield* withLane(yield* EventLog, who.agentId)(Effect.gen(function* () {
+    yield* client.compact!({ requestId: "manual-compact", agentId: who.agentId });
+    yield* TestClock.adjust("2 hours");
+  }));
+  expect(yield* waitCompact(runner)).toBe(1);
+  expect(runner.callsOf("compact")[0]?.input.delivery.cache).toBeUndefined();
+}), quietLists));
+
+it.effect.each(["missing", "partial", "future", "read-only", "normalized-used"] as const)(
+  "FR-022 composed fallback needs a current request and preserves independent context authority: %s", (current) => run((runner, client) => Effect.gen(function* () {
+    yield* seedHarness("claude"); yield* seedAccount("claude-account", "claude");
+    const sessionId = "123e4567-e89b-42d3-a456-426614174000";
+    runner.script("start", () => Effect.succeed({ session: { _tag: "acp", sessionId }, protocolVersion: 2, reloadable: true }));
+    const who = yield* start(runner, client, { harness: "claude", account: { _tag: "named", accountId: "claude-account" } });
+    const path = transcriptPath(join(rig.home, ".claude"), rig.work, sessionId)!;
+    mkdirSync(dirname(path), { recursive: true });
+    const row = (timestamp: number, usage: unknown) => JSON.stringify({ type: "assistant", timestamp: new Date(timestamp).toISOString(), message: { usage } });
+    const old = row(yield* Clock.currentTimeMillis, { input_tokens: 200_000, cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 10 } });
+    yield* TestClock.adjust("1 minute");
+    const now = yield* Clock.currentTimeMillis;
+    const latest = current === "missing" ? "" : row(current === "future" ? now + 60_000 : now,
+      current === "partial" ? { cache_creation_input_tokens: 0 } : { input_tokens: 200_000,
+        cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 0 } });
+    writeFileSync(path, `${old}\n${latest}\n`);
+    yield* turn(runner, client, who, "fallback-current", current === "normalized-used" ? { used: 1_000 } : undefined);
+    const rule = makeCacheRule();
+    const context = cacheContext(yield* snapshot, quietLists);
+    yield* rule.onStart!(context);
+    expect(rule.timers!(context)).toHaveLength(current === "read-only" || current === "normalized-used" ? 1 : 0);
+    yield* TestClock.adjust("58 minutes");
+    const timer = rule.timers!(context)[0];
+    if (timer !== undefined) yield* rule.onTimer!(context, armedCacheTimer(timer));
+    if (current === "read-only") expect(yield* waitCompact(runner)).toBe(1);
+    else expect(runner.callsOf("compact")).toHaveLength(0);
+  }), quietLists),
 );

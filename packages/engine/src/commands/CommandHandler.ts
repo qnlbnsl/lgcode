@@ -1,3 +1,4 @@
+import { acceptCache, type CacheTarget } from "./cache.ts";
 import { randomUUID } from "node:crypto";
 import {
   EventEnvelope, commandOutcome, publicAddressError,
@@ -44,6 +45,7 @@ type Credential =
   | { readonly _tag: "agent"; readonly token: Redacted.Redacted<string> };
 
 export class CommandHandler extends Context.Service<CommandHandler, {
+  readonly cache: (target: CacheTarget) => Effect.Effect<"flush" | "compact" | undefined, CommandRefused | LogWriteFailed>;
   readonly input: (actor: Caller) => Effect.Effect<Input>;
   readonly execute: (credential: Credential, name: string, payload: unknown) => Effect.Effect<Record<string, unknown>, CommandRefused | LogWriteFailed>;
 }>()("shephrd/engine/commands/CommandHandler") {}
@@ -234,6 +236,10 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     );
 
     return CommandHandler.of({
+      cache: (target) => Effect.gen(function* () {
+        if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
+        return yield* acceptCache(runtime, lists, target);
+      }),
       input: (actor) => views.snapshot.pipe(Effect.map((snapshot) => ({ runtime, actor, snapshot }))),
       execute: (credential, name, rawPayload) => Object.hasOwn(lists.reads, name) ? executeRead(credential, name, rawPayload)
         : Effect.acquireUseRelease(preemptStart(credential, name, rawPayload), () => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {

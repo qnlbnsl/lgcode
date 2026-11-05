@@ -1,3 +1,5 @@
+import { cacheDeliveryCurrent } from "../commands/cache.ts";
+import * as Clock from "effect/Clock";
 import { carryOnText } from "../accounts/available.ts";
 import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { guardPiece } from "../pieces/guardPiece.ts";
@@ -308,11 +310,13 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
     const reserved = yield* log.transact((append) => Effect.gen(function* () {
       let snapshot = yield* views.snapshot;
       let row = ready(snapshot);
-      while (row !== undefined && row.source?._tag === "piece") {
+      while (row !== undefined) {
+        const cacheCurrent = cacheDeliveryCurrent(snapshot, row, yield* Clock.currentTimeMillis, lists);
+        if (cacheCurrent && row.source?._tag !== "piece") break;
         const queued = snapshot.threads[agentId]?.find((envelope) => envelope.event._tag === "DeliveryQueued" && envelope.event.delivery.id === row!.id);
         const caller = queued?.caller;
-        if (canReach({ ...(caller === undefined || caller._tag === "piece" ? {} : { caller }), target: agentId, deliveryId: row.id, source: row.source, snapshot }, lists)) break;
-        const events = withWaitChecks(snapshot, [{ _tag: "DeliveryWithdrawn", agentId, deliveryId: row.id, reason: "delivery no longer reachable" }], lists);
+        if (cacheCurrent && row.source?._tag === "piece" && canReach({ ...(caller === undefined || caller._tag === "piece" ? {} : { caller }), target: agentId, deliveryId: row.id, source: row.source, snapshot }, lists)) break;
+        const events = withWaitChecks(snapshot, [{ _tag: "DeliveryWithdrawn", agentId, deliveryId: row.id, reason: cacheCurrent ? "delivery no longer reachable" : "automatic cache action obsolete" }], lists);
         yield* append(owner, freshRequest(), randomUUID(), events, {});
         snapshot = project(snapshot, events, lists);
         row = ready(snapshot);
