@@ -131,7 +131,7 @@ export const boardAfter = (state: BoardView, envelope: Pick<EventEnvelope, "even
     case "board.ChannelOpened": {
       const members = event.kind === "plain" && event.opener._tag === "agent" && !event.members.some((member) => sameAuthor(member, event.opener))
         ? [...event.members, event.opener] : event.members;
-      const channel = { ...event, members, seatSequence: sequence };
+      const channel = { ...event, ownName: event.name, members, seatSequence: sequence };
       let next: BoardView = { ...state, channels: put(state.channels, event.channelId, channel) };
       if (channel.kind === "group") {
         for (const id of Object.keys(indexes(state).parents) as AgentId[]) {
@@ -164,6 +164,8 @@ export const boardAfter = (state: BoardView, envelope: Pick<EventEnvelope, "even
         ? [...channel.members, event.manager] : channel.members;
       const next = { ...state, channels: put(state.channels, event.channelId, {
         ...channel, manager: event.manager, members, seatSequence: sequence,
+        ...(event.name === undefined ? {} : { name: event.name }),
+        ...(event.ownName === undefined ? {} : { ownName: event.ownName }),
       }) };
       return join(next, event.manager, event.channelId);
     }

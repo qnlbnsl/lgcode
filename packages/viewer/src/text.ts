@@ -1,3 +1,4 @@
+import { toolText, groupThreadItems } from "@shephrd/contracts/thread";
 // Remove terminal programs, including their payloads, before rendering data.
 // Keep ordinary Unicode, tabs and line breaks for reading tool input and diffs.
 export const safeText = (text: string): string => text
@@ -19,6 +20,7 @@ export const eventText = (value: unknown): string => {
   const event = record(value);
   const content = record(event.content);
   if (event._tag === "ThreadItem" && content._tag === "text" && typeof content.text === "string") return safeText(content.text);
+  if (event._tag === "ThreadItem" && content._tag === "tool-call") return safeText([content.title, content.status ?? "pending", typeof content.input === "string" ? toolText(content.input) : "", typeof content.output === "string" ? toolText(content.output) : ""].filter(Boolean).join("\n"));
   return safeJson(value);
 };
 
@@ -40,3 +42,27 @@ export const linesFor = (text: string, columns: number): ReadonlyArray<string> =
     return lines;
   });
 };
+
+export function threadText(items: ReadonlyArray<import("@shephrd/client").ClientEnvelope>): Array<{ sequence: number; text: string }> {
+  const sources = new Map<string, import("@shephrd/contracts").Delivery>();
+  for (const { event } of items) {
+    const delivery = event._tag === "AgentStarted" ? event.firstPromptDelivery : event._tag === "DeliveryQueued" ? event.delivery : undefined;
+    if (delivery !== undefined) sources.set(delivery.id, delivery);
+  }
+  return groupThreadItems(items).flatMap((item) => {
+    const event = item.event;
+    if ("deliveryId" in event && sources.has(event.deliveryId as string)
+      && (event._tag === "PromptSent" || event._tag.startsWith("Delivery"))) return [];
+    const delivery = event._tag === "AgentStarted" ? event.firstPromptDelivery : event._tag === "DeliveryQueued" ? event.delivery : undefined;
+    if (delivery !== undefined) {
+      const sender = delivery.sender;
+      const from = sender._tag === "owner" ? "Owner" : sender._tag === "agent" ? `Agent ${sender.agentId}`
+        : sender._tag === "service" ? `Service ${sender.service}` : `Piece ${sender.namespace}`;
+      const states = items.flatMap(({ event }) => "deliveryId" in event && event.deliveryId === delivery.id && event._tag.startsWith("Delivery")
+        ? [event._tag.slice("Delivery".length)] : []);
+      const source = delivery.source === undefined ? [] : [`Source: ${delivery.source._tag}: ${delivery.source.id}`];
+      return [{ sequence: item.sequence, text: safeText([`Prompt · From: ${from}`, ...source, "text" in delivery.content ? delivery.content.text : "Compact request", ["Queued", ...states].join(" → ")].join("\n")) }];
+    }
+    return [{ sequence: item.sequence, text: eventText(event) }];
+  });
+}

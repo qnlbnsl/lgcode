@@ -121,7 +121,7 @@ it.effect("6b A4: catches a symlink ancestor moving the shadow home outside the 
     expect.soft(readdirSync(outside, { recursive: true }).sort(), "refusal must leave the outside tree untouched").toEqual(before);
     expect(readFileSync(join(shadow, "keep.txt"), "utf8")).toBe("Outside data must stay untouched.\n");
     const failures = (yield* readLog).filter((row) => row.event._tag === "AgentStartFailed");
-    expect(failures.map((row) => row.event)).toEqual([{ _tag: "AgentStartFailed", agentId: reply.agentId, reason: "agent start failed" }]);
+    expect(failures.map((row) => row.event)).toEqual([{ _tag: "AgentStartFailed", agentId: reply.agentId, reason: "could-not-start" }]);
     expect(JSON.stringify([failures, context.logLines])).not.toContain(outside);
   }));
 }).pipe(Effect.orDie));
@@ -191,7 +191,7 @@ it.effect("6.5 E3: catches a missing secret reference leaking diagnostics or all
     expect((yield* snapshot).agents[reply.agentId]?.state._tag).toBe("stopped");
     expect(existsSync(echo)).toBe(false);
     const failures = (yield* readLog).filter((row) => row.event._tag === "AgentStartFailed");
-    expect(failures.map((row) => row.event)).toEqual([{ _tag: "AgentStartFailed", agentId: reply.agentId, reason: "agent start failed" }]);
+    expect(failures.map((row) => row.event)).toEqual([{ _tag: "AgentStartFailed", agentId: reply.agentId, reason: "could-not-start" }]);
     expect(JSON.stringify([failures, context.logLines])).not.toContain("secret:missing");
   }));
 }).pipe(Effect.orDie));

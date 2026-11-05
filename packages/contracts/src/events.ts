@@ -121,8 +121,9 @@ export const ThreadContent = Schema.Union([
   Schema.TaggedStruct("tool-call", {
     callId: Schema.NonEmptyString,
     title: Schema.String,
-    status: Schema.Literals(["pending", "in_progress", "completed", "failed"]),
-    // Structured adapter input/output is serialized and redacted by the runner.
+    // Tool updates are patches. An omitted status leaves the prior value.
+    status: Schema.optionalKey(Schema.Literals(["pending", "in_progress", "completed", "failed"])),
+    // Adapter input/output is extracted as readable text and redacted by the runner.
     input: Schema.optionalKey(Schema.String),
     output: Schema.optionalKey(Schema.String)
   }),

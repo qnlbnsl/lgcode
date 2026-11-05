@@ -51,7 +51,7 @@ it.live("a login store that cannot be inspected refuses the launch before any ad
       const reply = success(yield* call(ownerCredential, "start", startPayloadFor(harness, account, rig.work, { prompt: "show status" })));
       const failures = yield* eventually(readLog, (rows) => rows.some((row) => row.event._tag === "AgentStartFailed"));
       expect(failures.filter((row) => row.event._tag === "AgentStartFailed").map((row) => row.event))
-        .toEqual([{ _tag: "AgentStartFailed", agentId: reply.agentId, reason: "agent start failed" }]);
+        .toEqual([{ _tag: "AgentStartFailed", agentId: reply.agentId, reason: "could-not-start" }]);
       expect((yield* snapshot).agents[reply.agentId]?.state._tag).toBe("stopped");
       expect(existsSync(echo), "the adapter must never be spawned").toBe(false);
       expect(context.events.some((event) => event._tag === "deliveryUpdate")).toBe(false);

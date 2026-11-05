@@ -2541,3 +2541,37 @@ These are left to later plans:
 - Proxy, certificate and DNS setup. They are the owner's later work, and the setup
   document is an example (row 198).
 - Shephrd's own Unix user (row 78).
+
+
+## Live thread behavior after the first real browser run
+
+The owner's repair request on 2026-11-05 adds these requirements.
+
+An agent reply is one plain-text block that grows as its fragments arrive.
+The runner maps an adapter message identity to an internal identity within a
+turn. Every stored text fragment keeps that internal `itemId`. That identity
+joins message fragments, including fragments on different history pages.
+It is not a tool permission correlation key. Sequence deduplication prevents
+reconnect replay from appending the same fragment twice. A reload uses the
+same fold as the live stream. Adapters without message identities use a
+contiguous message run. A tool call uses `content.callId` to update one entry
+with its command, status and readable output. Its omitted fields preserve
+the earlier fields. A prompt uses its delivery identity to display its source
+once, including its queued, sent and accepted states. The terminal viewer
+uses the same content fold.
+
+A start failure records a fixed public reason for a missing sign-in, a private
+account without a sign-in, a refused model, a refused effort, a refused mode,
+a startup failure or a timeout. Raw adapter error text never reaches an event
+or a client. The roster includes the safe code as `startFailure`. The thread
+and situation page display its explanation. A prompt to that stopped agent
+returns the explanation. A successful session clears the earlier failure.
+
+The thread page exposes the existing `stop` and `resume` commands. A logged-in
+web caller is the owner and retains the existing owner access to both.
+Resume uses a fresh session when the agent has no stored session. The situation
+page lists stopped agents in their own section, including failed starts.
+
+The separate `pnpm live-check:web` workflow checks these behaviors with a real
+Codex account, a private engine and a real browser. It checks a permission
+answer and the actual file side effect. It is never part of `pnpm check`.

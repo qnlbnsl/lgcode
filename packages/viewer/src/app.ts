@@ -3,7 +3,7 @@ import { Box, Text, useApp, useInput, usePaste, useStdout } from "ink";
 import type { ViewerClient } from "./connection.ts";
 import { answerRequest, promptAgent, readRequestContext, type PermissionRequest } from "./actions.ts";
 import { ViewerSession, type RequestRow } from "./session.ts";
-import { eventText, linesFor, oneLine, record, safeText } from "./text.ts";
+import { threadText, linesFor, oneLine, record, safeText } from "./text.ts";
 
 type Mode = "thread" | "prompt" | "request" | "question";
 interface ReviewedRequest {
@@ -48,7 +48,7 @@ export function ViewerApp({ client }: { readonly client: ViewerClient }) {
   const requests = session.requests;
   const pending = requests[requestIndex % Math.max(1, requests.length)];
   const height = Math.max(1, dimensions.rows - 13);
-  const threadLines = session.items.flatMap((item) => linesFor(`[${item.sequence}] ${eventText(item.event)}`, dimensions.columns));
+  const threadLines = threadText(session.items).flatMap((item) => linesFor(`[${item.sequence}] ${item.text}`, dimensions.columns));
   const threadStart = Math.min(scroll ?? Math.max(0, threadLines.length - height), Math.max(0, threadLines.length - height));
   const contextLines = linesFor(review?.context ?? "Loading request context…", dimensions.columns);
   const contextStart = Math.min(contextScroll, Math.max(0, contextLines.length - height));

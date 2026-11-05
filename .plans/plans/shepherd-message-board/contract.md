@@ -82,6 +82,17 @@ rule 6). The roles plan decides which channels exist and who is in them.
   command names a channel by its id. A name matches
   `^[a-zA-Z][a-zA-Z0-9_-]{0,63}$`, the engine's slug pattern, and is unique
   among the channels of one manager.
+- **The transferred name.** Every manager transfer records the displayed name
+  and the channel's original own name in `board.ManagerChanged`. The displayed
+  name is `<stopped manager label>-<own name>`. A later transfer replaces the
+  label and never stacks it. The label is normalized to the channel's allowed
+  characters and starts with a letter. A clash uses the first free numeric
+  suffix, starting at `-1`. The displayed name stays within 64 characters.
+  Shorten the label first. Shorten the displayed own name only when necessary,
+  as the owner decided on 2026-11-05. Retain the original own name whole in the
+  view. Never infer it by splitting a displayed name. Both rename fields are
+  optional when decoding older durable events. An older event keeps the name.
+  Every channel reference, post, membership and read position keeps its id.
 - **The manager.** The opener is a plain or group channel's first manager.
   The manager seat moves only when the current manager stops, even if it has
   been resumed before the reactor runs: the reactor then writes

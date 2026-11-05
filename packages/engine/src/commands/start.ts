@@ -1,3 +1,4 @@
+import { safeStartFailure, type StartFailure } from "@shephrd/contracts/startFailure";
 import { randomUUID } from "node:crypto";
 import { AgentId, DeliveryId, PermissionLevel, type Event } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
@@ -60,10 +61,10 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
       afterCommit: withPreemption(runtime.log, agentId)((handle) => Effect.gen(function* () {
         // Writes the end of a start that did not open a session. The runner's
         // reason never reaches the log.
-        const failStart = runtime.log.transact((append) => Effect.gen(function* () {
+        const failStart = (reason: StartFailure = "could-not-start") => runtime.log.transact((append) => Effect.gen(function* () {
           const snapshot = yield* runtime.views.snapshot;
           yield* append(actor, freshRequest(), randomUUID(), withWaitChecks(snapshot, [
-            { _tag: "AgentStartFailed", agentId, reason: "agent start failed" },
+            { _tag: "AgentStartFailed", agentId, reason },
           ], runtime.lists), { revokeAgentTokens: [agentId] });
         })).pipe(Effect.catchTag("RequestIdReused", () => Effect.void));
         const cancelled = yield* Effect.gen(function* () {
@@ -96,7 +97,7 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
               yield* append(actor, freshRequest(), randomUUID(), lifecycle.length > 0 ? withWaitChecks(snapshot, opened, runtime.lists) : opened, {});
               return false;
             })).pipe(Effect.catchTag("RequestIdReused", () => Effect.succeed(false))) })),
-            Effect.catchTag("RunnerRejected", () => failStart.pipe(Effect.as(false))),
+            Effect.catchTag("RunnerRejected", (error) => failStart(safeStartFailure(error.startFailure)).pipe(Effect.as(false))),
           );
         }).pipe(withLane(runtime.log, agentId));
         if (!cancelled) return;
@@ -107,7 +108,7 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
         const after = (yield* runtime.views.snapshot).agents[agentId]?.state._tag;
         if (after !== "starting" && after !== "paused") return;
         yield* Effect.suspend(() => runtime.runner.stop({ agentId })).pipe(Effect.catchTag("RunnerRejected", () => Effect.void));
-        yield* failStart;
+        yield* failStart();
       })),
     };
   });

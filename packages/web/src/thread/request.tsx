@@ -1,3 +1,4 @@
+import { groupThreadItems } from "@shephrd/contracts/thread"
 import { useRef, useState, type FormEvent } from "react"
 import type { ClientEnvelope } from "@shephrd/client/browser"
 import type { ClientSnapshot, Event } from "@shephrd/contracts"
@@ -76,7 +77,7 @@ export function Request({ event, open, items, signal }: {
     const field = form.currentTarget.elements.namedItem("answer") as HTMLTextAreaElement
     if (field.value.trim()) answer(field.value)
   }
-  const matching = permission ? items.filter((item): item is ClientEnvelope & { event: ContentEvent } => {
+  const matching = permission ? groupThreadItems(items).filter((item): item is ClientEnvelope & { event: ContentEvent } => {
     const candidate = item.event
     return candidate._tag === "ThreadItem" && candidate.agentId === event.agentId
       && (candidate.content._tag === "tool-call" || candidate.content._tag === "file-change")

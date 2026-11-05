@@ -122,7 +122,7 @@ const until = async (done: () => boolean, milliseconds: number): Promise<boolean
 
 const signal = (pid: number, name: NodeJS.Signals): void => { try { process.kill(pid, name); } catch { /* gone; a process that stays is found by the liveness check */ } };
 
-export const startLiveService = (parent: Readonly<Record<string, string | undefined>>, reuse?: { readonly root: string; readonly output: string; readonly known: Map<number, string> }): LiveService => {
+export const startLiveService = (parent: Readonly<Record<string, string | undefined>>, reuse?: { readonly root: string; readonly output: string; readonly known: Map<number, string> }, webPassword?: string): LiveService => {
   const root = reuse?.root ?? realpathSync(mkdtempSync("/tmp/shephrd-live-"));
   chmodSync(root, 0o700);
   const state = join(root, "state");
@@ -130,7 +130,7 @@ export const startLiveService = (parent: Readonly<Record<string, string | undefi
   if (reuse === undefined) mkdirSync(work, { mode: 0o700 });
   const logFile = join(root, "service.log");
   const log = createWriteStream(logFile, { mode: 0o600, flags: "a" });
-  const child: ChildProcess = spawn(process.execPath, [servicePath], { env: serviceEnvironment(parent, state), stdio: ["ignore", "pipe", "pipe"] });
+  const child: ChildProcess = spawn(process.execPath, [servicePath], { env: { ...serviceEnvironment(parent, state), ...(webPassword === undefined ? {} : { SHEPHRD_WEB_PASSWORD: webPassword }) }, stdio: ["ignore", "pipe", "pipe"] });
   const both: Array<string> = reuse === undefined ? [] : [reuse.output];
   const known = reuse?.known ?? new Map<number, string>();
   const remember = (): void => {
@@ -183,7 +183,7 @@ export const startLiveService = (parent: Readonly<Record<string, string | undefi
       if (!child.kill("SIGKILL")) throw new Error("SIGKILL was not delivered to the service child");
       await closed;
       if (abort?.aborted || stopping) throw new Error("restart cancelled before a replacement was started");
-      return startLiveService(parent, { root, output: both.join(""), known });
+      return startLiveService(parent, { root, output: both.join(""), known }, webPassword);
     },
     remove: () => { rmSync(root, { recursive: true, force: true }); },
   };

@@ -65,6 +65,7 @@ type Spawn = Parameters<Runner["Service"]["start"]>[0];
 type Send = Parameters<Runner["Service"]["prompt"]>[0];
 type Hold = Effect.Success<ReturnType<typeof makePermissionHold>>;
 interface Turn {
+  messageIds?: Map<string, string>;
   readonly deliveryId: Send["delivery"]["id"];
   readonly sentSequence: number;
   replied: boolean;
@@ -100,6 +101,7 @@ interface Process {
   commands: ReadonlyArray<{ name: string }>;
   message?: {
     readonly id: string;
+    readonly sourceId?: string;
     readonly role: "user" | "agent" | undefined;
     readonly pending: Array<{ readonly length: number; readonly event: Extract<RunnerEvent, { _tag: "deliveryUpdate" }> }>;
     released: string;
@@ -549,10 +551,19 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           if (translated.kind === "message") {
             // Issue 144: one speaker per buffer, so redacted text released
             // across chunk boundaries never moves from one speaker to another.
-            if (current.message !== undefined && current.message.role !== translated.role) yield* drainMessages(current, true);
-            current.message ??= { id: randomUUID(), role: translated.role, pending: [], released: "" };
+            if (current.message !== undefined && (current.message.role !== translated.role || current.message.sourceId !== translated.messageId)) yield* drainMessages(current, true);
+            if (current.message === undefined) {
+              let id: string = randomUUID();
+              if (translated.messageId !== undefined && current.turn !== undefined) {
+                const ids = current.turn.messageIds ??= new Map();
+                const source = `${translated.role}:${translated.messageId}`;
+                id = ids.get(source) ?? id;
+                ids.set(source, id);
+              }
+              current.message = { id, ...(translated.messageId === undefined ? {} : { sourceId: translated.messageId }), role: translated.role, pending: [], released: "" };
+            }
             current.message.pending.push({ length: translated.text.length, event: {
-              _tag: "deliveryUpdate", ...identity(current), deliveryId, kind: "message", replay: current.loading,
+              _tag: "deliveryUpdate", ...identity(current), deliveryId, kind: "message", itemId: current.message.id, replay: current.loading,
               ...(translated.role === undefined ? {} : { role: translated.role }), text: "",
             } });
             current.message.released += yield* redactChunk(current.message.id, translated.text, false, current.covered);
@@ -646,7 +657,12 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       if (session !== undefined && !loads && !resumes) return yield* rejected("adapter cannot reload");
       const opened = yield* (session === undefined ? client.agent.createSession({ cwd: folder, mcpServers })
         : loads ? client.agent.loadSession({ sessionId: session.sessionId, cwd: folder, mcpServers })
-        : client.agent.resumeSession({ sessionId: session.sessionId, cwd: folder, mcpServers })).pipe(Effect.mapError(() => rejected("adapter session failed")));
+        : client.agent.resumeSession({ sessionId: session.sessionId, cwd: folder, mcpServers })).pipe(Effect.mapError((error) => {
+          const text = JSON.stringify(error);
+          const signedOut = /authentication required/i.test(text);
+          return new RunnerRejected({ reason: "adapter session failed", startFailure: signedOut
+            ? harness.id === "codex" && input.account.id !== "codex" ? "private-login-not-signed-in" : "not-signed-in" : "could-not-start" });
+        }));
       if ("sessionId" in opened && typeof opened.sessionId === "string") processEntry.sessionId = opened.sessionId;
       if (processEntry.sessionId === "" || (yield* redactText(processEntry.sessionId, processEntry.covered)) !== processEntry.sessionId) return yield* rejected("adapter session identifier refused");
       yield* checkChildFolder;
