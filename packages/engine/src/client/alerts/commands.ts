@@ -15,9 +15,12 @@ const list = ({ runtime, snapshot, actor }: Input, payload: Record<string, unkno
   const view = clientView(snapshot.client);
   const rows = Object.values(view.alerts).filter((row) => row.sequence > (payload.after as number)
     && (payload.status === undefined || row.status === payload.status)).sort((a, b) => a.sequence - b.sequence);
-  const page = rows.slice(0, payload.limit as number);
   const items = [];
-  for (const row of page) {
+  let bytes = 2;
+  let next: number | undefined;
+  let lastSequence = 0;
+  for (const row of rows) {
+    if (items.length >= (payload.limit as number)) { next = lastSequence; break; }
     // Reducers use only events and sequences. Timestamps come from the log,
     // so both the live projection and its rebuild remain deterministic.
     const times = yield* runtime.sql<{ sequence: number; occurred_at: number }>`
@@ -27,7 +30,7 @@ const list = ({ runtime, snapshot, actor }: Input, payload: Record<string, unkno
       generation: mark.generation, attempt: mark.attempt,
       ...(mark.status === "failed" ? { status: mark.status, reason: mark.reason, final: mark.final } : { status: mark.status }),
     };
-    items.push({ alertId: row.alertId, alertKey: row.alertKey, kind: row.kind, title: row.title,
+    const item = { alertId: row.alertId, alertKey: row.alertKey, kind: row.kind, title: row.title,
       sourceSequence: row.sourceSequence, status: row.status,
       ...(delivery === undefined ? {} : { delivery }),
       raisedAt: times.find((time) => time.sequence === row.sequence)!.occurred_at,
@@ -35,9 +38,14 @@ const list = ({ runtime, snapshot, actor }: Input, payload: Record<string, unkno
       ...(row.subject === undefined ? {} : { subject: row.subject }),
       ...(row.baseline === undefined ? {} : { baseline: row.baseline }),
       ...(row.clearedSequence === undefined ? {} : { clearedAt: times.find((time) => time.sequence === row.clearedSequence)!.occurred_at }),
-    });
+    };
+    const size = Buffer.byteLength(JSON.stringify(item)) + (items.length > 0 ? 1 : 0);
+    if (items.length > 0 && bytes + size > 900 * 1024) { next = lastSequence; break; }
+    items.push(item);
+    bytes += size;
+    lastSequence = row.sequence;
   }
-  return { reply: { requestId: payload.requestId, items, ...(rows.length > page.length ? { next: page.at(-1)!.sequence } : {}) } };
+  return { reply: { requestId: payload.requestId, items, ...(next === undefined ? {} : { next }) } };
 }).pipe(Effect.catchTag("SqlError", () => Effect.fail(refused("database read failed"))));
 
 export const alertReads = { "client.alerts.list": list, "client.alerts.settings": settings } satisfies Record<string, ReadHandler>;

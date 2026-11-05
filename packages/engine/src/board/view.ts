@@ -33,18 +33,24 @@ interface FoldIndexes {
   readonly parents: Keyed<Actor>;
   readonly acceptedWakes: Keyed<EventSequence>;
   readonly closures: Keyed<{ readonly closer: BoardAuthor; readonly sequence: EventSequence }>;
+  readonly ownerNoAnswers: Keyed<AgentId>;
 }
 export interface BoardFold extends BoardView, FoldIndexes {}
 const indexes = (state: BoardView): FoldIndexes => {
   const stored = state as BoardView & Partial<FoldIndexes>;
-  return { parents: stored.parents ?? keyed(), acceptedWakes: stored.acceptedWakes ?? keyed(), closures: stored.closures ?? keyed() };
+  return { parents: stored.parents ?? keyed(), acceptedWakes: stored.acceptedWakes ?? keyed(), closures: stored.closures ?? keyed(),
+    ownerNoAnswers: stored.ownerNoAnswers ?? keyed() };
 };
+
+// The first resolution owns the alert until the post closes, even if a
+// recipient's disposition changes later. Rebuild retains the live identity.
+export const firstOwnerNoAnswer = (state: BoardView, postId: PostId): AgentId | undefined => get(indexes(state).ownerNoAnswers, postId);
 
 export const emptyBoard = (): BoardFold => ({
   channels: keyed(), posts: keyed(), completions: keyed(), noAnswers: keyed(), wakes: keyed(),
   lastTurnEnd: keyed(), ceilings: keyed(), stopped: [], lastStopped: keyed(), lastCrashed: keyed(),
   labels: keyed(), lastLabelLeft: keyed(), lastMemberLeft: keyed(), readState: keyed(),
-  parents: keyed(), acceptedWakes: keyed(), closures: keyed(),
+  parents: keyed(), acceptedWakes: keyed(), closures: keyed(), ownerNoAnswers: keyed(),
 });
 
 const channelPosts = (state: BoardView, channelId: string): ReadonlyArray<BoardPostView> =>
@@ -189,6 +195,10 @@ export const boardAfter = (state: BoardView, envelope: Pick<EventEnvelope, "even
         decidingReplies: event.decidingPostId === undefined ? post.decidingReplies : put(post.decidingReplies, key, event.decidingPostId),
       };
       let next: BoardView = { ...state, posts: put(state.posts, post.postId, updated) };
+      if (event.disposition === "no-answer" && event.authorIsOwner && event.addressee._tag === "agent"
+        && firstOwnerNoAnswer(state, post.postId) === undefined) {
+        next = { ...next, ...indexes(state), ownerNoAnswers: put(indexes(state).ownerNoAnswers, post.postId, event.addressee.agentId) } as BoardFold;
+      }
       const notice = noticeKey(post.postId, event.addressee);
       if (event.disposition === "no-answer" && post.author._tag === "agent" && !state.stopped.includes(post.author.agentId)) {
         next = { ...next, noAnswers: put(next.noAnswers, notice, {

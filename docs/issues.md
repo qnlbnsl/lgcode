@@ -7171,3 +7171,77 @@ State: fixed in the regression suite.
 What happened: Snapshot replay compared identities without the changing control fields. Capacity parity omitted the hold boolean. Several wait fixtures could pass despite stale state or an omitted retry. The visibility fixtures reopened subscriptions after availability changes. The frame-boundary fixture stopped at its oversized marker.
 
 What changed: Snapshot replay compares groups, lifecycle, counts and holders before, during and after publication for the owner and a fixed agent read set. The fold property compares capacity holds through release, stop and crash. Both wait modes begin with an empty held queue. The quiet retry respects its cursor. The resumed-member case publishes a complete boundary while one member works. The permission matrix covers an answered suffix and a genuinely held control in both delivery phases and modes. Both socket subscription surfaces remain open through pause, crash and recovery, and replay old events with recovered rights. A separate current-holder oracle replaces the static event matrix. The transport-boundary stream must deliver ordered catch-up and live tails after its marker. Temporary fault mutations verify the strengthened assertions.
+
+## 435. The first alert scan selected a different silent recipient from the live follower
+
+Found: 2026-11-05, foundation review record FR-041.
+State: fixed.
+
+What happened: The live follower kept the first no-answer resolution for an owner post. The first-start scan instead chose the first silent recipient in the post's recipient list. Reversed resolution order therefore linked the same matter to different agent threads.
+
+What changed: The board fold retains the first agent whose no-answer resolution raised the owner's alert. The first-start scan uses that replayed identity for as long as the post remains open.
+
+Validation: Reversed two-recipient scenarios compare the live and rebuilt alert keys, kinds, subjects, agent identifiers, and production thread routes. Both closing the post and dismissing its alert clear one alert without raising a duplicate. The regression failed against the original scan.
+
+## 436. Alert list reads ignored the encoded page budget
+
+Found: 2026-11-05, foundation review record FR-045.
+State: fixed.
+
+What happened: The alert reader applied only the item-count limit. Two individually valid piece subjects could exceed the 900 kibibyte budget together, without returning a continuation cursor.
+
+What changed: The reader counts the complete encoded items, including array punctuation, escaping, timestamps, and delivery metadata. It retains the first whole item even when that item exceeds the budget. When another matching row remains, the cursor identifies the last included row.
+
+Validation: The public command path covers large escaped and multibyte subjects, exact and one-byte-over boundaries, status filtering, cleared rows, the count limit, an oversized first item, and cursor progress. The over-budget cases failed against the original reader.
+
+## 437. The carrier configuration test inspected baseline exclusion before work completed
+
+Found: 2026-11-05, foundation review record FR-061.
+State: fixed.
+
+What happened: The test waited for one ordinary alert's delivery and then immediately asserted that no baseline alert had been sent. A delayed worker could run after those assertions.
+
+What changed: A test helper observes the production delivery follower through its existing services. A subsequent reconciliation scan and joins of its worker fibers establish completion before the negative assertions. The test checks both successful and failed baseline attempts.
+
+Validation: A temporary fault that permits baseline delivery and delays its worker is rejected by the corrected test. The fault is restored before committing.
+
+## 438. The first-start tests did not start with a persisted carrier
+
+Found: 2026-11-05, foundation review record FR-070.
+State: fixed.
+
+What happened: Existing first-start coverage had no carrier configuration before the initial scan. It could not prove suppression of baseline delivery together with later live delivery.
+
+What changed: The new scenario persists a carrier and an open question with the client follower absent. It then starts the real follower and sender against a local fake carrier. It waits for a later live question to be delivered and for delivery work to complete.
+
+Validation: The scenario requires exactly one carrier request and one delivered live alert, with no baseline delivery or failure attempt. Temporary baseline-send and disabled-all-sends faults are rejected. No physical phone is involved.
+
+## 439. The alert crash fixtures missed the required process-death boundaries
+
+Found: 2026-11-05, foundation review record FR-075.
+State: fixed.
+
+What happened: The source crash fixture had no active client follower. The baseline fixture injected a handled database failure instead of killing the writer inside its transaction.
+
+What changed: A child now parks the real follower after it reads the source envelope and before appending its reaction. A second child parks after all baseline rows are staged on the transaction's writer connection and before commit. The parent kills each child with the SIGKILL signal.
+
+Validation: The parent verifies the durable source and absent reaction, or complete absence of baseline rows after rollback. Two reopens require one recovered alert or one complete baseline, stable alert identifiers, and progress on later sources. Temporary lost-source and split-baseline faults are rejected. The handled-write-failure and recovery-gate scenarios remain.
+
+
+## 440. Two new alert regressions selected different baseline threads
+
+Found: 2026-11-05, while integrating the foundation board-recovery and alert repairs.
+State: fixed.
+
+What happened: The new first-start recovery fixture expected recipient-list order.
+The independently verified alert repair preserves the first actual no-answer resolution.
+The combined test failed with the correct recovered agent identity.
+
+What changed: Both regressions remain.
+The first-start fixture now expects the first resolved agent and explains that rule.
+Its baseline, subject, unique-key, no-delivery and close assertions remain.
+The separate live-versus-rebuild tests retain exact thread routes through close and dismiss.
+
+Validation: The combined four-test file failed only at the old recipient-order expectation.
+The same tests pass after that expectation is reconciled with the cause repair.
+The run retains both logs and the complete resolution diff.

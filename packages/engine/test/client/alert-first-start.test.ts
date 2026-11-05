@@ -8,6 +8,35 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { makeRig, removeRig, seedAgent } from "../support/handlerRig.ts";
 import { eventually, pause } from "../support/routingRig.ts";
 import { alertLog, append, awaitCleared, awaitRaised, barrier, eventsOf, fixtureEvent, permission, pieceLists, question, quietLists, raised, withAlerts } from "../support/alertsRig.ts";
+import { configure, delivered, ntfyServer, posts, raiseQuestion, withCarrier } from "../support/carrierRig.ts";
+import { engineLists } from "../../src/pieces/lists.ts";
+import { settledDelivery } from "../support/settledDelivery.ts";
+
+it("FR-070 a carrier persisted before the first scan suppresses all baseline attempts and delivers a later live matter", async () => {
+  const rig = makeRig(); const server = await ntfyServer();
+  const delivery = settledDelivery();
+  try {
+    await withAlerts(() => Effect.gen(function* () {
+      yield* registerRebuildCheck();
+      yield* configure(server.origin);
+      yield* seedAgent({ id: "worker", state: "working" });
+      yield* question("worker", "pre-feature");
+      expect(yield* eventsOf("client.AlertBaseline")).toEqual([]);
+    }), { rig, lists: quietLists(engineLists) });
+    await withCarrier(() => Effect.gen(function* () {
+      yield* registerRebuildCheck();
+      const baseline = yield* awaitRaised("question:pre-feature");
+      expect(baseline).toHaveLength(1);
+      expect(baseline[0]!.event.baseline).toBe(true);
+      const id = yield* raiseQuestion("after-feature");
+      expect(yield* delivered(id)).toHaveLength(1);
+      yield* delivery.settle;
+      expect(posts(server)).toHaveLength(1);
+      expect((yield* eventsOf("client.AlertDelivered")).map((row) => row.event.alertId)).toEqual([id]);
+      expect(yield* eventsOf("client.AlertDeliveryFailed")).toEqual([]);
+    }), { rig, initialize: false, lists: delivery.lists });
+  } finally { await server.close(); removeRig(rig); }
+});
 
 it("6.16 first start scans only open engine and piece matters in one baseline batch, then marks later sources as live", async () => {
   const rig = makeRig();
