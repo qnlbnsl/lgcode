@@ -7314,3 +7314,108 @@ first-attempt delivery before the failed alert can retry.
 
 Verification: A temporary worker fault that blocks later alerts after a failure
 makes both progress checks fail. No physical phone or external carrier was used.
+
+## 445. The real web service fixtures skipped their live-view rebuild comparison
+
+Found: 2026-11-05, while repairing foundation review record FR-068.
+State: fixed.
+
+What happened: The child services opened durable event logs, but the parent
+fixtures declared that they had no log to compare.
+Setup, running and restarted instances closed without comparing live views.
+
+What changed: Each web child has a scoped stop operation that calls the existing
+owner-only debug comparison before stopping the process.
+Explicit stops and scope cleanup use that same operation.
+The no-password, environment, redaction and durable-outage fixtures use it.
+Comparison failures report no live values.
+
+Verification: A temporary live-only projection field passes the original
+fixtures and fails all three assigned child-service test files.
+The mutation is restored before committing.
+
+## 446. The heartbeat test did not require survival at the second tick
+
+Found: 2026-11-05, while repairing foundation review record FR-105.
+State: fixed.
+
+What happened: The missed-heartbeat test waited through the second tick without
+checking that the nonresponding connection remained open.
+It could accept termination after one unanswered heartbeat.
+
+What changed: The test requires both connections to remain open at 50 seconds,
+after allowing network processing.
+It still requires the nonresponding connection to close at 75 seconds.
+The healthy connection remains its positive control.
+
+Verification: A temporary one-miss threshold passes the original test and fails
+the new 50-second assertion.
+The mutation is restored before committing.
+
+## 447. The disable test proved eventual closure without proving its order
+
+Found: 2026-11-05, while repairing foundation review record FR-107.
+State: fixed.
+
+What happened: Polling until a port refused connections did not establish that
+the server had stopped accepting before the settings command returned.
+
+What changed: One test retains an accepted web connection and checks its closure.
+Another observes real listener-close and accepted-socket-destroy operations.
+It requires both operations before settings completion.
+It does not require synchronous close delivery to the peer.
+
+Verification: Temporarily delaying listener teardown passes the original test
+and fails the new ordering assertion.
+The mutation is restored before committing.
+
+## 448. The session-expiry test advanced only Effect time
+
+Found: 2026-11-05, while repairing foundation review record FR-109.
+State: fixed.
+
+What happened: A session lifetime implemented with the JavaScript wall clock
+could survive the test's adjustment of Effect time alone.
+
+What changed: The test advances Date.now after session creation as well as the
+Effect test clock.
+It restores the wall-clock observer through scope cleanup.
+Network timers and engine followers continue to use real scheduling.
+
+Verification: A temporary wall-clock session lifetime passes the original test
+and fails the updated session check.
+The mutation is restored before committing.
+
+## 449. The bind-retry test reset the supervisor before proving repeated recovery
+
+Found: 2026-11-05, while repairing foundation review record FR-116.
+State: fixed.
+
+What happened: The outage test replaced the listener after one failed retry.
+A supervisor that retried only once per lifetime could pass.
+
+What changed: A new regression holds one port through two failed retries of one
+supervisor, then releases it and requires its next attempt to succeed.
+It observes actual bind attempts at each 30-second boundary.
+The existing restart, outage and disable controls remain.
+
+Verification: A temporary one-retry supervisor passes the original outage test
+and fails the new repeated-retry assertion.
+The mutation is restored before committing.
+
+## 450. The proxy-mode test changed the public address at the same time
+
+Found: 2026-11-05, while repairing foundation review record FR-117.
+State: fixed.
+
+What happened: The proxy-mode invalidation fixture also changed publicAddress.
+It could pass when only address changes invalidated connections.
+
+What changed: Separate cases toggle only proxyMode in both directions.
+Each starts with a canonical public address and two established connections.
+Each requires both connections to close.
+The other setting-change cases remain.
+
+Verification: Temporarily retaining connections for a proxy-only change passes
+the original setting-change tests and fails both new direction cases.
+The mutation is restored before committing.

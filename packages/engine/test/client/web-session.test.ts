@@ -2,7 +2,7 @@ import { lstatSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as Effect from "effect/Effect";
 import * as TestClock from "effect/testing/TestClock";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { connected, eventually, login, post, withWeb } from "../support/webRig.ts";
 
@@ -44,6 +44,11 @@ it("5.6 logout: catches leaving either connection open or allowing an old cookie
 
 it("5.6 no expiry: catches adding a time-to-live or renewal requirement to the session", async () => withWeb((ctx) => Effect.gen(function* () {
   const { cookie } = yield* login(ctx);
+  // TestClock controls Effect time only. Move the wall clock after session
+  // creation too, without replacing network timers or engine follower time.
+  const future = Date.now() + 365 * 24 * 60 * 60 * 1_000;
+  yield* Effect.acquireRelease(Effect.sync(() => vi.spyOn(Date, "now").mockReturnValue(future)),
+    (clock) => Effect.sync(() => clock.mockRestore()));
   yield* TestClock.adjust(365 * 24 * 60 * 60 * 1_000);
   expect((yield* Effect.promise(() => post(ctx, "/api/session", undefined, { Cookie: cookie }))).status).toBe(204);
 }), { clock: true }));

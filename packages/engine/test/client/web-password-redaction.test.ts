@@ -66,7 +66,7 @@ await import(${JSON.stringify(pathToFileURL(fakeAgentPath).href)});
         }
       }
     } finally { database.close(); }
-    service.child.kill("SIGTERM"); yield* Effect.promise(() => service.exit);
+    yield* service.stop;
     expect([password, session].some((value) => service.output().includes(value)), "service log leaked a generated web secret").toBe(false);
   })));
 });

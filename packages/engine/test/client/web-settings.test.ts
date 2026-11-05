@@ -58,13 +58,12 @@ it("5.16 terminal settings: catches preventing the owner's terminal from restori
   yield* login(ctx);
 })));
 
-for (const field of ["enabled", "port", "proxyMode", "publicAddress"] as const) {
+for (const field of ["enabled", "port", "publicAddress"] as const) {
   it(`5.16 any change ${field}: catches invalidating connections for only a subset of settings`, async () => withWeb((ctx) => Effect.gen(function* () {
     const { cookie } = yield* login(ctx);
     const stream = yield* connected(ctx, cookie); const read = yield* connected(ctx, cookie);
     const changed = field === "enabled" ? { ...ctx.settings, enabled: false }
       : field === "port" ? { ...ctx.settings, port: ctx.settings.port === 65535 ? 65534 : ctx.settings.port + 1 }
-      : field === "proxyMode" ? { ...ctx.settings, proxyMode: true, publicAddress: "https://shephrd.example.test" }
       : { ...ctx.settings, publicAddress: "https://shephrd.example.test" };
     yield* setSettings(changed);
     yield* eventually(() => [stream.readyState, read.readyState], (states) => states.every((state) => state === 3), "a settings field changed without closing all connections");
@@ -75,6 +74,17 @@ for (const field of ["enabled", "port", "proxyMode", "publicAddress"] as const) 
       expect(result.status).toBe(101);
     }
   })));
+}
+
+for (const proxyMode of [false, true]) {
+  it(`5.16 proxy mode ${proxyMode} to ${!proxyMode}: catches preserving either connection when only proxyMode changes`, async () => withWeb((ctx) => Effect.gen(function* () {
+    const { cookie } = yield* login(ctx);
+    const stream = yield* connected(ctx, cookie); const read = yield* connected(ctx, cookie);
+    yield* setSettings({ ...ctx.settings, proxyMode: !proxyMode });
+    yield* eventually(() => [stream.readyState, read.readyState], (states) => states.every((state) => state === 3),
+      "changing only proxyMode left an established connection open");
+    expect(yield* readSettings).toMatchObject({ proxyMode: !proxyMode, publicAddress: "https://shephrd.example.test" });
+  }), { settings: { proxyMode, publicAddress: "https://shephrd.example.test" } }));
 }
 
 it("5.16 public address replacement: catches accepting a reconnect under the old origin after its connection was closed", async () => withWeb((ctx) => Effect.gen(function* () {

@@ -42,6 +42,8 @@ it("5.11 missed heartbeats: catches keeping a dead client, closing after only on
   yield* pause();
   expect(dead.readyState).toBe(1);
   yield* TestClock.adjust(1); yield* pause();
+  expect(dead.readyState, "one unanswered heartbeat must not close the client at 50 seconds").toBe(1);
+  expect(healthy.readyState).toBe(1);
   yield* TestClock.adjust(25_000); yield* pause();
   yield* eventually(() => dead.readyState, (state) => state === 3, "a client missing two heartbeats stayed open");
   expect(healthy.readyState).toBe(1);
