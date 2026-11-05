@@ -166,8 +166,11 @@ it("4c first prompt: catches dropping the initial queued delivery carried by Age
   expect(result.agents["agent-a"]?.state).toEqual({ _tag: "starting" });
 });
 
-it("4c requests: catches losing permission details, the moved holder, or the selected answer", () => {
-  const moved = [...ready, permission, event({
+const permissionWithAction = event({ ...permission, toolKind: "execute", toolInput: { command: "inspect configuration" },
+  locations: [{ path: "settings.json" }], inputRedacted: true, inputTruncated: true });
+
+it("4c requests: catches losing permission details, the moved holder, the selected answer, or retaining the answered action", () => {
+  const moved = [...ready, permissionWithAction, event({
     _tag: "PermissionMoved", agentId: "agent-a", permissionRequestId: "permission-a", from: owner,
     to: { _tag: "agent", agentId: "agent-b" }, deliveryId: "moved-permission",
   })];
@@ -176,16 +179,25 @@ it("4c requests: catches losing permission details, the moved holder, or the sel
     toolCallId: "tool-a", description: "Read the file?", settingsWrite: false,
     options: [{ id: "once", name: "Allow once", kind: "allow_once", level: "read-only", persistent: false }],
   });
-  expect(fold([...moved, event({
+  expect(fold(moved).requests["permission-a"]?.action).toEqual({ toolKind: "execute", toolInput: { command: "inspect configuration" },
+    locations: [{ path: "settings.json" }], inputRedacted: true, inputTruncated: true });
+  const answered = fold([...moved, event({
     _tag: "PermissionAnswered", agentId: "agent-a", permissionRequestId: "permission-a",
     answeredBy: { _tag: "agent", agentId: "agent-b" }, answer: { _tag: "selected", optionId: "once" },
-  })]).requests["permission-a"]).toMatchObject({ status: "answered", answer: { _tag: "selected", optionId: "once" } });
+  })]).requests["permission-a"];
+  expect(answered).toMatchObject({ status: "answered", answer: { _tag: "selected", optionId: "once" },
+    answeredBy: { _tag: "agent", agentId: "agent-b" } });
+  expect(answered).not.toHaveProperty("action");
 });
 
-it("4c requests: catches keeping a cancelled permission open after its adapter disappears", () => {
-  expect(fold([...ready, permission, event({
+it("4c requests: catches keeping a cancelled permission open or retaining its action after its adapter disappears", () => {
+  expect(fold([...ready, permissionWithAction]).requests["permission-a"]?.action).toEqual({ toolKind: "execute",
+    toolInput: { command: "inspect configuration" }, locations: [{ path: "settings.json" }], inputRedacted: true, inputTruncated: true });
+  const cancelled = fold([...ready, permissionWithAction, event({
     _tag: "PermissionCancelled", agentId: "agent-a", permissionRequestId: "permission-a", reason: "recovery",
-  })]).requests["permission-a"]).toMatchObject({ status: "cancelled", reason: "recovery" });
+  })]).requests["permission-a"];
+  expect(cancelled).toMatchObject({ status: "cancelled", reason: "recovery" });
+  expect(cancelled).not.toHaveProperty("action");
 });
 
 it("4c questions: catches losing the question, its reassignment or the owner's answer", () => {

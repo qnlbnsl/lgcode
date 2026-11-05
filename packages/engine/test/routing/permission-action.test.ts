@@ -38,7 +38,8 @@ for (const action of [
       if ("inputRedacted" in action) expect(text).toContain("Part of the action's input is hidden, because redaction changed it.");
       if ("inputTruncated" in action) expect(text).toContain("The action's input is cut at 8 KiB.");
       const view = yield* snapshot;
-      if ("toolInput" in action) expect(view.requests.permission).toHaveProperty("action.toolInput", action.toolInput);
+      if ("toolInput" in action) expect(view.requests.permission?.action).toEqual(action);
+      else expect(view.requests.permission).not.toHaveProperty("action");
       const publicView = yield* clientSnapshot({ _tag: "owner" });
       const withoutDisplays = {
         ...publicView,
@@ -52,8 +53,15 @@ for (const action of [
       const movedText = movedDelivery?._tag === "DeliveryQueued" && movedDelivery.delivery.content._tag === "prompt" ? movedDelivery.delivery.content.text : "";
       // Markers and delivery ids change, but the whole action section remains.
       expect(movedText.split("\n").slice(1, -1)).toEqual(text.split("\n").slice(1, -1));
-      const closed = project(view, [eventOf({ _tag: "PermissionCancelled", agentId: child.agentId, permissionRequestId: "permission", reason: "agent stopped" })]);
-      expect(closed.requests.permission).not.toHaveProperty("action");
+      const answered = project(view, [eventOf({ _tag: "PermissionAnswered", agentId: child.agentId,
+        permissionRequestId: "permission", answeredBy: { _tag: "agent", agentId: agentIdOf("parent") },
+        answer: { _tag: "selected", optionId: "once" } })]);
+      expect(answered.requests.permission).toMatchObject({ status: "answered", answer: { _tag: "selected", optionId: "once" },
+        answeredBy: { _tag: "agent", agentId: "parent" } });
+      expect(answered.requests.permission).not.toHaveProperty("action");
+      const cancelled = project(view, [eventOf({ _tag: "PermissionCancelled", agentId: child.agentId, permissionRequestId: "permission", reason: "agent stopped" })]);
+      expect(cancelled.requests.permission).toMatchObject({ status: "cancelled", reason: "agent stopped" });
+      expect(cancelled.requests.permission).not.toHaveProperty("action");
     }));
   });
 }
