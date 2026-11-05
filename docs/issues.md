@@ -5594,7 +5594,7 @@ Why it matters: Event text read by an agent is not marked as data, so it could b
 ## 322. `runner/translate.ts` drops the tool-call id from file-change content
 
 Found: 2026-11-03, while planning the client API plan.
-State: fixed on the foundation fix branch, pending independent verification.
+State: fixed and independently verified in the foundation fix run.
 
 What happened: A Codex diff lost the tool-call identity before it reached the event log.
 What changed: Both diff shapes retain the optional `content.callId` through the runner and persistence.
@@ -6040,7 +6040,7 @@ Verification: The socket-level cache runtime tests cover settings committed befo
 ## 372. The owner conversation clients omit outgoing sources and delivery history
 
 Found: 2026-11-04, in foundation review finding FR-002.
-State: fixed, pending independent verification.
+State: fixed and independently verified in the foundation fix run.
 
 What happened: The browser filtered out queued deliveries whose target is nested
 inside the delivery. The terminal viewer required an envelope agent identity,
@@ -6132,7 +6132,7 @@ eligible turn end, and the end of the original duty after acceptance.
 ## 375. The terminal permission context omits correlated file changes
 
 Found: 2026-11-04, while repairing foundation review record FR-005.
-State: fixed on `fix/foundation-005`, pending independent verification.
+State: fixed and independently verified in the foundation fix run.
 
 What happened: `packages/viewer/src/actions.ts` accepted only tool-call content when a permission request had no input. It omitted file-change content even when the content carried the request's tool-call identity. The upstream identity repair in issue 322 could not repair this independent filter.
 
@@ -6316,3 +6316,15 @@ activity and refuses a continuation after the lead loses management rights.
 
 Why it matters: A long worker history must remain recoverable without widening
 sequence ranges across unrelated events or refusing the summary.
+
+
+## 386. The board-alert browser test uses an ambiguous reply locator
+
+Found: 2026-11-04, by the combined first-phase browser gate after the FR-002 conversation-history repair.
+State: fixed.
+
+What happened: The reply text appears in its board subject and in the newly visible outgoing delivery. The browser test matched both elements with one global substring locator. The page displayed the reply correctly, but the locator failed its strict uniqueness check.
+
+What changed: The browser assertion selects the exact reply inside the named Board post region. The exact single runner wake, removed reply form, and durable alert-clear assertions remain. Production code is unchanged.
+
+Validation: The corrected browser case passed. A temporary rendering mutation kept the outgoing reply visible while replacing the subject reply. Two explicit browser preconditions established that state, and the corrected locator then failed at the missing subject reply. The production file and temporary proof assertions were restored byte-for-byte before the commit.

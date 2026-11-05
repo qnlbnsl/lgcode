@@ -99,7 +99,7 @@ test("7.4 a phone owner follows the board alert, reads and replies, and wakes th
           expect(widths.document).toBeLessThanOrEqual(widths.viewport)
           await page.getByRole("textbox", { name: "Reply", exact: true }).fill("I will review it.")
           await page.getByRole("button", { name: "Send reply", exact: true }).click()
-          await expect(page.getByText("I will review it.")).toBeVisible()
+          await expect(page.getByRole("region", { name: "Board post", exact: true }).getByText("I will review it.", { exact: true })).toBeVisible()
           await expect.poll(() => runner.callsOf("prompt").length).toBe(1)
           await expect(page.getByRole("textbox", { name: "Reply", exact: true })).toHaveCount(0)
         })
