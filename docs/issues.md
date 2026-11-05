@@ -6201,3 +6201,14 @@ What happened: The alert reactor checked a stop or crash against the latest snap
 What changed: A stop or crash closes an earlier question or approval alert according to the lifecycle event's sequence. A question source or resume from before a later stop or crash cannot raise an obsolete alert. The latest resume renews an open owner-held question with the same key and a fresh alert identifier.
 
 Why it matters: The returning question can notify the owner again after follower lag. The regression covers stopped and crashed agents with delivered and baseline alerts. Both lifecycle commits precede catch-up, either in the same service or across a restart. The real stop and resume commands, durable alert state, local carrier requests, and another restart are checked. The local carrier receives the replacement identifier exactly once. The test also rejects sources from obsolete runs. It does not verify a notification on the owner's physical phone.
+
+## 381. A failed viewer refresh leaves an acknowledged action available to resend
+
+Found: 2026-11-04, while repairing foundation review record FR-014.
+State: fixed.
+
+What happened: The terminal viewer cleared a prompt or answer only after its following snapshot read succeeded. A failed read left the acknowledged draft or permission controls active. Pressing Enter sent another action with a new request identifier. An uncertain send also received a new identifier when the owner retried it.
+
+What changed: The viewer retires acknowledged prompts and answers before refreshing its snapshot. It reports a failed refresh separately from the successful send. The connection retains an uncertain attempt's body and identifier for an unchanged retry. A confirmed send, a definite command refusal, or an edited body ends that attempt. Retry state lasts for the current viewer connection.
+
+Verification: `packages/viewer/test/send-recovery.test.tsx` drives the real Ink terminal interface and socket client. Its prompt, question and permission cases assert one write after acknowledgement and refresh failure. Its lost-acknowledgement prompt case uses the real command handler, delivery planner and SQLite receipts to check one durable receipt and delivery after retry. The answer cases check stable identifiers after transport failure and fresh identifiers after confirmation, refusal or an edit.

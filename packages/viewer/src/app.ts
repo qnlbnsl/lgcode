@@ -64,6 +64,16 @@ export function ViewerApp({ client }: { readonly client: ViewerClient }) {
     }).finally(() => { locked.current = false; if (mounted.current) setBusy(false); });
   };
 
+  const finishSend = async (confirmation: string) => {
+    // The write is acknowledged. Retire it before any fallible read so Enter
+    // cannot turn a failed roster refresh into a second write.
+    if (mounted.current) { setDraft(""); setMode("thread"); setReview(undefined); setMessage(confirmation); }
+    try { await session.refresh(); }
+    catch {
+      if (mounted.current) setMessage(`${confirmation} The roster could not be refreshed. Press r to reload.`);
+    }
+  };
+
   const openRequest = (row: RequestRow) => {
     setReview(undefined);
     setOptionIndex(0);
@@ -105,8 +115,7 @@ export function ViewerApp({ client }: { readonly client: ViewerClient }) {
           if (mode === "prompt" && draftTarget !== undefined) await promptAgent(client, draftTarget, draft);
           else if (mode === "question" && review !== undefined && stillOpen) await client.answer({ kind: "question", id: review.row.id, text: draft });
           else throw new Error("The question is closed");
-          await session.refresh();
-          if (mounted.current) { setDraft(""); setMode("thread"); setReview(undefined); setMessage("Sent."); }
+          await finishSend("Sent.");
         });
       } else if (key.backspace || key.delete) setDraft((value) => Array.from(value).slice(0, -1).join(""));
       else if (!key.ctrl && !key.meta && !key.upArrow && !key.downArrow && !key.leftArrow && !key.rightArrow) appendDraft(input);
@@ -126,8 +135,7 @@ export function ViewerApp({ client }: { readonly client: ViewerClient }) {
           if (review.row.kind === "question") { setDraft(""); setMode("question"); }
           else if (review.permission !== undefined && options[optionIndex] !== undefined) perform(async () => {
             await answerRequest(client, review.permission!, options[optionIndex]!.id);
-            await session.refresh();
-            if (mounted.current) { setReview(undefined); setMode("thread"); setMessage("Answered."); }
+            await finishSend("Answered.");
           });
         }
       }
