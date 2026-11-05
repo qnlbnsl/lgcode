@@ -6018,3 +6018,33 @@ State: fixed in the foundation fix for FR-008.
 What happened: An enabled startup initialized each sheepdog rule, but a switch from off to on only re-armed timers. The cache rule therefore kept an empty target map and never loaded the configured home or harness cache lifetimes. Existing eligible turns received no cache maintenance. Later turns with unsplit context usage also received none until a harness settings change or an enabled restart loaded the lifetime.
 What changed: A switch from off to on now runs the same rule initialization as an enabled startup before arming timers. The cache rule reloads settings and reconstructs targets from current agents and their recorded turns. A future deadline keeps its original expiry. A missed cache deadline is dropped. Repeated activation does not repeat an action.
 Verification: The socket-level cache runtime tests cover settings committed before disabled startup, existing and subsequent unsplit turns, missed deadlines, repeated activation, and Claude transcript reconstruction from the default home and both account-specific home settings. Five regression cases failed against the unfixed loop because no compaction was delivered. The missed-deadline case already passed and remains a guard against extending expiry at activation.
+
+## 372. The owner conversation clients omit outgoing sources and delivery history
+
+Found: 2026-11-04, in foundation review finding FR-002.
+State: fixed, pending independent verification.
+
+What happened: The browser filtered out queued deliveries whose target is nested
+inside the delivery. The terminal viewer required an envelope agent identity,
+which those deliveries do not have. The browser displayed `PromptSent`, although
+the engine records a first prompt inside `AgentStarted` and later prompts inside
+`DeliveryQueued`. It also omitted question answers and delivery states.
+Oversized sources could not be recovered from a current snapshot after the
+delivery had settled. A terminal reconnect could skip events missed during the
+disconnection.
+
+What changed: Both clients select queued sources by their delivery target.
+The browser renders first and later prompt sources, question answers, and the
+delivery history joined by delivery identity. It reads oversized display events
+by sequence before advancing its stream cursor. The terminal viewer reloads
+the selected thread when reconnecting. The engine's visibility rules remain
+the authority for every read.
+
+Verification: The conversation history regressions cover split pages, sources
+without a top-level agent identity, later delivery states, and oversized live
+sources across reconnect. A browser regression exercises both clients against
+the public engine interface for first and later prompts, a question answer,
+a board delivery, an oversized prompt, and history after reopening.
+
+Why it matters: The owner can read the conversation and its delivery outcome
+from either client without exporting the durable event log.

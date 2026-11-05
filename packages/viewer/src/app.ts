@@ -143,7 +143,7 @@ export function ViewerApp({ client }: { readonly client: ViewerClient }) {
     else if (key.tab) setRequestIndex((value) => (value + 1) % Math.max(1, requests.length));
     else if (input === "a" && pending !== undefined) openRequest(pending);
     else if (input === "p" && agent !== undefined) { setDraftTarget(agent.agentId); setDraft(""); setMode("prompt"); }
-    else if (input === "r") perform(async () => { await session.start(); await session.select(session.selectedAgentId); setMessage(""); });
+    else if (input === "r") perform(async () => { await session.start(); setMessage(""); });
   });
 
   const reviewMode = mode === "request" || mode === "question";

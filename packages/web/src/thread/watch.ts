@@ -28,7 +28,9 @@ export async function watchThread(
   }
   const put = (item: ThreadItem) => {
     if ("event" in item) {
-      if ("agentId" in item.event && item.event.agentId === agentId) items.set(`${item.sequence}:${item.event._tag}`, item)
+      const target = item.event._tag === "DeliveryQueued" ? item.event.delivery.target
+        : "agentId" in item.event ? item.event.agentId : item.agentId
+      if (target === agentId) items.set(`${item.sequence}:${item.event._tag}`, item)
     } else if (item.agentId === agentId && contentOnlyEventTags.some((tag) => tag === item.tag)
       && !([...items.values()].some((entry) => entry.sequence === item.sequence && "event" in entry))) items.set(`${item.sequence}:${item.tag}`, item)
   }
@@ -80,7 +82,17 @@ export async function watchThread(
               if (item.event._tag !== "ThreadItem" && item.event._tag !== "UnknownEvent") yield* refresh(item.sequence)
             } else if (item._tag === "client.Oversized") {
               if (contentOnlyEventTags.some((tag) => tag === item.tag)) put(item)
-              else yield* refresh(item.sequence)
+              else {
+                // Snapshot rows cannot recover closed answers or delivery
+                // sources. Read display events by sequence before advancing
+                // the stream cursor, including unscoped DeliveryQueued.
+                if (item.tag.startsWith("Delivery") || item.tag === "AgentStarted" || item.tag === "QuestionAsked"
+                  || item.tag === "PermissionRequested" || item.tag === "QuestionAnswered" || item.tag === "PermissionAnswered") {
+                  const reply = yield* client["client.event"]({ requestId: requestId(), sequence: item.sequence })
+                  if ("envelope" in reply) put(reply.envelope)
+                }
+                yield* refresh(item.sequence)
+              }
             }
             // A newer snapshot must not move the thread cursor past content
             // that is still queued on the stream connection.
