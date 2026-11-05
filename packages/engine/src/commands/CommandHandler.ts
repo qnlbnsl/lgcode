@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import {
-  EventEnvelope, commandOutcome,
+  EventEnvelope, commandOutcome, publicAddressError,
   type Caller, type Event, type HarnessSettings, type RequestId,
 } from "@shephrd/contracts";
 import * as Cause from "effect/Cause";
@@ -255,7 +255,8 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
               }
               return Schema.decodeUnknownSync(Schema.toType(rpc.payloadSchema))(value) as Record<string, unknown>;
             },
-            catch: (error) => name === "roles.settings.set" ? settingsRefusal(error) : refused(),
+            catch: (error) => name === "roles.settings.set" ? settingsRefusal(error)
+              : name === "client.web.settings.set" ? refused(`Invalid web settings. ${publicAddressError}`) : refused(),
           });
           const { requestId: id, ...body } = payload;
           const requestId = id as RequestId;

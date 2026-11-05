@@ -18,6 +18,11 @@ import {
   seedAccount, seedHarness, startPayload, success
 } from "../../engine/test/support/handlerRig.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
+import { httpsProxy } from "./support/httpsProxy.ts"
+
+// This browser test ignores errors for the proxy's self-signed certificate.
+// It installs no certificate trust; the production listener stays on HTTP.
+test.use({ ignoreHTTPSErrors: true })
 
 test("11.1 phone flow: catches a missing alert link, login, permission answer, agent release, or thread readback", async ({ page }) => {
   const rig = makeRig()
@@ -26,11 +31,13 @@ test("11.1 phone flow: catches a missing alert link, login, permission answer, a
   process.env.SHEPHRD_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url")
   const staticRoot = join(rig.root, "page")
+  let proxy: Awaited<ReturnType<typeof httpsProxy>> | undefined
   try {
     await build({ configFile: false, root: new URL("..", import.meta.url).pathname,
       logLevel: "silent", build: { outDir: staticRoot } })
     const port = await unusedPort()
-    const origin = `http://127.0.0.1:${port}`
+    proxy = await httpsProxy(port, rig.root)
+    const origin = proxy.origin
     const program = Effect.gen(function* () {
       const runner = yield* makeFakeRunner()
       const run = Effect.gen(function* () {
@@ -85,6 +92,9 @@ test("11.1 phone flow: catches a missing alert link, login, permission answer, a
           await page.getByLabel("Password", { exact: true }).fill(password)
           await page.getByRole("button", { name: "Log in", exact: true }).click()
           await expect(page.getByLabel("Situation", { exact: true })).toBeVisible()
+          expect(await page.evaluate(() => ({ secure: isSecureContext, uuid: typeof crypto.randomUUID })))
+            .toEqual({ secure: true, uuid: "function" })
+          expect((await page.context().cookies(origin)).some((cookie) => cookie.secure && cookie.httpOnly && cookie.sameSite === "Strict")).toBe(true)
           const documentHandle = await page.evaluateHandle(() => window.document)
           await page.goto(link.href)
           await expect(page).toHaveURL(link.href)
@@ -126,6 +136,7 @@ test("11.1 phone flow: catches a missing alert link, login, permission answer, a
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped)
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
   } finally {
+    await proxy?.close()
     await ntfy.close()
     if (previousHome === undefined) delete process.env.SHEPHRD_HOME
     else process.env.SHEPHRD_HOME = previousHome

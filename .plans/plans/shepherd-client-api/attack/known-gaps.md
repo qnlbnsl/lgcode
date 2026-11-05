@@ -60,10 +60,12 @@ close it. "Rows" are rows of `decisions.md` in this folder.
 - **A phone can get an alert twice.** Delivery is at least once. A crash
   after the carrier accepts and before the local record sends it again. ntfy's
   sequence id replaces the earlier one where the server honours it (row 106).
-- **Shephrd does not encrypt the password on the network.** With an `http` public
-  address, the password and the session cookie cross the owner's network unencrypted by
-  Shephrd, and only what the owner runs in front of it protects them. The owner chose
-  plain HTTP (row 198).
+- **The owner supplies HTTPS for the public page.** Shephrd serves HTTP on
+  loopback and requires an HTTPS public address (row 204). The owner configures
+  the external proxy's self-signed certificate. The owner accepts continuation
+  past the expected browser certificate warning, without installing certificate
+  trust. Shephrd holds no certificate. Interim remote access uses an SSH local
+  forward at `http://127.0.0.1:<port>`, with identical device and server ports.
 - **ntfy's own settings cannot be enforced.** The owner's server decides its
   access rules. `docs/remote-access.md` advises deny-all, and Shephrd cannot
   check it (row 115).

@@ -33,14 +33,14 @@ const cases = [
   { id: "missing-origin", host: "public", origin: "missing", forwarded: true, status: 403, secure: false },
 ] as const;
 
-for (const scheme of ["http", "https"]) for (const row of cases) {
-  it(`10.2 ${scheme} ${row.id}: catches the wrong proxy-table decision or trusting X-Forwarded-Proto for Secure`, async () => {
-    const publicAddress = `${scheme}://shephrd.example.test:9443`;
+for (const row of cases) {
+  it(`10.2 https ${row.id}: catches the wrong proxy-table decision or trusting X-Forwarded-Proto for Secure`, async () => {
+    const publicAddress = "https://shephrd.example.test:9443";
     await withWeb((ctx) => Effect.gen(function* () {
       const { cookie } = yield* login(ctx);
       const origin = row.origin === "local" ? ctx.origin : row.origin === "public" ? publicAddress
-        : row.origin === "missing" ? undefined : row.origin === "other-scheme" ? `${scheme === "http" ? "https" : "http"}://shephrd.example.test:9443`
-        : row.origin === "other-port" ? `${scheme}://shephrd.example.test:9444` : "https://evil.invalid";
+        : row.origin === "missing" ? undefined : row.origin === "other-scheme" ? "http://shephrd.example.test:9443"
+        : row.origin === "other-port" ? "https://shephrd.example.test:9444" : "https://evil.invalid";
       // No forwarded protocol is needed. When present, its value changes no
       // public row. Local rows with that header become public and are tested
       // separately by forwarded-only.
@@ -57,7 +57,7 @@ for (const scheme of ["http", "https"]) for (const row of cases) {
         else expect(reply.status).toBe(403);
         if (row.status === 204) {
           const attributes = (reply.headers["set-cookie"]?.[0] ?? "").split(";").map((part) => part.trim().toLowerCase());
-          expect(attributes.includes("secure")).toBe(row.secure && scheme === "https");
+          expect(attributes.includes("secure")).toBe(row.secure);
         } else expect(reply.headers["set-cookie"]).toBeUndefined();
       }
     }), { settings: { proxyMode: true, publicAddress } });

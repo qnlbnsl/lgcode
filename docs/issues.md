@@ -6048,3 +6048,38 @@ a board delivery, an oversized prompt, and history after reopening.
 
 Why it matters: The owner can read the conversation and its delivery outcome
 from either client without exporting the durable event log.
+
+## 373. A configured public HTTP page cannot generate browser request identifiers
+
+Found: 2026-11-04, while fixing foundation review record FR-001.
+State: fixed in the commit that adds this entry.
+
+What happens: The public address accepted plain Hypertext Transfer Protocol
+(HTTP), and the remote access guide offered a non-loopback HTTP page.
+Browsers do not expose `crypto.randomUUID` there, so the logged-in page cannot
+generate the identifiers needed for its application programming interface
+(API) requests.
+What should happen: By the owner's 2026-11-04 decision, every configured public
+address requires Hypertext Transfer Protocol Secure (HTTPS).
+The schema, engine and web settings refuse HTTP with a clear explanation.
+Local HTTP remains available at `127.0.0.1`, including through a Secure Shell
+(SSH) local forward with identical ports on the browser device and server.
+Why it matters: The supported remote dashboard journey needs the browser's
+secure-context APIs after login.
+The change keeps the existing request identifiers and retry behavior.
+Regression evidence: The pre-fix schema, engine and settings-page tests accept
+HTTP and fail the new refusal checks.
+The production-shell browser test checks login and an actual outgoing request
+identifier at `http://127.0.0.1:<port>`.
+The phone and board alert browser fixtures use a real local HTTPS proxy while
+retaining their link, answer and readback checks.
+Second-round clarification: The owner's later 2026-11-04 ruling accepts a
+self-signed certificate at the external proxy.
+The first fix's guide, security rule, plan and three contract copies incorrectly
+required certificate trust.
+Those requirements now describe the expected browser certificate warning and
+the accepted continuation without installing trust.
+Shephrd still holds no certificate and serves only HTTP on loopback.
+The existing browser fixtures ignore certificate errors for the self-signed
+proxy and prove login and authenticated requests without installing trust.
+Their comments now describe that bypass accurately.

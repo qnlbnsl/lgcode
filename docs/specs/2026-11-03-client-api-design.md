@@ -27,7 +27,10 @@ to localloopback"
 listens only on the loopback address. Remote access goes through the owner's
 own reverse proxy, such as Caddy, over the owner's WireGuard. The web server
 serves plain HTTP. Any encryption is at the proxy, and proxy, certificate and
-DNS setup are the owner's later work (rows 76, 198).
+DNS setup are the owner’s work (rows 76, 198, 204). Public addresses must use
+HTTPS, by the owner’s 2026-11-04 decision in row 204. Interim access uses a
+Secure Shell (SSH) local forward at `http://127.0.0.1:<port>`, with the same port on both ends.
+The name `localhost` remains refused.
 
 **The owner's later words, on 2026-11-03:** "Let's just focus on plain HTTP. That's what the software itself is doing, right? Then, whatever proxy we add on to it, that proxies to localhost. We'll figure this out then. Because I have to set up a local certificate authority so that I can do ARPA DNS certs"
 

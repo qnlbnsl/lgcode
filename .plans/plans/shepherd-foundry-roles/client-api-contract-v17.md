@@ -1,12 +1,20 @@
 ---
 topic: shepherd-client-api
 kind: contract
-status: v17, plain HTTP, anchored to engine 9e386b0
+status: v17 dependency copy, amended for v18 HTTPS access, anchored to engine 9e386b0
 version: 17
-updated: 2026-11-03
+updated: 2026-11-04
 ---
 
 # The client API contract that the other pieces build on
+
+This dependency copy includes the owner's 2026-11-04 access amendment.
+Public addresses require Hypertext Transfer Protocol Secure (HTTPS).
+Loopback Hypertext Transfer Protocol (HTTP) remains available at `127.0.0.1`
+through a Secure Shell (SSH) local forward with identical device and server
+ports.
+The current authority is [the client API contract](../shepherd-client-api/contract.md)
+and decision 204 in that plan's decision log.
 
 ## What this document is
 
@@ -381,9 +389,13 @@ These rules apply to the three kinds:
   stop a local program, which can send any header.
 - **Remote access comes through the owner's proxy.** The web server binds
   loopback only, also in proxy mode (row 76). Proxy mode has two settings: whether
-  it is on, and the public address, which may be `http` or `https`. The web server
-  serves plain HTTP, and its only HTTPS logic is the cookie's `Secure` attribute (row
-  198). Proxy, certificate and DNS setup are the owner's later work. Outside proxy mode, a request that carries a forwarded header is refused. Section
+  it is on, and the public address, which must use `https` (row 204). The web server
+  serves plain HTTP on loopback and holds no certificate. The external proxy
+  serves HTTPS. A self-signed certificate is accepted. Public session cookies have
+  the `Secure` attribute. The owner accepts continuation past the expected browser
+  certificate warning. No certificate trust installation is required. Proxy,
+  certificate and DNS setup are the owner's later work. Outside proxy mode, a
+  request that carries a forwarded header is refused. Section
   5, "The web server's settings", gives the full table (row 193).
 - **`debug.compare-views` is not on the web server** (rows 99, 195). It exists only
   under the engine's debug flag, which needs a test variable and a temporary folder
@@ -1320,9 +1332,15 @@ client is judged again under the new settings when it reconnects (row 140):
 | `port` | 8787 | The loopback port. A change applies at the next service start. |
 | `heartbeatSeconds` | 25 | The heartbeat interval. |
 | `proxyMode` | Off | Whether the public address applies. |
-| `publicAddress` | None | The page's address through the proxy, in one canonical form: `http://host`, `https://host`, or either with `:port`, in lower case, with no path and no default port. Any other form is refused. |
+| `publicAddress` | None | The page's address through the proxy, in one canonical form: `https://host`, or `https://host:port`, in lower case, with no path and no default port. Any other form is refused. |
 
-The command refuses proxy mode on without a public address. A logged-in dashboard
+The schema and command refuse every `http://` public address, including loopback,
+with a message explaining that the public address requires HTTPS.
+The command refuses proxy mode on without a public address.
+Loopback access remains `http://127.0.0.1:<port>` without a public address.
+An SSH local forward must use that same port on the device and server, because
+the `Host` check is exact. The name `localhost` remains refused.
+A logged-in dashboard
 that turns `enabled` off, or changes the public address, loses its own connection,
 and the owner's terminal can set it back (row 195).
 

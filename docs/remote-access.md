@@ -12,6 +12,33 @@ The configuration below is an example, rather than an installed service.
 It assumes that Caddy and Shephrd run on the same host.
 The owner must adapt it to the actual network before using it.
 
+## Use a Secure Shell local forward for interim access
+
+The owner chose Hypertext Transfer Protocol Secure (HTTPS) or loopback access
+on 2026-11-04.
+A configured public address must use HTTPS.
+Plain HTTP public addresses are refused, even inside WireGuard.
+The browser needs a secure context for its request identifiers.
+
+Secure Shell (SSH) must already permit the account to connect to the host.
+Until the HTTPS proxy is ready, run this on the device with the browser:
+
+```sh
+ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:8787:127.0.0.1:8787 qnlbnsl@SERVER
+```
+
+Replace `SERVER` with the host's reachable SSH name or address.
+Leave the command running, then open `http://127.0.0.1:8787` and log in.
+This is a local port forward, because the listener is on the browser's device.
+The public address can remain empty, with proxy mode off.
+If the service uses another port, use that same number in both positions of
+`-L` and in the browser address.
+Shephrd compares `Host` exactly against `127.0.0.1:<server-port>`.
+A different forwarded port is refused.
+The name `localhost` is also refused; type `127.0.0.1` exactly.
+If the local port is occupied, free it or change the service port and restart
+before creating a matching forward.
+
 ## Set the password on the Shephrd service alone
 
 Set `SHEPHRD_WEB_PASSWORD` to a long, random string in the environment of the
@@ -48,12 +75,20 @@ Replace both with the owner's addresses.
 Keep the proxy's listening port inaccessible through the home network and the
 public network.
 
-The example Caddyfile serves `http://10.77.0.1:8080` and forwards to Shephrd's
-loopback port:
+Resolve `shephrd.home.arpa` to `10.77.0.1` on the phone through the owner's
+Domain Name System (DNS) setup.
+Use a self-signed certificate for `shephrd.home.arpa` at the external proxy.
+Place its certificate and private key in the proxy's files, shown here as
+`/etc/caddy/shephrd.crt` and `/etc/caddy/shephrd.key`.
+Allow the proxy to read the key, and keep it private.
+Creating and renewing these files is the owner's proxy setup.
+The example Caddyfile serves `https://shephrd.home.arpa:8443` and forwards to
+Shephrd's loopback port:
 
 ```caddyfile
-http://10.77.0.1:8080 {
+https://shephrd.home.arpa:8443 {
     bind 10.77.0.1
+    tls /etc/caddy/shephrd.crt /etc/caddy/shephrd.key
 
     @wireguard remote_ip 10.77.0.0/24
     handle @wireguard {
@@ -75,12 +110,23 @@ These directives are documented in Caddy's [bind reference](https://caddyserver.
 and [reverse_proxy reference](https://caddyserver.com/docs/caddyfile/directives/reverse_proxy).
 These references were checked on 2026-11-04.
 
-With an `http` public address, only what the owner runs in front of Shephrd
-protects the password and session cookie in transit.
-In this example, that protection is the WireGuard tunnel.
-Shephrd adds no transport encryption.
-If the owner uses `https` instead, the proxy must provide Transport Layer
-Security (TLS), and the phone must trust its certificate.
+The proxy provides Transport Layer Security (TLS) with the self-signed certificate.
+The browser's certificate warning is expected.
+For example, Chromium may show "Your connection is not private" with
+`NET::ERR_CERT_AUTHORITY_INVALID`.
+For this owner's proxy, open the warning's advanced options and choose the
+option to proceed to `shephrd.home.arpa` before logging in.
+The owner accepted this continuation on 2026-11-04.
+No certificate or certificate authority needs to be installed in the device's
+trust store.
+Shephrd does not depend on certificate trust.
+A private WireGuard network does not remove the HTTPS requirement.
+Caddy documents certificate and key files in its [TLS reference](https://caddyserver.com/docs/caddyfile/directives/tls).
+This reference was checked on 2026-11-04.
+Shephrd's connection from the proxy remains HTTP on loopback.
+Shephrd holds no certificate and performs no certificate generation or trust setup.
+The browser tests ignore certificate errors for the self-signed proxy and prove
+login and authenticated requests without installing trust.
 
 ## Match the web settings to the proxy
 
@@ -88,15 +134,15 @@ Open the local page and log in.
 In Settings, enable proxy mode and set the public address to the proxy's exact
 site address.
 For the example, the two settings are `proxyMode: true` and
-`publicAddress: "http://10.77.0.1:8080"`.
-The public address contains a scheme, host, and optional port.
+`publicAddress: "https://shephrd.home.arpa:8443"`.
+The public address contains `https://`, a lower-case host, and an optional nondefault port.
 It contains no path, credentials, query, or fragment.
 Proxy mode requires a public address.
 
 The same record can be set from the owner's terminal:
 
 ```sh
-shephrd client web settings set --input '{"settings":{"enabled":true,"port":8787,"heartbeatSeconds":25,"proxyMode":true,"publicAddress":"http://10.77.0.1:8080"}}'
+shephrd client web settings set --input '{"settings":{"enabled":true,"port":8787,"heartbeatSeconds":25,"proxyMode":true,"publicAddress":"https://shephrd.home.arpa:8443"}}'
 shephrd client web settings
 ```
 
@@ -116,7 +162,7 @@ Forwarded headers are refused outside proxy mode.
 Their values do not select a scheme or relax authentication.
 The session cookie is `Secure` for a public request with an `https` public
 address.
-An `http` public address does not earn that attribute.
+An HTTP public address is refused by the settings schema, engine and web page.
 
 ## Protect account secrets and ntfy alerts
 
@@ -188,13 +234,14 @@ The carrier's attempt to clear a notification does not prove erasure.
 After the actual proxy exists, check these steps on the owner's devices.
 The headless browser test does not replace them.
 
-1. On mobile data with WireGuard enabled, open the public address, log in, and
-   read the situation view.
+1. On mobile data with WireGuard enabled, open the public address, continue past
+   the expected self-signed certificate warning, log in, and read the situation
+   view without installing certificate trust.
 2. On mobile data with WireGuard disabled, confirm that the page is unreachable.
 3. From a second device on the home network without WireGuard, confirm that the
    page is unreachable.
 4. Confirm that the proxy preserves `Origin` and forwards the expected `Host`.
-   Confirm that the cookie's `Secure` attribute matches the configured scheme.
+   Confirm that the public session cookie has the `Secure` attribute.
 5. Receive a real permission alert through ntfy, open its thread link, inspect
    the input, answer the request, and read the answer in the thread.
 6. Record the devices, proxy settings without secrets, date, and results in the

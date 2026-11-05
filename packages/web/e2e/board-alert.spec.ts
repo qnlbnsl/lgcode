@@ -19,7 +19,12 @@ import {
   seedAccount, seedAgent, seedHarness, success,
 } from "../../engine/test/support/handlerRig.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
+import { httpsProxy } from "./support/httpsProxy.ts"
 import { owner } from "../../engine/test/board/wakeFixtures.ts"
+
+// This browser test ignores errors for the proxy's self-signed certificate.
+// It installs no certificate trust; the production listener stays on HTTP.
+test.use({ ignoreHTTPSErrors: true })
 
 test("7.4 a phone owner follows the board alert, reads and replies, and wakes the fake agent once", async ({ page }) => {
   const rig = makeRig()
@@ -27,6 +32,7 @@ test("7.4 a phone owner follows the board alert, reads and replies, and wakes th
   process.env.SHEPHRD_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url")
   const staticRoot = join(rig.root, "page")
+  let proxy: Awaited<ReturnType<typeof httpsProxy>> | undefined
   const carrierRequests: Array<{ method: string; url: string; body: string; headers: Record<string, string | string[] | undefined> }> = []
   const carrier = createServer(async (request, response) => {
     const chunks: Buffer[] = []
@@ -41,7 +47,8 @@ test("7.4 a phone owner follows the board alert, reads and replies, and wakes th
     await build({ configFile: false, root: new URL("..", import.meta.url).pathname,
       logLevel: "silent", build: { outDir: staticRoot } })
     const port = await unusedPort()
-    const origin = `http://127.0.0.1:${port}`
+    proxy = await httpsProxy(port, rig.root)
+    const origin = proxy.origin
     const carrierOrigin = `http://127.0.0.1:${carrierAddress.port}`
     const program = Effect.gen(function* () {
       const runner = yield* makeFakeRunner()
@@ -75,6 +82,10 @@ test("7.4 a phone owner follows the board alert, reads and replies, and wakes th
           await page.goto(origin)
           await page.getByLabel("Password", { exact: true }).fill(password)
           await page.getByRole("button", { name: "Log in", exact: true }).click()
+          await expect(page.getByLabel("Situation", { exact: true })).toBeVisible()
+          expect(await page.evaluate(() => ({ secure: isSecureContext, uuid: typeof crypto.randomUUID })))
+            .toEqual({ secure: true, uuid: "function" })
+          expect((await page.context().cookies(origin)).some((cookie) => cookie.secure && cookie.httpOnly && cookie.sameSite === "Strict")).toBe(true)
           await page.goto(notification.headers.click as string)
           await expect(page.getByRole("heading", { name: "Thread: Thread lead", exact: true })).toBeVisible()
           const read = page.getByRole("button", { name: "Read post", exact: true })
@@ -107,6 +118,7 @@ test("7.4 a phone owner follows the board alert, reads and replies, and wakes th
   } finally {
     if (previousHome === undefined) delete process.env.SHEPHRD_HOME
     else process.env.SHEPHRD_HOME = previousHome
+    await proxy?.close()
     carrier.closeAllConnections()
     await new Promise<void>((resolve) => carrier.close(() => resolve()))
     removeRig(rig)

@@ -111,7 +111,15 @@ These rules apply to every change. A change that breaks one is a security bug.
    on a public request when the public address is `https`.
 5. **An encrypted channel for remote access is the owner's setup**, such as TLS, a
    Tailscale tailnet, or an SSH tunnel. Shephrd serves plain HTTP on loopback and
-   does not offer it to a non-loopback address. The owner's words, on 2026-11-03:
+   does not offer it to a non-loopback address. A configured public address must use
+   HTTPS, even inside a private network, by the owner’s decision on 2026-11-04.
+   The owner supplies the external proxy's certificate. The owner's later
+   clarification on 2026-11-04 accepts a self-signed certificate and continuation
+   past the expected browser certificate warning. Certificate trust installation
+   is not required. Shephrd holds no certificate and performs no trust setup.
+   An SSH local forward provides interim access at `http://127.0.0.1:<port>`, with identical ports on
+   the device and server. `localhost` remains refused. The owner’s earlier words,
+   on 2026-11-03:
    "Let's just focus on plain HTTP. That's what the software itself is doing, right? Then, whatever proxy we add on to it, that proxies to localhost. We'll figure this out then. Because I have to set up a local certificate authority so that I can do ARPA DNS certs"
 6. **Secrets never reach logs, the message board, or a client.** This covers
    API tokens, the web password, the session token, and the agent harnesses'
