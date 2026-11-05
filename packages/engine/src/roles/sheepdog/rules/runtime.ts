@@ -118,7 +118,12 @@ export const makeRules = (): ReadonlyArray<SheepdogRule> => {
   const current = (context: RuleContext) => Effect.gen(function* () {
     const snapshot = yield* (yield* Views).snapshot;
     yield* synchronize({ ...context, snapshot });
-    return input(snapshot, yield* Clock.currentTimeMillis, context.sourceSequence);
+    // Refresh lifecycle and action guards, but keep the switch at the loop's
+    // cursor. Views may already include a later off/on transition.
+    const roles = snapshot.roles as RolesView;
+    return input({ ...snapshot, roles: { ...roles, settings: { ...roles.settings,
+      sheepdog: (context.snapshot.roles as RolesView).settings?.sheepdog,
+    } } }, yield* Clock.currentTimeMillis, context.sourceSequence);
   });
   const giveUp = (context: RuleContext, admission: RolesActionRecord, cause: "crash" | "reload-failed" | "resume-refused") => Effect.gen(function* () {
     const live = yield* current(context);

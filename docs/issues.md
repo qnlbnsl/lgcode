@@ -6002,3 +6002,13 @@ What happened: The administration browser test expected `/threads/phone-worker`,
 What changed: The administration test pins the supported hash link, follows it, and reads the question before continuing through every settings check. The phone test checks the exact alert route and retained document. It checks the permission answer, the runner's agent and option, and output emitted only after approval. Reloading the thread independently reads back the committed answer and agent output. Only that fresh-document reload requires HTTP 200. Existing width and browser-storage checks remain in place.
 
 Why it matters: These tests now reach their administration and permission-flow assertions. Temporary production mutations verify that a wrong administration link and missing navigation handlers are rejected. The separate Hypertext Transfer Protocol Secure (HTTPS) fixture update belongs to the public-address repair in FR-001. The overflow mutation proof in FR-048 remains a Phase 2 item.
+
+## 371. The sheepdog lost its event-position switch when refreshing live state
+
+Status: Fixed in the foundation review corrections for finding FR-011.
+
+What happened: The sheepdog loop kept the switch at its subscriber cursor, but the production rules fetched Views again and used the latest switch. When consumption lagged behind a switch-off, an eligible earlier event could lose its advice notice or crash retry.
+
+What changed: The rules retain the cursor switch while refreshing the current lifecycle, settings limits, and action records. The regression holds the consumer before advice and crash events, commits switch-off, and then checks their outcomes through the production rules. It also proves that events committed while off remain ignored after re-enabling.
+
+Validation: The pre-off advice and crash cases failed against the unfixed rules with missing action records. The rules and loop suites cover these cases together with duplicate suppression, refused admission, and recovery lifecycle boundaries.
