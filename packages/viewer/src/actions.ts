@@ -53,7 +53,7 @@ export const readRequestContext = async (client: RequestContextClient, request: 
       for (const item of page.items) {
         const threadEvent = record(item.event);
         const content = record(threadEvent.content);
-        if (threadEvent._tag === "ThreadItem" && (content._tag === "tool-call" || content._tag === "toolCall")
+        if (threadEvent._tag === "ThreadItem" && (content._tag === "tool-call" || content._tag === "toolCall" || content._tag === "file-change")
           && (content.callId ?? content.toolCallId) === request.toolCallId) {
           found = true;
           parts.push(safeJson(content));

@@ -6110,3 +6110,16 @@ an open wait and log rebuilds. It also checks that replacement preserves owed
 completion debt and does not duplicate a question reserved by a sent wake.
 It covers deferred reactor replacement, the transition to a reminder after an
 eligible turn end, and the end of the original duty after acceptance.
+
+## 375. The terminal permission context omits correlated file changes
+
+Found: 2026-11-04, while repairing foundation review record FR-005.
+State: fixed on `fix/foundation-005`, pending independent verification.
+
+What happened: `packages/viewer/src/actions.ts` accepted only tool-call content when a permission request had no input. It omitted file-change content even when the content carried the request's tool-call identity. The upstream identity repair in issue 322 could not repair this independent filter.
+
+What changed: The terminal helper includes file changes whose `content.callId` matches the request's `toolCallId`. It keeps the request read first, the thread's page and item order, and the existing warnings for missing, redacted or truncated input. It never joins a diff by its path or thread-item identity.
+
+Validation: `packages/viewer/test/request-file-change.test.ts` covers a locations-only request, matching diffs across pages, a diff as the only input, and unrelated and uncorrelated diffs. It also checks that partial-input warnings remain visible. The matching-diff regression failed against the unfixed helper before the filter changed.
+
+Why it matters: The owner can review a correlated edit before answering its permission request in the terminal viewer.
