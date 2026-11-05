@@ -70,16 +70,28 @@ export const alertDelivery = Effect.scoped(Effect.gen(function* () {
       active.add(key);
       const generation = view.generation;
       const work = Effect.gen(function* () {
-        const mark = view.delivery[row.alertId];
-        if (mark?.failureSequence !== undefined) {
-          const times = yield* sql<{ occurred_at: number }>`SELECT occurred_at FROM events WHERE sequence = ${mark.failureSequence}`;
-          const deadline = times[0]!.occurred_at + retryDelay(mark.attempt);
-          yield* Effect.sleep(Math.max(0, deadline - (yield* Clock.currentTimeMillis)));
-        }
-        // Recheck every condition after backoff, and capture one destination.
-        const current = yield* views.snapshot; const state = clientView(current.client);
-        const alert = state.alerts[row.alertId];
-        if (state.generation !== generation || alert === undefined || !pending(state, alert)) return;
+        const ready = yield* Effect.gen(function* () {
+          while (true) {
+            // Cleanup can suspend a scan before it claims this key. Read the
+            // failure under the key, then recheck it after every wait or read.
+            const snapshot = yield* views.snapshot; const view = clientView(snapshot.client);
+            const rowNow = view.alerts[row.alertId];
+            if (view.generation !== generation || rowNow === undefined || !pending(view, rowNow)) return;
+            const mark = view.delivery[row.alertId];
+            if (mark?.failureSequence !== undefined) {
+              const times = yield* sql<{ occurred_at: number }>`SELECT occurred_at FROM events WHERE sequence = ${mark.failureSequence}`;
+              const remaining = times[0]!.occurred_at + retryDelay(mark.attempt) - (yield* Clock.currentTimeMillis);
+              if (remaining > 0) { yield* Effect.sleep(remaining); continue; }
+            }
+            const current = yield* views.snapshot; const state = clientView(current.client);
+            const alert = state.alerts[row.alertId];
+            if (state.generation !== generation || alert === undefined || !pending(state, alert)) return;
+            if (state.delivery[row.alertId]?.failureSequence !== mark?.failureSequence) continue;
+            return { current, state, alert };
+          }
+        });
+        if (ready === undefined) return;
+        const { current, state, alert } = ready;
         const attempt = (state.delivery[row.alertId]?.attempt ?? 0) + 1;
         const result = yield* sender.send(payload(alert, current), { carrier: state.carrier,
           ...(state.token === undefined ? {} : { token: state.token }) }).pipe(Effect.timeout(10_000),

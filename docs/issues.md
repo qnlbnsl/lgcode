@@ -6212,3 +6212,27 @@ What happened: The terminal viewer cleared a prompt or answer only after its fol
 What changed: The viewer retires acknowledged prompts and answers before refreshing its snapshot. It reports a failed refresh separately from the successful send. The connection retains an uncertain attempt's body and identifier for an unchanged retry. A confirmed send, a definite command refusal, or an edited body ends that attempt. Retry state lasts for the current viewer connection.
 
 Verification: `packages/viewer/test/send-recovery.test.tsx` drives the real Ink terminal interface and socket client. Its prompt, question and permission cases assert one write after acknowledgement and refresh failure. Its lost-acknowledgement prompt case uses the real command handler, delivery planner and SQLite receipts to check one durable receipt and delivery after retry. The answer cases check stable identifiers after transport failure and fresh identifiers after confirmation, refusal or an edit.
+
+## 382. A concurrent alert scan could retry before the latest failure's deadline
+
+Found: 2026-11-04, while investigating foundation review finding FR-015.
+State: fixed in the foundation fix for FR-015.
+
+What happens: Retired-token cleanup can suspend a delivery scan after it reads
+the client view. Another scan can send and record a failure in that same
+generation before the suspended scan claims the released delivery key. The
+claimant used the earlier view's retry deadline, even though it selected the
+next attempt from the current view.
+
+Why it matters: The next send could arrive before the required delay from the
+latest failure. The controlled regression in
+`packages/engine/test/client/alert-delivery-race.test.ts` holds real token
+cleanup and carrier responses. It also pauses the worker's self-scan at its
+snapshot read after key release, to give the stale scan the claim. The unfixed
+worker sends early after both the first and the second failure.
+
+What changed: The claimant reads the current failure while holding its delivery
+key. It recomputes the deadline after each wait. It validates the failure
+sequence again after the database read, together with the current generation
+and pending conditions. The regression checks the five-second and thirty-second
+deadlines and increasing attempt numbers.
