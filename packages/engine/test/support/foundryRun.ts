@@ -13,12 +13,13 @@ import * as Redacted from "effect/Redacted";
 import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import { TestClock } from "effect/testing";
-import { expect } from "vitest";
+import { expect, vi } from "vitest";
 
 import { exportThread } from "../../../cli/src/commands/threadExport.ts";
 import { serve } from "../../src/api/server.ts";
 import { makeRedactor } from "../../src/identity/redactor.ts";
 import { buildServices } from "../../src/service.ts";
+import { Views } from "../../src/views/Views.ts";
 import { unwrap } from "../client/support/readRig.ts";
 import { incarnationOf, makeFakeRunner, type RunnerCall } from "./fakeRunner.ts";
 import { harnessSettings, makeFakeSecrets, makeRig, removeRig } from "./handlerRig.ts";
@@ -177,9 +178,24 @@ export const runFoundryRun = (options: { scenario?: "capacity" } = {}) => Effect
     const delivery = yield* call(leadA.client, "prompt", { agentId: a1.agentId, text: "Continue after the capacity outage." });
     yield* working(a1);
     const capacityMark = yield* mark();
-    let blockingWaitReturns = 0;
+    let completionSequence: number | undefined;
+    const waitReturns: Array<{ completionSequence: number | undefined }> = [];
+    // A publication hook identifies the durable completion, including the
+    // yielding interval inside complete(). It changes no events or views.
+    // Wait replies are observed synchronously at the client boundary. The
+    // committed event is published before the wait follower can answer.
+    const views = yield* Views;
+    const apply = views.applyCommitted;
+    const publication = vi.spyOn(views, "applyCommitted").mockImplementation((batch) => apply(batch).pipe(
+      Effect.tap(() => Effect.sync(() => {
+        const ended = batch.find((row) => row.agentId === a1.agentId && row.event._tag === "TurnEnded");
+        if (ended !== undefined) completionSequence = ended.sequence;
+      })),
+    ));
+    yield* Effect.addFinalizer(() => Effect.sync(() => publication.mockRestore()));
+    const leadPromptsBefore = runner.callsOf("prompt").filter((row) => row.input.agentId === leadA.agentId).length;
     const waiting = yield* call(leadA.client, "wait", { members: [a1.agentId], mode: "all", block: true }).pipe(
-      Effect.tap(() => Effect.sync(() => { blockingWaitReturns++; })), Effect.forkIn(scope));
+      Effect.tap(() => Effect.sync(() => { waitReturns.push({ completionSequence }); })), Effect.forkIn(scope));
     yield* until("the blocking wait opening", events(capacityMark), (rows) => rows.some((row) => row.event._tag === "WaitOpened" && row.agentId === leadA.agentId));
     yield* runner.emitRaw({ _tag: "promptReply", agentId: a1.agentId, incarnation: incarnationOf(a1.token), deliveryId: delivery.deliveryId,
       outcome: { _tag: "capacity", error: "The provider is at capacity." } });
@@ -190,11 +206,24 @@ export const runFoundryRun = (options: { scenario?: "capacity" } = {}) => Effect
     const releasedRow = yield* until("the capacity retry", state(a1), (row) => row?.capacityHeld === false && row.state._tag === "working");
     const capacityRows = yield* events(capacityMark);
     expect(capacityRows.filter((row) => row.event._tag === "DeliveryReleased")).toHaveLength(1);
-    const capacityRetry = { leadWakeCount: wakeCount(capacityRows, leadA), blockingWaitReturns };
+    // Keep observing through the completion call, the committed TurnEnded,
+    // and the actual client reply, instead of freezing a precompletion count.
     yield* complete(pending.get(a1.agentId)!, "The worker continued after capacity returned.");
     yield* idle(a1);
     const waited = yield* Fiber.join(waiting);
     expect(waited.outcome).toBe("satisfied");
+    const capacityInterval = yield* events(capacityMark);
+    expect(completionSequence).toBeTypeOf("number");
+    expect(waitReturns).toEqual([{ completionSequence }]);
+    const satisfied = capacityInterval.find((row) => row.event._tag === "WaitSatisfied" && row.agentId === leadA.agentId);
+    expect(satisfied?.sequence).toBeGreaterThan(completionSequence!);
+    const leadSends = capacityInterval.filter((row) => row.event._tag === "DeliverySent" && row.agentId === leadA.agentId);
+    const leadPrompts = runner.callsOf("prompt").filter((row) => row.input.agentId === leadA.agentId).slice(leadPromptsBefore);
+    expect(leadPrompts.map((row) => row.input.delivery.id)).toEqual([]);
+    expect(leadSends).toEqual([]);
+    expect(wakeCount(capacityInterval, leadA)).toBe(0);
+    const capacityRetry = { leadWakeCount: leadSends.length,
+      blockingWaitReturns: waitReturns.filter((row) => row.completionSequence === undefined).length };
     const capacity = { held: heldRow.capacityHeld === true, released: releasedRow.capacityHeld === false,
       workerContinued: (yield* events(capacityMark)).some((row) => row.event._tag === "ThreadItem" && row.agentId === a1.agentId) };
     manual.delete(a1.agentId);

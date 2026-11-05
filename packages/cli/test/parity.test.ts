@@ -89,7 +89,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
         "board.post": { ...base, postId: "post" },
         "board.close": { ...base, postId: "post", outcome: "withdrawn" },
         "board.acknowledge": { ...base, postId: "post" },
-        "board.read": { ...base, data: "Board data." },
+        "board.read": { ...base, data: `Data from another agent [boundary] (delivery read):\n${JSON.stringify({ items: [{ text: '"\\\n\t🐑' }] })}\nEnd data [boundary]` },
         "board.channels": { ...base, items: [], next: "next-cursor" },
         "board.status": { ...base, agentId: "member", unread: 1, incomingOpen: 1, ownOpen: 0, owed: 0, failedCompletions: 0, wakeQueued: true, wakeSent: false, holdsUnsettled: false, holdsIncoming: true, sequence: 100, disabled: false },
         "board.flush": { ...base, wakeId: "wake" },
@@ -116,6 +116,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
     expect(engine.requests).toHaveLength(1);
     expect(engine.requests[0]).toMatchObject({ _tag: "Request", tag: command, payload });
     if (command.startsWith("roles.")) expect(JSON.parse(child.stdout())).toEqual(expectedReply);
+    if (command === "board.read") expect(child.stdout()).toBe((expectedReply as { data: string }).data + "\n");
     assertNoSecrets(child, [token]);
   });
 }
@@ -141,4 +142,19 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
     expect(names).not.toContain(excluded);
   }
   assertNoSecrets(child, [token]);
+});
+
+it("board.read MCP forwards the complete labelled data without changing its escapes or boundaries", async () => {
+  const root = prepareRoot();
+  const data = `Data from piece board [mcp-boundary]\n${JSON.stringify({ items: [{ text: '"\\\n\t🐑' }] })}\nEnd data [mcp-boundary]`;
+  const engine = await fakeEngine(root, { onRequest: (frame, socket) => succeed(socket, frame, { requestId: frame.payload.requestId, data }) });
+  const child = startCli(root, ["mcp"]);
+  const peer = mcpPeer(child);
+  await peer.initialize();
+  const reply = await peer.request("tools/call", { name: "board.read", arguments: { channelId: "channel", limit: 20 } });
+  expect(reply.error).toBeUndefined();
+  expect(reply.result.isError ?? false).toBe(false);
+  expect(reply.result.content).toEqual([{ type: "text", text: data }]);
+  expect(engine.requests).toHaveLength(1);
+  expect(engine.requests[0]).toMatchObject({ tag: "board.read", payload: { channelId: "channel", limit: 20 } });
 });

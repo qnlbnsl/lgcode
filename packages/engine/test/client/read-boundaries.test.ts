@@ -35,7 +35,8 @@ it("thread pages preserve the dispatch event caused by a queued delivery", async
   const first = yield* read("client.thread", { agentId: "agent-a", after, limit: 500 });
   const last = yield* read("client.thread", { agentId: "agent-a", after: first.next, limit: 500 });
   expect(first.items).toHaveLength(500);
-  expect(last.items.map((row: any) => row.event._tag)).toEqual(["ThreadItem", "DeliverySent"]);
+  expect(last.items.map((row: any) => row.event._tag)).toEqual(["ThreadItem", "DeliverySent", "PromptSent"]);
+  expect(last.items[2].event).toEqual({ _tag: "PromptSent", agentId: "agent-a", deliveryId: "boundary", sender: owner, text: "Dispatch me." });
   expect(last).not.toHaveProperty("next");
   expect([...first.items, ...last.items]).toEqual((yield* (yield* Views).snapshot).threads["agent-a"]!.filter((row) => row.sequence > after));
 })));

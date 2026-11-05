@@ -5716,11 +5716,18 @@ Why it matters: The owner could fill the board with open questions.
 ## 335. The dispatcher waited after a send-time withdrawal
 
 Found: 2026-11-03, while planning the message board plan.
-State: open.
+State: fixed. Its regression was strengthened on 2026-11-05 for foundation
+review record FR-066.
 
 What happens: The dispatcher waited instead of going on to the agent's next queued delivery (board review round 3, logic m4).
 What should happen: The client API contract's item 15 requires it to go on (ruling L23, `ced973b`), so the engine must be changed to match.
 Why it matters: An agent's queue stalls behind a delivery that was withdrawn.
+
+Validation: Both refused and thrown reach checks now queue three entries.
+The runner must receive exactly the reachable successor, with its valid
+incarnation. The withdrawn entry remains absent, and the third entry stays
+queued. Temporary duplicate-send and continuation-overdrain faults fail the
+corrected assertions.
 
 ## 336. A refused duty is retried after every later batch that touches it
 
@@ -6443,3 +6450,72 @@ A valid 64 KiB role file with escaping and multibyte advice passes real admissio
 strict event and envelope round trips, and actual stream and page frame checks.
 The invalid control-character case remains a separate refusal test. Temporary
 mutations establish that each strengthened test rejects its assigned fault.
+
+## 393. Capacity acceptance observed only an early counter and board wakes
+
+Found: 2026-11-05, while repairing foundation review records FR-050 and FR-071.
+State: fixed.
+
+What happened: The Foundry capacity fixture copied its blocking-wait counter
+before completing the worker. A later premature client reply escaped the
+assertion. The lead-wake metric counted only board wake events, so engine-only
+lead deliveries also escaped it.
+
+What changed: The fixture records every client reply against the committed
+worker completion sequence. It checks the wait satisfaction sequence after
+that completion. It counts all lead delivery sends and runner prompts from
+the capacity interval, with startup work explicitly excluded. Temporary faults
+show that the old fixture accepted a late premature reply and extra lead work
+during both hold and release. The corrected fixture rejects all three cases.
+
+## 394. Board membership tests did not reserve concurrent writers in both orders
+
+Found: 2026-11-05, while repairing foundation review record FR-083.
+State: fixed.
+
+What happened: Sequential label changes did not prove that queue and send
+checks use membership protected by the writer permit.
+
+What changed: Socket tests reserve each writer order at queue and send, with
+six repetitions of each case. The second operation attempts its writer
+acquisition while publication by the first operation is held. Withdrawn
+identities never enter runner calls. A send reserved before removal remains
+permitted. A temporary stale-snapshot fault is rejected.
+
+## 395. Addressee tests stopped collecting at the first correct send
+
+Found: 2026-11-05, while repairing foundation review record FR-084.
+State: fixed.
+
+What happened: The question and reply collections ended on their expected
+recipient. An extra later send was outside the asserted intervals.
+
+What changed: A companion socket test drains the real board lifecycle and
+all four dispatchers to a fixed point. It checks each complete recipient
+multiset, preserves the exact boundary between phases, and checks the final
+interval after both expected turns finish. Temporary extra deliveries after
+the correct question and completion sends are both rejected. The existing
+service-process scenario remains in place.
+
+## 396. Production board wakes had no sent-text event for their target
+
+Found: 2026-11-05, while repairing foundation review record FR-074.
+State: fixed.
+
+What happened: The dispatcher committed the send identity but omitted the
+existing `PromptSent` event. The board's criterion 5.14 therefore could not
+observe sent wake text through the target's subscription or event read.
+The queue envelope remains owner-only under the engine's visibility rule.
+
+What changed: Every text send commits its `PromptSent` beside `DeliverySent`.
+The existing delivery identity, incarnation, and send sequence still govern
+the runner call. A production-built wake crosses the oversized stream limit
+and is recovered whole by owner and target event and thread reads. The test
+uses a large valid target identity to exercise event-metadata overhead beyond
+the wake builder's reserved body space. Board events remain whole. Agent pages
+cover quotes, backslashes, control characters, four-byte text, singleton
+progress, exact cursors and read marks, fresh boundaries, and captured wire
+frames. The command line and Model Context Protocol forward the labelled
+board-read data unchanged.
+The thread pagination boundary also preserves the sent-text event and checks
+its complete delivery identity, sender, and text after the dispatch event.

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
 import { CommandsRpcGroup } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
 import * as RpcClient from "effect/rpc/RpcClient";
 import * as RpcSerialization from "effect/rpc/RpcSerialization";
 import * as Socket from "effect/socket/Socket";
@@ -55,12 +56,18 @@ export const authorization = (bearer: string): Record<string, string> => ({ Auth
 // An RPC client for every command in the contracts' group, the debug RPC
 // included, connected once. `headers` replaces the default handshake
 // headers (the bearer and this process's ancestry) when given.
-export const connect = (socketPath: string, bearer: string, options: { readonly headers?: Record<string, string> } = {}) =>
+export const connect = (socketPath: string, bearer: string, options: { readonly headers?: Record<string, string>; readonly frames?: string[] } = {}) =>
   Effect.gen(function* () {
     const headers = options.headers ?? { ...authorization(bearer), ...ancestryHeaders() };
     // Suite load can delay the healthy client handshake while other subscriptions are active.
+    const constructor = options.frames === undefined ? NodeSocket.layerWebSocketConstructorWS
+      : Layer.succeed(Socket.WebSocketConstructor)((url) => {
+        const ws = new WebSocket(url, { headers });
+        ws.on("message", (frame) => options.frames!.push(frame.toString()));
+        return ws as unknown as globalThis.WebSocket;
+      });
     const socket = yield* Socket.makeWebSocket(socketUrl(socketPath), { headers, openTimeout: 30_000 }).pipe(
-      Effect.provide(NodeSocket.layerWebSocketConstructorWS),
+      Effect.provide(constructor),
     );
     const protocol = yield* RpcClient.makeProtocolSocket({ retryTransientErrors: false }).pipe(
       Effect.provideService(Socket.Socket, socket),
