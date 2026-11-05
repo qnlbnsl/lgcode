@@ -1,14 +1,14 @@
 // Unit 3p, task 2h. The optional selection fields below are the builder's seam.
 // Existing callers keep their prompt and greeting defaults. These tests never
 // run an installed harness or create a fixture in the repository.
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
+import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { HarnessSettings } from "@shephrd/contracts"
 import * as Effect from "effect/Effect"
 import { afterEach, beforeEach, expect, it } from "vitest"
 import { RECORDER_PROMPT } from "../../engine/scripts/live/prompts.ts"
-import { recordFixtures } from "../../engine/scripts/recorder.ts"
+import { recordFixtures, runRecording } from "../../engine/scripts/recorder.ts"
 
 const home = "/home/recorder-scenario-test"
 // Synthetic canaries, never real credentials.
@@ -129,4 +129,68 @@ it("R3P06 scrubs a selected scenario's prompt, tool and permission frames while 
   expect(text).toContain('"kind":"execute"')
   expect(text).toContain("<redacted>")
   expect(transcript[0]?.scenario).toBe("shell-permission")
+})
+
+it.each(["success", "failure", "cancel", "version"] as const)("FR-043 awaits a stdio-released, TERM-resistant descendant on %s before workspace removal", async (ending) => {
+  const pidFile = join(root, "work", "descendant.pid")
+  const adapter = join(root, "work", "adapter.cjs")
+  const descendant = `process.on("SIGTERM", () => {}); require("node:fs").writeFileSync(${JSON.stringify(pidFile)}, String(process.pid)); setInterval(() => {}, 1000);`
+  const source = await readFile(adapter, "utf8")
+  const startDescendant = `
+    const child = require("node:child_process").spawn(process.execPath, ["-e", ${JSON.stringify(descendant)}], { stdio: "ignore" });
+    child.unref();
+    const deadline = Date.now() + 5000;
+    while (!fs.existsSync(${JSON.stringify(pidFile)})) {
+      if (Date.now() > deadline) throw new Error("descendant did not start");
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+  `
+  await writeFile(adapter, ending === "version" ? `#!${process.execPath}\n` + source.replace('const fs = require("node:fs");', `
+    const fs = require("node:fs");
+    if (process.argv.includes("--version")) { ${startDescendant} fs.writeSync(1, "synthetic-version\\n"); process.exit(0); }
+  `).replace('version: "1.0.0"', 'version: ""') : source.replace('promptId = frame.id;', `
+    ${startDescendant}
+    ${ending === "failure" ? 'send({ id: frame.id, error: { code: -32603, message: "synthetic failure" } }); return;' : ending === "cancel" ? "return;" : "promptId = frame.id;"}
+  `))
+  await chmod(adapter, 0o700)
+  const controller = new AbortController()
+  const selected = harness("codex")
+  if (ending === "version") selected.settings = { ...selected.settings, adapterPath: adapter, adapterArguments: [] }
+  const recording = runRecording({
+    harnesses: [selected], outputDirectory: root, temporaryRoot: join(root, "work"), homeDirectory: home,
+    parentEnvironment: { PATH: "/usr/bin:/bin", HOME: home }, prompt: RECORDER_PROMPT,
+  }, controller.signal)
+  let pid: number | undefined
+  const running = async () => {
+    try {
+      // A killed orphan may await init's reaper. A zombie cannot execute or
+      // access the workspace, so it is not a surviving recording process.
+      const stat = await readFile(`/proc/${pid}/stat`, "utf8")
+      return stat.slice(stat.lastIndexOf(")") + 2).split(" ")[0] !== "Z"
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false
+      throw error
+    }
+  }
+  try {
+    const deadline = Date.now() + 10_000
+    for (;;) {
+      try { pid = Number(await readFile(pidFile, "utf8")); if (pid > 0) break } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT" || Date.now() > deadline) throw error
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+    }
+    expect(await running()).toBe(true)
+    if (ending === "cancel") controller.abort()
+    const results = await recording
+    const aliveAtSettlement = await running()
+    await rm(join(root, "work"), { recursive: true, force: true })
+    expect(results).toMatchObject([{ status: ending === "success" || ending === "version" ? "recorded" : "failed" }])
+    expect(aliveAtSettlement, "descendant still executes when recording settles").toBe(false)
+    expect(await running(), "descendant still executes after workspace removal").toBe(false)
+  } finally {
+    controller.abort()
+    if (pid !== undefined) { try { process.kill(pid, "SIGKILL") } catch { /* Already gone. */ } }
+    await recording
+  }
 })

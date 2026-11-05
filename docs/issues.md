@@ -6087,13 +6087,15 @@ ordinary-waiting and owed-reply tests keep their behavior.
 ## 369. The live-check scripts depend on the order of their imports
 
 Found: 2026-11-04, by the builder or test writer of unit r14, during the foundation build.
-State: open, for the final review.
+State: fixed for foundation review record FR-157.
 
-What happens: Importing the existing live driver before the existing live runner causes a circular module initialization error for `pieceViews` under plain Node.js. The new script `packages/engine/scripts/live-check-roles.ts` imports the runner first, as `live-check.ts` does, and its help and dry-run checks pass. The cycle itself is still there.
+What happened: Importing the existing live driver before the existing live runner caused a circular module initialization error for `pieceViews` under plain Node.js. The live entry point depended on a runner-first import convention.
 
-The FR-013 regression also encountered this import-order sensitivity. Importing the alert reactor before the service test helpers left the client reactor registration incompletely initialized under Vitest. Loading the existing helpers first lets the test use the normal service registration. This observation does not close the underlying import-cycle issue.
+The FR-013 regression also encountered this import-order sensitivity. Importing the alert reactor before the service test helpers left the client reactor registration incompletely initialized under Vitest. Loading the helpers first was the earlier workaround.
 
-Why it matters: A reordered import would stop both owner-run checks from starting. It waits for the final review.
+What changed: The engine composition resolves its piece-view and reactor values on access after module initialization. It caches the reactor table so the web listener's startup identity check remains valid. It no longer reads the unfinished view table or combines unfinished reactor effects while constructing the registry. Plain Node regressions start with the driver, the alert reactor, and the view table, and require all registered views, reactors and representative commands. The roles entry point now imports the driver before the runner.
+
+Why it matters: The owner-run checks can start without their previous import-order convention.
 
 ## 370. Two browser assertions reject supported thread navigation
 
@@ -7697,3 +7699,51 @@ review. It keeps standing permission rules, real-account checks and physical
 phone checks separate from completed implementation. It makes no claim that
 the build is released or cleared. The recipe and plan corrections in this
 change do not build roles units 3, 4 or 11a.
+
+## 468. Recording cleanup could leave a descendant running after the adapter closed
+
+Found: 2026-11-05, while repairing foundation review record FR-043.
+State: fixed.
+
+What happened: Closing the adapter resolved the recorder's close promise.
+The finalizer then cancelled group escalation before a descendant that
+ignored termination had exited. A descendant with released standard streams
+could outlive the recording and the caller's temporary-workspace removal.
+
+What changed: Recording completion awaits cleanup of the owned process group,
+including bounded forced termination after the leader has exited. The version
+probe uses the same cleanup. Linux liveness checks exclude killed zombies
+that cannot execute or hold the workspace. Real-process regressions cover
+successful recording, failure, cancellation and a version-probe descendant.
+
+## 469. The roles live check omitted a positive first-stall observation
+
+Found: 2026-11-05, while repairing foundation review record FR-064.
+State: open for the owner's real-account execution.
+
+What happened: The live workflow rejected a false stall during collection,
+but never observed a genuine idle obligation through its first production-minute
+stall. The in-process acceptance test did not supply the retained child-process
+proof required by post-build check 7.
+
+What changed: The owner-run workflow now gives one worker an unanswered post,
+waits for its production stall interval without changing the clock or limits,
+and requires one stall action, one nudge wake and the worker's later reply.
+Its private report retains the event identities and elapsed milliseconds.
+The owner must run `pnpm live-check:roles` and retain the authentic report.
+No real account or owner recording was used for this repair.
+
+## 470. The roles live observer could count evidence outside the selected wave
+
+Found: 2026-11-05, while repairing foundation review record FR-125.
+State: open for the owner's real-account execution after observer repair.
+
+What happened: Orientation evidence was not bound to the selected post or
+channel. Aggregate answered closure and acknowledgments could coexist with
+a terminal non-reply disposition instead of a reply from each worker.
+
+What changed: Each exact worker must supply an authenticated orientation reply
+on that wave and channel. Its replied disposition must name that reply as its
+deciding post. Manual positive and negative controls exercise the observer.
+The owner must rerun the real-account workflow before this proof gap closes.
+The unit 14 ruling against a new required automated suite remains in force.

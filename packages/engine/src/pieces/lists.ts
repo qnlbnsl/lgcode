@@ -52,6 +52,7 @@ export interface EngineLists {
   readonly reactors: Readonly<Partial<Record<PieceNamespace, Effect.Effect<void, unknown, any>>>>;
 }
 const absent = () => undefined;
+let reactors: EngineLists["reactors"] | undefined;
 export const engineLists: EngineLists = {
   commandGroups, eventGroups, commands: CommandsRpcGroup, event: Event, envelope: EventEnvelope,
   reach, sourceRules, holdUnsettled, requestHeld, secretKeep: { client: carrierKeep, board: () => [], roles: () => [] },
@@ -62,10 +63,14 @@ export const engineLists: EngineLists = {
   access: commandAccess,
   planners: { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners },
   reads: { ...reads, ...alertReads, ...boardReads },
-  views: pieceViews,
+  // The tables and reactors import engine services in this same module graph.
+  // Resolve their values when used, after module initialization has completed.
+  get views() { return pieceViews; },
   migrations: { client: [], board: [], roles: [] }, visibility: eventVisibility, pieceVisibility: {},
   snapshotSections: { client: absent, board: boardSnapshotFor, roles: rolesSnapshotFor },
   alertSources: { client: absent, board: boardAlertSource, roles: rolesAlertSource },
   openMatters: { client: () => [], board: boardOpenMatters, roles: rolesOpenMatters },
-  reactors: { client: Effect.all([alertReactor, alertDelivery], { concurrency: "unbounded", discard: true }), board: boardReactor, roles: sheepdogLoop },
+  get reactors() { return reactors ??= {
+    client: Effect.all([alertReactor, alertDelivery], { concurrency: "unbounded", discard: true }), board: boardReactor, roles: sheepdogLoop,
+  }; },
 } satisfies EngineLists;
