@@ -127,19 +127,19 @@ it("SN03 paged actions recover every record omitted from a bounded snapshot, new
   expect(snapshot.roles.agents.truncated).toBe(true);
   expect(bytes(snapshot.roles)).toBeLessThanOrEqual(128 * 1024);
   const records: any[] = [];
-  let before: number | undefined;
+  let after: number | undefined;
   let pages = 0;
   do {
-    const page = yield* read("roles.actions.list", { limit: 500, ...(before === undefined ? {} : { before }) });
+    const page = yield* read("roles.actions.list", { limit: 500, ...(after === undefined ? {} : { after }) });
     expect(page.items.length).toBeGreaterThan(0);
     expect(page.items.length).toBeLessThanOrEqual(500);
     expect(bytes(page)).toBeLessThan(256 * 1024);
     records.push(...page.items);
-    if (page.next !== undefined) expect(page.next).toBeLessThan(before ?? Infinity);
-    before = page.next;
+    if (page.next !== undefined) expect(page.next).toBeLessThan(after ?? Infinity);
+    after = page.next;
     pages++;
     expect(pages).toBeLessThan(20);
-  } while (before !== undefined);
+  } while (after !== undefined);
   expect(records).toHaveLength(256 * 12);
   expect(new Set(records.map((row) => row.sequence)).size).toBe(records.length);
   for (let i = 1; i < records.length; i++) expect(records[i - 1].sequence).toBeGreaterThan(records[i].sequence);

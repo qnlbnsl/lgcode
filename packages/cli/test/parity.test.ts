@@ -63,7 +63,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
       "roles.role-file.set": { content: roleFileContent }, "roles.role-file.get": {},
       "roles.settings.get": {}, "roles.settings.set": { settings: { sheepdog: true, limits: { stallMinutes: 10 } } },
       "roles.snooze": { group: "review", until: 1_900_000_000_000 },
-      "roles.actions.list": { agentId: "member", before: 100, limit: 20 },
+      "roles.actions.list": { agentId: "member", after: 100, limit: 20 },
       "roles.record": { action: { _tag: "roles.StallSeen", ...action, agentId: "member" } },
     };
     expect(payloads[command], "new RPC needs a command dispatch fixture").toBeDefined();

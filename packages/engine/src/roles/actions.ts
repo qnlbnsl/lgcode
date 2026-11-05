@@ -8,14 +8,15 @@ export const listActions = (input: Input, payload: Record<string, unknown>) => {
   if (input.actor._tag !== "owner") return Effect.fail(refused());
   const records = (input.snapshot.roles as RolesView).actions.filter((row) =>
     (payload.agentId === undefined || row.agentId === payload.agentId)
-    && (payload.before === undefined || row.sequence < (payload.before as number))).toReversed();
+    && (payload.after === undefined || row.sequence < (payload.after as number))).toReversed();
   const limit = Math.min((payload.limit as number | undefined) ?? rolesMaxima.actionPageItems, rolesMaxima.actionPageItems);
   const items: RolesActionRecord[] = [];
   for (const record of records) {
     if (items.length === limit) break;
     const candidate = [...items, record];
-    if (encodedBytes({ requestId: payload.requestId, items: candidate, next: record.sequence }) >= rolesMaxima.actionPageBytes) {
-      if (items.length === 0) return Effect.fail(refused("action record exceeds the page budget"));
+    // Like every paged read, keep an oversized first item whole so its
+    // exclusive continuation still reaches the rest of the history.
+    if (items.length > 0 && encodedBytes({ requestId: payload.requestId, items: candidate, next: record.sequence }) > rolesMaxima.actionPageBytes) {
       break;
     }
     items.push(record);

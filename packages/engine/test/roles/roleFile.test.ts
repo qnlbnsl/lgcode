@@ -1,7 +1,15 @@
 import { createHash } from "node:crypto";
 import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+import * as Redacted from "effect/Redacted";
+import * as Schema from "effect/Schema";
+import * as SqlClient from "effect/sql/SqlClient";
+import { RolesEvent, rolesMaxima } from "@shephrd/contracts";
+import { makeRedactor } from "../../src/identity/redactor.ts";
+import { Redactor } from "../../src/log/Redactor.ts";
 import { expect, it } from "vitest";
 import { roleFile, roleFileContent } from "../../../contracts/test/roles/fixtures.ts";
+import { maximalContent, maximalFile } from "../../../contracts/test/roles/maximalRoleFile.ts";
 import { loadLists, productionModule, withFixture } from "../support/fixturePiece.ts";
 import { agentCredential, call, failureOf, readLog, seedAgent, success } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
@@ -80,6 +88,19 @@ it("F06 accepts exactly 64 KiB of content and refuses one more byte", async () =
   expect(Buffer.byteLength(boundary)).toBe(65_536);
   expect((await Effect.runPromise(load(boundary))).file).toEqual(roleFile);
   await refusedAt(`${boundary} `);
+});
+
+it("F06 admits the strict contracts size specimen through the real command and persisted writer", async () => {
+  await withFixture(await loadLists(), () => Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    success(yield* call({ _tag: "owner" }, "roles.role-file.set", { content: maximalContent }));
+    const stored = (yield* readLog).filter((row) => row.event._tag === "roles.RoleFileSet");
+    expect(stored).toHaveLength(1);
+    const event = stored[0]!.event;
+    if (event._tag !== "roles.RoleFileSet") throw new Error("wrong event");
+    expect(event.content === maximalContent).toBe(true);
+    expect(success(yield* call({ _tag: "owner" }, "roles.role-file.get", {})).file).toEqual(maximalFile);
+  }));
 });
 
 it("F06 UTF-8 bytes: refuses an oversized file even when its character count is below 64 KiB", async () => {
@@ -190,4 +211,65 @@ it("F10 resending role-file.set returns the committed hash and writes no second 
     expect(retry).toEqual(first);
     expect((yield* readLog).at(-1)?.sequence).toBe(head);
   }));
+});
+
+it.each(["E", "D", "ED"])("F11 final stored role-file content with synthetic short registration %s is redacted once and stays admitted", async (letters) => {
+  const redactor = makeRedactor({ secrets: () => Array.from(letters, (letter) => Redacted.make(letter)), tokenHashes: () => new Set() });
+  await withFixture(await loadLists(), () => Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    const sql = yield* SqlClient.SqlClient;
+    const document = JSON.stringify({ name: "file", roles: { builder: { advice: letters.repeat(3_000), limits: {} } } });
+    const content = document + " ".repeat(rolesMaxima.roleFileBytes - Buffer.byteLength(redactor.redactText(document)));
+    const expected = redactor.redactText(content);
+    expect(Buffer.byteLength(expected)).toBe(rolesMaxima.roleFileBytes);
+    success(yield* call({ _tag: "owner" }, "roles.role-file.set", { requestId: "file-good", content }));
+    const rows = yield* sql<{ payload_json: string }>`SELECT payload_json FROM events WHERE event_type = 'roles.RoleFileSet'`;
+    expect(rows).toHaveLength(1);
+    const stored = Schema.decodeUnknownSync(RolesEvent)(JSON.parse(rows[0]!.payload_json));
+    if (stored._tag !== "roles.RoleFileSet") throw new Error("wrong event");
+    // Compare lengths first to keep a failed regression from dumping content.
+    expect(Buffer.byteLength(stored.content)).toBe(Buffer.byteLength(expected));
+    expect(stored.content === expected).toBe(true);
+    expect(Buffer.byteLength(JSON.stringify(Schema.encodeSync(RolesEvent)(stored)))).toBeLessThanOrEqual(rolesMaxima.roleFileEventBytes);
+    expect(success(yield* call({ _tag: "owner" }, "roles.role-file.get", { requestId: "file-read" })).file).toEqual(JSON.parse(expected));
+    const before = success(yield* call({ _tag: "owner" }, "roles.role-file.get", { requestId: "file-before" }));
+    const rejected = yield* call({ _tag: "owner" }, "roles.role-file.set", {
+      requestId: "file-reject", content: content + " ",
+    });
+    expect(failureOf(rejected)?._tag).toBe("CommandRefused");
+    expect(success(yield* call({ _tag: "owner" }, "roles.role-file.get", { requestId: "file-after" }))).toMatchObject({ file: before.file, roleFileHash: before.roleFileHash });
+    expect((yield* readLog).filter((row) => row.event._tag === "roles.RoleFileSet")).toHaveLength(1);
+  }), { redactor: redactor.layer });
+});
+
+it("F12 writer validates the final representation if the real redactor registry changes after planning", async () => {
+  let secrets: ReadonlyArray<Redacted.Redacted<string>> = [];
+  let expand = false;
+  const real = makeRedactor({ secrets: () => secrets, tokenHashes: () => new Set() });
+  const layer = Layer.effect(Redactor, Effect.map(Redactor, (service) => ({ ...service, redact: (event) => Effect.gen(function* () {
+    if (expand && event._tag === "roles.RoleFileSet") secrets = [Redacted.make("E"), Redacted.make("D")];
+    return yield* service.redact(event);
+  }) }))).pipe(Layer.provide(real.layer));
+  await withFixture(await loadLists(), () => Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    success(yield* call({ _tag: "owner" }, "roles.role-file.set", { content: roleFileContent }));
+    const before = success(yield* call({ _tag: "owner" }, "roles.role-file.get", {}));
+    // This content is valid at ingress and planning. The writer's registry is
+    // refreshed before its mandatory redaction pass.
+    const countBefore = (yield* readLog).length;
+    const content = JSON.stringify({ name: "file", roles: { builder: { advice: "ED".repeat(14_000), limits: {} } } });
+    expand = true;
+    const rejected = yield* call({ _tag: "owner" }, "roles.role-file.set", {
+      requestId: "file-late", content,
+    });
+    expect(failureOf(rejected)?._tag).toBe("CommandRefused");
+    expect(encodedRoleFileEventBytes(real.redactText(content))).toBeGreaterThan(rolesMaxima.roleFileEventBytes);
+    expect((yield* readLog)).toHaveLength(countBefore);
+    expect(success(yield* call({ _tag: "owner" }, "roles.role-file.get", { requestId: "file-after" }))).toMatchObject({ file: before.file, roleFileHash: before.roleFileHash });
+    expect((yield* readLog).filter((row) => row.event._tag === "roles.RoleFileSet")).toHaveLength(1);
+    // A rejected representation must not latch a database failure.
+    expand = false;
+    success(yield* call({ _tag: "owner" }, "roles.role-file.set", { requestId: "file-recovery", content: roleFileContent }));
+    expect((yield* readLog).filter((row) => row.event._tag === "roles.RoleFileSet")).toHaveLength(2);
+  }), { redactor: layer });
 });

@@ -17,7 +17,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { followAvailability } from "../accounts/available.ts";
 import { sha256Hex } from "../identity/credential.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
-import { EventLog, LogWriteFailed, callerKey, type SideRows } from "../log/EventLog.ts";
+import { EventLog, InvalidEvent, LogWriteFailed, callerKey, type SideRows } from "../log/EventLog.ts";
 import { crashEvents } from "../recovery/crash.ts";
 import { Restart } from "../recovery/service.ts";
 import { Runner, RunnerEvent } from "../runner/Runner.ts";
@@ -329,6 +329,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
         },
         Effect.provideService(SqlClient.SqlClient, sql),
         Effect.catchTag("RequestIdReused", () => Effect.fail(refused("request id reused"))),
+        Effect.catchTag("LogWriteFailed", (error) => Effect.fail(error instanceof InvalidEvent ? refused(error.reason) : error)),
         Effect.catchTag("SqlError", () => Effect.fail(new LogWriteFailed({ reason: "database read failed" }))),
       ), (settle) => settle),
     });

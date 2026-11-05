@@ -78,6 +78,37 @@ it.effect("idle groups nudge every top, share one holder notice, and repeat hour
   expect(repeatedPosts).toHaveLength(6);
 })));
 
+it.effect("a supported 300 KiB group produces a persisted idle action that pages whole before older normal records", () => run(engineLists, () => Effect.gen(function* () {
+  yield* setup;
+  const client = yield* socket();
+  const started = yield* client.start!({ ...startPayload(rig, { role: "lead", groups: ["normal"] }), requestId: "large-group-start" });
+  const agentId = started.agentId as string;
+  yield* pause(100);
+  yield* TestClock.adjust("60 minutes");
+  const normal = yield* eventually(actions("roles.TeamIdleReported"), (rows) => rows.some((row) => row.agentId === agentId));
+  expect(normal.filter((row) => row.agentId === agentId)).toHaveLength(1);
+  const group = "group-" + "界".repeat(100 * 1024);
+  yield* client.group!({ requestId: "large-group-assign", agentId, add: [group], remove: ["normal"] });
+  yield* pause(100);
+  yield* TestClock.adjust("60 minutes");
+  const recorded = yield* eventually(actions("roles.TeamIdleReported"), (rows) => rows.some((row) => row._tag === "roles.TeamIdleReported" && row.group === group));
+  const oversized = recorded.find((row) => row._tag === "roles.TeamIdleReported" && row.group === group)!;
+  expect(oversized.agentId).toBe(agentId);
+  expect(Buffer.byteLength(JSON.stringify(oversized))).toBeGreaterThan(256 * 1024);
+  const persisted = (yield* alertLog).find((row) => row.sequence === oversized.sequence);
+  expect(persisted?.event._tag).toBe("roles.TeamIdleReported");
+  expect(persisted?.event._tag === "roles.TeamIdleReported" && persisted.event.group === group).toBe(true);
+  const first = yield* client["roles.actions.list"]!({ requestId: "large-group-page", agentId, limit: 500 });
+  expect((first.items as any[])).toHaveLength(1);
+  expect((first.items as any[])[0].sequence).toBe(oversized.sequence);
+  expect((first.items as any[])[0].group === group).toBe(true);
+  expect(first.next).toBe(oversized.sequence);
+  const last = yield* client["roles.actions.list"]!({ requestId: "large-group-rest", agentId, after: first.next, limit: 500 });
+  expect((last.items as any[]).map((row) => row.sequence)).toEqual(normal.filter((row) => row.agentId === agentId).map((row) => row.sequence).toReversed());
+  expect(last).not.toHaveProperty("next");
+  expect((yield* client["roles.actions.list"]!({ requestId: "large-group-unrelated", agentId: "unrelated", limit: 500 })).items).toEqual([]);
+})));
+
 it.effect("an unknown account reset suppresses idleness and account recovery restarts the whole hour", () => run(engineLists, () => Effect.gen(function* () {
   yield* setup;
   yield* seedAgent({ id: "top", groups: ["build"] });

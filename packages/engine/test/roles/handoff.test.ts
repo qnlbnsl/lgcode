@@ -96,6 +96,7 @@ it("H03 caps a 100 KiB first prompt and a 200 KiB tool exchange, names both cut 
   expect(body.lastExchange).not.toContain("OUTPUT-TAIL-MUST-BE-CUT");
   expect(body.lastExchange).toContain("LAST QUESTION: inspect the build.");
   expect(body.lastExchange).toContain("KEEP THIS WHOLE: the build passed.");
+  expect(body.lastExchange).toContain(`Output:\nOUTPUT ${"o".repeat(64)}`);
 })));
 
 it("H04 cuts multibyte prompts and messages at whole Unicode characters and reports each source sequence", async () => run((context) => Effect.gen(function* () {
@@ -325,3 +326,63 @@ it("H15 hides a later DeliveryQueued from an agent handoff and marks its visible
     after = page.next;
   }
 })));
+
+it("H16 pairs queued/sent across an actual 500-item split for owner, lead, recovered parent and replacement", async () => run((context) => Effect.gen(function* () {
+  const { root, lead, worker } = yield* family(context);
+  const historical = yield* prompt(context, worker, "Historical turn.");
+  yield* updates(context, worker, historical, [text("Historical response.")]);
+  const count = (yield* rows(context, worker)).length;
+  yield* updates(context, worker, historical, Array.from({ length: 498 - count }, (_, index) => text(`PAGE FILLER ${index}`)));
+  yield* finish(context, worker);
+  expect((yield* rows(context, worker))).toHaveLength(499);
+  const delivery = yield* prompt(context, worker, "SPLIT OWNER PROMPT");
+  yield* updates(context, worker, delivery, [text("SPLIT VISIBLE RESPONSE")]);
+  const queued = yield* request(context.owner, "prompt", { agentId: worker.agentId, text: "UNSENT SPLIT DECOY" });
+  expect(context.runner.callsOf("prompt").some((row) => row.input.delivery.id === queued.deliveryId)).toBe(false);
+  const first = yield* request(context.owner, "client.thread", { agentId: worker.agentId, after: 0, limit: 500 });
+  expect(first.items).toHaveLength(500);
+  expect(first.items.at(-1).event).toMatchObject({ _tag: "DeliveryQueued", delivery: { id: delivery } });
+  expect(first.next).toBe(first.items.at(-1).sequence);
+  const second = yield* request(context.owner, "client.thread", { agentId: worker.agentId, after: first.next, limit: 500 });
+  expect(second.items[0].event).toMatchObject({ _tag: "DeliverySent", deliveryId: delivery });
+  const sentSequence = second.items[0].sequence;
+  const agentFirst = unwrap(yield* request(lead.client, "client.thread", { agentId: worker.agentId, after: 0, limit: 500 }));
+  expect(agentFirst.items).toHaveLength(500);
+  expect(agentFirst.next).toBeTypeOf("number");
+  const agentSecond = unwrap(yield* request(lead.client, "client.thread", { agentId: worker.agentId, after: agentFirst.next, limit: 500 }));
+  expect(agentSecond.items.length).toBeGreaterThan(0);
+  for (const page of [agentFirst, agentSecond]) expect(page.items.some((row: any) => row.event._tag === "DeliveryQueued")).toBe(false);
+  const ownerRead = yield* handoff(context.owner, worker);
+  expect(ownerRead.body.lastExchange).toContain("SPLIT OWNER PROMPT");
+  expect(ownerRead.body.lastExchange).toContain("SPLIT VISIBLE RESPONSE");
+  expect(ownerRead.body.lastExchange).not.toContain("UNSENT SPLIT DECOY");
+  budget(ownerRead.wire);
+  const checkAgent = (value: { wire: unknown; body: { lastExchange: string } }) => {
+    expect(value.body.lastExchange).toContain("SPLIT VISIBLE RESPONSE");
+    expect(value.body.lastExchange).not.toContain("SPLIT OWNER PROMPT");
+    expect(value.body.lastExchange).not.toContain("UNSENT SPLIT DECOY");
+    cutAt(value.body.lastExchange, sentSequence);
+    budget(value.wire);
+  };
+  checkAgent(yield* handoff(lead.client, worker));
+  const leadDelivery = yield* prompt(context, lead, "Manage the split history.");
+  yield* updates(context, lead, leadDelivery, [text("Managing.")]);
+  yield* context.runner.emit({ _tag: "promptReply", agentId: lead.agentId, incarnation: incarnationOf(lead.token), deliveryId: leadDelivery,
+    outcome: { _tag: "pause", reason: "out-of-usage", error: "Simulated provider limit." } });
+  expect(yield* eventually(stateOf(lead.agentId), (state) => state === "paused")).toBe("paused");
+  checkAgent(yield* handoff(root.client, worker, "split-current-rights"));
+  yield* refused(lead.client, "roles.handoff", { agentId: worker.agentId });
+  const pausedHead = yield* headSequence;
+  yield* request(context.owner, "accounts mark-available", { accountId: "primary" });
+  expect(yield* eventually(rows(context, lead).pipe(Effect.map((all) => all.some((row) => row.event._tag === "DeliverySent" && row.sequence > pausedHead))), Boolean)).toBe(true);
+  expect(["idle", "working"]).toContain(yield* eventually(stateOf(lead.agentId), (state) => state === "idle" || state === "working"));
+  yield* refused(root.client, "roles.handoff", { agentId: worker.agentId, requestId: "split-current-rights" });
+  checkAgent(yield* handoff(lead.client, worker));
+  const replacement = yield* spawn(context, lead, { name: "Replacement", prompt: "Ask the lead for the prior work." });
+  yield* updates(context, replacement, yield* sent(context, replacement), [text("Ready.")]);
+  yield* finish(context, replacement);
+  const head = yield* headSequence;
+  yield* refused(replacement.client, "roles.handoff", { agentId: worker.agentId });
+  yield* refused(replacement.client, "client.thread", { agentId: worker.agentId, after: 0, limit: 500 });
+  expect(yield* headSequence).toBe(head);
+})), 90_000);

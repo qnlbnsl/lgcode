@@ -5985,10 +5985,17 @@ Why it matters: The foundation build's reviews are held until its end, so this w
 ## 365. An action record larger than the page budget cannot be read through `roles.actions.list`
 
 Found: 2026-11-04, by the builder or test writer of unit r2, during the foundation build.
-State: open, for the final review.
+State: fixed during the foundation review repair of FR-154.
 
-What happens: The existing action-event schema permits an individual encoded record larger than the action page budget. The history read refuses an oversized singleton instead of sending an oversized page. Such a record cannot be reconstructed through `roles.actions.list` until the writer or schema bounds it, or a large-record retrieval path exists. The 266 focused tests pass with ordinary records, including the 500-record size fixture. This limitation is separate from A07's overlarge requested limit, which is fixed.
-Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+What happened: The action-event schema permits an individual encoded record
+larger than the action page budget. The history read refused an oversized
+singleton instead of sending it whole, blocking traversal to older records.
+
+What changed: The reader returns an oversized first action whole on its own
+page. Its exclusive continuation reaches the older history. Regressions cover
+the byte boundary, filtering, ordinary controls, and a 300 KiB group assigned
+through the public command and recorded by the real idle-rule producer.
+No stored record is removed or cut.
 
 ## 366. The transcript fallback schedules nothing for a long Claude project folder
 
@@ -6386,3 +6393,53 @@ and one outcome notice. Existing no-carry and service-receipt restart cases
 remain covered.
 
 Why it matters: Recovery does not add work that the engine already preserved.
+
+## 390. Action history used a different continuation field from other paged reads
+
+Found: 2026-11-04, while repairing foundation review record FR-030.
+State: fixed.
+
+What happened: The action-history schema and handler accepted `before`, while
+the shared paged-read contract requires callers to pass `next` back as `after`.
+A generic caller repeated the newest page.
+
+What changed: The schema, handler, command-line parity fixture and snapshot
+recovery caller use `after`. Newest-first history uses an exclusive descending
+comparison. Authenticated regressions check filtering, ordering, uniqueness,
+termination, and the item and byte caps.
+
+## 391. A role file could expand beyond admission budgets during final redaction
+
+Found: 2026-11-04, while repairing foundation review record FR-046.
+State: fixed.
+
+What happened: The planner validated original and redacted content, then sent
+the redacted content through the writer's redactor again. Replacement markers
+could expand beyond the checked budgets. A registry refresh could also change
+the representation between planning and the write.
+
+What changed: The planner sends the original content to the writer. The writer
+validates its final redacted document before inserting any event or receipt.
+A refused document rolls back without latching a database failure. Regressions
+use the real redactor and SQLite, check stored bytes, preserve the previous
+file and hash on refusal, and prove a later valid write still succeeds.
+
+## 392. Handoff and roles-event tests did not prove their required boundaries
+
+Found: 2026-11-04, while repairing foundation review records FR-054, FR-057,
+and FR-115.
+State: fixed.
+
+What happened: Handoff tests did not combine a real 500-item queued/sent split
+with all four caller cases. The large-tool assertion did not require any output
+to survive. The contracts size fixture used a tolerant non-event instead of an
+admitted role file.
+
+What changed: A handoff regression places the queued prompt at item 500 and its
+sent event at item 501 through actual writers. It checks owner pairing, the
+intentional agent marker, fresh rights after parent recovery, replay refusal,
+and replacement refusal. The large-tool case requires a stable output prefix.
+A valid 64 KiB role file with escaping and multibyte advice passes real admission,
+strict event and envelope round trips, and actual stream and page frame checks.
+The invalid control-character case remains a separate refusal test. Temporary
+mutations establish that each strengthened test rejects its assigned fault.
