@@ -8,9 +8,11 @@ it("a failed candidate gate is retried on a quiet log without inventing another 
   const initial = snapshot({ agents: [agentRow("agent-a", "working")] });
   const waitForAgents = await loadWait();
   let reads = 0;
+  let payloads = 0;
+  const cursors: number[] = [];
   const peer = await clientApiPeer("node", (frame, socket) => {
     if (frame.tag === "client.snapshot") succeed(socket, frame, { requestId: frame.payload.requestId, ...initial });
-    if (frame.tag === "subscribe") chunk(socket, frame, [turnEnd(11)]);
+    if (frame.tag === "subscribe" && frame.payload.after < 11) { payloads++; chunk(socket, frame, [turnEnd(11)]); }
     if (frame.tag === "client.sequence") {
       if (++reads === 1) refuse(socket, frame, "database read failed");
       else succeed(socket, frame, { requestId: frame.payload.requestId, sequence: 11 });
@@ -18,9 +20,16 @@ it("a failed candidate gate is retried on a quiet log without inventing another 
   });
   const connect = await peer.connect();
   const result = await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
-    return yield* waitForAgents(yield* connect, { members: ["agent-a"], mode: "all" }).pipe(Effect.timeout(3_000));
+    const client = yield* connect;
+    const observed = { ...client, subscribe: (payload: any) => { cursors.push(payload.after); return client.subscribe(payload); } };
+    return yield* waitForAgents(observed, { members: ["agent-a"], mode: "all" }).pipe(Effect.timeout(3_000));
   })));
   expect(reads).toBe(2);
+  expect(payloads).toBe(1);
+  expect(cursors).toEqual([10, 11]);
+  // RPC streams are lazy: the quiet retry can finish at its gate before the
+  // next network pull. Any opened subscription must still respect its cursor.
+  expect(peer.requests.filter(({ frame }) => frame.tag === "subscribe").every(({ frame }) => [10, 11].includes(frame.payload.after))).toBe(true);
   expect(result).toEqual({ outcome: "satisfied", members: [{ agentId: "agent-a", reason: "settled" }] });
 });
 

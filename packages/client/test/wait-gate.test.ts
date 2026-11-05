@@ -1,7 +1,7 @@
 import "./support/unit3Group.ts";
 import * as Effect from "effect/Effect";
 import { afterEach, expect, it } from "vitest";
-import { agentRow, snapshot, envelope, state, turnEnd, queued, loadWait, clientApiPeer, closeClientApiPeers, cleanupUnit7b, chunk, succeed, refuse, until } from "./support/unit3.ts";
+import { agentRow, snapshot, envelope, state, turnEnd, queued, permission, loadWait, clientApiPeer, closeClientApiPeers, cleanupUnit7b, chunk, succeed, refuse, until } from "./support/unit3.ts";
 afterEach(async () => { await closeClientApiPeers(); await cleanupUnit7b(); });
 
 for (const mode of ["any", "all"] as const) for (const delivery of ["live", "catch-up"] as const) for (const split of ["reload", "wait wake", "question answer"] as const) {
@@ -107,3 +107,46 @@ it("3.9 the wait helper's nested piece read completes despite a stream queue bac
   succeed(pending!.socket, pending!.frame, { requestId: pending!.frame.payload.requestId, sequence: 11, holdsUnsettled: [], holdsIncoming: [], ownerHeld: [], disabled: false });
   expect((await running).outcome).toBe("satisfied");
 });
+
+for (const mode of ["any", "all"] as const) for (const delivery of ["live", "catch-up"] as const) for (const answered of [true, false]) {
+  it(`3.10 ${delivery}/${mode} owner-held permission ${answered ? "answered in committed suffix" : "genuinely held control"}`, async () => {
+    const initial = snapshot({ agents: [agentRow("agent-a", "working")] });
+    const waitForAgents = await loadWait();
+    const prefix = permission(11);
+    let subscription: { frame: any; socket: any } | undefined;
+    let gate: { frame: any; socket: any } | undefined;
+    let finished = false;
+    const peer = await clientApiPeer("node", (frame, socket) => {
+      if (frame.tag === "client.snapshot") succeed(socket, frame, { requestId: frame.payload.requestId, ...initial });
+      if (frame.tag === "subscribe") { subscription = { frame, socket }; if (delivery === "catch-up") chunk(socket, frame, [prefix]); }
+      if (frame.tag === "client.sequence") {
+        if (!gate) gate = { frame, socket };
+        else succeed(socket, frame, { requestId: frame.payload.requestId, sequence: 14 });
+      }
+    });
+    const connect = await peer.connect();
+    const running = Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const result = yield* waitForAgents(yield* connect, { members: ["agent-a"], mode }).pipe(Effect.timeout(5_000));
+      finished = true; return result;
+    })));
+    await until("permission subscription", () => subscription);
+    if (delivery === "live") chunk(subscription!.socket, subscription!.frame, [prefix]);
+    await until("owner-held candidate gate", () => gate || finished);
+    expect(finished).toBe(false);
+    expect(gate).toBeDefined();
+    succeed(gate!.socket, gate!.frame, { requestId: gate!.frame.payload.requestId, sequence: answered ? 13 : 11 });
+    if (answered) {
+      chunk(subscription!.socket, subscription!.frame, [
+        envelope(12, { _tag: "PermissionAnswered", agentId: "agent-a", permissionRequestId: "permission-11", answeredBy: { _tag: "owner" }, answer: { _tag: "selected", optionId: "once" } }),
+        state(13, "working"),
+      ]);
+      await until("answered suffix acknowledged", () => peer.acks.length >= 2 || finished);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(finished, "the committed answer cancels the owner-held candidate while work continues").toBe(false);
+      chunk(subscription!.socket, subscription!.frame, [turnEnd(14)]);
+    }
+    expect(await running).toEqual(answered
+      ? { outcome: "satisfied", members: [{ agentId: "agent-a", reason: "settled" }] }
+      : { outcome: "request-held", members: [] });
+  });
+}

@@ -225,8 +225,8 @@ export const connectWith = (options: CoreConnectOptions): Effect.Effect<Client, 
                       },
                       catch: () => new ClientError({ message: "the event recovery reply was invalid" })
                     })
-                    const wire = yield* Schema.decodeUnknownEffect(WireEnvelope)(value.envelope)
-                    value = { envelope: yield* decodeEnvelope(wire) }
+                    const recovered = yield* Schema.decodeUnknownEffect(Schema.Struct({ envelope: WireEnvelope }))(value)
+                    value = { envelope: yield* decodeEnvelope(recovered.envelope) }
                   }
                   if (!isEnvelope(value.envelope) || value.envelope.sequence !== item.sequence) {
                     return yield* new ClientError({ message: "the event recovery reply was invalid" })

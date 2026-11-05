@@ -1234,7 +1234,7 @@ settings paths are also owner-routed.
 ## 74. Requests asked by a crashed or stopped agent remain open
 
 Found: 2026-11-01, in the review of unit 5c.
-State: crash permission cancellation is fixed in unit 6c. Stop and recovery closure remain open, and question closure needs an owner decision (issue 113).
+State: Crash permission cancellation is fixed in unit 6c. Stop permission cancellation is fixed in foundation unit 1b and verified by the composed client regression on 2026-11-05. The historical recovery and question decisions are recorded below and in issue 113.
 
 What happens: no current writer emits `PermissionCancelled` or closes the
 questions asked by an agent that crashes or stops. Moving the subjects it
@@ -1273,7 +1273,9 @@ The crash cancellation in `packages/engine/src/recovery/crash.ts` does not
 cover this stop path.
 Score: MINOR, severity 4 × fallout 3 × probability 6 = 72, band schedule.
 The owner deferred this finding on 2026-11-03.
-The stop closure remains open under this issue.
+The stop closure was deferred under this issue at that time.
+
+Update on 2026-11-05: The stop command now cancels the asker's permissions and withdraws their queued notices. The foundation regression verifies simultaneous asking and holding, transfer of a grandchild's duty, stop and resume, a real owner wait after new work, and the release of the prior holder's queue. Questions intentionally remain open. Issue 313 records the same stop cause.
 
 ## 75. The wait contract has no owner waiter
 
@@ -5530,14 +5532,16 @@ What happens: A plain value under a name that does not look like a secret reache
 What should happen: Not decided.
 Why it matters: A secret stored under an ordinary name would be written to the log and shown to clients.
 
-## 313. A permission request's row stays open after `stop`
+## 313. A permission request's row stayed open after `stop`
 
-Found: 2026-11-03, while planning the client API plan.
-State: open.
+Found: 2026-11-03, while planning the client application programming interface (API).
+State: fixed by the stop command and verified by the foundation client regressions on 2026-11-05.
 
-What happens: A permission request's row stays open after `stop`, and a resumed session cannot answer it, because the hold belongs to the old process (client API row 144).
-What should happen: Edit E31 makes `stop` write `PermissionCancelled` with a withdrawal for the stopped agent's open requests, as a crash does (client API row 163). When unit 1b merges, the stop part of issue 74 is closed. Recovery's part is already done, and question closure stays with issue 113. A row left by an older log is closed by a restart.
-Why it matters: The owner sees a request that nobody can answer.
+What happened: A stopped asker's permission could remain open for its obsolete process.
+
+What changed: The stop command cancels the asker's permissions and withdraws their queued notices. It transfers duties held for other askers. Questions remain open. The composed regression stops and resumes an asker that also holds a grandchild's permission. It isolates the preserved question, completes a real owner wait after new work, and positively drains the prior holder's queue before checking that obsolete notices were never sent. The original stop-batch and parent-wait assertions remain covered.
+
+Why it matters: A resumed session does not inherit a permission that only its old process could answer.
 
 ## 314. A failing alert adds one event every 10 minutes
 
@@ -7140,3 +7144,30 @@ frames. The command line and Model Context Protocol forward the labelled
 board-read data unchanged.
 The thread pagination boundary also preserves the sent-text event and checks
 its complete delivery identity, sender, and text after the dispatch event.
+
+## 432. An invalid agent recovery wrapper escaped typed failure handling
+
+Found: 2026-11-05, while repairing foundation review record FR-025.
+State: fixed.
+
+What happened: The client parsed an agent's recovery data and accessed its envelope before validating the wrapper. JSON null caused a defect. Automatic subscription recovery only handles typed failures.
+
+What changed: The shared client core validates the complete wrapper with the wire schema before accessing its envelope. Node and browser socket regressions exercise null, missing and invalid envelopes, invalid JSON and malformed framing. They require a retry from the cursor before the marker, ordered delivery after a valid retry, and a typed client error on exhaustion.
+
+## 433. A thread read accepted a cursor beyond the durable log head
+
+Found: 2026-11-05, while repairing foundation review record FR-040.
+State: fixed.
+
+What happened: The thread reader checked numeric cursor validity but returned an empty final page when the cursor exceeded the durable log head.
+
+What changed: The reader compares the cursor with SQLite's durable head on the read connection. Equality remains valid. The published view still bounds the page. Regressions cover empty and populated logs, the public thread read, and a published view behind the durable log.
+
+## 434. Client regressions omitted control-state and temporal boundaries
+
+Found: 2026-11-05, while repairing foundation review records FR-056, FR-077, FR-095, FR-100, FR-103, FR-111 and FR-114.
+State: fixed in the regression suite.
+
+What happened: Snapshot replay compared identities without the changing control fields. Capacity parity omitted the hold boolean. Several wait fixtures could pass despite stale state or an omitted retry. The visibility fixtures reopened subscriptions after availability changes. The frame-boundary fixture stopped at its oversized marker.
+
+What changed: Snapshot replay compares groups, lifecycle, counts and holders before, during and after publication for the owner and a fixed agent read set. The fold property compares capacity holds through release, stop and crash. Both wait modes begin with an empty held queue. The quiet retry respects its cursor. The resumed-member case publishes a complete boundary while one member works. The permission matrix covers an answered suffix and a genuinely held control in both delivery phases and modes. Both socket subscription surfaces remain open through pause, crash and recovery, and replay old events with recovered rights. A separate current-holder oracle replaces the static event matrix. The transport-boundary stream must deliver ordered catch-up and live tails after its marker. Temporary fault mutations verify the strengthened assertions.

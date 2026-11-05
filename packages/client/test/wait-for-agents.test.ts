@@ -1,5 +1,6 @@
 import "./support/unit3Group.ts";
 import * as Effect from "effect/Effect";
+import * as Stream from "effect/Stream";
 import { afterEach, expect, it } from "vitest";
 import { apply, emptyViews } from "../../engine/src/views/apply.ts";
 import { withWaitChecks } from "../../engine/src/routing/waits.ts";
@@ -69,19 +70,25 @@ it("3.5 all discards an earlier resolution when that member goes back to working
   const initial = snapshot({ agents: [agentRow(), agentRow("agent-b", "working")] });
   const waitForAgents = await loadWait();
   let subscription: { frame: any; socket: any } | undefined;
+  let boundary = 12;
+  let consumed = 10;
   const peer = await clientApiPeer("node", (frame, socket) => {
     if (frame.tag === "client.snapshot") succeed(socket, frame, { requestId: frame.payload.requestId, ...initial });
     if (frame.tag === "subscribe") { subscription = { frame, socket }; chunk(socket, frame, [state(11, "working"), turnEnd(12, "agent-b")]); }
-    if (frame.tag === "client.sequence") succeed(socket, frame, { requestId: frame.payload.requestId, sequence: 13 });
+    if (frame.tag === "client.sequence") succeed(socket, frame, { requestId: frame.payload.requestId, sequence: boundary });
   });
   const connect = await peer.connect(); let finished = false;
   const running = Effect.runPromise(Effect.scoped(Effect.gen(function* () {
-    const result = yield* waitForAgents(yield* connect, { members: ["agent-a", "agent-b"], mode: "all" }).pipe(Effect.timeout(4_000));
+    const client = yield* connect;
+    const observed = { ...client, subscribe: (payload: any) => client.subscribe(payload).pipe(Stream.tap((row: any) => Effect.sync(() => { consumed = row.sequence; }))) };
+    const result = yield* waitForAgents(observed, { members: ["agent-a", "agent-b"], mode: "all" }).pipe(Effect.timeout(4_000));
     finished = true; return result;
   })));
-  await until("subscription", () => subscription);
-  await new Promise((resolve) => setTimeout(resolve, 30));
-  expect(finished).toBe(false);
+  await until("complete boundary 12 consumed", () => consumed === 12 || finished);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(consumed).toBe(12);
+  expect(finished, "A is working at the complete boundary even though A settled earlier").toBe(false);
+  boundary = 13;
   chunk(subscription!.socket, subscription!.frame, [turnEnd(13)]);
   expect(await running).toMatchObject({ outcome: "satisfied", members: [{ agentId: "agent-a", reason: "settled" }, { agentId: "agent-b", reason: "settled" }] });
 });
@@ -111,4 +118,29 @@ it("3.5 a piece hold predating the snapshot is checked by fresh lists before an 
   const result = await Effect.runPromise(Effect.scoped(Effect.gen(function* () { return yield* waitForAgents(yield* connect, { members, mode: "all" }).pipe(Effect.timeout(4_000)); })));
   expect(reads).toBeGreaterThanOrEqual(2); expect(result.outcome).toBe("satisfied");
   expect(peer.requests.find(({ frame }) => frame.tag === "subscribe")!.frame.payload).not.toHaveProperty("filter");
+});
+
+for (const mode of ["any", "all"] as const) it(`3.5 ${mode} an empty capacity hold predating the snapshot waits until released`, async () => {
+  const initial = snapshot({ agents: [{ ...agentRow(), capacityHeld: true }] });
+  const waitForAgents = await loadWait();
+  let subscription: { frame: any; socket: any } | undefined;
+  let consumed = false;
+  let finished = false;
+  const peer = await clientApiPeer("node", (frame, socket) => {
+    if (frame.tag === "client.snapshot") succeed(socket, frame, { requestId: frame.payload.requestId, ...initial });
+    if (frame.tag === "subscribe") { subscription = { frame, socket }; chunk(socket, frame, [state(11, "idle")]); }
+    if (frame.tag === "client.sequence") succeed(socket, frame, { requestId: frame.payload.requestId, sequence: 12 });
+  });
+  const connect = await peer.connect();
+  const running = Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+    const client = yield* connect;
+    const observed = { ...client, subscribe: (payload: any) => client.subscribe(payload).pipe(Stream.tap(() => Effect.sync(() => { consumed = true; }))) };
+    const result = yield* waitForAgents(observed, { members, mode }).pipe(Effect.timeout(4_000));
+    finished = true; return result;
+  })));
+  await until("held idle boundary consumed", () => consumed || finished);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(finished, "an empty queue does not clear the pre-snapshot capacity hold").toBe(false);
+  chunk(subscription!.socket, subscription!.frame, [envelope(12, { _tag: "DeliveryReleased", agentId: "agent-a" })]);
+  expect(await running).toEqual({ outcome: "satisfied", members: [{ agentId: "agent-a", reason: "settled" }] });
 });

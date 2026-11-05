@@ -6,7 +6,7 @@ import { mayReadAgent, visibleTo } from "../api/visibility.ts";
 import { refused } from "../commands/internal.ts";
 import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { Views } from "../views/Views.ts";
-import { decodeRowWith, LogReadFailed, SubscribeInvalidCursor, type EventRow } from "./subscribe.ts";
+import { decodeRowWith, LogReadFailed, SubscribeAheadOfHead, SubscribeInvalidCursor, type EventRow } from "./subscribe.ts";
 
 const budget = 900 * 1024;
 export const agentRead = (input: { readonly caller: Caller; readonly agentId: string; readonly after: number; readonly limit: number }, lists: EngineLists = engineLists) => Effect.gen(function* () {
@@ -14,6 +14,9 @@ export const agentRead = (input: { readonly caller: Caller; readonly agentId: st
   const view = yield* (yield* Views).snapshot;
   if (!mayReadAgent(input.caller, input.agentId, view)) return yield* refused();
   const sql = yield* SqlClient.SqlClient;
+  const heads = yield* SqliteClient.readOnly(sql<{ head: number }>`SELECT COALESCE(MAX(sequence), 0) AS head FROM events`);
+  const head = heads[0]!.head;
+  if (input.after > head) return yield* new SubscribeAheadOfHead({ after: input.after, head });
   const limit = Number.isFinite(input.limit) ? Math.max(1, Math.min(500, Math.floor(input.limit))) : 500;
   const items: EventEnvelope[] = [];
   let bytes = 2; // The JSON array's brackets.

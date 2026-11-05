@@ -57,22 +57,36 @@ it("a singleton just below the item budget becomes a marker when its actual RPC 
   const after = yield* headSequence;
   const [edge] = yield* appendSetup([textItem("edge", "x".repeat(256 * 1024 - bytes(small) - 10))]);
   expect(bytes(edge)).toBeLessThan(256 * 1024);
+  const [tail] = yield* appendSetup([textItem("boundary-tail", "After the marker.")]);
   const address = yield* endpoint;
   const socket = yield* Effect.acquireRelease(Effect.promise(() => new Promise<WebSocket>((resolve, reject) => {
     const socket = new WebSocket(socketUrl(address.socket), { headers: { Authorization: `Bearer ${address.bearer}`, ...ancestryHeaders() } });
     socket.once("error", reject); socket.once("open", () => resolve(socket));
   })), (socket) => Effect.sync(() => socket.terminate()));
-  const frame = yield* Effect.promise(() => new Promise<any>((resolve, reject) => {
-    socket.on("message", (data) => {
-      const message = JSON.parse(data.toString());
-      for (const frame of Array.isArray(message) ? message : [message]) {
-        if (frame._tag === "Ping") socket.send(JSON.stringify({ _tag: "Pong" }));
-        if (frame._tag === "Chunk") { socket.send(JSON.stringify({ _tag: "Ack", requestId: frame.requestId })); resolve(frame); }
-        if (frame._tag === "Exit") reject(new Error("Subscription ended before its item."));
+  const frames: any[] = [];
+  let ready!: () => void;
+  let complete!: () => void;
+  const replayed = new Promise<void>((resolve) => { ready = resolve; });
+  const continued = new Promise<void>((resolve) => { complete = resolve; });
+  socket.on("message", (data) => {
+    const message = JSON.parse(data.toString());
+    for (const frame of Array.isArray(message) ? message : [message]) {
+      if (frame._tag === "Ping") socket.send(JSON.stringify({ _tag: "Pong" }));
+      if (frame._tag === "Chunk") {
+        frames.push(frame);
+        socket.send(JSON.stringify({ _tag: "Ack", requestId: frame.requestId }));
+        if (frames.flatMap((f) => f.values).length >= 2) ready();
+        if (frames.flatMap((f) => f.values).length >= 3) complete();
       }
-    });
-    socket.send(requestFrame("boundary-frame", "client.subscribe", { requestId: "boundary-frame", after }));
-  }));
-  expect(bytes(frame)).toBeLessThanOrEqual(256 * 1024);
-  expect(frame.values).toEqual([{ _tag: "client.Oversized", sequence: edge!.sequence, tag: "ThreadItem", agentId: "agent-a", bytes: bytes(edge) }]);
+    }
+  });
+  socket.send(requestFrame("boundary-frame", "client.subscribe", { requestId: "boundary-frame", after }));
+  yield* Effect.promise(() => replayed).pipe(Effect.timeout(3_000));
+  const [liveTail] = yield* appendSetup([textItem("live-boundary-tail", "Live after the marker.")]);
+  yield* Effect.promise(() => continued).pipe(Effect.timeout(3_000));
+  for (const frame of frames) expect(bytes(frame)).toBeLessThanOrEqual(256 * 1024);
+  expect(frames.flatMap((frame) => frame.values)).toEqual([
+    { _tag: "client.Oversized", sequence: edge!.sequence, tag: "ThreadItem", agentId: "agent-a", bytes: bytes(edge) },
+    tail, liveTail,
+  ]);
 })));
