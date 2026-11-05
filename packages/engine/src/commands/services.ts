@@ -1,3 +1,4 @@
+import type { CacheTarget } from "./cache.ts";
 import type { Caller } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
@@ -32,3 +33,11 @@ export const subscribeService = (service: string, after: number, lists: EngineLi
   const input = yield* (yield* CommandHandler).input({ _tag: "service", service });
   return lists.reads.subscribe!({ ...input, runtime: { ...input.runtime, lists } }, { after }) as Stream.Stream<import("@shephrd/contracts").EventEnvelope, unknown, any>;
 }));
+
+// This is an internal composite of the existing compact and board.flush
+// rights, not a new public command or an expanded service permission.
+export const serviceCacheAction = (caller: Extract<Caller, { _tag: "service" }>, target: CacheTarget, lists: EngineLists = engineLists) => Effect.gen(function* () {
+  if (caller.service !== "roles.sheepdog" || !permitted(caller.service, "compact", lists)
+    || !permitted(caller.service, "board.flush", lists)) return yield* refused();
+  return yield* (yield* CommandHandler).cache(target);
+});

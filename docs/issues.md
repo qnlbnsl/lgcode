@@ -6443,3 +6443,58 @@ A valid 64 KiB role file with escaping and multibyte advice passes real admissio
 strict event and envelope round trips, and actual stream and page frame checks.
 The invalid control-character case remains a separate refusal test. Temporary
 mutations establish that each strengthened test rejects its assigned fault.
+
+## 393. Automatic cache actions used state from outside their acceptance transaction
+
+Found: 2026-11-04, foundation review records FR-021 and FR-024.
+State: fixed.
+
+What happened: Queued work, holds, new turns or fresh sessions could arrive after the final eligibility read. The flush-versus-compact choice also used an older board unread count. An accepted automatic compact could wait in the queue beyond the evidence that justified it.
+
+What changed: The internal cache service now selects and accepts the action from one writer snapshot. Dispatch revalidates the recorded cache evidence in its own writer transaction. It withdraws an obsolete automatic delivery and continues the queue. The owner's manual compact and flush retain their ordinary behavior.
+
+Verification: Service regressions inject each of the four eligibility races after the final read. Another injects two informational posts after status captured zero and requires a two-post flush. Delayed-dispatch regressions cover expiry, competing work, new turns, new sessions and disabled settings. Manual delivery controls remain.
+
+## 394. Transcript fallback could reuse an earlier request's context usage
+
+Found: 2026-11-04, foundation review record FR-022.
+State: fixed.
+
+What happened: The bounded transcript reader selected an earlier eligible row when the current request's usage was missing or incomplete. The cache rule could label its context and timestamp as current.
+
+What changed: The reader must correlate its latest usable row with the selected turn's time bounds and any normalized request timestamp. A later user request, malformed tail or incomplete assistant usage invalidates the earlier result. Only a proven current read-only request can inherit an earlier write lifetime. The expiry helper rejects a request timestamp outside the turn. Normalized context usage retains independent authority.
+
+Verification: Parser and composed service tests cover stale high usage with missing, malformed, partial and future current evidence. Positive controls cover a current read-only request and normalized context authority.
+
+## 395. A fresh session could inherit an old session's cache target
+
+Found: 2026-11-04, foundation review record FR-031.
+State: fixed.
+
+What happened: A refresh could combine an old session's turn and usage with the current session identifier after the owner enabled a harness lifetime.
+
+What changed: Every refresh requires the end event and its starting delivery to belong to the current session interval. A fresh session without a request cannot acquire a target. Reloading the same session keeps legitimate evidence.
+
+Verification: Socket-level stop and fresh-resume regressions cover late lifetime changes and startup reconstruction. Existing same-session late-setting and read-renewal controls remain.
+
+## 396. The unconfigured cache lifetime had no composed negative regression
+
+Found: 2026-11-04, foundation review record FR-060.
+State: fixed.
+
+What happened: Existing tests checked configured lifetime behavior without proving that valid context alone could not schedule an unconfigured cache.
+
+What changed: Pure and composed tests now use valid context with no lifetime split, prior write, transcript or setting. They assert an empty timer set and no action after two hours.
+
+Verification: A temporary implicit one-hour default makes both regressions fail. The mutation is restored before committing.
+
+## 397. The missing-transcript test returned before opening the file
+
+Found: 2026-11-04, foundation review record FR-073.
+State: fixed.
+
+What happened: The missing leaf had a basename that did not match the session identifier. The path guard masked missing-file handling.
+
+What changed: The test uses an absent leaf with the valid session basename in an existing directory. The existing bounded-tail file is its positive control.
+
+Verification: A temporary throw from the valid-path open failure makes the corrected test fail. The mutation is restored before committing.

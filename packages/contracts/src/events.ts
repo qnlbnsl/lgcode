@@ -52,6 +52,13 @@ export const Delivery = Schema.Struct({
     Schema.TaggedStruct("compact", {}),
     Schema.TaggedStruct("carry-on", { text: Schema.String })
   ]),
+  // Evidence for automatic cache work, revalidated at dispatch. Manual work
+  // carries no cache evidence and keeps its ordinary queue semantics.
+  cache: Schema.optionalKey(Schema.Struct({
+    agentId: AgentId, sequence: EventSequence, session: Schema.NonEmptyString,
+    expiry: EpochMilliseconds, contextTokens: Schema.Int,
+    action: Schema.Literals(["flush", "compact"])
+  })),
   // A moved or cancelled request withdraws its delivery atomically.
   source: Schema.optionalKey(Schema.Union([
     Schema.TaggedStruct("permission", { id: PermissionRequestId }),

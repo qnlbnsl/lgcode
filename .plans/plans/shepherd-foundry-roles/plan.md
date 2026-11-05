@@ -1000,10 +1000,36 @@ passed, or is unknown, nothing is scheduled. Two minutes before the expiry,
 for an idle agent with nothing queued or sent, no open request or question
 of its own, no open blocking `wait`, and no compaction under way or just
 done (row 84): if
-`board.status` shows unread posts and the board is on, the sheepdog calls
+the board has unread posts and is on, the sheepdog requests
 `board.flush` (row 28); otherwise, if the agent's context is at least its
 role's floor (default 150,000 tokens; a role file may switch compaction off
 for a role), it asks for a compaction.
+
+The engine accepts this automatic decision through an internal service helper.
+It reads all eligibility guards and the unread count from one snapshot while
+holding the writer transaction, then plans the existing `board.flush` or
+`compact` command. The helper requires the sheepdog's existing command rights.
+It does not add a public command. A deterministic receipt prevents accepting
+one turn twice, including across a restart before the action record.
+
+An automatic delivery carries `cache` evidence: its agent, turn-end sequence,
+session, real expiry, context size and chosen action. Dispatch checks that
+same predicate and action in its send transaction, excluding only the
+candidate itself from the queue check. It withdraws an obsolete automatic
+delivery and continues with the ordinary queue. Expiry, a new turn or session,
+competing work, and changed settings can invalidate it. The engine does not
+retry the withdrawn cache action. A later eligible turn can arm a new timer.
+The owner's manual compact and flush have no cache evidence and retain their
+ordinary queue behavior.
+
+Every refresh selects usage and the starting delivery from the current
+session interval. A fresh session without a request has no cache target,
+including after startup or a harness-lifetime change. Transcript fallback
+must prove a current request inside the selected turn's time bounds. A
+missing, invalid or incomplete latest request cannot reuse an older usage
+row. A later user request invalidates the earlier assistant usage. Only a
+proven current read-only request inherits an earlier same-session write's
+lifetime. Normalized context usage remains independently authoritative.
 
 **Done when:**
 
@@ -1011,11 +1037,11 @@ for a role), it asks for a compaction.
 |---|---|---|
 | 5.1 | A last request that started at time T, wrote only one-hour cache tokens, and left 200,000 context tokens, with no unread posts, gives a compact request at T + 58 minutes | `packages/engine/test/roles/sheepdog/rules/cache.test.ts` CM01 (`TestClock.adjust`) |
 | 5.2 | The same with two unread posts gives a `board.flush` at T + 58 minutes and no compaction | `cache.test.ts` CM02 |
-| 5.3 | Nothing is sent when the agent has a delivery queued or sent, an open capacity hold (row 129), an open request or question it asked, an open blocking `wait`, is compacting, or its last turn was a compaction; an open non-blocking wait and an open post of its own do not block it, so an idle lead whose workers are working is flushed or compacted (row 84); a newer turn replaces the timer; the guard is checked again at the moment of sending | `cache.test.ts` CM03-CM07, CM18-CM20 (an idle lead with a working worker and 200,000 tokens is compacted at T + 58 minutes; an idle orchestrator over working teams likewise; CM20 an agent with an empty open hold gets nothing) |
+| 5.3 | Nothing is sent when the agent has a delivery queued or sent, an open capacity hold (row 129), an open request or question it asked, an open blocking `wait`, is compacting, or its last turn was a compaction; an open non-blocking wait and an open post of its own do not block it, so an idle lead whose workers are working is flushed or compacted (row 84); a newer turn replaces the timer; the complete guard and current unread count are checked atomically at acceptance and again in the send transaction; obsolete automatic work is withdrawn, while manual compact and flush remain deliverable | `cache.test.ts` CM03-CM07, CM18-CM20 (an idle lead with a working worker and 200,000 tokens is compacted at T + 58 minutes; an idle orchestrator over working teams likewise; CM20 an agent with an empty open hold gets nothing) |
 | 5.4 | No compaction below the floor, with compaction off for the role, or with an unknown expiry | `cache.test.ts` CM08-CM10 |
 | 5.5 | A four-minute turn on a five-minute cache, timed from its `DeliverySent`, schedules nothing, because the deadline has passed; a request with both lifetimes uses five minutes; a read-only request after a one-hour write uses one hour; a read-only request with no write in view schedules nothing; with no lifetime split and no `cacheLifetime` setting, nothing is scheduled | `cache.test.ts` CM11-CM15 |
 | 5.6 | Usage comes from `TurnEnded` (WS-7c) when the adapter reports it; otherwise from the Claude transcript, and a missing transcript schedules nothing. The terminal counters on `TurnEnded` (`inputTokens`, `cachedReadTokens`, `cachedWriteTokens`) can be a whole-turn tally, as they are from the Claude adapter 0.99.1 (row 144), so they never decide compaction or a cache expiry by themselves: context comes from `used`, and otherwise from the transcript's last request; with neither, nothing is scheduled | `cache.test.ts` CM16-CM17 |
-| 5.7 | The transcript reader refuses a session id outside the expected format, opens one expected path without following a symbolic link, reads at most a bounded tail, keeps only numbers and timestamps, and never logs or records text it read | `packages/engine/test/roles/sheepdog/usage.test.ts` U01-U04 |
+| 5.7 | The transcript reader refuses a session id outside the expected format, opens one expected path without following a symbolic link, reads at most a bounded tail, keeps only numbers and timestamps, and never logs or records text it read | `packages/engine/test/roles/sheepdog/usage.test.ts` U01-U06; current-request and delayed-delivery regressions in `cache-runtime.test.ts` |
 
 **Tasks:**
 

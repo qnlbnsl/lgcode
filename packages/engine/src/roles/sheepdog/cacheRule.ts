@@ -3,51 +3,26 @@ import type { AgentId, EventEnvelope, EventSequence, TurnUsage } from "@shephrd/
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import type { Snapshot } from "../../commands/internal.ts";
-import { executeService, serviceCacheSettings } from "../../commands/services.ts";
+import { cacheActionFor, lastEnd, sessionOf, type CacheTarget } from "../../commands/cache.ts";
+import { executeService, serviceCacheAction, serviceCacheSettings } from "../../commands/services.ts";
 import { Views } from "../../views/Views.ts";
 import type { RolesView } from "../view.ts";
 import type { RuleContext, SheepdogRule } from "./loop.ts";
 import { recordAction, sheepdogCaller } from "./notices.ts";
 import { actionRequestId } from "./requests.ts";
-import { cacheAction, cacheExpiry, cacheLifetime } from "./rules/cache.ts";
+import { cacheExpiry, cacheLifetime } from "./rules/cache.ts";
 import { resolveSettings, roleSettings } from "./settings.ts";
 import type { TimerOrigin } from "./timers.ts";
 import { readTranscriptUsage, transcriptPath } from "./usage.ts";
 
-interface Target {
-  readonly agentId: string;
-  readonly sequence: number;
-  readonly session: string | undefined;
-  readonly expiry: number;
-  readonly contextTokens: number;
-}
-const sessionOf = (snapshot: Snapshot, agentId: string): string | undefined => {
-  const session = snapshot.agents[agentId]?.session;
-  return session?._tag === "acp" ? session.sessionId : undefined;
-};
-const lastEnd = (snapshot: Snapshot, agentId: string) => snapshot.threads[agentId]?.findLast((row) => row.event._tag === "TurnEnded");
 const limitsFor = (snapshot: Snapshot, agentId: string) => {
   const roles = snapshot.roles as RolesView;
   return resolveSettings(roles.settings, roleSettings(roles.file, snapshot.agents[agentId]!.role));
 };
-const guards = (snapshot: Snapshot, target: Target) => ({
-  idle: snapshot.agents[target.agentId]?.state._tag === "idle",
-  capacityHold: snapshot.agents[target.agentId]?.capacityHeld === true,
-  compacting: snapshot.agents[target.agentId]?.compacting === true,
-  queued: Object.values(snapshot.deliveries).some((row) => row.target === target.agentId && row.status === "queued"),
-  sent: Object.values(snapshot.deliveries).some((row) => row.target === target.agentId && row.status === "sent"),
-  openRequest: Object.values(snapshot.requests).some((row) => row.agentId === target.agentId && row.status === "open"),
-  openQuestion: Object.values(snapshot.questions).some((row) => row.agentId === target.agentId && row.status === "open"),
-  blockingWait: Object.values(snapshot.waits).some((row) => row.agentId === target.agentId && row.status === "open" && row.blocking),
-  newerTurn: lastEnd(snapshot, target.agentId)?.sequence !== target.sequence
-    || sessionOf(snapshot, target.agentId) !== target.session
-    || ((snapshot.roles as RolesView).agents[target.agentId]?.turnStartSequence ?? 0) > target.sequence,
-});
-
 // State belongs to one loop subscription. Restart derives it again from the
 // log and one bounded transcript read per current agent, never from a timer log.
 export const makeCacheRule = (): SheepdogRule => {
-  const targets = new Map<string, Target>();
+  const targets = new Map<string, CacheTarget>();
   let lifetimes = new Map<string, number | undefined>();
   let home = "";
   const loadSettings = (context: RuleContext) => Effect.gen(function* () {
@@ -63,10 +38,22 @@ export const makeCacheRule = (): SheepdogRule => {
     if (agent === undefined || end?.event._tag !== "TurnEnded" || end.event.compact) return;
     if ((snapshot.roles as RolesView).actions.some((action) => action.agentId === agentId && action.triggerSequence === end.sequence
       && (action._tag === "roles.CacheFlushed" || action._tag === "roles.CompactRequested"))) return;
-    const start = snapshot.threads[agentId]?.findLast((row) => row.sequence < end.sequence && row.event._tag === "DeliverySent");
-    if (start === undefined) return;
-    const usage = end.event.usage;
     const session = sessionOf(snapshot, agentId);
+    if (session === undefined) return;
+    // A repeated reload of the same session preserves its interval. A fresh
+    // session cannot relabel an earlier turn's evidence on any refresh path.
+    let activeSession: string | undefined;
+    let sessionStart = 0;
+    for (const row of snapshot.threads[agentId] ?? []) {
+      if (row.event._tag !== "SessionOpened") continue;
+      const next = row.event.session._tag === "acp" ? row.event.session.sessionId : undefined;
+      if (next !== activeSession) sessionStart = row.sequence;
+      activeSession = next;
+    }
+    if (activeSession !== session || end.sequence <= sessionStart) return;
+    const start = snapshot.threads[agentId]?.findLast((row) => row.sequence < end.sequence && row.event._tag === "DeliverySent");
+    if (start === undefined || start.sequence <= sessionStart) return;
+    const usage = end.event.usage;
     let transcript;
     // The normalized last-request fields and `used` win independently. The
     // adapter's terminal input/cache counters can cover an entire turn.
@@ -76,7 +63,9 @@ export const makeCacheRule = (): SheepdogRule => {
       const configured = account?.home ?? account?.environment?.CLAUDE_CONFIG_DIR ?? join(home, ".claude");
       if (!configured.startsWith("secret:")) {
         const path = transcriptPath(resolve(agent.folder, configured), agent.folder, session);
-        if (path !== undefined) transcript = readTranscriptUsage(path, session);
+        if (path !== undefined) transcript = readTranscriptUsage(path, session, {
+          startedAt: start.occurredAt, endedAt: end.occurredAt, requestStartedAt: usage?.requestStartedAt,
+        });
       }
     }
     const contextTokens = usage?.used ?? (transcript?.inputTokens === undefined ? undefined
@@ -87,7 +76,7 @@ export const makeCacheRule = (): SheepdogRule => {
     if (source === undefined && usage?.used === undefined) return;
     let priorWriteLifetimeMinutes: number | undefined;
     // Only the current session's proven writes establish a read-only TTL.
-    let activeSession: string | undefined;
+    activeSession = undefined;
     for (const row of snapshot.threads[agentId] ?? []) {
       if (row.sequence >= end.sequence) break;
       if (row.event._tag === "SessionOpened") {
@@ -137,23 +126,15 @@ export const makeCacheRule = (): SheepdogRule => {
       targets.delete(target.agentId);
       const id = (command: string) => actionRequestId({ rule: "cache", subject: target.agentId, triggerSequence: target.sequence,
         kind: command, recipient: target.agentId, occurrence: 1 });
-      const status = yield* executeService(sheepdogCaller, "board.status", { requestId: id("status"), agentId: target.agentId }, context.lists);
-      // Re-read after the status command; queued work, questions and new turns
-      // may have arrived while it ran. Engine idle checks remain the final gate.
+      yield* executeService(sheepdogCaller, "board.status", { requestId: id("status"), agentId: target.agentId }, context.lists);
       const snapshot = yield* (yield* Views).snapshot;
-      const limits = limitsFor(snapshot, target.agentId);
-      const action = cacheAction({ expiry: target.expiry, now: yield* Clock.currentTimeMillis, armed: true,
-        contextTokens: target.contextTokens, floor: limits.compactionTokens === "off" ? 150_000 : limits.compactionTokens ?? 150_000,
-        compaction: limits.compactionTokens === "off" ? "off" : "on", flushLeadMinutes: limits.flushLeadMinutes,
-        unreadPosts: typeof status.unread === "number" ? status.unread : 0, boardOn: context.lists.boardEnabled !== false,
-        ...guards(snapshot, target),
-      });
-      if (action === undefined || (snapshot.roles as RolesView).settings.sheepdog === false) return;
-      const command = action === "flush" ? "board.flush" : "compact";
-      const accepted = yield* executeService(sheepdogCaller, command, { requestId: id(command), agentId: target.agentId }, context.lists).pipe(
-        Effect.as(true), Effect.catchTag("CommandRefused", () => Effect.succeed(false)),
+      if (cacheActionFor(snapshot, target, yield* Clock.currentTimeMillis, context.lists) === undefined) return;
+      // The preflight read is advisory. The internal service selects the
+      // action and rechecks every guard in the acceptance transaction.
+      const action = yield* serviceCacheAction(sheepdogCaller, target, context.lists).pipe(
+        Effect.catchTag("CommandRefused", () => Effect.succeed(undefined)),
       );
-      if (accepted) yield* recordAction({ _tag: action === "flush" ? "roles.CacheFlushed" : "roles.CompactRequested",
+      if (action !== undefined) yield* recordAction({ _tag: action === "flush" ? "roles.CacheFlushed" : "roles.CompactRequested",
         agentId: target.agentId as AgentId, noticeRecipient: "owner", triggerSequence: target.sequence as EventSequence,
         sourceSequence: context.sourceSequence as EventSequence, occurrence: 1,
         notice: context.lists.boardEnabled === false ? "board-off" : "sent",

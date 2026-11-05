@@ -87,3 +87,15 @@ it("CM18-CM20 schedules current idle leads and orchestrators, replaces stale tur
   expect(cacheAction({ expiry, now: 1_900_003_480_000, contextTokens: 200_000, floor: 150_000,
     unreadPosts: 0, compaction: "on", newerTurn: true })).toBeUndefined();
 });
+
+
+it("FR-060 valid context alone cannot infer an unconfigured cache lifetime", () => {
+  expect(cacheExpiry({ turnStartedAt: 1_900_000_000_000, turnEndedAt: 1_900_000_001_000, used: 200_000 }))
+    .toBeUndefined();
+});
+
+
+it.each([1_899_999_999_999, 1_900_000_001_001])("FR-022 rejects a request time outside the current turn: %s", (requestStartedAt) => {
+  expect(cacheExpiry({ turnStartedAt: 1_900_000_000_000, turnEndedAt: 1_900_000_001_000,
+    requestStartedAt, written1h: 10 })).toBeUndefined();
+});
