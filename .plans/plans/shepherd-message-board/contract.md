@@ -93,6 +93,8 @@ rule 6). The roles plan decides which channels exist and who is in them.
   view. Never infer it by splitting a displayed name. Both rename fields are
   optional when decoding older durable events. An older event keeps the name.
   Every channel reference, post, membership and read position keeps its id.
+  A successor who is already a member keeps their existing unread position.
+  A successor who joins as a new member receives the normal initial position.
 - **The manager.** The opener is a plain or group channel's first manager.
   The manager seat moves only when the current manager stops, even if it has
   been resumed before the reactor runs: the reactor then writes

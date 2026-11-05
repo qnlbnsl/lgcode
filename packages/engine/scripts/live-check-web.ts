@@ -13,6 +13,7 @@ import * as Exit from "effect/Exit";
 import * as Scope from "effect/Scope";
 import { resolveHarnessDefaults } from "../src/runner/harnesses.ts";
 import { startLiveService, type LiveService } from "./live/service.ts";
+import { assertReply, replySentence } from "./live/webReply.ts";
 
 // This uses a real Codex account and browser. It is deliberately separate
 // from pnpm check. Only this run's engine, agents and folders are cleaned up.
@@ -131,7 +132,9 @@ const main = async () => {
       await expect(page.getByRole("heading", { name: "Thread: Web live worker", exact: true })).toBeVisible();
     });
     const firstPrompt = () => page.getByRole("article", { name: "Outgoing delivery", exact: true }).filter({ hasText: "HELLO_WEB" });
-    const replies = () => page.getByRole("article", { name: "Agent message", exact: true }).filter({ hasText: "PINEAPPLE" });
+    const messages = () => page.getByRole("article", { name: "Agent message", exact: true });
+    let replyIndex = 0;
+    const replies = () => messages().nth(replyIndex);
     await step("first prompt shown once", async () => {
       await idle();
       await expect(firstPrompt()).toHaveCount(1);
@@ -139,11 +142,11 @@ const main = async () => {
       await expect(page.getByRole("article", { name: "Sent prompt", exact: true })).toHaveCount(0);
     });
     await step("one prompt, one reply block", async () => {
-      await send("Reply with exactly PINEAPPLE and nothing else. Do not use any tools.");
-      await expect(replies()).toHaveCount(1, { timeout: 180_000 });
+      replyIndex = await messages().count();
+      await send(`Reply with exactly this sentence and nothing else. Do not use any tools: ${replySentence}`);
+      await expect(replies()).toHaveText(`Agent data${replySentence}`, { timeout: 180_000 });
       await idle();
-      await expect(replies()).toHaveCount(1);
-      await expect(replies()).toHaveText("Agent dataPINEAPPLE");
+      await assertReply(messages(), replyIndex, replySentence);
     });
     await step("shell permission answered from page and file written", async () => {
       await send("Use your shell tool to run exactly: printf 'hello-from-web\\n' > note.txt . Do nothing else. If permission is needed, request approval and wait for it. Do not use apply_patch.");
@@ -159,7 +162,7 @@ const main = async () => {
     await step("reload retains prompts, replies, command and permission answer", async () => {
       await page.reload();
       await expect(firstPrompt()).toHaveCount(1);
-      await expect(replies()).toHaveCount(1);
+      await expect(replies()).toHaveText(`Agent data${replySentence}`);
       await expect(page.getByRole("article", { name: "Permission answer", exact: true })).toHaveCount(1);
       await expect(page.getByRole("article", { name: "Agent message", exact: true }).filter({ hasText: "printf" })).toHaveCount(1);
     });

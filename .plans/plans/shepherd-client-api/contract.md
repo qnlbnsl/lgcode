@@ -2569,7 +2569,10 @@ returns the explanation. A successful session clears the earlier failure.
 
 The thread page exposes the existing `stop` and `resume` commands. A logged-in
 web caller is the owner and retains the existing owner access to both.
-Resume uses a fresh session when the agent has no stored session. The situation
+Resume uses a fresh session when the agent has no stored session or the snapshot
+says its stored session cannot be reloaded. In the latter case, the page explains
+before the action that it starts a new session and loses the old session's context.
+The situation
 page lists stopped agents in their own section, including failed starts.
 
 The separate `pnpm live-check:web` workflow checks these behaviors with a real

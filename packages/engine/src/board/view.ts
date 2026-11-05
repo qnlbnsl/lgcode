@@ -160,6 +160,9 @@ export const boardAfter = (state: BoardView, envelope: Pick<EventEnvelope, "even
     case "board.ManagerChanged": {
       const channel = get(state.channels, event.channelId);
       if (channel === undefined || channel.kind === "direct") return state;
+      const wasMember = channel.kind === "group"
+        ? event.manager._tag === "agent" ? groupMember(state, channel, event.manager.agentId) : channel.manager?._tag === "owner"
+        : channel.members.some((member) => sameAuthor(member, event.manager));
       const members = channel.kind === "plain" && !channel.members.some((member) => sameAuthor(member, event.manager))
         ? [...channel.members, event.manager] : channel.members;
       const next = { ...state, channels: put(state.channels, event.channelId, {
@@ -167,7 +170,7 @@ export const boardAfter = (state: BoardView, envelope: Pick<EventEnvelope, "even
         ...(event.name === undefined ? {} : { name: event.name }),
         ...(event.ownName === undefined ? {} : { ownName: event.ownName }),
       }) };
-      return join(next, event.manager, event.channelId);
+      return wasMember ? next : join(next, event.manager, event.channelId);
     }
     case "board.PostWritten": {
       const { replyToPostId, ...fields } = event;

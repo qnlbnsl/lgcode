@@ -4,15 +4,20 @@ import * as Schema from "effect/Schema";
 import { Event, type AgentId } from "@shephrd/contracts";
 import { BoardChannelName } from "@shephrd/contracts/board/schemas";
 import { lifecycleBatch } from "../../src/board/reactor.ts";
+import { isUnread } from "../../src/board/wake.ts";
 import { agent, board, channel, event, owner, post, snapshot, stop, tree } from "./accessFixtures.ts";
 
-it("renames every transfer, replaces the prior manager prefix, resolves clashes and retains channel state", () => {
+it.each(["plain", "group"] as const)("renames every %s transfer, replaces the prior manager prefix, resolves clashes and retains channel state", (kind) => {
   const history = [...tree.map((entry) => entry._tag === "AgentStarted" ? event({ ...entry, name: entry.agentId === "worker" ? "lead-a" : entry.agentId === "lead" ? "top-b" : entry.name }) : entry),
-    channel({ channelId: "moving", name: "review-queue", manager: agent("worker"), members: [owner, agent("lead"), agent("worker"), agent("other")] }),
+    channel({ channelId: "moving", name: "review-queue", manager: agent("worker"), kind,
+      ...(kind === "group" ? { group: "review", anchorAgentId: "lead", members: [] } : { members: [owner, agent("lead"), agent("worker"), agent("other")] }) }),
     channel({ channelId: "clash", name: "lead-a-review-queue", manager: agent("lead") }),
+    post("earlier", { channelId: "moving", author: owner, to: [agent("other")] }),
+    event({ _tag: "board.Read", channelId: "moving", reader: agent("lead"), postIds: ["earlier"] }),
     post("question", { channelId: "moving", author: owner, to: [agent("other")] }),
     event({ _tag: "board.Read", channelId: "moving", reader: agent("other"), postIds: ["question"] }), stop("worker")];
   const before = board(snapshot(...history));
+  expect(isUnread(snapshot(...history), agent("lead"), before.posts.question!)).toBe(true);
   const first = lifecycleBatch(snapshot(...history), "worker" as AgentId).events;
   expect(first.find((entry) => entry._tag === "board.ManagerChanged")).toMatchObject({ name: "lead-a-review-queue-1", ownName: "review-queue" });
   history.push(...first);
@@ -20,6 +25,8 @@ it("renames every transfer, replaces the prior manager prefix, resolves clashes 
   expect(moved.channels.moving?.members).toEqual(before.channels.moving?.members);
   expect(moved.posts.question).toEqual(before.posts.question);
   expect(moved.readState.other?.moving).toEqual(before.readState.other?.moving);
+  expect(moved.readState.lead?.moving).toEqual(before.readState.lead?.moving);
+  expect(isUnread(snapshot(...history), agent("lead"), moved.posts.question!)).toBe(true);
   expect(moved.posts.question?.status).toBe("open");
   history.push(stop("lead"));
   const second = lifecycleBatch(snapshot(...history), "lead" as AgentId).events;
@@ -29,6 +36,7 @@ it("renames every transfer, replaces the prior manager prefix, resolves clashes 
   expect(twice.channels.moving?.manager).toEqual(agent("root"));
   expect(twice.posts.question).toEqual(before.posts.question);
   expect(twice.readState.other?.moving).toEqual(before.readState.other?.moving);
+  expect(isUnread(snapshot(...history), agent("root"), twice.posts.question!)).toBe(false);
 });
 
 it("normalizes labels and bounds long names while retaining the original own name for future transfers", () => {

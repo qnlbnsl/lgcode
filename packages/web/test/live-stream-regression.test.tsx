@@ -77,7 +77,7 @@ it("stops and resumes from the thread using the existing commands", async () => 
   const resumeButton = [...stopped.querySelectorAll("button")].find((button) => button.textContent === "Resume agent")
   expect(resumeButton).toBeDefined()
   await act(async () => { resumeButton!.click() })
-  expect(resume).toHaveBeenCalledWith(expect.objectContaining({ agentId: "worker-1" }))
+  expect(resume).toHaveBeenCalledWith(expect.objectContaining({ agentId: "worker-1", fresh: true }))
 })
 
 it("shows one updated tool action in a permission request's missing-input context", async () => {
@@ -89,4 +89,23 @@ it("shows one updated tool action in a permission request's missing-input contex
   const context = container.querySelector('[aria-label="Permission request"]')!
   expect(context.textContent!.split("Matching tool action")).toHaveLength(2)
   expect(context.textContent).toContain("in_progress")
+})
+
+it.each([false, true])("resumes a stored session with reloadable=%s using the appropriate context policy", async (reloadable) => {
+  const resume = vi.fn((_payload: unknown) => Effect.succeed({}))
+  const snapshot = { sequence: 1, agents: [{ agentId: "worker-1", name: "Worker one", state: { _tag: "stopped" },
+    session: { _tag: "acp", sessionId: "stored-session" }, reloadable }], requests: [], questions: [] }
+  const container = await mountThread([], { resume, "client.snapshot": () => Effect.succeed(snapshot), "client.subscribe": () => Stream.never })
+  const button = [...container.querySelectorAll("button")].find((button) => button.textContent === "Resume agent")!
+  expect(button).toBeDefined()
+  if (!reloadable) expect(container.textContent).toContain("starts a new session and loses the old session's context")
+  await act(async () => { button.click() })
+  expect(resume).toHaveBeenCalledOnce()
+  if (reloadable) {
+    expect(resume.mock.calls[0]![0]).not.toHaveProperty("fresh")
+    expect(container.textContent).not.toContain("loses the old session's context")
+  } else {
+    expect(resume).toHaveBeenCalledWith(expect.objectContaining({ agentId: "worker-1", fresh: true }))
+    expect(container.textContent).toContain("starts a new session and loses the old session's context")
+  }
 })

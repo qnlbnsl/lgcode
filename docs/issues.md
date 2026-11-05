@@ -7894,3 +7894,57 @@ What changed: `pnpm live-check:web` starts a private engine and a real Codex
 agent, then exercises the authenticated browser journey and checks its file
 side effect. It prints fixed step results and removes its own processes and
 folders. It remains outside `pnpm check` because it consumes a real account.
+
+## 478. A manager transfer reset the successor's unread position
+
+Found: 2026-11-05, by the separate verifier of the live browser fixes.
+State: fixed in repair round 2.
+
+What happened: The manager-transfer reducer initialized the successor's read
+position even when that successor already belonged to the channel.
+Unread posts became read without the successor reading them.
+
+What changed: The reducer checks membership before changing the manager.
+An existing member keeps their position in both plain and group channels.
+A new member still receives the normal initial position.
+The transfer regression now checks the successor's own position and unread post.
+
+## 479. The page could not resume a session that could not be reloaded
+
+Found: 2026-11-05, by the separate verifier of the live browser fixes.
+State: fixed in repair round 2.
+
+What happened: The page requested a fresh resume only when there was no stored
+session. A stored session with `reloadable: false` was refused on every retry.
+
+What changed: That snapshot now selects a fresh resume.
+Before the action, the page explains that it starts a new session and loses
+the old session's context. Reloadable sessions retain their context.
+An agent without a stored session keeps its existing fresh-resume behavior.
+
+## 480. Older logs retain separate reply fragment blocks
+
+Found: 2026-11-05, by the separate verifier of the live browser fixes.
+State: accepted display limit by the owner's round 2 assignment.
+
+What happens: Logs written before the message-identity fix assigned a different
+item identifier to every reply fragment. Those fragments remain separate blocks
+in the web page and the terminal viewer. They remain readable.
+
+The affected logs are today's test threads. The owner chose to retain this
+limit. No migration or inferred grouping is added. Newly written fragments
+with a shared message identity use one growing block.
+
+## 481. The real browser reply check could overlook extra blocks
+
+Found: 2026-11-05, by the separate verifier of the live browser fixes.
+State: fixed in repair round 2.
+
+What happened: The check counted only articles containing a short expected
+reply. Other articles from the same turn did not affect that count.
+
+What changed: The check records the number of agent-message articles before
+the turn and requires exactly one additional article after it ends.
+That article must hold the complete fixed sentence of more than thirty words.
+A browser regression rejects extra blocks even when one has the whole sentence.
+No timing assertion about streaming growth is made.

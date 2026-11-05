@@ -24,6 +24,8 @@ The engine never exposes the adapter's original error text.
 Prompting the stopped agent repeats the safe explanation.
 After correcting its settings or login, resume it from its thread.
 A failed start without a session resumes with a fresh session.
+An existing session that cannot be reloaded also resumes with a fresh session.
+The page explains before that action that the old session's context is lost.
 
 # The real browser check
 
