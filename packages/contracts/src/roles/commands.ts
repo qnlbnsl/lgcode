@@ -12,7 +12,11 @@ const Refused = Schema.TaggedStruct("CommandError", { ...request, reason: Schema
 // The later read units define their record replies alongside their views.
 export const RolesRpcGroup = RpcGroup.make(
   Rpc.make("orient", { payload: request, success: Schema.Unknown, error: Refused }),
-  Rpc.make("handoff", { payload: { ...request, agentId: AgentId }, success: Schema.Unknown, error: Refused }),
+  Rpc.make("handoff", {
+    payload: { ...request, agentId: AgentId, omissions: Schema.optionalKey(Schema.Struct({
+      after: EventSequence, through: EventSequence, requestId: RequestId,
+    })) }, success: Schema.Unknown, error: Refused,
+  }),
   Rpc.make("role-file.set", {
     payload: { ...request, content: Schema.String },
     success: Schema.Struct({ ...request, roleFileHash: RoleFileHash }), error: Refused,

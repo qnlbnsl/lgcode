@@ -5991,3 +5991,24 @@ State: open, for the final review.
 
 What happens: Importing the existing live driver before the existing live runner causes a circular module initialization error for `pieceViews` under plain Node.js. The new script `packages/engine/scripts/live-check-roles.ts` imports the runner first, as `live-check.ts` does, and its help and dry-run checks pass. The cycle itself is still there.
 Why it matters: A reordered import would stop both owner-run checks from starting. It waits for the final review.
+
+## 370. Sparse omission metadata can refuse an otherwise small hand-off
+
+Found: 2026-11-04, while fixing foundation review finding FR-003.
+State: fixed by bounded omission pages in `roles.handoff`.
+
+What happens: The previous selector budgeted all exact omission ranges before
+the original brief or latest exchange. A worker history interleaved with other
+events could produce thousands of separate ranges. Their metadata exceeded
+the reply budget, and the hand-off refused even when its priority sections
+were small.
+
+The selector now reserves one bounded omission page before selecting content.
+Each reply lists at most 64 exact ranges and provides a continuation cursor
+when more remain. The cursor preserves the original history boundary and
+request identifier. Every continuation checks current management rights.
+The 5,000-item interleaved-history regression checks the public socket replies,
+both encoded budgets, whole small priority sections and complete exact recovery.
+
+Why it matters: A long worker history must remain recoverable without widening
+sequence ranges across unrelated events or refusing the summary.
