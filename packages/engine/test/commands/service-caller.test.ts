@@ -7,6 +7,8 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { expect, it } from "vitest";
 import { requiredModule, rulesFixture, useRules, type Services } from "../support/callerRules.ts";
 import { freshRequest, seedAgent, seedAccount, seedHarness, startPayload, appendSetup, eventOf } from "../support/handlerRig.ts";
+import { withFixture } from "../support/fixturePiece.ts";
+import { makeFakeRunner } from "../support/fakeRunner.ts";
 
 for (const command of ["prompt", "compact", "resume"] as const) {
   it(`1.12 service ${command}: catches tree restrictions on a listed service or owner attribution on its writes`, async () => {
@@ -16,18 +18,19 @@ for (const command of ["prompt", "compact", "resume"] as const) {
       yield* registerRebuildCheck();
       yield* seedAccount(); yield* seedHarness();
       const target = yield* seedAgent({ id: "unrelated", state: command === "resume" ? "crashed" : "idle" });
+      const sql = yield* SqlClient.SqlClient;
+      const mark = (yield* sql<{ sequence: number }>`SELECT MAX(sequence) AS sequence FROM events`)[0]!.sequence;
       const id = freshRequest();
       yield* services.executeService({ _tag: "service", service: "client.fixture" }, command, {
         requestId: id, agentId: target.agentId, text: "/clear\nUntrusted service nudge.",
       }, lists);
-      const sql = yield* SqlClient.SqlClient;
       const rows = yield* sql<{ caller: string; payload_json: string }>`SELECT caller, payload_json FROM events WHERE request_id = ${id}`;
       expect(rows.length).toBeGreaterThan(0);
       expect(rows.every((row) => row.caller === "service:client.fixture")).toBe(true);
       expect(rows.map((row) => JSON.parse(row.payload_json)._tag)).not.toContain("CommandRefused");
       if (command === "resume") {
         // Reload writes occur after the command's commit, under fresh ids.
-        const later = yield* sql<{ caller: string }>`SELECT caller FROM events WHERE event_type = 'SessionOpened' AND request_id != ${id} AND caller != 'owner'`;
+        const later = yield* sql<{ caller: string }>`SELECT caller FROM events WHERE event_type = 'SessionOpened' AND agent_id = ${target.agentId} AND sequence > ${mark} AND request_id != ${id}`;
         expect(later.length).toBeGreaterThan(0);
         expect(later.every((row) => row.caller === "service:client.fixture")).toBe(true);
       } else {
@@ -37,6 +40,59 @@ for (const command of ["prompt", "compact", "resume"] as const) {
       }
     }));
   });
+}
+
+for (const fresh of [false, true]) {
+  for (const rule of [undefined, "reload-fixture"]) {
+    it(`1.12 service resume ${fresh ? "start" : "load"}, rule ${rule ?? "absent"}: catches owner attribution, lost rules or live tokens after rejected setup`, async () => {
+      const services = await requiredModule<Services>("commands/services.ts");
+      const lists = await rulesFixture();
+      const runner = await Effect.runPromise(makeFakeRunner());
+      await withFixture(lists, () => Effect.gen(function* () {
+        yield* registerRebuildCheck();
+        yield* seedAccount(); yield* seedHarness();
+        const target = yield* seedAgent({ id: "rejected-service-resume", state: "crashed" });
+        const method = fresh ? "start" : "load";
+        runner.rejectNext(method, "fixture setup rejected");
+        const sql = yield* SqlClient.SqlClient;
+        const mark = (yield* sql<{ sequence: number }>`SELECT MAX(sequence) AS sequence FROM events`)[0]!.sequence;
+        const id = freshRequest();
+        yield* services.executeService({ _tag: "service", service: "client.fixture", ...(rule === undefined ? {} : { rule }) }, "resume", {
+          requestId: id, agentId: target.agentId, fresh,
+        }, lists);
+        // Observe the later failure transaction, including every row regardless
+        // of caller, rather than filtering away the attribution fault.
+        const later = sql<{ sequence: number; request_id: string; caller: string; caller_rule: string | null; payload_json: string }>`
+          SELECT sequence, request_id, caller, caller_rule, payload_json FROM events
+          WHERE agent_id = ${target.agentId} AND sequence > ${mark} ORDER BY sequence`;
+        for (let tries = 0; tries < 100; tries++) {
+          if ((yield* later).some((row) => JSON.parse(row.payload_json)._tag === "AgentReloadFailed")) break;
+          yield* Effect.sleep(10);
+        }
+        const rows = yield* later;
+        expect(rows.map((row) => JSON.parse(row.payload_json))).toEqual([
+          { _tag: "StateChanged", agentId: target.agentId, state: { _tag: "starting" } },
+          { _tag: "StateChanged", agentId: target.agentId, state: { _tag: "interrupted", previous: "starting" } },
+          { _tag: "AgentReloadFailed", agentId: target.agentId, reason: "agent reload failed" },
+        ]);
+        expect(rows.map((row) => [row.caller, row.caller_rule])).toEqual([
+          ["service:client.fixture", rule ?? null],
+          ["service:client.fixture", rule ?? null],
+          ["service:client.fixture", rule ?? null],
+        ]);
+        expect(rows[0]!.request_id).toBe(id);
+        expect(rows[1]!.request_id).not.toBe(id);
+        expect(rows[1]!.request_id).toBe(rows[2]!.request_id);
+        expect(runner.callsOf(method).map((call) => call.input.agentId)).toEqual([target.agentId]);
+        expect(runner.callsOf(fresh ? "load" : "start")).toHaveLength(0);
+        expect(runner.callsOf("prompt")).toHaveLength(0);
+        // Both the old crash token and the newly minted setup token are dead.
+        const tokens = yield* sql<{ revoked_at: number | null }>`SELECT revoked_at FROM agent_tokens WHERE agent_id = ${target.agentId}`;
+        expect(tokens).toHaveLength(2);
+        expect(tokens.every((row) => row.revoked_at !== null)).toBe(true);
+      }), { runner });
+    });
+  }
 }
 
 for (const command of ["answer", "start", "stop", "group", "pass-up", "ask", "wait", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views"]) {

@@ -5957,6 +5957,13 @@ State: open, for the final review.
 What happens: The existing recorder fake-agent test failed during initialization at the base commit in this environment. The new tests use a synchronous transport double and do not repair that separate failure.
 Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
 
+The foundation review investigation retained the exact failing status assertion
+from `/tmp/r3p-recorder-existing.log`. The archived result describes persistent
+initialization failures in a run with 107 failing files. It does not describe
+an unchanged failing-then-passing recorder case. The archived assertion omits
+the returned failure categories. Current focused execution passes, but does
+not establish the historical cause. This part of FR-158 remains open.
+
 ## 357. The source boundary check for tables is not a full data-flow analysis
 
 Found: 2026-11-04, by the builder or test writer of unit a1a, during the foundation build.
@@ -6001,13 +6008,26 @@ State: open, for the final review.
 What happens: The first full merge gate observed an intermittent concurrent-service startup timeout. The unchanged focused rerun and complete gate rerun both passed. The cause has not been established.
 Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
 
+The FR-158 investigation located the original timeout while waiting for the
+survivor's socket in `/tmp/foundation-r1-merge-check.log`. The fixture discards
+the child's standard error, so that log cannot distinguish an exited survivor
+from a delayed listener. Bounded focused startup contests preserve the existing
+exclusive-lock and survivor assertions. Passing contests do not establish the
+historical cause. This issue remains open.
+
 ## 361. A harness test rejects any adapter path containing `npx`, including random temporary folders
 
 Found: 2026-11-04, by the builder or test writer of unit b1, during the foundation build.
-State: open, for the final review.
+State: fixed during the foundation review repair of FR-152.
 
 What happens: `packages/engine/test/runner/harnesses.test.ts:82` rejects any adapter path containing the substring `npx`, including its random temporary directory. The whole gate generated `/tmp/shephrd-harnesses-bQtnpx/`, causing a false positive. The isolated case passed on rerun. The lead should narrow the assertion to the executable or invocation.
 Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+The fixture now always uses an ancestor containing `npx`, which deterministically
+failed the old substring assertion. Exact expected executable paths and argument
+vectors reject an actual package-runner invocation without rejecting that valid
+ancestor. Temporary executable and argument faults are checked separately.
+The runtime resolver did not need a change.
 
 ## 362. The board plan's engine-change table still says seven tools and eight events
 
@@ -6032,10 +6052,19 @@ Why it matters: The foundation build's reviews are held until its end, so this w
 ## 364. A web-down alert can be missed when the outage is disabled at once
 
 Found: 2026-11-04, by the builder or test writer of unit a5, during the foundation build.
-State: open, for the final review.
+State: closed with controlled evidence during the FR-158 investigation.
 
 What happens: The focused run intermittently observed no web-down alert when an outage was disabled immediately after its source event appeared. The unchanged isolated file and the full check both passed afterward. A timing race is suspected: the existing alert reactor evaluates a source against the current snapshot, so a rapid settings change can make that source already closed when consumed. This continuation did not change the reactor or the frozen assertion. The collector should retain this observation when assessing intermittent failures.
 Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+Commit `06ebd4a7b1f9789dcf7c69c9e2c83ccf93712cbb` already added an alert-creation
+wait before disabling the outage in this test. A controlled delayed follower
+reproduces the historical missing-alert assertion after the outage is disabled.
+An independent later alert proves that the follower consumed that source interval.
+The production source policy deliberately suppresses an alert whose subject is
+already closed. The existing guard establishes the open alert before testing
+its removal. This evidence concerns the test's missing precondition, rather
+than a failure to clear an established alert.
 
 ## 365. An action record larger than the page budget cannot be read through `roles.actions.list`
 
@@ -6063,10 +6092,24 @@ Why it matters: The foundation build's reviews are held until its end, so this w
 ## 367. The board restart acceptance case failed once in a full check
 
 Found: 2026-11-04, by the builder or test writer of unit r12, during the foundation build.
-State: open, for the final review.
+State: fixed during the FR-158 investigation.
 
 What happens: The first full `pnpm check` for unit r12 failed the board restart's sent-wake case, because no reminder wake was present. All three cases passed in an isolated rerun, and the next full check passed with no source change. Unit b5 had already repaired a startup race in this area, at an earlier commit, so that repair did not remove every timing dependency.
 Why it matters: An intermittent failure can block a merge, and it may hide a real readiness or scheduling fault. It waits for the final review.
+
+The sent-wake fixture now holds the recovered response turn behind a file
+barrier. The old assertion deterministically sees no reminder at that boundary.
+Socket readiness permits the response to remain working, while a reminder is
+due only after that response ends. The corrected test observes the recovered
+prompt reaching the restarted adapter, proves that its turn has not ended,
+releases it, and waits for the reminder before counting the complete observed
+wake history.
+The original one-wake and open-matter assertions remain.
+
+The earlier unit b5 failure concerned a completion send after a non-reloadable
+recipient was resolved. Its existing boot-recovery guard is separate from this
+later reminder boundary. Neither repair establishes the causes of issues 356
+or 360, and neither is attributed to the separate auxiliary alert barrier.
 
 ## 368. A lead can be reported stalled while its workers work
 
@@ -7747,3 +7790,22 @@ on that wave and channel. Its replied disposition must name that reply as its
 deciding post. Manual positive and negative controls exercise the observer.
 The owner must rerun the real-account workflow before this proof gap closes.
 The unit 14 ruling against a new required automated suite remains in force.
+
+## 471. The service-resume test omitted failed setup attribution
+
+Found: 2026-11-05, while repairing foundation review finding FR-120.
+State: fixed.
+
+What happened: The focused service-caller test exercised only successful
+reloads. Its later-write query excluded owner rows before checking attribution.
+The correct production failure path therefore lacked proof that its later
+state and failure rows retain the service and its optional rule.
+
+What changed: Four cases reject the actual load or fresh-start setup, with
+and without a service rule. They inspect every target row after the command's
+watermark, including the later failure transaction, without filtering callers.
+They require the exact service, rule, failure state, transaction identity and
+revocation of both the old token and the setup token. The successful reload
+case remains and no longer excludes owner rows. Temporary faults separately
+replace the failure caller, discard its rule, omit token revocation and replace
+the success caller. No production attribution change is needed.
