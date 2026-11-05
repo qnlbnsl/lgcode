@@ -58,7 +58,7 @@ export const waitForAgents = (client: Client, options: WaitOptions): Effect.Effe
       for (const [namespace] of older) conditions.set(namespace, yield* call[`${namespace}.status`]!({ requestId: globalThis.crypto.randomUUID() }))
     }
   })
-  const candidate = (): ClientWaitReply | undefined => {
+  const candidate = (includePieceHolds = true): ClientWaitReply | undefined => {
     const resolved: WaitMember[] = []
     let ownerHeld = false
     for (const id of options.members) {
@@ -71,7 +71,7 @@ export const waitForAgents = (client: Client, options: WaitOptions): Effect.Effe
       const reason = reasonOf(state, id)
       // A client receives the piece's computed condition lists, not its full
       // private view. Apply those lists after their sequence gate is current.
-      const held = reason === "settled" && [...conditions.values()].some((lists) => lists.holdsUnsettled.includes(id))
+      const held = includePieceHolds && reason === "settled" && [...conditions.values()].some((lists) => lists.holdsUnsettled.includes(id))
       if (reason !== undefined && !held) resolved.push({ agentId: id as WaitMember["agentId"], reason })
     }
     if (ownerHeld) return { outcome: "request-held", members: resolved }
@@ -101,7 +101,7 @@ export const waitForAgents = (client: Client, options: WaitOptions): Effect.Effe
         initial = false
         const result = candidate()
         if (result !== undefined) return result
-      } else if (candidate() !== undefined) {
+      } else if (candidate(false) !== undefined) {
         // A failed gate may be followed by a quiet stream. Recheck that
         // candidate after reconnect without requiring another log event.
         let gate = yield* readGate()
@@ -114,7 +114,9 @@ export const waitForAgents = (client: Client, options: WaitOptions): Effect.Effe
         const next = yield* advance
         const tag = next.event._tag === "UnknownEvent" ? next.event.tag : next.event._tag
         const pieceChanged = conditions.has(tag.split(".")[0]!)
-        if (candidate() === undefined && !pieceChanged) continue
+        // Cached piece holds must not suppress the read that can clear them.
+        // Use engine eligibility to trigger a gate, then apply every fresh hold.
+        if (candidate(false) === undefined && !pieceChanged) continue
         let gate = yield* readGate()
         while (gate < sequence) gate = yield* readGate()
         while (sequence < gate) yield* advance

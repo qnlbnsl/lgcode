@@ -5991,3 +5991,25 @@ State: open, for the final review.
 
 What happens: Importing the existing live driver before the existing live runner causes a circular module initialization error for `pieceViews` under plain Node.js. The new script `packages/engine/scripts/live-check-roles.ts` imports the runner first, as `live-check.ts` does, and its help and dry-run checks pass. The cycle itself is still there.
 Why it matters: A reordered import would stop both owner-run checks from starting. It waits for the final review.
+
+## 370. A cached piece hold prevented the owner wait from refreshing it
+
+Found: 2026-11-04, in foundation review record FR-009.
+State: fixed.
+
+What happened: The client wait filtered its refresh candidate through cached
+piece holds. A permission answer or an accepted board completion followed by a
+turn end could clear the actual hold without a later piece event. The stale
+hold then prevented the read that would observe the release.
+
+What changed: The refresh trigger uses engine eligibility before piece holds.
+The final result still applies every current piece hold after the published
+sequence gate. A failed refresh retries from the applied cursor without needing
+a new event. A quiet held member does not cause polling.
+
+Verification: `packages/client/test/wait-piece-refresh.test.ts` covers both
+release paths in both wait modes. It also checks persistent holds, queued
+deliveries, split batches, and a failed read followed by a quiet reconnect.
+
+Why it matters: The owner's wait can finish after the promised work completes,
+without cancellation or unrelated board activity.
