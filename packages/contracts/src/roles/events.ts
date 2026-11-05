@@ -10,7 +10,7 @@ export const rolesActionKinds = [
   "CompactRequested", "StallEnded",
 ] as const
 export const rolesEventTags = [
-  "roles.RoleFileSet", "roles.SettingsChanged", "roles.Snoozed", "roles.SheepdogBaseline",
+  "roles.RoleFileSet", "roles.SettingsChanged", "roles.Snoozed", "roles.SheepdogBaseline", "roles.StallNoticePlanned",
   ...rolesActionKinds.map((kind) => `roles.${kind}` as const),
 ] as const
 
@@ -59,13 +59,19 @@ export type RolesActionRecord = typeof RolesActionRecord.Type
 export const SheepdogBaseline = Schema.TaggedStruct("roles.SheepdogBaseline", {
   position: EventSequence, on: Schema.Boolean, boardOn: Schema.optionalKey(Schema.Boolean),
 })
-export const SheepdogRecord = Schema.Union([RolesAction, SheepdogBaseline])
+// Admit a stall notice before a board delivery can change its clock origin.
+export const StallNoticePlanned = Schema.TaggedStruct("roles.StallNoticePlanned", {
+  ...action, stalledPostId: PostId, kind: Schema.Literals(["roles.StallSeen", "roles.ReplaceAdvised"]),
+})
+export type StallNoticePlanned = typeof StallNoticePlanned.Type
+export const SheepdogRecord = Schema.Union([RolesAction, SheepdogBaseline, StallNoticePlanned])
 export type SheepdogRecord = typeof SheepdogRecord.Type
 export const RolesEvent = Schema.Union([
   Schema.TaggedStruct("roles.RoleFileSet", { content: Schema.String, roleFileHash: RoleFileHash }),
   Schema.TaggedStruct("roles.SettingsChanged", { settings: RolesSettings }),
   Schema.TaggedStruct("roles.Snoozed", { group: Schema.String, until: EpochMilliseconds }),
   SheepdogBaseline,
+  StallNoticePlanned,
   ...RolesAction.members,
 ])
 export type RolesEvent = typeof RolesEvent.Type

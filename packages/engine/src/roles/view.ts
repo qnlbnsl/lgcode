@@ -1,4 +1,4 @@
-import { comparePermission, rolesActionKinds, type AgentId, type Event, type PermissionLevel, type RolesActionRecord, type RolesSettings } from "@shephrd/contracts";
+import { comparePermission, rolesActionKinds, type AgentId, type Event, type PermissionLevel, type RolesAction, type RolesActionRecord, type RolesSettings, type StallNoticePlanned } from "@shephrd/contracts";
 import { emptyRoleFile, reduceRoleFile, type RoleFileState } from "./roleFile.ts";
 
 export interface Matter {
@@ -29,6 +29,8 @@ export interface StallClock {
 }
 export interface RolesView extends RoleFileState {
   readonly stalls: Readonly<Record<string, StallClock>>;
+  readonly pendingStallNotices: ReadonlyArray<StallNoticePlanned>;
+  readonly consumedNotices: Readonly<Record<string, ReadonlyArray<string>>>;
   readonly settings: RolesSettings;
   readonly snoozes: Readonly<Record<string, number>>;
   readonly actions: ReadonlyArray<RolesActionRecord>;
@@ -42,7 +44,7 @@ export interface RolesView extends RoleFileState {
 const keyed = <T>(): Readonly<Record<string, T>> => Object.create(null) as Record<string, T>;
 const get = <T>(rows: Readonly<Record<string, T>>, key: string): T | undefined => Object.hasOwn(rows, key) ? rows[key] : undefined;
 export const emptyRoles = (): RolesView => ({
-  ...emptyRoleFile(), stalls: keyed(), settings: {}, snoozes: keyed(), actions: [], agents: keyed(), position: 0,
+  ...emptyRoleFile(), stalls: keyed(), pendingStallNotices: [], consumedNotices: keyed(), settings: {}, snoozes: keyed(), actions: [], agents: keyed(), position: 0,
   wakes: keyed(), deliveryWakes: keyed(),
 });
 const change = (view: RolesView, id: string, update: (agent: AgentRoles) => AgentRoles): RolesView => {
@@ -68,9 +70,12 @@ const matterFor = (record: RolesActionRecord): Matter | undefined => {
 };
 const markRead = (view: RolesView, recipient: string, postIds: ReadonlyArray<string>): RolesView => {
   const ids = new Set(postIds);
-  return { ...view, actions: view.actions.map((record) => record.notice === "sent"
-    && record.noticeRecipient === recipient && record.postId !== undefined && ids.has(record.postId)
-    ? { ...record, noticeRead: true } : record) };
+  return {
+    ...view,
+    consumedNotices: { ...view.consumedNotices, [recipient]: [...new Set([...(get(view.consumedNotices, recipient) ?? []), ...postIds])] },
+    actions: view.actions.map((record) => record.notice === "sent" && record.noticeRecipient === recipient
+      && record.postId !== undefined && ids.has(record.postId) ? { ...record, noticeRead: true } : record),
+  };
 };
 const actionTags = new Set<string>(rolesActionKinds.map((kind) => `roles.${kind}`));
 
@@ -78,8 +83,17 @@ const actionTags = new Set<string>(rolesActionKinds.map((kind) => `roles.${kind}
 // live publication and replay all compute the same timer origins.
 export const apply = (view: RolesView, event: Event, sequence: number): RolesView => {
   if (actionTags.has(event._tag)) {
-    const record = { ...event, sequence, noticeRead: false } as RolesActionRecord;
-    const next = { ...view, actions: [...view.actions, record], position: Math.max(view.position, record.sourceSequence) };
+    const action = event as RolesAction;
+    const record = { ...event, sequence, noticeRead: action.notice === "sent" && action.postId !== undefined
+      && (get(view.consumedNotices, action.noticeRecipient) ?? []).includes(action.postId) } as RolesActionRecord;
+    const next = {
+      ...view,
+      pendingStallNotices: view.pendingStallNotices.filter(row => !((record._tag === "roles.StallSeen" || record._tag === "roles.ReplaceAdvised")
+        && row.kind === record._tag && row.stalledPostId === record.stalledPostId
+        && row.agentId === record.agentId && row.triggerSequence === record.triggerSequence
+        && row.noticeRecipient === record.noticeRecipient && row.occurrence === record.occurrence)),
+      actions: [...view.actions, record], position: Math.max(view.position, record.sourceSequence),
+    };
     return change(next, record.agentId, (agent) => {
       const matter = matterFor(record);
       let updated = { ...agent, matters: matter === undefined ? agent.matters
@@ -99,6 +113,7 @@ export const apply = (view: RolesView, event: Event, sequence: number): RolesVie
     });
   }
   switch (event._tag) {
+    case "roles.StallNoticePlanned": return { ...view, pendingStallNotices: [...view.pendingStallNotices, event] };
     case "roles.RoleFileSet": return reduceRoleFile(view, event) as RolesView;
     case "roles.SettingsChanged": return { ...view, settings: event.settings };
     case "roles.Snoozed": return { ...view, snoozes: { ...view.snoozes, [event.group]: event.until } };

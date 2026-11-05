@@ -1,3 +1,4 @@
+import { evaluateTeamIdle } from "../../../../src/roles/sheepdog/rules/teamIdle.ts";
 import { expect, it, beforeAll } from "vitest";
 import { registerRebuildCheck } from "../../../support/rebuildCheck.ts";
 
@@ -133,13 +134,17 @@ it("ST11-ST12 lets an idle lead and worker stall when their reciprocal post or e
   expect(tags(evaluate({ ...cycle, engineWaits: [{ waiter: "lead", members: ["worker"] }, { waiter: "worker", members: ["lead"] }] }))).toEqual(["roles.StallSeen"]);
 });
 
-it("ST13 does not report a cycle-only group as busy", () => {
-  const result = evaluate(input({ snapshot: { sequence: 20, agents: {
-    lead: agent("lead", "idle"), worker: agent("worker", "idle", "lead"),
-  }, deliveries: {}, waits: {}, roles: { settings: {}, agents: {}, actions: [] } },
-    engineWaits: [{ waiter: "lead", members: ["worker"] }, { waiter: "worker", members: ["lead"] }],
-    team: ["lead", "worker"] }));
-  expect(tags(result)).toEqual([]);
+it("ST13 reports a cycle-only group at its full idle hour", () => {
+  const value = {
+    now: 3_600_000, agents: {
+      lead: { agentId: "lead", role: "lead", state: { _tag: "idle" }, parent: { _tag: "owner" }, groups: ["cycle"] },
+      worker: { agentId: "worker", role: "worker", state: { _tag: "idle" }, parent: { _tag: "agent", agentId: "lead" }, groups: ["cycle"] },
+    }, roles: { settings: {}, actions: [] }, deliveries: {}, groupOrigins: { cycle: 1 }, eventTimes: { "1": 0 },
+    waits: { first: { status: "open", blocking: true, agentId: "lead", members: ["worker"] },
+      second: { status: "open", blocking: true, agentId: "worker", members: ["lead"] } },
+  };
+  expect(evaluateTeamIdle({ ...value, now: 3_599_999 } as any)).toEqual([]);
+  expect(evaluateTeamIdle(value as any)).toMatchObject([{ _tag: "roles.TeamIdleReported", agentId: "lead", group: "cycle" }]);
 });
 
 it("ST15-ST16 permits the lead's owed-reply clock when the worker reaches no busy agent except through the lead", () => {
@@ -198,24 +203,22 @@ it("ST14 ignores a signed-out pause instead of nudging the agent or its waiting 
   expect(tags(result)).toEqual([]);
 });
 
-it("ST22 treats a usage-limit pause without a reset as owner-held and restarts the lead's clock from zero when usable", () => {
+it("ST22 treats a usage-limit pause without a reset as owner-held", () => {
   const blocked = evaluate(input({ snapshot: { sequence: 20, agents: {
     lead: agent("lead", "idle"), worker: agent("worker", "paused", "lead", { pause: { kind: "usage-limit" } }),
   }, deliveries: {}, waits: {}, roles: { settings: {}, agents: {}, actions: [] } },
     engineWaits: [{ waiter: "lead", members: ["worker"] }],
     episode: { post: post("p", "owner", ["lead"]), addressee: "lead", elapsed: 1_200_000 } }));
   expect(tags(blocked)).toEqual([]);
-  const returned = evaluate(input({ episode: { post: post("p", "owner", ["lead"]), addressee: "lead", elapsed: 599_999 },
-    clockRestartedAt: 1_900_000_000_000 }));
-  expect(tags(returned)).toEqual([]);
 });
 
-it("ST23 closes the lead's clock and restarts it at zero when a stopped worker's permission row closes", () => {
+it("ST23 a stopped worker does not block its lead's full-interval stall", () => {
   const stopped = evaluate(input({ snapshot: { sequence: 21, agents: { lead: agent("lead", "idle"), worker: agent("worker", "stopped", "lead") },
     deliveries: {}, waits: {}, roles: { settings: {}, agents: {}, actions: [] } },
+    status: { disabled: false, conditions: { sequence: 21 } },
     openRequests: [], engineWaits: [{ waiter: "lead", members: ["worker"] }],
-    episode: { post: post("p", "owner", ["lead"]), addressee: "lead", elapsed: 599_999 } }));
-  expect(tags(stopped)).toEqual([]);
+    episode: { post: post("p", "owner", ["lead"]), addressee: "lead", elapsed: 1_200_000 } }));
+  expect(tags(stopped)).toEqual(["roles.StallSeen"]);
 });
 
 it("ST24 does not let a stopped worker's open question make its lead wait on the owner", () => {

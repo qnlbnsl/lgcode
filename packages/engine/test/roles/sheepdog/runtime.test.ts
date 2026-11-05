@@ -18,7 +18,8 @@ import { CommandHandler } from "../../../src/commands/CommandHandler.ts";
 import { refused } from "../../../src/commands/internal.ts";
 import { engineLists, type EngineLists } from "../../../src/pieces/lists.ts";
 import { makeSheepdogLoop, type SheepdogRule } from "../../../src/roles/sheepdog/loop.ts";
-import { sendNotice, sheepdogCaller, noticeRecipient, deliveryIsSheepdogTurn, resendUnread } from "../../../src/roles/sheepdog/notices.ts";
+import { sendNotice, sheepdogCaller, noticeRecipient, deliveryIsSheepdogTurn, resendUnread, recordAction } from "../../../src/roles/sheepdog/notices.ts";
+import { makeRules } from "../../../src/roles/sheepdog/rules/runtime.ts";
 import { callForAction } from "../../../src/roles/sheepdog/actions.ts";
 import { resolveSettings, roleSettings } from "../../../src/roles/sheepdog/settings.ts";
 import { actionRequestId } from "../../../src/roles/sheepdog/requests.ts";
@@ -162,20 +163,32 @@ it.effect("a socket snooze silences its idle group until the clock passes withou
   }));
 });
 
-it.effect("recovery holds the first baseline and all rule work; the first start never admits a historical crash", () => Effect.gen(function* () {
-  yield* run(quiet, setup.pipe(Effect.andThen(appendSetup([eventOf({ _tag: "AgentCrashed", agentId: "worker", exitCode: 1, signal: null, stderr: "untrusted error" })]))));
+it.effect("recovery holds production crash rules at the historical head and admits only a later crash", () => Effect.gen(function* () {
+  let historicalHead = 0;
+  yield* run(quiet, Effect.gen(function* () {
+    yield* setup;
+    yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId: "worker", exitCode: 1, signal: null, stderr: "historical detail" })]);
+    historicalHead = (yield* current).sequence;
+  }));
   const ready = yield* Deferred.make<void>();
   let calls = 0;
   const recovery = Layer.succeed(Restart, { ready: Deferred.isDone(ready), whenReady: Deferred.await(ready), recover: Effect.void, returnAccount: () => Effect.void });
-  const lists = listsWith([{ onStart: () => Effect.sync(() => { calls++; }) }]);
-  yield* run(lists, Effect.gen(function* () {
+  const lists = listsWith([...makeRules(), { onStart: () => Effect.sync(() => { calls++; }) }]);
+  yield* run(lists, runner => Effect.gen(function* () {
     yield* pause(25);
     expect((yield* roles).baseline).toBeUndefined(); expect(calls).toBe(0);
     yield* Deferred.succeed(ready, undefined);
-    const view = yield* settled(0);
-    expect(view.baseline!.position).toBeGreaterThan(0);
-    expect(calls).toBe(1);
-    expect((yield* alertLog).filter((row) => row.event._tag === "roles.CrashAdmitted")).toEqual([]);
+    const view = yield* settled(historicalHead);
+    expect(view.baseline!.position).toBe(historicalHead);
+    expect(yield* eventually(Effect.sync(() => calls), count => count === 1)).toBe(1);
+    yield* pause(50);
+    expect((yield* alertLog).filter(row => row.event._tag === "roles.CrashAdmitted")).toEqual([]);
+    expect(runner.callsOf("load")).toHaveLength(0);
+    expect((yield* alertLog).filter(row => row.event._tag === "DeliveryQueued")).toEqual([]);
+    yield* seedAgent({ id: "later", folder: rig.work });
+    const [crash] = yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId: "later", exitCode: 1, signal: null, stderr: "later detail" })]);
+    const after = yield* eventually(roles, view => view.actions.some(row => row._tag === "roles.CrashAdmitted"));
+    expect(after.actions.filter(row => row._tag === "roles.CrashAdmitted")).toMatchObject([{ agentId: "later", triggerSequence: crash!.sequence }]);
   }), recovery);
 }));
 
@@ -194,17 +207,27 @@ it.effect("lagging off/on switches replay in order and write one baseline with s
     rows = yield* alertLog;
   }));
   const seen: string[] = [];
-  const rule: SheepdogRule = { onEvent: (_ctx, row) => Effect.sync(() => { if (row.event._tag === "roles.Snoozed") seen.push(row.event.group); }) };
+  const rule: SheepdogRule = { onEvent: (ctx, row) => Effect.gen(function* () {
+    if (row.event._tag !== "roles.Snoozed") return;
+    seen.push(row.event.group);
+    yield* recordAction({ _tag: "roles.CacheFlushed", agentId: "worker" as RolesAction["agentId"], noticeRecipient: "owner", notice: "sent",
+      triggerSequence: row.sequence, sourceSequence: row.sequence, occurrence: 1 }, "switch-observer", ctx.lists);
+  }) };
   const lists = listsWith([rule]);
+  const afterOn = rows.find(row => row.event._tag === "roles.Snoozed" && row.event.group === "after-on")!.sequence;
   for (let restart = 0; restart < 2; restart++) yield* run(lists, Effect.gen(function* () {
     const onSequence = rows.find((row) => row.event._tag === "roles.SettingsChanged" && row.event.settings.sheepdog === true)!.sequence;
     yield* settled(onSequence);
-    yield* eventually(Effect.sync(() => seen.includes("after-on")), Boolean);
+    expect(yield* eventually(Effect.sync(() => seen.includes("after-on")), Boolean)).toBe(true);
+    const [marker] = yield* appendSetup([eventOf({ _tag: "roles.Snoozed", group: `barrier-${restart}`, until: 0 })]);
+    const handled = yield* eventually(roles, view => view.actions.some(row => row.triggerSequence === marker!.sequence));
+    expect(handled.actions.some(row => row.triggerSequence === marker!.sequence)).toBe(true);
+    expect(handled.actions.filter(row => row.triggerSequence === afterOn)).toHaveLength(1);
     const baselines = (yield* alertLog).filter((row) => row.event._tag === "roles.SheepdogBaseline");
     expect(baselines).toHaveLength(3);
     for (const row of baselines.slice(1)) if (row.event._tag === "roles.SheepdogBaseline") expect(row.requestId).toBe(`roles:baseline:${row.event.position}`);
   }));
-  expect(seen).toContain("before-off"); expect(seen).not.toContain("while-off");
+  expect(seen.filter(group => !group.startsWith("barrier-"))).toEqual(["before-off", "after-on"]);
 }));
 
 it.effect("one loop re-arms persisted event clocks and takes one missed step, dropping expired cache timers", () => Effect.gen(function* () {
@@ -389,26 +412,44 @@ it.effect("a refused flush preserves its notice, and an unread notice goes once 
   }));
 }));
 
-it.effect("an ordinary delivery ends a holder-addressed stall while a sheepdog carry-on preserves it", () => {
-  const lists = listsWith();
-  return run(lists, Effect.gen(function* () {
-    yield* setup; yield* settled(0);
-    const [trigger] = yield* appendSetup([eventOf({ _tag: "roles.Snoozed", group: "trigger", until: 3_600_000 })]);
-    const record = { ...action(trigger!, trigger!.sequence, "lead" as RolesAction["noticeRecipient"]), _tag: "roles.StallSeen" as const };
-    const { notice: _notice, ...notice } = record;
-    yield* sendNotice(notice, "stall", lists);
-    yield* callForAction(record, "stall", "prompt", { text: "Carry on with what you were doing." }, lists);
-    yield* pause(30);
-    expect((yield* roles).actions.some((row) => row._tag === "roles.StallEnded")).toBe(false);
-    // Complete that turn, then use the owner's real socket prompt path.
-    yield* appendSetup([eventOf({ _tag: "TurnEnded", agentId: "worker", compact: false })]);
-    const client = yield* socket(lists);
-    yield* client.prompt!({ requestId: "ordinary-turn", agentId: "worker", text: "Continue the assigned work." });
-    const view = yield* eventually(roles, (view) => view.actions.some((row) => row._tag === "roles.StallEnded"));
-    expect(view.agents.worker!.openStall).toBeUndefined();
-    expect(view.actions.filter((row) => row._tag === "roles.StallEnded")).toHaveLength(1);
-  }));
-});
+it.effect("a real sheepdog-only board wake preserves an owner stall alert and a mixed wake clears it", () => run(engineLists, Effect.gen(function* () {
+  yield* setup; yield* settled(0);
+  const [trigger] = yield* appendSetup([eventOf({ _tag: "roles.Snoozed", group: "trigger", until: 0 })]);
+  const { notice: _notice, ...record } = { ...action(trigger!, trigger!.sequence, "owner"), _tag: "roles.StallSeen" as const };
+  yield* sendNotice(record, "stall", engineLists);
+  const client = yield* socket(engineLists);
+  const openAlerts = () => client["client.alerts.list"]!({ requestId: randomBytes(8).toString("hex"), after: 0, limit: 200, status: "open" });
+  const reply = yield* eventually(openAlerts(), reply => (reply.items as any[]).some(row => row.alertKey === "stall:worker"));
+  const alert = (reply.items as any[]).find(row => row.alertKey === "stall:worker");
+  expect(alert).toMatchObject({ kind: "roles.stall", status: "open" });
+  yield* executeService(sheepdogCaller, "board.post", { requestId: "sheep-only", direct: { _tag: "agent", agentId: "worker" },
+    to: [{ _tag: "agent", agentId: "worker" }], reply: "none", text: "Check the board." });
+  yield* executeService(sheepdogCaller, "board.flush", { requestId: "flush-only", agentId: "worker" });
+  const working = yield* eventually(current, snapshot => snapshot.agents.worker?.state._tag === "working");
+  expect(working.agents.worker?.state._tag).toBe("working");
+  const only = Object.values(working.deliveries).findLast(row => row.target === "worker" && row.status === "sent")!;
+  expect(deliveryIsSheepdogTurn(working, only.id)).toBe(true);
+  yield* pause(50);
+  expect((yield* roles).actions.filter(row => row._tag === "roles.StallEnded")).toHaveLength(0);
+  expect((yield* openAlerts()).items).toContainEqual(expect.objectContaining({ alertId: alert.alertId, status: "open" }));
+  yield* appendSetup([eventOf({ _tag: "DeliveryAccepted", agentId: "worker", deliveryId: only.id }), eventOf({ _tag: "TurnEnded", agentId: "worker", compact: false })]);
+  yield* executeService(sheepdogCaller, "board.post", { requestId: "mixed-sheep", direct: { _tag: "agent", agentId: "worker" },
+    to: [{ _tag: "agent", agentId: "worker" }], reply: "none", text: "Check the board again." });
+  yield* client["board.post"]!({ requestId: "mixed-owner", direct: { _tag: "agent", agentId: "worker" },
+    to: [{ _tag: "agent", agentId: "worker" }], reply: "none", text: "Additional work." });
+  yield* client["board.flush"]!({ requestId: "flush-mixed", agentId: "worker" });
+  const ended = yield* eventually(roles, view => view.actions.some(row => row._tag === "roles.StallEnded"));
+  expect(ended.actions.filter(row => row._tag === "roles.StallEnded")).toHaveLength(1);
+  expect(ended.agents.worker!.openStall).toBeUndefined();
+  const final = yield* eventually(openAlerts(), reply => !(reply.items as any[]).some(row => row.alertId === alert.alertId));
+  expect(final.items).not.toContainEqual(expect.objectContaining({ alertId: alert.alertId }));
+  const rows = yield* alertLog;
+  expect(rows.filter(row => row.event._tag === "client.AlertCleared" && row.event.alertId === alert.alertId)).toHaveLength(1);
+  const wakes = rows.filter(row => row.event._tag === "board.WakeBuilt");
+  expect(wakes).toHaveLength(2);
+  expect(wakes[1]!.event).toMatchObject({ carried: expect.any(Array) });
+  if (wakes[1]!.event._tag === "board.WakeBuilt") expect(wakes[1]!.event.carried).toHaveLength(2);
+})));
 
 it.effect("limits resolve role defaults and overrides; invalid settings report the failing field", () => run(quiet, Effect.gen(function* () {
   const role = roleSettings(null, "lead:builder");
@@ -520,3 +561,38 @@ it.effect("two idle groups sharing a top agent keep distinct receipts and each u
     expect(records.filter((row) => row.noticeRecipient === "owner").map((row) => row._tag === "roles.TeamIdleReported" ? row.group : undefined)).toEqual(["first", "second"]);
   }));
 });
+
+for (const consumption of ["read", "accepted", "unread"] as const) it.effect(`a ${consumption} notice interrupted before recording reroutes only if unread`, () => Effect.gen(function* () {
+  let triggerSequence = 0;
+  const interrupted: EngineLists = { ...quiet, planners: { ...quiet.planners, "roles.record": () => Effect.interrupt } };
+  yield* run(interrupted, Effect.gen(function* () {
+    yield* setup;
+    const [trigger] = yield* appendSetup([eventOf({ _tag: "roles.Snoozed", group: "late-record", until: 0 })]);
+    triggerSequence = trigger!.sequence;
+    const { notice: _notice, ...record } = action(trigger!, trigger!.sequence, "lead" as RolesAction["noticeRecipient"]);
+    const fiber = yield* sendNotice(record, "late", interrupted).pipe(Effect.forkScoped);
+    expect((yield* Fiber.await(fiber))._tag).toBe("Failure");
+    const post = (yield* alertLog).find(row => row.event._tag === "board.PostWritten")!;
+    expect(post.event._tag).toBe("board.PostWritten");
+    if (post.event._tag !== "board.PostWritten") return;
+    if (consumption === "read") yield* appendSetup([eventOf({ _tag: "board.Read", channelId: post.event.channelId,
+      reader: { _tag: "agent", agentId: "lead" }, postIds: [post.event.postId] })]);
+    if (consumption === "accepted") {
+      const wake = (yield* alertLog).find(row => row.event._tag === "DeliveryQueued")!;
+      expect(wake.event._tag).toBe("DeliveryQueued");
+      if (wake.event._tag === "DeliveryQueued") yield* appendSetup([eventOf({ _tag: "DeliveryAccepted", agentId: "lead", deliveryId: wake.event.delivery.id })]);
+    }
+    expect((yield* roles).actions).toHaveLength(0);
+  }));
+  yield* run(quiet, Effect.gen(function* () {
+    const trigger = (yield* alertLog).find(row => row.sequence === triggerSequence)!;
+    const { notice: _notice, ...record } = action(trigger, trigger.sequence, "lead" as RolesAction["noticeRecipient"]);
+    yield* sendNotice(record, "late", quiet);
+    expect((yield* roles).actions[0]?.noticeRead).toBe(consumption !== "unread");
+    yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId: "lead", exitCode: 1, signal: null, stderr: "detail" })]);
+    yield* resendUnread((yield* current).sequence, quiet);
+    yield* resendUnread((yield* current).sequence, quiet);
+    expect((yield* roles).actions.map(row => row.noticeRecipient)).toEqual(consumption === "unread" ? ["lead", "owner"] : ["lead"]);
+    expect((yield* alertLog).filter(row => row.event._tag === "board.PostWritten")).toHaveLength(1);
+  }));
+}));
