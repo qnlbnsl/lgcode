@@ -20,6 +20,7 @@ import { threadAgent } from "../views/apply.ts";
 import * as Views from "../views/Views.ts";
 import * as Redactor from "./Redactor.ts";
 import { fieldStructure, receiptStructure, type RedactionStructure } from "./redactionStructure.ts";
+import { loadRoleFile } from "../roles/roleFile.ts";
 
 // The reason names the failure and never carries data. It is built from a
 // fixed category and nothing else, because SQLite's own message can quote a
@@ -27,6 +28,10 @@ import { fieldStructure, receiptStructure, type RedactionStructure } from "./red
 export class LogWriteFailed extends Data.TaggedError("LogWriteFailed")<{
   readonly reason: string;
 }> {}
+
+// A refused event is a failed write, but does not mean SQLite is unusable.
+// The command boundary translates it into an ordinary input refusal.
+export class InvalidEvent extends LogWriteFailed {}
 
 export class RequestIdReused extends Data.TaggedError("RequestIdReused")<{
   readonly reason: "request id reused";
@@ -251,6 +256,15 @@ export const makeLayer = (lists: EngineLists = engineLists) => Layer.effect(Even
         Effect.gen(function* () {
           if (!active) return yield* new LogWriteFailed({ reason: "writer transaction is closed" });
           const redacted = yield* Effect.forEach(events, (event) => redactor.redact(event));
+          // Nothing transforms an event after this check. A registry refresh
+          // or expanding redaction must not store an invalid role document or
+          // cross either of its admission budgets. This is an input refusal,
+          // not a database fault, and must not latch the writer.
+          for (const event of redacted) {
+            if (event._tag === "roles.RoleFileSet") yield* loadRoleFile(event.content).pipe(
+              Effect.mapError(() => new InvalidEvent({ reason: "invalid redacted role file" })),
+            );
+          }
           const redactedSideRows = yield* redactSideRows(sideRows);
           const occurredAt = yield* Clock.currentTimeMillis;
           const batch = yield* commit(callerKey(actor), requestId, bodyHash, redacted, redactedSideRows, actor, occurredAt, receiptResult).pipe(
@@ -272,8 +286,8 @@ export const makeLayer = (lists: EngineLists = engineLists) => Layer.effect(Even
         // A caller's cancellation must not split a successful COMMIT from its
         // publication. Waiting for the writer permit remains interruptible.
         Effect.uninterruptible,
-        // A request-id refusal is the caller's mistake, so only a write failure latches.
-        Effect.tapError((error) => error instanceof LogWriteFailed
+        // Refused requests and invalid events do not latch an infrastructure fault.
+        Effect.tapError((error) => error instanceof LogWriteFailed && !(error instanceof InvalidEvent)
           ? Effect.sync(() => { latched = error; })
           : Effect.void),
       );

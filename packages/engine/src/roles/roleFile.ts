@@ -63,7 +63,10 @@ export const setRoleFile = (input: Input, payload: Payload<"roles.role-file.set"
   const content = yield* input.runtime.log.redactText(payload.content);
   yield* load(content);
   return {
-    events: [{ _tag: "roles.RoleFileSet", content, roleFileHash: loaded.roleFileHash }],
+    // The writer performs the mandatory redaction pass. Passing the original
+    // avoids redacting replacement markers again. It validates the final
+    // representation as well, with its current secret registry.
+    events: [{ _tag: "roles.RoleFileSet", content: payload.content, roleFileHash: loaded.roleFileHash }],
     reply: (batch) => {
       const event = batch.find(({ event }) => event._tag === "roles.RoleFileSet")?.event;
       return { requestId: payload.requestId, roleFileHash: event?._tag === "roles.RoleFileSet" ? event.roleFileHash : undefined };

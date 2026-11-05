@@ -8,6 +8,7 @@ import type { ResponseChunkEncoded, ResponseExitEncoded } from "effect/rpc/RpcMe
 import { expect, it } from "vitest";
 import { agent, codec, envelope as boardEnvelope, exported, post } from "./board/fixtures.ts";
 import { definitions } from "./client/support.ts";
+import { maximalContent, maximalFile, maximalRoleFileEvent } from "./roles/maximalRoleFile.ts";
 
 interface Limits {
   readonly postCharacters: number;
@@ -135,14 +136,12 @@ it("2.6 a whole oversized event page preserves all escaping and remains under th
   expect(bytes(message)).toBeLessThan(900 * 1024);
 });
 
-it("2.6 future piece maxima survive the tolerant wire encoder and real chunk wrappers within the shared page budget", () => {
+it("2.6 the multibyte board sample survives the tolerant wire encoder and real chunk wrapper within the shared page budget", () => {
   const wire = (Contracts as unknown as { WireEnvelope?: Schema.Codec<unknown> }).WireEnvelope;
   expect(wire, "E25 must export WireEnvelope from contracts").toBeDefined();
-  // The roles' 64 KiB file cap is on encoded data. Escaped text occupies
-  // that budget in this fixture. The board's 16,384-character post uses
-  // multibyte text to exercise its approximately 64 KiB encoded maximum.
+  // The board's 16,384-character post uses multibyte text to exercise its
+  // approximately 64 KiB encoded maximum. Roles use their strict schema below.
   const samples = [
-    { _tag: "roles.RoleFileSet", text: '"\\'.repeat(16_383) },
     { _tag: "board.PostWritten", text: "😀".repeat(16_384), addressees: Array.from({ length: 16 }, (_, i) => `agent-${i}`) },
   ];
   for (const event of samples) {
@@ -151,6 +150,41 @@ it("2.6 future piece maxima survive the tolerant wire encoder and real chunk wra
     expect(JSON.parse(String(frame({ _tag: "Chunk", requestId: "1", values: [encoded] }))).values[0].event).toEqual(event);
     expect(bytes({ _tag: "Chunk", requestId: "1", values: [encoded] })).toBeLessThan(900 * 1024);
   }
+});
+
+it("1.3a a maximal admitted role file round-trips every strict event/envelope field through real Chunk and page frames without a marker", () => {
+  expect(Buffer.byteLength(maximalContent)).toBe(65_536);
+  expect(Schema.decodeUnknownSync(Contracts.RoleFile, { onExcessProperty: "error" })(JSON.parse(maximalContent))).toEqual(maximalFile);
+  const event = Schema.decodeUnknownSync(Contracts.RolesEvent, { onExcessProperty: "error" })(maximalRoleFileEvent);
+  const encodedEvent = Schema.encodeSync(Contracts.RolesEvent)(event);
+  expect(encodedEvent).toEqual(maximalRoleFileEvent);
+  const eventSize = Buffer.byteLength(JSON.stringify(encodedEvent));
+  expect(eventSize).toBeGreaterThan(127 * 1024);
+  expect(eventSize).toBeLessThanOrEqual(200 * 1024);
+  expect(() => Schema.decodeUnknownSync(Contracts.RolesEvent)({ _tag: "roles.RoleFileSet", roleFileHash: maximalRoleFileEvent.roleFileHash })).toThrow();
+  expect(() => Schema.decodeUnknownSync(Contracts.RolesEvent)({ ...maximalRoleFileEvent, roleFileHash: "invalid" })).toThrow();
+  const original = envelope(maximalRoleFileEvent);
+  const decoded = Schema.decodeUnknownSync(Contracts.EventEnvelope, { onExcessProperty: "error" })(original);
+  const encoded = Schema.encodeSync(Contracts.EventEnvelope)(decoded);
+  expect(encoded).toEqual(original);
+  const chunk = { _tag: "Chunk", requestId: "1", values: [encoded] };
+  const parsed = JSON.parse(String(frame(chunk)));
+  expect(parsed.values[0]).toEqual(original);
+  expect(bytes(chunk)).toBeGreaterThan(eventSize);
+  expect(bytes(chunk)).toBeLessThan(256 * 1024);
+  const rpc = definitions().requests.get("client.thread")!;
+  const reply = { requestId: "role-file-page", items: [original] };
+  const page = Schema.decodeUnknownSync(rpc.successSchema as Schema.Codec<unknown>)(reply);
+  const pageEncoded = Schema.encodeSync(rpc.successSchema as Schema.Codec<unknown>)(page);
+  expect(pageEncoded).toEqual(reply);
+  expect(frameBytes(pageEncoded, false)).toBeLessThan(900 * 1024);
+  const stream = definitions().requests.get("client.subscribe")!.successSchema;
+  expect(RpcSchema.isStreamSchema(stream)).toBe(true);
+  if (!RpcSchema.isStreamSchema(stream)) throw new Error("missing stream schema");
+  expect(Schema.decodeUnknownSync(stream.success as Schema.Codec<unknown>)(encoded)).toEqual(original);
+  const marker = { _tag: "client.Oversized", sequence: 1, tag: "roles.RoleFileSet", bytes: bytes(chunk) };
+  expect(Schema.decodeUnknownSync(stream.success as Schema.Codec<unknown>)(marker)).toEqual(marker);
+  expect(bytes({ ...chunk, values: [marker] })).toBeLessThan(256 * 1024);
 });
 
 it("1.3a roles action pages encode 500 real records below 256 KiB and reject a malformed record", () => {

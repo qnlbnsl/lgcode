@@ -30,7 +30,7 @@ export const RolesRpcGroup = RpcGroup.make(
   Rpc.make("snooze", { payload: { ...request, group: Schema.String, until: EpochMilliseconds }, success: Ack, error: Refused }),
   Rpc.make("actions.list", {
     payload: {
-      ...request, agentId: Schema.optionalKey(AgentId), before: Schema.optionalKey(EventSequence),
+      ...request, agentId: Schema.optionalKey(AgentId), after: Schema.optionalKey(EventSequence),
       limit: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
     }, success: Schema.Struct({ ...request, items: Schema.Array(RolesActionRecord), next: Schema.optionalKey(EventSequence) }), error: Refused,
   }),

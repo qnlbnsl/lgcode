@@ -366,7 +366,7 @@ marks. Commands, their access and their kind:
 | `roles.settings.get` | owner | read | The sheepdog's limits and the two on/off switches. |
 | `roles.settings.set` | owner | planner | Changes the sheepdog's limits, within bounds (rows 16, 25, 48), and the two on/off switches (row 46). |
 | `roles.snooze` | owner | planner | Silences team-idle notices for one group until a time. |
-| `roles.actions.list` | owner | read | The sheepdog's action records, paged, newest first, optionally for one agent (row 61). |
+| `roles.actions.list` | owner | read | The sheepdog's action records, paged, newest first, optionally for one agent (row 61). Pass `next` back as `after`; the next page contains sequences strictly below it. Omit `after` for the newest page. |
 | `roles.record` | service | planner | The sheepdog writes its own action records: a closed list of action kinds, allowed only for `roles.sheepdog` (rows 67, 99). Its reply is the record's sequence number. |
 
 Events, all `owner-only` (CAPI §3), so agents never see them through
@@ -431,15 +431,25 @@ of at most 1 MiB, a page that closes at 900 KiB or its item limit, and an
 event checked against that 900 KiB page budget (CAPI row 137; row 116). An
 event over 256 KiB reaches `client.subscribe` as a marker, and the client
 reads it with `client.event`.
-The roles' largest event is `roles.RoleFileSet` and their largest page is a
-`roles.rules.list` page, so each fits without a marker or a byte cut: a role file of at most 64 KiB, whose encoded `roles.RoleFileSet` must also stay under 200 KiB, because escaping can more than double a file's size (row 145); a rule of at most 2 KiB, measured on its encoded form and
+The role-file input is at most 64 KiB. Its final redacted
+`roles.RoleFileSet` is validated before committing, including valid JSON and
+an encoded event of at most 200 KiB (row 145). The writer redacts the original
+content once, so replacement markers are not expanded by a second pass.
+A valid maximal input, with escaping and multibyte text, must pass the strict
+event, envelope and real remote procedure call (RPC) frame size checks.
+The separate over-200-KiB control-character refusal is not a positive admission
+specimen. Other roles events can carry unbounded group labels.
+A rule is at most 2 KiB, measured on its encoded form and
 checked as a whole, because its fields at their separate maxima do not fit
 together (2a, row 70), and at most 500 rules, so a `roles.rules.list` page
 of at most 200 rules stays under 400 KiB; a `roles.actions.list` page of at most 500
-records, under 256 KiB; a `roles.handoff` reply of at most 64 KiB, encoded,
-envelope included; and the roles' snapshot section at most 128 KiB, with
-the rules' summary at most 500 entries, the snoozes at most 200, and the
-agents' latest records at most 256 agents. The section is filled in a
+records, closing at 256 KiB of encoded reply data. A first record larger
+than that budget is returned whole on its own page, under the shared paged-read
+rule, so existing records remain reachable. Its `next` still advances to older
+records. Ordinary pages stay within both caps. A `roles.handoff` reply is at most
+64 KiB encoded, including its envelope. The roles' snapshot section is at most
+128 KiB. The rules' summary holds at most 500 entries. The snoozes hold at
+most 200 entries. The agents' latest records cover at most 256 agents. The section is filled in a
 stated order until it reaches 128 KiB, measured encoded, as the board's
 section is: the role file, the settings and switches, the open alerts'
 matters, then the rules' summary, the snoozes, and the agents' latest
@@ -603,7 +613,7 @@ package, the role file, and `orient`. Role names are parsed from the free
 | 1.1 | `parseRole("worker:builder")` gives kind `worker` and name `builder`; `parseRole("")` and `parseRole("chef")` give kind `worker` with an `unknown-kind` flag | `packages/contracts/test/roles/role.test.ts` R01-R03 |
 | 1.2 | `RolesRpcGroup` is prefixed `roles.`, every payload has `requestId`, and the engine's uniqueness test passes with it | `packages/contracts/test/roles/group.test.ts` G01; `packages/contracts/test/unique.test.ts` (CAPI E1) |
 | 1.3 | `rolesAccess` equals the command table above, every event in `RolesEvent` is `owner-only` in `rolesVisibility`, and `snapshotFor` returns nothing for an agent caller; each roles command sits in the planner table or the read table as the table above says, which the engine's one-table test checks (CAPI E3); every roles event enters the lifecycle table as `keep` in all seven states through `keepInEveryState` (CAPI E5), and has one sample in the engine's visibility test, which an agent never receives (CAPI E5, E8); a resent `roles.rules.add` returns the stored reply and writes nothing (row 95) | `group.test.ts` G02-G06; `packages/contracts/test/state-machine.test.ts`; `packages/engine/test/api/subscribe-visibility.test.ts` |
-| 1.3a | A role file over 64 KiB is refused; a rule just under 2 KiB encoded is accepted, and a rule whose fields are each within their own maxima but whose encoded total, with multibyte text, passes 2 KiB is refused; a snapshot section built from 500 rules, 200 snoozes and 256 agents, each with records of every action kind, stays under 128 KiB, is filled in the stated order, marks each cut list `truncated`, and the client rebuilds the full rule set and the omitted records through `roles.rules.list` and `roles.actions.list`; the roles' largest event and page, as real encoded messages, pass the size test in `packages/contracts`, and the roles' section counts toward the 4 MiB snapshot test | `roleFile.test.ts` F06; `packages/engine/test/roles/snapshot.test.ts` SN01-SN03; `packages/contracts/test/size-limits.test.ts`; `packages/engine/test/client/snapshot-size.test.ts` (CAPI criterion 2.6) |
+| 1.3a | A role file over 64 KiB is refused; a rule just under 2 KiB encoded is accepted, and a rule whose fields are each within their own maxima but whose encoded total, with multibyte text, passes 2 KiB is refused; a snapshot section built from 500 rules, 200 snoozes and 256 agents, each with records of every action kind, stays under 128 KiB, is filled in the stated order, marks each cut list `truncated`, and the client rebuilds the full rule set and the omitted records through `roles.rules.list` and `roles.actions.list`; a maximal admitted role file and ordinary action pages pass the strict encoded size tests in `packages/contracts`, and an oversized first action remains whole and pageable in the engine regressions, and the roles' section counts toward the 4 MiB snapshot test | `roleFile.test.ts` F06; `packages/engine/test/roles/snapshot.test.ts` SN01-SN03; `packages/contracts/test/size-limits.test.ts`; `packages/engine/test/client/snapshot-size.test.ts` (CAPI criterion 2.6) |
 | 1.4 | A role file that fails the schema is refused with the failing path, and the previous file stays loaded | `packages/engine/test/roles/roleFile.test.ts` F01-F04 |
 | 1.5 | A role file with a key outside the schema, such as `permission` or `rules`, is refused; so is a limit outside its bounds (row 48) | `roleFile.test.ts` F05, F07 |
 | 1.6 | The exact MCP tool list in `packages/contracts/test/commands.test.ts` names `roles.orient` (CAPI E2, CAPI row 140; row 113). `shephrd roles orient` and the MCP tool, called by an agent, return its name, kind and role name, its parent's id and name, the agents it may read by CAPI's read rule with their states (its children, and, while a child is unavailable, which means in any state but idle or working, that child's children whose effective holder it is), its open-request and open-question counts, and its role's advice; called by the owner, it is refused | `packages/engine/test/roles/orient.test.ts` O01-O04, O06 (O06 a lead that becomes its worker's worker's effective holder while the worker is paused sees it, and stops seeing it when the worker recovers) |
@@ -1104,7 +1114,7 @@ replacement (row 62).
 | 6.3 | It lists the sequence numbers it left out as exact ranges in bounded pages. A 5,000-item thread interleaved with another agent preserves whole small priority sections, stays within both encoded budgets on every page, and recovers all omitted sequences without including unrelated events. A continuation retains the original boundary despite later activity and grants no additional read rights. The real Model Context Protocol tool and engine recover multiple omission pages and their full source content, and refuse continuation after the caller loses management rights. | `handoff.test.ts` H06; `handoff-sparse.test.ts` H16; `handoff-mcp.test.ts` H17 |
 | 6.4 | The old agent's text is inside a data envelope, and text the log redacted stays redacted | `handoff.test.ts` H07 |
 | 6.5 | An agent may ask only for an agent it may manage, by the engine's rights helper, checked on every request, including a resent one, because `roles.handoff` is a read and never deduplicated (row 95); an orchestrator may ask for a worker while that worker's lead is paused, and is refused once the lead recovers; the replacement's own `roles.handoff` and `client.thread` for its predecessor are refused, and the lead's `client.thread` read of a marked sequence succeeds, with the reply `{ requestId, data }` and the page inside the data envelope (rows 114, 119); the exact MCP tool list in `commands.test.ts` names `roles.handoff` (row 113) | `handoff.test.ts` H08-H12; `packages/contracts/test/commands.test.ts` |
-| 6.6 | The first prompt comes from `AgentStarted.firstPromptDelivery`, and a later exchange's user side from the `DeliveryQueued` of the delivery whose `DeliverySent` began its turn. An owner caller gets that text; an agent caller gets the cut marker with the `DeliverySent`'s sequence, and E21's rule is unchanged. Every hand-off test builds its thread through public `start` and `prompt` calls and actual runner updates, with no synthetic `PromptSent` (row 133) | `handoff.test.ts` H13-H15 |
+| 6.6 | The first prompt comes from `AgentStarted.firstPromptDelivery`, and a later exchange's user side from the `DeliveryQueued` of the delivery whose `DeliverySent` began its turn. An owner caller gets that text; an agent caller gets the cut marker with the `DeliverySent`'s sequence, and E21's rule is unchanged. Every hand-off test builds its thread through public `start` and `prompt` calls and actual runner updates, with no synthetic `PromptSent` (row 133) | `handoff.test.ts` H13-H16, including the actual queued/sent page split for the owner, lead, recovered parent and replacement |
 
 
 **Tasks:**
