@@ -1,10 +1,14 @@
 import { randomUUID } from "node:crypto";
 import * as Effect from "effect/Effect";
+import * as TestClock from "effect/testing/TestClock";
+import { AlertSender } from "../../src/client/alerts/AlertSender.ts";
+import { engineLists } from "../../src/pieces/lists.ts";
 import { expect, it } from "vitest";
 import { call, ownerCredential, success } from "../support/handlerRig.ts";
 import { eventsOf } from "../support/alertsRig.ts";
-import { configure, failed, ntfyServer, posts, raiseQuestion, setToken, withCarrier } from "../support/carrierRig.ts";
+import { configure, delivered, failed, ntfyServer, posted, posts, raiseQuestion, setToken, withCarrier } from "../support/carrierRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
+import { eventually, pause } from "../support/routingRig.ts";
 
 it.each([
   ["https://PUSH.EXAMPLE:443", "https://push.example"],
@@ -77,7 +81,17 @@ it("6.15 a redirect is a failed attempt and never reaches the redirect's server"
 
 it("6.15 an over-64-KiB response is bounded even when the server keeps streaming", async () => {
   const server = await ntfyServer();
-  server.respond(({ response }) => { response.writeHead(200); response.write(Buffer.alloc(65_537, 120)); /* no end */ });
+  // Delay the real sender after socket closure, before its outcome is written.
+  const delayedContinuation = { ...engineLists, reactors: { ...engineLists.reactors,
+    client: engineLists.reactors.client!.pipe(Effect.updateService(AlertSender, (sender) => ({
+      ...sender, send: (payload, destination) => sender.send(payload, destination).pipe(Effect.onExit(() => pause(150))),
+    }))),
+  } };
+  server.respond(({ response }) => {
+    response.writeHead(200);
+    if (posts(server).length === 1) response.write(Buffer.alloc(65_537, 120));
+    else response.end();
+  });
   try {
     await withCarrier(() => Effect.gen(function* () {
       yield* registerRebuildCheck();
@@ -85,10 +99,53 @@ it("6.15 an over-64-KiB response is bounded even when the server keeps streaming
       const id = yield* raiseQuestion();
       // Must finish reading or abort at the bound, before the 10-second send
       // timeout. This observes the real response socket, not a fetch mock.
-      const { eventually } = yield* Effect.promise(() => import("../support/routingRig.ts"));
       expect(yield* eventually(Effect.sync(() => server.requests[0]?.response.destroyed === true), Boolean)).toBe(true);
-      const attempts = [...yield* eventsOf("client.AlertDelivered"), ...yield* eventsOf("client.AlertDeliveryFailed")];
-      expect(attempts.some((row) => row.event.alertId === id)).toBe(true);
-    }));
+      expect(yield* failed(id)).toHaveLength(1);
+      expect((yield* eventsOf("client.AlertDelivered")).filter((row) => row.event.alertId === id)).toHaveLength(0);
+      const later = yield* raiseQuestion("after-huge-body");
+      const delivery = yield* delivered(later);
+      expect(delivery).toHaveLength(1);
+      expect(delivery[0]!.event.attempt).toBe(1);
+      expect(delivery[0]!.occurredAt).toBe(1_800_000_000_000);
+      expect(posts(server)).toHaveLength(2);
+    }), { lists: delayedContinuation, clockAt: 1_800_000_000_000 });
   } finally { await server.close(); }
+});
+
+it("6.15 a slow streaming body times out, closes, and permits a later source to send", async () => {
+  const server = await ntfyServer();
+  const timers: ReturnType<typeof setInterval>[] = [];
+  let chunks = 0;
+  server.respond(({ response }) => {
+    response.writeHead(200);
+    if (posts(server).length > 1) { response.end(); return; }
+    response.flushHeaders();
+    const timer = setInterval(() => { response.write("x"); chunks++; }, 10);
+    timers.push(timer);
+    response.once("close", () => clearInterval(timer));
+  });
+  try {
+    await withCarrier(() => Effect.gen(function* () {
+      yield* registerRebuildCheck(); yield* configure(server.origin);
+      const first = yield* raiseQuestion("slow-body");
+      expect(yield* posted(server)).toHaveLength(1);
+      expect(yield* eventually(Effect.sync(() => chunks), (count) => count >= 2)).toBeGreaterThanOrEqual(2);
+      yield* TestClock.adjust(9_999); yield* pause(20);
+      expect(server.requests[0]!.response.destroyed).toBe(false);
+      expect(yield* eventsOf("client.AlertDeliveryFailed")).toHaveLength(0);
+      expect(yield* eventsOf("client.AlertDelivered")).toHaveLength(0);
+      yield* TestClock.adjust(1);
+      const failure = yield* failed(first);
+      expect(failure).toHaveLength(1);
+      expect(failure[0]!.occurredAt).toBe(1_800_000_010_000);
+      expect(yield* eventually(Effect.sync(() => server.requests[0]!.response.destroyed), Boolean)).toBe(true);
+      const later = yield* raiseQuestion("after-slow-body");
+      const delivery = yield* delivered(later);
+      expect(delivery).toHaveLength(1);
+      expect(delivery[0]!.event.attempt).toBe(1);
+      expect(delivery[0]!.occurredAt).toBe(1_800_000_010_000);
+      expect(posts(server)).toHaveLength(2);
+      expect(yield* failed(first)).toHaveLength(1);
+    }), { clockAt: 1_800_000_000_000 });
+  } finally { timers.forEach(clearInterval); await server.close(); }
 });
