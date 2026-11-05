@@ -7971,7 +7971,8 @@ arguments, and historical entries.
 ## 483. The display formatter breaks deferred-tool discovery evidence
 
 Found: 2026-11-05, in the real live check on `area/live-fixes-2`.
-State: open. This is a separate tool-output finding from the input repair.
+State: fixed in round 2 on `area/live-fixes-2`.
+The owner identified this as the output side of the same storage regression.
 
 What happened: The Claude lead used the exact permitted ToolSearch query for
 the ask tool. Its completed output contained the matching tool reference.
@@ -7985,6 +7986,21 @@ The grouped discovery starts at sequence 148.
 The exact ask starts at sequence 152.
 The assigned run folder contains `live-check.log` and the result report.
 
-The input repair restores all arguments but does not change tool output.
-The discovery criterion remains unchanged and the step remains failed.
+What changed: The translator serializes original output and content blocks.
+The web page and terminal viewer continue deriving readable text at display.
+The probe merges output as replacement snapshots and preserves omitted fields.
+The discovery matcher decodes the original result and recognized content
+wrappers. It also reads historical arrays and formatted reference objects.
+Every reference must still name only the exact ask tool.
+
+Terminal output keeps its existing redacted, bounded, serialized snapshots.
+A terminal reference alone no longer writes an empty generic output.
+An explicit empty result still replaces earlier output.
+Shell evidence is decoded before line matching, while structured exit codes
+remain available for inspection.
+
+The extended translator regression tests exercise discovery and shell evidence
+through the real probe driver. They also check historical output, terminal
+snapshots, replacement updates, omitted fields, and empty results.
+The assigned run folder contains the round 2 check logs and result report.
 No deferred security issue was repaired to improve the live-check count.

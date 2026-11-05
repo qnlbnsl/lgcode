@@ -48,10 +48,11 @@ it.live("folds repeated real-shaped tool updates without repeating command text 
     const rows = yield* eventually(readLog, (rows) => tagged(rows, "TurnEnded").length === 1);
     const displayed = groupThreadItems(rows).filter((row) => row.event._tag === "ThreadItem");
     expect(displayed).toHaveLength(1);
-    expect(displayed[0]?.event, JSON.stringify(rows.filter((row) => ["ThreadItem", "TurnStarted", "SessionOpened"].includes(row.event._tag)))).toMatchObject({ content: { callId: "shell-1", title: "Run command", status: "completed", input: '{"command":"printf hello"}', output: "hello\nworld" } });
+    expect(displayed[0]?.event, JSON.stringify(rows.filter((row) => ["ThreadItem", "TurnStarted", "SessionOpened"].includes(row.event._tag)))).toMatchObject({ content: { callId: "shell-1", title: "Run command", status: "completed", input: '{"command":"printf hello"}', output: '"hello\\nworld"' } });
     const content = (displayed[0]!.event as Extract<import("@shephrd/contracts").Event, { _tag: "ThreadItem" }>).content;
     if (content._tag !== "tool-call") throw new Error("missing tool call");
     expect(toolText(content.input!)).toBe("printf hello");
+    expect(toolText(content.output!)).toBe("hello\nworld");
     const started = tagged(rows, "AgentStarted")[0]!;
     success(yield* call(ownerCredential, "prompt", { agentId: started.agentId, text: "run again" }));
     const later = yield* eventually(readLog, (rows) => tagged(rows, "TurnEnded").length === 2);

@@ -99,11 +99,23 @@ export const mcpAskDiscovery = (tool: { input?: string; title: string; status: s
   try {
     const input = JSON.parse(tool.input ?? "null");
     if (input?.query !== "select:mcp__shephrd__ask" || input.max_results !== 1 || Object.keys(input).length !== 2) return false;
-    const references = (tool.output ?? "").split("\n").filter(Boolean).flatMap((line) => {
-      const value: unknown = JSON.parse(line);
-      if (!Array.isArray(value)) throw new Error("not a lookup result");
-      return value;
-    });
+    // Stored raw results and ACP content wrappers retain their structure.
+    // Older logs contain arrays per line, or one formatted reference object.
+    // Decode those carriers without accepting prose as discovery evidence.
+    const referencesOf = (value: unknown): unknown[] => {
+      if (Array.isArray(value)) return value.flatMap(referencesOf);
+      if (typeof value === "string") return referencesOf(JSON.parse(value));
+      if (value !== null && typeof value === "object") {
+        const row = value as Json;
+        if (row.type === "content") return referencesOf(row.content);
+        if (row.type === "text" && typeof row.text === "string") return referencesOf(JSON.parse(row.text));
+      }
+      return [value];
+    };
+    let values: unknown[];
+    try { values = [JSON.parse(tool.output ?? "")]; }
+    catch { values = (tool.output ?? "").split("\n").filter(Boolean).map((line) => JSON.parse(line)); }
+    const references = values.flatMap(referencesOf) as Json[];
     return references.length > 0 && references.every((reference) => reference?.type === "tool_reference"
       && reference.tool_name === "mcp__shephrd__ask" && Object.keys(reference).length === 2);
   } catch { return false; }

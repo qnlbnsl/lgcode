@@ -1,4 +1,3 @@
-import { toolValueText } from "@shephrd/contracts/thread";
 import type { Event } from "@shephrd/contracts";
 
 type Content = Extract<Event, { _tag: "ThreadItem" }>["content"];
@@ -39,12 +38,16 @@ export const translate = (value: unknown, replay: boolean): ReadonlyArray<Transl
   });
   if (diffs.length > 0) return diffs;
   if (typeof update.toolCallId !== "string" || update.toolCallId === "") return [];
+  const toolContent = content.filter((part: any) => part?.type !== "terminal");
+  const hasToolContent = Array.isArray(update.content) && (content.length === 0 || toolContent.length > 0);
   return [{ kind: "tool-call", text: JSON.stringify(update), content: {
     _tag: "tool-call", callId: update.toolCallId, title: typeof update.title === "string" ? update.title : "",
     ...(["pending", "in_progress", "completed", "failed"].includes(update.status) ? { status: update.status } : {}),
-    // Keep every argument in the durable event. Viewers derive readable text
-    // with toolText; approval evidence must still see flags and other fields.
+    // Preserve tool data in the durable event. Viewers derive readable text
+    // with toolText; evidence readers still need every argument and result.
     ...(update.rawInput === undefined ? {} : { input: JSON.stringify(update.rawInput) }),
-    ...(update.rawOutput !== undefined ? { output: toolValueText(update.rawOutput) } : content.length > 0 ? { output: toolValueText(content.filter((part: any) => part?.type !== "terminal")) } : {}),
+    // Terminal snapshots are serialized separately by terminal.ts. A reference
+    // alone must not overwrite that correlated output with an empty result.
+    ...(update.rawOutput !== undefined ? { output: JSON.stringify(update.rawOutput) } : hasToolContent ? { output: JSON.stringify(toolContent) } : {}),
   } }];
 };
