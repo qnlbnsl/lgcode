@@ -6087,7 +6087,7 @@ What happened: The administration browser test expected `/threads/phone-worker`,
 
 What changed: The administration test pins the supported hash link, follows it, and reads the question before continuing through every settings check. The phone test checks the exact alert route and retained document. It checks the permission answer, the runner's agent and option, and output emitted only after approval. Reloading the thread independently reads back the committed answer and agent output. Only that fresh-document reload requires HTTP 200. Existing width and browser-storage checks remain in place.
 
-Why it matters: These tests now reach their administration and permission-flow assertions. Temporary production mutations verify that a wrong administration link and missing navigation handlers are rejected. The separate Hypertext Transfer Protocol Secure (HTTPS) fixture update belongs to the public-address repair in FR-001. The overflow mutation proof in FR-048 remains a Phase 2 item.
+Why it matters: These tests now reach their administration and permission-flow assertions. Temporary production mutations verify that a wrong administration link and missing navigation handlers are rejected. The separate Hypertext Transfer Protocol Secure (HTTPS) fixture update belongs to the public-address repair in FR-001. The Phase 2 repair for FR-048 adds independent production-bundle width cases for the login, situation, thread, alerts and settings pages. Each waits for its real content, measures the document and body against the 360-pixel viewport, and reports its own outcome. The existing navigation, administration, thread and storage checks remain. Temporary page-specific overflow mutations fail all five cases at their width assertions.
 
 ## 371. Enabling an initially disabled sheepdog skips cache initialization
 
@@ -7526,3 +7526,71 @@ What changed: The test gates the acknowledgement, requires a disabled pending
 checkbox, then requires an enabled unchecked checkbox without a refresh.
 A temporary mutation removes the saved-state update. The existing failed-save
 rollback test remains in place.
+
+## 459. The root acceptance gate omitted the required browser proofs
+
+Found: 2026-11-05, while repairing foundation review record FR-065.
+State: fixed as an acceptance-gate gap.
+
+What happened: The root `pnpm check` ran typechecking, Vitest and the credit
+check. It omitted Playwright. The old gate passed with an intentionally failing
+browser test present.
+
+What changed: The root gate now runs the complete Playwright suite after
+Vitest. `pnpm test:browser` also runs that suite independently. Browser
+execution has at most two workers. The client API plan records the Chromium
+prerequisites and the aggregate gate in decision 205. Vitest still excludes
+browser files because Playwright executes them.
+
+Validation: Discovery includes login, external navigation and foreign-origin
+checks. The repaired root gate executes and rejects the intentionally failing
+browser assertion. The temporary failure is removed before the final gate.
+
+## 460. The production-browser slow-link recovery proof was missing
+
+Found: 2026-11-05, while repairing foundation review record FR-080.
+State: fixed as a regression-proof gap.
+
+What happened: Unit tests covered oversized state and separate read and stream
+connections. They did not exercise the composed production browser on a slow
+link, as client API criterion 7.14 requires. No production recovery failure was
+established by that absence.
+
+What changed: A production-bundle Playwright scenario starts an agent with a
+300-kibibyte prompt and recovers large permission and harness changes. A real
+proxy then paces encoded WebSocket bytes at 500 kilobits per second while live
+state continues. The browser recovers a permission event over one mebibyte
+once, on the same surviving read connection. Its roster, request identities
+and counts converge. A controlled stream reconnect retains both requests, and
+the owner answers the recovered request.
+
+Validation: Chrome's debugger reads the initialized Effect pinger values in
+the production artifact before throttling starts. The read interval is 25
+seconds and its timeout is 50 seconds. The stream retains the five-second
+defaults. The encoded recovery reply is 1,049,303 bytes and takes about 16.9
+seconds. A temporary mutation restoring the read defaults fails the runtime
+option assertions. This automated fixture does not claim the separate owner
+phone or proxy checks.
+
+## 461. The board browser journey did not identify its read and completion effects
+
+Found: 2026-11-05, while repairing foundation review record FR-093.
+State: fixed as a regression-proof gap.
+
+What happened: Text visibility did not establish that following a notification
+left its post unread. A removed form did not establish an answered parent.
+An aggregate runner count did not identify the completion delivery.
+
+What changed: The scripted agent posts through the real authenticated Unix
+socket. A fake carrier sends the notification to the production browser.
+The test checks the durable owner read count before navigation, before the
+tap and after the tap. It checks the exact parent's answered outcome. It ties
+the completion wake to the original post, its owner reply, its target agent,
+the queued delivery, the sent delivery and the prompt received by the real
+agent process. Two controlled flushes and dispatch drains preserve one
+completion. The fixture uses the production state-folder permissions.
+
+Validation: Temporary mutations silently mark a linked post read, close its
+parent with the wrong outcome, or omit the completion reply manifest. Each
+fails its new discriminating assertion. The plain-text rendering, notification
+privacy, session-cookie and alert-clear checks remain.

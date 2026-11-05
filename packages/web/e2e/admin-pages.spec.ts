@@ -1,3 +1,4 @@
+import { assertPhoneWidth } from "./support/phoneWidth.ts"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
@@ -56,13 +57,7 @@ test("the production admin pages use real RPCs and fit a 360-pixel browser", asy
           await page.getByRole("link", { name: "Alerts", exact: true }).click()
           await page.reload()
           await expect(page.getByLabel("Alerts", { exact: true })).toContainText("A question needs your answer")
-          const assertWidth = async () => {
-            const widths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth,
-              document: document.documentElement.scrollWidth, body: document.body.scrollWidth }))
-            expect(widths.document).toBeLessThanOrEqual(widths.viewport)
-            expect(widths.body).toBeLessThanOrEqual(widths.viewport)
-          }
-          await assertWidth()
+          await assertPhoneWidth(page, "Alerts")
           await page.getByRole("link", { name: "Settings", exact: true }).click()
           const push = page.getByRole("checkbox", { name: "Push for approval", exact: true })
           await expect(push).toBeChecked()
@@ -81,7 +76,7 @@ test("the production admin pages use real RPCs and fit a 360-pixel browser", asy
           await expect(page.getByText("Token set", { exact: true })).toBeVisible()
           await token.getByRole("button", { name: "Clear token", exact: true }).click()
           await expect(page.getByText("No token set", { exact: true })).toBeVisible()
-          await assertWidth()
+          await assertPhoneWidth(page, "Settings")
           const web = page.getByRole("form", { name: "Web server settings", exact: true })
           await web.getByLabel("Heartbeat seconds", { exact: true }).fill("30")
           await web.getByRole("button", { name: "Save web settings" }).click()
