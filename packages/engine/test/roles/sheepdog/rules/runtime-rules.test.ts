@@ -3,7 +3,9 @@ import { join } from "node:path";
 import { it } from "@effect/vitest";
 import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import type { RolesActionRecord } from "@shephrd/contracts";
+import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import { TestClock } from "effect/testing";
@@ -15,6 +17,8 @@ import { engineLists, type EngineLists } from "../../../../src/pieces/lists.ts";
 import { layer as redactor } from "../../../../src/log/Redactor.ts";
 import { buildServices } from "../../../../src/service.ts";
 import type { RolesView } from "../../../../src/roles/view.ts";
+import { makeSheepdogLoop, type SheepdogRule } from "../../../../src/roles/sheepdog/loop.ts";
+import { makeRules } from "../../../../src/roles/sheepdog/rules/runtime.ts";
 import { callForAction } from "../../../../src/roles/sheepdog/actions.ts";
 import { sheepdogCaller } from "../../../../src/roles/sheepdog/notices.ts";
 import { alertLog } from "../../../support/alertsRig.ts";
@@ -241,3 +245,56 @@ it.effect("role advice reports each break kind once through authenticated agent 
     expect(yield* actions("roles.RoleAdviceBroken")).toHaveLength(1);
   }));
 }));
+
+for (const whileOff of [false, true]) {
+  for (const kind of ["advice", "crash"] as const) {
+    it.effect(`lagging production ${kind} rules ${whileOff ? "skip while-off events after enable" : "finish eligible events before off"}`, () => run(quiet, (runner) => Effect.gen(function* () {
+      yield* seedAccount(); yield* seedHarness();
+      const worker = yield* seedAgent({ id: "worker", folder: rig.work, groups: [] });
+      const client = yield* socket(quiet);
+      const agentClient = yield* fixtureClient(join(rig.stateFolder, "rules.sock"), worker.token, quiet as any);
+      const entered = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const finished = yield* Deferred.make<void>();
+      // Stop the consumer ahead of the trigger without holding the writer or
+      // Views. The production rules must refresh a snapshot past the switch.
+      const barrier: SheepdogRule = { onEvent: (_context, envelope) => Effect.gen(function* () {
+        if (envelope.event._tag !== "roles.Snoozed" || envelope.event.group !== "hold") return;
+        yield* Deferred.succeed(entered, undefined);
+        yield* Deferred.await(release);
+      }) };
+      const observer: SheepdogRule = { onEvent: (_context, envelope) => Effect.gen(function* () {
+        if (envelope.event._tag === "roles.Snoozed" && envelope.event.group === "finished") yield* Deferred.succeed(finished, undefined);
+      }) };
+      const loop = yield* makeSheepdogLoop([barrier, ...makeRules(), observer]).pipe(Effect.forkScoped);
+      yield* eventually(roles, (view) => view.baseline !== undefined);
+      yield* client["roles.snooze"]!({ requestId: "hold", group: "hold", until: 0 });
+      yield* Deferred.await(entered);
+      if (whileOff) yield* client["roles.settings.set"]!({ requestId: "off", settings: { sheepdog: false } });
+      if (kind === "advice") yield* agentClient.start!({ ...startPayload(rig, { groups: [] }), requestId: "child" });
+      else yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId: worker.agentId, exitCode: 1, signal: null, stderr: "detail" })]);
+      const trigger = (yield* alertLog).findLast((row) => kind === "advice"
+        ? row.event._tag === "AgentStarted" && row.caller._tag === "agent"
+        : row.event._tag === "AgentCrashed")!;
+      yield* client["roles.settings.set"]!({ requestId: whileOff ? "on" : "off", settings: { sheepdog: whileOff } });
+      expect((yield* roles).settings?.sheepdog).toBe(whileOff);
+      yield* Deferred.succeed(release, undefined);
+      // A later enabled marker proves all queued events have been consumed.
+      if (whileOff) {
+        yield* client["roles.snooze"]!({ requestId: "finished", group: "finished", until: 0 });
+        yield* Deferred.await(finished);
+      } else expect((yield* eventually(roles, (view) => view.baseline?.on === false)).baseline?.on).toBe(false);
+      const tag = kind === "advice" ? "roles.RoleAdviceBroken" : "roles.CrashRetried";
+      const records = whileOff ? yield* actions(tag) : yield* eventually(actions(tag), (rows) => rows.length > 0);
+      expect(records).toHaveLength(whileOff ? 0 : 1);
+      if (!whileOff) expect(records[0]).toMatchObject({ agentId: worker.agentId, triggerSequence: trigger.sequence });
+      if (kind === "crash") {
+        expect(yield* actions("roles.CrashAdmitted")).toHaveLength(whileOff ? 0 : 1);
+        expect(runner.callsOf("load")).toHaveLength(whileOff ? 0 : 1);
+        const carries = (yield* rowsOf("DeliveryQueued")).filter((row) => row.event._tag === "DeliveryQueued" && row.event.delivery.target === worker.agentId && row.caller._tag === "service");
+        expect(carries).toHaveLength(whileOff ? 0 : 1);
+      }
+      yield* Fiber.interrupt(loop);
+    })));
+  }
+}
