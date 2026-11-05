@@ -6830,3 +6830,90 @@ and proves construction has not entered. The earlier transaction commits
 before releasing the permit. The reactor then checks its transaction entry
 and fresh projected state. A temporary hoisted-construction mutation must fail.
 The existing projected-reach regression remains.
+
+## 416. Service-only command help claimed owner terminal access
+
+Found: 2026-11-04, while repairing foundation review finding FR-027.
+State: fixed.
+
+What happened: The command-line help treated the absence of agent access as
+owner-only access. The help for `roles.record`, whose only caller is a service,
+therefore claimed that the owner could call it from the terminal.
+
+What changed: The help lists the actual allowed caller kinds. The owner-terminal
+statement appears only for commands whose sole caller kind is the owner.
+Installed-command help checks cover service-only, agent-only, owner-only,
+owner-and-agent, and owner-agent-service combinations.
+
+## 417. The release tool had no purpose description
+
+Found: 2026-11-04, while repairing foundation review finding FR-032.
+State: fixed.
+
+What happened: The Model Context Protocol (MCP) inventory derived `release` from
+the command group, but its separate description table omitted that command.
+An agent discovering tools received no explanation of its capacity-hold purpose.
+
+What changed: The description names that purpose. The real `tools/list` check
+requires a meaningful description for every offered tool and checks the capacity
+hold meaning of `release`. Its explicit inventory and access exclusions remain.
+
+## 418. JSON thread export lost its local destination
+
+Found: 2026-11-04, while repairing foundation review finding FR-037.
+State: fixed.
+
+What happened: Generic JavaScript Object Notation (JSON) input returned from the
+parser before export-specific validation and dropped the output path. The
+command then connected and read a thread before failing at the local file open.
+An empty path also reached the filesystem, and a blank path could create a file.
+
+What changed: Thread export accepts its documented positional agent and `--out`
+form. It refuses JSON input and empty or blank output paths as usage errors
+before any connection or remote procedure call. Regression checks retain the
+existing destination, verify that no connection or request occurs for invalid
+arguments, and preserve paged export, local-only paths and mode 0600.
+
+## 419. Command groups used a different order from the fixed contract
+
+Found: 2026-11-04, while repairing foundation review finding FR-052.
+State: fixed.
+
+What happened: Both the command-group declarations and the merged request map
+put the board before the client. Contract edit E1 requires engine, client,
+board, then roles. Existing sorted inventory checks did not detect this drift.
+
+What changed: Both declarations follow the specified order. A literal namespace
+expectation checks the declarations and the contiguous request blocks through
+the contracts and the engine's composed lists. The independent uniqueness and
+engine inventory checks remain.
+
+## 420. The roles registration check pinned only two command kinds
+
+Found: 2026-11-04, while repairing foundation review finding FR-059.
+State: fixed.
+
+What happened: The G06 registration check omitted seven of the nine enabled
+roles commands. Other behavioral tests, including A04, already protected
+particular reads, but did not complete the required structural check.
+
+What changed: G06 checks all nine enabled commands in their specified planner
+or read table and requires their absence from the other table. A temporary
+wrong-kind move of `roles.actions.list` proves that the expanded check rejects
+that fault. The production registration and A04 remain unchanged.
+
+## 421. Spaced client commands lacked whole-group regression coverage
+
+Found: 2026-11-04, while repairing foundation review finding FR-099.
+State: fixed.
+
+What happened: The inventory and installed-command parity checks expanded dots
+only for board commands. Twelve client command names lacked checks for their
+fully spaced forms, including the nested settings setters.
+
+What changed: Every installed dotted command except `debug.compare-views` has
+fully spaced inventory matching, remaining-argument, help and dispatch coverage.
+The dotted forms keep their installed-command checks. Explicit nested settings
+checks guard longest matching, and the dedicated standard-input-only secret
+checks remain. A temporary mutation removing only the spaced spelling of
+`client.web.settings.set` proves that the strengthened checks detect that fault.

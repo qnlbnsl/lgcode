@@ -7,15 +7,19 @@ import {
 
 afterEach(cleanupUnit7b);
 
-const commandWords = (command: string) => command.startsWith("board.") ? command.split(".") : command.split(" ");
+const commandWords = (command: string) => command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ");
+const invocations = [...CommandsRpcGroup.requests.keys()].flatMap((command) => [
+  { command, words: commandWords(command), form: "spaced" },
+  ...(command.includes(".") && command !== "debug.compare-views" ? [{ command, words: [command], form: "dotted" }] : []),
+]);
 
 // Inventory comes from the RPC group, never from a second CLI-maintained list.
-for (const command of CommandsRpcGroup.requests.keys()) {
-  it(`P01 ${command} (7.5) catches omitting this RPC's shephrd subcommand/help registration`, async () => {
-    const child = startCli(prepareRoot(), [...commandWords(command), "--help"]);
+for (const { command, words, form } of invocations) {
+  it(`P01 ${command} ${form} (7.5) catches omitting this RPC's shephrd subcommand/help registration`, async () => {
+    const child = startCli(prepareRoot(), [...words, "--help"]);
     expect(await finishCli(child)).toEqual({ code: 0, signal: null });
     expect(child.stdout()).toMatch(/usage|options|arguments/i);
-    expect(child.stdout()).toContain(commandWords(command).join(" "));
+    expect(child.stdout()).toContain(words.join(" "));
     expect(child.stdout()).not.toContain("not built yet");
     assertNoSecrets(child, [token]);
   });
@@ -23,9 +27,9 @@ for (const command of CommandsRpcGroup.requests.keys()) {
 
 // Full payload parity has a compact escape hatch: every non-secret RPC accepts
 // --input JSON. Friendly wait/subscribe flags are separately exercised.
-for (const command of CommandsRpcGroup.requests.keys()) {
+for (const { command, words, form } of invocations) {
   if (command === "accounts set-secret" || command === "client.alerts.carrier.set-token") continue; // Dedicated tests check stdin-only dispatch.
-  it(`P03 ${command} catches a registered CLI command dispatching the wrong RPC or dropping payload fields`, async () => {
+  it(`P03 ${command} ${form} catches a registered CLI command dispatching the wrong RPC or dropping payload fields`, async () => {
     const root = prepareRoot();
     const payloads: Record<string, Record<string, unknown>> = {
       "client.alerts.list": { after: 0, limit: 1, status: "open" },
@@ -111,7 +115,7 @@ for (const command of CommandsRpcGroup.requests.keys()) {
       }
     } });
     const environment = (commandAccess[command as keyof typeof commandAccess] as ReadonlyArray<string>).includes("agent") ? agentEnvironment(root) : serviceEnvironment(root);
-    const child = startCli(root, [...commandWords(command), "--input", JSON.stringify(payload)], environment);
+    const child = startCli(root, [...words, "--input", JSON.stringify(payload)], environment);
     expect(await finishCli(child)).toEqual({ code: 0, signal: null });
     expect(engine.requests).toHaveLength(1);
     expect(engine.requests[0]).toMatchObject({ _tag: "Request", tag: command, payload });
@@ -128,7 +132,13 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   await peer.initialize();
   const reply = await peer.request("tools/list");
   expect(reply.error).toBeUndefined();
-  const names = (reply.result.tools as Array<{ name: string }>).map((tool) => tool.name);
+  const tools = reply.result.tools as Array<{ name: string; description?: string }>;
+  for (const tool of tools) {
+    expect(tool.description, `${tool.name} must describe its purpose in tools/list`).toBeTypeOf("string");
+    expect(tool.description!.trim().length, `${tool.name} purpose must be meaningful`).toBeGreaterThan(10);
+  }
+  expect(tools.find((tool) => tool.name === "release")?.description).toMatch(/release.*capacity hold/i);
+  const names = tools.map((tool) => tool.name);
   // Row 55's explicit allow-list is intentional: adding a new agent command
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([

@@ -24,8 +24,9 @@ const object = (text: string): Record<string, unknown> => {
   return value as Record<string, unknown>
 }
 
-// Every non-secret command takes its whole payload as --input JSON. wait and
-// subscribe also take the short forms their help shows.
+// RPC commands take their whole non-secret payload as --input JSON. wait and
+// subscribe also take short forms. The local thread export takes only an agent
+// and --out, so its destination never becomes part of an RPC payload.
 export const parseArguments = (command: CommandName, args: ReadonlyArray<string>): Parsed => {
   let help = false
   let input: Record<string, unknown> | undefined
@@ -54,14 +55,15 @@ export const parseArguments = (command: CommandName, args: ReadonlyArray<string>
     else throw new UsageError(`unexpected argument ${JSON.stringify(arg.slice(0, 40))}; see shephrd ${command} --help`)
   }
   if (help) return { help, payload: undefined, block }
+  if (command === "thread.export") {
+    if (input !== undefined) throw new UsageError("thread export does not accept --input; use thread export <agent> --out <file>")
+    if (members.length !== 1 || out === undefined || out.trim().length === 0) throw new UsageError("thread export needs one agent id and --out <file>")
+    return { help, block, out, payload: { agentId: members[0] } }
+  }
   const short = block || mode !== undefined || after !== undefined || members.length > 0
   if (input !== undefined && short) throw new UsageError("use either --input or the short options, not both")
   if (input !== undefined) {
     return { help, block: isWait && input.block === true, payload: { requestId: randomUUID(), ...input } }
-  }
-  if (command === "thread.export") {
-    if (members.length !== 1 || out === undefined) throw new UsageError("thread export needs one agent id and --out <file>")
-    return { help, block, out, payload: { agentId: members[0] } }
   }
   if (isWait) {
     if (members.length === 0) throw new UsageError("wait needs --input, or at least one agent id")

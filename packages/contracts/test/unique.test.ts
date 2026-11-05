@@ -51,6 +51,21 @@ it("1a E1 preserves the engine inventory independently of later piece commands",
   expect((Contracts as unknown as { engineCommandNames: unknown }).engineCommandNames).toEqual(engineNames);
 });
 
+it("FR-052 E1 composes declarations and merged request blocks in engine, client, board, roles order", async () => {
+  const lists = await loadLists();
+  const order = ["engine", "client", "board", "roles"];
+  expect(Contracts.commandGroups.map(({ namespace }) => namespace)).toEqual(order);
+  expect(lists.commandGroups.map(({ namespace }) => namespace)).toEqual(order);
+  const blockOrder = (names: ReadonlyArray<string>) => names.map((name) => {
+    if (name.startsWith("client.")) return "client";
+    if (name.startsWith("board.")) return "board";
+    if (name.startsWith("roles.")) return "roles";
+    return "engine";
+  }).filter((namespace, index, all) => index === 0 || namespace !== all[index - 1]);
+  expect(blockOrder([...Contracts.CommandsRpcGroup.requests.keys()])).toEqual(order);
+  expect(blockOrder([...lists.commands.requests.keys()])).toEqual(order);
+});
+
 it("1.3 checks every constituent declaration before merge, with a real prefixed fixture group", async () => {
   assertDeclarations(fixtureLists(await loadLists()));
 });

@@ -19,6 +19,18 @@ it("1a E10 maps every segment of a three-word piece command to its full RPC name
   expect(registry.matchCommand(["client", "alerts"])).toBeUndefined();
 });
 
+it("FR-099 matches nested installed client settings before their shorter read commands", async () => {
+  const registry = await registryWithPiece();
+  for (const [words, command] of [
+    [["client", "alerts", "settings", "set"], "client.alerts.settings.set"],
+    [["client", "web", "settings", "set"], "client.web.settings.set"],
+  ] as const) {
+    expect(registry.matchCommand([...words, "--input", "{}"]))
+      .toEqual({ command, rest: ["--input", "{}"] });
+    expect(registry.helpText(command)).toContain(`Usage: shephrd ${words.join(" ")}`);
+  }
+});
+
 it("1a E10 keeps debug.compare-views and the engine's existing multiword account command", async () => {
   const registry = await registryWithPiece();
   expect(registry.matchCommand(["debug.compare-views", "--help"])).toEqual({ command: "debug.compare-views", rest: ["--help"] });

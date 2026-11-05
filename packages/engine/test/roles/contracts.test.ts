@@ -21,7 +21,10 @@ it.each(rolesEvents)("G03 visibility: an agent never receives $_tag even with it
 });
 
 it.each([
+  ["roles.orient", "read"], ["roles.handoff", "read"],
   ["roles.role-file.set", "planner"], ["roles.role-file.get", "read"],
+  ["roles.settings.get", "read"], ["roles.settings.set", "planner"],
+  ["roles.snooze", "planner"], ["roles.actions.list", "read"], ["roles.record", "planner"],
 ] as const)("G06 %s is wired in exactly its specified %s table", (command, kind) => {
   const planners = engineLists.planners as Record<string, unknown>;
   const reads = engineLists.reads as Record<string, unknown>;
