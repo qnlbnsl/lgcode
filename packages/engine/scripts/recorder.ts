@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process"
-import { mkdir, mkdtemp, chmod, writeFile, realpath } from "node:fs/promises"
+import { mkdir, mkdtemp, chmod, writeFile, realpath, readFile, readdir } from "node:fs/promises"
 import { join, relative, isAbsolute } from "node:path"
 import { tmpdir } from "node:os"
 import { createInterface } from "node:readline"
@@ -93,6 +93,54 @@ class RecordingError extends Error {
   constructor(message: string, reason?: FailureReason) { super(message); this.reason = reason }
 }
 
+// A leader closing its streams says nothing about descendants in its group.
+// Keep the escalation owned by cleanup until no executable group member remains.
+async function cleanupGroup(pid: number | undefined, closed: Promise<unknown>): Promise<void> {
+  if (pid === undefined) { await closed; return }
+  const signal = (name: NodeJS.Signals) => {
+    try { process.kill(-pid, name) }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw new RecordingError("Unable to terminate recording process group")
+    }
+  }
+  const exists = () => {
+    try { process.kill(-pid, 0); return true }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ESRCH") return false
+      throw new RecordingError("Unable to inspect recording process group")
+    }
+  }
+  const running = async () => {
+    if (!exists()) return false
+    if (process.platform !== "linux") return true
+    // Linux can retain killed orphans as zombies until init reaps them.
+    // They cannot execute or hold the workspace. Inspect only state and group.
+    for (const entry of await readdir("/proc")) {
+      if (!/^\d+$/.test(entry)) continue
+      let stat: string
+      try { stat = await readFile(`/proc/${entry}/stat`, "utf8") }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT" || (error as NodeJS.ErrnoException).code === "ESRCH") continue
+        throw new RecordingError("Unable to inspect recording process group")
+      }
+      const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ")
+      if (Number(fields[2]) === pid && fields[0] !== "Z" && fields[0] !== "X") return true
+    }
+    return false
+  }
+  const pause = () => new Promise<void>((resolve) => setTimeout(resolve, 25))
+  signal("SIGTERM")
+  const graceful = Date.now() + 1000
+  while (exists() && Date.now() < graceful) await pause()
+  if (exists()) signal("SIGKILL")
+  await closed
+  const forced = Date.now() + 1000
+  while (await running()) {
+    if (Date.now() >= forced) throw new RecordingError("Recording process group cleanup was not confirmed")
+    await pause()
+  }
+}
+
 // Use the already resolved program, without adapter arguments, a shell or account credentials.
 async function cliVersion(settings: HarnessSettings, environment: Record<string, string>, workspace: string,
   scrub: (text: string) => string, signal: AbortSignal): Promise<string | undefined> {
@@ -112,14 +160,16 @@ async function cliVersion(settings: HarnessSettings, environment: Record<string,
   signal.addEventListener("abort", kill, { once: true })
   const timer = setTimeout(kill, 10_000)
   if (signal.aborted) kill()
+  const closed = new Promise<number | null>((resolve) => child.once("close", resolve))
   try {
-    const code = await new Promise<number | null>((resolve) => child.once("close", resolve))
+    const code = await closed
     if (failed || code !== 0) return undefined
     const line = output.split(/\r?\n/).find((line) => line.trim())
     return line === undefined ? undefined : scrub(line.trim()).trim().slice(0, 100) || undefined
   } finally {
     clearTimeout(timer)
     signal.removeEventListener("abort", kill)
+    await cleanupGroup(child.pid, closed)
   }
 }
 
@@ -244,12 +294,8 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
     signal.removeEventListener("abort", abort)
     idleReject = undefined
     child.stdin.end()
-    terminate("SIGTERM")
-    const killTimer = setTimeout(() => terminate("SIGKILL"), 1000)
-    await closed
-    clearTimeout(killTimer)
-    await reader
-    lines.close()
+    try { await cleanupGroup(child.pid, closed) }
+    finally { await reader; lines.close() }
   }
 }
 

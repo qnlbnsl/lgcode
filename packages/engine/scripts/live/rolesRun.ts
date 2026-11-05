@@ -10,12 +10,10 @@ import * as Exit from "effect/Exit";
 
 import { exportThread } from "../../../cli/src/commands/threadExport.ts";
 import { resolveHarnessDefaults } from "../../src/runner/harnesses.ts";
-// Initialize the existing live runner before its driver. The runner's routing
-// imports establish the engine's module order before the probe driver loads.
-import { parseArguments } from "./run.ts";
 import { liveConfig, registerAccounts } from "./driver.ts";
+import { parseArguments } from "./run.ts";
 import { createReporter, type Reporter } from "./reporter.ts";
-import { FLUSH_MARKER, ROLES_GROUP, rolesLeadPrompt, WAVE_MARKER } from "./rolesPrompts.ts";
+import { FLUSH_MARKER, ROLES_GROUP, rolesLeadPrompt, STALL_MARKER, WAVE_MARKER } from "./rolesPrompts.ts";
 import { startLiveService, type LiveService } from "./service.ts";
 import { eventsUntil, findLeaks, head, readOwnerCredentialFrom, redactSecrets, redactShapes, requestId, since } from "./support.ts";
 
@@ -27,8 +25,10 @@ an isolated engine under /tmp; it does not use or stop an existing engine.
 Saves a private report, roster and thread exports under .scratch/live-check-roles/.
 
 Checks orientation, group membership, an all-mode board collection with one
-completion wake, and a sheepdog-timed cache flush on the Claude lead. The timed
-step needs real cache usage evidence and can take several minutes (or an hour
+completion wake, a sheepdog-timed cache flush on the Claude lead, and one
+worker's first stall with an idle unanswered post. The stall uses the unchanged
+production limit (normally ten minutes), followed by exactly one nudge and reply.
+The cache step needs real cache usage evidence and can take several minutes (or an hour
 with a one-hour cache). Missing evidence or a timeout fails the step. It never
 invents usage or directly flushes in place of the sheepdog.
 
@@ -41,13 +41,14 @@ provider failures or kill real agent sessions to simulate them.
 reading the account homes. --help prints this text. Model, effort and timeout
 variables are the same SHEPHRD_LIVE_* variables as pnpm live-check.
 The default total limit is 30 minutes; set SHEPHRD_LIVE_TOTAL_TIMEOUT_SECONDS
-above 3600 when checking a one-hour cache. No permission is auto-approved.`;
+above 4200 when checking a one-hour cache plus the first stall. No permission is auto-approved.`;
 
 const STEPS = [
   { id: "service", title: "the isolated engine serves its authenticated socket" },
   { id: "setup", title: "real adapters and signed-in accounts are configured" },
   { id: "wave", title: "the real lead collects both workers through one all-mode post" },
   { id: "timed-flush", title: "the sheepdog flushes an unread post at the cache timer" },
+  { id: "first-stall", title: "an idle worker's unanswered post receives exactly one first-stall nudge after production minutes" },
   { id: "wrap-up", title: "the roster and every thread are exported" },
   { id: "shutdown", title: "roles switches are off and the run's agents are stopped" },
 ] as const;
@@ -86,9 +87,12 @@ const waitIdle = (owner: Client, ids: ReadonlyArray<string>, limit: number) => E
   }
 });
 
-const orientation = (events: ReadonlyArray<EventEnvelope>, agentId: string, marker: string, parentId?: string): boolean =>
-  events.some(({ event }) => {
-    if (event._tag !== "board.PostWritten" || event.author._tag !== "agent" || event.author.agentId !== agentId) return false;
+const orientation = (events: ReadonlyArray<EventEnvelope>, agentId: string, marker: string, parentId?: string,
+  wave?: { readonly postId: string; readonly channelId: string }) =>
+  events.find(({ event, caller }) => {
+    if (event._tag !== "board.PostWritten" || event.author._tag !== "agent" || event.author.agentId !== agentId
+      || caller._tag !== "agent" || caller.agentId !== agentId
+      || wave !== undefined && (event.channelId !== wave.channelId || event.replyToPostId !== wave.postId)) return false;
     try {
       const evidence = JSON.parse(event.text) as { marker?: string; agentId?: string; parent?: { _tag?: string; agentId?: string } };
       return evidence.marker === marker && evidence.agentId === agentId
@@ -96,6 +100,14 @@ const orientation = (events: ReadonlyArray<EventEnvelope>, agentId: string, mark
           : evidence.parent?._tag === "agent" && evidence.parent.agentId === parentId);
     } catch { return false; }
   });
+
+const waveReply = (events: ReadonlyArray<EventEnvelope>, agentId: string, parentId: string,
+  wave: { readonly postId: string; readonly channelId: string }): boolean => {
+  const answer = orientation(events, agentId, WAVE_MARKER, parentId, wave)?.event;
+  return answer?._tag === "board.PostWritten" && events.some(({ event }) => event._tag === "board.AddresseeResolved"
+    && event.postId === wave.postId && event.addressee._tag === "agent" && event.addressee.agentId === agentId
+    && event.disposition === "replied" && event.decidingPostId === answer.postId);
+};
 
 const runWave = (owner: Client, service: LiveService, environment: Readonly<Record<string, string | undefined>>) => Effect.gen(function* () {
   const config = liveConfig(environment);
@@ -129,9 +141,9 @@ const runWave = (owner: Client, service: LiveService, environment: Readonly<Reco
   yield* waitIdle(owner, [lead.agentId, ...workers.map((row) => row.agentId)], config.agentTimeout);
   yield* Effect.sleep(5_000);
   const all = yield* since(owner, mark);
-  requireCheck(orientation(all, lead.agentId, "roles-live-orient"), "the lead did not return its orientation identity and parent");
+  requireCheck(orientation(all, lead.agentId, "roles-live-orient") !== undefined, "the lead did not return its orientation identity and parent");
   for (const worker of workers) {
-    requireCheck(orientation(all, worker.agentId, WAVE_MARKER, lead.agentId), "a worker did not return its orientation identity and parent");
+    requireCheck(waveReply(all, worker.agentId, lead.agentId, batch), "a worker has no authenticated orientation reply and replied disposition for this wave and channel");
     requireCheck(all.some(({ event }) => event._tag === "board.PostAcknowledged" && event.postId === batch.postId
       && event.addressee._tag === "agent" && event.addressee.agentId === worker.agentId), "a worker did not acknowledge the wave");
   }
@@ -143,7 +155,7 @@ const runWave = (owner: Client, service: LiveService, environment: Readonly<Reco
   const channel = all.find(({ event }) => event._tag === "board.ChannelOpened" && event.channelId === batch.channelId)?.event;
   requireCheck(channel?._tag === "board.ChannelOpened" && channel.kind === "group" && channel.group === ROLES_GROUP
     && channel.anchorAgentId === lead.agentId, "the team channel is not bound to the lead's group");
-  return { leadId: lead.agentId, channelId: batch.channelId };
+  return { leadId: lead.agentId, workerId: workers[0]!.agentId, channelId: batch.channelId };
 });
 
 const timedFlush = (owner: Client, leadId: AgentId, channelId: string, totalTimeout: number) => Effect.gen(function* () {
@@ -167,6 +179,55 @@ const timedFlush = (owner: Client, leadId: AgentId, channelId: string, totalTime
   yield* eventsUntil(owner, wake!.sequence, "the lead to finish the timed flush", ({ event }) =>
     event._tag === "TurnEnded" && event.agentId === leadId, 300_000);
   yield* waitIdle(owner, [leadId], 30_000);
+});
+
+const firstStall = (owner: Client, workerId: AgentId, totalTimeout: number, reporter: Reporter) => Effect.gen(function* () {
+  const settings = yield* owner["roles.settings.get"]({ requestId: requestId() } as never);
+  // A plain worker has no named role override. Read the configured production
+  // limit and leave it unchanged; no TestClock, fake usage or manual flush.
+  const stallMillis = (settings.settings.limits?.stallMinutes ?? 10) * 60_000;
+  const mark = yield* head(owner);
+  const post = yield* owner["board.post"]({ requestId: requestId(), direct: { _tag: "agent", agentId: workerId },
+    to: [{ _tag: "agent", agentId: workerId }], text: STALL_MARKER, reply: "all" } as never);
+  yield* eventsUntil(owner, mark, "the worker to acknowledge its idle obligation", ({ event }) =>
+    event._tag === "board.PostAcknowledged" && event.postId === post.postId && event.addressee._tag === "agent"
+      && event.addressee.agentId === workerId, 300_000);
+  yield* waitIdle(owner, [workerId], 300_000);
+  const idle = yield* since(owner, mark);
+  requireCheck(!idle.some(({ event }) => event._tag === "board.AddresseeResolved" && event.postId === post.postId)
+    && !idle.some(({ event }) => event._tag === "roles.StallSeen" && event.stalledPostId === post.postId),
+    "the worker did not leave a genuine idle unanswered obligation");
+  reporter.note(`Waiting for the first stall with the unchanged ${stallMillis / 60_000}-minute production limit.`);
+  const stalled = yield* eventsUntil(owner, mark, "the first production-minute stall", ({ event }) =>
+    event._tag === "roles.StallSeen" && event.agentId === workerId && event.stalledPostId === post.postId, totalTimeout);
+  const action = stalled.find(({ event }) => event._tag === "roles.StallSeen" && event.agentId === workerId
+    && event.stalledPostId === post.postId)!;
+  if (action.event._tag !== "roles.StallSeen") return yield* Effect.die(new CheckFailed("the stall action is missing"));
+  const stall = action.event;
+  const obligation = stalled.find(({ event }) => event._tag === "board.PostWritten" && event.postId === post.postId)?.event;
+  if (obligation?._tag !== "board.PostWritten") return yield* Effect.die(new CheckFailed("the idle obligation is missing"));
+  const origin = stalled.find((row) => row.sequence === stall.triggerSequence);
+  requireCheck(origin?.event._tag === "TurnEnded" && origin.agentId === workerId
+    && action.occurredAt - origin.occurredAt >= stallMillis, "the first stall did not wait production minutes after the worker became idle");
+  requireCheck(stall.occurrence === 1 && stall.noticeRecipient === workerId && stall.notice === "sent"
+    && stall.postId !== undefined, "the first stall did not record its one worker nudge");
+  yield* eventsUntil(owner, mark, "the worker's answer after its first-stall nudge", ({ event }) =>
+    event._tag === "board.PostClosed" && event.postId === post.postId && event.outcome === "answered", 300_000);
+  yield* waitIdle(owner, [workerId], 300_000);
+  yield* Effect.sleep(5_000);
+  const all = yield* since(owner, mark);
+  requireCheck(all.filter(({ event }) => event._tag === "roles.StallSeen" && event.agentId === workerId
+    && event.stalledPostId === post.postId).length === 1, "the first-stall scenario recorded other than one stall action");
+  const wakes = all.filter(({ event }) => event._tag === "board.WakeBuilt" && event.targetAgentId === workerId
+    && event.carried.some((id) => id === stall.postId));
+  requireCheck(all.filter(({ event }) => event._tag === "board.PostWritten" && event.postId === stall.postId
+    && event.author._tag === "service" && event.author.service === "roles.sheepdog").length === 1
+    && wakes.length === 1, "the first-stall nudge did not reach its worker exactly once");
+  const reply = all.find(({ event, caller }) => event._tag === "board.PostWritten" && event.channelId === obligation.channelId
+    && event.replyToPostId === post.postId && event.author._tag === "agent" && event.author.agentId === workerId
+    && caller._tag === "agent" && caller.agentId === workerId);
+  requireCheck(reply !== undefined && reply.sequence > wakes[0]!.sequence, "the worker did not reply after its first-stall nudge");
+  reporter.note(`First-stall evidence: obligation ${post.postId}; action sequence ${action.sequence}; origin sequence ${origin!.sequence}; elapsed ${action.occurredAt - origin!.occurredAt} ms; nudge ${stall.postId}; reply sequence ${reply!.sequence}.`);
 });
 
 export const rolesMain = async (argv: ReadonlyArray<string>, environment: Readonly<Record<string, string | undefined>>): Promise<number> => {
@@ -194,7 +255,7 @@ export const rolesMain = async (argv: ReadonlyArray<string>, environment: Readon
   const safe = (line: string) => redactShapes(redactSecrets(line, secrets()));
   const reporter = createReporter((line) => { lines.push(line); process.stdout.write(`${line}\n`); }, Date.now, safe);
   reporter.note("SKIP standing-rules: owner deferred tasks 2a-2g and 7a pending recordings; no harness qualifies.");
-  reporter.note("Fault scenarios (capacity, crashes, repeated stalls and cut hand-offs) belong to the composed-service acceptance suite; this live run checks the real team delivery and cache timer.");
+  reporter.note("Fault scenarios (capacity, crashes, repeated stalls and cut hand-offs) belong to the composed-service acceptance suite; this live run checks real team delivery, the cache timer and the first production-minute stall.");
   const controller = new AbortController();
   const cancel = () => controller.abort();
   process.once("SIGINT", cancel);
@@ -222,12 +283,13 @@ export const rolesMain = async (argv: ReadonlyArray<string>, environment: Readon
           yield* owner["roles.settings.set"]({ requestId: requestId(), settings: { ...current.settings, sheepdog: true, standingRules: false } } as never);
         }));
         const wave = yield* checked(reporter, STEPS[2], runWave(owner, live, environment));
-        reporter.note("Observed one Claude lead, two Codex children, three matching orientation identities, two acknowledgments, two answers and one completion wake.");
+        reporter.note("Observed one Claude lead, two Codex children, three matching orientation identities, two acknowledgments, two authenticated replies to the selected wave and one completion wake.");
         yield* checked(reporter, STEPS[3], timedFlush(owner, wave.leadId, wave.channelId, config.totalTimeout));
+        yield* checked(reporter, STEPS[4], firstStall(owner, wave.workerId, config.totalTimeout, reporter));
       }));
       // Export evidence even if a journey assertion failed. Owner reads only,
       // with the production paged thread exporter and its 0600 file handling.
-      const wrapUp = yield* Effect.exit(checked(reporter, STEPS[4], Effect.gen(function* () {
+      const wrapUp = yield* Effect.exit(checked(reporter, STEPS[5], Effect.gen(function* () {
         const roster = yield* owner["client.roster"]({ requestId: requestId() } as never);
         requireCheck(roster.agents.length > 0, "there are no agents to attribute or export");
         const credential = readOwnerCredentialFrom(live.state);
@@ -247,7 +309,7 @@ export const rolesMain = async (argv: ReadonlyArray<string>, environment: Readon
         const views = yield* owner["debug.compare-views"]({ requestId: requestId() } as never);
         requireCheck(views.equal && views.differences.length === 0, "the live roles views differ from their rebuilt views");
       })));
-      yield* checked(reporter, STEPS[5], Effect.gen(function* () {
+      yield* checked(reporter, STEPS[6], Effect.gen(function* () {
         const current = yield* owner["roles.settings.get"]({ requestId: requestId() } as never);
         yield* owner["roles.settings.set"]({ requestId: requestId(), settings: { ...current.settings, sheepdog: false, standingRules: false } } as never);
         const roster = yield* owner["client.roster"]({ requestId: requestId() } as never);

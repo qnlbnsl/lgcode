@@ -1380,6 +1380,19 @@ use it is in the Founder OS repository and is changed after this plan.
 | 8b | Acceptance test with the composed service in the test process, the test clock as its clock, and a real Unix socket between the test's clients and the service | pattern `packages/engine/test/acceptance/flow-start-to-finish.test.ts`; `packages/engine/test/support/acceptance.ts` (its client helpers; not its child process), `serviceProcess.ts` (what the in-process start must match) |
 | 8c | Live check script | pattern `packages/engine/scripts/live-check.ts`, `packages/engine/scripts/live/flow.ts` |
 
+The owner-run script requires an authenticated reply from each exact worker
+to the selected wave on its channel. Each reply must carry the expected
+orientation evidence and have a matching `replied` disposition whose deciding
+post is that reply. Aggregate `answered` closure alone is insufficient.
+After the timed cache flush, the script gives one worker a real unanswered
+obligation. That worker acknowledges it and becomes idle until its first
+sheepdog nudge. The observer checks the unchanged production-minute interval,
+one stall action, one nudge wake, and a subsequent authenticated reply.
+The private report retains the obligation, origin, action, nudge and reply
+identities and elapsed milliseconds. The owner must execute this scenario
+against the real child-process service before post-build check 7 is closed.
+This adds no required automated suite for unit 14.
+
 **Risks:**
 
 | Risk | Severity | Mitigation |

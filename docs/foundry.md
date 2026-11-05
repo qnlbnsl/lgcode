@@ -387,7 +387,13 @@ Compare each row above with the source skill's four steps. Task 8b runs
 the composed-service acceptance flow through its Unix socket with fake
 agents and production defaults. Its standing-rule step is omitted while
 no harness qualifies. Task 8c belongs to the owner's later real-account
-checks, including a timed compaction or flush. The owner or manager then
+checks with `pnpm live-check:roles`, including a timed compaction or flush and
+a genuine idle obligation through its first production-minute stall. That
+run must retain its private report with the stall origin, nudge, action and
+reply identities. Its collection check requires each exact worker's
+authenticated reply to the selected wave and channel. An aggregate answered
+closure alone is insufficient. Allow the normal ten-minute worker stall
+interval in addition to the cache wait. The owner or manager then
 rewrites the external skill from this recipe. Keep the old workflow intact
 until that switch, and avoid running both delivery systems on the same
 agents.
