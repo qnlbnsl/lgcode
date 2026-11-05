@@ -31,6 +31,8 @@ export const rolesSamples: Record<string, (agentId: string, nonce: string) => Re
   "roles.SettingsChanged": () => ({ settings: { sheepdog: true, limits: { stallMinutes: 10 } } }),
   "roles.Snoozed": () => ({ group: "example", until: 1_900_000_000_000 }),
   "roles.SheepdogBaseline": () => ({ position: 2, on: true }),
+  "roles.StallNoticePlanned": (agentId, nonce) => ({ agentId, noticeRecipient: agentId, triggerSequence: 1,
+    sourceSequence: 2, occurrence: 1, stalledPostId: `owed-${nonce}`, kind: "roles.StallSeen" }),
   ...Object.fromEntries([
     "TeamIdleReported", "StallSeen", "ReplaceAdvised", "RunawayReported", "CapacityRetried",
     "CrashAdmitted", "CrashRetried", "GaveUp", "RoleAdviceBroken", "CacheFlushed",

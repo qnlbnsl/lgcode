@@ -35,3 +35,16 @@ it("RA04 ignores a question moved by its caller's pass-up instead of blaming the
 
   expect(evaluateRoleAdvice(views as any, moved as any)).toEqual([]);
 });
+
+it("seeded advice suppresses only the same agent/kind and includes owner-addressed posts", () => {
+  const seeded = { ...views, agents: { ...views.agents, other: { ...views.agents.worker, agentId: "other" } }, adviceKinds: { worker: ["start"] } };
+  expect(evaluateRoleAdvice(seeded as any, envelope({ _tag: "AgentStarted", agentId: "child", parent: { _tag: "agent", agentId: "worker" } }) as any)).toEqual([]);
+  expect(evaluateRoleAdvice(seeded as any, envelope({ _tag: "AgentStarted", agentId: "child", parent: { _tag: "agent", agentId: "other" } }, { _tag: "agent", agentId: "other" }) as any))
+    .toMatchObject([{ agentId: "other" }]);
+  const ownerPost = envelope({ _tag: "board.PostWritten", author: { _tag: "agent", agentId: "worker" }, to: [{ _tag: "owner" }] });
+  expect(evaluateRoleAdvice(seeded as any, ownerPost as any)).toMatchObject([{ agentId: "worker" }]);
+  const ownerSeeded = { ...seeded, adviceKinds: { worker: ["start", "owner"] } };
+  expect(evaluateRoleAdvice(ownerSeeded as any, ownerPost as any)).toEqual([]);
+  expect(evaluateRoleAdvice(ownerSeeded as any, envelope({ _tag: "QuestionAsked", agentId: "worker", holder: { _tag: "owner" } }) as any)).toEqual([]);
+  expect(evaluateRoleAdvice(ownerSeeded as any, envelope({ _tag: "QuestionMoved", agentId: "worker" }) as any)).toMatchObject([{ agentId: "worker" }]);
+});

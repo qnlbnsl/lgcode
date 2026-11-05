@@ -58,3 +58,17 @@ it("RW05 gives leads no age limit unless their role limits set one", () => {
 
   expect(actions).toEqual([]);
 });
+
+it.each([{ reports: [] }, { reports: [{ _tag: "roles.RunawayReported", agentId: "worker", triggerSequence: 2 }] },
+  { reports: [{ _tag: "roles.RunawayReported", agentId: "worker", triggerSequence: 1 }] }])("seeded runaway key isolation with reports %j", ({ reports }) => {
+  const agents = {
+    worker: worker({ startedSequence: 1, turnStartSequence: 2, turnOpen: true }),
+    other: worker({ agentId: "other", startedSequence: 1, turnStartSequence: 2, turnOpen: true }),
+  };
+  const input = context(agents, { roles: { settings: {}, actions: reports, agents: {} } });
+  const rows = evaluateRunaway(input as any).map(row => [row.agentId, row.triggerSequence]);
+  expect(rows).toEqual(reports.length === 0 ? [["worker", 2], ["worker", 1], ["other", 2], ["other", 1]]
+    : reports[0]!.triggerSequence === 2 ? [["worker", 1], ["other", 2], ["other", 1]] : [["worker", 2], ["other", 2], ["other", 1]]);
+  const later = context({ worker: worker({ turnStartSequence: 3, turnOpen: true }) }, { roles: { settings: {}, actions: reports, agents: {} } });
+  expect(evaluateRunaway(later as any)).toMatchObject([{ agentId: "worker", triggerSequence: 3 }]);
+});

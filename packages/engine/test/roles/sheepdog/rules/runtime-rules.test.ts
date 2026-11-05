@@ -298,3 +298,45 @@ for (const whileOff of [false, true]) {
     })));
   }
 }
+
+it.effect("advice deduplication reconstructs agent/kind keys while distinct workers and kinds stay eligible", () => Effect.gen(function* () {
+  const tokens: Record<string, string> = {};
+  for (const attempt of [1, 2, 3]) {
+    const marker = `advice-finished-${attempt}`;
+    let finished = false;
+    const observer: SheepdogRule = { onEvent: (_context, envelope) => Effect.sync(() => {
+      if (envelope.event._tag === "roles.Snoozed" && envelope.event.group === marker) finished = true;
+    }) };
+    const configured = { ...engineLists, reactors: { ...engineLists.reactors, roles: makeSheepdogLoop([...makeRules(), observer]) } };
+    yield* run(configured, () => Effect.gen(function* () {
+      if (attempt === 1) {
+        yield* setup;
+        tokens.worker = (yield* seedAgent({ id: "worker", folder: rig.work, groups: [] })).token;
+        tokens.asker = (yield* seedAgent({ id: "asker", parent: "worker", folder: rig.work, groups: [] })).token;
+      }
+      if (attempt === 2) tokens.other = (yield* seedAgent({ id: "other", folder: rig.work, groups: [] })).token;
+      const socketPath = join(rig.stateFolder, "advice-matrix.sock");
+      yield* serve({ socketPath, ownerCredential: Redacted.make(randomBytes(32).toString("base64url")), debug: true, lists: engineLists });
+      const worker = yield* fixtureClient(socketPath, tokens.worker!, engineLists as any);
+      const asker = yield* fixtureClient(socketPath, tokens.asker!, engineLists as any);
+      const before = attempt === 1 ? 0 : attempt === 2 ? 2 : 5;
+      yield* worker.start!({ ...startPayload(rig, { groups: [] }), requestId: `matrix-child-${attempt}` });
+      yield* worker["board.post"]!({ requestId: `matrix-owner-${attempt}`, direct: { _tag: "owner" }, to: [{ _tag: "owner" }], reply: "none", text: "A progress report." });
+      expect(yield* eventually(actions("roles.RoleAdviceBroken"), rows => rows.length >= 2)).toHaveLength(before === 0 ? 2 : before);
+      if (attempt >= 2) {
+        const question = yield* asker.ask!({ requestId: `matrix-ask-${attempt}`, text: "Which task?" });
+        yield* worker["pass-up"]!({ requestId: `matrix-pass-${attempt}`, subject: { _tag: "question", id: question.questionId } });
+        const other = yield* fixtureClient(socketPath, tokens.other!, engineLists as any);
+        yield* other.start!({ ...startPayload(rig, { groups: [] }), requestId: `other-child-${attempt}` });
+        yield* other["board.post"]!({ requestId: `other-owner-${attempt}`, direct: { _tag: "owner" }, to: [{ _tag: "owner" }], reply: "none", text: "Another report." });
+        const rows = yield* eventually(actions("roles.RoleAdviceBroken"), rows => rows.length === 5);
+        expect(rows.map(row => row.agentId)).toEqual(["worker", "worker", "worker", "other", "other"]);
+      }
+      // The production consumer must pass this marker before checking absence.
+      const owner = yield* socket();
+      yield* owner["roles.snooze"]!({ requestId: marker, group: marker, until: 0 });
+      expect(yield* eventually(Effect.sync(() => finished), Boolean)).toBe(true);
+      expect(yield* actions("roles.RoleAdviceBroken")).toHaveLength(attempt === 1 ? 2 : 5);
+    }));
+  }
+}));

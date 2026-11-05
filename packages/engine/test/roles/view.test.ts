@@ -154,3 +154,26 @@ it("V14 another reader, another post and an unaccepted wake cannot settle an unr
   ]));
   expect(state.actions[0]?.noticeRead).toBe(false);
 });
+
+for (const path of ["read", "accepted"] as const) for (const before of [true, false]) {
+  it(`consumption by ${path} ${before ? "before" : "after"} a late notice record survives replay and isolates recipient/post`, () => {
+    const base = [start(), start("lead"), start("other"), channel(),
+      post("notice", { author: { _tag: "service", service: "roles.sheepdog" }, to: [{ _tag: "agent", agentId: "lead" }], reply: "none" })];
+    const consume = path === "read" ? [read(["notice"], "lead")]
+      : [wake("late", { targetAgentId: "lead", carried: ["notice"] }), queue("late", "delivery-late", "lead"), accept("late", "lead")];
+    const records = [action("ReplaceAdvised", { noticeRecipient: "lead", postId: "notice" }),
+      action("ReplaceAdvised", { noticeRecipient: "other", postId: "notice" }),
+      action("ReplaceAdvised", { noticeRecipient: "lead", postId: "different" })];
+    expect(roles(fold([...base, ...(before ? [...consume, ...records] : [...records, ...consume])])).actions.map(row => row.noticeRead))
+      .toEqual([true, false, false]);
+  });
+}
+
+it("completing one planned stall notice retains another post with the same agent and origin", () => {
+  const planned = (postId: string) => event({ _tag: "roles.StallNoticePlanned", kind: "roles.StallSeen", agentId: "worker",
+    noticeRecipient: "worker", stalledPostId: postId, triggerSequence: 4, sourceSequence: 3, occurrence: 1 });
+  const state = fold([start(), planned("first"), planned("second"), action("StallSeen", {
+    noticeRecipient: "worker", stalledPostId: "first", triggerSequence: 4, sourceSequence: 3, occurrence: 1,
+  })]).roles as import("../../src/roles/view.ts").RolesView;
+  expect(state.pendingStallNotices.map(row => row.stalledPostId)).toEqual(["second"]);
+});

@@ -6328,3 +6328,121 @@ What happened: The reply text appears in its board subject and in the newly visi
 What changed: The browser assertion selects the exact reply inside the named Board post region. The exact single runner wake, removed reply form, and durable alert-clear assertions remain. Production code is unchanged.
 
 Validation: The corrected browser case passed. A temporary rendering mutation kept the outgoing reply visible while replacing the subject reply. Two explicit browser preconditions established that state, and the corrected locator then failed at the missing subject reply. The production file and temporary proof assertions were restored byte-for-byte before the commit.
+
+## 387. A delivered stall nudge can lose its episode before its action is recorded
+
+Found: 2026-11-04, in foundation review record FR-023.
+State: fixed.
+
+What happened: Posting and flushing a nudge could queue and send a board wake
+before the action record was written. A no-progress turn then changed the
+stall clock's origin. Recovery had no durable copy of the original episode
+identity and could repeat the first occurrence instead of escalating.
+
+What changed: The automatic stall rule records `roles.StallNoticePlanned`
+before sending a notice. The roles view retains its original post, agent,
+origin, recipient, kind and occurrence until the matching action is recorded.
+Recovery finishes that notice using the original command receipts. Different
+posts that share an origin retain separate pending identities.
+
+Validation: The automatic-rule regressions interrupt recording after a real
+board wake is queued, complete the delivered no-progress turn, and restart
+from the database. Both first and second occurrences retain their count,
+complete the second holder notice, and advance without duplicate posts or
+wakes. The original implementation failed both occurrence assertions. The new event
+also has an independent wire sample for round-trip, lifecycle-state and
+owner-only subscription checks.
+
+## 388. Consumption before a notice record is forgotten
+
+Found: 2026-11-04, in foundation review record FR-029.
+State: fixed.
+
+What happened: A board read or accepted wake marked only action records that
+already existed. A late action started unread even when its recipient had
+consumed its board post. A later recipient failure could reroute that notice.
+
+What changed: The roles fold retains consumed post identities per recipient.
+A late action derives its read state from that durable fold. Reads by another
+recipient and reads of another post do not consume the notice.
+
+Validation: Pure regressions cover both consumption paths before and after
+recording. Composed regressions interrupt after posting and flushing, consume
+the notice, restart, record it late, and crash its recipient. Consumed notices
+do not reroute. The unread control reroutes once. The original fold failed
+both consumption-before-record cases.
+
+## 389. Repeat-suppression tests omitted seeded key separation
+
+Found: 2026-11-04, in foundation review record FR-051.
+State: fixed as a regression-proof gap.
+
+What happened: Positive runaway and role-advice tests did not establish all
+old-key and new-key distinctions. No duplicate production notice was observed.
+
+What changed: Seeded runaway tests distinguish agent, turn and age origins.
+Seeded advice tests distinguish agents and kinds, including owner-addressed
+posts. A production advice sequence repeats commands across three service
+lifetimes while another worker and another kind remain eligible.
+
+Validation: Temporary mutations remove suppression, broaden runaway keys,
+broaden advice keys, and remove advice reconstruction. The corresponding
+strengthened assertions must fail before the original source is restored.
+
+## 390. Stall scenario names claimed transitions their fixtures never performed
+
+Found: 2026-11-04, in foundation review record FR-082.
+State: fixed as a regression-proof gap.
+
+What happened: The cycle-only test called the per-post evaluator with no
+post episode. The account and permission cases supplied disconnected elapsed
+snapshots. They did not prove a fresh lead clock after real state changes.
+
+What changed: The cycle test calls the team-idle evaluator. A runtime sequence
+keeps both reciprocal obligations open across restart and reaches the configured
+hour. Separate lead sequences apply account unavailability and recovery, or a
+permission request to that idle lead followed by the owner's real stop command. They check the
+lost origin, cancellation, restored origin, restart, and full new lead interval.
+The lead uses a separate available account, so its own pause cannot mask a
+broken dependency on its child's unavailable account.
+The old pure fixtures now claim only the snapshot behavior they check.
+
+Validation: Temporary mutations preserve an old origin, treat open obligations
+as busy, and omit permission cancellation. The corresponding transition or
+cycle assertions must fail before the original source is restored.
+
+## 391. Startup tests did not exercise historical crash rules or require later work
+
+Found: 2026-11-04, in foundation review record FR-102.
+State: fixed as a regression-proof gap.
+
+What happened: The recovery-barrier fixture had no production crash rule.
+The lagged-switch fixture discarded an eventual result for the after-on event.
+Both tests could pass without the behavior their names promised.
+
+What changed: Production crash rules now wait behind the recovery barrier.
+The test checks the captured historical head, no old admission, no resume or
+prompt, and admission of a later crash. The switch test explicitly requires
+one before-off and one after-on observation across another restart.
+
+Validation: Temporary historical replay and skipped switch-on work must fail
+the strengthened assertions before the original source is restored.
+
+## 392. The stall runtime test could not observe closure of an owner alert
+
+Found: 2026-11-04, in foundation review record FR-119.
+State: fixed as a regression-proof gap.
+
+What happened: The fixture disabled the client alert reactor, addressed the
+stall to a lead, and used direct prompts. It did not create the owner alert
+or either board wake required by the criterion.
+
+What changed: The runtime test uses the production reactor table. It observes
+an open owner stall alert, delivers a sheepdog-only board wake, and checks
+that the same alert remains open. It then delivers a mixed board wake and
+checks one stall end and one clear of that exact alert through the client API.
+
+Validation: Temporary mutations classify every wake as sheepdog-only or omit
+the client stall-end source. Both must fail the composed assertions before
+the original source is restored. The existing classifier cases also cover
+another author, completions, reminders and no-answer duties.

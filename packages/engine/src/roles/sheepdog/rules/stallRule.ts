@@ -1,8 +1,10 @@
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
+import { executeService } from "../../../commands/services.ts";
+import { actionRequestId, actionSubject } from "../requests.ts";
 import type { RolesView } from "../../view.ts";
 import type { RuleContext, SheepdogRule } from "../loop.ts";
-import { noticeRecipient, sendNotice } from "../notices.ts";
+import { noticeRecipient, sendNotice, sheepdogCaller } from "../notices.ts";
 import { stallInput, stallKey } from "../stallView.ts";
 import { evaluateStall } from "./stall.ts";
 
@@ -22,9 +24,17 @@ const completeHolderNotices = ({ snapshot, lists }: RuleContext) => Effect.gen(f
   }
 });
 
+const recoverNotices = (context: RuleContext) => Effect.gen(function* () {
+  for (const planned of (context.snapshot.roles as RolesView).pendingStallNotices) {
+    const { _tag: _planned, kind, ...action } = planned;
+    yield* sendNotice({ ...action, _tag: kind }, "stall", context.lists);
+  }
+  yield* completeHolderNotices(context);
+});
+
 export const stallRule: SheepdogRule = {
-  onStart: completeHolderNotices,
-  onEvent: (context) => completeHolderNotices(context),
+  onStart: recoverNotices,
+  onEvent: recoverNotices,
   timers: ({ snapshot, lists }: RuleContext) => {
     if (lists.boardEnabled === false) return [];
     const input = stallInput(snapshot);
@@ -50,6 +60,19 @@ export const stallRule: SheepdogRule = {
       post, addressee: clock.agentId, elapsed: now - timer.dueAt + timer.delayMillis,
       occurrence: clock.occurrence, originSequence: timer.originSequence,
     } });
-    for (const action of actions) yield* sendNotice({ ...action, sourceSequence: context.sourceSequence as typeof action.sourceSequence }, "stall", lists);
+    for (const action of actions) {
+      const notice = { ...action, sourceSequence: context.sourceSequence as typeof action.sourceSequence };
+      if ((notice._tag === "roles.StallSeen" || notice._tag === "roles.ReplaceAdvised") && notice.stalledPostId !== undefined) {
+        const { _tag: kind, ...fields } = notice;
+        // This is not a notice or an alert. It retains the original request
+        // body until posting, flushing and recording have all finished.
+        yield* executeService(sheepdogCaller, "roles.record", {
+          requestId: actionRequestId({ rule: "stall", subject: actionSubject(notice), triggerSequence: notice.triggerSequence,
+            kind: `${kind}.plan`, recipient: notice.noticeRecipient, occurrence: notice.occurrence }),
+          action: { ...fields, _tag: "roles.StallNoticePlanned", kind },
+        }, lists);
+      }
+      yield* sendNotice(notice, "stall", lists);
+    }
   }),
 };
