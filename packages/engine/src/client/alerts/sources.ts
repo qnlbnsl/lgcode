@@ -1,4 +1,4 @@
-import type { AlertSourceRequest, EventEnvelope, PermissionRequestId, QuestionId } from "@shephrd/contracts";
+import type { AlertSourceRequest, Event, EventEnvelope, PermissionRequestId, QuestionId } from "@shephrd/contracts";
 import type { Snapshot } from "../../commands/internal.ts";
 import { alertKeyPart } from "./keys.ts";
 import { clientView } from "./view.ts";
@@ -7,6 +7,15 @@ export const inactive = (snapshot: Snapshot, agentId: string): boolean => {
   const state = snapshot.agents[agentId]?.state._tag;
   return state === undefined || state === "stopped" || state === "crashed";
 };
+export const endsAgentRun = (event: Event, agentId: string): boolean => "agentId" in event && event.agentId === agentId
+  && (event._tag === "AgentStopped" || event._tag === "AgentCrashed"
+    || (event._tag === "StateChanged" && (event.state._tag === "stopped" || event.state._tag === "crashed")));
+
+// The live snapshot can already include another stop and resume. Only a
+// source from the latest run may renew a retained question during catch-up.
+export const currentAgentRun = (snapshot: Snapshot, agentId: string, sequence: number): boolean =>
+  !snapshot.threads[agentId]?.some((row) => row.sequence > sequence && endsAgentRun(row.event, agentId));
+
 const agentRemedyClosed = (snapshot: Snapshot, agentId: string): boolean => {
   const state = snapshot.agents[agentId]?.state._tag;
   return state === undefined || state === "stopped" || state === "idle" || state === "working";
@@ -41,6 +50,7 @@ export const engineSource = (envelope: EventEnvelope, snapshot: Snapshot): Alert
   if (event._tag === "OwnerNeeded") {
     const { agentId, subject, reason } = event;
     if (reason === "request needs the owner" && subject !== undefined) {
+      if (!currentAgentRun(snapshot, agentId, envelope.sequence)) return undefined;
       source = { kind: subject._tag === "permission" ? "approval" : "question", key: `${subject._tag}:${alertKeyPart(subject.id)}`, agentId, subject };
     } else if (reason === "agent crashed") {
       source = { kind: "failure", key: `crash:${alertKeyPart(agentId)}:${envelope.sequence}`, agentId, subject: { _tag: "agent", id: agentId } };

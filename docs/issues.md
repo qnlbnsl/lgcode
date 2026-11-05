@@ -5990,6 +5990,9 @@ Found: 2026-11-04, by the builder or test writer of unit r14, during the foundat
 State: open, for the final review.
 
 What happens: Importing the existing live driver before the existing live runner causes a circular module initialization error for `pieceViews` under plain Node.js. The new script `packages/engine/scripts/live-check-roles.ts` imports the runner first, as `live-check.ts` does, and its help and dry-run checks pass. The cycle itself is still there.
+
+The FR-013 regression also encountered this import-order sensitivity. Importing the alert reactor before the service test helpers left the client reactor registration incompletely initialized under Vitest. Loading the existing helpers first lets the test use the normal service registration. This observation does not close the underlying import-cycle issue.
+
 Why it matters: A reordered import would stop both owner-run checks from starting. It waits for the final review.
 
 ## 370. Two browser assertions reject supported thread navigation
@@ -6002,3 +6005,14 @@ What happened: The administration browser test expected `/threads/phone-worker`,
 What changed: The administration test pins the supported hash link, follows it, and reads the question before continuing through every settings check. The phone test checks the exact alert route and retained document. It checks the permission answer, the runner's agent and option, and output emitted only after approval. Reloading the thread independently reads back the committed answer and agent output. Only that fresh-document reload requires HTTP 200. Existing width and browser-storage checks remain in place.
 
 Why it matters: These tests now reach their administration and permission-flow assertions. Temporary production mutations verify that a wrong administration link and missing navigation handlers are rejected. The separate Hypertext Transfer Protocol Secure (HTTPS) fixture update belongs to the public-address repair in FR-001. The overflow mutation proof in FR-048 remains a Phase 2 item.
+
+## 371. A stop and resume during alert follower lag suppress the returning question
+
+Found: 2026-11-04, while repairing foundation review record FR-013.
+State: fixed.
+
+What happened: The alert reactor checked a stop or crash against the latest snapshot. If the agent had already resumed, the old question alert stayed open. Its key suppressed the replacement alert. A delivered alert therefore kept its delivered mark, and a baseline alert kept its push exclusion.
+
+What changed: A stop or crash closes an earlier question or approval alert according to the lifecycle event's sequence. A question source or resume from before a later stop or crash cannot raise an obsolete alert. The latest resume renews an open owner-held question with the same key and a fresh alert identifier.
+
+Why it matters: The returning question can notify the owner again after follower lag. The regression covers stopped and crashed agents with delivered and baseline alerts. Both lifecycle commits precede catch-up, either in the same service or across a restart. The real stop and resume commands, durable alert state, local carrier requests, and another restart are checked. The local carrier receives the replacement identifier exactly once. The test also rejects sources from obsolete runs. It does not verify a notification on the owner's physical phone.

@@ -12,7 +12,7 @@ import { subscribe } from "../../log/subscribe.ts";
 import { guardPiece } from "../../pieces/guardPiece.ts";
 import type { EngineLists } from "../../pieces/lists.ts";
 import { Views } from "../../views/Views.ts";
-import { engineOpenMatters, engineSource, openQuestions, subjectClosed } from "./sources.ts";
+import { currentAgentRun, endsAgentRun, engineOpenMatters, engineSource, openQuestions, subjectClosed } from "./sources.ts";
 import { clientView, type AlertRow } from "./view.ts";
 
 export type PieceAlertSourceRequest = Omit<AlertSourceRequest, "subject" | "key"> & {
@@ -88,7 +88,7 @@ const react = (envelope: EventEnvelope, snapshot: Snapshot, lists: EngineLists):
     }
   }
   const agentId = resumed(envelope, snapshot);
-  if (agentId !== undefined) sources.push(...openQuestions(snapshot, agentId));
+  if (agentId !== undefined && currentAgentRun(snapshot, agentId, envelope.sequence)) sources.push(...openQuestions(snapshot, agentId));
   const clears: Event[] = [];
   for (const row of Object.values(view.alerts)) {
     if (row.status !== "open") continue;
@@ -98,7 +98,11 @@ const react = (envelope: EventEnvelope, snapshot: Snapshot, lists: EngineLists):
     // its source order, including when raise and end were both in catch-up.
     const ended = row.sourceSequence < envelope.sequence
       && [...ends].some(([namespace, key]) => key === row.alertKey && ownedKind(namespace, source));
-    if (ended || (row.sequence < envelope.sequence && touchesSubject(row, envelope.event) && subjectClosed(source, snapshot))) clears.push({
+    // Stop/crash is a boundary even if the live snapshot has resumed. Order
+    // by the source, so an older boundary cannot clear a later renewal.
+    const runEnded = (row.kind === "question" || row.kind === "approval") && row.agentId !== undefined
+      && row.sourceSequence < envelope.sequence && endsAgentRun(envelope.event, row.agentId);
+    if (ended || runEnded || (row.sequence < envelope.sequence && touchesSubject(row, envelope.event) && subjectClosed(source, snapshot))) clears.push({
       _tag: "client.AlertCleared", alertId: row.alertId, cause: "subject closed", sourceSequence: envelope.sequence,
     });
   }
