@@ -110,7 +110,7 @@ const replayCase = (c: { readonly name: string; readonly file: string; readonly 
       expect(opened.protocolVersion).toEqual(expected.protocolVersion);
       const delivery = deliveryFor(spawn.agentId, "Reply with the word ok. Do not run tools or create or change any file.");
       const before = context.events.length;
-      yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
+      yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
       yield* context.waitFor((event) => event._tag === "turnEnded" && event.deliveryId === delivery.id, before);
       const own = ofDelivery(context.eventsAfter(before), delivery.id);
       expect(messages(own)).toEqual([expected.text]);
@@ -160,7 +160,7 @@ live("6.2 row 51, runner: every update the adapter sends while session/load runs
     expect(during.some((event) => event._tag === "deliveryUpdate" && event.text.includes("earlier answer"))).toBe(true);
     const delivery = deliveryFor(spawn.agentId, "go");
     const next = context.events.length;
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
     yield* context.waitFor((event) => event._tag === "turnEnded" && event.deliveryId === delivery.id, next);
     const live = ofDelivery(context.eventsAfter(next), delivery.id).filter((event) => event._tag === "deliveryUpdate");
     expect(live.length).toBeGreaterThanOrEqual(1);
@@ -208,7 +208,7 @@ live("6.2 issue 38: the third harness's out-of-usage sample, replayed through th
       yield* context.runner.start(spawn.input);
       const delivery = deliveryFor(spawn.agentId, "go");
       const before = context.events.length;
-      yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
+      yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
       const reply = yield* context.waitFor((event) => event._tag === "promptReply" && event.deliveryId === delivery.id, before);
       expect(reply).toMatchObject({ agentId: spawn.agentId, incarnation: spawn.incarnation, outcome: { _tag: "pause", reason: "out-of-usage" } });
       expect(seen.some((input) => input.harness === "cursor" && input.text.includes(sample.text))).toBe(true);

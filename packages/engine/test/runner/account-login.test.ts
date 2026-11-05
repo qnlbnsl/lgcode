@@ -110,7 +110,7 @@ live("A9 secret: an account `secret` reaches the child only as the harness's key
     expect(seen.env.OPENAI_API_KEY).toBeUndefined();
     const delivery = deliveryFor(spawn.input.agentId, "go");
     const before = events.length;
-    yield* runner.prompt({ agentId: spawn.input.agentId, incarnation: spawn.incarnation, delivery });
+    yield* runner.prompt({ sentSequence: 1, agentId: spawn.input.agentId, incarnation: spawn.incarnation, delivery });
     yield* waitFor((event: RunnerEvent) => event._tag === "turnEnded" && event.deliveryId === delivery.id, before);
     const text = eventsAfter(before).flatMap((event) => event._tag === "deliveryUpdate" && event.kind === "message" ? [event.text] : []).join("");
     expect(text).toContain("the key is");

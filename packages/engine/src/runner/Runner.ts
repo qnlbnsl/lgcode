@@ -46,7 +46,8 @@ export interface SessionInfo {
 // reply that ends the turn comes before that turn's `turnEnded`.
 // `turnEnded` names the delivery whose `session/prompt` reply ended, also
 // from the runner's own process table, so a repeated old turn end cannot end
-// a later turn.
+// a later turn. `sentSequence` is the sequence of the reserved DeliverySent,
+// so a delayed end cannot end a retry of the same delivery in the same spawn.
 export const RunnerEvent = Schema.Union([
   Schema.TaggedStruct("exited", {
     agentId: AgentId,
@@ -67,6 +68,7 @@ export const RunnerEvent = Schema.Union([
   }),
   Schema.TaggedStruct("turnEnded", {
     agentId: AgentId, incarnation: Schema.NonEmptyString, deliveryId: DeliveryId,
+    sentSequence: Schema.Int.check(Schema.isGreaterThan(0)),
     usage: Schema.optionalKey(TurnUsage),
   }),
   Schema.TaggedStruct("deliveryUpdate", {
@@ -124,11 +126,11 @@ interface Spawn {
 export class Runner extends Context.Service<Runner, {
   readonly start: (input: Spawn) => Effect.Effect<SessionInfo, RunnerRejected>;
   readonly load: (input: Spawn & { readonly session: SessionReference }) => Effect.Effect<SessionInfo, RunnerRejected>;
-  readonly prompt: (input: { readonly agentId: AgentId; readonly incarnation: string; readonly delivery: Delivery }) => Effect.Effect<void, RunnerRejected>;
+  readonly prompt: (input: { readonly agentId: AgentId; readonly incarnation: string; readonly delivery: Delivery; readonly sentSequence: number }) => Effect.Effect<void, RunnerRejected>;
   readonly cancel: (input: { readonly agentId: AgentId }) => Effect.Effect<void, RunnerRejected>;
   readonly answerPermission: (input: { readonly agentId: AgentId; readonly requestId: string; readonly optionId: string }) => Effect.Effect<void, RunnerRejected>;
   readonly setMode: (input: { readonly agentId: AgentId; readonly permission: PermissionLevel }) => Effect.Effect<void, RunnerRejected>;
-  readonly compact: (input: { readonly agentId: AgentId; readonly incarnation: string; readonly delivery: Delivery }) => Effect.Effect<void, RunnerRejected>;
+  readonly compact: (input: { readonly agentId: AgentId; readonly incarnation: string; readonly delivery: Delivery; readonly sentSequence: number }) => Effect.Effect<void, RunnerRejected>;
   readonly stop: (input: { readonly agentId: AgentId }) => Effect.Effect<void, RunnerRejected>;
   readonly capabilities: RunnerCapabilities;
   readonly events: Stream.Stream<RunnerEvent>;

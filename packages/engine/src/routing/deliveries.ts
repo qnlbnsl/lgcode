@@ -117,20 +117,22 @@ export const targetGone = (snapshot: Snapshot, agentId: AgentId, cause: "stopped
 
 // The delivery that started the agent's current turn: the last one sent
 // since the previous turn end. None while the agent is not working.
-const currentTurn = (snapshot: Snapshot, agentId: string): string | undefined => {
+const currentSend = (snapshot: Snapshot, agentId: string) => {
   if (snapshot.agents[agentId]?.state._tag !== "working") return undefined;
   const thread = snapshot.threads[agentId] ?? [];
   const sent = thread.slice(thread.findLastIndex((row) => row.event._tag === "TurnEnded") + 1)
     .findLast((row): row is EventEnvelope & { readonly event: Extract<Event, { _tag: "DeliverySent" }> } => row.event._tag === "DeliverySent");
-  return sent?.event.deliveryId;
+  return sent;
 };
+const currentTurn = (snapshot: Snapshot, agentId: string): string | undefined => currentSend(snapshot, agentId)?.event.deliveryId;
 
 // Fix round 1, F4: a turn end ends the current turn only, so a repeated old
 // one writes nothing. Row 67: whether the turn was a compact turn follows
 // from the delivery that started it.
 export const turnEnded = (snapshot: Snapshot, event: Extract<RunnerEvent, { _tag: "turnEnded" }>): ReadonlyArray<Event> => {
   const { agentId, deliveryId } = event;
-  if (currentTurn(snapshot, agentId) !== deliveryId) return [];
+  const sent = currentSend(snapshot, agentId);
+  if (sent?.event.deliveryId !== deliveryId || sent.sequence !== event.sentSequence) return [];
   const compact = snapshot.deliveries[deliveryId]?.content._tag === "compact";
   return [{ _tag: "TurnEnded", agentId, compact,
     ...(event.usage === undefined ? {} : { usage: event.usage }),
@@ -321,10 +323,10 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
         ORDER BY rowid DESC LIMIT 1`;
       const incarnation = tokens[0]?.token_hash;
       if (incarnation === undefined) return undefined;
-      yield* append(owner, freshRequest(), randomUUID(), [{
+      const sent = yield* append(owner, freshRequest(), randomUUID(), [{
         _tag: "DeliverySent", agentId, deliveryId: row.id, method: decodeRunMode(snapshot.agents[agentId]!.runMode),
       }], {});
-      return { incarnation, delivery: asDelivery(row) };
+      return { incarnation, delivery: asDelivery(row), sentSequence: sent[0]!.sequence };
     }));
     if (reserved === undefined) return;
     const send = { agentId, ...reserved };

@@ -52,7 +52,7 @@ const prepared = (context: RunnerContext, turns: ReadonlyArray<ReadonlyArray<Rec
   for (const _ of turns) {
     const delivery = deliveryFor(spawn.agentId, "go");
     const before = context.events.length;
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
     yield* context.waitFor((event) => event._tag === "turnEnded" && event.deliveryId === delivery.id, before);
   }
   yield* readEcho(echo, (current) => framesOf(current, "session/prompt").length === turns.length);
@@ -64,7 +64,7 @@ live("6.4 advertised: compact sends the harness's /compact command as a prompt, 
     const agent = yield* prepared(context, [[catalogue(["autocompact", "compact", "review"])]]);
     const delivery = compactFor(agent.agentId);
     const before = context.events.length;
-    yield* context.runner.compact({ agentId: agent.agentId, incarnation: agent.incarnation, delivery });
+    yield* context.runner.compact({ sentSequence: 1, agentId: agent.agentId, incarnation: agent.incarnation, delivery });
     yield* context.waitFor((event) => event._tag === "turnEnded" && event.deliveryId === delivery.id, before);
     expect(promptTexts(yield* readEcho(agent.echo)).at(-1)).toBe("/compact");
     const reply = context.eventsAfter(before).find((event) => event._tag === "promptReply");
@@ -75,7 +75,7 @@ live("6.4 not advertised: compact is refused with a reason and nothing is sent t
   withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
     const agent = yield* prepared(context, [[{ step: "text", text: "no catalogue" }]]);
     const prompts = framesOf(peekEcho(agent.echo)!, "session/prompt").length;
-    const result = yield* context.runner.compact({ agentId: agent.agentId, incarnation: agent.incarnation, delivery: compactFor(agent.agentId) }).pipe(Effect.result);
+    const result = yield* context.runner.compact({ sentSequence: 1, agentId: agent.agentId, incarnation: agent.incarnation, delivery: compactFor(agent.agentId) }).pipe(Effect.result);
     expect(result._tag).toBe("Failure");
     if (result._tag === "Failure") {
       expect(result.failure._tag).toBe("RunnerRejected");
@@ -89,7 +89,7 @@ live("6.4 exact name: an adapter that offers only autocompact has no compact com
   withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
     const agent = yield* prepared(context, [[catalogue(["autocompact", "compact-history"])]]);
     const prompts = framesOf(peekEcho(agent.echo)!, "session/prompt").length;
-    const result = yield* context.runner.compact({ agentId: agent.agentId, incarnation: agent.incarnation, delivery: compactFor(agent.agentId) }).pipe(Effect.result);
+    const result = yield* context.runner.compact({ sentSequence: 1, agentId: agent.agentId, incarnation: agent.incarnation, delivery: compactFor(agent.agentId) }).pipe(Effect.result);
     expect(result._tag).toBe("Failure");
     yield* pause(300);
     expect(framesOf(peekEcho(agent.echo)!, "session/prompt").length - prompts).toBe(0);
@@ -98,7 +98,7 @@ live("6.4 exact name: an adapter that offers only autocompact has no compact com
 live("6.4 latest catalogue: a later available_commands_update without compact withdraws it (breaks if the runner adds to the commands it saw instead of replacing them)", () =>
   withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
     const agent = yield* prepared(context, [[catalogue(["compact"])], [catalogue(["review"])]]);
-    const result = yield* context.runner.compact({ agentId: agent.agentId, incarnation: agent.incarnation, delivery: compactFor(agent.agentId) }).pipe(Effect.result);
+    const result = yield* context.runner.compact({ sentSequence: 1, agentId: agent.agentId, incarnation: agent.incarnation, delivery: compactFor(agent.agentId) }).pipe(Effect.result);
     expect(result._tag).toBe("Failure");
   })));
 
@@ -110,12 +110,12 @@ live("6.4 compact returns once the command is sent, not when its turn ends (brea
     }, echo));
     yield* context.runner.start(spawn.input);
     const first = deliveryFor(spawn.agentId, "go");
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery: first });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery: first });
     yield* context.waitFor((event) => event._tag === "turnEnded" && event.deliveryId === first.id);
     const delivery = compactFor(spawn.agentId);
     const before = context.events.length;
     const started = Date.now();
-    yield* context.runner.compact({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
+    yield* context.runner.compact({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
     expect(Date.now() - started).toBeLessThan(1000);
     expect(context.eventsAfter(before).filter((event) => event._tag === "turnEnded")).toEqual([]);
     yield* context.waitFor((event) => event._tag === "turnEnded" && event.deliveryId === delivery.id, before);

@@ -138,7 +138,7 @@ live("U03: replayed usage creates no turn end and supplies no values to the next
     yield* context.runner.load({ ...spawn.input, session: { _tag: "acp", sessionId: replay.sessionId } });
     expect(context.events.filter((event) => event._tag === "turnEnded")).toEqual([]);
     const delivery = deliveryFor(spawn.agentId, "live turn");
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
     const ended = yield* context.waitFor((event) => event._tag === "turnEnded" && event.deliveryId === delivery.id);
     // Exact equality catches a stale `used` or cache-write count, while the
     // positive input count catches a runner that simply drops every usage.

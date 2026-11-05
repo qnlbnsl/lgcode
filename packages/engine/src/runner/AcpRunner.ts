@@ -66,6 +66,7 @@ type Send = Parameters<Runner["Service"]["prompt"]>[0];
 type Hold = Effect.Success<ReturnType<typeof makePermissionHold>>;
 interface Turn {
   readonly deliveryId: Send["delivery"]["id"];
+  readonly sentSequence: number;
   replied: boolean;
   idle: boolean;
   ended: boolean;
@@ -288,6 +289,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         : turn.error !== undefined ? { _tag: "error", error: clean } : { _tag: "success" } });
     if (entry.turn === turn) delete entry.turn;
     yield* emit({ _tag: "turnEnded", ...identity(entry), deliveryId: turn.deliveryId,
+      sentSequence: turn.sentSequence,
       ...(turn.usage === undefined ? {} : { usage: turn.usage }),
     });
   });
@@ -693,7 +695,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     if (input.delivery.target !== input.agentId || (!compact && input.delivery.content._tag !== "prompt" && input.delivery.content._tag !== "carry-on")) return yield* rejected("delivery does not match send");
     if (entry.turn !== undefined && !entry.turn.ended) return yield* rejected("agent already has a turn");
     const text = compact ? yield* compactPrompt(entry.commands) : input.delivery.content._tag === "prompt" || input.delivery.content._tag === "carry-on" ? input.delivery.content.text : "";
-    const turn: Turn = { deliveryId: input.delivery.id, replied: false, idle: false, ended: false, text: "" };
+    const turn: Turn = { deliveryId: input.delivery.id, sentSequence: input.sentSequence, replied: false, idle: false, ended: false, text: "" };
     entry.turn = turn;
     const sent = yield* Deferred.make<void, RunnerRejected>();
     entry.sent = sent;
