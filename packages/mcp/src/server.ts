@@ -60,6 +60,14 @@ const makeLazyClient = (environment: Environment) => Effect.gen(function* () {
 // connection is a new wait (the client's own rule), so it takes a new id.
 const payloadFor = (name: ToolName, parameters: unknown, requestId: string) => {
   const payload: Record<string, unknown> = { ...(parameters as Record<string, unknown>), requestId }
+  // A hand-off continuation is a fresh authorized read, with no receipt.
+  // Its original id fixes the encoded selection budget across all pages.
+  // MCP callers only supply the cursor, so retain that id on their behalf.
+  const cursor = payload.omissions
+  if (name === "roles.handoff" && typeof cursor === "object" && cursor !== null
+    && "requestId" in cursor && typeof cursor.requestId === "string") {
+    return { ...payload, requestId: cursor.requestId }
+  }
   return name === "wait" && payload.block === true ? { ...payload, requestId: randomUUID() } : payload
 }
 

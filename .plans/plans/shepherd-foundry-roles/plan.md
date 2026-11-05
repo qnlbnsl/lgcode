@@ -1067,6 +1067,15 @@ for the continuation, so later activity cannot shift the omission set.
 Every page remains within both reply limits and checks the caller's current
 management rights. Recovery adds no stored state or new read rights.
 
+The Model Context Protocol (MCP) connector generates the initial request
+identifier. Its tool has no top-level `requestId` parameter. For a
+`roles.handoff` continuation, the connector uses `omissions.requestId` as
+the command's request identifier. The caller supplies only the same
+`agentId` and the returned cursor. This read has no cached receipt, so
+retaining its identifier does not skip authorization or return an earlier
+page. The real tool and engine must recover multiple omission pages with
+an unchanged summary and refuse a continuation after management rights change.
+
 The hand-off is written to its caller, the lead, who may manage the old
 worker by the engine's rights helper (CAPI E22). The markers tell the lead which sequences hold
 the rest, which the lead reads with `client.thread`. To an agent caller, a
@@ -1092,7 +1101,7 @@ replacement (row 62).
 |---|---|---|
 | 6.1 | For a 5,000-item thread with small items, the hand-off contains the first prompt and the last exchange whole and stays under both limits | `packages/engine/test/roles/handoff.test.ts` H01-H02 |
 | 6.2 | For a 100 KiB first prompt, a last exchange with a 200 KiB tool output, and multibyte text, the hand-off stays under both limits with both sections at their caps, cuts each with a marker that names its sequence, and never splits a character | `handoff.test.ts` H03-H05 |
-| 6.3 | It lists the sequence numbers it left out as exact ranges in bounded pages. A 5,000-item thread interleaved with another agent preserves whole small priority sections, stays within both encoded budgets on every page, and recovers all omitted sequences without including unrelated events. A continuation retains the original boundary despite later activity and grants no additional read rights. | `handoff.test.ts` H06; `handoff-sparse.test.ts` H16 |
+| 6.3 | It lists the sequence numbers it left out as exact ranges in bounded pages. A 5,000-item thread interleaved with another agent preserves whole small priority sections, stays within both encoded budgets on every page, and recovers all omitted sequences without including unrelated events. A continuation retains the original boundary despite later activity and grants no additional read rights. The real Model Context Protocol tool and engine recover multiple omission pages and their full source content, and refuse continuation after the caller loses management rights. | `handoff.test.ts` H06; `handoff-sparse.test.ts` H16; `handoff-mcp.test.ts` H17 |
 | 6.4 | The old agent's text is inside a data envelope, and text the log redacted stays redacted | `handoff.test.ts` H07 |
 | 6.5 | An agent may ask only for an agent it may manage, by the engine's rights helper, checked on every request, including a resent one, because `roles.handoff` is a read and never deduplicated (row 95); an orchestrator may ask for a worker while that worker's lead is paused, and is refused once the lead recovers; the replacement's own `roles.handoff` and `client.thread` for its predecessor are refused, and the lead's `client.thread` read of a marked sequence succeeds, with the reply `{ requestId, data }` and the page inside the data envelope (rows 114, 119); the exact MCP tool list in `commands.test.ts` names `roles.handoff` (row 113) | `handoff.test.ts` H08-H12; `packages/contracts/test/commands.test.ts` |
 | 6.6 | The first prompt comes from `AgentStarted.firstPromptDelivery`, and a later exchange's user side from the `DeliveryQueued` of the delivery whose `DeliverySent` began its turn. An owner caller gets that text; an agent caller gets the cut marker with the `DeliverySent`'s sequence, and E21's rule is unchanged. Every hand-off test builds its thread through public `start` and `prompt` calls and actual runner updates, with no synthetic `PromptSent` (row 133) | `handoff.test.ts` H13-H15 |

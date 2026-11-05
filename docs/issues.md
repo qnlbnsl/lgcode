@@ -5995,7 +5995,8 @@ Why it matters: A reordered import would stop both owner-run checks from startin
 ## 370. Sparse omission metadata can refuse an otherwise small hand-off
 
 Found: 2026-11-04, while fixing foundation review finding FR-003.
-State: fixed by bounded omission pages in `roles.handoff`.
+State: fixed by bounded omission pages in `roles.handoff` and continuation
+identifier preservation in the Model Context Protocol (MCP) connector.
 
 What happens: The previous selector budgeted all exact omission ranges before
 the original brief or latest exchange. A worker history interleaved with other
@@ -6009,6 +6010,15 @@ when more remain. The cursor preserves the original history boundary and
 request identifier. Every continuation checks current management rights.
 The 5,000-item interleaved-history regression checks the public socket replies,
 both encoded budgets, whole small priority sections and complete exact recovery.
+
+The first-round verifier found that the MCP connector generated a new request
+identifier for each tool call. Its schema has no top-level identifier
+parameter, so an agent could not meet the continuation's original-identifier
+requirement. The connector now uses the returned cursor's identifier for
+hand-off continuations. A second regression runs the real MCP command and
+engine, recovers all 150 interleaved historical items across three omission
+pages, reads their full content, preserves the original summary after later
+activity and refuses a continuation after the lead loses management rights.
 
 Why it matters: A long worker history must remain recoverable without widening
 sequence ranges across unrelated events or refusing the summary.
