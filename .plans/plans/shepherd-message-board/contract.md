@@ -637,7 +637,10 @@ those two cases.
   written through the piece batch path (edit E23) as the caller, with no
   receipt. Marks only move read state forward, so writing them twice is
   safe. It uses the client API's paged-read shape: `after`, `limit` (at most 200), and a reply of `items`
-  and `next` (row 39). A page also closes when its encoded size passes
+  and `next` (row 39). A post cursor keeps the original post sequence even
+  when that post closes, resolves, or leaves the current visible result.
+  The next page applies current access and selection strictly after that
+  position. A page also closes when its encoded size passes
   512 KiB, and it always holds at least one item. To an agent caller, the size is
   measured on the wrapped string below. With `open` set, it returns the caller's own open posts instead.
   With `incoming` set, it returns the open posts across the caller's
@@ -797,7 +800,7 @@ real encoded frames.
 
 | What | The board's largest | Against the budget |
 | --- | --- | --- |
-| A page: `board.read`, `board.channels`, `board.status` with `detail` | 512 KiB of encoded items, with at least one item | Under the 900 KiB page budget. One post encodes to at most about 64 KiB, so one item never passes it. |
+| A page: `board.read`, `board.channels`, `board.status` with `detail` | 512 KiB of encoded items, with at least one item | Ordinary generated posts fit under the 900 KiB page budget. A schema-valid replay item can exceed the 512 KiB budget; it is returned alone and its cursor still advances. |
 | A board event: `board.PostWritten` | One post of 16,384 characters, with at most 16 addressees: about 64 KiB | Under the page budget, and under 256 KiB, so it is never replaced by a marker, and the owner's wait always sees it in the stream. |
 | A board event: `board.WakeBuilt` | Ids only, for what one body of 256 KiB can carry. Each item costs its header and markers in the body, so the event stays well under the body's size | Under the page budget, and under 256 KiB, so it is never replaced by a marker. |
 | An engine event: the `DeliveryQueued` and `PromptSent` of a wake | A body of 256 KiB, plus the engine's envelope and the event's own fields | Under the page budget. It may pass 256 KiB, and in `client.subscribe` it then becomes a `client.Oversized` marker. `client.event` and `client.thread` return it whole to whoever the read rule lets see it; an agent gets it inside the data envelope. `subscribe` is unchanged. |

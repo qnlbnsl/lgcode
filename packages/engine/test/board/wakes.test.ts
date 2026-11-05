@@ -9,6 +9,7 @@ import type { Event } from "@shephrd/contracts";
 import { holdsIncoming, holdsUnsettled } from "@shephrd/contracts/board/conditions";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
+import * as Deferred from "effect/Deferred";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 
 import { engineLists } from "../../src/pieces/lists.ts";
@@ -527,16 +528,45 @@ it.live("3.7 redacted: generic strings under to, author, replyTo and carried rem
     toolInput: { to: ["[REDACTED]"], author: "[REDACTED]", carried: ["[REDACTED]"], channelId: "[REDACTED]", postId: "[REDACTED]" } });
 }), [collision]).pipe(Effect.orDie));
 
-it.live("3.7 redacted: post text and queued wake contain no registered value while their ids stay joined", () => provideBoard(rig, Effect.gen(function* () {
+it.live("FR-118 redacted free text preserves deterministic UUID identities, manifests and receipt joins", () => provideBoard(rig, Effect.gen(function* () {
   yield* registerRebuildCheck();
   const c = yield* seedBoard();
-  const id = yield* postAs(c.lead!, { text: "Please redact beef before writing." });
-  expect((yield* boardState).posts[id]?.text).toBe("Please redact [REDACTED] before writing.");
-  expect(deliveryText((yield* queued("worker"))[0]!)).not.toContain(collision);
+  const channelId = "00000000-beef-4000-8000-000000000001";
+  const postId = "00000000-beef-4000-8000-000000000002";
+  const requestId = freshRequest();
+  const log = yield* EventLog;
+  yield* log.append(owner, requestId, "a".repeat(64), [
+    channel({ channelId, name: "Room", members: [agent("lead"), agent("worker")] }),
+    post(postId, { channelId, text: "Please redact beef before writing." }),
+  ], {}, () => ({ requestId, channelId, postId }));
+  success(yield* call(ownerCredential, "board.flush", { agentId: "worker" }));
+  const state = yield* boardState;
+  expect(state.posts[postId]).toMatchObject({ postId, channelId, text: "Please redact [REDACTED] before writing." });
+  const [delivery] = yield* queued("worker");
+  const built = yield* wakeFor(delivery!.id);
+  expect(built.carried).toEqual([postId]);
+  expect(built.mustReply).toEqual([postId]);
+  expect(delivery!.source).toEqual({ _tag: "piece", namespace: "board", id: built.wakeId });
   const sql = yield* SqlClient.SqlClient;
-  const rows = yield* sql<{ payload_json: string }>`SELECT payload_json FROM events WHERE event_type IN ('board.PostWritten', 'DeliveryQueued')`;
-  expect(rows.length).toBeGreaterThan(0);
-  expect(rows.map((row) => row.payload_json).join("\n")).not.toContain(collision);
+  const rows = yield* sql<{ payload_json: string }>`SELECT payload_json FROM events WHERE event_type IN ('board.PostWritten', 'DeliveryQueued', 'board.WakeBuilt')`;
+  const stored: Event[] = rows.map((row) => JSON.parse(row.payload_json));
+  const written = stored.find((row) => row._tag === "board.PostWritten");
+  expect(written).toMatchObject({ postId, channelId, author: agent("lead"), to: [agent("worker")], text: "Please redact [REDACTED] before writing." });
+  const manifest = stored.find((row) => row._tag === "board.WakeBuilt");
+  expect(manifest).toEqual({ _tag: "board.WakeBuilt", wakeId: built.wakeId, targetAgentId: "worker", carried: [postId], mustReply: [postId], completions: [], completionReplyText: [], reminders: [], noAnswers: [] });
+  const queuedEvent = stored.find((row) => row._tag === "DeliveryQueued");
+  expect(queuedEvent).toMatchObject({ delivery: { id: delivery!.id, target: "worker", source: delivery!.source } });
+  // Rendered headers are free text too. Typed identities above stay exact.
+  const body = wakeBody(delivery!);
+  expect(body).toContain("Post 00000000-[REDACTED]-4000-8000-000000000002 from agent lead in channel 00000000-[REDACTED]-4000-8000-000000000001");
+  expect(body).toContain("Please redact [REDACTED] before writing.");
+  expect(body).not.toContain("Please redact beef before writing.");
+  const receipts = yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE request_id = ${requestId}`;
+  expect(JSON.parse(receipts[0]!.result_json).reply).toEqual({ requestId, channelId, postId });
+  // Retain the ordinary post command's free-text regression too.
+  const commanded = yield* postAs(c.lead!, { text: "Please redact beef before writing.", to: [agent("other")] });
+  expect((yield* boardState).posts[commanded]?.text).toBe("Please redact [REDACTED] before writing.");
+  expect(deliveryText((yield* queued("other"))[0]!)).not.toContain("Please redact beef before writing.");
 }), [collision]).pipe(Effect.orDie));
 
 it.live("3.7 redacted: anchor membership, wake-target join and completion discharge survive an agent-id collision", () => provideBoard(rig, Effect.gen(function* () {
@@ -829,3 +859,56 @@ it.live("3.16 acknowledge continuation: status and read expose the same acknowle
   expect(page.items[0]?.acknowledged).toEqual([agent("worker")]);
   expect(holdsIncoming("worker", yield* boardState)).toBe(true);
 })));
+
+for (const order of ["cleanup-first", "dispatch-first"] as const) {
+  it.live(`FR-123 ${order} reservation barrier excludes withdrawn wakes under repeated concurrent merge/close`, () => run((c, runner) => Effect.gen(function* () {
+    const log = yield* EventLog;
+    const sent: string[] = [];
+    const withdrawn: string[] = [];
+    for (let iteration = 0; iteration < 4; iteration++) {
+      if (iteration > 0) yield* change({ _tag: "StateChanged", agentId: "worker", state: { _tag: "idle" } });
+      const first = yield* postAs(c.lead!, { text: `Old ${iteration}.` });
+      const [original] = yield* queued("worker");
+      const entered = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const hold = order === "dispatch-first" ? runner.holdNext("prompt") : undefined;
+      // Interpose only at this dispatch's real transaction entry. Commands,
+      // SQLite, reach checks, reservation and runner call remain real.
+      const dispatch = dispatchQueued(agentIdOf("worker")).pipe(Effect.provideService(EventLog, order === "cleanup-first" ? {
+        ...log, transact: (use) => Effect.gen(function* () {
+          yield* Deferred.succeed(entered, undefined);
+          yield* Deferred.await(release);
+          return yield* log.transact(use);
+        }),
+      } : log));
+      const sending = yield* dispatch.pipe(Effect.forkChild);
+      if (hold !== undefined) yield* hold.entered;
+      else yield* Deferred.await(entered);
+      expect((yield* snapshot).deliveries[original!.id]?.status).toBe(order === "cleanup-first" ? "queued" : "sent");
+      const [second] = yield* Effect.all([
+        postAs(c.lead!, { text: `Survivor ${iteration}.` }),
+        call(c.lead!, "board.close", { postId: first }).pipe(Effect.map(success)),
+      ], { concurrency: 2 });
+      const [surviving] = yield* queued("worker");
+      expect((yield* wakeFor(surviving!.id)).mustReply).toEqual([second]);
+      if (hold !== undefined) yield* hold.release;
+      else yield* Deferred.succeed(release, undefined);
+      yield* Fiber.join(sending);
+      sent.push(order === "cleanup-first" ? surviving!.id : original!.id);
+      if (order === "dispatch-first") {
+        expect((yield* snapshot).deliveries[original!.id]?.status).toBe("sent");
+        // The next reservation sends the independently expected surviving wake.
+        yield* change({ _tag: "StateChanged", agentId: "worker", state: { _tag: "idle" } });
+        yield* dispatchQueued(agentIdOf("worker"));
+        sent.push(surviving!.id);
+      } else withdrawn.push(original!.id);
+      success(yield* call(c.lead!, "board.close", { postId: second }));
+    }
+    const committed = eventsOf(yield* readLog, "DeliveryWithdrawn").map((row) => row.deliveryId);
+    expect(withdrawn.every((id) => committed.includes(id as never))).toBe(true);
+    const calls = runner.callsOf("prompt").map((row) => row.input.delivery.id);
+    expect(calls).toEqual(sent);
+    expect(calls.filter((id) => committed.includes(id))).toEqual([]);
+    expect(yield* queued("worker")).toEqual([]);
+  })));
+}

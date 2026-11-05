@@ -6328,3 +6328,77 @@ What happened: The reply text appears in its board subject and in the newly visi
 What changed: The browser assertion selects the exact reply inside the named Board post region. The exact single runner wake, removed reply form, and durable alert-clear assertions remain. Production code is unchanged.
 
 Validation: The corrected browser case passed. A temporary rendering mutation kept the outgoing reply visible while replacing the subject reply. Two explicit browser preconditions established that state, and the corrected locator then failed at the missing subject reply. The production file and temporary proof assertions were restored byte-for-byte before the commit.
+
+
+## 387. Opening a channel did not enforce its manager's unique names
+
+Found: 2026-11-05, while fixing foundation review record FR-034.
+State: fixed.
+
+What happened: A fresh request identifier could open another plain or group
+channel with a name already held by the same manager.
+
+What changed: The opener checks the stored channel names and managers inside
+the command's serialized writer transaction. Plain and group channels share
+this namespace. Another manager can use the same name. An exact request retry
+still replays its original receipt.
+
+Validation: The new plain and group handler regressions rejected the unfixed
+code. They cover distinct requests, exact replay, different managers, cross-kind
+collisions, and two concurrent opens.
+
+## 388. A disappearing board cursor restarted its filtered page
+
+Found: 2026-11-05, while fixing foundation review record FR-035.
+State: fixed.
+
+What happened: Paging resolved its anchor inside the current selected result.
+Closing, resolving, or hiding that anchor restarted the page at its beginning.
+
+What changed: Paging resolves the anchor in the full stable order before
+applying the current result selection. Post reads and status details use post
+sequences. Channel reads use their stored order. Current authorization, encoded
+byte limits, and reads without receipts remain in force.
+
+Validation: Real handler regressions reproduced repeated earlier posts before
+the fix. They cover closed, resolved, and newly hidden incoming anchors, status
+incoming details, and own-open status details.
+
+## 389. Four board regression proofs lacked discriminating fixtures
+
+Found: 2026-11-05, while fixing foundation review records FR-096, FR-113,
+FR-118, and FR-123.
+State: fixed.
+
+What happened: The page fixture never exceeded the singleton budget. Rebuild
+coverage omitted a complete stop and addressed-post batch. A whole-event
+substring assertion rejected valid identity values. The dispatcher regression
+observed only the already reserved send order.
+
+What changed: A schema-valid replay fixture now produces an encoded singleton
+above 512 kibibytes and follows its cursor. Both stop/post/read orders compare
+independent expected state with projection, durable live state, and a reopened
+rebuild. Deterministic universally unique identifiers containing the registered
+text value exercise free-text redaction alongside exact typed identities,
+wake manifests, delivery sources, and receipt joins. Both reservation orders
+run four controlled concurrent merge/close iterations and compare runner calls
+with surviving wakes and committed withdrawals. The existing exact-output
+terminal and Model Context Protocol tests remain unchanged.
+
+Validation: Temporary production mutations exercise each new proof. No
+production change is needed for these four test findings.
+
+## 390. A manager transfer has no channel-name collision policy
+
+Found: 2026-11-05, while checking the manager-transfer scope of FR-034.
+State: open, awaiting an owner policy decision.
+
+What happens: The board contract requires unique names per manager. It also
+requires a stopped manager's channels to move to its available ancestor or the
+owner. Independently opened same-name channels can therefore meet at one
+successor. The transfer event cannot rename a channel. The contract states no
+collision outcome.
+
+What remains: Choose the collision policy before changing transfers. The
+opening fix prevents new collisions within an existing manager's namespace.
+It does not refuse required transfers or invent a new channel name.
