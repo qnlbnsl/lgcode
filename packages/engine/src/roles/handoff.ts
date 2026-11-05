@@ -8,9 +8,11 @@ import { holderAbove, mayActForHolder } from "../routing/holders.ts";
 
 const sectionLimit = 20 * 1024;
 const replyLimit = Math.min(16_000 * 3, 64 * 1024);
+const omissionPageItems = 64;
 const cutMarker = (sequence: number) => `[Cut at sequence ${sequence}]`;
 interface Piece { readonly sequence: number; readonly text: string; readonly bulk: boolean }
 interface Range { from: number; to: number }
+interface OmissionCursor { readonly after: number; readonly through: number; readonly requestId: string }
 
 // All prefixes end at Unicode code points. The predicate measures JSON, so
 // quotes, backslashes and control characters cost their encoded size.
@@ -72,7 +74,7 @@ const omittedRanges = (sources: ReadonlyArray<Piece>, retained: ReadonlySet<numb
   return ranges;
 };
 
-export const buildHandoff = (agentId: string, requestId: unknown, rows: ReadonlyArray<EventEnvelope>) => {
+export const buildHandoff = (agentId: string, requestId: string, rows: ReadonlyArray<EventEnvelope>, cursor?: OmissionCursor) => {
   const sources: Piece[] = [];
   const items: Piece[] = [];
   const deliveries = new Map<string, Piece>();
@@ -101,16 +103,24 @@ export const buildHandoff = (agentId: string, requestId: unknown, rows: Readonly
   }
 
   const retained = new Set<number>();
+  const through = cursor?.through ?? rows.at(-1)?.sequence ?? 0;
   const body = { agentId, firstPrompt: first === undefined ? "No first prompt was recorded." : "",
-    lastExchange: "No exchange was recorded.", recent: [] as Array<{ sequence: number; text: string }>, omitted: [] as Range[] };
+    lastExchange: "No exchange was recorded.", recent: [] as Array<{ sequence: number; text: string }>,
+    omitted: [] as Range[], omittedNext: undefined as OmissionCursor | undefined };
   // Inserting the JSON body into the envelope adds one further JSON string
   // encoding. The marker has a fixed length, including when redrawn to avoid
   // a collision. Generate the actual envelope only after selection is final.
   const overhead = encodedBytes({ requestId, data: envelope("read", "") });
-  const fitsReply = () => {
-    body.omitted = omittedRanges(sources, retained);
-    return overhead + encodedBytes(JSON.stringify(body)) - 2 <= replyLimit;
-  };
+  // Reserve one bounded omission page, including its largest possible cursor,
+  // before filling priority sections. Global gaps never increase this reserve.
+  // The same reserve on every page keeps selection stable across pagination.
+  const maximumSequence = Number.MAX_SAFE_INTEGER;
+  const omissionReserve = encodedBytes(JSON.stringify({
+    omitted: Array.from({ length: Math.min(omissionPageItems, sources.length) }, () => ({ from: maximumSequence, to: maximumSequence })),
+    omittedNext: { after: maximumSequence, through: maximumSequence, requestId },
+  })) - encodedBytes(JSON.stringify({ omitted: [] }));
+  const replyBytes = () => overhead + encodedBytes(JSON.stringify(body)) - 2;
+  const fitsReply = () => replyBytes() + omissionReserve <= replyLimit;
   if (!fitsReply()) return undefined;
 
   if (first !== undefined) {
@@ -172,6 +182,14 @@ export const buildHandoff = (agentId: string, requestId: unknown, rows: Readonly
     }
   }
   if (!fitsReply()) return undefined;
+  const remaining = omittedRanges(sources, retained).filter((range) => range.to > (cursor?.after ?? 0));
+  body.omitted = remaining.slice(0, omissionPageItems).map((range) => ({
+    from: Math.max(range.from, (cursor?.after ?? 0) + 1), to: range.to,
+  }));
+  if (remaining.length > body.omitted.length) {
+    body.omittedNext = { after: body.omitted.at(-1)!.to, through, requestId };
+  }
+  if (replyBytes() > replyLimit) return undefined;
   return { requestId, data: envelope("read", JSON.stringify(body)) };
 };
 
@@ -180,18 +198,23 @@ export const handoff = (input: Input, payload: Record<string, unknown>) => Effec
   const snapshot = yield* input.runtime.views.snapshot;
   if (snapshot.agents[agentId] === undefined || (input.actor._tag !== "owner" && input.actor._tag !== "agent")
     || !mayActForHolder(snapshot, input.actor, holderAbove(snapshot, agentId))) return yield* refused();
+  const cursor = payload.omissions as OmissionCursor | undefined;
+  // A changed request id can change the encoded budget and therefore the
+  // retained set. A continuation must use the original id and log boundary.
+  if (cursor !== undefined && (cursor.requestId !== payload.requestId || cursor.after > cursor.through
+    || cursor.through > snapshot.sequence)) return yield* refused("invalid hand-off omission cursor");
   const rows: EventEnvelope[] = [];
   let after = 0;
   for (;;) {
     const page = yield* agentRead({ caller: input.actor, agentId, after, limit: 500 }, input.runtime.lists);
-    rows.push(...page.items);
-    if (page.next === undefined) break;
+    rows.push(...page.items.filter((row) => cursor === undefined || row.sequence <= cursor.through));
+    if (page.next === undefined || (cursor !== undefined && page.next >= cursor.through)) break;
     after = page.next;
   }
   // Reading can span pages. Check management again against the current view
   // before releasing any data if the effective holder changed meanwhile.
   const current = yield* input.runtime.views.snapshot;
   if (!mayActForHolder(current, input.actor, holderAbove(current, agentId))) return yield* refused();
-  const reply = buildHandoff(agentId, payload.requestId, rows);
+  const reply = buildHandoff(agentId, payload.requestId as string, rows, cursor);
   return reply === undefined ? yield* refused("hand-off metadata exceeds the reply budget") : { reply };
 });

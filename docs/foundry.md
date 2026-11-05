@@ -295,6 +295,22 @@ it. Redacted or owner-only material stays unavailable. An agent-visible
 hand-off can mark a later prompt as cut because the underlying queued
 delivery is owner-only; ask the owner when that missing material is needed.
 
+The `omitted` field lists exact sequence ranges, with at most 64 ranges per
+reply. If the hand-off includes `omittedNext`, call `roles.handoff` again
+with the same `agentId` and `requestId`, and pass that cursor as `omissions`.
+Repeat until `omittedNext` is absent. Every page repeats the original summary
+and covers the same history boundary, even if the old worker receives more
+messages. The cursor includes the original request identifier, because
+changing its encoded size could change the summary's budget. A continuation
+with a different identifier is refused. Read the listed sequences through
+`client.thread` or `client.event` when their full content is needed.
+
+The Model Context Protocol (MCP) tool generates the first request identifier.
+For each continuation, pass the same `agentId` and the returned cursor as
+`omissions`. The connector uses the cursor's original identifier for that
+read, because the tool has no top-level `requestId` parameter. Every tool
+call still checks the caller's current credentials and management rights.
+
 The replacement cannot read its predecessor's thread or obtain its hand-off
 directly. Siblings have no such read right. The lead can read its child;
 an effective holder can act while an unavailable parent is bypassed. Those
