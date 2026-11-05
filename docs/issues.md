@@ -5991,3 +5991,27 @@ State: open, for the final review.
 
 What happens: Importing the existing live driver before the existing live runner causes a circular module initialization error for `pieceViews` under plain Node.js. The new script `packages/engine/scripts/live-check-roles.ts` imports the runner first, as `live-check.ts` does, and its help and dry-run checks pass. The cycle itself is still there.
 Why it matters: A reordered import would stop both owner-run checks from starting. It waits for the final review.
+
+## 370. A concurrent alert scan could retry before the latest failure's deadline
+
+Found: 2026-11-04, while investigating foundation review finding FR-015.
+State: fixed in the foundation fix for FR-015.
+
+What happens: Retired-token cleanup can suspend a delivery scan after it reads
+the client view. Another scan can send and record a failure in that same
+generation before the suspended scan claims the released delivery key. The
+claimant used the earlier view's retry deadline, even though it selected the
+next attempt from the current view.
+
+Why it matters: The next send could arrive before the required delay from the
+latest failure. The controlled regression in
+`packages/engine/test/client/alert-delivery-race.test.ts` holds real token
+cleanup and carrier responses. It also pauses the worker's self-scan at its
+snapshot read after key release, to give the stale scan the claim. The unfixed
+worker sends early after both the first and the second failure.
+
+What changed: The claimant reads the current failure while holding its delivery
+key. It recomputes the deadline after each wait. It validates the failure
+sequence again after the database read, together with the current generation
+and pending conditions. The regression checks the five-second and thirty-second
+deadlines and increasing attempt numbers.
