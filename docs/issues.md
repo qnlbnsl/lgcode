@@ -6498,3 +6498,72 @@ What happened: The missing leaf had a basename that did not match the session id
 What changed: The test uses an absent leaf with the valid session basename in an existing directory. The existing bounded-tail file is its positive control.
 
 Verification: A temporary throw from the valid-path open failure makes the corrected test fail. The mutation is restored before committing.
+
+## 398. The backoff independence test dismissed the first alert
+
+Found: 2026-11-05, while repairing foundation review record FR-053.
+State: fixed.
+
+What happened: The regression cleared the failed alert before raising another.
+It did not prove that a sleeping retry leaves another open alert free to send.
+
+What changed: A separate controlled-clock regression keeps the first alert open
+with one failed attempt. It requires the second alert to deliver before the
+first retry deadline. It then advances to that deadline and checks attempt two.
+The existing clear-during-backoff regression remains.
+
+Verification: A temporary serialization guard prevents the second delivery and
+fails the new regression. The production worker is restored before committing.
+
+## 399. Socket closure was treated as a persisted delivery outcome
+
+Found: 2026-11-05, while repairing foundation review record FR-081.
+State: fixed.
+
+What happened: The large-response test checked the event log once immediately
+after observing socket closure. The delivery continuation could still be
+waiting to write its outcome.
+
+What changed: The test waits for the alert-specific persisted failed attempt.
+A controlled delay after the real transport closes keeps this boundary visible.
+
+Verification: The earlier assertion fails with that delay. The corrected wait
+passes with the real writer. A temporary omission of the failed-attempt write
+fails the corrected regression. This establishes a scheduling proof gap rather
+than an observed intermittent test failure rate.
+
+## 400. The accepted-send crash fixture signalled before the failed write latched
+
+Found: 2026-11-05, while repairing foundation review record FR-104.
+State: fixed.
+
+What happened: The child reported the raised alert before its delivery write
+failed. Killing it after the carrier accepted the request did not prove that
+the live delivery reactor stopped or that the writer latched.
+
+What changed: The child observes the composed reactor's write-failure exit and
+the service supervisor's stop decision. It removes the database trigger and
+probes the same writer to prove that the failure remains latched. The parent
+advances the live child's clock past retry deadlines and checks a stable
+request count before killing it. The restart still proves at-least-once delivery.
+
+Verification: Temporary faults exercise swallowed worker errors, a missing
+writer latch, and supervisor restart after write failure. Production source is
+restored before committing.
+
+## 401. Large and slowly streaming carrier responses lacked later-progress checks
+
+Found: 2026-11-05, while repairing foundation review record FR-106.
+State: fixed.
+
+What happened: The large-body test ended after its first outcome. No direct
+fixture exercised a slowly streaming response body and a later alert source.
+
+What changed: The large-body case waits for socket closure and a persisted
+failed attempt before raising a new source and requiring delivery. A separate
+streaming-body fixture writes repeated chunks without ending. It checks the
+ten-second timeout, socket closure, persisted failure, and a later source's
+first-attempt delivery before the failed alert can retry.
+
+Verification: A temporary worker fault that blocks later alerts after a failure
+makes both progress checks fail. No physical phone or external carrier was used.

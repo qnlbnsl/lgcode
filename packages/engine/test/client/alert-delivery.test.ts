@@ -91,6 +91,40 @@ it("6.11 clearing one alert during backoff skips its retry, while another alert 
   } finally { await server.close(); }
 });
 
+it("6.11 an open alert in backoff does not delay a second alert's delivery", async () => {
+  const server = await ntfyServer();
+  server.respond(({ response }) => { response.writeHead(503); response.end(); });
+  try {
+    await withCarrier(() => Effect.gen(function* () {
+      yield* registerRebuildCheck(); yield* configure(server.origin);
+      const first = yield* raiseQuestion("backed-off");
+      expect(yield* failed(first)).toHaveLength(1);
+      expect(success(yield* call(ownerCredential, "client.alerts.list", { after: 0, limit: 100 })).items
+        .find((row: { alertId: string }) => row.alertId === first)).toMatchObject({ status: "open" });
+      server.respond(({ response }) => { response.writeHead(200); response.end(); });
+      const second = yield* raiseQuestion("independent-backoff");
+      const delivery = yield* delivered(second);
+      expect(delivery).toHaveLength(1);
+      expect(delivery[0]!.occurredAt).toBe(startTime);
+      expect(delivery[0]!.event.attempt).toBe(1);
+      expect(posts(server)).toHaveLength(2);
+      expect((yield* eventsOf("client.AlertDelivered")).some((row) => row.event.alertId === first)).toBe(false);
+      expect(yield* failed(first)).toHaveLength(1);
+      expect(success(yield* call(ownerCredential, "client.alerts.list", { after: 0, limit: 100 })).items
+        .find((row: { alertId: string }) => row.alertId === first))
+        .toMatchObject({ status: "open", delivery: { status: "failed", attempt: 1 } });
+      yield* TestClock.adjust(4_999); yield* pause(20);
+      expect(posts(server)).toHaveLength(2);
+      yield* TestClock.adjust(1);
+      const retry = yield* delivered(first);
+      expect(retry).toHaveLength(1);
+      expect(retry[0]!.event.attempt).toBe(2);
+      expect(retry[0]!.occurredAt).toBe(startTime + 5_000);
+      expect(posts(server)).toHaveLength(3);
+    }), { clockAt: startTime });
+  } finally { await server.close(); }
+});
+
 it.each(["timeout", "lost response"])("6.11 %s records a failed attempt and retries instead of losing the alert", async (fault) => {
   const server = await ntfyServer();
   server.respond(({ response }) => { if (fault === "lost response") response.destroy(); });
