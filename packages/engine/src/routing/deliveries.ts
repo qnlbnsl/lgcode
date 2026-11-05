@@ -327,9 +327,14 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
         ORDER BY rowid DESC LIMIT 1`;
       const incarnation = tokens[0]?.token_hash;
       if (incarnation === undefined) return undefined;
-      const sent = yield* append(owner, freshRequest(), randomUUID(), [{
-        _tag: "DeliverySent", agentId, deliveryId: row.id, method: decodeRunMode(snapshot.agents[agentId]!.runMode),
-      }], {});
+      // The target can read sent text through its own thread. A queued
+      // delivery has no top-level agent identity and stays owner-only.
+      const sent = yield* append(owner, freshRequest(), randomUUID(), [
+        { _tag: "DeliverySent", agentId, deliveryId: row.id, method: decodeRunMode(snapshot.agents[agentId]!.runMode) },
+        ...(row.content._tag === "compact" ? [] : [{
+          _tag: "PromptSent" as const, agentId, deliveryId: row.id, sender: row.sender, text: row.content.text,
+        }]),
+      ], {});
       return { incarnation, delivery: asDelivery(row), sentSequence: sent[0]!.sequence };
     }));
     if (reserved === undefined) return;

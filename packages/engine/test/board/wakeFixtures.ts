@@ -34,9 +34,16 @@ export const wakeFor = (deliveryId: string) => boardState.pipe(Effect.map((state
 // external harness and secret store are fake. A separate notification channel
 // parks the handler's automatic followers; the program still gets the real log
 // and can run its dispatcher or reactor explicitly at a chosen boundary.
-export const provideBoard = <A, E, R>(rig: Rig, program: Effect.Effect<A, E, R> | ((runner: FakeRunner) => Effect.Effect<A, E, R>), secrets: ReadonlyArray<string> = [], options: {
-  readonly capacityHoldCondition?: (id: import("@shephrd/contracts").AgentId, snapshot: import("../../src/commands/internal.ts").Snapshot) => unknown;
-} = {}) => Effect.gen(function* () {
+// The optional observer signals a handler's writer attempt before acquisition.
+export const provideBoard = <A, E, R>(
+  rig: Rig,
+  program: Effect.Effect<A, E, R> | ((runner: FakeRunner) => Effect.Effect<A, E, R>),
+  secrets: ReadonlyArray<string> = [],
+  options: {
+    readonly capacityHoldCondition?: (id: import("@shephrd/contracts").AgentId, snapshot: import("../../src/commands/internal.ts").Snapshot) => unknown;
+  } = {},
+  beforeHandlerTransaction: Effect.Effect<void> = Effect.void,
+) => Effect.gen(function* () {
   const runner = yield* makeFakeRunner();
   const lists = { ...engineLists, services: { ...engineLists.services,
     "test.board": ["board.post", "board.close", "board.status", "board.flush"],
@@ -46,7 +53,9 @@ export const provideBoard = <A, E, R>(rig: Rig, program: Effect.Effect<A, E, R> 
   const quietNotifications = Layer.effect(EventLog.EventLog, Effect.gen(function* () {
     const real = yield* EventLog.EventLog;
     const parked = yield* PubSub.unbounded<EventEnvelope>();
-    return { ...real, subscribeCommitted: PubSub.subscribe(parked) };
+    return { ...real, subscribeCommitted: PubSub.subscribe(parked),
+      transact: (use) => beforeHandlerTransaction.pipe(Effect.andThen(real.transact(use))),
+    } satisfies typeof real;
   })).pipe(Layer.provide(log));
   const services = CommandHandler.layer({ ...rig, ...options }, lists).pipe(
     Layer.provide(quietNotifications), Layer.provideMerge(log),
