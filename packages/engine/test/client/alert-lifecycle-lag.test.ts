@@ -31,7 +31,9 @@ it.each(cases)("FR-013 renews a $initial question after $state and resume both c
     }), { rig, lists: quietLists() });
 
     const verifyRenewal = Effect.gen(function* () {
-      expect(yield* barrier()).toHaveLength(1);
+      const barrierRows = yield* barrier();
+      expect(barrierRows).toHaveLength(1);
+      expect(yield* delivered(barrierRows[0]!.event.alertId)).toHaveLength(1);
       const ends = yield* cleared(oldId);
       expect(ends).toHaveLength(1);
       expect(ends[0]!.event.sourceSequence).toBe(boundary);

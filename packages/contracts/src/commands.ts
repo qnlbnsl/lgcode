@@ -143,7 +143,7 @@ export const WebRpcGroup = ClientRpcGroup.omit(
 )
 export const ClientReadsRpcGroup = ClientRpcGroup.omit("client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", "client.web.settings", "client.web.settings.set")
 const InstalledClientRpcGroup = ClientReadsRpcGroup.merge(AlertRpcGroup).merge(WebRpcGroup)
-export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(BoardRpcGroup).merge(InstalledClientRpcGroup).merge(RolesRpcGroup)
+export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(InstalledClientRpcGroup).merge(BoardRpcGroup).merge(RolesRpcGroup)
 export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 
 // A new command requires an access decision at the composition point.
@@ -166,4 +166,4 @@ export const commandAccess = {
   "client.event": clientCommandAccess["client.event"], "client.sequence": clientCommandAccess["client.sequence"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>, ReadonlyArray<CallerKind>>
 export const ownerOnlyCommands = [...CommandsRpcGroup.requests.keys()].filter((name) => !(commandAccess[name as keyof typeof commandAccess] as ReadonlyArray<CallerKind>).includes("agent"))
-export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }, { namespace: "board", group: BoardRpcGroup }, { namespace: "client", group: InstalledClientRpcGroup }, { namespace: "roles", group: RolesRpcGroup }] as const
+export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }, { namespace: "client", group: InstalledClientRpcGroup }, { namespace: "board", group: BoardRpcGroup }, { namespace: "roles", group: RolesRpcGroup }] as const

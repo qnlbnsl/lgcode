@@ -49,6 +49,7 @@ export const descriptions: Record<ToolName, string> = {
   wait: "Wait for agents to settle. With block true the call stays open until the wait is satisfied or cancelled.",
   stop: "Stop an agent.",
   resume: "Resume a stopped or crashed agent; fresh true starts a new session.",
+  release: "Release an agent's capacity hold.",
   compact: "Ask an agent to compact its context.",
   group: "Add or remove an agent's group memberships.",
   "client.snapshot": "Read the visible team snapshot.",
