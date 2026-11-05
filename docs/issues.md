@@ -6123,3 +6123,25 @@ What changed: The terminal helper includes file changes whose `content.callId` m
 Validation: `packages/viewer/test/request-file-change.test.ts` covers a locations-only request, matching diffs across pages, a diff as the only input, and unrelated and uncorrelated diffs. It also checks that partial-input warnings remain visible. The matching-diff regression failed against the unfixed helper before the filter changed.
 
 Why it matters: The owner can review a correlated edit before answering its permission request in the terminal viewer.
+
+## 376. A cached piece hold prevented the owner wait from refreshing it
+
+Found: 2026-11-04, in foundation review record FR-009.
+State: fixed.
+
+What happened: The client wait filtered its refresh candidate through cached
+piece holds. A permission answer or an accepted board completion followed by a
+turn end could clear the actual hold without a later piece event. The stale
+hold then prevented the read that would observe the release.
+
+What changed: The refresh trigger uses engine eligibility before piece holds.
+The final result still applies every current piece hold after the published
+sequence gate. A failed refresh retries from the applied cursor without needing
+a new event. A quiet held member does not cause polling.
+
+Verification: `packages/client/test/wait-piece-refresh.test.ts` covers both
+release paths in both wait modes. It also checks persistent holds, queued
+deliveries, split batches, and a failed read followed by a quiet reconnect.
+
+Why it matters: The owner's wait can finish after the promised work completes,
+without cancellation or unrelated board activity.

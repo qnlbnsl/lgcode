@@ -787,6 +787,13 @@ open, when the engine's part says settled, and when the stream shows an event
 that the piece names as able to change its `ownerHeld`. This amends lead ruling
 L31's point 3 (row 135).
 
+Cached piece holds do not filter the engine's settlement candidate that triggers
+a read. A permission answer or an accepted completion followed by a turn end can
+clear a piece hold without any later piece event. The helper reads the current
+lists on that engine-only candidate, passes the sequence gate below, and applies
+every current piece hold before returning. After a failed read, it uses the same
+trigger on reconnect, even when no further event arrives.
+
 **One gate before any end** (row 159). The stream shows no batch. A chunk or a
 catch-up page can end in the middle of one, so the helper can hold a state that the
 engine never judged. The engine judges a wait on a batch's whole result
