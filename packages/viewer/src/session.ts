@@ -34,20 +34,29 @@ export class ViewerSession {
   async start(): Promise<void> {
     this.stream?.abort();
     await this.streaming;
+    this.error = undefined;
+    const selected = this.selectedAgentId;
     await this.refresh();
     if (this.stopped || this.snapshot === undefined) return;
-    this.error = undefined;
+    const after = this.snapshot.sequence;
+    // A snapshot contains current state, not the conversation missed while
+    // disconnected. Re-read the selected thread before replaying from this
+    // anchor; events produced during paging will then arrive on the stream.
+    if (selected !== undefined && selected === this.selectedAgentId) await this.select(selected);
     const controller = new AbortController();
     this.stream = controller;
-    this.streaming = this.client.subscribe(this.snapshot.sequence, (item) => {
+    this.streaming = this.client.subscribe(after, (item) => {
       if (controller.signal.aborted || this.stopped) return;
       if ("event" in item) {
         this.append(item as ClientEnvelope);
         if (item.event?._tag !== "ThreadItem") void this.refresh().catch(() => this.fail("The roster could not be refreshed. Press r to retry."));
       } else if ("tag" in item) {
-        // Content-only oversized markers are intentionally left to clients.
+        // Recover the full event so settled sources survive snapshot refresh.
         void this.client.event({ sequence: item.sequence }).then((reply) => {
-          if (!controller.signal.aborted) this.append(reply.envelope);
+          if (!controller.signal.aborted) {
+            this.append(reply.envelope);
+            if (reply.envelope.event._tag !== "ThreadItem") void this.refresh().catch(() => this.fail("The roster could not be refreshed. Press r to retry."));
+          }
         }).catch(() => this.fail("A live event could not be read. Press r to reload."));
       }
     }, controller.signal).then(() => {
@@ -83,7 +92,9 @@ export class ViewerSession {
   }
 
   private append(item: ClientEnvelope): void {
-    if (item.agentId !== this.selectedAgentId || this.stopped) return;
+    const target = item.event._tag === "DeliveryQueued" ? item.event.delivery.target
+      : "agentId" in item.event ? item.event.agentId : item.agentId;
+    if (this.selectedAgentId === undefined || target !== this.selectedAgentId || this.stopped) return;
     const bySequence = new Map(this.items.map((entry) => [entry.sequence, entry]));
     bySequence.set(item.sequence, item);
     this.items = [...bySequence.values()].sort((a, b) => a.sequence - b.sequence);

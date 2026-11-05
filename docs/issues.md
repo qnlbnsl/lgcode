@@ -5991,3 +5991,33 @@ State: open, for the final review.
 
 What happens: Importing the existing live driver before the existing live runner causes a circular module initialization error for `pieceViews` under plain Node.js. The new script `packages/engine/scripts/live-check-roles.ts` imports the runner first, as `live-check.ts` does, and its help and dry-run checks pass. The cycle itself is still there.
 Why it matters: A reordered import would stop both owner-run checks from starting. It waits for the final review.
+
+## 370. The owner conversation clients omit outgoing sources and delivery history
+
+Found: 2026-11-04, in foundation review finding FR-002.
+State: fixed, pending independent verification.
+
+What happened: The browser filtered out queued deliveries whose target is nested
+inside the delivery. The terminal viewer required an envelope agent identity,
+which those deliveries do not have. The browser displayed `PromptSent`, although
+the engine records a first prompt inside `AgentStarted` and later prompts inside
+`DeliveryQueued`. It also omitted question answers and delivery states.
+Oversized sources could not be recovered from a current snapshot after the
+delivery had settled. A terminal reconnect could skip events missed during the
+disconnection.
+
+What changed: Both clients select queued sources by their delivery target.
+The browser renders first and later prompt sources, question answers, and the
+delivery history joined by delivery identity. It reads oversized display events
+by sequence before advancing its stream cursor. The terminal viewer reloads
+the selected thread when reconnecting. The engine's visibility rules remain
+the authority for every read.
+
+Verification: The conversation history regressions cover split pages, sources
+without a top-level agent identity, later delivery states, and oversized live
+sources across reconnect. A browser regression exercises both clients against
+the public engine interface for first and later prompts, a question answer,
+a board delivery, an oversized prompt, and history after reopening.
+
+Why it matters: The owner can read the conversation and its delivery outcome
+from either client without exporting the durable event log.

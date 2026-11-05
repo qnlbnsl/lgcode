@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react"
 import type { ClientEnvelope } from "@shephrd/client/browser"
 import type { AgentId, Oversized } from "@shephrd/contracts"
 import { Content } from "./content.tsx"
+import { DeliveryHistory } from "./delivery.tsx"
 import { requestId, withClient } from "./client.ts"
 import { PermissionAnswer, Request, requestOpen } from "./request.tsx"
 import { AlertSubjects } from "./subjects/alerts.tsx"
@@ -96,6 +97,12 @@ export function Thread({ agentId, subject, onSessionExpired }: {
       switch (event._tag) {
         case "ThreadItem": return <article aria-label="Agent message" key={`${item.sequence}:${event._tag}`}><p>Agent data</p><Content event={event} /></article>
         case "PromptSent": return <article aria-label="Sent prompt" key={`${item.sequence}:${event._tag}`}><p>Prompt</p><DataText text={event.text} /></article>
+        case "AgentStarted": case "DeliveryQueued": case "DeliverySent": case "DeliveryAccepted": case "DeliveryRequeued":
+        case "DeliveryHeld": case "DeliveryReleased": case "DeliveryReturned": case "DeliveryWithdrawn":
+          return <DeliveryHistory key={`${item.sequence}:${event._tag}`} event={event} items={envelopes} />
+        case "QuestionAnswered": return <article aria-label="Question answer" key={`${item.sequence}:${event._tag}`}>
+          <h3>Question answer</h3><p>Question: {visibleText(event.questionId)}</p><DataText text={event.text} />
+        </article>
         case "PermissionRequested": case "QuestionAsked": return <Request key={`${item.sequence}:${event._tag}`} event={event}
           open={requestOpen(event, item.sequence, envelopes, state.snapshot)} items={envelopes} signal={controller.signal} />
         case "PermissionAnswered": return <PermissionAnswer key={`${item.sequence}:${event._tag}`} event={event} items={envelopes} />
