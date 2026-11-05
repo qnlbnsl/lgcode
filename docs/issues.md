@@ -5918,6 +5918,13 @@ State: open, for the final review.
 What happens: The source boundary check masks guarded closures and recognizes direct indexed calls into the named tables. It is a supplemental guard, not a complete alias/data-flow analysis. Runtime throwing-reducer and snapshot cases supply independent behavior checks for the 1a tables.
 Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
 
+The repair for foundation review record FR-026 adds entry resolution, observer
+property access, simple assignment aliases, and renamed destructuring aliases
+to this supplemental check. Runtime regressions independently exercise absent
+entries, null entries, throwing accessors, and observer failures through
+projection, live publication, and rebuilding. The source check remains a
+bounded check, rather than a general data-flow analysis.
+
 ## 358. Criterion 2.3 says every reply carries a request identifier, but stream markers carry none
 
 Found: 2026-11-04, by the builder or test writer of unit a2, during the foundation build.
@@ -6328,3 +6335,121 @@ What happened: The reply text appears in its board subject and in the newly visi
 What changed: The browser assertion selects the exact reply inside the named Board post region. The exact single runner wake, removed reply form, and durable alert-clear assertions remain. Production code is unchanged.
 
 Validation: The corrected browser case passed. A temporary rendering mutation kept the outgoing reply visible while replacing the subject reply. Two explicit browser preconditions established that state, and the corrected locator then failed at the missing subject reply. The production file and temporary proof assertions were restored byte-for-byte before the commit.
+
+
+## 387. A piece observer could escape the fold's failure guard
+
+Found: 2026-11-04, while repairing foundation review record FR-026.
+State: fixed.
+
+What happened: The fold resolved the piece observer before entering its guard.
+An absent entry, a null entry, or a throwing accessor could stop projection,
+publication, or rebuilding instead of retaining the piece fallback.
+
+What changed: The fold resolves and invokes the observer inside one guard.
+The regression covers each resolution fault, a throwing observer, and a
+healthy observer through the service writer and the durable rebuild.
+
+## 388. An undefined optional side-row value could latch the writer
+
+Found: 2026-11-04, while repairing foundation review record FR-033.
+State: fixed.
+
+What happened: The side-row type allowed an undefined namespaced entry.
+The writer treated that entry as malformed.
+The transaction rolled back.
+The writer retained the failure for all later writes.
+
+What changed: An undefined entry now has the same meaning as an omitted entry.
+Planner, marked-read, and reactor regressions cover omitted, undefined, empty,
+and populated rows. Each case checks receipts, a healthy follow-up write,
+and rebuilding. A genuinely malformed row still rolls back and latches.
+
+## 389. The normal service log discarded the identity of a failing piece
+
+Found: 2026-11-04, while repairing foundation review record FR-042.
+State: fixed.
+
+What happened: The piece guard and service drain produced safe diagnostic
+categories.
+The final normal sink replaced the message.
+It also removed the namespace, table, and error class.
+
+What changed: The sink preserves the fixed piece-failure message and permits
+only the three fields with their bounded category values. The regression
+runs a throwing reducer through the service drain, the redacting logger,
+and both sink modes. It checks throttling and continued engine writes.
+Arbitrary exception text, causes, and annotations remain excluded from the
+normal sink.
+
+## 390. Composed service flows lacked a throwing-piece regression
+
+Found: 2026-11-04, while repairing foundation review record FR-078.
+State: fixed as a regression-proof gap.
+
+What happened: Existing tests covered individual consumers and raw appends.
+They did not compose commands, adapter permission requests, stopping, and
+recovery with the failing piece installed.
+
+What changed: A service regression starts agents, prompts them, answers a
+permission, stops an agent with a pending request, and closes the service.
+It reopens the same database with the failing piece, runs actual recovery,
+checks durable permission states and receipt replay, and compares the live
+views with a rebuild. A second regression uses the real Agent Client Protocol
+(ACP) runner, a scripted adapter subprocess, authenticated socket commands,
+and a real session reload after reopening the database.
+
+## 391. Piece planner registration accepted the broader engine plan
+
+Found: 2026-11-04, while repairing foundation review record FR-087.
+State: fixed.
+
+What happened: The composition table accepted an engine plan for every key.
+A piece planner could omit its reply, and a wider variable could carry an
+engine after-commit hook past the piece type's excess-property check.
+
+What changed: Namespaced registrations require a piece plan with a reply and
+an explicitly forbidden hook. Engine registrations retain engine hooks.
+Compile fixtures cover wider variables at composition and fixture boundaries.
+The existing receipt replay regressions remain.
+
+## 392. The piece-writer matrix did not prove every independent guard
+
+Found: 2026-11-04, while repairing foundation review record FR-090.
+State: fixed as a regression-proof gap.
+
+What happened: The matrix lacked known delivery ownership and status cases,
+a foreign existing-table side row, and an open wait changed by the batch.
+Its partial assertions could miss an extra refusal write.
+
+What changed: The matrix covers planner writes, direct marked reads, reactor
+writes, and marked reads over the authenticated socket. It compares the exact
+event delta, caller, receipt delta, unchanged prior rows, side rows, and wait
+state. Valid owned withdrawals and wait-changing batches provide controls.
+Temporary mutations verify each independent guard and refusal-write check.
+
+## 393. The piece return-policy test accepted an extra engine event
+
+Found: 2026-11-04, while repairing foundation review record FR-098.
+State: fixed as a regression-proof gap.
+
+What happened: The return-policy branch checked for the expected event's
+presence and the absence of a queued notice. An extra withdrawal still passed.
+
+What changed: All stopped or crashed, queued or sent return cases require the
+exact returned singleton. The withdrawal, throwing-rule, and no-notice checks
+remain. A temporary extra-withdrawal mutation must fail the corrected test.
+
+## 394. The reactor test did not distinguish construction before the permit
+
+Found: 2026-11-04, while repairing foundation review record FR-110.
+State: fixed as a regression-proof gap.
+
+What happened: The old sequence-only test passed when reactor construction
+moved immediately before the writer transaction.
+
+What changed: The regression holds the real writer permit, starts a reactor,
+and proves construction has not entered. The earlier transaction commits
+before releasing the permit. The reactor then checks its transaction entry
+and fresh projected state. A temporary hoisted-construction mutation must fail.
+The existing projected-reach regression remains.

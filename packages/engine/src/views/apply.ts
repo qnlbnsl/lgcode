@@ -362,8 +362,10 @@ export const applyWith = (state: State, envelope: EventEnvelope, views: Readonly
     accounts: accountsAfter(state, event),
   };
   for (const namespace of pieceNamespaces) {
-    const observe = views[namespace].observe;
-    if (observe !== undefined) pieces[namespace] = guardPiece("views", namespace, () => observe(next, event, envelope.sequence), next[namespace]);
+    pieces[namespace] = guardPiece("views", namespace, () => {
+      const observe = views[namespace].observe;
+      return observe === undefined ? next[namespace] : observe(next, event, envelope.sequence);
+    }, next[namespace]);
   }
   return { ...next, ...pieces };
 };

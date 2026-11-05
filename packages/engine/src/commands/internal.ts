@@ -54,7 +54,12 @@ export interface Plan {
 // Piece planners cannot run engine hooks or omit their committed-batch reply.
 export type PiecePlan = Omit<Plan, "afterCommit" | "reply"> & {
   readonly reply: (batch: ReadonlyArray<EventEnvelope>) => Record<string, unknown>;
+  readonly afterCommit?: never;
 };
+
+export type Planner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<Plan, CommandRefused | LogWriteFailed>;
+export type PiecePlanner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<PiecePlan, CommandRefused | LogWriteFailed>;
+export type PlannerTable = Readonly<Record<string, Planner> & Record<`${import("@shephrd/contracts").PieceNamespace}.${string}`, PiecePlanner>>;
 
 export const freshRequest = () => Schema.decodeUnknownSync(RequestId)(randomUUID());
 export const readHarnesses = (runtime: Runtime): Effect.Effect<ReadonlyArray<HarnessSettings>, LogWriteFailed> =>

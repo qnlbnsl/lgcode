@@ -206,6 +206,7 @@ export const makeLayer = (lists: EngineLists = engineLists) => Layer.effect(Even
       // side row shares this transaction with its events and receipt.
       for (const [table, rows] of Object.entries(sideRows)) {
         if (!/^(client|board|roles)_[A-Za-z0-9_]+$/.test(table)) continue;
+        if (rows === undefined) continue;
         if (!Array.isArray(rows)) return yield* new LogWriteFailed({ reason: "invalid piece side rows" });
         for (const row of rows) {
           if (row === null || typeof row !== "object") return yield* new LogWriteFailed({ reason: "invalid piece side row" });

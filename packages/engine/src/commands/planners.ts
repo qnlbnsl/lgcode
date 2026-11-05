@@ -13,14 +13,12 @@ import { prompt } from "./prompt.ts";
 import { resume } from "./resume.ts";
 import { start } from "./start.ts";
 import { stop } from "./stop.ts";
-import { refused, type Input, type Payload, type Plan } from "./internal.ts";
-import type { LogWriteFailed } from "../log/EventLog.ts";
+import { refused, type Payload, type Planner, type PlannerTable } from "./internal.ts";
 import { setWebSettings } from "../client/settings.ts";
 import { setRoleFile } from "../roles/roleFile.ts";
 import { setSettings, snooze } from "../roles/sheepdog/settings.ts";
 import { record } from "../roles/sheepdog/record.ts";
 
-type Planner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<Plan, ReturnType<typeof refused> | LogWriteFailed>;
 const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan: Planner): Planner => (input, payload) => Effect.gen(function* () {
   const { actor, snapshot } = input;
   const agentId = payload.agentId as string;
@@ -53,4 +51,4 @@ export const planners = {
   "accounts set-secret": (input, payload) => setSecret(input, payload as Payload<"accounts set-secret">),
   "accounts mark-available": (input, payload) => markAvailable(input, payload as Payload<"accounts mark-available">),
   harnesses: (input, payload) => harnesses(input, payload as Payload<"harnesses">),
-} satisfies Record<string, Planner>;
+} satisfies PlannerTable;

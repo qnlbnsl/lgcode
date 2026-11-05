@@ -29,7 +29,7 @@ it("1.5/1.22 tables reject missing visibility and namespace entries, and a piece
       import type { PieceNamespace } from ${JSON.stringify(namespaces)};
       import { eventVisibility } from ${JSON.stringify(visibility)};
       import { engineLists } from ${JSON.stringify(lists)};
-      import type { PiecePlan } from ${JSON.stringify(join(root, "packages/engine/src/commands/internal.ts"))};
+      import type { PiecePlan, Plan } from ${JSON.stringify(join(root, "packages/engine/src/commands/internal.ts"))};
       type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
       const exactNamespaces: Equal<PieceNamespace, "client" | "board" | "roles"> = true;
       const complete = engineLists.snapshotSections;
@@ -44,6 +44,36 @@ it("1.5/1.22 tables reject missing visibility and namespace entries, and a piece
       const noReply: PiecePlan = { events: [] };
       // @ts-expect-error A piece must not acquire an engine after-commit hook.
       const hook: PiecePlan = { events: [], reply: () => ({}), afterCommit: undefined };
+      import * as importEffect from ${JSON.stringify(join(root, "node_modules/effect/dist/Effect.js"))};
+      import type { TestPlan, EngineLists as FixtureLists } from ${JSON.stringify(join(root, "packages/engine/test/support/fixturePiece.ts"))};
+      type Registered = typeof engineLists.planners;
+      // Compile real registration functions, including structural wider values.
+      const make = <A,>(value: A) => importEffect.succeed(value);
+      const validRegistration: Registered = { "client.fixture": () => make(valid) };
+      const engineRegistration: Registered = { stop: () => make({ events: [], afterCommit: importEffect.void }) };
+      const missingReply = { events: [] };
+      const widerHook = { events: [], reply: () => ({}), afterCommit: importEffect.void };
+      const broad: Plan = { events: [], reply: () => ({}) };
+      // @ts-expect-error Piece registration must require a reply, even for wider variables.
+      const badMissing: Registered = { "client.fixture": () => make(missingReply) };
+      // @ts-expect-error Piece registration must reject a hook on a wider variable.
+      const badHook: Registered = { "board.fixture": () => make(widerHook) };
+      // @ts-expect-error The engine Plan type is too broad for a roles registration.
+      const badBroad: Registered = { "roles.fixture": () => make(broad) };
+      // @ts-expect-error Fixtures must also reject a wider hook as a PiecePlan.
+      const badFixture: PiecePlan = widerHook;
+      const validFixture: TestPlan = { events: [], reply: () => ({}) };
+      // @ts-expect-error The fixture seam must reject a hook on a wider variable.
+      const badTestFixture: TestPlan = widerHook;
+      type FixtureRegistered = FixtureLists["planners"];
+      const validFixtureRegistration: FixtureRegistered = { "client.fixture": () => make(validFixture) };
+      const validEngineFixture: FixtureRegistered = { stop: () => make({ events: [], afterCommit: importEffect.void }) };
+      // @ts-expect-error A piece fixture registration must require its reply.
+      const badFixtureMissing: FixtureRegistered = { "client.fixture": () => make(missingReply) };
+      // @ts-expect-error A piece fixture registration must reject a wider hook.
+      const badFixtureHook: FixtureRegistered = { "roles.fixture": () => make(widerHook) };
+      void [validFixture, badTestFixture, validFixtureRegistration, validEngineFixture, badFixtureMissing, badFixtureHook];
+      void [validRegistration, engineRegistration, badMissing, badHook, badBroad, badFixture];
       void [exactNamespaces, complete, missing, incomplete, valid, noReply, hook, roles, ThreadItem];
     `);
     // A successful compilation proves the positive fixture and every expected

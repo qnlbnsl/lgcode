@@ -1,3 +1,6 @@
+import * as Deferred from "effect/Deferred";
+import * as Fiber from "effect/Fiber";
+import { EventLog } from "../../src/log/EventLog.ts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -6,7 +9,7 @@ import { planWith, record, reply, requiredModule, rulesFixture, useRules, type B
 import { appendSetup, call, eventOf, freshRequest, seedAgent } from "../support/handlerRig.ts";
 import { CommandHandler } from "../../src/commands/CommandHandler.ts";
 import { snapshot } from "../support/routingRig.ts";
-import { withFixture } from "../support/fixturePiece.ts";
+import { asEvent, withFixture } from "../support/fixturePiece.ts";
 import { Restart } from "../../src/recovery/service.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
@@ -65,18 +68,46 @@ for (const [broken, bad] of Object.entries(invalid)) for (const kind of ["planne
   });
 }
 
-it("1.32 reactor: catches building outside the transaction, owner attribution or writing a receipt", async () => {
+it("FR-110 reactor waits for the real writer permit, then builds inside the transaction from the preceding commit", async () => {
   const { writePieceBatch } = await requiredModule<PieceBatches>("commands/pieceBatch.ts");
-  const lists = await isolatedRules();
+  const lists = { ...await isolatedRules(), reactors: {} };
   await useRules(lists, () => Effect.gen(function* () {
+    const log = yield* EventLog;
     const sql = yield* SqlClient.SqlClient;
-    const before = (yield* snapshot).sequence;
-    yield* writePieceBatch({ namespace: "client", kind: "reactor", sourceSequence: before, build: (view) => {
-      expect(view.sequence).toBe(before);
-      return { events: [record()], reply };
-    } }, lists);
-    expect(yield* sql`SELECT caller FROM events WHERE event_type = 'client.FixtureRecorded'`).toEqual([{ caller: "piece:client" }]);
-    expect(yield* sql`SELECT * FROM receipts WHERE caller = 'piece:client'`).toEqual([]);
+    const held = yield* Deferred.make<void>();
+    const release = yield* Deferred.make<void>();
+    const holder = yield* log.transact((append) => Effect.gen(function* () {
+      yield* Deferred.succeed(held, undefined);
+      yield* Deferred.await(release);
+      yield* append({ _tag: "owner" }, freshRequest(), "prior", [asEvent(record("prior"))], {});
+    })).pipe(Effect.forkChild({ startImmediately: true }));
+    yield* Deferred.await(held);
+    let attempted = false;
+    let entered = false;
+    let built = false;
+    const observedLog = { ...log, transact: ((use: Parameters<typeof log.transact>[0]) =>
+      Effect.sync(() => { attempted = true; }).pipe(Effect.andThen(log.transact((append) => {
+        entered = true;
+        return use(append);
+      })))) as typeof log.transact };
+    const reactor = yield* writePieceBatch({ namespace: "client", kind: "reactor", sourceSequence: 0, build: (view) => {
+      built = true;
+      expect(entered, "construction must run inside the acquired transaction").toBe(true);
+      expect(view.client).toEqual({ records: [{ id: "prior", text: "Fixture data.", sequence: view.sequence }] });
+      return { events: [record("reactor")], reply };
+    } }, lists).pipe(Effect.provideService(EventLog, observedLog), Effect.forkChild({ startImmediately: true }));
+    yield* Effect.sync(() => {
+      expect(attempted, "the reactor must have reached the contended transaction").toBe(true);
+      expect(entered).toBe(false);
+      expect(built).toBe(false);
+    }).pipe(Effect.ensuring(Deferred.succeed(release, undefined)));
+    yield* Fiber.join(holder);
+    yield* Fiber.join(reactor);
+    expect(built).toBe(true);
+    expect(yield* sql`SELECT caller, json_extract(payload_json, '$.id') AS id FROM events ORDER BY sequence`).toEqual([
+      { caller: "owner", id: "prior" }, { caller: "piece:client", id: "reactor" },
+    ]);
+    expect(yield* sql`SELECT caller FROM receipts`).toEqual([{ caller: "owner" }]);
   }));
 });
 
