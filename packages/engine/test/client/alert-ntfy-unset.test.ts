@@ -6,9 +6,11 @@ import { append, eventsOf } from "../support/alertsRig.ts";
 import { call, ownerCredential, success } from "../support/handlerRig.ts";
 import { configure, delivered, ntfyServer, posts, raiseQuestion, withCarrier } from "../support/carrierRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
+import { settledDelivery } from "../support/settledDelivery.ts";
 
 it("6.8 unset delivery leaves alerts readable, then a carrier makes only non-baseline open alerts pending", async () => {
   const server = await ntfyServer();
+  const delivery = settledDelivery();
   try {
     await withCarrier(() => Effect.gen(function* () {
       yield* registerRebuildCheck();
@@ -20,9 +22,11 @@ it("6.8 unset delivery leaves alerts readable, then a carrier makes only non-bas
       yield* append({ _tag: "client.AlertRaised", alertId: "baseline-6b", alertKey: "question:baseline-6b", kind: "question", title: "A question needs your answer", sourceSequence: 1, baseline: true });
       yield* configure(server.origin);
       expect(yield* delivered(id)).toHaveLength(1);
+      yield* delivery.settle;
       expect(posts(server)).toHaveLength(1);
       expect((yield* eventsOf("client.AlertDelivered")).some((row) => row.event.alertId === "baseline-6b")).toBe(false);
-    }));
+      expect((yield* eventsOf("client.AlertDeliveryFailed")).some((row) => row.event.alertId === "baseline-6b")).toBe(false);
+    }), { lists: delivery.lists });
   } finally { await server.close(); }
 });
 

@@ -1,10 +1,59 @@
 import * as Effect from "effect/Effect"
 import { expect, it } from "vitest"
+import { threadHref, threadLocation } from "../../../web/src/thread/links.ts"
 import { engineLists } from "../../src/pieces/lists.ts"
-import { append, awaitCleared, eventsOf, raised, quietLists, withAlerts } from "../support/alertsRig.ts"
-import { makeRig, removeRig, seedAgent } from "../support/handlerRig.ts"
+import { append, awaitCleared, awaitRaised, barrier, eventsOf, raised, quietLists, withAlerts } from "../support/alertsRig.ts"
+import { call, makeRig, ownerCredential, removeRig, seedAgent, success } from "../support/handlerRig.ts"
 import { registerRebuildCheck } from "../support/rebuildCheck.ts"
 import { owner } from "./wakeFixtures.ts"
+
+it.each(["close", "dismiss"] as const)("FR-041 reverse-order silent recipients retain the same live and baseline thread through %s", async (ending) => {
+  const identities: unknown[] = []
+  for (const baseline of [false, true]) {
+    const rig = makeRig()
+    const setup = () => Effect.gen(function* () {
+      yield* seedAgent({ id: "first", state: "idle" })
+      yield* seedAgent({ id: "second", state: "idle" })
+      yield* append(
+        { _tag: "board.ChannelOpened", channelId: "silent", name: "Silent", kind: "plain", opener: owner, manager: owner,
+          members: [owner, { _tag: "agent", agentId: "first" }, { _tag: "agent", agentId: "second" }] },
+        { _tag: "board.PostWritten", postId: "silent-post", channelId: "silent", author: owner, text: "Reply, please.", reply: "all",
+          to: [{ _tag: "agent", agentId: "first" }, { _tag: "agent", agentId: "second" }] },
+        { _tag: "board.AddresseeResolved", postId: "silent-post", addressee: { _tag: "agent", agentId: "second" }, disposition: "no-answer", authorIsOwner: true },
+        { _tag: "board.AddresseeResolved", postId: "silent-post", addressee: { _tag: "agent", agentId: "first" }, disposition: "no-answer", authorIsOwner: true },
+      )
+    })
+    try {
+      if (baseline) await withAlerts(() => Effect.gen(function* () {
+        yield* registerRebuildCheck(); yield* setup()
+      }), { rig, lists: quietLists(engineLists) })
+      await withAlerts(() => Effect.gen(function* () {
+        yield* registerRebuildCheck()
+        if (!baseline) yield* setup()
+        const rows = yield* awaitRaised("no-answer:silent-post")
+        yield* barrier()
+        expect(yield* raised("no-answer:silent-post")).toHaveLength(1)
+        const event = rows[0]!.event
+        const page = success(yield* call(ownerCredential, "client.alerts.list", { after: 0, limit: 100 }))
+        const item = page.items.find((row: { alertId: string }) => row.alertId === event.alertId)!
+        const identity = { key: item.alertKey, kind: item.kind, subject: item.subject, agentId: item.agentId,
+          route: threadHref(item.agentId, `${item.subject.namespace}:${item.subject.id}`) }
+        expect(identity).toEqual({ key: "no-answer:silent-post", kind: "board.no-answer",
+          subject: { _tag: "piece", namespace: "board", id: "silent-post" }, agentId: "second", route: "/#/thread/second?subject=board%3Asilent-post" })
+        expect(threadLocation(`https://example.test${identity.route}`)).toEqual({ agentId: "second", subject: "board:silent-post" })
+        identities.push(identity)
+        expect(event.baseline === true).toBe(baseline)
+        expect(yield* eventsOf("client.AlertDelivered")).toEqual([])
+        if (ending === "close") yield* append({ _tag: "board.PostClosed", postId: "silent-post", outcome: "answered", closer: owner, completionOwed: false })
+        else success(yield* call(ownerCredential, "client.alerts.dismiss", { alertId: event.alertId }))
+        expect(yield* awaitCleared(event.alertId)).toHaveLength(1)
+        yield* barrier("after-ending")
+        expect(yield* raised("no-answer:silent-post")).toHaveLength(1)
+      }), { rig, initialize: !baseline })
+    } finally { removeRig(rig) }
+  }
+  expect(identities[0]).toEqual(identities[1])
+})
 
 it("7.5 first-start baseline raises and clears an open post to the owner without delivering it", async () => {
   const rig = makeRig()
