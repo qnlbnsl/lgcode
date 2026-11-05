@@ -45,7 +45,7 @@ it.each(cases)("FR-013 renews a $initial question after $state and resume both c
       const view = clientView((yield* snapshot).client);
       expect(view.alerts[oldId]?.status).toBe("cleared");
       expect(view.alerts[newId]?.status).toBe("open");
-      expect(view.delivery[newId]).toMatchObject({ delivered: true, attempt: 1 });
+      expect(view.delivery[newId]).toMatchObject({ status: "delivered", attempt: 1 });
       const ids = posts(server).map((row) => row.headers["x-sequence-id"]);
       expect(ids.filter((id) => id === newId)).toHaveLength(1);
       expect(ids.filter((id) => id === oldId)).toHaveLength(initial === "delivered" ? 1 : 0);

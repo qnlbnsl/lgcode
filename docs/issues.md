@@ -6251,3 +6251,37 @@ key. It recomputes the deadline after each wait. It validates the failure
 sequence again after the database read, together with the current generation
 and pending conditions. The regression checks the five-second and thirty-second
 deadlines and increasing attempt numbers.
+
+## 383. Delivery failure diagnostics did not reach the alerts page
+
+Found: 2026-11-04, while repairing foundation review record FR-017.
+State: fixed.
+
+What happened: The delivery worker recorded a safe failure reason and the fifth
+failure's `final` mark, but the client projection dropped those fields. The
+alert-list contract, read and page exposed only the alert's open or cleared
+lifecycle, so the owner could not see that delivery was still failing.
+
+What changed: The projection retains the last outcome for the current delivery
+generation. The owner read and public schema expose its outcome and attempt,
+with a fixed safe reason and `final` for failures. The page renders "Failed",
+"Still failing" or "Delivered" separately from the alert's lifecycle. The
+command-line list retains the same fields in its reply. A successful attempt
+replaces the failure, and a generation change cannot reuse an old failure.
+
+Why it matters: The owner can diagnose a carrier outage or a missing backing
+token while durable retries continue. Regression tests exercise the writer,
+read, public schema, rebuild, restart, recovery, generation changes, clear,
+page rendering and command-line output. No live carrier or phone was used.
+
+
+## 384. An integrated alert test still expects the earlier delivery projection
+
+Found: 2026-11-04, by the full merge check combining foundation review repairs FR-013 and FR-017.
+State: fixed.
+
+What happened: The lifecycle regression expected the private delivery row's earlier `delivered` boolean. The diagnostics repair replaced it with the explicit `status` field. All eight lifecycle matrix cases failed at this one assertion after integration.
+
+What changed: The assertion now requires `status: "delivered"` and the same first-attempt count. The existing durable delivery event, exact carrier request, renewal identity, and restart assertions remain. The production behavior is unchanged.
+
+Validation: The initial complete merge check is archived with eight failures at the old assertion. The corrected lifecycle, retry-race, and delivery-diagnostics suites run together before the repaired full merge check.

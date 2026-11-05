@@ -45,12 +45,20 @@ export const CarrierSettings = Schema.Union([
   })
 ])
 export type CarrierSettings = typeof CarrierSettings.Type
+const deliveryAttempt = { generation: EventSequence, attempt: Schema.Int.check(Schema.isGreaterThan(0)) }
+export const AlertDelivery = Schema.Union([
+  Schema.Struct({ status: Schema.Literal("delivered"), ...deliveryAttempt }),
+  Schema.Struct({ status: Schema.Literal("failed"), ...deliveryAttempt,
+    reason: Schema.Literals(["token missing", "carrier delivery failed"]), final: Schema.Boolean })
+])
+export type AlertDelivery = typeof AlertDelivery.Type
 export const Alert = Schema.Struct({
   alertId: AlertId, alertKey: AlertKey, kind: AlertKind,
   agentId: Schema.optionalKey(AgentId), subject: Schema.optionalKey(AlertSubject),
   title: Schema.String, sourceSequence: EventSequence, baseline: Schema.optionalKey(Schema.Boolean),
   status: Schema.Literals(["open", "cleared"]),
-  raisedAt: EpochMilliseconds, clearedAt: Schema.optionalKey(EpochMilliseconds)
+  raisedAt: EpochMilliseconds, clearedAt: Schema.optionalKey(EpochMilliseconds),
+  delivery: Schema.optionalKey(AlertDelivery)
 })
 export type Alert = typeof Alert.Type
 export const AlertSettings = Schema.Struct({

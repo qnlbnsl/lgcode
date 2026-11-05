@@ -26,6 +26,11 @@ export function Alerts({ onSessionExpired }: { readonly onSessionExpired: () => 
       {items.map((alert) => <li key={alert.alertId}>
         <p>{alert.title}</p>
         <p>Status: {alert.status} · Kind: {alert.kind}</p>
+        {alert.delivery !== undefined && <p>
+          Delivery: {alert.delivery.status === "delivered" ? "Delivered" : alert.delivery.final ? "Still failing" : "Failed"}
+          {" · "}Attempt: {alert.delivery.attempt}
+          {alert.delivery.status === "failed" && <> · Reason: {alert.delivery.reason}</>}
+        </p>}
         {alert.agentId !== undefined && <a href={threadHref(alert.agentId,
           alert.subject?._tag === "piece" ? `${alert.subject.namespace}:${alert.subject.id}` : undefined)}>Open thread for {alert.agentId}</a>}
         {alert.subject !== undefined && <p>Subject: {alert.subject._tag} · {alert.subject.id}</p>}

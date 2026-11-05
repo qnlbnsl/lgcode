@@ -1048,6 +1048,23 @@ and it can arrive twice (rows 106, 83).
   sequence id. A clear never proves that a copy is gone from the server or
   the phone (section 5, "Stored copies").
 
+The owner's `client.alerts.list` read includes an optional `delivery` on each
+alert. It reports the last recorded outcome in the current delivery generation,
+with `status` (`delivered` or `failed`), `generation` and `attempt`. A failed
+outcome also carries `final` and a fixed safe `reason`: `token missing` or
+`carrier delivery failed`. It never includes a carrier response or a credential.
+Before the first recorded outcome in a generation, the field is absent.
+Changing the destination clears the old outcome. Changing the token clears a
+failed outcome and preserves an already delivered one in the new generation.
+A late result from an earlier generation changes nothing in this read.
+
+The alerts page shows the delivery outcome separately from the alert's open or
+cleared lifecycle. It shows a failed outcome with `final: true` as "Still failing".
+The command-line list prints the same fields in its JavaScript Object Notation
+(JSON) reply. Recovery replaces a failure with the delivered outcome. Clearing
+an alert retains its last outcome for diagnosis, but stops its retries. These
+fields rebuild from the event log and survive a restart.
+
 A refused alert batch is not itself alerted. It is a defect that each
 piece's tests rule out, and it stays visible as a `CommandRefused` in the
 log (row 108).
