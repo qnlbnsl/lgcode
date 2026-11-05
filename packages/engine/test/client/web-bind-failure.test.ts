@@ -1,9 +1,9 @@
-import { createServer, type Server } from "node:net";
+import { createServer, Server } from "node:net";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as TestClock from "effect/testing/TestClock";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { DatabaseSync } from "node:sqlite";
 import { Restart } from "../../src/recovery/service.ts";
 import * as HostServer from "../../src/api/server.ts";
@@ -12,7 +12,8 @@ import { join } from "node:path";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { ancestryHeaders, authorization, ownerBearer, upgrade as hostUpgrade, upgradeStatus } from "../support/socketClient.ts";
 import { processWeb } from "../support/processWeb.ts";
-import { startService, stopAllServices, waitServing } from "../support/serviceProcess.ts";
+import { stopAllServices, waitServing } from "../support/serviceProcess.ts";
+import { startCheckedWebService } from "../support/checkedWebService.ts";
 import { eventually, freePort, freshSecret, login, pause, readSettings, rows, rpc, setSettings, withWeb } from "../support/webRig.ts";
 
 registerRebuildCheck({ noLog: true });
@@ -34,6 +35,43 @@ const waitForEvent = (tag: string, count: number) => Effect.gen(function* () {
   }
   const found = (yield* rows).filter((row) => row.event_type === tag);
   expect(found, `missing ${tag}`).toHaveLength(count); return found;
+});
+
+it("5.15 repeated retries: catches a supervisor that retries only once or stops before the occupied port becomes available", async () => {
+  const port = await freePort(); const blocker = await occupy(port);
+  const listen = Server.prototype.listen;
+  let attempts = 0;
+  const spy = vi.spyOn(Server.prototype, "listen").mockImplementation(function (this: Server, ...args: Parameters<Server["listen"]>) {
+    const options = args[0] as unknown;
+    if (typeof options === "object" && options !== null && "port" in options && options.port === port) attempts++;
+    return listen.apply(this, args);
+  });
+  try {
+    await withWeb((ctx) => Effect.gen(function* () {
+      expect(attempts).toBe(1);
+      yield* waitForEvent("client.WebServerDown", 1);
+      for (const expected of [2, 3]) {
+        yield* TestClock.adjust(29_999); yield* pause();
+        expect(attempts, "the supervisor retried before 30 seconds").toBe(expected - 1);
+        yield* TestClock.adjust(1);
+        yield* eventually(() => attempts, (count) => count === expected, "the same supervisor stopped retrying");
+        expect(yield* readSettings).toMatchObject({ serverState: "port-taken" });
+        expect((yield* rows).filter((row) => row.event_type === "client.WebServerDown")).toHaveLength(1);
+      }
+      yield* release(blocker);
+      yield* TestClock.adjust(29_999); yield* pause();
+      expect(attempts).toBe(3);
+      expect(yield* readSettings).toMatchObject({ serverState: "port-taken" });
+      yield* TestClock.adjust(1);
+      yield* waitForEvent("client.WebServerUp", 1);
+      expect(attempts).toBe(4);
+      expect(yield* readSettings).toMatchObject({ serverState: "running" });
+      yield* login(ctx);
+    }), { clock: true, settings: { port } });
+  } finally {
+    spy.mockRestore();
+    if (blocker.listening) await new Promise<void>((resolve) => blocker.close(() => resolve()));
+  }
 });
 
 it("5.15 bind outage: catches stopping the engine, duplicating the outage, retrying early or failing to clear it when the port is released", async () => {
@@ -73,7 +111,7 @@ it("5.15 durable outage: catches recording another WebServerDown when a port sta
   try {
     await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
       const process = yield* processWeb();
-      process.service.child.kill("SIGTERM"); yield* Effect.promise(() => process.service.exit);
+      yield* process.service.stop;
       blocker = yield* Effect.promise(() => occupy(process.ctx.settings.port));
       const countDown = () => {
         const database = new DatabaseSync(join(process.root.state, "events.sqlite"), { readOnly: true });
@@ -81,7 +119,7 @@ it("5.15 durable outage: catches recording another WebServerDown when a port sta
         finally { database.close(); }
       };
       for (let restart = 0; restart < 2; restart++) {
-        const service = startService(process.root, { env: { SHEPHRD_WEB_PASSWORD: process.ctx.password } });
+        const service = yield* startCheckedWebService(process.root, { SHEPHRD_WEB_PASSWORD: process.ctx.password });
         yield* waitServing(process.root, service);
         const upgrade = yield* Effect.promise(() => hostUpgrade(process.root.socket, { ...authorization(ownerBearer(process.root.state)), ...ancestryHeaders() }));
         expect(upgrade.status).toBe(101);
@@ -89,7 +127,7 @@ it("5.15 durable outage: catches recording another WebServerDown when a port sta
         const state = yield* rpc(upgrade.socket!, "client.web.settings", { requestId: `outage-restart-${restart}` });
         expect(state).toMatchObject({ _tag: "Success", value: { serverState: "port-taken" } });
         yield* eventually(countDown, (count) => count === 1, "the outage was missing or duplicated across restarts");
-        service.child.kill("SIGTERM"); yield* Effect.promise(() => service.exit);
+        yield* service.stop;
         expect(countDown()).toBe(1);
       }
     })));

@@ -1,10 +1,10 @@
-import { connect } from "node:net";
+import { connect, Server, Socket } from "node:net";
 import { networkInterfaces } from "node:os";
 import * as Effect from "effect/Effect";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { call, ownerCredential } from "../support/handlerRig.ts";
-import { eventually, http, login, readSettings, setSettings, withWeb } from "../support/webRig.ts";
+import { connected, eventually, login, readSettings, setSettings, withWeb } from "../support/webRig.ts";
 
 registerRebuildCheck({ noLog: true });
 
@@ -26,10 +26,42 @@ for (const proxyMode of [false, true]) {
 }
 
 it("5.1 enabled off: catches keeping the listener or accepted connections alive after the setting commits", async () => withWeb((ctx) => Effect.gen(function* () {
-  yield* login(ctx);
+  const { cookie } = yield* login(ctx);
+  const accepted = yield* connected(ctx, cookie);
   yield* setSettings({ ...ctx.settings, enabled: false });
+  yield* eventually(() => accepted.readyState, (state) => state === 3, "disable retained an accepted web connection");
   yield* eventually(() => accepts("127.0.0.1", ctx.settings.port), (accepted) => !accepted, "disabled web listener still accepts connections");
   expect(yield* readSettings).toMatchObject({ serverState: "off" });
+})));
+
+it("5.1 disable ordering: catches returning from settings before stopping accepts and destroying accepted TCP sockets", async () => withWeb((ctx) => Effect.gen(function* () {
+  // Observe the actual Node operations. Peer close notifications arrive on a
+  // later network turn and cannot establish when the server stopped.
+  const peer = yield* Effect.acquireRelease(Effect.promise(() => new Promise<Socket>((resolve, reject) => {
+    const socket = connect({ host: "127.0.0.1", port: ctx.settings.port });
+    socket.once("error", reject);
+    socket.once("connect", () => resolve(socket));
+  })), (socket) => Effect.sync(() => socket.destroy()));
+  const peerPort = peer.localPort;
+  const operations: string[] = [];
+  const close = Server.prototype.close;
+  const destroy = Socket.prototype.destroy;
+  yield* Effect.acquireRelease(Effect.sync(() => vi.spyOn(Server.prototype, "close").mockImplementation(function (this: Server, ...args: Parameters<Server["close"]>) {
+    const address = this.address();
+    if (typeof address === "object" && address?.port === ctx.settings.port) operations.push("stop accepting");
+    return close.apply(this, args);
+  })), (spy) => Effect.sync(() => spy.mockRestore()));
+  yield* Effect.acquireRelease(Effect.sync(() => vi.spyOn(Socket.prototype, "destroy").mockImplementation(function (this: Socket, ...args: Parameters<Socket["destroy"]>) {
+    if (this.localPort === ctx.settings.port && this.remotePort === peerPort) operations.push("destroy accepted socket");
+    return destroy.apply(this, args);
+  })), (spy) => Effect.sync(() => spy.mockRestore()));
+  yield* setSettings({ ...ctx.settings, enabled: false });
+  operations.push("settings completed");
+  // Assert immediately, before any polling or yielding to network callbacks.
+  expect(operations).toContain("stop accepting");
+  expect(operations).toContain("destroy accepted socket");
+  expect(operations.indexOf("stop accepting")).toBeLessThan(operations.indexOf("settings completed"));
+  expect(operations.indexOf("destroy accepted socket")).toBeLessThan(operations.indexOf("settings completed"));
 })));
 
 for (const field of ["host", "hostname", "address", "bindAddress"]) {

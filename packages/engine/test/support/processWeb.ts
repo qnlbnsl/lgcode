@@ -3,19 +3,20 @@
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";
 import { ancestryHeaders, authorization, ownerBearer, upgrade } from "./socketClient.ts";
-import { makeServiceRoot, startService, waitServing, type ServiceProcess, type ServiceRoot } from "./serviceProcess.ts";
+import { makeServiceRoot, waitServing, type ServiceRoot } from "./serviceProcess.ts";
+import { startCheckedWebService, type CheckedWebService } from "./checkedWebService.ts";
 import { freePort, freshSecret, http, rpc, type WebEndpoint } from "./webRig.ts";
 
 export interface ProcessWeb {
   readonly root: ServiceRoot;
   readonly ctx: WebEndpoint;
-  readonly service: ServiceProcess;
-  readonly restart: () => Effect.Effect<ServiceProcess, unknown>;
+  readonly service: CheckedWebService;
+  readonly restart: () => Effect.Effect<CheckedWebService, unknown, import("effect/Scope").Scope>;
 }
 
 export const processWeb = (password = freshSecret()) => Effect.gen(function* () {
   const root = makeServiceRoot(); const port = yield* Effect.promise(freePort);
-  const initial = startService(root);
+  const initial = yield* startCheckedWebService(root);
   yield* waitServing(root, initial);
   const settings = { enabled: true, port, heartbeatSeconds: 25, proxyMode: false };
   yield* Effect.scoped(Effect.gen(function* () {
@@ -25,12 +26,12 @@ export const processWeb = (password = freshSecret()) => Effect.gen(function* () 
     const exit = yield* rpc(result.socket!, "client.web.settings.set", { requestId: "web-process-settings", settings });
     expect(exit._tag, "the service must install the real web settings planner").toBe("Success");
   }));
-  initial.child.kill("SIGTERM"); yield* Effect.promise(() => initial.exit);
+  yield* initial.stop;
   const ctx: WebEndpoint = { settings, origin: `http://127.0.0.1:${port}`, host: `127.0.0.1:${port}`, password };
-  let service: ServiceProcess;
+  let service: CheckedWebService;
   const restart = () => Effect.gen(function* () {
-    if (service !== undefined && !service.exited()) { service.child.kill("SIGTERM"); yield* Effect.promise(() => service.exit); }
-    service = startService(root, { env: { SHEPHRD_WEB_PASSWORD: password } });
+    if (service !== undefined) yield* service.stop;
+    service = yield* startCheckedWebService(root, { SHEPHRD_WEB_PASSWORD: password });
     yield* waitServing(root, service);
     let listening = false;
     for (let attempt = 0; attempt < 100; attempt++) {
