@@ -6498,3 +6498,110 @@ What happened: The missing leaf had a basename that did not match the session id
 What changed: The test uses an absent leaf with the valid session basename in an existing directory. The existing bounded-tail file is its positive control.
 
 Verification: A temporary throw from the valid-path open failure makes the corrected test fail. The mutation is restored before committing.
+
+## 398. Loading a large action did not update its permission request's context
+
+Found: 2026-11-05, foundation review record FR-038.
+State: fixed.
+
+What happened: A loaded content event stayed inside its placeholder component.
+The thread watcher retained the marker, so the matching permission request still
+showed the missing-input warning and lacked its local action context.
+
+What changed: Successful content recovery enters the watcher's shared map by
+sequence. Later publications retain the event without duplicating its marker.
+Regressions cover live large actions, request-local context before Allow,
+reconnection, unrelated identities, and retained partial-input warnings.
+
+## 399. Situation lane tests did not distinguish questions or recovery states
+
+Found: 2026-11-05, foundation review record FR-085.
+State: fixed.
+
+What happened: The fixtures exercised permissions, working agents, and idle
+agents, but no question-only agent or paused, interrupted, or crashed agent.
+
+What changed: Isolated fixtures require each predicate to place its agent only
+in Needs you. Controlled live updates check entry, exit, and precedence while
+retaining permission, working, and idle controls. Temporary mutations remove
+each predicate and reverse precedence to verify the assertions reject them.
+
+## 400. A navigation test could count Strict Mode's earlier cancellation
+
+Found: 2026-11-05, foundation review record FR-089.
+State: fixed.
+
+What happened: An aggregate finalizer count could pass because React's Strict
+Mode replay cancelled an earlier read before navigation.
+
+What changed: The test identifies the active read generation before navigation
+and requires that generation's finalizer afterward. Alerts and Settings are
+covered with and without Strict Mode. A temporary mutation preserves replay
+cancellation while omitting navigation cancellation.
+
+## 401. The unknown-event thread test only covered history
+
+Found: 2026-11-05, foundation review record FR-094.
+State: fixed.
+
+What happened: The named compatibility test did not deliver an unknown event
+through the mounted thread's live subscription.
+
+What changed: A controlled subscription emits unknown and supported events after
+mounting. The test requires subsequent content, a usable prompt, and reconnect
+cursors that include unknown events. Temporary mutations stop live continuation
+or skip the unknown event's cursor advancement.
+
+## 402. Recovery tests omitted the period before context was available
+
+Found: 2026-11-05, foundation review record FR-108.
+State: fixed.
+
+What happened: Awaiting recovered content before inspecting the answer controls
+could miss premature publication while an event read was pending.
+The new rejection case also exposed partial history with enabled controls after
+another request's initial context recovery failed.
+
+What changed: Gated snapshot and oversized live recovery tests inspect the
+pending interval before releasing context. They require no premature answer
+command and verify context before enabled controls. The watcher now withholds
+partial history until initial recovery finishes. Rejection and cancellation
+remain non-actionable. A temporary early-publication mutation is rejected.
+
+## 403. Matching-context assertions could read the ordinary thread article
+
+Found: 2026-11-05, foundation review record FR-121.
+State: fixed.
+
+What happened: Container-wide assertions could pass when the matching file
+change appeared only outside its permission request.
+
+What changed: The test requires the path and diff inside the identified request,
+unfolded and before its own Allow control. It separately retains the ordinary
+article. Temporary absent, collapsed, and below-control mutations are rejected.
+
+## 404. A placeholder test could not count an extra state-event placeholder
+
+Found: 2026-11-05, foundation review record FR-124.
+State: fixed.
+
+What happened: The generic placeholder did not name its event tag, so asserting
+that StateChanged text was absent could not detect an extra placeholder.
+
+What changed: Combined content and state input must yield exactly one placeholder.
+State-only input must yield none. The tests require lazy content reads and a
+separate snapshot recovery for state. A temporary state-placeholder mutation
+is rejected.
+
+## 405. A successful push-setting test omitted the acknowledged checkbox state
+
+Found: 2026-11-05, foundation review record FR-126.
+State: fixed.
+
+What happened: The test checked the command payload without inspecting the
+checkbox after the successful acknowledgement.
+
+What changed: The test gates the acknowledgement, requires a disabled pending
+checkbox, then requires an enabled unchecked checkbox without a refresh.
+A temporary mutation removes the saved-state update. The existing failed-save
+rollback test remains in place.
