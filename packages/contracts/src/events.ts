@@ -220,7 +220,7 @@ export const EngineEvent = Schema.Union([
   Schema.TaggedStruct("DeliveryAccepted", { ...delivery }),
   Schema.TaggedStruct("DeliveryRequeued", { ...delivery, reason: Schema.String }),
   Schema.TaggedStruct("DeliveryHeld", { ...delivery, reason: Schema.Literal("capacity") }),
-  Schema.TaggedStruct("DeliveryReleased", { ...agent }),
+  Schema.TaggedStruct("DeliveryReleased", { ...agent, holdSequence: Schema.optionalKey(EventSequence) }),
   Schema.TaggedStruct("DeliveryReturned", { ...delivery, sender: Sender, reason: Schema.String, cause: Schema.optionalKey(Schema.Literal("capacity")) }),
   Schema.TaggedStruct("DeliveryWithdrawn", { ...delivery, reason: Schema.String }),
   Schema.TaggedStruct("AgentCrashed", {

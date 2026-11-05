@@ -87,7 +87,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
       outcome: Schema.Literals(["opened", "satisfied", "request-held", "cancelled"])
     }), error: Refused
   }),
-  Rpc.make("release", { payload: target, success: Ack, error: Refused }),
+  Rpc.make("release", { payload: { ...target, expectedHoldSequence: Schema.optionalKey(EventSequence) }, success: Ack, error: Refused }),
   Rpc.make("stop", { payload: target, success: Ack, error: Refused }),
   Rpc.make("resume", {
     payload: { ...target, fresh: Schema.optionalKey(Schema.Boolean) }, success: Ack, error: Refused

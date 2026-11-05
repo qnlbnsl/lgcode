@@ -1,4 +1,6 @@
 import { expect, it } from "vitest";
+import { RolesActionRecord } from "@shephrd/contracts";
+import * as Schema from "effect/Schema";
 import { evaluateCrash } from "../../../../src/roles/sheepdog/rules/crash.ts";
 import { registerRebuildCheck } from "../../../support/rebuildCheck.ts";
 
@@ -39,14 +41,18 @@ it("CR03 gives up immediately when automatic crash retries are disabled", () => 
 });
 
 it("CR04 does not admit a second crash within the retry window", () => {
+  const admitted = Schema.decodeUnknownSync(RolesActionRecord)({ _tag: "roles.CrashAdmitted", agentId: "worker",
+    noticeRecipient: "owner", notice: "sent", triggerSequence: 8, sourceSequence: 8, sequence: 9, occurrence: 1 });
   const actions = evaluateCrash(context({ roles: {
     settings: {},
     agents: { worker: { crashRetries: 1 } },
-    actions: [{ _tag: "roles.CrashAdmitted", agentId: "worker", triggerSequence: 8, sourceSequence: 8, occurrence: 1 }],
-  } }) as any);
+    actions: [admitted],
+  }, eventTimes: { "9": crash.occurredAt - 45 * 60_000 } }) as any);
 
   expect(actions).toHaveLength(1);
   expect(actions[0]).toMatchObject({ _tag: "roles.GaveUp", cause: "crash", agentId: "worker" });
+  expect(evaluateCrash(context({ roles: { settings: {}, actions: [admitted] },
+    eventTimes: { "9": crash.occurredAt - 60 * 60_000 - 1 } }) as any)[0]?._tag).toBe("roles.CrashAdmitted");
 });
 
 it("CR05 suppresses a duplicate owner alert while the engine failure alert remains open", () => {

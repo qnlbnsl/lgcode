@@ -25,6 +25,27 @@ export const makeCacheRule = (): SheepdogRule => {
   const targets = new Map<string, CacheTarget>();
   let lifetimes = new Map<string, number | undefined>();
   let home = "";
+  const completeAccepted = (context: RuleContext) => Effect.gen(function* () {
+    const roles = context.snapshot.roles as RolesView;
+    // A committed command can make the target busy before its action record
+    // is written. Recover that successful effect before applying idle guards.
+    for (let sequence = roles.position + 1; sequence <= context.snapshot.sequence; sequence++) {
+      const reply = yield* executeService(sheepdogCaller, "client.event", { requestId: `roles:cache-recover:${sequence}`, sequence }, context.lists);
+      const row = reply.envelope as EventEnvelope;
+      if (row.caller._tag !== "service" || row.caller.service !== "roles.sheepdog" || row.requestId === undefined) continue;
+      const event = row.event;
+      if (event._tag !== "DeliveryQueued" || event.delivery.cache === undefined) continue;
+      const { agentId: target, sequence: trigger, action } = event.delivery.cache;
+      if (event.delivery.target !== target || row.requestId !== actionRequestId({ rule: "cache", subject: target,
+        triggerSequence: trigger, kind: "accept", recipient: target, occurrence: 1 })) continue;
+      const tag = action === "compact" ? "roles.CompactRequested" : "roles.CacheFlushed";
+      if (roles.actions.some((action) => action._tag === tag && action.agentId === target && action.triggerSequence === trigger)) continue;
+      yield* recordAction({ _tag: tag, agentId: target, noticeRecipient: "owner", triggerSequence: trigger as EventSequence,
+        sourceSequence: context.sourceSequence as EventSequence, occurrence: 1,
+        notice: context.lists.boardEnabled === false ? "board-off" : "sent",
+      }, "cache", context.lists);
+    }
+  });
   const loadSettings = (context: RuleContext) => Effect.gen(function* () {
     const settings = yield* serviceCacheSettings(sheepdogCaller, context.lists);
     home = settings.home;
@@ -104,6 +125,7 @@ export const makeCacheRule = (): SheepdogRule => {
   return {
     onStart: (context) => Effect.gen(function* () {
       targets.clear();
+      yield* completeAccepted(context);
       yield* loadSettings(context);
       for (const agentId of Object.keys(context.snapshot.agents)) yield* refresh(context, agentId);
     }),

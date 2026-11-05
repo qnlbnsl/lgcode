@@ -20,8 +20,8 @@ export const resolveSettings = (settings: RolesSettings, role: { readonly limits
   ...settings.limits, ...role?.limits,
 });
 export const roleSettings = (file: RoleFile | null, role: string) => {
-  const { kind, name } = parseRole(role);
-  const definition = name !== undefined && file !== null && Object.hasOwn(file.roles, name) ? file.roles[name] : undefined;
+  const { kind, name, flags } = parseRole(role);
+  const definition = flags.length === 0 && name !== undefined && file !== null && Object.hasOwn(file.roles, name) ? file.roles[name] : undefined;
   return { kind, limits: definition?.limits ?? {} };
 };
 export const setSettings = (input: Input, payload: Payload<"roles.settings.set">): Effect.Effect<PiecePlan, ReturnType<typeof refused>> =>

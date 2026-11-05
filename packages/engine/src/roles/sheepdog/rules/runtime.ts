@@ -9,7 +9,7 @@ import type { RolesView } from "../../view.ts";
 import { callForAction } from "../actions.ts";
 import type { RuleContext, SheepdogRule } from "../loop.ts";
 import { deliveryIsSheepdogTurn, idleNoticeIdentity, noticeRecipient, sendNotice, sheepdogCaller } from "../notices.ts";
-import { actionRequestId, actionSubject } from "../requests.ts";
+import { actionRequestId, actionSubject, parseActionRequestId } from "../requests.ts";
 import type { TimerOrigin } from "../timers.ts";
 import { actionBase, ageLimitFor, agentRoles, limitsFor, own, turnIsExcluded, type AdviceKind, type RuleInput } from "./context.ts";
 import { engineAlertOpen, evaluateCrash } from "./crash.ts";
@@ -173,6 +173,34 @@ export const makeRules = (): ReadonlyArray<SheepdogRule> => {
       if (agent.openCrash !== undefined) yield* continueCrash(context, agent.openCrash);
     }
   });
+  const completeIdleNotices = (context: RuleContext) => Effect.gen(function* () {
+    const roles = context.snapshot.roles as RolesView;
+    // Recovery may change the group's idle origin after the nudge commits.
+    // Complete its flush and notice from the committed board nudge's identity.
+    for (let sequence = roles.position + 1; sequence <= context.snapshot.sequence; sequence++) {
+      const reply = yield* executeService(sheepdogCaller, "client.event", { requestId: `roles:idle-recover:${sequence}`, sequence }, context.lists);
+      const row = reply.envelope as EventEnvelope;
+      if (row.caller._tag !== "service" || row.caller.service !== "roles.sheepdog" || row.event._tag !== "board.PostWritten"
+        || row.requestId === undefined) continue;
+      const id = parseActionRequestId(row.requestId);
+      if (id?.rule !== "team-idle" || id.kind !== "roles.TeamIdleReported.nudge.post") continue;
+      let subject: unknown;
+      try { subject = JSON.parse(id.subject); } catch { continue; }
+      if (!Array.isArray(subject) || subject.length !== 2 || subject[0] !== id.recipient || typeof subject[1] !== "string"
+        || !row.event.to.some((to) => to._tag === "agent" && to.agentId === id.recipient)) continue;
+      const agentId = id.recipient as RolesActionRecord["agentId"];
+      const group = subject[1];
+      if (roles.actions.some((action) => action._tag === "roles.TeamIdleReported" && action.agentId === agentId
+        && action.group === group && action.triggerSequence === id.triggerSequence && action.occurrence === id.occurrence)) continue;
+      yield* executeService(sheepdogCaller, "board.flush", {
+        requestId: actionRequestId({ ...id, kind: "roles.TeamIdleReported.nudge.flush" }), agentId,
+      }, context.lists).pipe(Effect.catchTag("CommandRefused", () => Effect.void));
+      const current = yield* (yield* Views).snapshot;
+      yield* sendNotice({ _tag: "roles.TeamIdleReported", agentId, group, noticeRecipient: noticeRecipient(current, agentId),
+        triggerSequence: id.triggerSequence as RolesActionRecord["triggerSequence"], sourceSequence: context.sourceSequence as RolesActionRecord["sourceSequence"],
+        occurrence: id.occurrence }, "team-idle", context.lists, idleNoticeIdentity(current, group));
+    }
+  });
   const checkTimers = (context: RuleContext) => Effect.gen(function* () {
     let live = yield* current(context);
     if (context.lists.boardEnabled !== false) for (const action of evaluateTeamIdle(live)) {
@@ -199,7 +227,7 @@ export const makeRules = (): ReadonlyArray<SheepdogRule> => {
     for (const action of evaluateRunaway(live)) yield* sendNotice(action, "runaway", context.lists);
   });
   const rule: SheepdogRule = {
-    onStart: (context) => synchronize(context).pipe(Effect.andThen(recover(context))),
+    onStart: (context) => synchronize(context).pipe(Effect.andThen(completeIdleNotices(context)), Effect.andThen(recover(context))),
     onEvent: (context, envelope) => Effect.gen(function* () {
       const live = yield* current(context);
       for (const action of evaluateRoleAdvice(live, envelope)) yield* sendNotice(action, "role-advice", context.lists);

@@ -5,6 +5,7 @@ import { evaluateCrash } from "../../../../src/roles/sheepdog/rules/crash.ts";
 import { evaluateRunaway } from "../../../../src/roles/sheepdog/rules/runaway.ts";
 import { evaluateTeamIdle } from "../../../../src/roles/sheepdog/rules/teamIdle.ts";
 import type { RuleAgent, RuleInput } from "../../../../src/roles/sheepdog/rules/context.ts";
+import { ageLimitFor, limitsFor } from "../../../../src/roles/sheepdog/rules/context.ts";
 import { agentIdOf } from "../../../support/handlerRig.ts";
 import { registerRebuildCheck } from "../../../support/rebuildCheck.ts";
 
@@ -18,6 +19,19 @@ const input = (overrides: Partial<RuleInput> = {}): RuleInput => ({
   now, agents: { worker: agent() }, roles: {}, eventTimes: { "group:build": now - hour }, ...overrides,
 });
 const record = Schema.decodeUnknownSync(RolesActionRecord);
+
+it.each(["chef:builder", ":builder", "worker:builder"])("named limits apply only to a known kind: %s", (role) => {
+  const worker = agent({ role, startedSequence: 1 });
+  const context = input({ agents: { worker }, eventTimes: { "1": now - 90 * 60_000 }, roles: {
+    settings: { limits: { stallMinutes: 15, ageMinutes: 180 } },
+    file: { name: "Team", roles: { builder: { advice: "Build carefully.", limits: { capacityRetries: 0, stallMinutes: 25, ageMinutes: 60 } } } },
+  } });
+  const known = role === "worker:builder";
+  expect(limitsFor(context, worker).capacityRetries).toBe(known ? 0 : 12);
+  expect(limitsFor(context, worker).stallMinutes).toBe(known ? 25 : 15);
+  expect(ageLimitFor(context, worker)).toBe(known ? 60 : 180);
+  expect(evaluateRunaway(context)).toHaveLength(known ? 1 : 0);
+});
 
 it.each(["stopped", "crashed", "paused"])("a group containing only %s agents receives no idle nudge", (state) => {
   expect(evaluateTeamIdle(input({ agents: { worker: agent({ state: { _tag: state } }) } }))).toEqual([]);

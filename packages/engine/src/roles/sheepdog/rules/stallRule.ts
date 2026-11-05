@@ -1,8 +1,11 @@
+import type { EventEnvelope, EventSequence, PostId, AgentId } from "@shephrd/contracts";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import type { RolesView } from "../../view.ts";
 import type { RuleContext, SheepdogRule } from "../loop.ts";
-import { noticeRecipient, sendNotice } from "../notices.ts";
+import { noticeRecipient, sendNotice, sheepdogCaller } from "../notices.ts";
+import { executeService } from "../../../commands/services.ts";
+import { parseActionRequestId } from "../requests.ts";
 import { stallInput, stallKey } from "../stallView.ts";
 import { evaluateStall } from "./stall.ts";
 
@@ -22,8 +25,30 @@ const completeHolderNotices = ({ snapshot, lists }: RuleContext) => Effect.gen(f
   }
 });
 
+const completePostedNotices = (context: RuleContext) => Effect.gen(function* () {
+  const roles = context.snapshot.roles as RolesView;
+  // Flushing a nudge can change the stall clock before its action commits.
+  // Its posted notice retains the original subject and episode identity.
+  for (let sequence = roles.position + 1; sequence <= context.snapshot.sequence; sequence++) {
+    const reply = yield* executeService(sheepdogCaller, "client.event", { requestId: `roles:stall-recover:${sequence}`, sequence }, context.lists);
+    const row = reply.envelope as EventEnvelope;
+    if (row.event._tag !== "board.PostWritten" || row.caller._tag !== "service" || row.caller.service !== "roles.sheepdog" || row.requestId === undefined) continue;
+    const id = parseActionRequestId(row.requestId);
+    if (id?.rule !== "stall" || id.kind !== "roles.StallSeen.post" && id.kind !== "roles.ReplaceAdvised.post") continue;
+    let subject: unknown;
+    try { subject = JSON.parse(id.subject); } catch { continue; }
+    if (!Array.isArray(subject) || subject.length !== 2 || typeof subject[0] !== "string" || typeof subject[1] !== "string") continue;
+    const tag = id.kind === "roles.StallSeen.post" ? "roles.StallSeen" : "roles.ReplaceAdvised";
+    if (roles.actions.some((action) => action._tag === tag && action.agentId === subject[0] && action.stalledPostId === subject[1]
+      && action.triggerSequence === id.triggerSequence && action.occurrence === id.occurrence && action.noticeRecipient === id.recipient)) continue;
+    yield* sendNotice({ _tag: tag, agentId: subject[0] as AgentId, stalledPostId: subject[1] as PostId,
+      noticeRecipient: id.recipient as AgentId, triggerSequence: id.triggerSequence as EventSequence,
+      sourceSequence: context.sourceSequence as EventSequence, occurrence: id.occurrence }, "stall", context.lists);
+  }
+});
+
 export const stallRule: SheepdogRule = {
-  onStart: completeHolderNotices,
+  onStart: (context) => completePostedNotices(context).pipe(Effect.andThen(completeHolderNotices(context))),
   onEvent: (context) => completeHolderNotices(context),
   timers: ({ snapshot, lists }: RuleContext) => {
     if (lists.boardEnabled === false) return [];
