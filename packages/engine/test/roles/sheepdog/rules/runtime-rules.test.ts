@@ -2,12 +2,14 @@ import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { it } from "@effect/vitest";
 import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
+import type { BoardView } from "@shephrd/contracts/board/view";
 import type { RolesActionRecord } from "@shephrd/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
+import * as SqlClient from "effect/sql/SqlClient";
 import { TestClock } from "effect/testing";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 import { serve } from "../../../../src/api/server.ts";
@@ -19,11 +21,12 @@ import { buildServices } from "../../../../src/service.ts";
 import type { RolesView } from "../../../../src/roles/view.ts";
 import { makeSheepdogLoop, type SheepdogRule } from "../../../../src/roles/sheepdog/loop.ts";
 import { makeRules } from "../../../../src/roles/sheepdog/rules/runtime.ts";
+import { reloadedEvents } from "../../../../src/recovery/reload.ts";
 import { callForAction } from "../../../../src/roles/sheepdog/actions.ts";
-import { sheepdogCaller } from "../../../../src/roles/sheepdog/notices.ts";
+import { deliveryIsSheepdogTurn, sheepdogCaller } from "../../../../src/roles/sheepdog/notices.ts";
 import { alertLog } from "../../../support/alertsRig.ts";
 import { fixtureClient } from "../../../support/fixturePiece.ts";
-import { makeFakeRunner, type FakeRunner } from "../../../support/fakeRunner.ts";
+import { makeFakeRunner, sessionFor, type FakeRunner } from "../../../support/fakeRunner.ts";
 import { appendSetup, eventOf, makeFakeSecrets, makeRig, removeRig, seedAccount, seedAgent, seedHarness, startPayload, type Rig } from "../../../support/handlerRig.ts";
 import { eventually, pause, snapshot } from "../../../support/routingRig.ts";
 import { registerRebuildCheck } from "../../../support/rebuildCheck.ts";
@@ -64,13 +67,15 @@ it.effect("idle groups nudge every top, share one holder notice, and repeat hour
   yield* TestClock.adjust("60 minutes");
   expect(yield* eventually(actions("roles.TeamIdleReported"), (rows) => rows.length === 2)).toHaveLength(2);
   const posts = (yield* rowsOf("board.PostWritten")).filter((row) => row.event._tag === "board.PostWritten" && row.event.text.includes("team has no running work"));
-  expect(posts).toHaveLength(1);
+  expect(posts).toHaveLength(3);
   const targets = (yield* rowsOf("DeliveryQueued")).flatMap((row) => row.event._tag === "DeliveryQueued"
     && row.event.delivery.sender._tag === "service" ? [row.event.delivery.target] : []);
-  expect(targets.sort()).toEqual(["top-a", "top-b"]);
+  expect(targets).toEqual([]);
   yield* TestClock.adjust("60 minutes");
   const repeats = yield* eventually(actions("roles.TeamIdleReported"), (rows) => rows.length === 4);
   expect(repeats.map((row) => row.occurrence)).toEqual([1, 1, 2, 2]);
+  const repeatedPosts = (yield* rowsOf("board.PostWritten")).filter((row) => row.event._tag === "board.PostWritten" && row.event.text.includes("team has no running work"));
+  expect(repeatedPosts).toHaveLength(6);
 })));
 
 it.effect("an unknown account reset suppresses idleness and account recovery restarts the whole hour", () => run(engineLists, () => Effect.gen(function* () {
@@ -298,3 +303,111 @@ for (const whileOff of [false, true]) {
     })));
   }
 }
+
+it.effect("FR-019 idle tops receive direct board nudges and flushes, independently of shared holder receipts", () => run(engineLists, () => Effect.gen(function* () {
+  yield* setup;
+  yield* seedAgent({ id: "holder" });
+  yield* seedAgent({ id: "top-a", parent: "holder", groups: ["build"] });
+  yield* seedAgent({ id: "top-b", parent: "holder", groups: ["build"] });
+  yield* seedAgent({ id: "owner-top", groups: ["build"] });
+  yield* pause(100);
+  yield* TestClock.adjust("60 minutes");
+  const reports = yield* eventually(actions("roles.TeamIdleReported"), (rows) => rows.length === 3);
+  const posts = (yield* rowsOf("board.PostWritten")).filter((row) => row.event._tag === "board.PostWritten" && row.event.author._tag === "service");
+  expect(posts.map((row) => row.event._tag === "board.PostWritten" ? row.event.to : []).flat()
+    .map((party) => party._tag === "agent" ? party.agentId : "owner").sort()).toEqual(["holder", "owner-top", "top-a", "top-b"]);
+  for (const row of posts) {
+    expect(row.event).toMatchObject({ author: sheepdogCaller, reply: "none" });
+    if (row.event._tag === "board.PostWritten") expect(((yield* snapshot).board as BoardView).channels[row.event.channelId]?.kind).toBe("direct");
+  }
+  expect(reports.filter((row) => row.noticeRecipient === "holder").map((row) => row.postId)).toEqual([reports[0]!.postId, reports[0]!.postId]);
+  expect(reports.find((row) => row.agentId === "owner-top")).toMatchObject({ noticeRecipient: "owner", notice: "sent" });
+  const sql = yield* SqlClient.SqlClient;
+  const receipts = yield* sql<{ request_id: string }>`SELECT request_id FROM receipts WHERE request_id LIKE ${"%roles.TeamIdleReported%flush%"}`;
+  expect(receipts.filter((row) => row.request_id.includes(".nudge.flush:")).map((row) => row.request_id.split(":").at(-2)).sort()).toEqual(["owner-top", "top-a", "top-b"]);
+  expect(receipts.filter((row) => row.request_id.includes(".flush:holder:"))).toHaveLength(1);
+  const wakes = yield* eventually(rowsOf("board.WakeBuilt"), (rows) => rows.length === 4);
+  expect(wakes.map((row) => row.event._tag === "board.WakeBuilt" ? row.event.targetAgentId : "").sort()).toEqual(["holder", "owner-top", "top-a", "top-b"]);
+  const live = yield* snapshot;
+  const deliveries = Object.values(live.deliveries).filter((row) => row.source?._tag === "piece" && row.source.namespace === "board");
+  expect(deliveries).toHaveLength(4);
+  for (const delivery of deliveries) expect(deliveryIsSheepdogTurn(live, delivery.id)).toBe(true);
+  expect((yield* rowsOf("DeliveryQueued")).filter((row) => row.event._tag === "DeliveryQueued" && row.event.delivery.sender._tag === "service" && row.event.delivery.sender.service === "roles.sheepdog")).toHaveLength(0);
+})));
+it.effect("FR-044 an open admission recognizes engine C1 preserved across S2 and a sheepdog restart", () => Effect.gen(function* () {
+  let carryId: string;
+  yield* run(quiet, () => Effect.gen(function* () {
+    yield* seedAccount(); yield* seedHarness();
+    const worker = yield* seedAgent({ id: "worker", folder: rig.work });
+    const [crash] = yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId: "worker", exitCode: 1, signal: null, stderr: "detail" })]);
+    yield* executeService(sheepdogCaller, "roles.record", { requestId: "baseline-c1", action: { _tag: "roles.SheepdogBaseline", position: crash!.sequence, on: true } });
+    yield* executeService(sheepdogCaller, "roles.record", { requestId: "admission-c1", action: { _tag: "roles.CrashAdmitted", agentId: "worker", noticeRecipient: "owner",
+      triggerSequence: crash!.sequence, sourceSequence: crash!.sequence, occurrence: 1, notice: "sent" } });
+    const admission = (yield* roles).agents.worker!.openCrash!;
+    yield* callForAction(admission, "crash", "resume", {}, quiet);
+    const client = yield* socket(quiet);
+    const prompt = yield* client.prompt!({ requestId: "owner-work-before-closure", agentId: "worker", text: "Continue the assigned work." });
+    yield* appendSetup([
+      eventOf({ _tag: "DeliverySent", agentId: "worker", deliveryId: prompt.deliveryId, method: "acp" }),
+      eventOf({ _tag: "DeliveryAccepted", agentId: "worker", deliveryId: prompt.deliveryId }),
+      eventOf({ _tag: "StateChanged", agentId: "worker", state: { _tag: "working" } }),
+      eventOf({ _tag: "AgentInterrupted", agentId: "worker", previous: "working" }),
+    ]);
+    // Use the engine's reload transaction builder, rather than inventing C1.
+    yield* appendSetup(reloadedEvents(yield* snapshot, worker.agentId, sessionFor(worker.agentId), true, "Carry on."));
+    const first = Object.values((yield* snapshot).deliveries).filter((row) => row.content._tag === "carry-on");
+    expect(first).toHaveLength(1);
+    carryId = first[0]!.id;
+    yield* appendSetup([eventOf({ _tag: "AgentInterrupted", agentId: "worker", previous: "working" })]);
+    yield* appendSetup(reloadedEvents(yield* snapshot, worker.agentId, sessionFor(worker.agentId), true, "Carry on."));
+    expect(Object.values((yield* snapshot).deliveries).filter((row) => row.content._tag === "carry-on").map((row) => row.id)).toEqual([carryId]);
+    expect((yield* roles).agents.worker!.openCrash).toBeDefined();
+  }));
+  for (let restart = 0; restart < 2; restart++) yield* run(engineLists, () => Effect.gen(function* () {
+    expect(yield* eventually(actions("roles.CrashRetried"), (rows) => rows.length > 0)).toHaveLength(1);
+    yield* pause(100);
+    const queued = (yield* rowsOf("DeliveryQueued")).filter((row) => row.event._tag === "DeliveryQueued" && row.event.delivery.target === "worker");
+    expect(queued).toHaveLength(2); // Owner work plus the single engine C1.
+    expect(queued.filter((row) => row.caller._tag === "service")).toHaveLength(0);
+    expect(Object.values((yield* snapshot).deliveries).filter((row) => row.content._tag === "carry-on").map((row) => row.id)).toEqual([carryId!]);
+    expect((yield* roles).agents.worker!.openCrash).toBeUndefined();
+  }));
+}));
+
+it.effect("FR-019 idle board nudges respect snooze and restart without duplicate posts", () => Effect.gen(function* () {
+  yield* run(engineLists, () => Effect.gen(function* () {
+    yield* setup;
+    yield* seedAgent({ id: "top", groups: ["build"] });
+    const client = yield* socket();
+    yield* client["roles.snooze"]!({ requestId: "snooze-build", group: "build", until: 2 * 60 * 60_000 });
+    yield* pause(100);
+    yield* TestClock.adjust("60 minutes");
+    expect(yield* actions("roles.TeamIdleReported")).toHaveLength(0);
+    expect(yield* rowsOf("board.PostWritten")).toHaveLength(0);
+    yield* TestClock.adjust("60 minutes");
+    expect(yield* eventually(actions("roles.TeamIdleReported"), (rows) => rows.length > 0)).toHaveLength(1);
+    expect(yield* rowsOf("board.PostWritten")).toHaveLength(1);
+    expect(yield* rowsOf("board.WakeBuilt")).toHaveLength(1);
+  }));
+  yield* run(engineLists, () => Effect.gen(function* () {
+    yield* pause(100);
+    expect(yield* actions("roles.TeamIdleReported")).toHaveLength(1);
+    expect(yield* rowsOf("board.PostWritten")).toHaveLength(1);
+    expect(yield* rowsOf("board.WakeBuilt")).toHaveLength(1);
+    yield* TestClock.adjust("60 minutes");
+    expect(yield* eventually(actions("roles.TeamIdleReported"), (rows) => rows.length > 1)).toHaveLength(2);
+    expect(yield* rowsOf("board.PostWritten")).toHaveLength(2);
+  }));
+}));
+it.effect("FR-019 disabled board suppresses both top nudges and holder reports", () => run({ ...engineLists, boardEnabled: false }, () => Effect.gen(function* () {
+  yield* setup;
+  yield* seedAgent({ id: "holder" });
+  yield* seedAgent({ id: "top", parent: "holder", groups: ["build"] });
+  yield* pause(100);
+  yield* TestClock.adjust("120 minutes");
+  yield* pause(100);
+  expect(yield* actions("roles.TeamIdleReported")).toHaveLength(0);
+  expect(yield* rowsOf("board.PostWritten")).toHaveLength(0);
+  expect(yield* rowsOf("board.WakeBuilt")).toHaveLength(0);
+  expect(yield* rowsOf("DeliveryQueued")).toHaveLength(0);
+})));
