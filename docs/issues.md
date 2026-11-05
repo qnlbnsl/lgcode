@@ -1374,6 +1374,21 @@ one `promptReply` followed by one `turnEnded` for it. Version 2 waits for
 both the protocol reply and idle state, in either order. A later idle error
 is therefore retained even when the prompt acknowledgement arrived early.
 
+Found again: 2026-11-04, in foundation review record FR-016. A capacity
+release can resend an unaccepted delivery with the same identifier before
+the previous attempt's end is consumed. The identifier check alone then
+ends the retry and clears the capacity outage count.
+
+What the foundation fix changed: `Runner.prompt` and `Runner.compact` take
+the sequence of the reserved `DeliverySent` event. The runner retains that
+sequence for the turn and includes it as `sentSequence` on `turnEnded`.
+The delivery planner requires both the delivery identifier and the send
+sequence to match the current turn. The stored event format is unchanged.
+The regression in `packages/engine/test/runner/capacity-attempt-end.test.ts`
+delivers an old end after owner and holder releases, before and after the
+retry is accepted. It checks that the retry keeps working, its outage count
+stays one, and a waiting parent wakes only after the retry's own completion.
+
 ## 84. A queued answer to a stopped or crashed agent was lost
 
 Found: 2026-11-01, in the focused review of unit 5d (finding F5).

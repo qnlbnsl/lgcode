@@ -78,7 +78,7 @@ export const runFoundryRun = (options: { scenario?: "capacity" } = {}) => Effect
     const complete = (input: NonNullable<ReturnType<typeof pending.get>>, text = "The fake agent completed its turn.") => Effect.gen(function* () {
       yield* runner.emitRaw({ _tag: "deliveryUpdate", agentId: input.agentId, incarnation: input.incarnation,
         deliveryId: input.delivery.id, kind: "message", replay: false, role: "agent", text, content: { _tag: "text", text } });
-      yield* runner.emitRaw({ _tag: "turnEnded", agentId: input.agentId, incarnation: input.incarnation, deliveryId: input.delivery.id });
+      yield* runner.emitRaw({ _tag: "turnEnded", agentId: input.agentId, incarnation: input.incarnation, deliveryId: input.delivery.id, sentSequence: input.sentSequence });
     });
     runner.script("prompt", (input) => Effect.gen(function* () {
       pending.set(input.agentId, input);

@@ -30,7 +30,7 @@ it.live("U08: the handler and delivery planner persist the last request's start 
     const usage = { requestStartedAt: 1_798_761_600_123, inputTokens: 17, cachedReadTokens: 31,
       cachedWriteTokens: 120, cachedWrite5mTokens: 20, cachedWrite1hTokens: 100 };
     yield* runner.emitRaw({ _tag: "turnEnded", agentId: target.agentId,
-      incarnation: incarnationOf(target.token), deliveryId, usage });
+      incarnation: incarnationOf(target.token), deliveryId, sentSequence: promptsTo(runner, target).at(-1)!.input.sentSequence, usage });
     const rows = yield* eventually(readLog, (rows) => tagged(rows, "TurnEnded").length === 1);
     expect(tagged(rows, "TurnEnded")).toHaveLength(1);
     expect(tagged(rows, "TurnEnded")[0]).toHaveProperty("usage", usage);

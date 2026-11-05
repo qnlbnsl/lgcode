@@ -115,7 +115,7 @@ const turnReply = (context: { readonly runner: any; readonly events: ReadonlyArr
   Effect.gen(function* () {
     const delivery = deliveryFor(spawn.agentId, text);
     const before = context.events.length;
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
     return yield* context.waitFor((event: any) => event._tag === "promptReply" && event.deliveryId === delivery.id, before);
   }) as Effect.Effect<unknown, unknown, never>;
 

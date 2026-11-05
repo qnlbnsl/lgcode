@@ -24,7 +24,7 @@ const observe = (fields: Record<string, unknown>, inspect: (event: Record<string
     const account = accountFor("first", { turns: [[request(fields), { step: "slow", ms: 60_000 }]] }, echoFile(rig));
     const spawn = yield* spawnFor(rig, harness, account);
     yield* context.runner.start(spawn.input);
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery: deliveryFor(spawn.agentId, "Inspect the action.") });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery: deliveryFor(spawn.agentId, "Inspect the action.") });
     const event = yield* context.waitFor((e) => e._tag === "permissionRequested");
     inspect(event as unknown as Record<string, unknown>);
     if (sensitive !== undefined) expect(JSON.stringify(context.events).includes(sensitive)).toBe(false);

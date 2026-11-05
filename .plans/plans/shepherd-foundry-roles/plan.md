@@ -1175,7 +1175,19 @@ engine commit `9e386b0`):
   `cause: "capacity"`. That return ends the outage and resets the count.
   So does a turn that ends without a capacity error, or a later
   non-capacity error. The count is the number of `DeliveryHeld` events in
-  the outage (row 89). The engine's part of the settled test
+  the outage (row 89). Each send attempt is correlated with the sequence of
+  its committed `DeliverySent` event. `Runner.prompt` and `Runner.compact`
+  receive that sequence, and the runner returns it as `sentSequence` on
+  `turnEnded`. The planner requires the current delivery identifier and
+  send sequence to match before ending a turn. This preserves the outage
+  count when an owner or holder releases a capacity hold and the same
+  delivery is resent before the previous attempt's end is consumed.
+  The sequence is already in the log, so no stored event changes.
+  `packages/engine/test/runner/capacity-attempt-end.test.ts` covers the old
+  end after a same-identifier resend, before and after acceptance, and
+  genuine completion with the parent's wait. `runner/send-sequence.test.ts`
+  covers the real runner for prompts and compacts on protocol versions 1 and 2.
+  The engine's part of the settled test
   (`packages/contracts/src/settled.ts`, CAPI E19) gains one clause: an agent
   with an open capacity hold is not settled, even once its queue is empty.
   So its input gains the open holds, `client.snapshot`'s agent entry gains a

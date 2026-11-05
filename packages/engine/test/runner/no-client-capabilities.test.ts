@@ -77,7 +77,7 @@ live("6.12 fs and terminal requests are refused: reads, writes and terminal call
     yield* context.runner.start(spawn.input);
     const delivery = deliveryFor(spawn.agentId, "go");
     const before = context.events.length;
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
     yield* context.waitFor((event) => event._tag === "turnEnded" && event.deliveryId === delivery.id, before);
     const texts = context.eventsAfter(before).flatMap((event) => event._tag === "deliveryUpdate" ? [event.text] : []);
     for (const { method } of methods) {

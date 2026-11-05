@@ -126,7 +126,7 @@ live("6.2 reply order: promptReply success comes before turnEnded and both name 
       const agent = yield* startAgent(context, { protocolVersion, turns: [[{ step: "text", text: `hello v${protocolVersion}` }]] });
       const delivery = deliveryFor(agent.agentId, "go");
       const before = context.events.length;
-      yield* context.runner.prompt({ agentId: agent.agentId, incarnation: agent.incarnation, delivery });
+      yield* context.runner.prompt({ sentSequence: 1, agentId: agent.agentId, incarnation: agent.incarnation, delivery });
       yield* context.waitFor(turnEndedFor(delivery.id), before);
       const own = ofDelivery(context.eventsAfter(before), delivery.id);
       const replies = own.filter((event) => event._tag === "promptReply");
@@ -144,7 +144,7 @@ live("6.2 prompt returns once the request is sent, not when the turn ends (break
     const delivery = deliveryFor(agent.agentId, "go");
     const before = context.events.length;
     const started = Date.now();
-    yield* context.runner.prompt({ agentId: agent.agentId, incarnation: agent.incarnation, delivery });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: agent.agentId, incarnation: agent.incarnation, delivery });
     expect(Date.now() - started).toBeLessThan(1000);
     expect(ofDelivery(context.eventsAfter(before), delivery.id).filter((event) => event._tag === "turnEnded" || event._tag === "promptReply")).toEqual([]);
     yield* readEcho(agent.echo, (echo) => framesOf(echo, "session/prompt").length === 1);
@@ -157,7 +157,7 @@ live("6.2 content updates: each content update after a send is one deliveryUpdat
     const agent = yield* startAgent(context, { turns: [[{ step: "raw_frame", frame: commands }, { step: "text", text: "one" }, { step: "text", text: "two" }]] });
     const delivery = deliveryFor(agent.agentId, "go");
     const before = context.events.length;
-    yield* context.runner.prompt({ agentId: agent.agentId, incarnation: agent.incarnation, delivery });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: agent.agentId, incarnation: agent.incarnation, delivery });
     yield* context.waitFor(turnEndedFor(delivery.id), before);
     const updates = ofDelivery(context.eventsAfter(before), delivery.id).filter((event) => event._tag === "deliveryUpdate");
     const messages = updates.filter((event) => event._tag === "deliveryUpdate" && event.kind === "message");
@@ -195,7 +195,7 @@ live("6.2 identity (issues 61, 83): a child that writes another agent's id, an o
     const forger = yield* startAgent(context, { turns: [[{ step: "raw_frame", frame }, { step: "text", text: forged }]] });
     const delivery = deliveryFor(forger.agentId, "go");
     const before = context.events.length;
-    yield* context.runner.prompt({ agentId: forger.agentId, incarnation: forger.incarnation, delivery });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: forger.agentId, incarnation: forger.incarnation, delivery });
     yield* context.waitFor(turnEndedFor(delivery.id), before);
     const after = context.eventsAfter(before);
     expect(after.filter((event) => event.agentId === victim.agentId)).toEqual([]);
@@ -215,8 +215,8 @@ live("6.2 stale sends (issue 82): prompt and compact with an incarnation that is
     yield* readEcho(agent.echo, (echo) => framesOf(echo, "session/new").length === 1);
     const promptsBefore = framesOf(peekEcho(agent.echo)!, "session/prompt").length;
     const stale = "0".repeat(64);
-    const prompt = yield* context.runner.prompt({ agentId: agent.agentId, incarnation: stale, delivery: deliveryFor(agent.agentId, "stale") }).pipe(Effect.result);
-    const compact = yield* context.runner.compact({ agentId: agent.agentId, incarnation: stale, delivery: compactFor(agent.agentId) }).pipe(Effect.result);
+    const prompt = yield* context.runner.prompt({ sentSequence: 1, agentId: agent.agentId, incarnation: stale, delivery: deliveryFor(agent.agentId, "stale") }).pipe(Effect.result);
+    const compact = yield* context.runner.compact({ sentSequence: 1, agentId: agent.agentId, incarnation: stale, delivery: compactFor(agent.agentId) }).pipe(Effect.result);
     for (const result of [prompt, compact]) {
       expect(result._tag).toBe("Failure");
       if (result._tag === "Failure") expect(result.failure._tag).toBe("RunnerRejected");
@@ -227,7 +227,7 @@ live("6.2 stale sends (issue 82): prompt and compact with an incarnation that is
     yield* context.runner.stop({ agentId: agent.agentId });
     const second = yield* spawnFor(rig, harnessFor("first", writeFakeAdapter(rig)), accountFor("first", { turns: [] }, echoFile(rig)), { agentId: agent.agentId });
     yield* context.runner.start(second.input);
-    const old = yield* context.runner.prompt({ agentId: agent.agentId, incarnation: agent.incarnation, delivery: deliveryFor(agent.agentId, "old") }).pipe(Effect.result);
+    const old = yield* context.runner.prompt({ sentSequence: 1, agentId: agent.agentId, incarnation: agent.incarnation, delivery: deliveryFor(agent.agentId, "old") }).pipe(Effect.result);
     expect(old._tag).toBe("Failure");
   })));
 
@@ -242,8 +242,8 @@ live("6.2 malformed child data: garbage, an unknown method and a malformed updat
     const good = yield* startAgent(context, { turns: [[{ step: "slow", ms: 500 }, { step: "text", text: "still here" }]] });
     const before = context.events.length;
     const goodDelivery = deliveryFor(good.agentId, "go");
-    yield* context.runner.prompt({ agentId: bad.agentId, incarnation: bad.incarnation, delivery: deliveryFor(bad.agentId, "go") }).pipe(Effect.ignore);
-    yield* context.runner.prompt({ agentId: good.agentId, incarnation: good.incarnation, delivery: goodDelivery });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: bad.agentId, incarnation: bad.incarnation, delivery: deliveryFor(bad.agentId, "go") }).pipe(Effect.ignore);
+    yield* context.runner.prompt({ sentSequence: 1, agentId: good.agentId, incarnation: good.incarnation, delivery: goodDelivery });
     yield* context.waitFor(turnEndedFor(goodDelivery.id), before);
     expect(ofDelivery(context.eventsAfter(before), goodDelivery.id).some((event) => event._tag === "deliveryUpdate" && event.text === "still here")).toBe(true);
   })));
@@ -308,7 +308,7 @@ live("6.2 stderr drain (review F-1): an agent that writes 10,000,000 bytes of st
     const agent = yield* startAgent(context, { turns: [[{ type: "stderr_flood", bytes: 10_000_000 }, { step: "text", text: "after flood" }]] });
     const delivery = deliveryFor(agent.agentId, "go");
     const before = context.events.length;
-    yield* context.runner.prompt({ agentId: agent.agentId, incarnation: agent.incarnation, delivery });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: agent.agentId, incarnation: agent.incarnation, delivery });
     yield* context.waitFor(turnEndedFor(delivery.id), before);
     const own = ofDelivery(context.eventsAfter(before), delivery.id);
     const text = own.flatMap((event) => event._tag === "deliveryUpdate" && event.kind === "message" ? [event.text] : []).join("");
