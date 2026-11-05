@@ -6,13 +6,25 @@ import { connected, eventually, login, readSettings, rpc, setSettings, upgrade, 
 
 registerRebuildCheck({ noLog: true });
 
-for (const publicAddress of ["http://shephrd.example.test", "https://shephrd.example.test", "http://shephrd.example.test:8080", "https://shephrd.example.test:9443"]) {
-  it(`5.16 canonical address ${publicAddress}: catches rejecting either supported scheme or an explicit nondefault port`, async () => withWeb((ctx) => Effect.gen(function* () {
+for (const proxyMode of [false, true]) {
+  it(`FR-001 refuses plain HTTP public addresses with proxyMode=${proxyMode} without changing settings`, async () => withWeb((ctx) => Effect.gen(function* () {
+    const before = yield* readSettings;
+    const result = yield* call(ownerCredential, "client.web.settings.set", {
+      settings: { ...ctx.settings, proxyMode, publicAddress: "http://shephrd.example.test" }
+    });
+    expect(result._tag).toBe("Failure");
+    if (result._tag === "Failure") expect(result.failure.reason).toMatch(/https/i);
+    expect(yield* readSettings).toEqual(before);
+  })));
+}
+
+for (const publicAddress of ["https://shephrd.example.test", "https://shephrd.example.test:9443"]) {
+  it(`5.16 canonical address ${publicAddress}: catches rejecting HTTPS or an explicit nondefault port`, async () => withWeb((ctx) => Effect.gen(function* () {
     yield* setSettings({ ...ctx.settings, proxyMode: true, publicAddress });
     expect(yield* readSettings).toMatchObject({ proxyMode: true, publicAddress });
   })));
 }
-for (const publicAddress of ["ftp://shephrd.example.test", "ws://shephrd.example.test", "javascript:alert(1)", "HTTPS://shephrd.example.test", "https://SHEPHRD.example.test", "https://shephrd.example.test/", "https://shephrd.example.test/path", "https://shephrd.example.test:443", "http://shephrd.example.test:80", "https://user:pass@shephrd.example.test", "https://shephrd.example.test?q=1", "https://shephrd.example.test#fragment", " https://shephrd.example.test", "https://shephrd.example.test "]) {
+for (const publicAddress of ["http://shephrd.example.test", "http://shephrd.example.test:8080", "ftp://shephrd.example.test", "ws://shephrd.example.test", "javascript:alert(1)", "HTTPS://shephrd.example.test", "https://SHEPHRD.example.test", "https://shephrd.example.test/", "https://shephrd.example.test/path", "https://shephrd.example.test:443", "http://shephrd.example.test:80", "https://user:pass@shephrd.example.test", "https://shephrd.example.test?q=1", "https://shephrd.example.test#fragment", " https://shephrd.example.test", "https://shephrd.example.test "]) {
   it(`5.16 noncanonical address ${publicAddress}: catches silently normalizing or accepting a forbidden public address`, async () => withWeb((ctx) => Effect.gen(function* () {
     const before = yield* readSettings;
     const result = yield* call(ownerCredential, "client.web.settings.set", { settings: { ...ctx.settings, proxyMode: true, publicAddress } });
@@ -52,8 +64,8 @@ for (const field of ["enabled", "port", "proxyMode", "publicAddress"] as const) 
     const stream = yield* connected(ctx, cookie); const read = yield* connected(ctx, cookie);
     const changed = field === "enabled" ? { ...ctx.settings, enabled: false }
       : field === "port" ? { ...ctx.settings, port: ctx.settings.port === 65535 ? 65534 : ctx.settings.port + 1 }
-      : field === "proxyMode" ? { ...ctx.settings, proxyMode: true, publicAddress: "http://shephrd.example.test" }
-      : { ...ctx.settings, publicAddress: "http://shephrd.example.test" };
+      : field === "proxyMode" ? { ...ctx.settings, proxyMode: true, publicAddress: "https://shephrd.example.test" }
+      : { ...ctx.settings, publicAddress: "https://shephrd.example.test" };
     yield* setSettings(changed);
     yield* eventually(() => [stream.readyState, read.readyState], (states) => states.every((state) => state === 3), "a settings field changed without closing all connections");
     if (field === "port") {
@@ -66,11 +78,11 @@ for (const field of ["enabled", "port", "proxyMode", "publicAddress"] as const) 
 }
 
 it("5.16 public address replacement: catches accepting a reconnect under the old origin after its connection was closed", async () => withWeb((ctx) => Effect.gen(function* () {
-  const { cookie } = yield* login(ctx, { Host: "old.example.test", Origin: "http://old.example.test" });
-  const result = yield* upgrade(ctx, { Cookie: cookie, Host: "old.example.test", Origin: "http://old.example.test" });
+  const { cookie } = yield* login(ctx, { Host: "old.example.test", Origin: "https://old.example.test" });
+  const result = yield* upgrade(ctx, { Cookie: cookie, Host: "old.example.test", Origin: "https://old.example.test" });
   expect(result.status).toBe(101);
-  yield* setSettings({ ...ctx.settings, publicAddress: "http://new.example.test" });
+  yield* setSettings({ ...ctx.settings, publicAddress: "https://new.example.test" });
   yield* eventually(() => result.socket!.readyState, (state) => state === 3, "old public connection stayed open");
-  expect((yield* upgrade(ctx, { Cookie: cookie, Host: "old.example.test", Origin: "http://old.example.test" })).status).toBe(403);
-  expect((yield* upgrade(ctx, { Cookie: cookie, Host: "new.example.test", Origin: "http://new.example.test" })).status).toBe(101);
-}), { settings: { proxyMode: true, publicAddress: "http://old.example.test" } }));
+  expect((yield* upgrade(ctx, { Cookie: cookie, Host: "old.example.test", Origin: "https://old.example.test" })).status).toBe(403);
+  expect((yield* upgrade(ctx, { Cookie: cookie, Host: "new.example.test", Origin: "https://new.example.test" })).status).toBe(101);
+}), { settings: { proxyMode: true, publicAddress: "https://old.example.test" } }));

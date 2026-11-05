@@ -1,5 +1,6 @@
-import { defaultWebSettings, type WebSettings } from "@shephrd/contracts";
+import { defaultWebSettings, PublicWebAddress, publicAddressError, type WebSettings } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
+import * as Schema from "effect/Schema";
 import { refused, type Input } from "../commands/internal.ts";
 import type { Views } from "../views/Views.ts";
 
@@ -23,15 +24,9 @@ export const settingsOf = (view: unknown) => (view as ClientWebView | undefined)
 
 export const setWebSettings = (_input: Input, payload: Record<string, unknown>) => Effect.gen(function* () {
   const settings = payload.settings as WebSettings;
-  if (settings.proxyMode && settings.publicAddress === undefined) return yield* refused();
-  if (settings.publicAddress !== undefined) {
-    let canonical = false;
-    try {
-      const url = new URL(settings.publicAddress);
-      canonical = ["http:", "https:"].includes(url.protocol) && url.origin === settings.publicAddress
-        && url.username === "" && url.password === "";
-    } catch { /* Refuse malformed addresses without exposing the input. */ }
-    if (!canonical) return yield* refused();
+  if (settings.proxyMode && settings.publicAddress === undefined) return yield* refused("Proxy mode requires an HTTPS public address.");
+  if (settings.publicAddress !== undefined && !Schema.is(PublicWebAddress)(settings.publicAddress)) {
+    return yield* refused(publicAddressError);
   }
   return { events: [{ _tag: "client.WebSettingsChanged" as const, settings }], reply: () => ({ requestId: payload.requestId }) };
 });

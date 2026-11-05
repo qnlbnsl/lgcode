@@ -38,11 +38,22 @@ test("the production shell logs in, follows real client RPCs, fits a phone, and 
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
         yield* Effect.promise(async () => {
           await page.setViewportSize({ width: 360, height: 800 })
+          const requestIds: string[] = []
+          page.on("websocket", (socket) => socket.on("framesent", ({ payload }) => {
+            try {
+              const frame = JSON.parse(payload.toString()) as { payload?: { requestId?: string } }
+              if (frame.payload?.requestId !== undefined) requestIds.push(frame.payload.requestId)
+            } catch { /* Ping frames are not RPC requests. */ }
+          }))
           await page.goto(`http://127.0.0.1:${port}/`)
           await page.getByLabel("Password", { exact: true }).fill(password)
           await page.getByRole("button", { name: "Log in", exact: true }).click()
           await expect(page.getByLabel("Situation", { exact: true })).toContainText("Live")
           await expect(page.getByLabel("Idle", { exact: true })).toContainText("No agents.")
+          expect(await page.evaluate(() => ({ secure: isSecureContext, uuid: typeof crypto.randomUUID })))
+            .toEqual({ secure: true, uuid: "function" })
+          await expect.poll(() => requestIds.some((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))).toBe(true)
+          console.info(`FR-001 loopback proof: http://127.0.0.1:${port}, authenticated Live snapshot, requestId=${requestIds[0]}`)
         })
         // Use the real command handler and log, with only the harness faked.
         // The browser must observe the resulting roster event on its stream.

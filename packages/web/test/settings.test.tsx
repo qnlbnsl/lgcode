@@ -141,7 +141,28 @@ it("7.8 changes web server settings and shows the current serverState", async ()
   expect(port, "web server settings need an editable port control").toBeTruthy()
   await act(async () => {
     setControlValue(port!, "8899")
+    setControlValue(container.querySelector<HTMLInputElement>('input[name="publicAddress"]')!, "https://shephrd.example.test:9443")
     container.querySelector("form[aria-label='Web server settings']")?.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }))
   })
-  await vi.waitFor(() => expect(set).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({ port: 8899 }) })))
+  await vi.waitFor(() => expect(set).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({ port: 8899, publicAddress: "https://shephrd.example.test:9443" }) })))
+})
+
+it("FR-001 refuses an HTTP public address before saving and explains HTTPS", async () => {
+  const set = vi.fn(() => Effect.succeed({ requestId: "reply" }))
+  browser.client = {
+    "client.snapshot": () => Effect.succeed({ requestId: "snapshot", sequence: 7, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }),
+    "client.subscribe": () => Stream.never,
+    "client.alerts.settings": () => Effect.succeed({ requestId: "reply", ...alertSettings }),
+    "client.web.settings": () => Effect.succeed({ requestId: "reply", ...webSettings, serverState: "running" }),
+    "client.web.settings.set": set
+  }
+  const container = await render()
+  await openSettings(container)
+  await vi.waitFor(() => expect(container.querySelector('input[name="publicAddress"]')).toBeTruthy())
+  await act(async () => {
+    setControlValue(container.querySelector<HTMLInputElement>('input[name="publicAddress"]')!, "http://shephrd.example.test")
+    container.querySelector("form[aria-label='Web server settings']")!.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }))
+  })
+  expect(container.querySelector('[role="status"]')?.textContent).toMatch(/public address.*https/i)
+  expect(set).not.toHaveBeenCalled()
 })

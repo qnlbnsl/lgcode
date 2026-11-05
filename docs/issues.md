@@ -5991,3 +5991,39 @@ State: open, for the final review.
 
 What happens: Importing the existing live driver before the existing live runner causes a circular module initialization error for `pieceViews` under plain Node.js. The new script `packages/engine/scripts/live-check-roles.ts` imports the runner first, as `live-check.ts` does, and its help and dry-run checks pass. The cycle itself is still there.
 Why it matters: A reordered import would stop both owner-run checks from starting. It waits for the final review.
+
+## 370. Two browser assertions reject supported thread navigation
+
+Found: 2026-11-04, while repairing foundation review records FR-086 and FR-092.
+State: fixed.
+
+What happened: The administration browser test expected `/threads/phone-worker`, but the production link uses `/#/thread/phone-worker`. The phone browser test required a Hypertext Transfer Protocol (HTTP) 200 response from a hash-only navigation. Playwright returns no response for that navigation. Both assertions stopped the later behavior checks.
+
+What changed: The administration test pins the supported hash link, follows it, and reads the question before continuing through every settings check. The phone test checks the exact alert route and retained document. It checks the permission answer, the runner's agent and option, and output emitted only after approval. Reloading the thread independently reads back the committed answer and agent output. Only that fresh-document reload requires HTTP 200. Existing width and browser-storage checks remain in place.
+
+Why it matters: These tests now reach their administration and permission-flow assertions. Temporary production mutations verify that a wrong administration link and missing navigation handlers are rejected. The separate Hypertext Transfer Protocol Secure (HTTPS) fixture update belongs to the public-address repair in FR-001. The overflow mutation proof in FR-048 remains a Phase 2 item.
+
+## 371. A configured public HTTP page cannot generate browser request identifiers
+
+Found: 2026-11-04, while fixing foundation review record FR-001.
+State: fixed in the commit that adds this entry.
+
+What happens: The public address accepted plain Hypertext Transfer Protocol
+(HTTP), and the remote access guide offered a non-loopback HTTP page.
+Browsers do not expose `crypto.randomUUID` there, so the logged-in page cannot
+generate the identifiers needed for its application programming interface
+(API) requests.
+What should happen: By the owner's 2026-11-04 decision, every configured public
+address requires Hypertext Transfer Protocol Secure (HTTPS).
+The schema, engine and web settings refuse HTTP with a clear explanation.
+Local HTTP remains available at `127.0.0.1`, including through a Secure Shell
+(SSH) local forward with identical ports on the browser device and server.
+Why it matters: The supported remote dashboard journey needs the browser's
+secure-context APIs after login.
+The change keeps the existing request identifiers and retry behavior.
+Regression evidence: The pre-fix schema, engine and settings-page tests accept
+HTTP and fail the new refusal checks.
+The production-shell browser test checks login and an actual outgoing request
+identifier at `http://127.0.0.1:<port>`.
+The phone and board alert browser fixtures use a real local HTTPS proxy while
+retaining their link, answer and readback checks.

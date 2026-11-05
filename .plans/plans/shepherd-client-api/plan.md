@@ -3,7 +3,7 @@ topic: shepherd-client-api
 status: accepted
 tier: L
 created: 2026-11-03
-updated: 2026-11-03
+updated: 2026-11-04
 epic: shepherd-foundation
 ---
 
@@ -85,10 +85,12 @@ view each get an attack pass.
   One random token per engine start, held in memory, is the session. There are no
   rate limits and no lockouts, and no command is kept from a logged-in dashboard. If
   the variable is not set, the web server does not start. The owner chose this.
-- **The software serves plain HTTP on loopback.** A public address may be `http` or
-  `https`, and the login cookie is `Secure` only when it is `https`. Proxy, certificate
-  and DNS setup are the owner's later work. With an `http` address, only what the owner
-  runs in front protects the password. The owner chose this.
+- **The software serves plain HTTP on loopback.** A public address must use
+  `https`, and public login cookies are `Secure` (row 204). The proxy must serve
+  HTTPS with a certificate trusted by the browser. Proxy, certificate and Domain
+  Name System (DNS) setup remain the owner's work. Interim access uses an SSH
+  local forward at `http://127.0.0.1:<port>`, with identical device and server
+  ports. The name `localhost` remains refused.
 - **Phone alerts carry no thread text,** and go through one sender
   interface, with ntfy first. An alert says what kind of thing needs the
   owner, and names the agent and its team, each cut short and under a fixed
@@ -525,7 +527,7 @@ password, with the checks a browser needs. SECURITY.md rules 1, 2, 3, 4 and 6. R
 | 5.13 | The engine's Unix socket keeps its authentication: its existing tests pass, apart from the device cases of E12, and it still refuses a connection with no credential | Test id: `packages/engine/test/api/auth.test.ts` (one new case, per E12 and E13) |
 | 5.14 | During recovery the web server answers HTTP 503 and serves no command or stream | Test id: `packages/engine/test/client/web-recovery.test.ts` |
 | 5.15 | When its port cannot be bound, the engine keeps running and the Unix socket works; one `client.WebServerDown` is written, a `client.web-down` alert is raised, the bind is retried every 30 seconds (test clock), and on success `client.WebServerUp` clears the alert; held before recovery is ready, its first record is written after it; a port taken across restarts writes one `client.WebServerDown`; `enabled` off closes the outage and its alert | Test id: `packages/engine/test/client/web-bind-failure.test.ts` |
-| 5.16 | `client.web.settings.set` validates the record as contract section 5 says: a `publicAddress` that is neither `http` nor `https`, or not in canonical form, is refused, and both schemes are accepted, and proxy mode on with no public address is refused; it works from a logged-in session and from the owner's terminal; any change closes every web connection, so a reconnect is judged under the new settings | Test id: `packages/engine/test/client/web-settings.test.ts` |
+| 5.16 | `client.web.settings.set` validates the record as contract section 5 says: a `publicAddress` that is not canonical HTTPS is refused with a clear HTTPS explanation by the schema, engine and settings page, including HTTP values while proxy mode is off; canonical HTTPS with a nondefault port is accepted, and proxy mode on with no public address is refused; it works from a logged-in session and from the owner's terminal; any change closes every web connection, so a reconnect is judged under the new settings | Test id: `packages/engine/test/client/web-settings.test.ts` |
 | 5.17 | The password stays secret (E34): with the variable set, a fake adapter's recorded environment holds neither its name nor its value; after a right and a wrong login, the service's log, the event log, the receipts and every client reply hold neither the password nor the session token; an agent's text that contains the password is redacted in its event | Test id: `packages/engine/test/client/web-password-environment.test.ts`; `packages/engine/test/client/web-password-redaction.test.ts`; `packages/engine/test/runner/baseEnvironment.test.ts` (new case) |
 
 **Tasks:**
@@ -737,8 +739,8 @@ builds criteria 10.3 and 10.4 (row 194).
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
 | 10.1 | In proxy mode, the web server accepts the public address setting's `Host` and `Origin` whatever the proxy does with `Host`, and a request that is not public keeps the loopback names, and still binds only loopback; outside proxy mode the public address is refused | Test id: `packages/engine/test/client/web-proxy.test.ts` |
-| 10.2 | Every row of contract section 5's proxy table holds: with proxy mode off, a request with any forwarded header is refused; a public request that names no public address is refused; a settings change closes open connections; a public request with `Host` set to the public address and a loopback `Origin` is refused, and the pair for a proxy that rewrites `Host` is accepted; with each form of public address, an `Origin` with the other scheme is refused; `X-Forwarded-Proto` changes no result, with any value or none; a login over the accepted public row sets a `Secure` cookie when the public address is `https`, and none when it is `http`; a login on loopback never does | Test id: `packages/engine/test/client/web-proxy-table.test.ts` |
-| 10.3 | `docs/remote-access.md` describes the setup: `SHEPHRD_WEB_PASSWORD`, a long string set on the service alone and never in Herdr's environment, and that changing it means restarting the engine; WireGuard to the host; an example Caddyfile whose site uses `bind` on the WireGuard address and a `remote_ip` matcher for the WireGuard network, and proxies to the loopback port; that the setup is an example and the proxy is the owner's own; that with an `http` public address only what the owner runs in front protects the password; the web server's two proxy settings; that the page is at `127.0.0.1`; the warning to store a secret with `accounts set-secret`; the ntfy server's deny-all setup; the limit that an agent on the same user can read the password; and a "lost phone" section; that a `client.web-down` alert means the page must not be opened; and the limit of a squatter on the loopback port | Command: `grep -q SHEPHRD_WEB_PASSWORD docs/remote-access.md && grep -q 'bind ' docs/remote-access.md && grep -q remote_ip docs/remote-access.md && grep -q reverse_proxy docs/remote-access.md && grep -qi 'lost phone' docs/remote-access.md && grep -qi deny-all docs/remote-access.md && grep -q 127.0.0.1 docs/remote-access.md && grep -q 'accounts set-secret' docs/remote-access.md && grep -q 'client.web-down' docs/remote-access.md` |
+| 10.2 | Every row of contract section 5's proxy table holds: with proxy mode off, a request with any forwarded header is refused; a public request that names no public address is refused; a settings change closes open connections; a public request with `Host` set to the public address and a loopback `Origin` is refused, and the pair for a proxy that rewrites `Host` is accepted; with an HTTPS public address, an HTTP `Origin` is refused; `X-Forwarded-Proto` changes no result, with any value or none; a login over the accepted HTTPS public row sets a `Secure` cookie; a login on loopback never does | Test id: `packages/engine/test/client/web-proxy-table.test.ts` |
+| 10.3 | `docs/remote-access.md` describes the setup: `SHEPHRD_WEB_PASSWORD`, a long string set on the service alone and never in Herdr's environment, and that changing it means restarting the engine; WireGuard to the host; an example Caddyfile whose site uses `bind` on the WireGuard address and a `remote_ip` matcher for the WireGuard network, and proxies to the loopback port; that the setup is an example and the proxy is the owner's own; that public addresses require HTTPS with a trusted certificate, even inside WireGuard; that interim SSH local forwarding uses identical device and server ports and `http://127.0.0.1:<port>`, with a real browser login and request identifier proof; the web server's two proxy settings; that the page is at `127.0.0.1`; the warning to store a secret with `accounts set-secret`; the ntfy server's deny-all setup; the limit that an agent on the same user can read the password; and a "lost phone" section; that a `client.web-down` alert means the page must not be opened; and the limit of a squatter on the loopback port | Command: `grep -q SHEPHRD_WEB_PASSWORD docs/remote-access.md && grep -q 'bind ' docs/remote-access.md && grep -q remote_ip docs/remote-access.md && grep -q reverse_proxy docs/remote-access.md && grep -qi 'lost phone' docs/remote-access.md && grep -qi deny-all docs/remote-access.md && grep -q 127.0.0.1 docs/remote-access.md && grep -q 'accounts set-secret' docs/remote-access.md && grep -q 'client.web-down' docs/remote-access.md` |
 | 10.4 | From a phone on mobile data with WireGuard on, through the owner's proxy, the login form opens, the password works, and the page shows the situation view. With WireGuard off on mobile data, and from another device on the home network, the page cannot be reached | On-device step: the owner's phone and a second device, rollout step 8, once the owner's proxy exists; it does not gate the build |
 
 **Tasks:**
@@ -755,7 +757,7 @@ builds criteria 10.3 and 10.4 (row 194).
 | Risk | Severity | Mitigation |
 |---|---|---|
 | Anyone who reaches the proxy can try the password | Medium | The password is the boundary, by the owner's choice (row 184). The example binds only WireGuard, and the owner checks the negative steps (criterion 10.4). |
-| With an `http` public address, the password and the session cookie cross the owner's network unencrypted by Shephrd | Medium | Accepted by the owner (row 198), and named in the known gaps. Only what the owner runs in front protects them. The web server binds only loopback (criterion 5.1), and `Secure` follows the address (criterion 10.2). |
+| An untrusted proxy certificate prevents browser access | Medium | Public addresses require HTTPS (row 204). The owner configures the proxy certificate and trusts it on each device, or uses the documented SSH local forward. The web server still binds only loopback (criterion 5.1). |
 
 **Verify:** criteria 10.1-10.3; criterion 10.4 is the owner's step once the proxy exists.
 
@@ -880,7 +882,7 @@ the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
 |---|---|---|
 | Epic row 2: device pairing | WS-5 | replaced by one password, by the owner (row 184) |
 | Epic row 2: phone alerts | WS-6 | planned |
-| Epic row 2: encrypted remote access | WS-10 | planned as plain HTTP behind the owner's proxy; encryption is the owner's later setup (row 198) |
+| Epic row 2: encrypted remote access | WS-10 | planned as loopback HTTP behind the owner’s HTTPS proxy; certificates are the owner’s setup (row 204) |
 | Epic row 2: the web page | WS-5, WS-7 | planned |
 | Epic row 2: thread viewer in a Herdr pane | WS-8 | planned |
 | Epic done-when 2: answer and read from a phone | WS-11 | planned after a real login; the lead rewords the epic, so done-when 2 names no pairing |
@@ -936,7 +938,7 @@ the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
 | Lead's rulings on round 3, 1 to 8 | WS-1, WS-2, WS-3, WS-5, WS-6, WS-7, WS-8, WS-10 | planned (rows 158 to 175; `attack/round-3-findings.md`) |
 | Lead's v12 note, two lines and a ruling | WS-1 (1.44), WS-3 (3.1, 3.8) | planned (rows 176 to 178); roles unit 11b writes the capacity-hold clause |
 | Lead's final rulings, R4-A1 and the re-anchor to `9e386b0` | WS-1 (1.42), WS-2, WS-7 (7.14) | planned (rows 179 to 181; `attack/round-4-findings.md`) |
-| Owner question 10: plain HTTP | WS-5 (5.5, 5.16), WS-10 (10.2, 10.3) | planned (row 198) |
+| Owner question 10: loopback HTTP and HTTPS public access | WS-5 (5.5, 5.16), WS-10 (10.2, 10.3) | planned (row 204 supersedes public HTTP in row 198) |
 | Owner question 6 | none | answered no; edit E28 and criterion 1.41 are removed (rows 95, 184) |
 | The owner's password ruling and the lead's rulings on it | WS-1 (1.34, E12), WS-5 (5.2, 5.5 to 5.7, 5.17, E34), WS-7 (7.1, 7.8), WS-10 (10.1 to 10.4) | planned (rows 184 to 196) |
 | Roles requests 1-6 | WS-1, WS-3, WS-6; contract section 7 | planned |
@@ -1013,5 +1015,6 @@ gap).
 | v15 | — | No review round, by the lead's ruling. The owner's answer: question 6 is no, and login is one password. The plan loses pairing, devices, the guard, the computer-only list and the lasting-setting alert (rows 184 to 196). |
 | 5 | 0 / 1 / 0 | The lead's final check of contract v15: two Sol reviews, `attack/round-5-architect-sol.md` (grade 7, one major) and `attack/round-5-threat-model-sol.md` (grade 10, ship), no refusals. The major, R5-A1, is folded as contract v16 and row 197: E12's test list gains three files. |
 | v17 | — | No review round, by the lead's instructions. The owner chose plain HTTP (row 198), and row 51 is closed (row 199). |
+| v18 | — | The owner restricts public addresses to HTTPS (row 204). Criteria 5.16, 10.2 and 10.3 follow that decision. Loopback HTTP and exact host matching remain. |
 
 </details>
