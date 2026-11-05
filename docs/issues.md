@@ -6007,3 +6007,16 @@ What happened: The administration browser test expected `/threads/phone-worker`,
 What changed: The administration test pins the supported hash link, follows it, and reads the question before continuing through every settings check. The phone test checks the exact alert route and retained document. It checks the permission answer, the runner's agent and option, and output emitted only after approval. Reloading the thread independently reads back the committed answer and agent output. Only that fresh-document reload requires HTTP 200. Existing width and browser-storage checks remain in place.
 
 Why it matters: These tests now reach their administration and permission-flow assertions. Temporary production mutations verify that a wrong administration link and missing navigation handlers are rejected. The separate Hypertext Transfer Protocol Secure (HTTPS) fixture update belongs to the public-address repair in FR-001. The overflow mutation proof in FR-048 remains a Phase 2 item.
+
+## 371. The terminal permission context omits correlated file changes
+
+Found: 2026-11-04, while repairing foundation review record FR-005.
+State: fixed on `fix/foundation-005`, pending independent verification.
+
+What happened: `packages/viewer/src/actions.ts` accepted only tool-call content when a permission request had no input. It omitted file-change content even when the content carried the request's tool-call identity. The upstream identity repair in issue 322 could not repair this independent filter.
+
+What changed: The terminal helper includes file changes whose `content.callId` matches the request's `toolCallId`. It keeps the request read first, the thread's page and item order, and the existing warnings for missing, redacted or truncated input. It never joins a diff by its path or thread-item identity.
+
+Validation: `packages/viewer/test/request-file-change.test.ts` covers a locations-only request, matching diffs across pages, a diff as the only input, and unrelated and uncorrelated diffs. It also checks that partial-input warnings remain visible. The matching-diff regression failed against the unfixed helper before the filter changed.
+
+Why it matters: The owner can review a correlated edit before answering its permission request in the terminal viewer.
