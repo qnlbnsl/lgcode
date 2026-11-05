@@ -5991,3 +5991,13 @@ State: open, for the final review.
 
 What happens: Importing the existing live driver before the existing live runner causes a circular module initialization error for `pieceViews` under plain Node.js. The new script `packages/engine/scripts/live-check-roles.ts` imports the runner first, as `live-check.ts` does, and its help and dry-run checks pass. The cycle itself is still there.
 Why it matters: A reordered import would stop both owner-run checks from starting. It waits for the final review.
+
+
+## 370. Enabling an initially disabled sheepdog skips cache initialization
+
+Found: 2026-11-04, in the foundation review, record FR-008.
+State: fixed in the foundation fix for FR-008.
+
+What happened: An enabled startup initialized each sheepdog rule, but a switch from off to on only re-armed timers. The cache rule therefore kept an empty target map and never loaded the configured home or harness cache lifetimes. Existing eligible turns received no cache maintenance. Later turns with unsplit context usage also received none until a harness settings change or an enabled restart loaded the lifetime.
+What changed: A switch from off to on now runs the same rule initialization as an enabled startup before arming timers. The cache rule reloads settings and reconstructs targets from current agents and their recorded turns. A future deadline keeps its original expiry. A missed cache deadline is dropped. Repeated activation does not repeat an action.
+Verification: The socket-level cache runtime tests cover settings committed before disabled startup, existing and subsequent unsplit turns, missed deadlines, repeated activation, and Claude transcript reconstruction from the default home and both account-specific home settings. Five regression cases failed against the unfixed loop because no compaction was delivered. The missed-deadline case already passed and remains a guard against extending expiry at activation.

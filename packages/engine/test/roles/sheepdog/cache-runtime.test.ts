@@ -18,6 +18,7 @@ import { layer as redactor } from "../../../src/log/Redactor.ts";
 import { buildServices } from "../../../src/service.ts";
 import { transcriptPath } from "../../../src/roles/sheepdog/usage.ts";
 import { sheepdogLoop } from "../../../src/roles/sheepdog/loop.ts";
+import type { RolesView } from "../../../src/roles/view.ts";
 import { fixtureClient } from "../../support/fixturePiece.ts";
 import { incarnationOf, makeFakeRunner, type FakeRunner } from "../../support/fakeRunner.ts";
 import { agentIdOf, appendSetup, eventOf, makeFakeSecrets, makeRig, removeRig, seedAccount, seedHarness, startPayload, type Rig } from "../../support/handlerRig.ts";
@@ -216,3 +217,90 @@ it.effect("Claude transcript fallback uses only last-request usage and never rec
   yield* TestClock.adjust("58 minutes"); expect(yield* waitCompact(runner)).toBe(1);
   expect(JSON.stringify(yield* alertLog)).not.toContain("PRIVATE TRANSCRIPT BODY");
 })));
+
+// Configuration is committed before the disabled subscription starts. Enabling
+// must reconstruct the cache without depending on another HarnessChanged.
+const switchSheepdog = (client: Client, on: boolean, requestId: string) => Effect.gen(function* () {
+  yield* client["roles.settings.set"]!({ requestId, settings: { sheepdog: on } });
+  const view = yield* eventually(snapshot, (view) => (view.roles as RolesView).baseline?.on === on);
+  expect((view.roles as RolesView).baseline?.on).toBe(on);
+  yield* pause(50);
+});
+
+it.effect.each(["existing", "subsequent", "missed"] as const)(
+  "enabling an initially disabled sheepdog loads the configured lifetime for an %s unsplit turn",
+  (timing) => run((runner, client) => Effect.gen(function* () {
+    const reply = yield* client.harnesses!({ requestId: "activation-harness", operation: "list" });
+    const harness = (reply.harnesses as Array<Record<string, unknown>>).find((row) => row.id === "first")!;
+    yield* client.harnesses!({ requestId: "activation-lifetime", operation: "set", harness: { ...harness, cacheLifetime: 60 } });
+    yield* client["roles.settings.set"]!({ requestId: "initially-off", settings: { sheepdog: false } });
+    const who = yield* start(runner, client);
+    if (timing !== "subsequent") yield* turn(runner, client, who, "before-activation", { used: 200_000 });
+    yield* sheepdogLoop.pipe(Effect.forkScoped);
+    const disabled = yield* eventually(snapshot, (view) => (view.roles as RolesView).baseline?.on === false);
+    expect((disabled.roles as RolesView).baseline?.on).toBe(false);
+    yield* TestClock.adjust(timing === "missed" ? "59 minutes" : "30 minutes");
+    expect(runner.callsOf("compact")).toHaveLength(0);
+    const beforeEnable = (yield* snapshot).sequence;
+    yield* switchSheepdog(client, true, "activate");
+    if (timing === "subsequent") yield* turn(runner, client, who, "after-activation", { used: 200_000 });
+    // Exercise a repeated on write and a real off/on cycle with the same turn.
+    yield* switchSheepdog(client, true, "already-on");
+    yield* switchSheepdog(client, false, "disable-again");
+    yield* switchSheepdog(client, true, "activate-again");
+    expect((yield* alertLog).some((row) => row.sequence > beforeEnable && row.event._tag === "HarnessChanged")).toBe(false);
+    if (timing === "missed") {
+      yield* TestClock.adjust("1 hour");
+      yield* pause(50);
+      expect(runner.callsOf("compact")).toHaveLength(0);
+    } else {
+      // The existing turn's deadline remains minute 58, not enable time + 58.
+      yield* TestClock.adjust(timing === "existing" ? "27 minutes" : "57 minutes");
+      expect(runner.callsOf("compact")).toHaveLength(0);
+      yield* TestClock.adjust("1 minute");
+      expect(yield* waitCompact(runner)).toBe(1);
+      yield* runner.emit({ _tag: "turnEnded", ...who, deliveryId: runner.callsOf("compact")[0]!.input.delivery.id, usage: warm });
+      yield* eventually(snapshot, (view) => view.agents[who.agentId]?.state._tag === "idle");
+      yield* switchSheepdog(client, false, "off-after-action");
+      yield* switchSheepdog(client, true, "on-after-action");
+      yield* TestClock.adjust("1 hour");
+      yield* pause(50);
+      expect(runner.callsOf("compact")).toHaveLength(1);
+      expect((yield* alertLog).filter((row) => row.event._tag === "roles.CompactRequested")).toHaveLength(1);
+    }
+  }), { ...engineLists, reactors: {} }),
+);
+
+it.effect.each(["default", "account-home", "account-environment"] as const)(
+  "enabling an initially disabled sheepdog reconstructs the Claude transcript deadline from %s",
+  (location) => run((runner, client) => Effect.gen(function* () {
+    yield* seedHarness("claude");
+    const configHome = location === "default" ? join(rig.home, ".claude") : join(rig.home, "claude-account");
+    yield* appendSetup([eventOf({ _tag: "AccountChanged", accountId: "activation-claude", account: {
+      id: "activation-claude", harness: "claude", displayName: "Claude", enabled: true,
+      ...(location === "account-home" ? { home: configHome } : {}),
+      ...(location === "account-environment" ? { environment: { CLAUDE_CONFIG_DIR: configHome } } : {}),
+    } })]);
+    yield* client["roles.settings.set"]!({ requestId: "claude-initially-off", settings: { sheepdog: false } });
+    const sessionId = "123e4567-e89b-42d3-a456-426614174000";
+    runner.script("start", () => Effect.succeed({ session: { _tag: "acp", sessionId }, protocolVersion: 2, reloadable: true }));
+    const who = yield* start(runner, client, { harness: "claude", account: { _tag: "named", accountId: "activation-claude" } });
+    const path = transcriptPath(configHome, rig.work, sessionId)!;
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify({ type: "assistant", timestamp: new Date(yield* Clock.currentTimeMillis).toISOString(), message: {
+      content: "PRIVATE ACTIVATION TRANSCRIPT", usage: { input_tokens: 180_000, cache_read_input_tokens: 20_000,
+        cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 10 } },
+    } }) + "\n");
+    yield* turn(runner, client, who, "claude-before-activation", undefined);
+    yield* sheepdogLoop.pipe(Effect.forkScoped);
+    const disabled = yield* eventually(snapshot, (view) => (view.roles as RolesView).baseline?.on === false);
+    expect((disabled.roles as RolesView).baseline?.on).toBe(false);
+    yield* TestClock.adjust("30 minutes");
+    yield* switchSheepdog(client, true, "claude-activate");
+    yield* TestClock.adjust("27 minutes");
+    expect(runner.callsOf("compact")).toHaveLength(0);
+    yield* TestClock.adjust("1 minute");
+    expect(yield* waitCompact(runner)).toBe(1);
+    expect(JSON.stringify(yield* alertLog)).not.toContain("PRIVATE ACTIVATION TRANSCRIPT");
+  }), { ...engineLists, reactors: {} }),
+);
