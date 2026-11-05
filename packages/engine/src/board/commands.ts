@@ -34,6 +34,8 @@ const open: Planner = (input, raw) => Effect.gen(function* () {
   if (payload.group !== undefined && !canOpenGroup(input.snapshot, input.actor, payload.group, anchor)) return yield* refused("group cannot be opened");
   const name = yield* input.runtime.log.redactText(payload.name);
   if (!Schema.is(BoardChannelName)(name)) return yield* refused("name holds a secret");
+  if (Object.values(boardView(input.snapshot).channels).some((channel) => channel.name === name
+    && channel.manager !== undefined && sameAuthor(channel.manager, opener))) return yield* refused("channel name already belongs to this manager");
   const event: Extract<Event, { _tag: "board.ChannelOpened" }> = {
     _tag: "board.ChannelOpened", channelId: Schema.decodeUnknownSync(ChannelId)(randomUUID()), name,
     kind: payload.group === undefined ? "plain" : "group", opener, manager: opener,
@@ -164,14 +166,17 @@ const flush: Planner = (input, raw) => Effect.gen(function* () {
 });
 
 // All reads page from one snapshot. Tokens identify an item within the
-// filtered result, and never grant access on a later request.
+// full stable order before current selection, and never grant access on a later request.
 const page = <T>(items: ReadonlyArray<T>, payload: Record<string, unknown>, key: (item: T) => string,
-  wrap: (reply: Record<string, unknown>) => Record<string, unknown> = (reply) => reply) => {
-  const start = payload.after === undefined ? 0 : items.findIndex((item) => key(item) === payload.after) + 1;
+  wrap: (reply: Record<string, unknown>) => Record<string, unknown> = (reply) => reply,
+  orderedKeys: ReadonlyArray<string> = items.map(key)) => {
+  const positions = new Map(orderedKeys.map((id, index) => [id, index]));
+  const anchor = typeof payload.after === "string" ? positions.get(payload.after) ?? -1 : -1;
+  const remaining = items.filter((item) => positions.get(key(item))! > anchor);
   const result: T[] = [];
   const reply = () => ({ requestId: payload.requestId, items: result,
-    ...(start + result.length < items.length && result.length > 0 ? { next: key(result.at(-1)!) } : {}) });
-  for (const item of items.slice(start)) {
+    ...(result.length < remaining.length && result.length > 0 ? { next: key(result.at(-1)!) } : {}) });
+  for (const item of remaining) {
     if (result.length >= (payload.limit as number | undefined ?? 200)) break;
     result.push(item);
     // Include the envelope, escaping and cursor in the actual wire budget.
@@ -186,7 +191,7 @@ const channels: ReadHandler = (input, payload) => input.runtime.lists?.boardEnab
     ...(channel.manager === undefined ? {} : { manager: channel.manager }),
     ...(channel.group === undefined ? {} : { group: channel.group }),
     ...(channel.anchorAgentId === undefined ? {} : { anchorAgentId: channel.anchorAgentId }),
-  })), payload, (channel) => channel.channelId,
+  })), payload, (channel) => channel.channelId, undefined, Object.keys(boardView(input.snapshot).channels),
 ) });
 
 const read: ReadHandler = (input, payload) => Effect.gen(function* () {
@@ -199,7 +204,8 @@ const read: ReadHandler = (input, payload) => Effect.gen(function* () {
   if ((payload.post !== undefined || payload.repliesTo !== undefined)
     && (referenced === undefined || !canRead(snapshot, actor, referenced.channelId))) return yield* refused();
   if (typeof payload.channelId === "string" && !canRead(snapshot, actor, payload.channelId)) return yield* refused();
-  const posts = Object.values(board.posts).filter((post) => canRead(snapshot, actor, post.channelId)
+  const ordered = Object.values(board.posts).sort((a, b) => a.sequence - b.sequence);
+  const posts = ordered.filter((post) => canRead(snapshot, actor, post.channelId)
     && (payload.channelId === undefined || post.channelId === payload.channelId)
     && (payload.post === undefined || post.postId === payload.post)
     && (payload.repliesTo === undefined || post.replyTo === payload.repliesTo)
@@ -215,7 +221,7 @@ const read: ReadHandler = (input, payload) => Effect.gen(function* () {
     ...(post.outcome === undefined ? {} : { outcome: post.outcome }),
   }));
   const wrap = (value: Record<string, unknown>) => actor._tag === "agent" ? agentReadReply(payload.requestId, value) : value;
-  const plain = page(items, payload, (post) => post.postId, wrap);
+  const plain = page(items, payload, (post) => post.postId, wrap, ordered.map((post) => post.postId));
   const reply = wrap(plain);
   const returned = new Set(plain.items.map((post) => post.postId));
   const unread = posts.filter((post) => returned.has(post.postId) && isUnread(snapshot, actor, post));
@@ -247,7 +253,7 @@ const status = (input: Input, raw: Record<string, unknown>): Effect.Effect<ReadR
   if (disabled) return { reply: { requestId: payload.requestId, agentId: id, sequence: snapshot.sequence, disabled: true,
     unread: 0, incomingOpen: 0, ownOpen: 0, owed: 0, failedCompletions: 0, wakeQueued: false, wakeSent: false,
     holdsUnsettled: false, holdsIncoming: false } };
-  const posts = Object.values(board.posts);
+  const posts = Object.values(board.posts).sort((a, b) => a.sequence - b.sequence);
   const incoming = posts.filter((post) => post.status === "open" && post.reply !== "none"
     && post.to.some((to) => to._tag === "agent" && to.agentId === id)
     && (own(post.dispositions, id) === undefined || own(post.dispositions, id) === "no-answer"));
@@ -261,7 +267,7 @@ const status = (input: Input, raw: Record<string, unknown>): Effect.Effect<ReadR
       postId: post.postId, channelId: post.channelId, reply: post.reply, to: post.to, dispositions: postDispositions(post), acknowledged: post.acknowledged,
       ...(post.outcome === undefined ? {} : { outcome: post.outcome }), ...(failed.has(post.postId) ? { deliveryFailed: true } : {}),
     }));
-    return { reply: page(details, raw, (post) => post.postId) };
+    return { reply: page(details, raw, (post) => post.postId, undefined, posts.map((post) => post.postId)) };
   }
   const wakes = activeWakes(snapshot, id);
   return { reply: { requestId: payload.requestId, agentId: id, sequence: snapshot.sequence, disabled: false,

@@ -103,7 +103,7 @@ it.live("5.11 board.read checks current access on every request, stores no recei
   expect((yield* call(c.worker!, "board.read", { requestId, channelId: "room" }))._tag).toBe("Failure");
 })));
 
-it.live("5.8 board.read pages close at 512 KiB and include one item even when it exceeds the cap", () => run(() => Effect.gen(function* () {
+it.live("5.8 board.read pages close at 512 KiB and limit one returns an ordinary item", () => run(() => Effect.gen(function* () {
   const rows = Array.from({ length: 40 }, (_, index) => postEvent(`large-${index}`, { text: "\\\"界".repeat(4_000) }));
   yield* change(...rows);
   const first = success(yield* call(ownerCredential, "board.read", { channelId: "room", limit: 200 }));
@@ -170,4 +170,79 @@ it.live("5.6 board.status exposes only bounded ids and counts to owner, service,
   }
   expect(ids).toHaveLength(3_074);
   expect(new Set(ids).size).toBe(3_074);
+})));
+
+for (const group of [false, true]) {
+  it.live(`FR-034 ${group ? "group" : "plain"} names are unique per manager across fresh requests and exact replay`, () => run((c) => Effect.gen(function* () {
+    yield* change({ _tag: "AgentGrouped", agentId: "lead", groups: ["review"] });
+    const payload = { requestId: freshRequest(), name: "Review", ...(group ? { group: "review", anchorAgentId: "lead" } : {}) };
+    const first = success(yield* call(c.lead!, "board.open", payload));
+    const before = yield* headSequence;
+    expect(success(yield* call(c.lead!, "board.open", payload))).toEqual(first);
+    expect(yield* logAfter(before)).toEqual([]);
+    const duplicate = yield* call(c.lead!, "board.open", { ...payload, requestId: freshRequest() });
+    expect(duplicate._tag).toBe("Failure");
+    expect(eventsOf(yield* logAfter(before), "board.ChannelOpened")).toEqual([]);
+    const other = success(yield* call(ownerCredential, "board.open", { ...payload, requestId: freshRequest() }));
+    expect(other.channelId).not.toBe(first.channelId);
+    // Plain and group channels share their manager's namespace.
+    expect((yield* call(c.lead!, "board.open", { name: "Review", ...(group ? {} : { group: "review" }) }))._tag).toBe("Failure");
+    const racing = yield* Effect.all([1, 2].map(() => call(c.lead!, "board.open", { ...payload, name: "Concurrent", requestId: freshRequest() })), { concurrency: 2 });
+    expect(racing.map((result) => result._tag).sort()).toEqual(["Failure", "Success"]);
+  })));
+}
+
+for (const changeKind of ["closed", "resolved", "hidden"] as const) {
+  it.live(`FR-035 incoming and status cursors advance when their anchor becomes ${changeKind}`, () => run((c) => Effect.gen(function* () {
+    yield* change(channelEvent({ channelId: "anchor-room", name: "Anchor", members: [agent("lead"), agent("worker")] }));
+    const first = yield* postAs(c.lead!);
+    const anchor = yield* postAs(c.lead!, { channelId: "anchor-room" });
+    const last = yield* postAs(c.lead!);
+    const requestId = freshRequest();
+    const unwrap = (reply: Record<string, any>) => reply.data === undefined ? reply : JSON.parse(reply.data.split("\n").find((line: string) => line.startsWith("{"))!);
+    const page = unwrap(success(yield* call(c.worker!, "board.read", { requestId, incoming: true, limit: 2 })));
+    expect(page.items.map((row: { postId: string }) => row.postId)).toEqual([first, anchor]);
+    expect(page.next).toBe(anchor);
+    const status = success(yield* call(c.worker!, "board.status", { agentId: "worker", detail: "incoming", limit: 2 }));
+    expect(status.next).toBe(anchor);
+    if (changeKind === "closed") success(yield* call(c.lead!, "board.close", { postId: anchor }));
+    else if (changeKind === "resolved") yield* change({ _tag: "board.AddresseeResolved", postId: anchor, addressee: agent("worker"), disposition: "removed", authorIsOwner: false });
+    else success(yield* call(c.lead!, "board.members", { channelId: "anchor-room", add: [], remove: ["worker"] }));
+    const beforeRead = yield* headSequence;
+    const next = unwrap(success(yield* call(c.worker!, "board.read", { requestId, incoming: true, after: page.next, limit: 2 })));
+    expect(next.items.map((row: { postId: string }) => row.postId)).toEqual([last]);
+    expect(next.next).toBeUndefined();
+    expect(eventsOf(yield* logAfter(beforeRead), "board.Read").flatMap((row) => row.postIds)).toEqual([last]);
+    const detail = success(yield* call(c.worker!, "board.status", { agentId: "worker", detail: "incoming", after: status.next, limit: 2 }));
+    expect(detail.items.map((row: { postId: string }) => row.postId)).toEqual([last]);
+    const sql = yield* SqlClient.SqlClient;
+    expect(yield* sql<{ count: number }>`SELECT count(*) AS count FROM receipts WHERE request_id = ${requestId}`).toEqual([{ count: 0 }]);
+  })));
+}
+
+it.live("FR-035 own-open pagination keeps a closed anchor's sequence", () => run((c) => Effect.gen(function* () {
+  const ids: string[] = [];
+  for (let i = 0; i < 3; i++) ids.push(yield* postAs(c.lead!));
+  const first = success(yield* call(ownerCredential, "board.status", { agentId: "lead", detail: "own", limit: 2 }));
+  const open = success(yield* call(c.lead!, "board.read", { open: true, limit: 2 }));
+  const parsed = JSON.parse(open.data.split("\n").find((line: string) => line.startsWith("{"))!);
+  expect(parsed.next).toBe(ids[1]);
+  success(yield* call(c.lead!, "board.close", { postId: ids[1] }));
+  const next = success(yield* call(ownerCredential, "board.status", { agentId: "lead", detail: "own", after: first.next }));
+  expect(next.items.map((row: { postId: string }) => row.postId)).toEqual([ids[2]]);
+  const continued = success(yield* call(c.lead!, "board.read", { open: true, after: parsed.next }));
+  expect(JSON.parse(continued.data.split("\n").find((line: string) => line.startsWith("{"))!).items.map((row: { postId: string }) => row.postId)).toEqual([ids[2]]);
+})));
+
+it.live("FR-096 a schema-valid replay singleton exceeds 512 KiB and advances to the following post", () => run(() => Effect.gen(function* () {
+  // Branded legacy identities have no length bound. The text stays schema-valid.
+  const legacy = postEvent("legacy-large", { author: { _tag: "service", service: "x".repeat(530_000) }, reply: "none", to: [], text: "Legacy notice." });
+  yield* change(legacy, postEvent("following", { reply: "none", to: [] }));
+  const page = success(yield* call(ownerCredential, "board.read", { channelId: "room" }));
+  expect(page.items.map((row: { postId: string }) => row.postId)).toEqual(["legacy-large"]);
+  expect(encodedBytes(page)).toBeGreaterThan(512 * 1024);
+  expect(page.next).toBe("legacy-large");
+  const next = success(yield* call(ownerCredential, "board.read", { channelId: "room", after: page.next }));
+  expect(next.items.map((row: { postId: string }) => row.postId)).toEqual(["following"]);
+  expect(next.next).toBeUndefined();
 })));
