@@ -7077,20 +7077,23 @@ terminal and Model Context Protocol tests remain unchanged.
 Validation: Temporary production mutations exercise each new proof. No
 production change is needed for these four test findings.
 
-## 425. A manager transfer has no channel-name collision policy
+## 425. A manager transfer had no channel-name collision policy
 
 Found: 2026-11-05, while checking the manager-transfer scope of FR-034.
-State: open, awaiting an owner policy decision.
+State: fixed after the owner's decision on 2026-11-05.
 
-What happens: The board contract requires unique names per manager. It also
-requires a stopped manager's channels to move to its available ancestor or the
-owner. Independently opened same-name channels can therefore meet at one
-successor. The transfer event cannot rename a channel. The contract states no
-collision outcome.
+What happened: Channels with the same name could meet at a successor manager.
+The transfer event carried no renamed channel name.
 
-What remains: Choose the collision policy before changing transfers. The
-opening fix prevents new collisions within an existing manager's namespace.
-It does not refuse required transfers or invent a new channel name.
+What changed: Every transfer prefixes the channel's own name with the stopped
+manager's normalized label. A later transfer replaces the prefix. The view
+retains the original own name instead of splitting a displayed name at dashes.
+A collision adds the first available numeric suffix, starting at `-1`.
+The name keeps the existing character rules and 64-character limit.
+The label is shortened first. The owner chose to shorten the displayed own
+name only when necessary to keep that limit. The original own name remains
+stored for later transfers. Membership, history, unread state and open questions
+remain attached to the channel id. Older transfer events still replay.
 
 ## 426. Board recovery polling reads public dispositions as a keyed object
 
@@ -7809,3 +7812,139 @@ revocation of both the old token and the setup token. The successful reload
 case remains and no longer excludes owner rows. Temporary faults separately
 replace the failure caller, discard its rule, omit token revocation and replace
 the success caller. No production attribution change is needed.
+
+## 472. Reply fragments lost their message identity
+
+Found: 2026-11-05, during the first real-agent browser repair.
+State: fixed.
+
+What happened: The Agent Client Protocol adapter's message identity was dropped.
+The runner emitted separate updates, and the engine gave every fragment a new
+thread item identity. Both clients rendered each event as a separate block.
+
+What changed: The runner assigns one internal identity to each adapter message
+within a turn. It preserves that identity when a message resumes after another
+update. Adapters without message identities use a contiguous message run.
+The engine stores the identity with every delta. Both clients fold deltas by
+identity after paging and sequence deduplication. Text remains plain text.
+
+## 473. Tool updates appeared as repeated serialized objects
+
+Found: 2026-11-05, during the first real-agent browser repair.
+State: fixed.
+
+What happened: Every tool update became a separate displayed event. Structured
+command input and output were serialized rather than displayed as readable text.
+
+What changed: Both clients fold tool updates by call identity within a turn.
+An omitted input, output or status preserves its earlier value. Commands and text
+content are extracted for reading. Terminal snapshots display their output,
+exit code and truncation notice. The stored terminal payload remains structured.
+
+## 474. A sent prompt duplicated its queued source
+
+Found: 2026-11-05, during the first real-agent browser repair.
+State: fixed.
+
+What happened: A first prompt in the agent's start event, or a later queued
+prompt, was displayed again when its sent event arrived.
+
+What changed: Each client displays the source once with its sender and delivery
+states. The web page retains the full queued, sent and accepted history.
+
+## 475. Startup failures hid their safe cause
+
+Found: 2026-11-05, during the first real-agent browser repair.
+State: fixed.
+
+What happened: Every start failure recorded the same generic reason. A failed
+agent looked stopped, and a prompt returned a bare refusal. Extra Codex account
+names implicitly selected private empty logins. A combined model and effort
+string was passed as a model and refused by the adapter.
+
+What changed: Setup failures record fixed reason codes for authentication,
+model, effort, mode, startup and timeout failures. An unsigned extra Codex
+account identifies its private login. The roster, thread and prompt refusal
+explain the code. Raw adapter errors are never persisted or sent to clients.
+The default account remains `codex`. Both existing live workflows already use
+that account. The setup guide documents separate model and effort settings.
+
+## 476. The page lacked stop and resume controls and mislabeled stopped agents
+
+Found: 2026-11-05, during the first real-agent browser repair.
+State: fixed.
+
+What happened: The thread offered no stop or resume action. The situation page
+placed stopped agents, including failed starts, in the idle section.
+
+What changed: The thread calls the existing stop and resume commands. A stopped
+agent without a session uses a fresh resume. The situation page has a stopped
+section with safe failure reasons. A password-authenticated web caller already
+has owner access to these commands, so no permission rule was widened.
+
+## 477. The browser journey had no repeatable real-agent check
+
+Found: 2026-11-05, during the first real-agent browser repair.
+State: implemented; the result file records the actual execution outcome.
+
+What happened: Fake-agent suites did not expose the real adapter's fragmented
+replies, repeated tool updates and account selection behavior.
+
+What changed: `pnpm live-check:web` starts a private engine and a real Codex
+agent, then exercises the authenticated browser journey and checks its file
+side effect. It prints fixed step results and removes its own processes and
+folders. It remains outside `pnpm check` because it consumes a real account.
+
+## 478. A manager transfer reset the successor's unread position
+
+Found: 2026-11-05, by the separate verifier of the live browser fixes.
+State: fixed in repair round 2.
+
+What happened: The manager-transfer reducer initialized the successor's read
+position even when that successor already belonged to the channel.
+Unread posts became read without the successor reading them.
+
+What changed: The reducer checks membership before changing the manager.
+An existing member keeps their position in both plain and group channels.
+A new member still receives the normal initial position.
+The transfer regression now checks the successor's own position and unread post.
+
+## 479. The page could not resume a session that could not be reloaded
+
+Found: 2026-11-05, by the separate verifier of the live browser fixes.
+State: fixed in repair round 2.
+
+What happened: The page requested a fresh resume only when there was no stored
+session. A stored session with `reloadable: false` was refused on every retry.
+
+What changed: That snapshot now selects a fresh resume.
+Before the action, the page explains that it starts a new session and loses
+the old session's context. Reloadable sessions retain their context.
+An agent without a stored session keeps its existing fresh-resume behavior.
+
+## 480. Older logs retain separate reply fragment blocks
+
+Found: 2026-11-05, by the separate verifier of the live browser fixes.
+State: accepted display limit by the owner's round 2 assignment.
+
+What happens: Logs written before the message-identity fix assigned a different
+item identifier to every reply fragment. Those fragments remain separate blocks
+in the web page and the terminal viewer. They remain readable.
+
+The affected logs are today's test threads. The owner chose to retain this
+limit. No migration or inferred grouping is added. Newly written fragments
+with a shared message identity use one growing block.
+
+## 481. The real browser reply check could overlook extra blocks
+
+Found: 2026-11-05, by the separate verifier of the live browser fixes.
+State: fixed in repair round 2.
+
+What happened: The check counted only articles containing a short expected
+reply. Other articles from the same turn did not affect that count.
+
+What changed: The check records the number of agent-message articles before
+the turn and requires exactly one additional article after it ends.
+That article must hold the complete fixed sentence of more than thirty words.
+A browser regression rejects extra blocks even when one has the whole sentence.
+No timing assertion about streaming growth is made.

@@ -11,8 +11,11 @@ import type * as Stream from "effect/Stream";
 
 import type { folderForSpawn } from "../identity/ceiling.ts";
 
+import type { StartFailure } from "@shephrd/contracts/startFailure";
+
 export class RunnerRejected extends Data.TaggedError("RunnerRejected")<{
   readonly reason: string;
+  readonly startFailure?: StartFailure;
 }> {}
 
 export interface RunnerCapabilities {
@@ -81,6 +84,7 @@ export const RunnerEvent = Schema.Union([
     // the user's content (row 66).
     role: Schema.optionalKey(Schema.Literals(["user", "agent"])),
     text: Schema.String,
+    itemId: Schema.optionalKey(Schema.NonEmptyString),
     content: Schema.optionalKey(ThreadContent),
   }),
   Schema.TaggedStruct("modeReported", {

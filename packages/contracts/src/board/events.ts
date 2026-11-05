@@ -23,7 +23,10 @@ export const BoardEvent = Schema.Union([
   Schema.TaggedStruct("board.ChannelMembersChanged", {
     channelId: ChannelId, membersAdded: Schema.Array(BoardAddressee), membersRemoved: Schema.Array(BoardAddressee)
   }),
-  Schema.TaggedStruct("board.ManagerChanged", { channelId: ChannelId, manager: BoardAddressee }),
+  Schema.TaggedStruct("board.ManagerChanged", {
+    channelId: ChannelId, manager: BoardAddressee,
+    name: Schema.optionalKey(BoardChannelName), ownName: Schema.optionalKey(BoardChannelName)
+  }),
   Schema.TaggedStruct("board.PostWritten", { ...postFields, replyToPostId: replyTo }),
   Schema.TaggedStruct("board.PostAcknowledged", { postId: PostId, addressee: BoardAddressee }),
   Schema.TaggedStruct("board.AddresseeResolved", {

@@ -1,3 +1,4 @@
+import { startFailureText } from "@shephrd/contracts/startFailure";
 import { commandOutcome } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import { holderAbove, passUp } from "../routing/holders.ts";
@@ -23,9 +24,11 @@ const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan
   const { actor, snapshot } = input;
   const agentId = payload.agentId as string;
   const agent = snapshot.agents[agentId];
-  if (agent === undefined || commandOutcome(agent.state._tag, name) === "refused") return yield* refused();
+  if (agent === undefined) return yield* refused();
   const holder = holderAbove(snapshot, agentId);
   if (actor._tag === "agent" && (holder._tag !== "agent" || holder.agentId !== actor.agentId)) return yield* refused();
+  if (agent.state._tag === "stopped" && agent.startFailure !== undefined && name === "prompt") return yield* refused(`Failed to start: ${startFailureText(agent.startFailure)}`);
+  if (commandOutcome(agent.state._tag, name) === "refused") return yield* refused();
   return yield* plan(input, payload);
 });
 export const planners = {

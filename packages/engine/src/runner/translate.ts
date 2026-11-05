@@ -1,9 +1,11 @@
+import { toolValueText } from "@shephrd/contracts/thread";
 import type { Event } from "@shephrd/contracts";
 
 type Content = Extract<Event, { _tag: "ThreadItem" }>["content"];
 export interface Translated {
   readonly kind: "message" | "plan" | "tool-call" | "file-change";
   // Issue 144: the speaker of a message chunk.
+  readonly messageId?: string;
   readonly role?: "user" | "agent";
   readonly text: string;
   readonly content: Content;
@@ -20,7 +22,7 @@ export const translate = (value: unknown, replay: boolean): ReadonlyArray<Transl
   if (update.sessionUpdate === "agent_message_chunk" || (replay && update.sessionUpdate === "user_message_chunk")) {
     const content = record(update.content);
     return content?.type === "text" && typeof content.text === "string"
-      ? [{ kind: "message", role: update.sessionUpdate === "user_message_chunk" ? "user" : "agent", text: content.text, content: { _tag: "text", text: content.text } }] : [];
+      ? [{ kind: "message", ...(typeof update.messageId === "string" ? { messageId: update.messageId } : {}), role: update.sessionUpdate === "user_message_chunk" ? "user" : "agent", text: content.text, content: { _tag: "text", text: content.text } }] : [];
   }
   const entries = update.sessionUpdate === "plan" ? update.entries
     : update.sessionUpdate === "plan_update" && update.plan?.type === "items" ? update.plan.entries : undefined;
@@ -39,8 +41,8 @@ export const translate = (value: unknown, replay: boolean): ReadonlyArray<Transl
   if (typeof update.toolCallId !== "string" || update.toolCallId === "") return [];
   return [{ kind: "tool-call", text: JSON.stringify(update), content: {
     _tag: "tool-call", callId: update.toolCallId, title: typeof update.title === "string" ? update.title : "",
-    status: ["pending", "in_progress", "completed", "failed"].includes(update.status) ? update.status : "pending",
-    ...(update.rawInput === undefined ? {} : { input: JSON.stringify(update.rawInput) }),
-    output: update.rawOutput === undefined ? JSON.stringify(content) : JSON.stringify(update.rawOutput),
+    ...(["pending", "in_progress", "completed", "failed"].includes(update.status) ? { status: update.status } : {}),
+    ...(update.rawInput === undefined ? {} : { input: toolValueText(update.rawInput) }),
+    ...(update.rawOutput !== undefined ? { output: toolValueText(update.rawOutput) } : content.length > 0 ? { output: toolValueText(content.filter((part: any) => part?.type !== "terminal")) } : {}),
   } }];
 };

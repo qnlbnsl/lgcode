@@ -1,3 +1,4 @@
+import { StartFailure } from "../startFailure.ts"
 import * as Schema from "effect/Schema"
 import { Actor, EventEnvelope, PermissionOption, SessionReference } from "../events.ts"
 import { AccountId, AgentId, DeliveryId, EpochMilliseconds, EventSequence, HarnessId, WaitId } from "../ids.ts"
@@ -24,6 +25,7 @@ export const contentOnlyEventTags = ["ThreadItem"] as const
 export const RosterEntry = Schema.Struct({
   agentId: AgentId, name: Schema.String, role: Schema.String, groups: Schema.Array(Schema.String),
   parent: Actor, parentName: Schema.optionalKey(Schema.String),
+  startFailure: Schema.optionalKey(StartFailure),
   state: LifecycleState, displayedState: DisplayedState,
   openPermissionRequests: Count, openQuestionsAsked: Count,
   harness: HarnessId, account: AccountId,

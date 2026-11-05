@@ -1,3 +1,4 @@
+import { safeStartFailure, type StartFailure } from "@shephrd/contracts/startFailure";
 import {
   EventSequence as EventSequenceSchema, eventEffect,
   type Account, type Actor, type Caller, type PermissionAction, type AgentId, type Delivery, type Event, type EventEnvelope, type EventSequence, type LifecycleState,
@@ -25,6 +26,7 @@ interface AgentRow {
   readonly folder: string;
   readonly runMode: string;
   readonly state: LifecycleState;
+  readonly startFailure?: StartFailure | undefined;
   readonly session?: SessionReference;
   readonly protocolVersion?: number;
   readonly reloadable?: boolean;
@@ -187,7 +189,7 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
       compacting: false, capacityHeld: false,
     });
     case "SessionOpened": return change(state.agents, event.agentId, (row) => ({
-      ...row, state: nextState(row.state, event), session: event.session,
+      ...row, state: nextState(row.state, event), startFailure: undefined, session: event.session,
       protocolVersion: event.protocolVersion, reloadable: event.reloadable,
     }));
     case "AgentGrouped": return change(state.agents, event.agentId, (row) => ({ ...row, groups: event.groups }));
@@ -199,9 +201,11 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
       const compacting = next._tag === "working" && lookup(state.deliveries, event.deliveryId)?.content._tag === "compact";
       return next === row.state && compacting === row.compacting ? row : { ...row, state: next, compacting };
     });
+    case "AgentStartFailed": return change(state.agents, event.agentId, (row) => ({
+      ...row, state: nextState(row.state, event), startFailure: safeStartFailure(event.reason),
+    }));
     case "DeliveryHeld":
     case "DeliveryReleased":
-    case "AgentStartFailed":
     case "TurnStarted":
     case "TurnEnded":
     case "StateChanged":

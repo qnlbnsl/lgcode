@@ -35,7 +35,7 @@ it("fold: channels preserve their opener and group anchor, and a direct channel 
   expect(state.channels["direct"]?.manager).toBeUndefined();
 });
 
-it("fold: member removal and rejoin preserve the last-left sequence; moving the seat preserves the opener", async () => {
+it("fold: member removal and rejoin preserve the last-left sequence; moving the seat preserves the opener and existing member's unread position", async () => {
   const { state } = await scenario([...setup, post("old"),
     event({ _tag: "board.ChannelMembersChanged", channelId: "room", membersAdded: [], membersRemoved: [agent("worker")] }),
     event({ _tag: "board.ChannelMembersChanged", channelId: "room", membersAdded: [agent("worker")], membersRemoved: [] }),
@@ -45,7 +45,7 @@ it("fold: member removal and rejoin preserve the last-left sequence; moving the 
   expect(state.channels["room"]).toMatchObject({ manager: agent("other"), opener: agent("lead"), seatSequence: 8 });
   expect(state.channels["room"]?.members).toContainEqual(agent("lead"));
   expect(position(state)).toEqual({ watermark: 5, above: [] });
-  expect(position(state, "other")).toEqual({ watermark: 5, above: [] });
+  expect(position(state, "other")).toEqual({ watermark: 0, above: [] });
 });
 
 it("fold: PostWritten retains post order and replyTo, and records every reply in order", async () => {

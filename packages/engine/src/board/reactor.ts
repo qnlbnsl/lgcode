@@ -1,3 +1,4 @@
+import { transferName } from "./transferName.ts";
 import type { AgentId, Event, EventEnvelope } from "@shephrd/contracts";
 import type { BoardPostView } from "@shephrd/contracts/board/view";
 import * as Effect from "effect/Effect";
@@ -55,7 +56,8 @@ export const lifecycleBatch = (snapshot: Snapshot, target: AgentId, lists?: Engi
     if (channel.kind === "direct" || channel.manager?._tag !== "agent" || channel.manager.agentId !== target
       || !stoppedAfter(state, target, channel.seatSequence)) continue;
     const manager = successorManager(state, channel.channelId);
-    if (manager !== undefined) append({ _tag: "board.ManagerChanged", channelId: channel.channelId, manager });
+    if (manager !== undefined) append({ _tag: "board.ManagerChanged", channelId: channel.channelId, manager,
+      ...transferName(state, channel, manager, state.agents[target]?.name ?? "agent") });
   }
   for (const original of Object.values(boardView(state).posts)) {
     if (original.status !== "open") continue;

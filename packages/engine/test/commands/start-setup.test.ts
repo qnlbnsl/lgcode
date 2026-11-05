@@ -113,7 +113,7 @@ it.effect("A3 timeout: catches a plain start whose setup is not bounded at two m
 
     const rows = yield* readLog;
     // The fixed reason, never the runner's.
-    expect(tagged(rows, "AgentStartFailed")).toEqual([{ _tag: "AgentStartFailed", agentId, reason: "agent start failed" }]);
+    expect(tagged(rows, "AgentStartFailed")).toEqual([{ _tag: "AgentStartFailed", agentId, reason: "timed-out" }]);
     expect(tagged(rows, "SessionOpened")).toEqual([]);
     expect(fakes.runner.callsOf("stop").map((entry) => entry.input.agentId)).toEqual([agentId]);
     const sql = yield* SqlClient.SqlClient;
@@ -152,7 +152,7 @@ const expectFailedStart = (fakes: Fakes, agentId: string) => Effect.gen(function
   yield* eventually(agentRow(agentId), (row) => row?.state._tag === "stopped");
   expect((yield* agentRow(agentId))?.state._tag).toBe("stopped");
   const rows = yield* readLog;
-  expect(tagged(rows, "AgentStartFailed")).toEqual([{ _tag: "AgentStartFailed", agentId, reason: "agent start failed" }]);
+  expect(tagged(rows, "AgentStartFailed")).toEqual([{ _tag: "AgentStartFailed", agentId, reason: "could-not-start" }]);
   expect(tagged(rows, "SessionOpened")).toEqual([]);
   expect(fakes.runner.callsOf("stop").map((entry) => entry.input.agentId)).toContain(agentId);
   const sql = yield* SqlClient.SqlClient;

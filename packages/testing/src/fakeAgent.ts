@@ -62,6 +62,7 @@ type Step = DiagnosticStep | StepDiagnostic
 interface Script {
   protocolVersion?: 1 | 2
   // Unit 6d: advertise a peer that cannot reload, without starting a real adapter.
+  sessionError?: string
   reloadable?: boolean
   reportVersion?: boolean
   agentInfo?: { name: string; version: string }
@@ -227,7 +228,9 @@ const program = Effect.gen(function*() {
   const sessions = new Map<string, { turn: number; options: AcpSchema.SessionConfigOption[]; cancel?: Deferred.Deferred<void> }>()
   let nextSession = 0
   yield* agent.handleInitialize(() => Effect.succeed({ protocolVersion: 2, info: script.agentInfo ?? { name: "fake-agent", version: "0.0.0" }, capabilities: script.reloadable === false ? {} : { session: {} } }))
-  yield* agent.handleCreateSession(() => Effect.sync(() => {
+  yield* agent.handleCreateSession(() => script.sessionError !== undefined
+    ? Effect.fail(new AcpRequestError({ code: -32000, errorMessage: script.sessionError }))
+    : Effect.sync(() => {
     const sessionId = `fake-session-${++nextSession}`
     const options = structuredClone(script.configOptions ?? [])
     sessions.set(sessionId, { turn: 0, options })

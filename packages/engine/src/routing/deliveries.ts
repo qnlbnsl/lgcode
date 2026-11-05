@@ -156,7 +156,7 @@ const accepted = (snapshot: Snapshot, agentId: AgentId, deliveryId: string): Rea
 export const deliveryUpdate = (snapshot: Snapshot, event: Extract<RunnerEvent, { _tag: "deliveryUpdate" }>): ReadonlyArray<Event> =>
   event.replay || event.kind === "available_commands_update" ? [] : [
     ...accepted(snapshot, event.agentId, event.deliveryId),
-    ...(event.content === undefined ? [] : [{ _tag: "ThreadItem" as const, agentId: event.agentId, itemId: randomUUID(),
+    ...(event.content === undefined ? [] : [{ _tag: "ThreadItem" as const, agentId: event.agentId, itemId: event.itemId ?? randomUUID(),
       content: event.content, replay: false }]),
   ];
 

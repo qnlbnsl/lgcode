@@ -10,6 +10,7 @@ export const roster = (caller: Caller, view: Snapshot): ReadonlyArray<RosterEntr
     return {
       agentId: row.agentId, name: row.name, role: row.role, groups: row.groups, parent: row.parent,
       ...(row.parent._tag === "agent" && view.agents[row.parent.agentId] !== undefined ? { parentName: view.agents[row.parent.agentId]!.name } : {}),
+      ...(row.startFailure === undefined ? {} : { startFailure: row.startFailure }),
       state: row.state, displayedState: displayedState({ state: row.state, openPermissionRequests, openQuestionsAsked }),
       openPermissionRequests, openQuestionsAsked, harness: row.harness, account: row.account,
       ...(row.model === undefined ? {} : { model: row.model }), ...(row.effort === undefined ? {} : { effort: row.effort }),

@@ -105,7 +105,7 @@ it.effect("5.4 start: catches a start with no prompt that still queues a deliver
     expect(Object.values((yield* views.snapshot).deliveries)).toHaveLength(0);
   })).pipe(Effect.orDie));
 
-it.effect("5.4 start (row 70): catches an adapter rejection that leaves the agent starting, writes no 'agent start failed', or writes it with other text", () =>
+it.effect("5.4 start (row 70): catches an adapter rejection that leaves the agent starting, writes no safe failure category, or writes raw adapter text", () =>
   withRig((fakes) => Effect.gen(function* () {
     fakes.runner.rejectNext("start", "model not available");
     const before = yield* headSequence;
@@ -115,7 +115,7 @@ it.effect("5.4 start (row 70): catches an adapter rejection that leaves the agen
     const written = (yield* logAfter(before)).map((row) => row.event);
     expect(written.map((event) => event._tag)).toEqual(expect.arrayContaining(["AgentStarted", "AgentStartFailed"]));
     const failed = written.find((event) => event._tag === "AgentStartFailed");
-    expect(failed).toMatchObject({ _tag: "AgentStartFailed", reason: "agent start failed" });
+    expect(failed).toMatchObject({ _tag: "AgentStartFailed", reason: "could-not-start" });
 
     const views = yield* Views.Views;
     const rows = Object.values((yield* views.snapshot).agents).filter((agent) => agent.name === "Builder");

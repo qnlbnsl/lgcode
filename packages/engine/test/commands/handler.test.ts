@@ -656,7 +656,7 @@ it.effect("5b error reasons, a rejected adapter: catches an AgentStartFailed rea
     const outcome = yield* call(ownerCredential, "start", startPayload(rig, { prompt: plant("first-prompt") }));
     const written = yield* readLog;
     const failed = written.find((row) => row.event._tag === "AgentStartFailed")?.event;
-    expect(failed).toMatchObject({ _tag: "AgentStartFailed", reason: "agent start failed" });
+    expect(failed).toMatchObject({ _tag: "AgentStartFailed", reason: "could-not-start" });
     for (const where of [JSON.stringify(failureOf(outcome) ?? null), JSON.stringify(written), ...lines]) {
       expect(where).not.toContain(secretText);
     }

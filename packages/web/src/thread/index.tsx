@@ -1,6 +1,9 @@
+import { startFailureText } from "@shephrd/contracts/startFailure"
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import type { ClientEnvelope } from "@shephrd/client/browser"
 import type { AgentId, Oversized } from "@shephrd/contracts"
+import { groupThreadItems } from "@shephrd/contracts/thread"
+import { Lifecycle } from "./lifecycle.tsx"
 import { Content } from "./content.tsx"
 import { DeliveryHistory } from "./delivery.tsx"
 import { requestId, withClient } from "./client.ts"
@@ -38,7 +41,7 @@ function LargeItem({ item, signal, onLoaded }: {
   </article>
 }
 
-function Prompt({ agentId, signal }: { readonly agentId: AgentId; readonly signal: AbortSignal }) {
+function Prompt({ agentId, signal, failure }: { readonly agentId: AgentId; readonly signal: AbortSignal; readonly failure?: string }) {
   const busy = useRef(false)
   const attempt = useRef<{ text: string; requestId: ReturnType<typeof requestId> } | undefined>(undefined)
   const [sending, setSending] = useState(false)
@@ -49,6 +52,7 @@ function Prompt({ agentId, signal }: { readonly agentId: AgentId; readonly signa
     const field = event.currentTarget.elements.namedItem("prompt") as HTMLTextAreaElement
     const text = field.value
     if (!text.trim()) return
+    if (failure !== undefined) { setMessage(`Failed to start: ${startFailureText(failure)}`); return }
     busy.current = true
     setSending(true)
     setMessage("")
@@ -90,17 +94,20 @@ export function Thread({ agentId, subject, onSessionExpired }: {
     <nav><a href="/">Situation</a></nav>
     <h2>Thread: {visibleText(agent?.name ?? agentId)}</h2>
     <p role="status">{state.connection}</p>
+    {agent?.state && <Lifecycle agent={agent} signal={controller.signal} />}
     <AlertSubjects agentId={agentId} {...(subject === undefined ? {} : { subject })}
       {...(state.snapshot === undefined ? {} : { sequence: state.snapshot.sequence })} />
     {!state.loaded && <p>Loading thread…</p>}
     {state.loaded && state.items.length === 0 && <p>No thread items.</p>}
-    {state.items.map((item) => {
+    {groupThreadItems(state.items).map((item) => {
       if (!("event" in item)) return <LargeItem key={item.sequence} item={item} signal={controller.signal}
         onLoaded={(envelope) => watcher.current?.recover(envelope)} />
       const event = item.event
       switch (event._tag) {
+        case "AgentStartFailed": return <article aria-label="Failed start" key={item.sequence}><p>Failed to start: {startFailureText(event.reason)}</p></article>
         case "ThreadItem": return <article aria-label="Agent message" key={`${item.sequence}:${event._tag}`}><p>Agent data</p><Content event={event} /></article>
-        case "PromptSent": return <article aria-label="Sent prompt" key={`${item.sequence}:${event._tag}`}><p>Prompt</p><DataText text={event.text} /></article>
+        case "PromptSent": if (envelopes.some(({ event: source }) => (source._tag === "AgentStarted" ? source.firstPromptDelivery?.id : source._tag === "DeliveryQueued" ? source.delivery.id : undefined) === event.deliveryId)) return null
+          return <article aria-label="Sent prompt" key={`${item.sequence}:${event._tag}`}><p>Prompt</p><DataText text={event.text} /></article>
         case "AgentStarted": case "DeliveryQueued": case "DeliverySent": case "DeliveryAccepted": case "DeliveryRequeued":
         case "DeliveryHeld": case "DeliveryReleased": case "DeliveryReturned": case "DeliveryWithdrawn":
           return <DeliveryHistory key={`${item.sequence}:${event._tag}`} event={event} items={envelopes} />
@@ -113,6 +120,6 @@ export function Thread({ agentId, subject, onSessionExpired }: {
         default: return null
       }
     })}
-    {state.loaded && <Prompt agentId={agentId} signal={controller.signal} />}
+    {state.loaded && <Prompt agentId={agentId} signal={controller.signal} {...(agent?.startFailure === undefined ? {} : { failure: agent.startFailure })} />}
   </section>
 }

@@ -61,7 +61,7 @@ export const bounded = (runtime: Runtime, agentId: AgentId, timeoutMillis: numbe
     Effect.flatMap((result) => Option.isSome(result) ? Effect.succeed(result.value)
       : runtime.runner.stop({ agentId }).pipe(
         Effect.catchTag("RunnerRejected", () => Effect.void),
-        Effect.andThen(Effect.fail(new RunnerRejected({ reason: "adapter setup timed out" }))),
+        Effect.andThen(Effect.fail(new RunnerRejected({ reason: "adapter setup timed out", startFailure: "timed-out" }))),
       )),
   );
 

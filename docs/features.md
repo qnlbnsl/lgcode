@@ -326,3 +326,11 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   file compiled with Bun was considered and not chosen: T3 Code's SQLite
   code uses Node.js's own `node:sqlite`, and the Claude Code ACP adapter
   needs Node.js anyway.
+
+
+## The real browser check
+
+`pnpm live-check:web` exercises a private engine with a real Codex agent and
+Chromium. It verifies streamed replies, prompts, command permission answers,
+reload, stop, resume and safe startup failures. It remains separate from
+`pnpm check` because it consumes the signed-in account's allowance.

@@ -14,7 +14,8 @@
     "check": "pnpm -r typecheck && tsc --noEmit && vitest run && pnpm test:browser && scripts/check-credits.sh",
     "record-fixtures": "node packages/engine/scripts/record-fixtures.ts",
     "live-check": "node packages/engine/scripts/live-check.ts",
-    "live-check:roles": "node packages/engine/scripts/live-check-roles.ts"
+    "live-check:roles": "node packages/engine/scripts/live-check-roles.ts",
+    "live-check:web": "node packages/engine/scripts/live-check-web.ts"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
