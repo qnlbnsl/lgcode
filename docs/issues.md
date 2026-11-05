@@ -6156,3 +6156,24 @@ What happened: `packages/client/src/waitForAgents.ts` rejected every snapshot wi
 What changed: The helper identifies the board condition read from an explicit namespace table. It includes a failed board section in that discovery. It recovers `holdsUnsettled` and `ownerHeld` from the independent status read before deciding whether to end the wait. The existing published-sequence gate and failed-read retry remain in use.
 
 Why it matters: A snapshot-hook failure no longer forces the owner to restart a wait. Held targets keep waiting, owner-held targets return `request-held`, and released targets settle only after the stream reaches the lists' published sequence. The client regression covers both wait modes and a failed status read on a quiet log. The existing engine test still checks that a held publication exposes only the previous published lists and that status survives a failed snapshot hook.
+
+## 378. Plain-channel additions used immediate parents instead of effective holders
+
+Found: 2026-11-04, while fixing foundation review record FR-010.
+State: fixed in the foundation fix branch.
+
+What happened: `board/access.ts` checked immediate parent links when an agent
+manager added a member. An idle manager could not add a descendant through a
+paused, starting, interrupted, crashed or stopped intermediary. A manager also
+could not add its own effective holder through an unavailable ancestor.
+
+What changed: Plain-channel additions use the engine's `holderAbove` rule in
+both directions. The management check and the stored manager seat retain their
+existing rules. The shared access fixture now opens the agents' sessions, so
+its baseline holders are idle instead of starting. Existing assertions remain.
+New pure and authenticated command regressions cover unavailable intermediaries,
+available intermediaries, the manager's own holder and the owner's override.
+
+Why it matters: The contract permits a manager to add agents it holds, even
+when their immediate parents cannot act. The fix restores that delegated
+operation without changing stored membership when an agent's state changes.

@@ -2,6 +2,7 @@ import { comparePermission, type Actor, type AgentId, type Caller } from "@sheph
 import type { BoardAddressee, BoardAuthor, ReplyMode } from "@shephrd/contracts/board/ids";
 import type { BoardPostView, BoardView } from "@shephrd/contracts/board/view";
 import type { Snapshot } from "../commands/internal.ts";
+import { holderAbove } from "../routing/holders.ts";
 
 export interface PostAccess {
   readonly channelId: string;
@@ -105,10 +106,10 @@ export const canAddMember = (snapshot: Snapshot, caller: Caller, channelId: stri
     || !canManage(snapshot, caller, channelId)) return false;
   if (caller._tag === "owner") return true;
   if (caller._tag !== "agent") return false;
-  const parent = own(snapshot.agents, memberId)?.parent;
-  const ownParent = own(snapshot.agents, caller.agentId)?.parent;
-  return (parent?._tag === "agent" && parent.agentId === caller.agentId)
-    || (ownParent?._tag === "agent" && ownParent.agentId === memberId);
+  const holder = holderAbove(snapshot, memberId);
+  const ownHolder = holderAbove(snapshot, caller.agentId);
+  return (holder._tag === "agent" && holder.agentId === caller.agentId)
+    || (ownHolder._tag === "agent" && ownHolder.agentId === memberId);
 };
 
 export const canClose = (snapshot: Snapshot, caller: Caller, postId: string): boolean => {
