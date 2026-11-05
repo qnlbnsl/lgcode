@@ -10,7 +10,7 @@ import { safeText } from "../src/text.ts";
 import { agentRow, envelope, permission, snapshot } from "../../client/test/support/unit3.ts";
 import {
   agentEnvironment, chunk, cleanupUnit7b, fakeEngine, finishCli, prepareRoot,
-  ownerCredential, serviceEnvironment, startCli, succeed, until, type RequestFrame,
+  ownerCredential, refuse, serviceEnvironment, startCli, succeed, until, type RequestFrame,
 } from "../../testing/test/support/unit7b.ts";
 import type { WebSocket } from "ws";
 
@@ -39,7 +39,10 @@ it("drives live threads, context review, a selected answer and an owner prompt t
     }) });
     else if (frame.tag === "client.thread") succeed(socket, frame, { requestId: frame.payload.requestId, items: [initial] });
     else if (frame.tag === "client.subscribe") subscription = { frame, socket };
-    else if (frame.tag === "client.event") succeed(socket, frame, { requestId: frame.payload.requestId, envelope: envelope(9, action) });
+    else if (frame.tag === "client.event") {
+      if (frame.payload.sequence !== 9) refuse(socket, frame, "unexpected request source sequence");
+      else succeed(socket, frame, { requestId: frame.payload.requestId, envelope: envelope(9, action) });
+    }
     else if (frame.tag === "answer") { answered = true; succeed(socket, frame, { requestId: frame.payload.requestId }); }
     else if (frame.tag === "prompt") succeed(socket, frame, { requestId: frame.payload.requestId, deliveryId: "owner-prompt" });
     else throw new Error(`Unexpected viewer request: ${frame.tag}`);
@@ -66,6 +69,8 @@ it("drives live threads, context review, a selected answer and an owner prompt t
   await until("live rendered event", () => output.includes("Live leftright"));
   expect(output).not.toContain("clipboard-data");
   key("a");
+  await until("request event read", () => peer.requests.some((frame) => frame.tag === "client.event"));
+  expect(peer.requests.filter((frame) => frame.tag === "client.event").map((frame) => frame.payload.sequence)).toEqual([9]);
   await until("first context page", () => output.includes("inspect configuration") && output.includes("Read the context"));
   key("\r");
   key("\u001b[F");
@@ -79,6 +84,10 @@ it("drives live threads, context review, a selected answer and an owner prompt t
   expect(peer.requests.find((frame) => frame.tag === "answer")?.payload).toMatchObject({
     kind: "permission", id: "permission-9", optionId: "reject",
   });
+  expect(peer.requests.filter((frame) => frame.tag === "answer")).toHaveLength(1);
+  expect(peer.requests.findIndex((frame) => frame.tag === "client.event")).toBeLessThan(
+    peer.requests.findIndex((frame) => frame.tag === "answer"),
+  );
   key("p");
   await until("prompt composer", () => output.includes("Owner draft to agent-a"));
   key("\u001b[200~Please inspect\nthis exact text.\u001b[201~");

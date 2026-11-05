@@ -6830,3 +6830,32 @@ and proves construction has not entered. The earlier transaction commits
 before releasing the permit. The reactor then checks its transaction entry
 and fresh projected state. A temporary hoisted-construction mutation must fail.
 The existing projected-reach regression remains.
+
+## 416. The terminal viewer integration peer accepted any request source sequence
+
+Found: 2026-11-05, while repairing foundation review record FR-088.
+State: fixed as a regression-proof gap.
+
+What happened: The fake event responder returned permission event 9 for every
+numeric sequence. The integration test could pass if the application requested
+the wrong source event.
+
+What changed: The peer refuses any sequence other than 9. The test independently
+checks the observed sequence, requires the context read before the answer, and
+keeps the context-reading and selected-answer assertions. A temporary wrong
+sequence in the application must fail the corrected integration test.
+
+## 417. Permission closure tests did not prove answered action removal
+
+Found: 2026-11-05, while repairing foundation review record FR-091.
+State: fixed as a regression-proof gap.
+
+What happened: The routing fixtures checked action removal only on cancellation.
+The reducer's answered fixture began without action data. A retained action in
+an answered row could escape both expectations.
+
+What changed: The routing and reducer tests independently assert populated
+action data before closure. Separate answer and cancellation projections require
+the action property to be absent. Status, selected answer, answering actor, and
+cancellation reason remain checked. Temporary action-retention mutations in each
+closure branch must fail the corrected tests.
