@@ -30,7 +30,7 @@ it("7.12 uses fixed warnings for hidden input, and shows matching Codex file cha
 
   const codex = await mountThread([
     permissionRequest({ description: "Edit file", locations: [{ path: "src/target.ts", line: 4 }] }),
-    item(3, { _tag: "ThreadItem", itemId: "tool-1", replay: false, content: { _tag: "file-change", path: "src/target.ts", diff: "+safe change" } })
+    item(3, { _tag: "ThreadItem", itemId: "file-change-item", replay: false, content: { _tag: "file-change", callId: "tool-1", path: "src/target.ts", diff: "+safe change" } })
   ])
   expect(codex.textContent).toContain("src/target.ts") // catches hiding the locations that identify Codex's action
   expect(codex.textContent).toContain("+safe change") // catches leaving the matching tool call collapsed or missing

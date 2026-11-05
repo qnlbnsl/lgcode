@@ -111,7 +111,7 @@ live("6.2 stream: text, a plan, a tool call and a file change become thread item
       expect(items[1]!.content).toEqual({ _tag: "plan", entries });
       expect(items[2]!.content).toMatchObject({ _tag: "tool-call", callId: "tool-7", title: "List files", status: "completed" });
       expect(JSON.stringify(items[2]!.content)).toContain("a.txt b.txt");
-      expect(items[3]!.content).toEqual({ _tag: "file-change", path: `${rig.work}/x.ts`, diff: patch });
+      expect(items[3]!.content).toEqual({ _tag: "file-change", callId: "edit-1", path: `${rig.work}/x.ts`, diff: patch });
       expect(items[4]!.content).toEqual({ _tag: "text", text: "last words" });
       // Every item comes before the turn end.
       const lastItem = Math.max(...rows.filter((row) => row.event._tag === "ThreadItem").map((row) => row.sequence));
