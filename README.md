@@ -6,14 +6,18 @@ leads under it, and workers under each lead. They coordinate through a strict
 message board that is built for efficiency, so no agent is woken, and no turn
 is spent, without a reason.
 
-Shephrd also exposes its state through a network API. The goal is that a
-person can start a Herdr server, install Shephrd, and then set up and steer
-their teams from a web page, a desktop app, or a phone, with every agent
-conversation available as a thread.
+Shephrd also exposes its state through a network application programming
+interface (API). The goal is that a person can start a Herdr server, install
+Shephrd, and then set up and steer their teams from a web page, a desktop
+app, or a phone, with every agent conversation available as a thread.
 
 > [!WARNING]
-> Shephrd is at the very start. Nothing is built yet. This README describes
-> the direction, not working software.
+> Shephrd is under development. The engine, authenticated client API, message
+> board and foundry supervision code are implemented. The foundation review
+> and its repairs are still in progress. Standing permission rules remain
+> unbuilt, pending the owner's harness recordings. Real-account and physical
+> phone checks remain separate owner-run work. This is not a released or
+> cleared build, and the capabilities below still include planned work.
 
 ## Where Shephrd came from
 
