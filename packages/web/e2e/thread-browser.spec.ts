@@ -1,3 +1,4 @@
+import { assertPhoneWidth } from "./support/phoneWidth.ts"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
@@ -71,10 +72,7 @@ test("the production thread opens from a roster link, prompts, displays full per
           await expect(page.getByRole("article", { name: "Agent message", exact: true })).toContainText(maliciousText)
           expect(await page.locator("img").count()).toBe(0)
           expect(await page.evaluate(() => (window as typeof window & { __threadXss?: number }).__threadXss)).toBeUndefined()
-          const widths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth,
-            document: document.documentElement.scrollWidth, body: document.body.scrollWidth }))
-          expect(widths.document).toBeLessThanOrEqual(widths.viewport)
-          expect(widths.body).toBeLessThanOrEqual(widths.viewport)
+          await assertPhoneWidth(page, "Thread")
           // Dispatch both clicks before React can commit a disabled state.
           await request.getByRole("button", { name: "Allow", exact: true }).evaluate((button) => {
             (button as HTMLButtonElement).click(); (button as HTMLButtonElement).click()

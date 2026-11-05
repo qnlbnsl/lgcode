@@ -1,3 +1,4 @@
+import { assertPhoneWidth } from "./support/phoneWidth.ts"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
@@ -46,6 +47,8 @@ test("the production shell logs in, follows real client RPCs, fits a phone, and 
             } catch { /* Ping frames are not RPC requests. */ }
           }))
           await page.goto(`http://127.0.0.1:${port}/`)
+          await expect(page.getByRole("form", { name: "Log in" })).toBeVisible()
+          await assertPhoneWidth(page, "Login")
           await page.getByLabel("Password", { exact: true }).fill(password)
           await page.getByRole("button", { name: "Log in", exact: true }).click()
           await expect(page.getByLabel("Situation", { exact: true })).toContainText("Live")
@@ -63,10 +66,7 @@ test("the production shell logs in, follows real client RPCs, fits a phone, and 
           await expect(situation).toContainText("PhoneWorker")
           await page.reload()
           await expect(situation).toContainText("PhoneWorker")
-          const widths = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth,
-            document: document.documentElement.scrollWidth, body: document.body.scrollWidth }))
-          expect(widths.document).toBeLessThanOrEqual(widths.viewport)
-          expect(widths.body).toBeLessThanOrEqual(widths.viewport)
+          await assertPhoneWidth(page, "Situation")
           expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0)
           expect(await page.evaluate(async () => (await indexedDB.databases()).length)).toBe(0)
           await page.getByRole("button", { name: "Log out", exact: true }).click()

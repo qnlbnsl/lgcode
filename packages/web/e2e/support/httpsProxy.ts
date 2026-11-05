@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { request } from "node:http"
 import { createServer } from "node:https"
 import { connect, type AddressInfo, type Socket } from "node:net"
+import { Transform } from "node:stream"
 import { join } from "node:path"
 
 // Only the test proxy terminates TLS. The real production web listener stays
@@ -14,6 +15,7 @@ export async function httpsProxy(upstreamPort: number, root: string) {
   execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes",
     "-keyout", key, "-out", cert, "-days", "1", "-subj", "/CN=127.0.0.1",
     "-addext", "subjectAltName=IP:127.0.0.1"], { stdio: "ignore" })
+  let bytesPerSecond: number | undefined
   const sockets = new Set<Socket>()
   const track = (socket: Socket) => {
     sockets.add(socket)
@@ -40,7 +42,30 @@ export async function httpsProxy(upstreamPort: number, root: string) {
       }, [])
       upstream.write(`${incoming.method} ${incoming.url} HTTP/${incoming.httpVersion}\r\n${headers.join("\r\n")}\r\nx-forwarded-proto: https\r\n\r\n`)
       if (head.length > 0) upstream.write(head)
-      upstream.pipe(socket).pipe(upstream)
+      // Pace raw encoded bytes, including fragmented WebSocket messages and
+      // protocol pongs. Forwarding decoded messages would hide the watchdog bug.
+      const paced = new Transform({
+        transform(chunk: Buffer, _encoding, done) {
+          if (bytesPerSecond === undefined) { done(null, chunk); return }
+          const rate = bytesPerSecond
+          let offset = 0
+          const send = () => {
+            if (this.destroyed || socket.destroyed) { done(); return }
+            const end = Math.min(offset + 3125, chunk.length)
+            const slice = chunk.subarray(offset, end)
+            setTimeout(() => {
+              this.push(slice)
+              offset = end
+              if (offset < chunk.length) send()
+              else done()
+            }, slice.length / rate * 1000)
+          }
+          send()
+        }
+      })
+      socket.once("close", () => paced.destroy())
+      upstream.pipe(paced).pipe(socket)
+      socket.pipe(upstream)
     })
     upstream.on("error", () => socket.destroy())
     socket.on("error", () => upstream.destroy())
@@ -51,6 +76,7 @@ export async function httpsProxy(upstreamPort: number, root: string) {
     server.listen(0, "127.0.0.1", resolve)
   })
   return {
+    throttle: (rate: number | undefined) => { bytesPerSecond = rate },
     origin: `https://127.0.0.1:${(server.address() as AddressInfo).port}`,
     close: async () => {
       for (const socket of sockets) socket.destroy()

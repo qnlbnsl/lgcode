@@ -274,11 +274,18 @@ rows of this plan's `decisions.md`; "engine rows" are rows of
 unit and the contract disagree, the unit reports it to the lead. A test id
 is a Vitest file path, run from the repository root with
 `pnpm vitest run <path>`; Playwright tests run with
-`pnpm playwright test <path>`. Effect code is written from Effect
+`pnpm playwright test <path>`. The root `pnpm check` runs typechecking,
+Vitest, the complete Playwright suite, and the credit check. Install Chromium
+and its system dependencies once with `pnpm exec playwright install --with-deps chromium`
+after installing the frozen workspace dependencies. `pnpm test:browser` also
+runs the browser suite on its own. Browser execution uses at most two workers.
+Effect code is written from Effect
 4.0.5's documentation or installed source, looked up, never from memory
 (AGENTS.md, "Language"). Every unit records a problem it finds in
 `docs/issues.md` in the same change (AGENTS.md rule 3). No unit edits
-`package.json`, `pnpm-workspace.yaml` or `pnpm-lock.yaml` (row 52). Tests
+`package.json`, `pnpm-workspace.yaml` or `pnpm-lock.yaml` (row 52). The
+foundation review repair for FR-065 is an exception for the root acceptance
+script, as decision 205 records. It changes no dependency version. Tests
 set their own `SHEPHRD_HOME` under `/tmp` (engine row 54). Abbreviations:
 RPC (remote procedure call), MCP (Model Context Protocol), CSP (Content
 Security Policy, a header that tells the browser which scripts may run),
@@ -290,7 +297,7 @@ changes only where section 6 names the change. An existing test changes
 only where section 6 names it, and then only as section 6 says. The check,
 for every unit that touches `packages/engine`, `packages/contracts`,
 `packages/client`, `packages/cli` or `packages/mcp`: the root `pnpm check`
-exits 0 and its Vitest summary shows that tests ran (row 111),
+exits 0 and its Vitest and Playwright summaries show that both suites ran (rows 111 and 205),
 and each existing file in `git diff --stat engine...HEAD --
 'packages/*/test/**'` is one that section 6 names for that unit's edits.
 
