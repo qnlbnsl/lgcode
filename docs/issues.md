@@ -6145,3 +6145,14 @@ deliveries, split batches, and a failed read followed by a quiet reconnect.
 
 Why it matters: The owner's wait can finish after the promised work completes,
 without cancellation or unrelated board activity.
+
+## 377. A failed board snapshot section stopped the owner wait before status recovery
+
+Found: 2026-11-04, while repairing foundation review record FR-012.
+State: fixed.
+
+What happened: `packages/client/src/waitForAgents.ts` rejected every snapshot with a failed section. It discovered the piece condition reads only from successful sections. A failed board snapshot therefore stopped the owner wait even when `board.status` could still return complete condition lists.
+
+What changed: The helper identifies the board condition read from an explicit namespace table. It includes a failed board section in that discovery. It recovers `holdsUnsettled` and `ownerHeld` from the independent status read before deciding whether to end the wait. The existing published-sequence gate and failed-read retry remain in use.
+
+Why it matters: A snapshot-hook failure no longer forces the owner to restart a wait. Held targets keep waiting, owner-held targets return `request-held`, and released targets settle only after the stream reaches the lists' published sequence. The client regression covers both wait modes and a failed status read on a quiet log. The existing engine test still checks that a held publication exposes only the previous published lists and that status survives a failed snapshot hook.
