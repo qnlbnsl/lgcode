@@ -5991,3 +5991,24 @@ State: open, for the final review.
 
 What happens: Importing the existing live driver before the existing live runner causes a circular module initialization error for `pieceViews` under plain Node.js. The new script `packages/engine/scripts/live-check-roles.ts` imports the runner first, as `live-check.ts` does, and its help and dry-run checks pass. The cycle itself is still there.
 Why it matters: A reordered import would stop both owner-run checks from starting. It waits for the final review.
+
+## 370. Plain-channel additions used immediate parents instead of effective holders
+
+Found: 2026-11-04, while fixing foundation review record FR-010.
+State: fixed in the foundation fix branch.
+
+What happened: `board/access.ts` checked immediate parent links when an agent
+manager added a member. An idle manager could not add a descendant through a
+paused, starting, interrupted, crashed or stopped intermediary. A manager also
+could not add its own effective holder through an unavailable ancestor.
+
+What changed: Plain-channel additions use the engine's `holderAbove` rule in
+both directions. The management check and the stored manager seat retain their
+existing rules. The shared access fixture now opens the agents' sessions, so
+its baseline holders are idle instead of starting. Existing assertions remain.
+New pure and authenticated command regressions cover unavailable intermediaries,
+available intermediaries, the manager's own holder and the owner's override.
+
+Why it matters: The contract permits a manager to add agents it holds, even
+when their immediate parents cannot act. The fix restores that delegated
+operation without changing stored membership when an agent's state changes.

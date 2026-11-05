@@ -43,9 +43,15 @@ export async function access(): Promise<BoardAccess> {
 
 export const spawn = (id: string, parent = "lead", groups: ReadonlyArray<string> = [], permission: PermissionLevel = "edit") =>
   event({ ...start(id, groups, parent), permission, parent: id === "root" || id === "stranger" ? owner : agent(parent) });
-export const tree = [spawn("root"), spawn("lead", "root"), spawn("worker", "lead", ["review"]),
+const startedTree = [spawn("root"), spawn("lead", "root"), spawn("worker", "lead", ["review"]),
   spawn("other", "lead", ["review"]), spawn("new-child"), spawn("grandchild", "worker"),
   spawn("sibling", "root", ["review"]), spawn("cousin", "sibling", ["review"]), spawn("stranger")];
+// The baseline hierarchy has available holders. AgentStarted alone leaves
+// every agent starting, so it cannot represent the child/holder access cases.
+export const tree = startedTree.flatMap((row) => row._tag !== "AgentStarted" ? [row] : [row, event({
+  _tag: "SessionOpened", agentId: row.agentId, session: { _tag: "acp", sessionId: `session-${row.agentId}` },
+  protocolVersion: 2, reloadable: true,
+})]);
 export const withCeilings = (permissions: Readonly<Record<string, PermissionLevel>>) => tree.map((row) =>
   row._tag === "AgentStarted" && permissions[row.agentId] !== undefined
     ? event({ ...row, permission: permissions[row.agentId] }) : row);
