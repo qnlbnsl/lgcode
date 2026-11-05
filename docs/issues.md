@@ -6009,3 +6009,14 @@ What happened: The administration browser test expected `/threads/phone-worker`,
 What changed: The administration test pins the supported hash link, follows it, and reads the question before continuing through every settings check. The phone test checks the exact alert route and retained document. It checks the permission answer, the runner's agent and option, and output emitted only after approval. Reloading the thread independently reads back the committed answer and agent output. Only that fresh-document reload requires HTTP 200. Existing width and browser-storage checks remain in place.
 
 Why it matters: These tests now reach their administration and permission-flow assertions. Temporary production mutations verify that a wrong administration link and missing navigation handlers are rejected. The separate Hypertext Transfer Protocol Secure (HTTPS) fixture update belongs to the public-address repair in FR-001. The overflow mutation proof in FR-048 remains a Phase 2 item.
+
+## 371. A failed viewer refresh leaves an acknowledged action available to resend
+
+Found: 2026-11-04, while repairing foundation review record FR-014.
+State: fixed.
+
+What happened: The terminal viewer cleared a prompt or answer only after its following snapshot read succeeded. A failed read left the acknowledged draft or permission controls active. Pressing Enter sent another action with a new request identifier. An uncertain send also received a new identifier when the owner retried it.
+
+What changed: The viewer retires acknowledged prompts and answers before refreshing its snapshot. It reports a failed refresh separately from the successful send. The connection retains an uncertain attempt's body and identifier for an unchanged retry. A confirmed send, a definite command refusal, or an edited body ends that attempt. Retry state lasts for the current viewer connection.
+
+Verification: `packages/viewer/test/send-recovery.test.tsx` drives the real Ink terminal interface and socket client. Its prompt, question and permission cases assert one write after acknowledgement and refresh failure. Its lost-acknowledgement prompt case uses the real command handler, delivery planner and SQLite receipts to check one durable receipt and delivery after retry. The answer cases check stable identifiers after transport failure and fresh identifiers after confirmation, refusal or an edit.
