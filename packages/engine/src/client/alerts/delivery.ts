@@ -48,7 +48,7 @@ const payload = (row: AlertRow, snapshot: Snapshot): AlertPayload => {
   };
 };
 const pending = (view: ClientView, row: AlertRow): boolean => row.status === "open" && !row.baseline
-  && view.push[row.kind] && view.carrier._tag !== "none" && !view.delivery[row.alertId]?.delivered;
+  && view.push[row.kind] && view.carrier._tag !== "none" && view.delivery[row.alertId]?.status !== "delivered";
 const retryDelay = (attempt: number) => [5_000, 30_000, 120_000, 600_000][Math.min(attempt - 1, 3)]!;
 
 export const alertDelivery = Effect.scoped(Effect.gen(function* () {

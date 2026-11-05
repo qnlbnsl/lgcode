@@ -12,7 +12,8 @@ const settings = ({ snapshot, actor }: Input, payload: Record<string, unknown>) 
 });
 const list = ({ runtime, snapshot, actor }: Input, payload: Record<string, unknown>) => Effect.gen(function* () {
   if (actor._tag !== "owner") return yield* refused();
-  const rows = Object.values(clientView(snapshot.client).alerts).filter((row) => row.sequence > (payload.after as number)
+  const view = clientView(snapshot.client);
+  const rows = Object.values(view.alerts).filter((row) => row.sequence > (payload.after as number)
     && (payload.status === undefined || row.status === payload.status)).sort((a, b) => a.sequence - b.sequence);
   const page = rows.slice(0, payload.limit as number);
   const items = [];
@@ -21,8 +22,14 @@ const list = ({ runtime, snapshot, actor }: Input, payload: Record<string, unkno
     // so both the live projection and its rebuild remain deterministic.
     const times = yield* runtime.sql<{ sequence: number; occurred_at: number }>`
       SELECT sequence, occurred_at FROM events WHERE sequence = ${row.sequence} OR sequence = ${row.clearedSequence ?? -1}`;
+    const mark = view.delivery[row.alertId];
+    const delivery = mark?.generation !== view.generation ? undefined : {
+      generation: mark.generation, attempt: mark.attempt,
+      ...(mark.status === "failed" ? { status: mark.status, reason: mark.reason, final: mark.final } : { status: mark.status }),
+    };
     items.push({ alertId: row.alertId, alertKey: row.alertKey, kind: row.kind, title: row.title,
       sourceSequence: row.sourceSequence, status: row.status,
+      ...(delivery === undefined ? {} : { delivery }),
       raisedAt: times.find((time) => time.sequence === row.sequence)!.occurred_at,
       ...(row.agentId === undefined ? {} : { agentId: row.agentId }),
       ...(row.subject === undefined ? {} : { subject: row.subject }),

@@ -6002,3 +6002,25 @@ What happened: The administration browser test expected `/threads/phone-worker`,
 What changed: The administration test pins the supported hash link, follows it, and reads the question before continuing through every settings check. The phone test checks the exact alert route and retained document. It checks the permission answer, the runner's agent and option, and output emitted only after approval. Reloading the thread independently reads back the committed answer and agent output. Only that fresh-document reload requires HTTP 200. Existing width and browser-storage checks remain in place.
 
 Why it matters: These tests now reach their administration and permission-flow assertions. Temporary production mutations verify that a wrong administration link and missing navigation handlers are rejected. The separate Hypertext Transfer Protocol Secure (HTTPS) fixture update belongs to the public-address repair in FR-001. The overflow mutation proof in FR-048 remains a Phase 2 item.
+
+## 371. Delivery failure diagnostics did not reach the alerts page
+
+Found: 2026-11-04, while repairing foundation review record FR-017.
+State: fixed.
+
+What happened: The delivery worker recorded a safe failure reason and the fifth
+failure's `final` mark, but the client projection dropped those fields. The
+alert-list contract, read and page exposed only the alert's open or cleared
+lifecycle, so the owner could not see that delivery was still failing.
+
+What changed: The projection retains the last outcome for the current delivery
+generation. The owner read and public schema expose its outcome and attempt,
+with a fixed safe reason and `final` for failures. The page renders "Failed",
+"Still failing" or "Delivered" separately from the alert's lifecycle. The
+command-line list retains the same fields in its reply. A successful attempt
+replaces the failure, and a generation change cannot reuse an old failure.
+
+Why it matters: The owner can diagnose a carrier outage or a missing backing
+token while durable retries continue. Regression tests exercise the writer,
+read, public schema, rebuild, restart, recovery, generation changes, clear,
+page rendering and command-line output. No live carrier or phone was used.

@@ -1,6 +1,6 @@
 import {
   alertPushDefaults, defaultWebSettings, type AlertKind, type CarrierSettings,
-  type ClientEvent, type Event, type WebSettings,
+  type AlertDelivery, type ClientEvent, type Event, type EventSequence, type WebSettings,
 } from "@shephrd/contracts";
 import type { PieceView } from "../../pieces/viewTables.ts";
 
@@ -19,7 +19,7 @@ export interface ClientView {
   readonly generation: number;
   readonly token?: { readonly origin: string; readonly carrierGeneration: string } | undefined;
   readonly retiredTokens: readonly string[];
-  readonly delivery: Readonly<Record<string, { readonly generation: number; readonly delivered: boolean; readonly attempt: number; readonly failureSequence?: number }>>;
+  readonly delivery: Readonly<Record<string, AlertDelivery & { readonly failureSequence?: number }>>;
   readonly webSettings: WebSettings;
   readonly webDown: boolean;
 }
@@ -47,8 +47,8 @@ const reduce = (view: ClientView, event: Event, sequence: number): ClientView =>
     case "client.AlertCarrierChanged": return { ...view, carrier: event.carrier, generation: sequence, delivery: Object.create(null) };
     case "client.AlertCarrierTokenSet":
     case "client.AlertCarrierTokenCleared": {
-      const delivery = Object.fromEntries(Object.entries(view.delivery).filter(([, mark]) => mark.delivered)
-        .map(([id, mark]) => [id, { ...mark, generation: sequence }]));
+      const delivery = Object.fromEntries(Object.entries(view.delivery).filter(([, mark]) => mark.status === "delivered")
+        .map(([id, mark]) => [id, { ...mark, generation: sequence as EventSequence }]));
       return { ...view, generation: sequence, delivery, tokenSet: event._tag === "client.AlertCarrierTokenSet",
         token: event._tag === "client.AlertCarrierTokenSet" ? { origin: event.origin, carrierGeneration: event.carrierGeneration } : undefined,
         retiredTokens: view.token === undefined ? view.retiredTokens : [...view.retiredTokens, view.token.carrierGeneration] };
@@ -57,8 +57,13 @@ const reduce = (view: ClientView, event: Event, sequence: number): ClientView =>
     case "client.AlertDeliveryFailed":
       if (event.generation !== view.generation) return view;
       return { ...view, delivery: { ...view.delivery, [event.alertId]: {
-        generation: event.generation, attempt: event.attempt, delivered: event._tag === "client.AlertDelivered",
-        ...(event._tag === "client.AlertDeliveryFailed" ? { failureSequence: sequence } : {}),
+        generation: event.generation, attempt: event.attempt,
+        ...(event._tag === "client.AlertDeliveryFailed" ? {
+          status: "failed", failureSequence: sequence, final: event.final === true,
+          // Historical events allow arbitrary strings. Only fixed diagnostics
+          // belong in owner reads, never raw carrier responses or credentials.
+          reason: event.reason === "token missing" ? "token missing" : "carrier delivery failed",
+        } : { status: "delivered" }),
       } } };
     case "client.WebSettingsChanged": return { ...view, webSettings: event.settings,
       webDown: event.settings.enabled && view.webDown };

@@ -87,3 +87,34 @@ it("7.7 opens an alert's agent thread through a link without sending a command",
   await act(async () => { threadLink!.click() })
   expect(commands).not.toHaveBeenCalled()
 })
+
+it.each([
+  { status: "failed", generation: 7, attempt: 1, reason: "token missing", final: false, label: "Failed" },
+  { status: "failed", generation: 7, attempt: 5, reason: "carrier delivery failed", final: true, label: "Still failing" },
+  { status: "delivered", generation: 7, attempt: 6, label: "Delivered" }
+])("FR-017 displays $label separately from the alert lifecycle and refreshes after recovery", async ({ label, ...delivery }) => {
+  let item = { ...openAlert, delivery }
+  browser.client = {
+    "client.snapshot": () => Effect.succeed({ requestId: "snapshot", sequence: 7, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }),
+    "client.subscribe": () => Stream.never,
+    "client.alerts.list": () => Effect.succeed({ requestId: "reply", items: [item] })
+  }
+  const container = await render()
+  await openAlerts(container)
+  await vi.waitFor(() => {
+    expect(container.textContent).toContain(`Delivery: ${label}`)
+    expect(container.textContent).toContain(`Attempt: ${delivery.attempt}`)
+    expect(container.textContent).toContain("Status: open")
+    if (delivery.status === "failed") expect(container.textContent).toContain(delivery.reason)
+  })
+  item = { ...openAlert, status: "cleared", delivery: { status: "delivered", generation: 7, attempt: 6 } }
+  const refresh = Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Refresh alerts")!
+  await act(async () => { refresh.click() })
+  await vi.waitFor(() => {
+    expect(container.textContent).toContain("Delivery: Delivered")
+    expect(container.textContent).toContain("Status: cleared")
+    expect(container.textContent).not.toContain("Still failing")
+    expect(container.textContent).not.toContain("token missing")
+    expect(container.textContent).not.toContain("carrier delivery failed")
+  })
+})
