@@ -974,11 +974,13 @@ Unit 6b: `accounts/SecretStore.ts` keeps the store-before-commit order, so a com
 ## 58. A refusal by the state table or by rights is stored as the request's receipt
 
 Found: 2026-11-01, in the focused review of unit 5b.
-State: open; the current behaviour is kept until the plan's owner of row 30 rules on it.
+State: the receipt policy is retained. The board reply retry defect is fixed in foundation finding FR-006 on 2026-11-04.
 
 What happens: when the state table or the rights check refuses a command, the handler stores the refusal as the receipt for that caller and request id (`packages/engine/src/commands/CommandHandler.ts`, the refusal branch of `execute`). A retry with the same request id after the agent's state has changed returns the old "command refused".
 Why it matters: row 30 names only "no usable account" and "database busy" as temporary refusals that write no receipt. A state refusal also depends on state, so a client that retries with the same request id never sees the new outcome.
-What should happen: either the plan's decision log confirms that a state or rights refusal is final for its request id, and clients must send a new request id, or these refusals stop writing a receipt. Engine-lead's reading for now: it is final, as row 30 reads.
+What changed: the owner-approved foundation fix scope keeps a definite refusal final for that attempt. The web board reply form preserves the draft and ends the attempt when it receives the server's `CommandError`. The owner's next send gets a fresh request identifier, so restored membership is checked again. An uncertain transport or connection outcome keeps the same identifier for unchanged text. A confirmed write is never resent after a failed refresh.
+
+Verification: `packages/web/test/subjects/board-handler-recovery.test.tsx` exercises the real planner, SQLite receipts and views through the reply form. It removes and restores the original author's channel membership, proves that the old identifier still replays the refusal, and sends the unchanged draft successfully with a fresh identifier. It also loses a response after commit, as both a typed transport failure and a connection exception, and proves that an unchanged retry creates only one stored reply. The board contract and criterion 7.3 now state this retry policy.
 
 ## 59. A read failure inside a writer turn latches the whole writer
 

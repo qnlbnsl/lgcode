@@ -927,7 +927,11 @@ fallback). The board's plan writes the board's entry, in
 - **Answering.** While the post is open, the entry offers a reply box. It
   calls `board.post` with the post's channel id and `replyTo` set to the
   post's id, and with one request id for each reply, so a double tap acts
-  once. The owner's reply closes the post `answered`, so the alert ends and
+  once. A definite server refusal keeps the draft but ends that attempt, so
+  the owner's next send uses a new request id after correcting the cause.
+  An uncertain transport or connection outcome keeps the request id for an
+  unchanged retry. A confirmed write is never resent after a failed refresh.
+  The owner's reply closes the post `answered`, so the alert ends and
   the author is woken once with its completion. A closed post shows its state
   and no reply box.
 - **Its state.** The entry shows who has acknowledged the post and who has given no

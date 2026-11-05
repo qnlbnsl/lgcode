@@ -62,6 +62,10 @@ export function Board({ id, alertKind }: SubjectProps) {
       const result = await withClient((client) => Effect.result(client["board.post"](payload)), signal)
       if (signal.aborted) return
       if (result._tag === "Failure") {
+        // A server refusal ends this attempt, even when its receipt is final.
+        // A deliberate send after correction gets a new key and keeps the draft.
+        // Transport failures leave the outcome uncertain and must reuse the key.
+        if (result.failure._tag === "CommandError") attempt.current = undefined
         setMessage(reason(result.failure, "Could not confirm the reply. You can retry the same text."))
         return
       }
