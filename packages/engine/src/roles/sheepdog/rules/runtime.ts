@@ -9,7 +9,7 @@ import type { RolesView } from "../../view.ts";
 import { callForAction } from "../actions.ts";
 import type { RuleContext, SheepdogRule } from "../loop.ts";
 import { deliveryIsSheepdogTurn, idleNoticeIdentity, noticeRecipient, sendNotice, sheepdogCaller } from "../notices.ts";
-import { actionRequestId } from "../requests.ts";
+import { actionRequestId, actionSubject } from "../requests.ts";
 import type { TimerOrigin } from "../timers.ts";
 import { actionBase, ageLimitFor, agentRoles, limitsFor, own, turnIsExcluded, type AdviceKind, type RuleInput } from "./context.ts";
 import { engineAlertOpen, evaluateCrash } from "./crash.ts";
@@ -156,7 +156,10 @@ export const makeRules = (): ReadonlyArray<SheepdogRule> => {
       yield* giveUp(context, admission, "reload-failed"); return;
     }
     if ((mark?.session ?? 0) <= admission.triggerSequence) return;
-    if ((mark?.carry ?? 0) < mark!.session!) {
+    // A reload may preserve the admitted attempt's queued engine carry-on
+    // while opening a later session. The crash, rather than the newest
+    // session, separates that continuation from a previous attempt's carry.
+    if ((mark?.carry ?? 0) <= admission.triggerSequence) {
       const carried = yield* callForAction(admission, "crash", "prompt", { text: CARRY_ON }, context.lists).pipe(Effect.result);
       if (carried._tag === "Failure") {
         if (carried.failure._tag !== "CommandRefused") return yield* carried.failure;
@@ -174,8 +177,21 @@ export const makeRules = (): ReadonlyArray<SheepdogRule> => {
     let live = yield* current(context);
     if (context.lists.boardEnabled !== false) for (const action of evaluateTeamIdle(live)) {
       // Each top gets a nudge; shared holders receive one notice per group.
-      const nudged = yield* callForAction(action, "team-idle", "prompt", { text: "The team has no running work. Check the board and carry on, or report what is blocking it." }, context.lists).pipe(Effect.result);
-      if (nudged._tag === "Failure" && nudged.failure._tag !== "CommandRefused") return yield* nudged.failure;
+      const id = (kind: string) => actionRequestId({ rule: "team-idle", subject: actionSubject(action),
+        triggerSequence: action.triggerSequence, kind: `${action._tag}.nudge.${kind}`,
+        recipient: action.agentId, occurrence: action.occurrence });
+      const status = yield* executeService(sheepdogCaller, "board.status", { requestId: id("status") }, context.lists);
+      if (status.disabled === true) continue;
+      const nudged = yield* executeService(sheepdogCaller, "board.post", {
+        requestId: id("post"), direct: { _tag: "agent", agentId: action.agentId },
+        to: [{ _tag: "agent", agentId: action.agentId }], reply: "none",
+        text: "The team has no running work. Check the board and carry on, or report what is blocking it.",
+      }, context.lists).pipe(Effect.result);
+      if (nudged._tag === "Failure") {
+        if (nudged.failure._tag !== "CommandRefused") return yield* nudged.failure;
+      } else yield* executeService(sheepdogCaller, "board.flush", {
+        requestId: id("flush"), agentId: action.agentId,
+      }, context.lists).pipe(Effect.catchTag("CommandRefused", () => Effect.void));
       const group = action._tag === "roles.TeamIdleReported" ? action.group : "";
       yield* sendNotice(action, "team-idle", context.lists, idleNoticeIdentity(context.snapshot, group));
     }

@@ -5767,6 +5767,14 @@ What happens: The engine's redactor at `9e386b0` has fixed structure tables (`lo
 What should happen: The board adds its entries as B13. The roles and client API plans must do the same.
 Why it matters: A piece that forgets gets its ids redacted as text.
 
+The roles persistence proof was strengthened on 2026-11-04 for foundation review
+finding FR-067. A nonempty collision batch now passes through the real redactor
+and event writer. The test checks Structured Query Language (SQL) event rows,
+receipt envelopes, agent and board joins, read marking, and rebuilt equality.
+Free text remains redacted. A temporary roles-only writer mutation is rejected
+by this test while the older isolated and empty-event checks still pass.
+This closes the roles proof gap without claiming first-use execution.
+
 ## 341. A "model at capacity" error is returned to the sender as a failed delivery
 
 Found: 2026-11-03, while planning the foundry roles plan.
@@ -6328,3 +6336,42 @@ What happened: The reply text appears in its board subject and in the newly visi
 What changed: The browser assertion selects the exact reply inside the named Board post region. The exact single runner wake, removed reply form, and durable alert-clear assertions remain. Production code is unchanged.
 
 Validation: The corrected browser case passed. A temporary rendering mutation kept the outgoing reply visible while replacing the subject reply. Two explicit browser preconditions established that state, and the corrected locator then failed at the missing subject reply. The production file and temporary proof assertions were restored byte-for-byte before the commit.
+
+## 387. Idle-team nudges bypassed the board
+
+Found: 2026-11-04, while fixing foundation review finding FR-019.
+State: fixed.
+
+What happened: The sheepdog prompted every top agent through the engine, even
+though roles decision 60 requires a direct board post with no reply, followed
+by a flush. Only the holder notice had a board record.
+
+What changed: Each top receives a service-authored direct board post and a
+flush under deterministic per-top identities. Shared holders still receive
+one notice per group and occurrence. An owner-held top still receives a board
+nudge, and the owner's notice remains the roles event. The regression checks
+the top posts and flush receipts separately from the shared holder receipt.
+It also checks sheepdog turn classification, hourly repeats, restart deduplication,
+snooze, and a disabled board.
+
+Why it matters: The nudge now follows the promised board history and wake path.
+
+## 388. A later session hid an existing crash continuation
+
+Found: 2026-11-04, while fixing foundation review finding FR-044.
+State: fixed.
+
+What happened: An open crash admission treated a carry-on as absent when a
+later reload preserved it but opened a newer session. The session sequence
+comparison sent an unnecessary sheepdog continuation.
+
+What changed: The rule recognizes a carry-on queued after the admitted crash,
+even when another session opens afterward. Earlier crashes' carry-ons do not
+satisfy that guard. Deterministic service request identifiers remain in use.
+The regression admits a crash, accepts ordinary owner work, creates an engine
+carry-on through the reload transaction builder, preserves it through another
+reload, and restarts the sheepdog twice. It requires one logical continuation
+and one outcome notice. Existing no-carry and service-receipt restart cases
+remain covered.
+
+Why it matters: Recovery does not add work that the engine already preserved.
