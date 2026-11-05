@@ -125,7 +125,20 @@ const answerTurnEnded = (snapshot: Snapshot, target: string, since: number): boo
       boundary = Math.max(boundary, own(closures, post.postId)?.sequence ?? 0);
     }
   }
-  for (const { event, sequence } of own(snapshot.threads, target) ?? []) {
+  const thread = own(snapshot.threads, target) ?? [];
+  for (let index = 0; index < thread.length; index++) {
+    const { event, sequence } = thread[index]!;
+    // Recovery reloads idle agents too. Its interruption and setup are not
+    // a new response turn, and must not erase a response that already ended.
+    // A working/paused interruption still needs its later carry-on turn.
+    const starting = thread[index + 1]?.event;
+    const opened = thread[index + 2]?.event;
+    if (event._tag === "AgentInterrupted" && event.previous === "idle"
+      && starting?._tag === "StateChanged" && starting.state._tag === "starting"
+      && opened?._tag === "SessionOpened") {
+      index += 2;
+      continue;
+    }
     if (event._tag === "SessionOpened" || event._tag === "AgentInterrupted" || event._tag === "DeliveryAccepted"
       || event._tag === "DeliveryReleased" || event._tag === "PermissionAnswered" || event._tag === "PermissionCancelled"
       || event._tag === "QuestionAnswered"

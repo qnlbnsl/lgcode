@@ -15,7 +15,7 @@ const completion = { ...empty, completions: [{ postId: "question", authorAgentId
 
 it.live("boot waits through a non-reloadable recipient's resolution and the closed-but-unsent completion window", () => Effect.gen(function* () {
   const snapshots = [
-    { agents: [author, recipient], board: { ...empty, posts: [{ reply: "all", to: [{ _tag: "agent", agentId: recipient.agentId }], dispositions: {} }] } },
+    { agents: [author, recipient], board: { ...empty, posts: [{ reply: "all", to: [{ _tag: "agent", agentId: recipient.agentId }], dispositions: [] }] } },
     { agents: [author, recipient], board: completion },
     { agents: [{ ...author, state: { _tag: "working" as const } }, recipient], board: completion },
   ];
@@ -28,6 +28,15 @@ it.live("a completion that is never sent fails the boot wait instead of passing 
   const result = yield* waitForBoardRecovery(Effect.succeed({ agents: [author], board: completion }), 25).pipe(Effect.exit);
   expect(result._tag).toBe("Failure");
   if (result._tag === "Failure") expect(Cause.pretty(result.cause)).toContain("Timed out waiting for board recovery resolutions and notifications");
+}));
+
+it.live("no-answer remains provisional for a terminal recipient until a terminal resolution is published", () => Effect.gen(function* () {
+  let reads = 0;
+  const post = { reply: "all", to: [{ _tag: "agent", agentId: recipient.agentId }] };
+  yield* waitForBoardRecovery(Effect.sync(() => ({ agents: [author, recipient], board: { ...empty, posts: [{ ...post,
+    dispositions: [{ addressee: { _tag: "agent", agentId: recipient.agentId }, disposition: reads++ === 0 ? "no-answer" : "gone" }],
+  }] } })));
+  expect(reads).toBe(2);
 }));
 
 for (const obstacle of ["working", "paused", "held", "signed-out"] as const) {

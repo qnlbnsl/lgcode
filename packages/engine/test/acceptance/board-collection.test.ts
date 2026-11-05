@@ -1,7 +1,7 @@
 import { afterEach, expect } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
-import { eventsUntil, isTag, requestId, scenario, stopAllServices, tagged, type Started } from "../support/acceptance.ts";
+import { drainAgent, eventsUntil, isTag, requestId, scenario, stopAllServices, tagged, type Started } from "../support/acceptance.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 registerRebuildCheck({ noLog: true });
@@ -45,8 +45,30 @@ scenario("6.2 an all-mode hand-off to three workers wakes its lead once after al
     yield* client["board.post"]({ requestId: requestId(), channelId, text: `${worker.agentId} completed.`, to: [], reply: "none", replyTo: postId } as never);
   }
 
-  const completion = yield* eventsUntil(w.owner, beforePost, "one completion wake for the lead", isTag("DeliverySent", lead.agentId), 15_000);
-  expect(tagged(completion, "DeliverySent", lead.agentId)).toHaveLength(1);
+  const wakeIds = new Set<string>();
+  const deliveriesForCompletion = new Set<string>();
+  yield* eventsUntil(w.owner, beforePost, "the collection completion to be accepted by its lead", (row) => {
+    if (row.event._tag === "board.WakeBuilt" && row.event.targetAgentId === lead.agentId && row.event.completions.includes(postId as never)) wakeIds.add(row.event.wakeId);
+    if (row.event._tag === "DeliveryQueued" && row.event.delivery.source?._tag === "piece"
+      && row.event.delivery.source.namespace === "board" && wakeIds.has(row.event.delivery.source.id)) deliveriesForCompletion.add(row.event.delivery.id);
+    return row.event._tag === "DeliveryAccepted" && deliveriesForCompletion.has(row.event.deliveryId);
+  }, 15_000);
+  const completion = yield* drainAgent(w.owner, lead.agentId, beforePost);
+  const wakes = completion.filter((row) => row.event._tag === "board.WakeBuilt"
+    && row.event.targetAgentId === lead.agentId && row.event.completions.includes(postId as never));
+  expect(wakes, "exactly one logical completion for this collection, excluding the engine crash notice").toHaveLength(1);
+  const wakeId = (wakes[0]!.event as { wakeId: string }).wakeId;
+  const queued = completion.filter((row) => row.event._tag === "DeliveryQueued" && row.event.delivery.source?._tag === "piece"
+    && row.event.delivery.source.namespace === "board" && row.event.delivery.source.id === wakeId);
+  expect(queued).toHaveLength(1);
+  const deliveryId = (queued[0]!.event as { delivery: { id: string } }).delivery.id;
+  for (const tag of ["DeliverySent", "DeliveryAccepted"] as const) {
+    expect(completion.filter((row) => row.event._tag === tag && row.event.deliveryId === deliveryId)).toHaveLength(1);
+  }
+  const acceptedCompletion = completion.find((row) => row.event._tag === "DeliveryAccepted" && row.event.deliveryId === deliveryId)!;
+  const drainQueued = completion.find((row) => row.event._tag === "DeliveryQueued" && row.event.delivery.target === lead.agentId
+    && row.event.delivery.content._tag === "prompt" && row.event.delivery.content.text === "Finish the acceptance drain boundary.")!;
+  expect(acceptedCompletion.sequence, "the completion must be accepted before the independent terminal drain boundary").toBeLessThan(drainQueued.sequence);
   const own = yield* w.owner["board.status"]({ requestId: requestId(), agentId: lead.agentId, detail: "own" } as never);
   expect((own as { readonly items: ReadonlyArray<unknown> }).items).toHaveLength(0);
 }));

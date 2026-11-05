@@ -3,6 +3,7 @@ import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
+import { TestClock } from "effect/testing";
 import { boardAlertSources } from "@shephrd/contracts/board/alerts";
 import * as SqlClient from "effect/sql/SqlClient";
 import { expect, vi } from "vitest";
@@ -483,10 +484,16 @@ for (const mode of ["any", "all"] as const) {
   })));
 }
 
-for (const obstacle of ["own-post", "completion", "nonblocking-wait", "paused", "interrupted"] as const) {
-  it.live(`4.14 reminder bound: ${obstacle} defers a reminder until the obstacle clears and a further turn ends`, () => run((c) => Effect.gen(function* () {
+for (const stage of ["reminder", "no-answer"] as const) for (const obstacle of ["own-post", "completion", "nonblocking-wait", "paused", "interrupted"] as const) {
+  it.live(`4.14 ${stage} bound: ${obstacle} defers until the obstacle clears and a further turn ends`, () => run((c) => Effect.gen(function* () {
     const id = yield* postAs(c.lead!);
     yield* acceptWake((yield* pendingWake()).id);
+    if (stage === "no-answer") {
+      yield* end(); yield* catchUp;
+      const reminder = yield* pendingWake();
+      expect((yield* wakeFor(reminder.id)).reminders).toEqual([id]);
+      yield* acceptWake(reminder.id);
+    }
     let ownPost: string | undefined;
     if (obstacle === "own-post") ownPost = yield* postAs(c.worker!, { to: [agent("other")] });
     if (obstacle === "completion") {
@@ -494,23 +501,57 @@ for (const obstacle of ["own-post", "completion", "nonblocking-wait", "paused", 
       yield* appendSetup([close(ownPost, { closer: owner, outcome: "withdrawn" })]);
     }
     if (obstacle === "nonblocking-wait") yield* change({ _tag: "WaitOpened", agentId: "worker", waitId: "nested-wait", members: ["other"], mode: "all", blocking: false });
-    yield* end();
+    if (obstacle !== "interrupted") yield* end();
     if (obstacle === "paused") yield* change({ _tag: "StateChanged", agentId: "worker", state: { _tag: "paused", reason: "limit", midTurn: false } });
-    if (obstacle === "interrupted") yield* change({ _tag: "AgentInterrupted", agentId: "worker", previous: "idle" });
+    if (obstacle === "interrupted") yield* change({ _tag: "AgentInterrupted", agentId: "worker", previous: "working" });
     yield* catchUp;
-    expect(eventsOf(yield* readLog, "board.WakeBuilt").filter((row) => row.reminders.includes(id as never))).toEqual([]);
+    const assertDeferred = Effect.gen(function* () {
+      const state = yield* boardState;
+      expect(state.posts[id]?.dispositions.worker).toBeUndefined();
+      expect(Object.values(state.noAnswers).filter((notice) => notice.postId === id)).toEqual([]);
+      expect(eventsOf(yield* readLog, "board.WakeBuilt").filter((row) => row.reminders.includes(id as never))).toHaveLength(stage === "reminder" ? 0 : 1);
+    });
+    yield* assertDeferred;
     if (obstacle === "own-post" || obstacle === "completion") {
       if (obstacle === "own-post") success(yield* call(c.worker!, "board.close", { postId: ownPost! }));
       else { yield* catchUp; const completion = yield* pendingWake(); yield* acceptWake(completion.id); }
     } else if (obstacle === "nonblocking-wait") yield* change({ _tag: "WaitCancelled", agentId: "worker", waitId: "nested-wait", reason: "fixture work finished" });
     else yield* resumeHistory("worker");
     yield* catchUp;
-    expect(eventsOf(yield* readLog, "board.WakeBuilt").filter((row) => row.reminders.includes(id as never))).toEqual([]);
+    yield* assertDeferred;
     yield* end();
     yield* catchUp;
-    expect((yield* wakeFor((yield* pendingWake()).id)).reminders).toContain(id);
+    if (stage === "reminder") expect((yield* wakeFor((yield* pendingWake()).id)).reminders).toContain(id);
+    else {
+      expect((yield* boardState).posts[id]?.dispositions.worker).toBe("no-answer");
+      expect((yield* wakeFor((yield* pendingWake("lead")).id)).noAnswers).toEqual([{ postId: id, addressee: agent("worker") }]);
+    }
   })));
 }
+
+it.effect("4.14 mutual questions remain free of reminder/no-answer traffic with the real sheepdog running across its timers", () => Effect.gen(function* () {
+  const ids = yield* run((c) => Effect.gen(function* () {
+    const a = yield* postAs(c.worker!, { to: [agent("other")] });
+    const b = yield* postAs(c.other!, { to: [agent("worker")] });
+    for (const id of ["worker", "other"]) {
+      yield* acceptWake((yield* pendingWake(id)).id, id);
+      yield* end(id);
+    }
+    return [a, b];
+  }));
+  yield* service(Effect.gen(function* () {
+    expect((yield* eventually(snapshot, (state) => (state.roles as any).baseline?.on === true)).roles).toMatchObject({ baseline: { on: true } });
+    yield* TestClock.adjust("30 minutes");
+    // A settings transition is a positive follower barrier after the timer
+    // interval. An absent/dead sheepdog cannot satisfy this assertion.
+    success(yield* call(ownerCredential, "roles.settings.set", { settings: { sheepdog: false } }));
+    expect((yield* eventually(snapshot, (state) => (state.roles as any).baseline?.on === false)).roles).toMatchObject({ baseline: { on: false } });
+    const rows = yield* readLog;
+    expect(eventsOf(rows, "board.WakeBuilt").filter((wake) => wake.reminders.some((id) => ids.includes(id)) || wake.noAnswers.some((notice) => ids.includes(notice.postId)))).toEqual([]);
+    expect(eventsOf(rows, "board.AddresseeResolved").filter((event) => ids.includes(event.postId) && event.disposition === "no-answer")).toEqual([]);
+    for (const id of ids) expect((yield* boardState).posts[id]?.status).toBe("open");
+  }), { sheepdog: true });
+}));
 
 it.live("4.14 two agents waiting on each other's posts do not create reminder traffic", () => run((c) => Effect.gen(function* () {
   const a = yield* postAs(c.worker!, { to: [agent("other")] });

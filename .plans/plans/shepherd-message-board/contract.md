@@ -528,8 +528,12 @@ is not idle, so nothing happens to it.
 - **A capacity error that returns the wake.** With the sheepdog off, or at its give-up, the
   hold is over and the agent is idle, so this is a return like any other, whatever its
   `cause`. The rule goes on. The asker is told, and a late reply still counts.
-- **A pause, or an interrupt that reloads.** The accepted wake stays accepted, and a carry-on
+- **A pause, or a working interrupt that reloads.** The accepted wake stays accepted, and a carry-on
   follows, so its `TurnEnded` counts (`packages/engine/src/recovery/reload.ts:85-99`).
+- **An idle interrupt that reloads.** A response turn that already ended before the
+  interruption remains eligible for its pending reminder or no-answer disposition.
+  Recovery reloads an idle session without a carry-on. Its interruption, starting
+  state and session-open events do not erase that completed response.
 - **A stop, a crash, or an interrupt that cannot reload.** These are `gone` by the existing
   rows, and they end the rule.
 - **The limit.** A failure in a turn that a non-board delivery started, such as a

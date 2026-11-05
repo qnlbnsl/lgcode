@@ -6,19 +6,19 @@ import { awaitCleared, awaitRaised, barrier, raised, withAlerts } from "../suppo
 import { call, ownerCredential, seedAgent, success } from "../support/handlerRig.ts";
 import { agent, change, owner } from "./wakeFixtures.ts";
 
-it("5.17 the real alert follower raises one fixed-title no-answer alert per post and closes it with its post", async () => withAlerts(() => Effect.gen(function* () {
+for (const first of ["worker", "other"]) it(`5.17 the real alert follower keeps the first no-answer thread, first=${first}, and closes its single key with the post`, async () => withAlerts(() => Effect.gen(function* () {
   yield* registerRebuildCheck();
   yield* seedAgent({ id: "worker", state: "paused" });
   yield* seedAgent({ id: "other", state: "paused" });
   const channelId = success(yield* call(ownerCredential, "board.open", { name: "Alerts" })).channelId;
   success(yield* call(ownerCredential, "board.members", { channelId, add: ["worker", "other"], remove: [] }));
   const postId = success(yield* call(ownerCredential, "board.post", { channelId, text: "A private question", to: [agent("worker"), agent("other")], reply: "all" })).postId;
-  yield* change({ _tag: "board.AddresseeResolved", postId, addressee: agent("worker"), disposition: "no-answer", authorIsOwner: true });
+  yield* change({ _tag: "board.AddresseeResolved", postId, addressee: agent(first), disposition: "no-answer", authorIsOwner: true });
   const alerts = yield* awaitRaised(`no-answer:${postId}`);
   expect(alerts).toHaveLength(1);
-  expect(alerts[0]!.event).toMatchObject({ kind: "board.no-answer", agentId: "worker", title: boardAlertTitles["board.no-answer"],
+  expect(alerts[0]!.event).toMatchObject({ kind: "board.no-answer", agentId: first, title: boardAlertTitles["board.no-answer"],
     subject: { _tag: "piece", namespace: "board", id: postId } });
-  yield* change({ _tag: "board.AddresseeResolved", postId, addressee: agent("other"), disposition: "no-answer", authorIsOwner: true });
+  yield* change({ _tag: "board.AddresseeResolved", postId, addressee: agent(first === "worker" ? "other" : "worker"), disposition: "no-answer", authorIsOwner: true });
   yield* barrier();
   expect(yield* raised(`no-answer:${postId}`)).toHaveLength(1);
   success(yield* call(ownerCredential, "board.close", { postId }));

@@ -1,4 +1,5 @@
 import { it } from "@effect/vitest";
+import type { ClientSnapshot } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 
@@ -7,6 +8,7 @@ import { makeRig, removeRig, type Rig } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { agent, change, encodedBytes, owner, provideBoard, seedBoard } from "./wakeFixtures.ts";
 import { post as postEvent } from "./fixtures.ts";
+import { waitForBoardRecovery } from "../support/boardRecovery.ts";
 
 let rig: Rig;
 beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
@@ -37,3 +39,21 @@ it.live("5.9 board snapshot is absent for agents and is bounded metadata for own
   expect(board.truncated).toBe(true);
 
 })));
+
+for (const terminal of ["crashed", "non-reloadable"] as const) {
+  it.live(`recovery polling consumes public disposition arrays with a ${terminal} gone recipient and a pending blocked recipient`, () => run(Effect.gen(function* () {
+    yield* change(postEvent("mixed-recovery", { to: [agent("worker"), agent("other")] }),
+      ...(terminal === "crashed"
+        ? [{ _tag: "AgentCrashed", agentId: "worker", exitCode: 1, signal: null, stderr: "Fixture exit." }]
+        : [{ _tag: "SessionOpened", agentId: "worker", session: { _tag: "acp", sessionId: "not-reloadable" }, protocolVersion: 2, reloadable: false },
+          { _tag: "AgentInterrupted", agentId: "worker", previous: "idle" }]),
+      { _tag: "StateChanged", agentId: "other", state: { _tag: "paused", reason: "limit", midTurn: false } },
+      { _tag: "board.AddresseeResolved", postId: "mixed-recovery", addressee: agent("worker"), disposition: "gone", authorIsOwner: false });
+    const publicSnapshot = (yield* clientSnapshot(owner)) as unknown as ClientSnapshot;
+    expect(publicSnapshot.board).toMatchObject({ posts: [{ postId: "mixed-recovery", status: "open",
+      dispositions: [{ addressee: agent("worker"), disposition: "gone" }] }] });
+    let reads = 0;
+    yield* waitForBoardRecovery(Effect.sync(() => { reads++; return publicSnapshot; }), 25);
+    expect(reads).toBe(1);
+  })));
+}
