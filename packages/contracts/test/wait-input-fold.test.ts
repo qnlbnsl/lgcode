@@ -8,7 +8,7 @@ import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 registerRebuildCheck({ noLog: true });
 const empty = (): SettledInput => ({ agents: {}, requests: {}, questions: {}, deliveries: {}, waits: {} });
 const pick = (input: SettledInput) => ({
-  agents: Object.fromEntries(Object.entries(input.agents).map(([id, row]) => [id, { state: { _tag: row.state._tag }, ...(row.reloadable === undefined ? {} : { reloadable: row.reloadable }) }])),
+  agents: Object.fromEntries(Object.entries(input.agents).map(([id, row]) => [id, { state: { _tag: row.state._tag }, ...(row.reloadable === undefined ? {} : { reloadable: row.reloadable }), capacityHeld: row.capacityHeld === true }])),
   requests: Object.fromEntries(Object.entries(input.requests).map(([id, row]) => [id, { agentId: row.agentId, holder: row.holder, status: row.status }])),
   questions: Object.fromEntries(Object.entries(input.questions).map(([id, row]) => [id, { agentId: row.agentId, holder: row.holder, status: row.status }])),
   deliveries: Object.fromEntries(Object.entries(input.deliveries).map(([id, row]) => [id, { target: row.target, status: row.status }])),
@@ -34,6 +34,9 @@ it("3.5 generated engine histories keep the client wait-input fold equal to appl
         event({ _tag: "DeliveryQueued", delivery: { ...queued.delivery, id: `withdraw-${id}` } }),
         event({ _tag: "DeliveryWithdrawn", agentId, deliveryId: `withdraw-${id}`, reason: "Source closed." }),
         event({ _tag: "TurnEnded", agentId, compact: false }),
+        event({ _tag: "DeliveryHeld", agentId, deliveryId: `hold-${id}`, reason: "capacity" }),
+        event({ _tag: "DeliveryReleased", agentId }),
+        event({ _tag: "DeliveryHeld", agentId, deliveryId: `final-hold-${id}`, reason: "capacity" }),
         event(episode.end === "crashed" ? { _tag: "AgentCrashed", agentId, exitCode: 1, signal: null, stderr: "Fixture." }
           : episode.end === "stopped" ? { _tag: "AgentStopped", agentId }
           : episode.end === "interrupted" ? { _tag: "AgentInterrupted", agentId, previous: "idle" }

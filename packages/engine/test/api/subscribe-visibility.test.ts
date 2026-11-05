@@ -1,9 +1,5 @@
-// Criterion 7.3 (unit 7a; spec "The command handler": `subscribe` for an
-// agent shows only its own thread and its children's, and a parent's rights
-// reach only its own children, not its grandchildren): for every event type,
-// an agent's `subscribe` returns only events of itself and its children, and
-// agent-less events are owner-only. The cases are driven from the contracts'
-// event union, so a new event type fails here until it has a sample. Issue
+// Criterion 7.3 uses the current effective holder and event visibility class.
+// The cases cover every contract event type in catch-up and live streams. Issue
 // 41: a subscriber that stops acknowledging is disconnected, and the service
 // keeps serving the others. The server is built in process.
 import { randomBytes } from "node:crypto";
@@ -20,6 +16,8 @@ import * as Stream from "effect/Stream";
 
 import * as Server from "../../src/api/server.ts";
 import { makeFakeRunner } from "../support/fakeRunner.ts";
+import { Views } from "../../src/views/Views.ts";
+import { currentVisibilityOracle } from "../support/currentVisibilityOracle.ts";
 import {
   appendSetup, eventOf, makeFakeSecrets, makeRig, provideRig, readLog, removeRig, seedAccount, seedAgent, seedHarness,
 } from "../support/handlerRig.ts";
@@ -125,16 +123,20 @@ const family = Effect.gen(function* () {
 // One event of every type for each agent (but no terminal event for the
 // subscriber), and one of every agent-less type.
 const plantRound = (round: string, ids: ReadonlyArray<string>, subscriber: string) => Effect.gen(function* () {
+  const batch: Event[] = [];
   for (const tag of tags) {
     if (agentBearing.has(tag)) {
       for (const agentId of ids) {
         if (agentId === subscriber && terminal.has(tag)) continue;
-        yield* appendSetup([sample(tag, agentId, `${round}-${tag}-${agentId}`)]);
+        batch.push(sample(tag, agentId, `${round}-${tag}-${agentId}`));
       }
     } else {
-      yield* appendSetup([sample(tag, ids[0]!, `${round}-${tag}`)]);
+      batch.push(sample(tag, ids[0]!, `${round}-${tag}`));
     }
   }
+  // One published view for the exhaustive tag matrix; temporal changes are
+  // synchronized separately by the open-stream regression.
+  yield* appendSetup(batch);
 });
 
 const markerFor = (agentId: string, round: string) => eventOf({ _tag: "ThreadItem", agentId, itemId: `marker-${round}`, content: { _tag: "text", text: "marker" }, replay: false });
@@ -170,23 +172,23 @@ it("7.3 the samples cover every event type in the contracts' union (breaks when 
   }
 });
 
-live("7.3 for every event type, an agent's subscribe returns exactly the events of itself and its children, in catch-up and live, and never a grandchild's, a stranger's or an agent-less event (breaks if the filter is skipped on either path, follows the whole subtree, or lets agent-less events through)", () =>
+live("7.3 every event type follows the current holder and tag class in catch-up and live subscribe", () =>
   withServer((socket) => Effect.gen(function* () {
     const { self, child, grandchild, stranger, sibling } = yield* family;
     const ids = [self.agentId, child.agentId, grandchild.agentId, stranger.agentId, sibling.agentId];
     yield* plantRound("replay", ids, self.agentId);
     yield* appendSetup([markerFor(self.agentId, "replay")]);
-    const visible = new Set<string>([self.agentId, child.agentId]);
-
-    const expectedAfter = (after: number) => readLog.pipe(Effect.map((rows) => rows
-      .filter((row) => row.sequence > after && eventVisibility[row.event._tag] !== "owner-only" && "agentId" in row.event && visible.has((row.event as { agentId: string }).agentId))
-      .map((row) => row.sequence)));
+    const expectedAfter = (after: number) => Effect.gen(function* () {
+      const current = yield* (yield* Views).snapshot;
+      return (yield* readLog).filter((row) => row.sequence > after && currentVisibilityOracle(self.agentId, row, current)).map((row) => row.sequence);
+    });
 
     // Catch-up: everything already in the log.
     const replay = yield* collect(socket, self.token, 0, isMarker("replay"));
     expect(replay.map((envelope) => envelope.sequence)).toEqual(yield* expectedAfter(0));
     expect(replay.every((envelope) => eventVisibility[envelope.event._tag] !== "owner-only")).toBe(true);
-    for (const envelope of replay) expect(visible.has(envelope.agentId ?? "none"), JSON.stringify(envelope.event)).toBe(true);
+    const current = yield* (yield* Views).snapshot;
+    for (const envelope of replay) expect(currentVisibilityOracle(self.agentId, envelope, current)).toBe(true);
 
     // Every type was really exercised on both sides of the rule.
     const rows = yield* readLog;
@@ -198,8 +200,8 @@ live("7.3 for every event type, an agent's subscribe returns exactly the events 
         continue;
       }
       if (agentBearing.has(tag)) {
-        expect([tag, ofTag.some((row) => visible.has((row.event as { agentId: string }).agentId))]).toEqual([tag, true]);
-        expect([tag, ofTag.some((row) => !visible.has((row.event as { agentId: string }).agentId))]).toEqual([tag, true]);
+        expect([tag, ofTag.some((row) => currentVisibilityOracle(self.agentId, row, current))]).toEqual([tag, true]);
+        expect([tag, ofTag.some((row) => !currentVisibilityOracle(self.agentId, row, current))]).toEqual([tag, true]);
       } else {
         expect([tag, ofTag.length > 0]).toEqual([tag, true]);
       }

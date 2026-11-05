@@ -1,47 +1,66 @@
 import * as Effect from "effect/Effect";
+import * as Deferred from "effect/Deferred";
+import * as Fiber from "effect/Fiber";
 import * as Stream from "effect/Stream";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { apply, emptyViews } from "../../src/views/apply.ts";
 import { Views } from "../../src/views/Views.ts";
 import { snapshot } from "../../src/api/snapshot.ts";
-import { visibleTo } from "../../src/api/visibility.ts";
-import { agentCredential, appendSetup, seedAgent, seedAccount } from "../support/handlerRig.ts";
+import { controlProjection, restoreControl, snapshotControl } from "./support/controlProjection.ts";
+import { agentCredential, appendSetup, seedAgent, seedAccount, headSequence } from "../support/handlerRig.ts";
 import { subscribe } from "../../src/log/subscribe.ts";
 import { run as runReadRig, read, snapshotFor, permissionFor, questionFor, event, bytes, owner } from "./support/readRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 const run = <A>(program: Effect.Effect<A, any, any>) => runReadRig(program, registerRebuildCheck());
 
-it.each(["owner", "agent"] as const)("3.1 %s snapshot plus subscribe reaches the same visible agent, request and question state as full replay", async (kind) => run(Effect.gen(function* () {
-  const a = yield* seedAgent({ id: "agent-a" });
-  yield* seedAgent({ id: "hidden" });
+it.each(["owner", "agent"] as const)("3.1 %s snapshot plus suffix equals full control replay before, during and after publication", async (kind) => run(Effect.gen(function* () {
+  const a = yield* seedAgent({ id: "agent-a", state: "working", groups: ["old"] });
+  yield* seedAgent({ id: "child", parent: "agent-a", state: "working" });
+  yield* seedAgent({ id: "hidden", state: "working" });
   yield* appendSetup([permissionFor("p1"), questionFor("q1")]);
   const credential = kind === "owner" ? owner : agentCredential(a.token);
   const caller = kind === "owner" ? owner : { _tag: "agent", agentId: a.agentId } as const;
+  const ids = new Set(kind === "owner" ? ["agent-a", "child", "hidden"] : ["agent-a", "child"]);
   const before = yield* read("client.snapshot", {}, credential);
-  yield* appendSetup([
-    event({ _tag: "PermissionAnswered", agentId: a.agentId, permissionRequestId: "p1", answeredBy: owner, answer: { _tag: "selected", optionId: "once" } }),
-    questionFor("q2"),
-  ]);
+  const prefix = yield* subscribe(0).pipe(Stream.take(before.sequence), Stream.runCollect);
+  expect(snapshotControl(before, kind === "owner")).toEqual(controlProjection(prefix.reduce(apply, emptyViews()), ids, kind === "owner"));
   const views = yield* Views;
-  const current = yield* views.snapshot;
-  const full = yield* subscribe(0).pipe(Stream.take(current.sequence), Stream.runCollect);
-  const visible = full.filter((row) => visibleTo(caller, row, current));
-  const suffix = yield* subscribe(before.sequence).pipe(Stream.take(current.sequence - before.sequence), Stream.runCollect);
-  const after = yield* read("client.snapshot", {}, credential);
-  const requests = new Set(before.requests.map((row: any) => row.id));
-  const questions = new Set(before.questions.map((row: any) => row.id));
-  for (const { event: e } of suffix.filter((row) => visibleTo(caller, row, current))) {
-    if (e._tag === "PermissionAnswered") requests.delete(e.permissionRequestId);
-    if (e._tag === "QuestionAsked") questions.add(e.questionId);
-  }
-  const replay = visible.reduce(apply, emptyViews());
-  expect(after.sequence).toBe(current.sequence);
-  expect(after.agents.map((row: any) => row.agentId).sort()).toEqual(Object.keys(replay.agents).sort());
-  expect(after.requests.map((row: any) => row.id).sort()).toEqual([...requests].sort());
-  expect(after.questions.map((row: any) => row.id).sort()).toEqual([...questions].sort());
-  expect(after.requests).toHaveLength(0);
-  expect(after.questions.map((row: any) => row.id)).toEqual(["q1", "q2"]);
+  const entered = yield* Deferred.make<void>();
+  const release = yield* Deferred.make<void>();
+  const realApply = views.applyCommitted;
+  const spy = vi.spyOn(views, "applyCommitted").mockImplementation((batch) =>
+    Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(release)), Effect.andThen(realApply(batch))));
+  yield* Effect.gen(function* () {
+    const writing = yield* appendSetup([
+      event({ _tag: "AgentGrouped", agentId: a.agentId, groups: ["new", "review"] }),
+      event({ _tag: "StateChanged", agentId: a.agentId, state: { _tag: "paused", reason: "limit", midTurn: true } }),
+      event({ _tag: "PermissionMoved", agentId: a.agentId, permissionRequestId: "p1", from: owner, to: { _tag: "agent", agentId: "child" }, deliveryId: "moved-p1" }),
+      event({ _tag: "QuestionAnswered", agentId: a.agentId, questionId: "q1", answeredBy: owner, text: "Answer.", deliveryId: "answered-q1" }),
+      permissionFor("p2", { agentId: "child" }), questionFor("q2", { agentId: "child" }),
+      event({ _tag: "DeliveryHeld", agentId: a.agentId, deliveryId: "empty-hold", reason: "capacity" }),
+    ]).pipe(Effect.forkScoped);
+    yield* Deferred.await(entered);
+    const during = yield* snapshotFor(caller);
+    expect(during.sequence).toBe(before.sequence);
+    expect(snapshotControl(during, kind === "owner")).toEqual(snapshotControl(before, kind === "owner"));
+    // The durable suffix is readable while publication is held. Fold it into
+    // the snapshot's control data and compare with independently projected replay.
+    const head = yield* headSequence;
+    const durable = yield* subscribe(0).pipe(Stream.take(head), Stream.runCollect);
+    const suffix = yield* subscribe(before.sequence).pipe(Stream.take(head - before.sequence), Stream.runCollect);
+    const visibleSuffix = suffix.filter((row) => row.agentId !== undefined && ids.has(row.agentId));
+    const restored = visibleSuffix.reduce(apply, restoreControl(before, emptyViews()));
+    const expected = controlProjection(durable.reduce(apply, emptyViews()), ids, kind === "owner");
+    expect(controlProjection(restored, ids, kind === "owner")).toEqual(expected);
+    yield* Deferred.succeed(release, undefined);
+    yield* Fiber.join(writing);
+    const after = yield* read("client.snapshot", {}, credential);
+    expect(after.sequence).toBe(head);
+    expect(snapshotControl(after, kind === "owner")).toEqual(expected);
+    expect(after.agents.find((row: any) => row.agentId === a.agentId)).toMatchObject({ groups: ["new", "review"], state: { _tag: "paused" }, openPermissionRequests: 1, openQuestionsAsked: 0 });
+    expect(after.requests.find((row: any) => row.id === "p1").holder).toEqual({ _tag: "agent", agentId: "child" });
+  }).pipe(Effect.ensuring(Deferred.succeed(release, undefined)), Effect.ensuring(Effect.sync(() => spy.mockRestore())));
 })));
 
 it("3.1 owner snapshot preserves pre-existing deliveries, nonblocking waits, reloadability and every identity without prompt text or account values", async () => run(Effect.gen(function* () {
