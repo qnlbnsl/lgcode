@@ -13,29 +13,33 @@ export interface ThreadState {
   readonly loaded: boolean
 }
 
-export async function watchThread(
+export function watchThread(
   agentId: AgentId, changed: (state: ThreadState) => void, expired: () => void, signal: AbortSignal
 ) {
   let snapshot: ClientSnapshot | undefined
-  const items = new Map<string, ThreadItem>()
+  const items = new Map<EventSequence, ThreadItem>()
   let after = 0 as EventSequence
   let loaded = false
   let ended = false
   let failures = 0
-  const publish = (connection: ConnectionState) => {
+  let connection: ConnectionState = "Connecting"
+  const publish = (nextConnection: ConnectionState) => {
+    connection = nextConnection
     if (!signal.aborted) changed({ ...(snapshot === undefined ? {} : { snapshot }),
-      items: [...items.values()].sort((a, b) => a.sequence - b.sequence), loaded, connection })
+      // Initial history is actionable only after all request context recovers.
+      // A failed recovery must not publish a partially loaded request list.
+      items: loaded ? [...items.values()].sort((a, b) => a.sequence - b.sequence) : [], loaded, connection })
   }
   const put = (item: ThreadItem) => {
     if ("event" in item) {
       const target = item.event._tag === "DeliveryQueued" ? item.event.delivery.target
         : "agentId" in item.event ? item.event.agentId : item.agentId
-      if (target === agentId) items.set(`${item.sequence}:${item.event._tag}`, item)
+      if (target === agentId) items.set(item.sequence, item)
     } else if (item.agentId === agentId && contentOnlyEventTags.some((tag) => tag === item.tag)
-      && !([...items.values()].some((entry) => entry.sequence === item.sequence && "event" in entry))) items.set(`${item.sequence}:${item.tag}`, item)
+      && !(items.has(item.sequence) && "event" in items.get(item.sequence)!)) items.set(item.sequence, item)
   }
 
-  await Effect.runPromise(Effect.gen(function* () {
+  void Effect.runPromise(Effect.gen(function* () {
     while (!ended) {
       yield* Effect.scoped(Effect.gen(function* () {
         const client = yield* connectBrowser()
@@ -122,4 +126,11 @@ export async function watchThread(
       }
     }
   }), { signal }).catch(() => { if (!signal.aborted) publish("Reconnecting") })
+  return {
+    recover: (envelope: ClientEnvelope) => {
+      if (signal.aborted) return
+      put(envelope)
+      publish(connection)
+    }
+  }
 }

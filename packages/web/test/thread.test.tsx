@@ -30,11 +30,20 @@ it("7.4 renders every thread content kind as inert text and resolves oversized m
   expect(container.textContent).toContain("loaded full event")
 })
 
-it("7.4 shows a placeholder only for content-only event tags", async () => {
+it.each([false, true])("7.4 recovers state separately from content placeholders (content=%s)", async (withContent) => {
+  const view = { agents: [{ agentId, name: "Worker one" }], requests: [], questions: [],
+    requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }
+  const snapshot = vi.fn().mockReturnValueOnce(Effect.succeed({ ...view, sequence: 1 }))
+    .mockReturnValueOnce(Effect.succeed({ ...view, sequence: 1 }))
+    .mockReturnValue(Effect.succeed({ ...view, sequence: 5, agents: [{ agentId, name: "Worker one recovered" }] }))
+  const event = vi.fn(() => Effect.fail(new Error("content must remain lazy")))
   const container = await mountThread([], { "client.subscribe": () => Stream.fromIterable([
-    { _tag: "client.Oversized", sequence: 2, tag: "ThreadItem", agentId, bytes: 300_000 },
-    { _tag: "client.Oversized", sequence: 3, tag: "StateChanged", agentId, bytes: 300_000 }
-  ]) })
-  expect(container.querySelector('button[aria-label*="Load"]')).toBeTruthy() // catches dropping the placeholder for content-only thread data
-  expect(container.textContent).not.toContain("StateChanged") // catches placeholders for control events that carry no display content
+    ...(withContent ? [{ _tag: "client.Oversized", sequence: 4, tag: "ThreadItem", agentId, bytes: 300_000 }] : []),
+    { _tag: "client.Oversized", sequence: 5, tag: "StateChanged", agentId, bytes: 300_000 }
+  ]), "client.snapshot": snapshot, "client.event": event })
+  expect(container.querySelectorAll('article[aria-label="Large thread item"]')).toHaveLength(withContent ? 1 : 0)
+  expect(container.querySelectorAll('button[aria-label="Load full thread item"]')).toHaveLength(withContent ? 1 : 0)
+  expect(container.querySelector("h2")?.textContent).toContain("Worker one recovered")
+  expect(event).not.toHaveBeenCalled()
+  expect(snapshot).toHaveBeenCalledTimes(3) // initial, history reconciliation, then live state-marker recovery
 })

@@ -52,11 +52,14 @@ afterEach(async () => {
 })
 
 it("7.8 changes a kind's alert push setting through its client command", async () => {
-  const set = vi.fn(() => Effect.succeed({ requestId: "reply" }))
+  let acknowledge!: (value: { requestId: string }) => void
+  const pending = new Promise<{ requestId: string }>((resolve) => { acknowledge = resolve })
+  const set = vi.fn(() => Effect.tryPromise(() => pending))
+  const read = vi.fn(() => Effect.succeed({ requestId: "reply", ...alertSettings }))
   browser.client = {
     "client.snapshot": () => Effect.succeed({ requestId: "snapshot", sequence: 7, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }),
     "client.subscribe": () => Stream.never,
-    "client.alerts.settings": () => Effect.succeed({ requestId: "reply", ...alertSettings }),
+    "client.alerts.settings": read,
     "client.alerts.settings.set": set,
     "client.web.settings": () => Effect.succeed({ requestId: "reply", ...webSettings, serverState: "running" })
   }
@@ -70,6 +73,14 @@ it("7.8 changes a kind's alert push setting through its client command", async (
     control!.dispatchEvent(new Event("change", { bubbles: true }))
   })
   await vi.waitFor(() => expect(set).toHaveBeenCalledWith(expect.objectContaining({ kind: "approval", push: false })))
+  expect(control!.checked).toBe(false)
+  expect(control!.disabled).toBe(true)
+  await act(async () => { acknowledge({ requestId: "reply" }) })
+  await vi.waitFor(() => expect(control!.disabled).toBe(false))
+  expect(control!.checked).toBe(false)
+  expect(container.textContent).toContain("Alert push setting saved.")
+  expect(read).toHaveBeenCalledTimes(1)
+  expect(set).toHaveBeenCalledTimes(1)
 })
 
 it("7.8 changes the alert carrier server and topic through its client command", async () => {

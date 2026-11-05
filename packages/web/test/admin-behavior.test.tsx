@@ -182,11 +182,31 @@ it("returns an expired settings session to login without displaying server error
   expect(container.querySelector('[aria-label="Settings"]')).toBeNull()
 })
 
-it("cancels pending admin reads when navigating away, including Strict Mode effect replay", async () => {
-  let closed = 0
-  browser.client = { ...baseClient(), "client.alerts.list": () => Effect.never.pipe(Effect.ensuring(Effect.sync(() => { closed++ }))) }
-  const container = await render("/alerts", true)
+it.each([
+  { page: "alerts", strict: false }, { page: "alerts", strict: true },
+  { page: "settings", strict: false }, { page: "settings", strict: true }
+])("cancels the active $page read on navigation (StrictMode=$strict)", async ({ page, strict }) => {
+  let generation = 0
+  const active = new Set<number>()
+  const closed: number[] = []
+  const read = () => Effect.suspend(() => {
+    const id = ++generation
+    active.add(id)
+    return Effect.never.pipe(Effect.ensuring(Effect.sync(() => { active.delete(id); closed.push(id) })))
+  })
+  browser.client = { ...baseClient(), [page === "alerts" ? "client.alerts.list" : "client.alerts.settings"]: read }
+  const container = await render(`/${page}`, strict)
+  await eventually(() => expect(active.size).toBe(1))
+  const current = [...active][0]!
+  expect(closed).not.toContain(current)
+  if (strict) {
+    expect(generation).toBeGreaterThan(1)
+    expect(closed.length).toBeGreaterThan(0)
+  } else expect(closed).toEqual([])
+  const before = closed.length
   await act(async () => { Array.from(container.querySelectorAll("a")).find((link) => link.textContent === "Situation")!.click() })
   await eventually(() => expect(container.querySelector('[aria-label="Situation"]')).not.toBeNull())
-  expect(closed).toBeGreaterThan(0)
+  await eventually(() => expect(closed).toContain(current))
+  expect(closed).toHaveLength(before + 1)
+  expect(active.size).toBe(0)
 })

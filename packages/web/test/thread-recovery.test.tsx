@@ -2,7 +2,8 @@ import { act } from "react"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import { expect, it, vi } from "vitest"
-import { agentId, item, mountThread, permissionRequest } from "./thread-fixtures.tsx"
+import { agentId, item, mountThread, permissionRequest, roots } from "./thread-fixtures.tsx"
+import { controlledStream } from "./controlled-stream.ts"
 import { threadHref, threadLocation } from "../src/thread/links.ts"
 
 const snapshot = (sequence: number, requests: ReadonlyArray<unknown> = []) => ({
@@ -21,6 +22,88 @@ it("recovers snapshot-only permission context before displaying an answer contro
   expect(event).toHaveBeenCalledWith(expect.objectContaining({ sequence: 2 }))
   expect(container.textContent).toContain('"command":"inspect"')
   expect(allowIn(container)?.disabled).toBe(false)
+})
+
+it("FR-108 publishes no answer until every snapshot request context has recovered", async () => {
+  let release!: (value: { envelope: ReturnType<typeof permissionRequest> }) => void
+  const pending = new Promise<{ envelope: ReturnType<typeof permissionRequest> }>((resolve) => { release = resolve })
+  const event = vi.fn(() => Effect.tryPromise(() => pending))
+  const answer = vi.fn(() => Effect.succeed({}))
+  const container = await mountThread([permissionRequest({ toolInput: "already loaded" })], {
+    "client.snapshot": () => Effect.succeed(snapshot(3, [requestRow, { ...requestRow, id: "permission-2", sourceSequence: 3 }])),
+    "client.event": event, answer
+  }, `/thread/${agentId}`, false)
+  expect(event).toHaveBeenCalledWith(expect.objectContaining({ sequence: 3 }))
+  expect(container.querySelector('[aria-label="Thread"]')).not.toBeNull()
+  expect(allowIn(container)).toBeUndefined()
+  for (const control of container.querySelectorAll<HTMLButtonElement>('[aria-label="Permission request"] button')) {
+    expect(control.disabled).toBe(true)
+    await act(async () => { control.click() })
+  }
+  expect(answer).not.toHaveBeenCalled()
+  await act(async () => { release({ envelope: { ...permissionRequest({ permissionRequestId: "permission-2", toolInput: "recovered input" }), sequence: 3 } }) })
+  const request = container.querySelector('[data-request-id="permission-2"]')!
+  const allow = [...request.querySelectorAll("button")].find((button) => button.textContent === "Allow")!
+  expect(request.textContent).toContain("recovered input")
+  const context = [...request.querySelectorAll("pre")].find((node) => node.textContent?.includes("recovered input"))!
+  expect(context.compareDocumentPosition(allow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(allow.disabled).toBe(false)
+  expect(answer).not.toHaveBeenCalled()
+  await act(async () => { allow.click() })
+  expect(answer).toHaveBeenCalledWith(expect.objectContaining({ id: "permission-2", kind: "permission" }))
+})
+
+it.each(["reject", "cancel"])("FR-108 exposes no answer when snapshot recovery is %s", async (outcome) => {
+  let reject!: (error: Error) => void
+  const pending = new Promise<never>((_, fail) => { reject = fail })
+  const finalized = vi.fn()
+  const event = vi.fn(() => Effect.tryPromise(() => pending).pipe(Effect.ensuring(Effect.sync(finalized))))
+  const answer = vi.fn(() => Effect.succeed({}))
+  const container = await mountThread([permissionRequest({ toolInput: "already loaded" })], {
+    "client.snapshot": () => Effect.succeed(snapshot(3, [requestRow, { ...requestRow, id: "permission-2", sourceSequence: 3 }])),
+    "client.event": event, answer
+  }, `/thread/${agentId}`, false)
+  expect(event).toHaveBeenCalledTimes(1)
+  expect(allowIn(container)).toBeUndefined()
+  if (outcome === "reject") {
+    await act(async () => { reject(new Error("context unavailable")) })
+    expect(container.textContent).toContain("Reconnecting")
+    expect(allowIn(container)).toBeUndefined()
+  } else {
+    const mounted = roots.pop()!
+    await act(async () => { mounted.root.unmount() })
+    mounted.container.remove()
+  }
+  expect(finalized).toHaveBeenCalledTimes(1)
+  expect(answer).not.toHaveBeenCalled()
+})
+
+it("FR-108 recovers a pending oversized live permission before exposing its answer", async () => {
+  const live = await controlledStream()
+  let release!: (value: { envelope: ReturnType<typeof permissionRequest> }) => void
+  const pending = new Promise<{ envelope: ReturnType<typeof permissionRequest> }>((resolve) => { release = resolve })
+  const event = vi.fn(() => Effect.tryPromise(() => pending))
+  const answer = vi.fn(() => Effect.succeed({}))
+  let sequence = 1
+  const container = await mountThread([], {
+    "client.subscribe": () => live.stream, "client.event": event, answer,
+    "client.snapshot": () => Effect.succeed(snapshot(sequence, sequence === 1 ? [] : [requestRow]))
+  })
+  await act(async () => {
+    sequence = 2
+    await live.emit({ _tag: "client.Oversized", sequence: 2, tag: "PermissionRequested", agentId, bytes: 300_000 })
+  })
+  expect(event).toHaveBeenCalledWith(expect.objectContaining({ sequence: 2 }))
+  expect(allowIn(container)).toBeUndefined()
+  expect(answer).not.toHaveBeenCalled()
+  await act(async () => { release({ envelope: permissionRequest({ toolInput: "live recovered input" }) }) })
+  const request = container.querySelector('[data-request-id="permission-1"]')!
+  const allow = allowIn(request as HTMLElement)!
+  expect(request.textContent).toContain("live recovered input")
+  const context = [...request.querySelectorAll("pre")].find((node) => node.textContent?.includes("recovered input"))!
+  expect(context.compareDocumentPosition(allow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  expect(allow.disabled).toBe(false)
+  expect(answer).not.toHaveBeenCalled()
 })
 
 it("loads later history pages and keeps answered requests from becoming actionable again", async () => {

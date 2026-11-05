@@ -9,8 +9,11 @@ import { AlertSubjects } from "./subjects/alerts.tsx"
 import { DataText, visibleText } from "./text.tsx"
 import { watchThread, type ThreadState } from "./watch.ts"
 
-function LargeItem({ item, signal }: { readonly item: typeof Oversized.Type; readonly signal: AbortSignal }) {
-  const [full, setFull] = useState<ClientEnvelope>()
+function LargeItem({ item, signal, onLoaded }: {
+  readonly item: typeof Oversized.Type
+  readonly signal: AbortSignal
+  readonly onLoaded: (envelope: ClientEnvelope) => void
+}) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(false)
   const loading = useRef(false)
@@ -22,17 +25,16 @@ function LargeItem({ item, signal }: { readonly item: typeof Oversized.Type; rea
     void withClient((client) => client["client.event"]({ requestId: requestId(), sequence: item.sequence }), signal)
       .then((reply) => {
         if (signal.aborted) return
-        if ("envelope" in reply && reply.envelope.sequence === item.sequence) setFull(reply.envelope)
+        if ("envelope" in reply && reply.envelope.sequence === item.sequence
+          && reply.envelope.event._tag === "ThreadItem" && reply.envelope.event.agentId === item.agentId) onLoaded(reply.envelope)
         else setError(true)
       }).catch(() => { if (!signal.aborted) setError(true) })
       .finally(() => { if (!signal.aborted) { loading.current = false; setBusy(false) } })
   }
   return <article aria-label="Large thread item">
-    {full?.event._tag === "ThreadItem" ? <Content event={full.event} /> : <>
-      <p>Large thread item ({item.bytes} bytes).</p>
-      <button aria-label="Load full thread item" disabled={busy} onClick={load}>{busy ? "Loading…" : "Load full item"}</button>
-      {error && <p role="alert">Could not load this item. Try again.</p>}
-    </>}
+    <p>Large thread item ({item.bytes} bytes).</p>
+    <button aria-label="Load full thread item" disabled={busy} onClick={load}>{busy ? "Loading…" : "Load full item"}</button>
+    {error && <p role="alert">Could not load this item. Try again.</p>}
   </article>
 }
 
@@ -75,10 +77,11 @@ export function Thread({ agentId, subject, onSessionExpired }: {
 }) {
   const [state, setState] = useState<ThreadState>({ items: [], loaded: false, connection: "Connecting" })
   const [controller] = useState(() => new AbortController())
+  const watcher = useRef<ReturnType<typeof watchThread> | undefined>(undefined)
   const expired = useRef(onSessionExpired)
   expired.current = onSessionExpired
   useEffect(() => {
-    void watchThread(agentId, setState, () => expired.current(), controller.signal)
+    watcher.current = watchThread(agentId, setState, () => expired.current(), controller.signal)
     return () => controller.abort()
   }, [agentId, controller])
   const envelopes = state.items.filter((item): item is ClientEnvelope => "event" in item)
@@ -92,7 +95,8 @@ export function Thread({ agentId, subject, onSessionExpired }: {
     {!state.loaded && <p>Loading thread…</p>}
     {state.loaded && state.items.length === 0 && <p>No thread items.</p>}
     {state.items.map((item) => {
-      if (!("event" in item)) return <LargeItem key={item.sequence} item={item} signal={controller.signal} />
+      if (!("event" in item)) return <LargeItem key={item.sequence} item={item} signal={controller.signal}
+        onLoaded={(envelope) => watcher.current?.recover(envelope)} />
       const event = item.event
       switch (event._tag) {
         case "ThreadItem": return <article aria-label="Agent message" key={`${item.sequence}:${event._tag}`}><p>Agent data</p><Content event={event} /></article>

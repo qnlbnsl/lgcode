@@ -35,7 +35,7 @@ const rosterAgent = {
 export const roots: Array<{ container: HTMLDivElement; root: Root }> = []
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-export const mountThread = async (items: ReadonlyArray<unknown>, extraClient: Record<string, unknown> = {}, path = `/thread/${agentId}`) => {
+export const mountThread = async (items: ReadonlyArray<unknown>, extraClient: Record<string, unknown> = {}, path = `/thread/${agentId}`, waitForThread = true) => {
   window.history.replaceState({}, "", path)
   const container = document.createElement("div")
   document.body.append(container)
@@ -51,7 +51,7 @@ export const mountThread = async (items: ReadonlyArray<unknown>, extraClient: Re
     ...extraClient
   }
   await act(async () => { root.render(<App />) })
-  await act(async () => {
+  if (waitForThread) await act(async () => {
     await vi.waitFor(() => {
       if (!container.textContent?.includes("Worker one")) throw new Error("owner view has not loaded")
     })
