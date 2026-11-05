@@ -113,8 +113,12 @@ capacity handling.
 This payload opens an area's channel from an identity allowed to manage it:
 
 ```sh
-shephrd board.open --input '{"name":"Backend team","group":"area:backend","anchorAgentId":"<lead id>"}'
+shephrd board.open --input '{"name":"backend-team","group":"area:backend","anchorAgentId":"<lead id>"}'
 ```
+
+The channel name must start with a letter and contain only letters, digits,
+underscores or hyphens, with at most 64 characters. The command line does
+not normalize a display name into that form.
 
 The rest of the source step maps as follows. Rows marked as team workflow
 remain in the external skill.
@@ -265,13 +269,15 @@ retry resumes the existing agent and sends its carry-on once. A later crash
 is reported instead of retried indefinitely.
 
 The stall rule accounts for work an agent awaits through the board, open
-requests and waits. A lead waiting on busy workers is not stalled merely
-because its own thread is idle. A circular dependency that ends at idle
-agents can stall. The sheepdog nudges and reports; it does not decide the
-project's next assignment. Runaway, age and role-advice notices likewise
-leave the decision to the holder. Compaction and cache flushes depend on
-supported usage information. They do not invent a context estimate when
-the adapter supplies none.
+requests and waits. A lead waiting on busy workers normally has no stall
+clock. The owed-reply exception still lets the clock run for a post whose
+eligible agent author reaches nothing busy except through that lead
+(roles decision 88). An owner-authored post does not qualify for that
+exception. A circular dependency that ends at idle agents can stall. The
+sheepdog nudges and reports; it does not decide the project's next assignment.
+Runaway, age and role-advice notices likewise leave the decision to the
+holder. Compaction and cache flushes depend on supported usage information.
+They do not invent a context estimate when the adapter supplies none.
 
 Every notice goes to the subject's nearest idle or working ancestor, or
 to the owner if there is none. Notices skip a paused parent. If a recipient
@@ -321,14 +327,25 @@ Have the replacement call `roles.orient` for its own current assignment.
 
 1. Read `client.roster`, optionally filtered by the area group. Save the
    returned identifiers, parents, roles, harnesses, models, efforts,
-   folders and session references. Export each relevant conversation with
-   `shephrd thread export <agent id> --out <archive file>`. The command
-   pages the thread and writes a local file with mode `0600`.
+   folders and session references. Each lead sends the owner the relevant
+   agent identifiers and intended archive paths. The owner runs
+   `shephrd thread export <agent id> --out <archive file>` for each
+   conversation from the owner's authenticated terminal. The command
+   requires the owner identity, pages the thread and writes a local file
+   with mode `0600`. It refuses an agent's enveloped thread reply, even
+   when that agent may read its child's thread. Keep the engine-supplied
+   agent credentials unchanged, and never give agents the owner credential
+   or unwrap their replies to export them. The owner confirms the exports
+   and sends each lead the saved archive paths through a board post or
+   prompt before reporting proceeds.
+   The owner-run `pnpm live-check:roles` script follows the same responsibility
+   through its owner client.
 2. Each lead builds its team's report from the worker result files, roster
-   and exported threads. Keep the source skill's attribution table: commit,
-   originating branch, agent, harness, model, effort, reviewers and
-   transcript or export path. Git identifies commits and branches; the
-   roster does not prove authorship of a commit. Keep worker branches on
+   and exported threads at the owner-confirmed archive paths. Keep the
+   source skill's attribution table: commit, originating branch, agent,
+   harness, model, effort, reviewers and transcript or export path. Git
+   identifies commits and branches; the roster does not prove authorship
+   of a commit. Keep worker branches on
    the remote for later attribution.
 3. The manager reports the area branches, delivered changes, review
    verdicts, risks, approvals and steward log to the owner. The one journal
@@ -340,9 +357,11 @@ Have the replacement call `roles.orient` for its own current assignment.
    reject a change that adds tracked `.foundry/` paths. Branch pushes,
    pull requests and merges are git and hosting workflow, not a role's
    implied authority to deploy or merge a base branch.
-5. Copy the area's task files, results, logs, scores and exports into its
-   run archive before deleting a worktree. Board history remains in the
-   engine's event record; export the relevant threads for the report.
+5. Copy the area's task files, results, logs, scores and owner-confirmed
+   exports into its run archive before deleting a worktree. Confirm that
+   each archive path from step 1 is saved there before cleanup. If an export
+   is missing, wait for the owner's export and path handoff. Board history
+   remains in the engine's event record.
    Legacy team folders, if present during migration, are still archive
    inputs. Check task names, stage coverage and cross-team duplicate files,
    and record native session identifiers for recovery.

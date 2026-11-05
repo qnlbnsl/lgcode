@@ -5936,10 +5936,15 @@ bounded check, rather than a general data-flow analysis.
 ## 358. Criterion 2.3 says every reply carries a request identifier, but stream markers carry none
 
 Found: 2026-11-04, by the builder or test writer of unit a2, during the foundation build.
-State: open, for the final review.
+State: fixed as a documentation conflict in foundation review record FR-151.
 
-What happens: Criterion 2.3 says every reply carries a nonempty request identifier, but the specified checkpoint and oversized stream markers do not carry one. The tests require it on every command payload, unary reply and error, and do not add it to stream elements.
-Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+What happened: Criterion 2.3 and the generic contract wording said every
+reply carried a request identifier. Stream items instead carry event sequence
+numbers, including checkpoint and oversized markers.
+
+What changed: The criterion and both generic contract statements distinguish
+payloads, unary replies and errors from stream items. The existing identity
+and reconnection tests keep their expectations. No schema changed.
 
 ## 359. The contract names no largest alert event or alert-list page
 
@@ -5968,10 +5973,14 @@ Why it matters: The foundation build's reviews are held until its end, so this w
 ## 362. The board plan's engine-change table still says seven tools and eight events
 
 Found: 2026-11-04, by the builder or test writer of unit b1, during the foundation build.
-State: open, for the final review.
+State: fixed as a documentation conflict in foundation review record FR-153.
 
-What happens: The engine-change table's B1 and B2 prose still says seven board tools and eight board events. The current WS-1 criteria and v15 contract require eight agent tools and nine events, including acknowledgement and no-answer behavior. The tests follow the current criteria.
-Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+What happened: The engine-change table retained counts from before the
+acknowledgement command and event were added.
+
+What changed: Both tool counts in row B1 now say eight. The event count in
+row B2 now says nine. The counts agree with the current command access
+table, event union and exact inventory tests. No command or event changed.
 
 ## 363. An agent named `owner` shares its reader records with the human owner
 
@@ -6023,10 +6032,18 @@ Why it matters: An intermittent failure can block a merge, and it may hide a rea
 ## 368. A lead can be reported stalled while its workers work
 
 Found: 2026-11-04, by the builder or test writer of unit r13, during the foundation build.
-State: open, for the final review.
+State: fixed as a documentation conflict in foundation review record FR-156.
 
-What happens: The roles plan's owed-reply exception in section WS-4 lets an idle orchestrator's assignment stall its lead while that lead's workers work, when the orchestrator reaches no busy work outside that lead. Section WS-8 says without qualification that the lead is not reported stalled while its workers work. The acceptance fixture tests the owner-authored case, and production behaviour was left as it is.
-Why it matters: The two plan sections disagree, so the final review should decide which one holds.
+What happened: The roles plan's clock summary and acceptance wording omitted
+decision 88's owed-reply exception. Criterion 4.3 also denied that exception
+before requiring it later in the same row. The recipe repeated the broad
+waiting exclusion.
+
+What changed: The clock summary, criteria 4.3 and 8.2, and the recipe now
+preserve the exception. The owner-authored acceptance assignment does not
+qualify. An eligible idle orchestrator's assignment can qualify when its
+author reaches no busy work outside the lead. The evaluator and existing
+ordinary-waiting and owed-reply tests keep their behavior.
 
 ## 369. The live-check scripts depend on the order of their imports
 
@@ -6830,3 +6847,61 @@ and proves construction has not entered. The earlier transaction commits
 before releasing the permit. The reactor then checks its transaction entry
 and fresh projected state. A temporary hoisted-construction mutation must fail.
 The existing projected-reach regression remains.
+
+
+## 416. Foundry wrap-up assigned owner-only thread exports to agent leads
+
+Found: 2026-11-05, while repairing foundation review record FR-020.
+State: fixed as a documentation conflict.
+
+What happened: The recipe asked each lead to export conversations without
+an owner-side caller or handoff. The exporter requires structured owner
+pages. An agent receives an enveloped reply even when it may read a child's
+thread, so its export is refused.
+
+What changed: The owner exports the requested threads from an authenticated
+terminal and confirms the archive paths to each lead before reporting.
+Cleanup waits for those files to be saved in the run archive. This agrees
+with the owner client used by the live roles script. Agent credentials and
+data envelopes keep their existing boundaries.
+
+## 417. The Foundry channel example used a display name instead of a valid channel name
+
+Found: 2026-11-05, while repairing foundation review record FR-036.
+State: fixed as a documentation conflict.
+
+What happened: The Step 3 example used `Backend team`. The channel name
+schema refuses spaces, and the command line does not normalize the name.
+
+What changed: The example uses `backend-team`. The recipe states the existing
+letter-first, 64-character limit and allowed letters, digits, underscores
+and hyphens. The schema and command behavior are unchanged.
+
+## 418. The board read criterion promised services a plain post page
+
+Found: 2026-11-05, while repairing foundation review record FR-079.
+State: fixed as a documentation conflict.
+
+What happened: Criterion 5.16 grouped the owner and services together for
+plain `board.read` replies. The contract and command access table forbid
+service reads of posts.
+
+What changed: Criterion 5.16 now requires the owner's plain reply, the
+agent's unchanged data envelope, and refusal for a service. No access was
+widened, and the existing read and wrapping checks remain.
+
+## 419. The README said nothing was built after foundation implementation
+
+Found: 2026-11-05, while checking the foundation documentation repair scope.
+State: fixed as a documentation problem.
+
+What happened: The README's opening warning said nothing was built. The
+service composition already registers the engine, client, board and foundry
+supervision implementations. The foundation review and its repairs are in
+progress, so implementation presence does not mean release clearance.
+
+What changed: The warning describes the implemented foundation and ongoing
+review. It keeps standing permission rules, real-account checks and physical
+phone checks separate from completed implementation. It makes no claim that
+the build is released or cleared. The recipe and plan corrections in this
+change do not build roles units 3, 4 or 11a.

@@ -114,8 +114,10 @@ A piece adds itself to the engine's own lists, which section 6 makes:
 
 1. **Its commands** join `CommandsRpcGroup` in
    `packages/contracts/src/commands.ts`, already prefixed. Every payload has
-   a `requestId` field, and every reply and error carries it back, as the
-   engine's commands do (`packages/contracts/src/commands.ts:24`).
+   a `requestId` field, and every unary reply and error carries it back, as
+   the engine's commands do (`packages/contracts/src/commands.ts:24`). Stream
+   items use event sequence numbers, including checkpoint and oversized
+   markers, rather than the command's `requestId` (section 5).
 2. **Its events** join the `Event` union in
    `packages/contracts/src/events.ts`, each with a namespaced `_tag`. The
    envelope stays one schema, `EventEnvelope`.
@@ -1197,9 +1199,12 @@ and publish to it, including a fake alert with a lookalike link.
   handler.
 - `subscribe`, `client.subscribe` and `client.snapshot` are reads, and are
   not deduplicated.
-- A command's reply carries its `requestId`. It does not carry the
-  sequence number it committed (`commands.ts:26`). A client learns the
-  effect of its command from the stream.
+- A command's unary reply and error carry its `requestId`. A unary reply
+  does not carry the sequence number it committed (`commands.ts:26`). A
+  client learns the effect of its command from the stream.
+- Stream items do not carry the command's `requestId`. Events, checkpoints
+  and oversized markers carry event sequence numbers for ordering and
+  reconnection. A stream command's payload and error still carry `requestId`.
 
 **Cursors:**
 
