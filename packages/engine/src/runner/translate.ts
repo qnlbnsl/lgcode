@@ -42,7 +42,9 @@ export const translate = (value: unknown, replay: boolean): ReadonlyArray<Transl
   return [{ kind: "tool-call", text: JSON.stringify(update), content: {
     _tag: "tool-call", callId: update.toolCallId, title: typeof update.title === "string" ? update.title : "",
     ...(["pending", "in_progress", "completed", "failed"].includes(update.status) ? { status: update.status } : {}),
-    ...(update.rawInput === undefined ? {} : { input: toolValueText(update.rawInput) }),
+    // Keep every argument in the durable event. Viewers derive readable text
+    // with toolText; approval evidence must still see flags and other fields.
+    ...(update.rawInput === undefined ? {} : { input: JSON.stringify(update.rawInput) }),
     ...(update.rawOutput !== undefined ? { output: toolValueText(update.rawOutput) } : content.length > 0 ? { output: toolValueText(content.filter((part: any) => part?.type !== "terminal")) } : {}),
   } }];
 };

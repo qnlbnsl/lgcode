@@ -84,6 +84,8 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
     if (!exactCommand(tool.input, command)) return false;
     try {
       const input = JSON.parse(tool.input!);
+      // A historical display string has no working-directory evidence.
+      if (input === null || typeof input !== "object" || Array.isArray(input)) return false;
       for (const key of ["cwd", "workdir"]) {
         if (input[key] === undefined) continue;
         if (typeof input[key] !== "string") return false;

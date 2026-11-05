@@ -58,18 +58,25 @@ export const slashReceipt = (received: ReadonlyArray<string>, id: string, payloa
 };
 
 export const exactCommand = (input: string | undefined, command: string): boolean => {
-  try {
-    const actual = JSON.parse(input ?? "null")?.command;
-    if (actual === command) return true;
-    const quoted = `'${command.replaceAll("'", "'\\''")}'`;
-    return ["/bin/bash", "/bin/sh", "/bin/zsh", "bash", "sh", "zsh"].some((shell) =>
-      ["-c", "-lc"].some((flag) => actual === `${shell} ${flag} ${quoted}`));
-  } catch { return false; }
+  let value: unknown;
+  try { value = JSON.parse(input ?? "null"); }
+  catch { value = input; } // Logs written with display text lost the object.
+  const actual = typeof value === "string" ? value
+    : value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Json).command : undefined;
+  if (typeof actual !== "string") return false;
+  if (actual === command) return true;
+  const quoted = `'${command.replaceAll("'", "'\\''")}'`;
+  return ["/bin/bash", "/bin/sh", "/bin/zsh", "bash", "sh", "zsh"].some((shell) =>
+    ["-c", "-lc"].some((flag) => actual === `${shell} ${flag} ${quoted}`));
 };
 export const foregroundCommand = (input: string | undefined, command: string): boolean => {
   if (!exactCommand(input, command)) return false;
-  const value = JSON.parse(input!);
-  return [value.run_in_background, value.background].every((flag) => flag === undefined || flag === false);
+  try {
+    const value = JSON.parse(input!);
+    // Plain historical text cannot prove that background flags were absent.
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      && [value.run_in_background, value.background].every((flag) => flag === undefined || flag === false);
+  } catch { return false; }
 };
 export const mcpAskInput = (input: string | undefined, title: string, marker: string): boolean => {
   try {
