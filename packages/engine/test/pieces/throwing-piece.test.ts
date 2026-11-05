@@ -98,15 +98,34 @@ const unguardedCalls = (source: string): string[] => {
     }
     code = code.slice(0, match.index) + " ".repeat(end - match.index!) + code.slice(end);
   }
-  const direct = /(?:\b\w+\.)?\b(?:views|snapshotSections|reach|holdUnsettled|requestHeld|sourceRules|secretKeep|openMatters)\s*\[[^\]]+\](?:\s*\.\s*(?:reduce|snapshotFor|check|keep|openMatters))?\s*\(/g;
-  return [...code.matchAll(direct)].map((match) => match[0].replace(/\s*\($/, ""));
+  // Resolving an entry or observer can itself throw. Track simple table
+  // aliases before matching entry access, even if invocation is guarded later.
+  const names = new Set(["views", "snapshotSections", "reach", "holdUnsettled", "requestHeld", "sourceRules", "secretKeep", "openMatters"]);
+  for (const match of code.matchAll(/\b(?:const|let|var)\s*\{\s*(\w+)\s*:\s*(\w+)\s*\}\s*=\s*\w+/g)) {
+    if (names.has(match[1]!)) names.add(match[2]!);
+  }
+  for (;;) {
+    const size = names.size;
+    for (const match of code.matchAll(/\b(?:const|let|var)\s+(\w+)\s*=\s*(?:\w+\.)?(\w+)\s*(?=[;,\n])/g)) {
+      if (names.has(match[2]!)) names.add(match[1]!);
+    }
+    if (names.size === size) break;
+  }
+  const direct = new RegExp(`(?:\\b\\w+\\.)?\\b(?:${[...names].join("|")})\\s*(?:\\[[^\\]]+\\]|\\.\\s*(?:client|board|roles)\\s*\\.\\s*(?:empty|reduce|observe))(?:\\s*\\.\\s*(?:reduce|snapshotFor|check|keep|openMatters|observe))?`, "g");
+  return [...code.matchAll(direct)].map((match) => match[0]);
 };
 
-it("1.44 boundary catches a direct table call and ignores comments and the guard's closure", async () => {
+it("1.44 boundary catches table resolution, observer access and aliases outside the guard", async () => {
   registerRebuildCheck({ noLog: true });
   await productionModule<GuardModule>("pieces/guardPiece.ts");
   expect(unguardedCalls('lists.snapshotSections[ns](caller, view); // guardPiece()')).toEqual(["lists.snapshotSections[ns]"]);
   expect(unguardedCalls('guardPiece("snapshotSections", ns, () => lists.snapshotSections[ns](caller, view), undefined)')).toEqual([]);
+  expect(unguardedCalls('const observe = views[ns].observe; guardPiece("views", ns, () => observe(next), next[ns]);')).toEqual(["views[ns].observe"]);
+  expect(unguardedCalls('const table = lists.views; const alias = table; const entry = alias[ns]; guardPiece("views", ns, () => entry.observe(next), next[ns]);')).toEqual(["alias[ns]"]);
+  expect(unguardedCalls('const { views: table } = lists; table[ns].observe;')).toEqual(["table[ns].observe"]);
+  expect(unguardedCalls('const observe = lists.views.client.observe;')).toEqual(["lists.views.client.observe"]);
+  expect(unguardedCalls('const same = lists.views.client === clientPieceView; const data = views.roles;')).toEqual([]);
+  expect(unguardedCalls('guardPiece("views", ns, () => { const observe = views[ns].observe; return observe(next); }, next[ns]);')).toEqual([]);
   const root = new URL("../../src/", import.meta.url);
   const failures: string[] = [];
   const scan = (directory: string) => {

@@ -5,14 +5,13 @@ import {
 import * as Effect from "effect/Effect";
 import type * as Schema from "effect/Schema";
 import type * as RpcGroup from "effect/rpc/RpcGroup";
-import type { Input, Plan, Snapshot, CommandRefused } from "../commands/internal.ts";
+import type { PlannerTable, Snapshot } from "../commands/internal.ts";
 import { planners } from "../commands/planners.ts";
 import { reads, type ReadHandler } from "../api/reads.ts";
 import { boardPlanners, boardReads } from "../board/commands.ts";
 import { boardReactor } from "../board/reactor.ts";
 import { snapshotFor as boardSnapshotFor } from "../board/snapshot.ts";
 import { openMatters as boardOpenMatters, alertSource as boardAlertSource } from "../board/openMatters.ts";
-import type { LogWriteFailed } from "../log/EventLog.ts";
 import { pieceViews, type PieceView } from "./viewTables.ts";
 import { snapshotFor as rolesSnapshotFor } from "../roles/snapshot.ts";
 import { openMatters as rolesOpenMatters, alertSource as rolesAlertSource } from "../roles/openMatters.ts";
@@ -41,7 +40,7 @@ export interface EngineLists {
   readonly event: Schema.Codec<import("@shephrd/contracts").Event, unknown>;
   readonly envelope: Schema.Codec<EventEnvelope, unknown>;
   readonly access: Readonly<Record<string, ReadonlyArray<CallerKind>>>;
-  readonly planners: Readonly<Record<string, (input: Input, payload: Record<string, unknown>) => Effect.Effect<Plan, CommandRefused | LogWriteFailed>>>;
+  readonly planners: PlannerTable;
   readonly reads: Readonly<Record<string, ReadHandler>>;
   readonly views: Readonly<Record<PieceNamespace, PieceView>>;
   readonly migrations: Readonly<Record<PieceNamespace, ReadonlyArray<Migration>>>;

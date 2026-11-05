@@ -19,7 +19,7 @@ for (const cause of ["stopped", "crashed"] as const) for (const status of ["queu
     } as unknown as ReturnType<typeof eventOf>, ...(status === "sent" ? [eventOf({ _tag: "DeliverySent", agentId: "target", deliveryId: "piece-delivery", method: "acp" })] : [])]);
     const events = (targetGone as unknown as (view: typeof state, id: ReturnType<typeof agentIdOf>, cause: string, lists: unknown) => ReadonlyArray<unknown>)(state, agentIdOf("target"), cause, lists);
     expect(checked, "targetGone must ask the source's namespace rule").toBe(1);
-    if (action === "return") expect(events).toContainEqual({ _tag: "DeliveryReturned", agentId: "target", deliveryId: "piece-delivery", sender: { _tag: "piece", namespace: "client" }, reason: "not delivered" });
+    if (action === "return") expect(events).toEqual([{ _tag: "DeliveryReturned", agentId: "target", deliveryId: "piece-delivery", sender: { _tag: "piece", namespace: "client" }, reason: "not delivered" }]);
     else expect(events).toEqual([{ _tag: "DeliveryWithdrawn", agentId: "target", deliveryId: "piece-delivery", reason: cause === "stopped" ? "agent stopped" : "agent crashed" }]);
     expect(events.filter((event) => (event as { _tag: string })._tag === "DeliveryQueued")).toEqual([]);
   });

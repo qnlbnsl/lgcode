@@ -20,7 +20,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { expect, vi } from "vitest";
 
 import { CommandHandler } from "../../src/commands/CommandHandler.ts";
-import type { Input, Runtime } from "../../src/commands/internal.ts";
+import type { Input, Plan, Runtime } from "../../src/commands/internal.ts";
 import { SecretStore } from "../../src/commands/SecretStore.ts";
 import { EventLog } from "../../src/log/EventLog.ts";
 import { Redactor } from "../../src/log/Redactor.ts";
@@ -28,7 +28,7 @@ import { Runner } from "../../src/runner/Runner.ts";
 import type { Restart } from "../../src/recovery/service.ts";
 import { Views } from "../../src/views/Views.ts";
 import type { emptyViews } from "../../src/views/apply.ts";
-import { makeFakeRunner } from "./fakeRunner.ts";
+import { makeFakeRunner, type FakeRunner } from "./fakeRunner.ts";
 import { makeFakeSecrets, makeRig, removeRig, type Rig } from "./handlerRig.ts";
 import { ancestryHeaders, authorization, socketUrl } from "./socketClient.ts";
 
@@ -40,6 +40,7 @@ export interface PieceView {
   readonly reduce: (view: unknown, event: Readonly<Record<string, unknown>>, sequence: number) => unknown;
 }
 export interface TestPlan {
+  readonly afterCommit?: never;
   readonly events: ReadonlyArray<unknown>;
   readonly sideRows?: Readonly<Record<string, unknown>>;
   readonly reply: (batch: ReadonlyArray<Contracts.EventEnvelope>) => Record<string, unknown>;
@@ -52,7 +53,10 @@ export interface EngineLists {
   readonly event: Schema.Top;
   readonly envelope: Schema.Top;
   readonly access: Readonly<Record<string, ReadonlyArray<"owner" | "agent" | "service">>>;
-  readonly planners: Readonly<Record<string, (input: Input, payload: Record<string, unknown>) => Effect.Effect<TestPlan, unknown>>>;
+  readonly planners: Readonly<
+    Record<string, (input: Input, payload: Record<string, unknown>) => Effect.Effect<Plan | TestPlan, unknown>>
+    & Record<`${Contracts.PieceNamespace}.${string}`, (input: Input, payload: Record<string, unknown>) => Effect.Effect<TestPlan, unknown>>
+  >;
   readonly reads: Readonly<Record<string, unknown>>;
   readonly views: Readonly<Record<string, PieceView>>;
   readonly migrations: Readonly<Record<string, ReadonlyArray<{ readonly id: number; readonly statements: ReadonlyArray<string> }>>>;
@@ -133,6 +137,8 @@ export const withFixture = async (
     readonly redactor?: Layer.Layer<Redactor>;
     readonly recovery?: Layer.Layer<Restart>;
     readonly logger?: Layer.Layer<never>;
+    readonly rig?: Rig;
+    readonly runner?: Pick<FakeRunner, "layer">;
   } = {},
 ): Promise<void> => {
   // service.ts currently runs its CLI on import. Assert the builder export
@@ -141,12 +147,12 @@ export const withFixture = async (
   expect(readFileSync(service, "utf8"), "E22 must export buildServices without launching the CLI on import")
     .toMatch(/export\s+(?:const|function)\s+buildServices\b/);
   const { buildServices } = await import(/* @vite-ignore */ service.href) as { buildServices: BuildServices };
-  const rig = makeRig();
+  const rig = options.rig ?? makeRig();
   vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
   const bearer = randomBytes(32).toString("base64url");
   try {
     let program = Effect.gen(function* () {
-      const runner = yield* makeFakeRunner();
+      const runner = options.runner ?? (yield* makeFakeRunner());
       const services = buildServices(rig, lists);
       const redactor = options.redactor ?? Layer.succeed(Redactor, {
         redact: (event: Contracts.Event) => Effect.succeed(event), redactText: (text: string) => Effect.succeed(text),
@@ -161,6 +167,6 @@ export const withFixture = async (
     await Effect.runPromise(program as Effect.Effect<unknown, unknown, never>);
   } finally {
     vi.unstubAllEnvs();
-    removeRig(rig);
+    if (options.rig === undefined) removeRig(rig);
   }
 };
