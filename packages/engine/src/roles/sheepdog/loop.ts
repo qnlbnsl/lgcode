@@ -31,6 +31,7 @@ export interface RuleContext {
 // Only this consumer calls handlers, including after a restart, so a timer
 // cannot write a cursor past an event still waiting in the subscription.
 export interface SheepdogRule {
+  // Reconstruct transient state at enabled startup and each off-to-on change.
   readonly onStart?: (context: RuleContext) => Effect.Effect<void, unknown, any>;
   readonly onEvent?: (context: RuleContext, envelope: EventEnvelope) => Effect.Effect<void, unknown, any>;
   readonly timers?: (context: RuleContext) => ReadonlyArray<TimerOrigin>;
@@ -63,10 +64,13 @@ export const makeSheepdogLoop = (rules: ReadonlyArray<SheepdogRule>): Effect.Eff
     snapshot: { ...live, roles: { ...live.roles as RolesView, settings: { ...(live.roles as RolesView).settings, sheepdog: on } } },
     lists, sourceSequence: cursor, firstStart, baselinePosition,
   })));
+  const initializeRules = () => Effect.gen(function* () {
+    for (const rule of rules) if (rule.onStart !== undefined) yield* rule.onStart(yield* context());
+  });
   if (!on) yield* releaseHolds(snapshot, lists);
   else {
     yield* resendUnread(cursor, lists);
-    for (const rule of rules) if (rule.onStart !== undefined) yield* rule.onStart(yield* context());
+    yield* initializeRules();
   }
   type Message = { readonly _tag: "event"; readonly envelope: EventEnvelope } | { readonly _tag: "tick" };
   const queue = yield* Queue.make<Message, unknown>({ capacity: 256 });
@@ -134,6 +138,7 @@ export const makeSheepdogLoop = (rules: ReadonlyArray<SheepdogRule>): Effect.Eff
         rearming = next;
         attempted.clear();
         if (!on) yield* releaseHolds(yield* views.snapshot, lists);
+        else yield* initializeRules();
       }
     } else if (on) {
       const ctx = yield* context();

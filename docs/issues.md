@@ -6009,3 +6009,12 @@ What happened: The administration browser test expected `/threads/phone-worker`,
 What changed: The administration test pins the supported hash link, follows it, and reads the question before continuing through every settings check. The phone test checks the exact alert route and retained document. It checks the permission answer, the runner's agent and option, and output emitted only after approval. Reloading the thread independently reads back the committed answer and agent output. Only that fresh-document reload requires HTTP 200. Existing width and browser-storage checks remain in place.
 
 Why it matters: These tests now reach their administration and permission-flow assertions. Temporary production mutations verify that a wrong administration link and missing navigation handlers are rejected. The separate Hypertext Transfer Protocol Secure (HTTPS) fixture update belongs to the public-address repair in FR-001. The overflow mutation proof in FR-048 remains a Phase 2 item.
+
+## 371. Enabling an initially disabled sheepdog skips cache initialization
+
+Found: 2026-11-04, in the foundation review, record FR-008.
+State: fixed in the foundation fix for FR-008.
+
+What happened: An enabled startup initialized each sheepdog rule, but a switch from off to on only re-armed timers. The cache rule therefore kept an empty target map and never loaded the configured home or harness cache lifetimes. Existing eligible turns received no cache maintenance. Later turns with unsplit context usage also received none until a harness settings change or an enabled restart loaded the lifetime.
+What changed: A switch from off to on now runs the same rule initialization as an enabled startup before arming timers. The cache rule reloads settings and reconstructs targets from current agents and their recorded turns. A future deadline keeps its original expiry. A missed cache deadline is dropped. Repeated activation does not repeat an action.
+Verification: The socket-level cache runtime tests cover settings committed before disabled startup, existing and subsequent unsplit turns, missed deadlines, repeated activation, and Claude transcript reconstruction from the default home and both account-specific home settings. Five regression cases failed against the unfixed loop because no compaction was delivered. The missed-deadline case already passed and remains a guard against extending expiry at activation.
