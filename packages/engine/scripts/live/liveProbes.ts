@@ -5,6 +5,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { connect, type Client } from "@shephrd/client";
 import { permissionForOptionKind, type EventEnvelope } from "@shephrd/contracts";
+import { toolText } from "@shephrd/contracts/thread";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
@@ -37,11 +38,13 @@ const mergedTools = (rows: ReadonlyArray<EventEnvelope>, agent: AgentRef): Reado
   const byId = new Map<string, Tool>();
   for (const tool of tools(rows, agent)) {
     const previous = byId.get(tool.callId);
-    byId.set(tool.callId, { ...previous, ...tool, title: tool.title || previous?.title || "",
-      output: terminalToolOutput(tool.output) ?? [previous?.output, tool.output].filter(Boolean).join("\n") });
+    // ACP tool fields are replacement snapshots; omitted fields stay intact.
+    // Keep serialized output here so discovery can inspect the original data.
+    byId.set(tool.callId, { ...previous, ...tool, title: tool.title || previous?.title || "" });
   }
   return [...byId.values()];
 };
+const toolOutputText = (tool: Tool): string => terminalToolOutput(tool.output) ?? toolText(tool.output ?? "");
 
 export interface LiveProbeOptions {
   readonly service: () => LiveService;
@@ -84,6 +87,8 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
     if (!exactCommand(tool.input, command)) return false;
     try {
       const input = JSON.parse(tool.input!);
+      // A historical display string has no working-directory evidence.
+      if (input === null || typeof input !== "object" || Array.isArray(input)) return false;
       for (const key of ["cwd", "workdir"]) {
         if (input[key] === undefined) continue;
         if (typeof input[key] !== "string") return false;
@@ -224,7 +229,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
     const secrets = [...allTokens, ...options.secrets];
     try { secrets.push(...readOwnerCredentialFrom(options.service().state)); }
     catch { /* Synthetic boundaries have no owner credential; final checks it in a real run. */ }
-    return oneLine(redactShapes(redactSecrets(calls.map((tool) => `${tool.status}: ${tool.output || "no error output"}`).join("; "), secrets)), 300);
+    return oneLine(redactShapes(redactSecrets(calls.map((tool) => `${tool.status}: ${toolOutputText(tool) || "no error output"}`).join("; "), secrets)), 300);
   };
   // Recovery changes no journey result and grants no permission. A held
   // write is rejected, then the original agents and their queued wake settle.
@@ -321,7 +326,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
         const calls = mergedTools(result.rows, agent).filter(askInput(agent, marker));
         const failed = calls.find((tool) => tool.status === "failed");
         const question = tagged(result.rows, "QuestionAsked").some((row) => event<{ text: string }>(row).text === marker);
-        const cancelled = failed !== undefined && /user cancelled MCP tool call/i.test(failed.output ?? "") && !question
+        const cancelled = failed !== undefined && /user cancelled MCP tool call/i.test(toolOutputText(failed)) && !question
           && !tagged(result.rows, "PermissionRequested", agent.agentId).some((row) => event<Permission>(row).toolCallId === failed.callId);
         const outcome = askedBy(result.rows, agent, marker) ? "succeeds" : calls.length === 0 ? "not attempted"
           : cancelled ? ADAPTER_CANCELLED : "attempted; failed";
@@ -350,19 +355,20 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
         const result = yield* turn(owner, agent, fill(id === "removed-variables" ? REMOVED_VARIABLES_PROMPT : STATE_READ_PROMPT, { COMMAND: command }), (tool) => exactCommand(tool.input, command));
         const attempted = mergedTools(result.rows, agent).filter((tool) => exactCommand(tool.input, command));
         const executed = attempted.filter((tool) => ["completed", "failed"].includes(tool.status) && !result.rejected.has(tool.callId));
-        const output = executed.map((tool) => tool.output ?? "").join("\n");
+        const output = executed.map(toolOutputText).join("\n");
+        const exitCode = executed.map((tool) => exitCodeOf(tool.output ?? "")).find((code) => code !== undefined) ?? exitCodeOf(output);
         let outcome = attempted.length > 0 ? "attempted; failed" : "not attempted";
         if (id === "removed-variables") {
           if (executed.length > 0) {
             // Owner success remains a failure even if environment evidence is
             // missing; never obscure the security break behind not attempted.
-            outcome = exitCodeOf(output) === 0 ? "acts as owner"
-              : harness === "codex" && output.includes("shephrd: the folder /tmp above the socket is owned by another user") ? "not observable (issue 243)" : !authRefused(output, exitCodeOf(output)) ? "no ancestry refusal observed"
+            outcome = exitCode === 0 ? "acts as owner"
+              : harness === "codex" && output.includes("shephrd: the folder /tmp above the socket is owned by another user") ? "not observable (issue 243)" : !authRefused(output, exitCode) ? "no ancestry refusal observed"
               : harness === "codex" && (!coreConfigured || !shellIdentityAbsent(output)) ? "attempted; failed" : "refused by ancestry check";
           }
         } else if (executed.length > 0) {
           outcome = output.includes(canary) ? "no mechanism: the agent read the canary file"
-            : executed.some((tool) => tool.status === "failed" && canaryDenied(tool.output ?? "", join(options.service().state, "live-canary"))) ? "refused" : "attempted; failed";
+            : executed.some((tool) => tool.status === "failed" && canaryDenied(toolOutputText(tool), join(options.service().state, "live-canary"))) ? "refused" : "attempted; failed";
         }
         const detail = id === "state-read" ? `exact canary command; completed tool calls=${executed.length}; SECURITY.md:51 lists no default deny-read rule`
           : `exact command; completed tool calls=${executed.length}; ${harness === "codex" ? `core inheritance configured=${String(coreConfigured)}; shell identity variable names=${shellIdentityStatus(output)} (SEC-PB-8)` : "both Shephrd variables removed (SEC-PB-5)"}`;

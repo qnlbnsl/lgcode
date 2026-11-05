@@ -7948,3 +7948,59 @@ the turn and requires exactly one additional article after it ends.
 That article must hold the complete fixed sentence of more than thirty words.
 A browser regression rejects extra blocks even when one has the whole sentence.
 No timing assertion about streaming growth is made.
+
+## 482. Readable tool input replaced the original arguments in stored events
+
+Found: 2026-11-05, while checking the live-check regression from pull request 21.
+State: fixed on `area/live-fixes-2`.
+
+What happened: Commit `70f64eb` applied the display formatter to tool input
+before storing it. A shell input became its command text and lost its other
+arguments. The live probes expected a serialized object, so they rejected even
+the exact requested command. Other input shapes could also lose fields.
+
+What changed: The translator stores the complete serialized input again.
+The web page and terminal viewer already derive readable text at display.
+Exact command matching also reads earlier plain-text entries with the same
+whole-command comparison and canonical shell wrappers. Foreground and folder
+checks require structured arguments and reject entries that lost them.
+The regression passes the real translator's stored input to the probe matchers.
+It checks both update variants, shell wrappers, background flags, other tool
+arguments, and historical entries.
+
+## 483. The display formatter breaks deferred-tool discovery evidence
+
+Found: 2026-11-05, in the real live check on `area/live-fixes-2`.
+State: fixed in round 2 on `area/live-fixes-2`.
+The owner identified this as the output side of the same storage regression.
+
+What happened: The Claude lead used the exact permitted ToolSearch query for
+the ask tool. Its completed output contained the matching tool reference.
+The translator's output formatter flattened the reference array into a
+pretty-printed object. `mcpAskDiscovery` still requires a serialized array
+on each output line. It rejected this output before the Codex sandbox probe
+could run, even though Claude's authenticated ask succeeded.
+
+Evidence: `/tmp/shephrd-live-IEqoM1/state/events.sqlite`, read-only.
+The grouped discovery starts at sequence 148.
+The exact ask starts at sequence 152.
+The assigned run folder contains `live-check.log` and the result report.
+
+What changed: The translator serializes original output and content blocks.
+The web page and terminal viewer continue deriving readable text at display.
+The probe merges output as replacement snapshots and preserves omitted fields.
+The discovery matcher decodes the original result and recognized content
+wrappers. It also reads historical arrays and formatted reference objects.
+Every reference must still name only the exact ask tool.
+
+Terminal output keeps its existing redacted, bounded, serialized snapshots.
+A terminal reference alone no longer writes an empty generic output.
+An explicit empty result still replaces earlier output.
+Shell evidence is decoded before line matching, while structured exit codes
+remain available for inspection.
+
+The extended translator regression tests exercise discovery and shell evidence
+through the real probe driver. They also check historical output, terminal
+snapshots, replacement updates, omitted fields, and empty results.
+The assigned run folder contains the round 2 check logs and result report.
+No deferred security issue was repaired to improve the live-check count.

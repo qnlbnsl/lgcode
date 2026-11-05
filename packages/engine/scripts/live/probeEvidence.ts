@@ -58,18 +58,25 @@ export const slashReceipt = (received: ReadonlyArray<string>, id: string, payloa
 };
 
 export const exactCommand = (input: string | undefined, command: string): boolean => {
-  try {
-    const actual = JSON.parse(input ?? "null")?.command;
-    if (actual === command) return true;
-    const quoted = `'${command.replaceAll("'", "'\\''")}'`;
-    return ["/bin/bash", "/bin/sh", "/bin/zsh", "bash", "sh", "zsh"].some((shell) =>
-      ["-c", "-lc"].some((flag) => actual === `${shell} ${flag} ${quoted}`));
-  } catch { return false; }
+  let value: unknown;
+  try { value = JSON.parse(input ?? "null"); }
+  catch { value = input; } // Logs written with display text lost the object.
+  const actual = typeof value === "string" ? value
+    : value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Json).command : undefined;
+  if (typeof actual !== "string") return false;
+  if (actual === command) return true;
+  const quoted = `'${command.replaceAll("'", "'\\''")}'`;
+  return ["/bin/bash", "/bin/sh", "/bin/zsh", "bash", "sh", "zsh"].some((shell) =>
+    ["-c", "-lc"].some((flag) => actual === `${shell} ${flag} ${quoted}`));
 };
 export const foregroundCommand = (input: string | undefined, command: string): boolean => {
   if (!exactCommand(input, command)) return false;
-  const value = JSON.parse(input!);
-  return [value.run_in_background, value.background].every((flag) => flag === undefined || flag === false);
+  try {
+    const value = JSON.parse(input!);
+    // Plain historical text cannot prove that background flags were absent.
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      && [value.run_in_background, value.background].every((flag) => flag === undefined || flag === false);
+  } catch { return false; }
 };
 export const mcpAskInput = (input: string | undefined, title: string, marker: string): boolean => {
   try {
@@ -92,11 +99,23 @@ export const mcpAskDiscovery = (tool: { input?: string; title: string; status: s
   try {
     const input = JSON.parse(tool.input ?? "null");
     if (input?.query !== "select:mcp__shephrd__ask" || input.max_results !== 1 || Object.keys(input).length !== 2) return false;
-    const references = (tool.output ?? "").split("\n").filter(Boolean).flatMap((line) => {
-      const value: unknown = JSON.parse(line);
-      if (!Array.isArray(value)) throw new Error("not a lookup result");
-      return value;
-    });
+    // Stored raw results and ACP content wrappers retain their structure.
+    // Older logs contain arrays per line, or one formatted reference object.
+    // Decode those carriers without accepting prose as discovery evidence.
+    const referencesOf = (value: unknown): unknown[] => {
+      if (Array.isArray(value)) return value.flatMap(referencesOf);
+      if (typeof value === "string") return referencesOf(JSON.parse(value));
+      if (value !== null && typeof value === "object") {
+        const row = value as Json;
+        if (row.type === "content") return referencesOf(row.content);
+        if (row.type === "text" && typeof row.text === "string") return referencesOf(JSON.parse(row.text));
+      }
+      return [value];
+    };
+    let values: unknown[];
+    try { values = [JSON.parse(tool.output ?? "")]; }
+    catch { values = (tool.output ?? "").split("\n").filter(Boolean).map((line) => JSON.parse(line)); }
+    const references = values.flatMap(referencesOf) as Json[];
     return references.length > 0 && references.every((reference) => reference?.type === "tool_reference"
       && reference.tool_name === "mcp__shephrd__ask" && Object.keys(reference).length === 2);
   } catch { return false; }
