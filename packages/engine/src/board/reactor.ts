@@ -12,7 +12,7 @@ import { project } from "../routing/waits.ts";
 import { Views } from "../views/Views.ts";
 import { canCarryPost, leftChannelAfter, own, successorManager } from "./access.ts";
 import { outcome } from "./outcome.ts";
-import { activeWakes, boardView, buildWake, completionOwed, isUnread, noAnswerDue, readerKey, refreshWakes, reminderDue } from "./wake.ts";
+import { activeWakes, boardView, buildWake, completionOwed, isUnread, noAnswerDue, originalsOwed, readerKey, refreshWakes, reminderDue } from "./wake.ts";
 
 const closer = { _tag: "service", service: "board" } as const;
 const stoppedAfter = (snapshot: Snapshot, id: string, sequence: number): boolean =>
@@ -28,6 +28,7 @@ const owesWake = (snapshot: Snapshot, target: AgentId): boolean => {
   const board = boardView(snapshot);
   return Object.values(board.completions).some((debt) => debt.authorAgentId === target && debt.returns < 2)
     || Object.values(board.noAnswers).some((debt) => debt.authorAgentId === target && debt.returns < 2)
+    || originalsOwed(snapshot, target).size > 0
     || Object.values(board.posts).some((post) => post.status === "open" && post.reply !== "none"
       && post.to.some((to) => to._tag === "agent" && to.agentId === target) && own(post.dispositions, target) === undefined
       && (own(post.returns ?? {}, target) ?? 0) < 2

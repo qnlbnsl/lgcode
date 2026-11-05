@@ -450,7 +450,11 @@ A post has:
   because such a post wakes nobody. A wake already sent is not recalled.
   A completion's debt is not touched.
 - **Reading alone cancels nothing.** The queued wake stays as the safety net if
-  the agent stalls after reading.
+  the agent stalls after reading. An eligible original question remains in a
+  replacement after a close, acknowledgement or merge, even if it has been
+  read. If another target's cleanup withdraws its wake, the original duty
+  survives until its replacement is built. Acceptance ends the original
+  wake's duty, and later reminders follow the turn-end rule.
 - **It is not a disposition.** `holdsIncoming` and `holdsUnsettled` read no
   acknowledgement, and the post stays open.
 - **Where it shows.** `board.status`, `board.read`, the snapshot's post metadata and
