@@ -6328,3 +6328,14 @@ What happened: The reply text appears in its board subject and in the newly visi
 What changed: The browser assertion selects the exact reply inside the named Board post region. The exact single runner wake, removed reply form, and durable alert-clear assertions remain. Production code is unchanged.
 
 Validation: The corrected browser case passed. A temporary rendering mutation kept the outgoing reply visible while replacing the subject reply. Two explicit browser preconditions established that state, and the corrected locator then failed at the missing subject reply. The production file and temporary proof assertions were restored byte-for-byte before the commit.
+
+## 387. The alert lifecycle test leaves an auxiliary delivery unfinished
+
+Found: 2026-11-05, by the command-line batch's complete check during the foundation repairs.
+State: fixed.
+
+What happened: The lifecycle regression waited for its auxiliary barrier alert to be raised. It did not wait for that alert to be delivered before closing the service scope and counting carrier requests. The next restart could correctly deliver both this unfinished alert and the new restart barrier. The exact total then failed even though the renewed question was sent once.
+
+What changed: The regression waits for the auxiliary barrier's durable delivery before ending that scope. It retains the exact request total, renewed identity, per-question request count, clear events, and restart checks. Production code is unchanged.
+
+Validation: A controlled finite delay reproduces the old count failure with no production changes. The same delay passes with the delivery wait, and confirms that the auxiliary request has completed before the first scope ends. The worker's independent baseline reproduction and the lead's failed and passing proof logs are archived in the foundation fix run.
