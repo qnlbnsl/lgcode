@@ -62,7 +62,9 @@ close it. "Rows" are rows of `decisions.md` in this folder.
   sequence id replaces the earlier one where the server honours it (row 106).
 - **The owner supplies HTTPS for the public page.** Shephrd serves HTTP on
   loopback and requires an HTTPS public address (row 204). The owner configures
-  the proxy certificate and device trust. Interim remote access uses an SSH local
+  the external proxy's self-signed certificate. The owner accepts continuation
+  past the expected browser certificate warning, without installing certificate
+  trust. Shephrd holds no certificate. Interim remote access uses an SSH local
   forward at `http://127.0.0.1:<port>`, with identical device and server ports.
 - **ntfy's own settings cannot be enforced.** The owner's server decides its
   access rules. `docs/remote-access.md` advises deny-all, and Shephrd cannot

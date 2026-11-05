@@ -22,7 +22,8 @@ import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { httpsProxy } from "./support/httpsProxy.ts"
 import { owner } from "../../engine/test/board/wakeFixtures.ts"
 
-// The ephemeral fixture certificate is trusted only in this browser test.
+// This browser test ignores errors for the proxy's self-signed certificate.
+// It installs no certificate trust; the production listener stays on HTTP.
 test.use({ ignoreHTTPSErrors: true })
 
 test("7.4 a phone owner follows the board alert, reads and replies, and wakes the fake agent once", async ({ page }) => {

@@ -6027,3 +6027,13 @@ The production-shell browser test checks login and an actual outgoing request
 identifier at `http://127.0.0.1:<port>`.
 The phone and board alert browser fixtures use a real local HTTPS proxy while
 retaining their link, answer and readback checks.
+Second-round clarification: The owner's later 2026-11-04 ruling accepts a
+self-signed certificate at the external proxy.
+The first fix's guide, security rule, plan and three contract copies incorrectly
+required certificate trust.
+Those requirements now describe the expected browser certificate warning and
+the accepted continuation without installing trust.
+Shephrd still holds no certificate and serves only HTTP on loopback.
+The existing browser fixtures ignore certificate errors for the self-signed
+proxy and prove login and authenticated requests without installing trust.
+Their comments now describe that bypass accurately.

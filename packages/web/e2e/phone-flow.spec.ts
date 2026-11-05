@@ -20,7 +20,8 @@ import {
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { httpsProxy } from "./support/httpsProxy.ts"
 
-// The ephemeral fixture certificate is trusted only in this browser test.
+// This browser test ignores errors for the proxy's self-signed certificate.
+// It installs no certificate trust; the production listener stays on HTTP.
 test.use({ ignoreHTTPSErrors: true })
 
 test("11.1 phone flow: catches a missing alert link, login, permission answer, agent release, or thread readback", async ({ page }) => {

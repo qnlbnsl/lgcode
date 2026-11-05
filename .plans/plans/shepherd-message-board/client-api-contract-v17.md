@@ -390,8 +390,10 @@ These rules apply to the three kinds:
 - **Remote access comes through the owner's proxy.** The web server binds
   loopback only, also in proxy mode (row 76). Proxy mode has two settings: whether
   it is on, and the public address, which must use `https` (row 204). The web server
-  serves plain HTTP on loopback. The proxy serves HTTPS with a certificate trusted
-  by the browser, and public session cookies have the `Secure` attribute. Proxy,
+  serves plain HTTP on loopback and holds no certificate. The external proxy
+  serves HTTPS. A self-signed certificate is accepted. Public session cookies have
+  the `Secure` attribute. The owner accepts continuation past the expected browser
+  certificate warning. No certificate trust installation is required. Proxy,
   certificate and DNS setup are the owner's later work. Outside proxy mode, a
   request that carries a forwarded header is refused. Section
   5, "The web server's settings", gives the full table (row 193).
