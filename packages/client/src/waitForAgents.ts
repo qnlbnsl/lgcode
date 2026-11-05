@@ -1,4 +1,4 @@
-import { foldSettled, pieceNamespaces, reasonOf, waitSatisfied, type ClientSnapshot, type EventEnvelope, type SettledInput, type WaitMember, type RequestId } from "@shephrd/contracts"
+import { foldSettled, pieceNamespaces, reasonOf, waitSatisfied, type ClientSnapshot, type EventEnvelope, type PieceNamespace, type SettledInput, type WaitMember, type RequestId } from "@shephrd/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import type { Client, ClientEnvelope } from "./core.ts"
@@ -17,6 +17,10 @@ interface ConditionLists {
   readonly holdsUnsettled: ReadonlyArray<string>
   readonly ownerHeld?: ReadonlyArray<string>
 }
+// A failed snapshot hook must not hide the piece's independent condition read.
+const conditionReads = {
+  client: undefined, board: "board.status", roles: undefined,
+} as const satisfies Record<PieceNamespace, keyof Client | undefined>
 const keyed = <A>(rows: ReadonlyArray<A>, id: (row: A) => string) => Object.fromEntries(rows.map((row) => [id(row), row]))
 const requestId = () => globalThis.crypto.randomUUID() as RequestId
 const inputs = (snapshot: ClientSnapshot): SettledInput => ({
@@ -33,21 +37,18 @@ export const waitForAgents = (client: Client, options: WaitOptions): Effect.Effe
   if (options.members.length === 0 || !["any", "all"].includes(options.mode)) return yield* new ClientError({ message: "wait needs members and mode any or all" })
   const snapshot = yield* client["client.snapshot"]({ requestId: requestId() })
   if (snapshot.waitState === undefined) return yield* new ClientError({ message: "client wait requires an owner or service identity" })
-  if ((snapshot.failedSections?.length ?? 0) > 0) return yield* new ClientError({ message: "a wait snapshot section is unavailable" })
   let state = inputs(snapshot)
   let sequence: number = snapshot.sequence
-  const conditions = new Map<string, ConditionLists>()
-  for (const namespace of pieceNamespaces) {
-    const section = snapshot[namespace] as ConditionLists | undefined
-    if (section !== undefined && Array.isArray(section.holdsUnsettled)) conditions.set(namespace, section)
-  }
+  const conditions = new Map<PieceNamespace, ConditionLists>()
+  const namespaces = new Set(pieceNamespaces.filter((namespace) => conditionReads[namespace] !== undefined
+    && (snapshot[namespace] !== undefined || snapshot.failedSections?.includes(namespace))))
   const call = client as unknown as Record<string, (payload: unknown) => Effect.Effect<any, unknown>>
   const readGate = (): Effect.Effect<number, unknown> => Effect.gen(function* () {
-    if (conditions.size === 0) return (yield* client["client.sequence"]({ requestId: requestId() })).sequence
+    if (namespaces.size === 0) return (yield* client["client.sequence"]({ requestId: requestId() })).sequence
     // More than one piece must name the same published state. Reread the older
     // lists, rather than mixing holds computed at different sequences.
-    for (const namespace of conditions.keys()) {
-      const read = call[`${namespace}.status`]
+    for (const namespace of namespaces) {
+      const read = call[conditionReads[namespace]!]
       if (read === undefined) return yield* new ClientError({ message: "a wait condition read is unavailable" })
       conditions.set(namespace, yield* read({ requestId: globalThis.crypto.randomUUID() }))
     }
@@ -55,7 +56,7 @@ export const waitForAgents = (client: Client, options: WaitOptions): Effect.Effe
       const latest = Math.max(...[...conditions.values()].map((lists) => lists.sequence))
       const older = [...conditions].filter(([, lists]) => lists.sequence < latest)
       if (older.length === 0) return latest
-      for (const [namespace] of older) conditions.set(namespace, yield* call[`${namespace}.status`]!({ requestId: globalThis.crypto.randomUUID() }))
+      for (const [namespace] of older) conditions.set(namespace, yield* call[conditionReads[namespace]!]!({ requestId: globalThis.crypto.randomUUID() }))
     }
   })
   const candidate = (): ClientWaitReply | undefined => {
@@ -93,7 +94,7 @@ export const waitForAgents = (client: Client, options: WaitOptions): Effect.Effe
         return next
       })
       if (initial) {
-        if (conditions.size > 0) {
+        if (namespaces.size > 0) {
           let gate = yield* readGate()
           while (gate < sequence) gate = yield* readGate()
           while (sequence < gate) yield* advance
@@ -113,7 +114,7 @@ export const waitForAgents = (client: Client, options: WaitOptions): Effect.Effe
       for (;;) {
         const next = yield* advance
         const tag = next.event._tag === "UnknownEvent" ? next.event.tag : next.event._tag
-        const pieceChanged = conditions.has(tag.split(".")[0]!)
+        const pieceChanged = namespaces.has(tag.split(".")[0] as PieceNamespace)
         if (candidate() === undefined && !pieceChanged) continue
         let gate = yield* readGate()
         while (gate < sequence) gate = yield* readGate()
