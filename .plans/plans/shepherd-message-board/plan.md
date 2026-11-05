@@ -466,8 +466,10 @@ agent's owed completions, and a later resume does not bring them back.
 still-queued board wake that carries it. When one addressee gets a
 disposition, the post is removed only from that addressee's queued wakes.
 A replacement is built from the target's current duties only: completions
-still owed and open must-reply posts it has not read. A completion already
-discharged is never carried again (row 115).
+still owed, no-answer notices and reminders still owed, and open must-reply
+posts it has not acknowledged. An original question in the withdrawn wake
+stays eligible after a read until acknowledgement (row 152).
+A completion already discharged is never carried again (row 115).
 
 **WS-1: One shared definition of the board's commands and events**
 
@@ -662,7 +664,7 @@ escaped. The engine wraps the whole body in its agent-text envelope.
 | 3.13 | A sixteen-addressee `all` collection whose replies are each 16,384 backslashes gives a completion under 64 KiB encoded, with every disposition and each deciding reply's id; an open `all` post that collects 2,048 short repeated replies before its last addressee answers gives a completion under 64 KiB, with at most 17 ids and the reply count; `board.read` with `repliesTo` returns every reply in pages; five such completions owed at once take at most 128 KiB of one wake, and the rest ride the next (row 111) | Test id: `packages/engine/test/board/wakes.test.ts`, "completion size" |
 | 3.14 | `board.open` returns its channel id and `board.post` its post id through the real handler; a resent request id returns an equal reply and writes nothing; no planner's reply holds post text (row 107) | Test id: `packages/engine/test/board/handler.test.ts`, "planner replies" |
 | 3.15 | A completion carried by a sent wake that is not yet accepted is not packed into a second wake built meanwhile; after that wake is returned, the next wake carries it; a replacement built after `resume --fresh` re-queued an accepted wake carries no discharged completion (row 115) | Test id: `packages/engine/test/board/wakes.test.ts`, "one copy of a completion" |
-| 3.16 | `board.acknowledge` by an addressee writes one `board.PostAcknowledged` and marks the post read; a repeat, a closed post and an addressee with a disposition write nothing and are not refused; a non-addressee, a non-member and a post with `reply: none` are refused; a queued wake holding only that post is withdrawn with no replacement; a wake that also holds another question, a completion, a notice or a reminder is replaced and still delivers those, with the completion's debt untouched; a sent wake is not recalled; reading alone withdraws nothing; `holdsIncoming` does not change; `board.status`, `board.read` and the snapshot name who has acknowledged, and a reply counts (row 152) | Test id: `packages/engine/test/board/wakes.test.ts`, "acknowledge" |
+| 3.16 | `board.acknowledge` by an addressee writes one `board.PostAcknowledged` and marks the post read; a repeat, a closed post and an addressee with a disposition write nothing and are not refused; a non-addressee, a non-member and a post with `reply: none` are refused; a queued wake holding only that post is withdrawn with no replacement; a wake that also holds another question, a completion, a notice or a reminder is replaced and still delivers those, with the completion's debt untouched; a sent wake is not recalled; reading alone withdraws nothing, including after another question closes, is acknowledged or merges into the wake; deferred reactor replacement preserves the same original duty, and acceptance ends it; `holdsIncoming` does not change; `board.status`, `board.read` and the snapshot name who has acknowledged, and a reply counts (row 152) | Test ids: `packages/engine/test/board/wakes.test.ts`, "acknowledge", and `packages/engine/test/board/wake-replacement.test.ts` |
 
 **Tasks:**
 

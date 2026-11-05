@@ -5991,3 +5991,30 @@ State: open, for the final review.
 
 What happens: Importing the existing live driver before the existing live runner causes a circular module initialization error for `pieceViews` under plain Node.js. The new script `packages/engine/scripts/live-check-roles.ts` imports the runner first, as `live-check.ts` does, and its help and dry-run checks pass. The cycle itself is still there.
 Why it matters: A reordered import would stop both owner-run checks from starting. It waits for the final review.
+
+## 370. Replacing a queued board wake drops a read question before acknowledgement
+
+Found: 2026-11-04, while fixing foundation review record FR-007.
+State: fixed by the FR-007 repair on `fix/foundation-007`.
+
+What happened: A read marked an original question as taken without acknowledging
+it. Closing or acknowledging another question, or merging a new question,
+withdrew the mixed wake. Replacement retained reminders but selected original
+questions only when unread, so the read question lost its queued safety net.
+The post remained stored and open, but recovery could need a later turn end.
+
+What changed: Replacement carries the withdrawn wake's original reply duties
+forward from stored wake history, independently of unread digest selection.
+This also covers replacement deferred to another reactor transaction.
+Acceptance of any copy ends the original wake duty.
+Current reach, open status, acknowledgement, disposition, reservations and byte
+limits still govern them.
+The plan's cleanup paragraph now follows decision 152's acknowledgement rule.
+
+Validation: `packages/engine/test/board/wake-replacement.test.ts` reproduces
+the read-then-close, read-then-acknowledge and read-then-merge cases before
+any turn end. It checks replacement manifests, actual prompt delivery, status,
+an open wait and log rebuilds. It also checks that replacement preserves owed
+completion debt and does not duplicate a question reserved by a sent wake.
+It covers deferred reactor replacement, the transition to a reminder after an
+eligible turn end, and the end of the original duty after acceptance.

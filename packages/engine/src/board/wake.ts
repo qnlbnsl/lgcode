@@ -143,6 +143,27 @@ export const noAnswerDue = (snapshot: Snapshot, target: string, post: BoardPostV
     && accepted !== undefined && answerTurnEnded(snapshot, target, accepted);
 };
 
+// A withdrawn or unaccepted returned wake still owes its original safety net,
+// even across another target's cleanup transaction or a log rebuild. Acceptance
+// of any copy ends that original duty; later reminders follow the turn rules.
+export const originalsOwed = (snapshot: Snapshot, target: string): ReadonlySet<string> => {
+  const board = boardView(snapshot);
+  const wakes = Object.values(board.wakes).filter((wake) => wake.targetAgentId === target);
+  const acceptedWakes = (board as Partial<BoardFold>).acceptedWakes ?? {};
+  const accepted = new Set(wakes.filter((wake) => own(acceptedWakes, wake.wakeId) !== undefined).flatMap((wake) => wake.mustReply));
+  return new Set(wakes.filter((wake) => {
+    const delivery = wake.deliveryId === undefined ? undefined : own(snapshot.deliveries, wake.deliveryId);
+    return delivery?.status === "withdrawn" || delivery?.status === "returned";
+  }).flatMap((wake) => wake.mustReply).filter((id) => {
+    const post = own(board.posts, id);
+    return !accepted.has(id) && post?.status === "open" && post.reply !== "none"
+      && post.to.some((to) => to._tag === "agent" && to.agentId === target)
+      && own(post.dispositions, target) === undefined && own(post.reminderAcceptedAt, target) === undefined
+      && !post.acknowledged.some((to) => to._tag === "agent" && to.agentId === target)
+      && (own(post.returns ?? {}, target) ?? 0) < 2;
+  }));
+};
+
 export interface BuiltWake { readonly event: Extract<Event, { _tag: "board.WakeBuilt" }>; readonly delivery: DeliveryRequest }
 // Call under the writer permit, after projecting withdrawals and post changes.
 // A flush may deliver a digest on its own; cleanup never wakes for notices alone.
@@ -186,6 +207,7 @@ export const buildWake = (snapshot: Snapshot, target: AgentId, options: {
     built = { ...built, noAnswers: [...built.noAnswers, { postId: notice.postId, addressee: notice.addressee }] };
   }
   const posts = orderedPosts(snapshot);
+  const originals = originalsOwed(snapshot, target);
   for (const post of posts) {
     const retained = options.reminders?.has(post.postId) === true && post.status === "open" && post.reply !== "none"
       && own(post.dispositions, target) === undefined && own(post.reminderAcceptedAt, target) === undefined;
@@ -199,7 +221,8 @@ export const buildWake = (snapshot: Snapshot, target: AgentId, options: {
   for (const post of posts) {
     if (post.status !== "open" || post.reply === "none" || !post.to.some((to) => to._tag === "agent" && to.agentId === target)
       || own(post.dispositions, target) !== undefined || post.acknowledged.some((to) => to._tag === "agent" && to.agentId === target)
-      || !isUnread(snapshot, { _tag: "agent", agentId: target }, post) || reservedPosts.has(post.postId)
+      || built.reminders.includes(post.postId)
+      || (!originals.has(post.postId) && !isUnread(snapshot, { _tag: "agent", agentId: target }, post)) || reservedPosts.has(post.postId)
       || !canCarryPost(snapshot, target, post.postId)) continue;
     const text = postText(post, post.status, true);
     if (omittedQuestions > 0 || !fits(text)) { omittedQuestions++; continue; }
