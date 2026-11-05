@@ -2272,8 +2272,14 @@ thread would rely on the agent obeying it, so it was not chosen.
 - The page shows the input unfolded before "Allow" can be tapped.
 - The pane viewer shows the input or the warning before an answer (row 162).
 - When the event has no input, the page and the viewer show the thread items with the
-  same `toolCallId`, unfolded, above "Allow" (row 174). A harness such as Codex sends
-  its file edit that way, with a fixed title and only `locations` on the request.
+  same `content.callId` as the request's `toolCallId`, unfolded, above "Allow"
+  (row 174). Both `tool-call` and `file-change` content carry that correlation.
+  The translator preserves the adapter's `toolCallId` as `callId` for both diff
+  shapes. The runner redacts it, and the event log persists it with the content.
+  A thread item's independently generated `itemId` is never a correlation key.
+  A harness such as Codex sends its file edit that way, with a fixed title and
+  only `locations` on the request. The `file-change.callId` field is optional so
+  old events remain readable. Its absence keeps the missing-input warning.
 - When the input is redacted or cut, or when neither the input nor such an item
   exists, they show the fixed warning, in Shephrd's own styling. So a warning does not
   appear on every edit and teach the owner to tap past it.
@@ -2286,9 +2292,17 @@ thread would rely on the agent obeying it, so it was not chosen.
   read a request's delivered text. `live-check/rendered-prompts.test.ts` keeps its
   first-line pattern and gains the new lines. `packages/testing/src/fakeAgent.ts`
   (l.293-294) gains the new fields on its permission step.
+  `packages/engine/test/runner/stream.test.ts` adds the preserved `callId` to its
+  exact file-change expectation. `packages/web/test/request-whole.test.tsx` uses
+  that correlation instead of inventing an `itemId` equal to a tool-call id.
 - Tests: `packages/engine/test/runner/permission-fields.test.ts` covers each tool
   kind, a redacted input, a cut input, an absent input, a secret across the 8 KiB
   boundary, an old log, and a Codex-shaped request with `locations` and no input.
+  `packages/engine/test/runner/file-change-correlation.test.ts` exercises the
+  runner and persisted events with two edits of one path, unrelated tool calls,
+  a locations-only request, and redacted diff text.
+  `packages/web/test/file-change-correlation.test.tsx` renders both translated
+  diff shapes and checks the selected context and the old-event warning.
 
 ### Edits added by review round 3
 

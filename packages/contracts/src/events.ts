@@ -119,7 +119,13 @@ export const ThreadContent = Schema.Union([
     input: Schema.optionalKey(Schema.String),
     output: Schema.optionalKey(Schema.String)
   }),
-  Schema.TaggedStruct("file-change", { path: Schema.String, diff: Schema.String })
+  Schema.TaggedStruct("file-change", {
+    // The adapter's tool-call identity, independent of the thread item's id.
+    // Older events and adapter updates without an identity remain readable.
+    callId: Schema.optionalKey(Schema.NonEmptyString),
+    path: Schema.String,
+    diff: Schema.String
+  })
 ])
 
 const agent = { agentId: AgentId }

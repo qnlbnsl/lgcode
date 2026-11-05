@@ -79,8 +79,8 @@ export function Request({ event, open, items, signal }: {
   const matching = permission ? items.filter((item): item is ClientEnvelope & { event: ContentEvent } => {
     const candidate = item.event
     return candidate._tag === "ThreadItem" && candidate.agentId === event.agentId
-      && (candidate.content._tag === "tool-call" && candidate.content.callId === event.toolCallId
-        || candidate.itemId === event.toolCallId)
+      && (candidate.content._tag === "tool-call" || candidate.content._tag === "file-change")
+      && candidate.content.callId === event.toolCallId
   }) : []
   const hidden = permission && (event.inputRedacted === true || event.inputTruncated === true
     || event.toolInput === undefined && matching.length === 0)

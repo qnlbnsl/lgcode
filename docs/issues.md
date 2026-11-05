@@ -5577,10 +5577,15 @@ Why it matters: Event text read by an agent is not marked as data, so it could b
 ## 322. `runner/translate.ts` drops the tool-call id from file-change content
 
 Found: 2026-11-03, while planning the client API plan.
-State: open.
+State: fixed on the foundation fix branch, pending independent verification.
 
-What happens: A Codex diff cannot be joined to its permission request (client API R4-A2, C4-01, not folded).
-What should happen: Not decided.
+What happened: A Codex diff lost the tool-call identity before it reached the event log.
+What changed: Both diff shapes retain the optional `content.callId` through the runner and persistence.
+The web permission view joins that field to the request's `toolCallId`.
+It no longer treats an independently generated thread-item identity as a tool-call identity.
+Old file-change events still decode, and a missing correlation keeps the fixed missing-input warning.
+The runner regression covers two edits of one path, unrelated calls, a locations-only request, and redacted diff text.
+The web regression renders both translated diff shapes and checks that only the matching action is shown.
 Why it matters: A client cannot show which request a changed file belongs to.
 
 ## 323. A Herdr pane starts from Herdr's environment, not the engine's
