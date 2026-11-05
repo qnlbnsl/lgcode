@@ -61,7 +61,7 @@ live("6.2 hardening: a v2 acknowledgement before idle does not hide a later usag
     const spawn = yield* spawnFor(rig, harness, account);
     yield* context.runner.start(spawn.input);
     const delivery = deliveryFor(spawn.agentId, "go");
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
     yield* pause(80);
     expect(context.events.filter((event) => event._tag === "promptReply")).toHaveLength(0);
     const reply = yield* context.waitFor((event) => event._tag === "promptReply" && event.deliveryId === delivery.id);
@@ -82,7 +82,7 @@ live("6.2 hardening: resolved spawn secrets remain protected across chunks when 
     const spawn = yield* spawnFor(rig, harness, account);
     yield* context.runner.start(spawn.input);
     const delivery = deliveryFor(spawn.agentId, "go");
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
     yield* context.waitFor((event) => event._tag === "turnEnded" && event.deliveryId === delivery.id);
     const text = context.events.flatMap((event) => event._tag === "deliveryUpdate" && event.kind === "message" ? [event.text] : []).join("");
     expect(text).toBe("before [REDACTED] after");
@@ -111,11 +111,11 @@ live("6.1 hardening: a naturally exited process releases its identity before the
       Effect.forkScoped,
     );
     yield* runner.start(first.input);
-    yield* runner.prompt({ agentId: first.agentId, incarnation: first.incarnation, delivery: deliveryFor(first.agentId, "go") });
+    yield* runner.prompt({ sentSequence: 1, agentId: first.agentId, incarnation: first.incarnation, delivery: deliveryFor(first.agentId, "go") });
     const exit = yield* Deferred.await(restarted).pipe(Effect.timeout("10 seconds"));
     expect(exit._tag).toBe("Success");
     if (exit._tag === "Success") expect(exit.value.session._tag).toBe("acp");
-    expect((yield* runner.prompt({ agentId: first.agentId, incarnation: first.incarnation, delivery: deliveryFor(first.agentId, "stale") }).pipe(Effect.result))._tag).toBe("Failure");
+    expect((yield* runner.prompt({ sentSequence: 1, agentId: first.agentId, incarnation: first.incarnation, delivery: deliveryFor(first.agentId, "stale") }).pipe(Effect.result))._tag).toBe("Failure");
   }).pipe(Effect.provide(runnerLayer), Effect.scoped);
 });
 
@@ -131,7 +131,7 @@ live("6.3 hardening: a permission path through a symlink into harness settings i
       options: [{ optionId: "once", name: "Yes", kind: "allow_once" }] }]] }, echoFile(rig));
     const spawn = yield* spawnFor(rig, harness, account);
     yield* context.runner.start(spawn.input);
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery: deliveryFor(spawn.agentId, "go") });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery: deliveryFor(spawn.agentId, "go") });
     expect(yield* context.waitFor((event) => event._tag === "permissionRequested")).toMatchObject({ settingsWrite: true });
   })));
 

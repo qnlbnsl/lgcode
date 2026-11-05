@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import type { Socket } from "node:net";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import { CommandsRpcGroup, ServiceRpcGroup, type AgentId } from "@shephrd/contracts";
+import { CommandsRpcGroup, type Actor, type AgentId, type EventEnvelope } from "@shephrd/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -16,6 +16,7 @@ import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as HttpServerRequest from "effect/http/HttpServerRequest";
 import * as HttpServerResponse from "effect/http/HttpServerResponse";
+import * as RpcSchema from "effect/rpc/RpcSchema";
 import * as RpcServer from "effect/rpc/RpcServer";
 import type * as Rpc from "effect/rpc/Rpc";
 import type * as RpcGroup from "effect/rpc/RpcGroup";
@@ -23,13 +24,13 @@ import * as RpcSerialization from "effect/rpc/RpcSerialization";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import { CommandHandler } from "../commands/CommandHandler.ts";
-import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
 import { EventLog } from "../log/EventLog.ts";
-import { subscribe } from "../log/subscribe.ts";
+import { checkPieceBatch, pieceNamespace } from "../commands/pieceBatch.ts";
+import { freshRequest, refused as refuseCommand } from "../commands/internal.ts";
+import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { Restart } from "../recovery/service.ts";
 import { Views } from "../views/Views.ts";
-import { compareViews } from "../views/compare.ts";
 import { outsideAdapters } from "./ancestry.ts";
 
 type Services = CommandHandler | EventLog | Views | SqlClient.SqlClient;
@@ -40,12 +41,21 @@ type Handlers = { readonly [R in RpcGroup.Rpcs<typeof CommandsRpcGroup> as R["_t
 const refused = (status: number, text: string) => HttpServerResponse.text(text, { status });
 const reasons = new Set([
   "command refused", "cannot reload", "no usable account", "invalid credential",
-  "request id reused", "recovering", "database read failed", "database write failed",
+  "request id reused", "recovering", "board disabled", "database read failed", "database write failed",
   "database write failed: busy", "database write failed: disk full", "database write failed: constraint",
 ]);
-const commandError = (requestId: unknown, reason = "command refused") => ({
-  _tag: "CommandError" as const, requestId, reason: reasons.has(reason) ? reason : "command refused",
+const commandError = (requestId: unknown, reason = "command refused", command?: string) => ({
+  // The role-file planner redacts its schema path and uses fixed reason text.
+  // Preserve that owner's validation error without exposing other failures.
+  _tag: "CommandError" as const, requestId, reason: reasons.has(reason)
+    || (command === "roles.role-file.set" && reason.startsWith("role file error: "))
+    || (command === "roles.settings.set" && reason.startsWith("roles settings error: ")) ? reason : "command refused",
 });
+// Authentication refusals already carry a fixed public reason. Preserve it
+// across a generic read wrapper without returning arbitrary failure content.
+const readError = (requestId: unknown, error: unknown) => commandError(requestId,
+  typeof error === "object" && error !== null && "reason" in error && typeof error.reason === "string"
+    ? error.reason : "command refused");
 
 // This listener can be opened before migrations or recovery. Its only
 // initial response, including to an unauthenticated upgrade, is recovering.
@@ -73,49 +83,55 @@ export const listen = (socketPath: string) => Effect.gen(function* () {
   };
 });
 
-export const application = (options: { readonly ownerCredential: Redacted.Redacted<string>; readonly debug: boolean }) => Effect.gen(function* () {
+export interface Identity { readonly credential: Credential; readonly agentId?: AgentId }
+type ApplicationOptions = { readonly debug: boolean; readonly lists?: Pick<EngineLists, "commands" | "access"> & { readonly reads: Readonly<Record<string, unknown>> } } & (
+  | { readonly ownerCredential: Redacted.Redacted<string>; readonly webIdentity?: never }
+  | { readonly ownerCredential?: never; readonly webIdentity: (request: HttpServerRequest.HttpServerRequest) => Identity | undefined }
+);
+export const application = (options: ApplicationOptions) => Effect.gen(function* () {
   const services = yield* Effect.context<Services>();
   const handler = yield* CommandHandler;
   const log = yield* EventLog;
   const views = yield* Views;
   const recovery = yield* Effect.serviceOption(Restart);
-  const expected = Buffer.from(Redacted.value(options.ownerCredential));
+  const expected = options.ownerCredential === undefined ? undefined : Buffer.from(Redacted.value(options.ownerCredential));
   // The runtime group really omits debug. Use its superset type only to
   // share assembly of the dynamically enumerated, schema-checked handlers.
-  const group = (options.debug ? CommandsRpcGroup : ServiceRpcGroup) as typeof CommandsRpcGroup;
+  const lists = options.lists ?? engineLists;
+  const group = (options.debug ? lists.commands : lists.commands.omit("debug.compare-views")) as typeof CommandsRpcGroup;
 
   const authenticate = (raw: string) => Effect.gen(function* () {
     const bytes = Buffer.from(raw);
-    if (bytes.length === expected.length && timingSafeEqual(bytes, expected)) return { credential: { _tag: "owner" } as Credential };
+    if (expected !== undefined && bytes.length === expected.length && timingSafeEqual(bytes, expected)) return { credential: { _tag: "owner" } as Credential };
     if (raw.startsWith("shp_a_")) {
       const agentId = yield* verifyAgentToken(raw);
       return { credential: { _tag: "agent", token: Redacted.make(raw) } as Credential, agentId };
     }
-    yield* verifyDeviceCredential(raw);
-    return { credential: { _tag: "device", credential: Redacted.make(raw) } as Credential };
+    return yield* refuseCommand("invalid credential");
   }).pipe(Effect.option);
 
   const app: Application = Effect.scoped(Effect.gen(function* () {
     if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return refused(503, "recovering");
     const request = yield* HttpServerRequest.HttpServerRequest;
     const bearer = /^Bearer ([A-Za-z0-9_-]+)$/.exec(request.headers.authorization ?? "");
-    if (bearer === null || bearer[1]!.length > 256) return refused(401, "invalid credential");
-    const raw = bearer[1]!;
-    const identity = yield* authenticate(raw);
+    if (options.webIdentity === undefined && (bearer === null || bearer[1]!.length > 256)) return refused(401, "invalid credential");
+    const raw = bearer?.[1] ?? "";
+    const currentIdentity = () => options.webIdentity === undefined ? authenticate(raw) : Effect.sync(() => Option.fromUndefinedOr(options.webIdentity!(request)));
+    const identity = yield* currentIdentity();
     if (Option.isNone(identity)) return refused(401, "invalid credential");
     const { credential, agentId } = identity.value as { credential: Credential; agentId?: AgentId };
-    if (credential._tag === "owner" && !(yield* outsideAdapters(request.headers["shephrd-ancestors"], request.headers["shephrd-process-group"]))) return refused(403, "owner credential refused");
+    if (options.webIdentity === undefined && credential._tag === "owner" && !(yield* outsideAdapters(request.headers["shephrd-ancestors"], request.headers["shephrd-process-group"]))) return refused(403, "owner credential refused");
     // Ordinary HTTP is used by serve --detach to detect this service. It
     // performs the same authentication but never starts an RPC session.
     if (request.headers.upgrade?.toLowerCase() !== "websocket") return refused(400, "websocket required");
     const invalidated = yield* Deferred.make<void>();
     const invalidate = Deferred.succeed(invalidated, undefined);
-    const authenticateRequest = (requestId: string) => authenticate(raw).pipe(Effect.flatMap((current) =>
+    const authenticateRequest = (requestId: string) => currentIdentity().pipe(Effect.flatMap((current) =>
       Option.isNone(current)
         ? invalidate.pipe(Effect.andThen(Effect.fail(commandError(requestId, "invalid credential"))))
         : Effect.void,
     ));
-    const check = authenticate(raw).pipe(Effect.flatMap((current) => Option.isNone(current) ? invalidate : Effect.void));
+    const check = currentIdentity().pipe(Effect.flatMap((current) => Option.isNone(current) ? invalidate : Effect.void));
     if (credential._tag !== "owner") {
       const changes = yield* log.subscribeCommitted;
       // Recheck after subscribing to close the handshake/watcher gap. Batch
@@ -127,15 +143,32 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
     }
     const { protocol, httpEffect } = yield* RpcServer.makeProtocolWithHttpEffectWebsocket.pipe(Effect.provide(RpcSerialization.layerJson));
     const pending = new Map<string, number>();
+    const filteredStreams = new Set<string>();
     const boundedProtocol: RpcServer.Protocol["Service"] = {
       ...protocol,
       run: (receive) => protocol.run((clientId, message) => {
+        if (message._tag === "Request" && message.tag === "client.subscribe") filteredStreams.add(String(message.id));
         if (message._tag === "Ack" || message._tag === "Interrupt") pending.delete(String(message.requestId));
+        if (message._tag === "Interrupt") filteredStreams.delete(String(message.requestId));
         return receive(clientId, message);
       }),
       send: (clientId, message, transferables) => {
         if (message._tag === "Chunk") pending.set(String(message.requestId), Date.now());
-        if (message._tag === "Exit") pending.delete(String(message.requestId));
+        if (message._tag === "Exit") { pending.delete(String(message.requestId)); filteredStreams.delete(String(message.requestId)); }
+        if (message._tag === "Chunk" && filteredStreams.has(String(message.requestId))) {
+          // The handler emits singletons. Measure the real encoded wrapper as
+          // well, so an event just below the item limit still fits its frame.
+          return Effect.forEach(message.values, (value) => {
+            let item = value;
+            const frame = () => ({ ...message, values: [item] as [unknown] });
+            if (Buffer.byteLength(JSON.stringify(frame())) > 256 * 1024 && typeof value === "object" && value !== null && "event" in value) {
+              const row = value as EventEnvelope;
+              item = { _tag: "client.Oversized", sequence: row.sequence, tag: row.event._tag,
+                ...(row.agentId === undefined ? {} : { agentId: row.agentId }), bytes: Buffer.byteLength(JSON.stringify(row)) };
+            }
+            return protocol.send(clientId, frame(), transferables);
+          }, { discard: true });
+        }
         return protocol.send(clientId, message, transferables);
       },
     };
@@ -150,20 +183,32 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
         Effect.flatMap((count) => count >= 2_048 ? invalidate : Effect.void))).pipe(Effect.forkScoped);
       return subscription;
     }) };
-    const handlers = yield* group.toHandlers(Effect.succeed(Object.fromEntries([...group.requests.keys()].map((name) => [name, (payload: { requestId: string; after: number }) => {
-      if (name === "subscribe") return Stream.unwrap(authenticateRequest(payload.requestId).pipe(Effect.as(subscribe(payload.after).pipe(
-        Stream.filterEffect((envelope) => agentId === undefined ? Effect.succeed(true) : views.snapshot.pipe(Effect.map((snapshot) => {
-          if (envelope.agentId === undefined) return false;
-          const parent = snapshot.agents[envelope.agentId]?.parent;
-          return envelope.agentId === agentId || (parent?._tag === "agent" && parent.agentId === agentId);
-        }))),
-        Stream.mapError(() => commandError(payload.requestId)),
-        Stream.provideService(EventLog, boundedLog),
-      ))));
-      if (name === "debug.compare-views") return authenticateRequest(payload.requestId).pipe(Effect.andThen(credential._tag === "owner"
-        ? compareViews().pipe(Effect.map((result) => ({ requestId: payload.requestId, sequence: result.sequence, equal: result.differences.length === 0, differences: result.differences.map((difference) => difference.path.join(".")) })), Effect.mapError(() => commandError(payload.requestId)))
-        : Effect.fail(commandError(payload.requestId))));
-      return handler.execute(credential, name, payload).pipe(Effect.mapError((error) => commandError(payload.requestId, error.reason)));
+    const actor: Actor = agentId === undefined ? { _tag: "owner" } : { _tag: "agent", agentId };
+    const handlers = yield* group.toHandlers(Effect.succeed(Object.fromEntries([...group.requests].map(([name, rpc]) => [name, (payload: { requestId: string; after: number }) => {
+      const read = (Object.hasOwn(lists.reads, name) ? lists.reads[name] : undefined) as import("./reads.ts").ReadHandler | undefined;
+      if (read === undefined) return handler.execute(credential, name, payload).pipe(Effect.mapError((error) => commandError(payload.requestId, error.reason, name)));
+      const prepare = authenticateRequest(payload.requestId).pipe(Effect.andThen(Effect.gen(function* () {
+        if (name === "debug.compare-views" && credential._tag !== "owner") return yield* refuseCommand();
+        if (!lists.access[name]?.includes(actor._tag)) return yield* refuseCommand();
+        return yield* handler.input(actor);
+      })));
+      if (RpcSchema.isStreamSchema(rpc.successSchema)) return Stream.unwrap(prepare.pipe(Effect.map((input) =>
+        read(input, payload) as Stream.Stream<unknown, unknown, Services>
+      ))).pipe(Stream.mapError((error) => readError(payload.requestId, error)), Stream.provideService(EventLog, boundedLog));
+      return prepare.pipe(Effect.flatMap((input) => read(input, payload) as Effect.Effect<import("./reads.ts").ReadReply, unknown, Services>),
+        Effect.flatMap((result) => Effect.gen(function* () {
+          const marks = result.marks ?? [];
+          if (marks.length > 0 || (result.deliveries?.length ?? 0) > 0 || Object.keys(result.sideRows ?? {}).length > 0) {
+            const namespace = pieceNamespace(name);
+            if (namespace === undefined) return yield* refuseCommand();
+            yield* log.transact((append) => Effect.gen(function* () {
+              const snapshot = yield* views.snapshot;
+              const events = yield* checkPieceBatch(namespace, snapshot, { events: marks, deliveries: result.deliveries, sideRows: result.sideRows }, actor, log.lists ?? engineLists);
+              yield* append(actor, freshRequest(), "read marks", events, result.sideRows ?? {}, false);
+            }));
+          }
+          return result.reply;
+        })), Effect.mapError((error) => readError(payload.requestId, error)));
     }])) as unknown as Handlers));
     yield* RpcServer.make(group).pipe(Effect.provide(handlers), Effect.provideService(RpcServer.Protocol, boundedProtocol), Effect.forkScoped);
     return yield* Effect.raceFirst(httpEffect, Deferred.await(invalidated).pipe(Effect.as(HttpServerResponse.empty())));
@@ -173,7 +218,7 @@ export const application = (options: { readonly ownerCredential: Redacted.Redact
   return app;
 });
 
-export const serve = (options: { readonly socketPath: string; readonly ownerCredential: Redacted.Redacted<string>; readonly debug: boolean }) => Effect.gen(function* () {
+export const serve = (options: { readonly socketPath: string; readonly ownerCredential: Redacted.Redacted<string>; readonly debug: boolean; readonly lists?: Pick<EngineLists, "commands" | "access"> & { readonly reads: Readonly<Record<string, unknown>> } }) => Effect.gen(function* () {
   const listener = yield* listen(options.socketPath);
   yield* listener.install(yield* application(options));
 });

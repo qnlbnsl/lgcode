@@ -48,10 +48,12 @@ export const provideRestart = <A, E, R>(
     readonly secrets?: FakeSecrets;
     readonly wrapLog?: Fakes["wrapLog"];
     readonly logLines?: Array<string>;
+    readonly capacityHoldCondition?: Fakes["capacityHoldCondition"];
+    readonly lists?: Fakes["lists"];
   } = {},
 ) => {
   const secrets = options.secrets ?? makeFakeSecrets();
-  const base = EventLog.layer.pipe(Layer.provideMerge(Views.layer), Layer.provide(Redactor.layer));
+  const base = EventLog.makeLayer(options.lists).pipe(Layer.provideMerge(Views.makeLayer(options.lists)), Layer.provide(Redactor.layer));
   const log = options.wrapLog === undefined ? base : Layer.effect(EventLog.EventLog,
     Effect.map(EventLog.EventLog, options.wrapLog),
   ).pipe(Layer.provideMerge(base));
@@ -62,7 +64,8 @@ export const provideRestart = <A, E, R>(
   }).pipe(Layer.provideMerge(dependencies));
   const handler = CommandHandler.layer({
     home: rig.home, stateFolder: rig.stateFolder, pluginRoot: rig.pluginRoot,
-  }).pipe(Layer.provideMerge(recovery));
+    ...(options.capacityHoldCondition === undefined ? {} : { capacityHoldCondition: options.capacityHoldCondition }),
+  }, options.lists).pipe(Layer.provideMerge(recovery));
   return Effect.gen(function* () {
     yield* migrate;
     const sql = yield* SqlClient.SqlClient;

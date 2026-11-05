@@ -1,7 +1,8 @@
+import { acceptCache, type CacheTarget } from "./cache.ts";
 import { randomUUID } from "node:crypto";
 import {
-  CommandsRpcGroup, EventEnvelope, commandOutcome, ownerOnlyCommands,
-  type Actor, type Event, type HarnessSettings, type RequestId,
+  EventEnvelope, commandOutcome, publicAddressError,
+  type Caller, type Event, type HarnessSettings, type RequestId,
 } from "@shephrd/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
@@ -11,49 +12,44 @@ import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
+import * as RpcSchema from "effect/rpc/RpcSchema";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import { followAvailability } from "../accounts/available.ts";
 import { sha256Hex } from "../identity/credential.ts";
-import { verifyDeviceCredential } from "../identity/devices.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
-import { EventLog, LogWriteFailed, type SideRows } from "../log/EventLog.ts";
+import { EventLog, InvalidEvent, LogWriteFailed, callerKey, type SideRows } from "../log/EventLog.ts";
 import { crashEvents } from "../recovery/crash.ts";
 import { Restart } from "../recovery/service.ts";
 import { Runner, RunnerEvent } from "../runner/Runner.ts";
 import { dispatchCommitted, deliveryUpdate, promptReply, turnEnded } from "../routing/deliveries.ts";
-import { holderAbove, passUp } from "../routing/holders.ts";
+import { settingsRefusal } from "../roles/sheepdog/settings.ts";
+import { holderAbove } from "../routing/holders.ts";
 import { preempt, withLane } from "../routing/lanes.ts";
-import { answer, permissionRequested } from "../routing/permissions.ts";
-import { ask } from "../routing/questions.ts";
-import { wait, waitReply, withWaitChecks } from "../routing/waits.ts";
+import { permissionRequested } from "../routing/permissions.ts";
+import { waitReply, withWaitChecks } from "../routing/waits.ts";
 import { Views } from "../views/Views.ts";
 import { apply } from "../views/apply.ts";
+import { engineLists, type EngineLists } from "../pieces/lists.ts";
+import { checkPieceBatch, pieceNamespace } from "./pieceBatch.ts";
 import { SecretStore } from "./SecretStore.ts";
-import { accounts, setSecret, markAvailable } from "./accounts.ts";
-import { compact } from "./compact.ts";
-import { group } from "./group.ts";
-import { harnesses, loadFirstDefaults } from "./harnesses.ts";
-import { prompt } from "./prompt.ts";
-import { resume } from "./resume.ts";
-import { start } from "./start.ts";
-import { stop } from "./stop.ts";
-import { CommandRefused, freshRequest, readHarnesses, refused, type Input, type Payload, type Plan, type Runtime, type Snapshot } from "./internal.ts";
+import { loadFirstDefaults } from "./harnesses.ts";
+import { webSettingsCommitted } from "../client/settings.ts";
+import { CommandRefused, freshRequest, readHarnesses, refused, type Input, type Runtime, type Snapshot } from "./internal.ts";
 
 export { CommandRefused } from "./internal.ts";
 
 type Credential =
   | { readonly _tag: "owner" }
-  | { readonly _tag: "device"; readonly credential: Redacted.Redacted<string> }
+  | Extract<Caller, { _tag: "service" }>
   | { readonly _tag: "agent"; readonly token: Redacted.Redacted<string> };
 
 export class CommandHandler extends Context.Service<CommandHandler, {
+  readonly cache: (target: CacheTarget) => Effect.Effect<"flush" | "compact" | undefined, CommandRefused | LogWriteFailed>;
+  readonly input: (actor: Caller) => Effect.Effect<Input>;
   readonly execute: (credential: Credential, name: string, payload: unknown) => Effect.Effect<Record<string, unknown>, CommandRefused | LogWriteFailed>;
 }>()("shephrd/engine/commands/CommandHandler") {}
 
-const supported = new Set(["start", "prompt", "stop", "resume", "compact", "group", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "answer", "pass-up", "ask", "wait"]);
-const targeted = new Set(["prompt", "stop", "resume", "compact", "group"]);
-const owners = new Set<string>(ownerOnlyCommands);
 const canonical = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value !== null && typeof value === "object") {
@@ -62,37 +58,6 @@ const canonical = (value: unknown): string => {
   }
   return JSON.stringify(value);
 };
-
-// Payloads have been checked with their contract's decoded-value schema.
-const planCommand = (input: Input, name: string, payload: Record<string, unknown>): Effect.Effect<Plan, CommandRefused | LogWriteFailed> =>
-  Effect.gen(function* () {
-    const { actor, snapshot } = input;
-    if (!supported.has(name) || (owners.has(name) && actor._tag !== "owner")) return yield* refused();
-    const agentId = payload.agentId as string;
-    const agent = snapshot.agents[agentId];
-    if (targeted.has(name)) {
-      if (agent === undefined || commandOutcome(agent.state._tag, name as "prompt" | "stop" | "resume" | "compact" | "group") === "refused") return yield* refused();
-      const holder = holderAbove(snapshot, agentId);
-      if (actor._tag === "agent" && (holder._tag !== "agent" || holder.agentId !== actor.agentId)) return yield* refused();
-    }
-    switch (name) {
-      case "start": return yield* start(input, payload as Payload<"start">);
-      case "prompt": return prompt(input, payload as Payload<"prompt">);
-      case "answer": return yield* answer(input, payload as Payload<"answer">);
-      case "pass-up": return yield* passUp(input, payload as Payload<"pass-up">);
-      case "ask": return yield* ask(input, payload as Payload<"ask">);
-      case "wait": return yield* wait(input, payload as Payload<"wait">);
-      case "compact": return compact(input, payload as Payload<"compact">);
-      case "stop": return stop(input, agent!);
-      case "resume": return yield* resume(input, agent!, payload as Payload<"resume">);
-      case "group": return group(agent!, payload as Payload<"group">);
-      case "accounts": return yield* accounts(input, payload as Payload<"accounts">);
-      case "accounts set-secret": return yield* setSecret(input, payload as Payload<"accounts set-secret">);
-      case "accounts mark-available": return yield* markAvailable(input, payload as Payload<"accounts mark-available">);
-      case "harnesses": return yield* harnesses(input, payload as Payload<"harnesses">);
-      default: return yield* refused();
-    }
-  });
 
 const replyFor = (snapshot: Snapshot, name: string, requestId: RequestId, envelopes: ReadonlyArray<EventEnvelope>, settings: ReadonlyArray<HarnessSettings>) => {
   const events = envelopes.map((envelope) => envelope.event);
@@ -106,7 +71,7 @@ const replyFor = (snapshot: Snapshot, name: string, requestId: RequestId, envelo
   const queued = events.find((event) => event._tag === "DeliveryQueued");
   if (queued !== undefined && name !== "wait") reply.deliveryId = queued.delivery.id;
   if (name === "wait") Object.assign(reply, waitReply(events));
-  if (name === "accounts") reply.accounts = Object.values(envelopes.reduce(apply, snapshot).accounts);
+  if (name === "accounts") reply.accounts = Object.values(envelopes.reduce((state, envelope) => apply(state, envelope), snapshot).accounts);
   if (name === "harnesses") {
     const harnesses = new Map(settings.map((harness) => [harness.id, harness]));
     for (const event of events) if (event._tag === "HarnessChanged") harnesses.set(event.harness.id, event.harness);
@@ -115,14 +80,14 @@ const replyFor = (snapshot: Snapshot, name: string, requestId: RequestId, envelo
   return { reply };
 };
 
-export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults">) =>
+export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "pluginRoot" | "harnessDefaults"> & { readonly capacityHoldCondition?: import("../routing/deliveries.ts").CapacityHoldCondition }, lists: EngineLists = engineLists) =>
   Layer.effect(CommandHandler, Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     const log = yield* EventLog;
     const views = yield* Views;
     const runner = yield* Runner;
     const secrets = yield* SecretStore;
-    const runtime: Runtime = { ...configuration, sql, log, runner, secrets, views };
+    const runtime: Runtime = { ...configuration, lists, sql, log, runner, secrets, views };
     // Fix round 1, N-1: the first start loads the harness defaults.
     yield* loadFirstDefaults(runtime);
     // Issue 88 and row 52: while restart recovery is present and has not
@@ -147,7 +112,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           if (tokens.length === 0) return;
           // Every batch carries the wait checks it causes (rows 25 and 50).
           const write = (events: ReadonlyArray<Event>, sideRows: SideRows = {}) => events.length === 0 ? Effect.void
-            : append({ _tag: "owner" }, freshRequest(), randomUUID(), withWaitChecks(snapshot, events), sideRows).pipe(Effect.asVoid);
+            : append({ _tag: "owner" }, freshRequest(), randomUUID(), withWaitChecks(snapshot, events, lists), sideRows).pipe(Effect.asVoid);
           switch (event._tag) {
             case "permissionRequested": return yield* write(yield* permissionRequested(snapshot, event));
             case "turnEnded": return yield* write(turnEnded(snapshot, event));
@@ -158,9 +123,9 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
                 ? { _tag: "ModeRefused", agentId: event.agentId, mode: event.mode, ceiling: event.ceiling, reason: "mode exceeds permission ceiling" }
                 : { _tag: "ModeChanged", agentId: event.agentId, mode: event.mode, level: event.level }]);
             }
-            case "promptReply": return yield* write(yield* promptReply(snapshot, event, log.redactText));
+            case "promptReply": return yield* write(yield* promptReply(snapshot, event, log.redactText, configuration.capacityHoldCondition));
             case "exited": {
-              return yield* write(crashEvents(snapshot, event),
+              return yield* write(crashEvents(snapshot, event, lists),
                 { revokeAgentTokens: [event.agentId] });
             }
           }
@@ -199,22 +164,28 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     // to mean the stop commits: the result is the step that tells the start
     // how the stop ended, and the start finishes the agent itself when the
     // stop did not (lanes.ts, round 2 F-1).
+    const resolveCredential = (credential: Credential, name: string): Effect.Effect<Exclude<Caller, { _tag: "piece" }>, CommandRefused> => Effect.gen(function* () {
+      if (credential._tag === "owner") return { _tag: "owner" } as const;
+      if (credential._tag === "service") {
+        if (!Object.hasOwn(lists.services, credential.service) || !lists.services[credential.service]?.includes(name)
+          || (pieceNamespace(name) === undefined && !["prompt", "compact", "resume", "release", "subscribe"].includes(name))) return yield* refused();
+        return credential;
+      }
+      const agentId = yield* verifyAgentToken(Redacted.value(credential.token)).pipe(Effect.mapError(() => refused("invalid credential")));
+      const current = (yield* views.snapshot).agents[agentId];
+      if (current === undefined || current.state._tag === "stopped" || current.state._tag === "crashed") return yield* refused("invalid credential");
+      return { _tag: "agent", agentId } as const;
+    }).pipe(Effect.provideService(SqlClient.SqlClient, sql));
+
     const preemptStart = (credential: Credential, name: string, rawPayload: unknown) => Effect.gen(function* () {
       const agentId = name === "stop" ? laneFor(name, rawPayload) : undefined;
-      const rpc = CommandsRpcGroup.requests.get("stop");
+      const rpc = lists.commands.requests.get("stop");
       if (agentId === undefined || rpc === undefined) return Effect.void;
       yield* Effect.try({
         try: () => Schema.decodeUnknownSync(Schema.toType(rpc.payloadSchema))(rawPayload),
         catch: () => refused(),
       });
-      let caller: Actor;
-      if (credential._tag === "owner") caller = { _tag: "owner" };
-      else if (credential._tag === "device") {
-        yield* verifyDeviceCredential(Redacted.value(credential.credential));
-        caller = { _tag: "owner" };
-      } else {
-        caller = { _tag: "agent", agentId: yield* verifyAgentToken(Redacted.value(credential.token)) };
-      }
+      const caller = yield* resolveCredential(credential, name);
       const snapshot = yield* views.snapshot;
       const target = snapshot.agents[agentId];
       if (target === undefined || (target.state._tag !== "starting" && target.state._tag !== "paused")
@@ -233,47 +204,77 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     const isBlockingWait = (name: string, rawPayload: unknown) => name === "wait" && typeof rawPayload === "object"
       && rawPayload !== null && (rawPayload as { readonly block?: unknown }).block === true;
 
+    // Direct callers use the same read table as the transport. A read always
+    // rechecks current credentials and access, and never creates a receipt.
+    const executeRead = (credential: Credential, name: string, rawPayload: unknown) => Effect.gen(function* () {
+      if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
+      const actor = yield* resolveCredential(credential, name);
+      const rpc = lists.commands.requests.get(name);
+      if (rpc === undefined || RpcSchema.isStreamSchema(rpc.successSchema) || !lists.access[name]?.includes(actor._tag)) return yield* refused();
+      const payload = yield* Effect.try({
+        try: () => Schema.decodeUnknownSync(Schema.toType(rpc.payloadSchema))(rawPayload) as Record<string, unknown>,
+        catch: () => refused(),
+      });
+      const snapshot = yield* views.snapshot;
+      const read = lists.reads[name]!({ runtime, actor, snapshot }, payload);
+      if (!Effect.isEffect(read)) return yield* refused();
+      const result = yield* (read as Effect.Effect<import("../api/reads.ts").ReadReply, unknown, EventLog | Views | SqlClient.SqlClient>);
+      const marks = result.marks ?? [];
+      if (marks.length > 0 || (result.deliveries?.length ?? 0) > 0 || Object.keys(result.sideRows ?? {}).length > 0) {
+        const namespace = pieceNamespace(name);
+        if (namespace === undefined) return yield* refused();
+        yield* log.transact((append) => Effect.gen(function* () {
+          const current = yield* views.snapshot;
+          const events = yield* checkPieceBatch(namespace, current, { events: marks, deliveries: result.deliveries, sideRows: result.sideRows }, actor, lists);
+          yield* append(actor, freshRequest(), "read marks", events, result.sideRows ?? {}, false);
+        }));
+      }
+      return result.reply;
+    }).pipe(
+      Effect.provideService(EventLog, log), Effect.provideService(Views, views), Effect.provideService(SqlClient.SqlClient, sql),
+      Effect.mapError((error) => error instanceof CommandRefused || error instanceof LogWriteFailed ? error : refused()),
+    );
+
     return CommandHandler.of({
-      execute: (credential, name, rawPayload) => Effect.acquireUseRelease(preemptStart(credential, name, rawPayload), () => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
+      cache: (target) => Effect.gen(function* () {
+        if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
+        return yield* acceptCache(runtime, lists, target);
+      }),
+      input: (actor) => views.snapshot.pipe(Effect.map((snapshot) => ({ runtime, actor, snapshot }))),
+      execute: (credential, name, rawPayload) => Object.hasOwn(lists.reads, name) ? executeRead(credential, name, rawPayload)
+        : Effect.acquireUseRelease(preemptStart(credential, name, rawPayload), () => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
         if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
         const step = isBlockingWait(name, rawPayload) ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : restore;
         const outcome = yield* step(log.transact((append) => Effect.gen(function* () {
           // Invalid credentials never write an event or retrieve a receipt.
-          let actor: Actor;
-          if (credential._tag === "owner") actor = { _tag: "owner" };
-          else if (credential._tag === "device") {
-            yield* verifyDeviceCredential(Redacted.value(credential.credential)).pipe(Effect.mapError(() => refused("invalid credential")));
-            actor = { _tag: "owner" };
-          } else {
-            const agentId = yield* verifyAgentToken(Redacted.value(credential.token)).pipe(Effect.mapError(() => refused("invalid credential")));
-            const current = (yield* views.snapshot).agents[agentId];
-            if (current === undefined || current.state._tag === "stopped" || current.state._tag === "crashed") return yield* refused("invalid credential");
-            actor = { _tag: "agent", agentId };
-          }
-          const rpc = CommandsRpcGroup.requests.get(name);
-          if (rpc === undefined || !supported.has(name)) return yield* refused();
+          const actor = yield* resolveCredential(credential, name);
+          const rpc = lists.commands.requests.get(name);
+          if (rpc === undefined || !Object.hasOwn(lists.planners, name)) return yield* refused();
           const payload = yield* Effect.try({
             try: () => {
               // The transport supplies decoded values. Normalize the wrapper's
               // label before validating it; the label is not secret data.
               let value = rawPayload;
-              if (name === "accounts set-secret" && typeof value === "object" && value !== null
+              if (lists.secretCommands.includes(name) && typeof value === "object" && value !== null
                 && "value" in value && Redacted.isRedacted(value.value)) {
                 value = { ...value, value: Redacted.make(Redacted.value(value.value), { label: "secret value" }) };
               }
               return Schema.decodeUnknownSync(Schema.toType(rpc.payloadSchema))(value) as Record<string, unknown>;
             },
-            catch: () => refused(),
+            catch: (error) => name === "roles.settings.set" ? settingsRefusal(error)
+              : name === "client.web.settings.set" ? refused(`Invalid web settings. ${publicAddressError}`) : refused(),
           });
           const { requestId: id, ...body } = payload;
           const requestId = id as RequestId;
+          // The rollback switch also refuses requests with an old receipt.
+          if (name.startsWith("board.") && lists.boardEnabled === false) return yield* refused("board disabled");
           // Identifiers bypass event-text redaction. Reject a secret-bearing
           // id before looking up a receipt or planning even a refusal event.
           if ((yield* log.redactText(requestId)) !== requestId) return yield* refused();
-          const bodyHash = sha256Hex(canonical(name === "accounts set-secret"
-            ? { command: name, accountId: payload.accountId, nonce: payload.nonce }
+          const bodyHash = sha256Hex(canonical(lists.secretCommands.includes(name)
+            ? { command: name, payload: Object.fromEntries(Object.entries(body).filter(([key]) => key !== "value")) }
             : { command: name, payload: body }));
-          const caller = actor._tag === "owner" ? "owner" : `agent:${actor.agentId}`;
+          const caller = callerKey(actor);
           const receipts = yield* sql<{ body_hash: string; result_json: string }>`
             SELECT body_hash, result_json FROM receipts WHERE caller = ${caller} AND request_id = ${requestId}`;
           const snapshot = yield* views.snapshot;
@@ -282,10 +283,10 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
             try: () => {
               const data: unknown = JSON.parse(resultJson);
               if (Array.isArray(data)) {
-                const envelopes = Schema.decodeUnknownSync(Schema.Array(EventEnvelope))(data);
-                return replyFor(snapshot, name, requestId, envelopes, settings);
+                const envelopes = Schema.decodeUnknownSync(Schema.Array(lists.envelope))(data);
+                return replyFor(snapshot, name, requestId, envelopes as ReadonlyArray<EventEnvelope>, settings);
               }
-              const result = Schema.decodeUnknownSync(Schema.Struct({ envelopes: Schema.Array(EventEnvelope), reply: Schema.Unknown }))(data);
+              const result = Schema.decodeUnknownSync(Schema.Struct({ envelopes: Schema.Array(lists.envelope), reply: Schema.Unknown }))(data);
               return { reply: Schema.decodeUnknownSync(Schema.toType(rpc.successSchema))(result.reply) as Record<string, unknown> };
             },
             catch: () => new LogWriteFailed({ reason: "stored receipt is unreadable" }),
@@ -296,7 +297,17 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
             const stored = yield* decodeReceipt(receipt.result_json);
             return { ...stored, afterCommit: undefined };
           }
-          const planned = yield* planCommand({ runtime, actor, snapshot }, name, payload).pipe(Effect.result);
+          const planned = yield* Effect.gen(function* () {
+            if (!lists.access[name]?.includes(actor._tag)) return yield* refused();
+            const plan = yield* lists.planners[name]!({ runtime, actor, snapshot }, payload);
+            const namespace = pieceNamespace(name);
+            if (namespace !== undefined) {
+              if (plan.afterCommit !== undefined) return yield* refused();
+              const events = yield* checkPieceBatch(namespace, snapshot, plan, actor, lists);
+              return { ...plan, events };
+            }
+            return plan;
+          }).pipe(Effect.result);
           if (planned._tag === "Failure") {
             if (planned.failure._tag === "LogWriteFailed") return yield* planned.failure;
             const failure = planned.failure;
@@ -305,8 +316,8 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
             return { failure, afterCommit: undefined };
           }
           const plan = planned.success;
-          yield* append(actor, requestId, bodyHash, withWaitChecks(snapshot, plan.events), plan.sideRows ?? {}, (batch) =>
-            replyFor(snapshot, name, requestId, batch, settings).reply);
+          yield* append(actor, requestId, bodyHash, pieceNamespace(name) === undefined ? withWaitChecks(snapshot, plan.events, lists) : plan.events, plan.sideRows ?? {}, (batch) =>
+            plan.reply === undefined ? replyFor(snapshot, name, requestId, batch, settings).reply : plan.reply(batch));
           // Return precisely the redacted result that a later retry reads.
           const written = yield* sql<{ result_json: string }>`
             SELECT result_json FROM receipts WHERE caller = ${caller} AND request_id = ${requestId}`;
@@ -314,6 +325,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           return { ...(yield* decodeReceipt(written[0].result_json)), afterCommit: plan.afterCommit };
         })));
         if (outcome.failure !== undefined) return yield* outcome.failure;
+        if (name === "client.web.settings.set") yield* webSettingsCommitted(views);
         const late = outcome.afterCommit === undefined ? undefined : yield* step(outcome.afterCommit);
         return late ?? outcome.reply!;
       })).pipe(
@@ -323,6 +335,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
         },
         Effect.provideService(SqlClient.SqlClient, sql),
         Effect.catchTag("RequestIdReused", () => Effect.fail(refused("request id reused"))),
+        Effect.catchTag("LogWriteFailed", (error) => Effect.fail(error instanceof InvalidEvent ? refused(error.reason) : error)),
         Effect.catchTag("SqlError", () => Effect.fail(new LogWriteFailed({ reason: "database read failed" }))),
       ), (settle) => settle),
     });

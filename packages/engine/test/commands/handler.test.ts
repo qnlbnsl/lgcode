@@ -12,9 +12,9 @@ import { afterEach, beforeEach, describe, expect, it as plainIt, vi } from "vite
 
 import { makeFakeRunner } from "../support/fakeRunner.ts";
 import {
-  agentCredential, agentIdOf, call, deviceCredential, eventOf, failureOf,
+  agentCredential, agentIdOf, call, eventOf, failureOf,
   freshRequest, harnessSettings, headSequence, logAfter, makeFakeSecrets, makeRig, ownerCredential,
-  provideRig, readLog, removeRig, seedAccount, seedAgent, seedDevice, seedHarness, startPayload, stateOf,
+  provideRig, readLog, removeRig, seedAccount, seedAgent, seedHarness, startPayload, stateOf,
   success, type Credential, type Fakes, type Outcome, type Rig,
 } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
@@ -145,21 +145,6 @@ it.live("5.1 token race control: catches a race rig that blocks every command, s
     expect(raced.written[0]?.caller).toEqual({ _tag: "agent", agentId: "agent-p" });
   })).pipe(Effect.orDie));
 
-it.live("5.1 device race: catches a handler that checks the device credential before the writer permit, so a device revoked while its command waited still writes", () =>
-  withRig((fakes) => Effect.gen(function* () {
-    yield* seedAgent({ id: "agent-a" });
-    const device = yield* seedDevice("Phone");
-    const sql = yield* SqlClient.SqlClient;
-    const raced = yield* raceRevocation(
-      fakes, { credential: deviceCredential(device.credential) },
-      sql`UPDATE devices SET revoked_at = 5 WHERE device_id = ${device.deviceId}`,
-      { name: "stop", payload: { agentId: "agent-a" } },
-    );
-    expect(failureOf(raced.outcome)).toBeDefined();
-    expect(raced.written).toEqual([]);
-    expect(raced.runnerCalls).toBe(0);
-    expect(yield* stateOf("agent-a")).toBe("idle");
-  })).pipe(Effect.orDie));
 
 it.live("5.1 token race on stop: catches a stop that has acted on the runner before the writer confirms the token, so the adapter stops although the command is refused", () =>
   withRig((fakes) => Effect.gen(function* () {
@@ -701,15 +686,13 @@ it.effect("issue 50 pass-through redactText: catches a pass-through layer that l
     expect(yield* redactor.redactText("kept as is")).toBe("kept as is");
   }).pipe(Effect.provide(Redactor.layer), Effect.orDie));
 
-for (const field of ["device-name", "process-executable"] as const) {
+for (const field of ["process-executable"] as const) {
   it.effect(`issue 50 ${field}: catches a side-row text that reaches the database unredacted, or a redaction that writes a carrier DeviceAdded event named side-row-text`, () =>
     withRig(() => Effect.gen(function* () {
       const log = yield* EventLog.EventLog;
       const sql = yield* SqlClient.SqlClient;
       const before = yield* headSequence;
-      const owned = field === "device-name"
-        ? { devices: [{ deviceId: "device-secret" as never, name: `Phone ${planted}`, tokenHash: "h".repeat(64), createdAt: 1, revokedAt: null }] }
-        : {
+      const owned = {
           processes: [{
             agentId: agentIdOf("agent-a"), groupId: 42, bootId: "boot" as never, startTime: "123", userId: 1000,
             executable: `/tmp/${planted}/runner`,
@@ -717,9 +700,7 @@ for (const field of ["device-name", "process-executable"] as const) {
         };
       yield* log.append({ _tag: "owner" }, freshRequest(), "a".repeat(64), [eventOf({ _tag: "TurnStarted", agentId: "agent-a" })], owned);
 
-      const rows = field === "device-name"
-        ? yield* sql<{ name: string }>`SELECT name FROM devices`
-        : yield* sql<{ executable: string }>`SELECT executable FROM processes`;
+      const rows = yield* sql<{ executable: string }>`SELECT executable FROM processes`;
       expect(JSON.stringify(rows)).not.toContain(planted);
       expect(JSON.stringify(rows)).toContain("[REDACTED]");
 
@@ -744,7 +725,7 @@ it.effect("issue 50 no carrier with the pass-through redactor: catches a log tha
       const log = yield* EventLog.EventLog;
       seen.length = 0;
       yield* log.append({ _tag: "owner" }, freshRequest(), "b".repeat(64), [eventOf({ _tag: "TurnStarted", agentId: "agent-a" })], {
-        devices: [{ deviceId: "device-count" as never, name: "Phone", tokenHash: "h".repeat(64), createdAt: 1, revokedAt: null }],
+        processes: [{ agentId: agentIdOf("agent-a"), groupId: 42, bootId: "boot" as never, startTime: "123", userId: 1000, executable: "/tmp/runner" }],
       });
       expect(seen).toEqual(["TurnStarted"]);
     }), { redactor: counting });

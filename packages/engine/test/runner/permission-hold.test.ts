@@ -56,7 +56,7 @@ const startPrompted = (context: RunnerContext, turn: ReadonlyArray<Record<string
   const spawn = yield* spawnFor(rig, harnessFor("first", writeFakeAdapter(rig)), accountFor("first", { turns: [turn] }, echo));
   yield* context.runner.start(spawn.input);
   const delivery = deliveryFor(spawn.agentId, "go");
-  yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
+  yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery });
   return { ...spawn, echo, delivery };
 });
 

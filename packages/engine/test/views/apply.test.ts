@@ -71,10 +71,7 @@ const keyedJourneys = [
     event({ _tag: "AccountChanged", accountId: id, account: { ...account, id } }),
     event({ _tag: "AccountOutOfUsage", accountId: id, resetAt: 1_900_000_000_000 }),
   ], want: { status: "out-of-usage", resetAt: 1_900_000_000_000, displayName: "Primary" } },
-  { view: "devices", events: (id: string) => [
-    event({ _tag: "DeviceAdded", deviceId: id, name: "Phone" }),
-    event({ _tag: "DeviceRevoked", deviceId: id }),
-  ], want: { name: "Phone", revoked: true } },
+
 ] as const;
 
 for (const { view, events, want } of keyedJourneys) {
@@ -93,7 +90,6 @@ const orphanUpdates = [
   { view: "waits", event: (id: string) => event({ _tag: "WaitMemberResolved", agentId: "agent-a", waitId: id, member: { agentId: "agent-b", reason: "settled" } }) },
   { view: "deliveries", event: (id: string) => event({ _tag: "DeliveryAccepted", agentId: "agent-a", deliveryId: id }) },
   { view: "accounts", event: (id: string) => event({ _tag: "AccountNeedsSignIn", accountId: id, reason: "expired" }) },
-  { view: "devices", event: (id: string) => event({ _tag: "DeviceRevoked", deviceId: id }) },
 ] as const;
 
 for (const { view, event: update } of orphanUpdates) {
@@ -170,8 +166,11 @@ it("4c first prompt: catches dropping the initial queued delivery carried by Age
   expect(result.agents["agent-a"]?.state).toEqual({ _tag: "starting" });
 });
 
-it("4c requests: catches losing permission details, the moved holder, or the selected answer", () => {
-  const moved = [...ready, permission, event({
+const permissionWithAction = event({ ...permission, toolKind: "execute", toolInput: { command: "inspect configuration" },
+  locations: [{ path: "settings.json" }], inputRedacted: true, inputTruncated: true });
+
+it("4c requests: catches losing permission details, the moved holder, the selected answer, or retaining the answered action", () => {
+  const moved = [...ready, permissionWithAction, event({
     _tag: "PermissionMoved", agentId: "agent-a", permissionRequestId: "permission-a", from: owner,
     to: { _tag: "agent", agentId: "agent-b" }, deliveryId: "moved-permission",
   })];
@@ -180,16 +179,25 @@ it("4c requests: catches losing permission details, the moved holder, or the sel
     toolCallId: "tool-a", description: "Read the file?", settingsWrite: false,
     options: [{ id: "once", name: "Allow once", kind: "allow_once", level: "read-only", persistent: false }],
   });
-  expect(fold([...moved, event({
+  expect(fold(moved).requests["permission-a"]?.action).toEqual({ toolKind: "execute", toolInput: { command: "inspect configuration" },
+    locations: [{ path: "settings.json" }], inputRedacted: true, inputTruncated: true });
+  const answered = fold([...moved, event({
     _tag: "PermissionAnswered", agentId: "agent-a", permissionRequestId: "permission-a",
     answeredBy: { _tag: "agent", agentId: "agent-b" }, answer: { _tag: "selected", optionId: "once" },
-  })]).requests["permission-a"]).toMatchObject({ status: "answered", answer: { _tag: "selected", optionId: "once" } });
+  })]).requests["permission-a"];
+  expect(answered).toMatchObject({ status: "answered", answer: { _tag: "selected", optionId: "once" },
+    answeredBy: { _tag: "agent", agentId: "agent-b" } });
+  expect(answered).not.toHaveProperty("action");
 });
 
-it("4c requests: catches keeping a cancelled permission open after its adapter disappears", () => {
-  expect(fold([...ready, permission, event({
+it("4c requests: catches keeping a cancelled permission open or retaining its action after its adapter disappears", () => {
+  expect(fold([...ready, permissionWithAction]).requests["permission-a"]?.action).toEqual({ toolKind: "execute",
+    toolInput: { command: "inspect configuration" }, locations: [{ path: "settings.json" }], inputRedacted: true, inputTruncated: true });
+  const cancelled = fold([...ready, permissionWithAction, event({
     _tag: "PermissionCancelled", agentId: "agent-a", permissionRequestId: "permission-a", reason: "recovery",
-  })]).requests["permission-a"]).toMatchObject({ status: "cancelled", reason: "recovery" });
+  })]).requests["permission-a"];
+  expect(cancelled).toMatchObject({ status: "cancelled", reason: "recovery" });
+  expect(cancelled).not.toHaveProperty("action");
 });
 
 it("4c questions: catches losing the question, its reassignment or the owner's answer", () => {
@@ -261,14 +269,6 @@ it("4c row 28 signed-out pause: catches losing the account reason, the agent's m
   expect(result.deliveries["delivery-b"]).toMatchObject({ status: "queued" });
 });
 
-it("4c devices: catches revoking every device or forgetting one device's name and revocation", () => {
-  const result = fold([
-    event({ _tag: "DeviceAdded", deviceId: "phone", name: "Phone" }),
-    event({ _tag: "DeviceAdded", deviceId: "desktop", name: "Desktop" }),
-    event({ _tag: "DeviceRevoked", deviceId: "phone" }),
-  ]);
-  expect(result.devices).toMatchObject({ phone: { name: "Phone", revoked: true }, desktop: { name: "Desktop", revoked: false } });
-});
 
 it.each(["idle", "working"] as const)("4c rows 52 and 66 post-reload %s: catches leaving a successful reload interrupted or guessing idle", (state) => {
   const before = state === "working" ? [...ready, queued, sent] : ready;
@@ -301,8 +301,6 @@ it("4c eight-view property: catches dropping a view branch or mutating nested re
       wait, sample.cancelWait
         ? event({ _tag: "WaitCancelled", agentId: "agent-a", waitId: "wait-a", reason: "cancelled" })
         : event({ _tag: "WaitSatisfied", agentId: "agent-a", waitId: "wait-a", members: [{ agentId: "agent-b", reason: "settled" }, { agentId: "agent-c", reason: "settled" }] }),
-      event({ _tag: "DeviceAdded", deviceId: "phone", name: sample.text }),
-      ...(sample.revoke ? [event({ _tag: "DeviceRevoked", deviceId: "phone" })] : []),
       event({ _tag: "TurnEnded", agentId: "agent-a", compact: false }),
       ...(sample.limit ? [
         event({ _tag: "AccountOutOfUsage", accountId: "primary", resetAt: 1_900_000_000_000 }),
@@ -316,7 +314,6 @@ it("4c eight-view property: catches dropping a view branch or mutating nested re
       ...("waitId" in value ? { waitId: sample.identity } : {}),
       ...("deliveryId" in value ? { deliveryId: sample.identity } : {}),
       ...("accountId" in value ? { accountId: sample.accountIdentity } : {}),
-      ...("deviceId" in value ? { deviceId: sample.identity } : {}),
       ...(value._tag === "AgentStarted" ? { account: sample.accountIdentity } : {}),
       ...(value._tag === "AccountChanged" && value.account !== undefined ? { account: { ...value.account, id: sample.accountIdentity } } : {}),
       ...(value._tag === "DeliveryQueued" ? { delivery: { ...value.delivery, id: sample.identity, target: sample.identity } } : {}),
@@ -351,7 +348,6 @@ it("4c eight-view property: catches dropping a view branch or mutating nested re
     expect(result.waits[sample.identity]).toMatchObject({ status: sample.cancelWait ? "cancelled" : "satisfied" });
     expect(result.deliveries[sample.identity]).toMatchObject({ status: sample.accept ? "accepted" : "sent", content: { text: sample.text } });
     expect(result.accounts[sample.accountIdentity]).toMatchObject({ status: sample.limit ? "out-of-usage" : "available" });
-    expect(result.devices[sample.identity]).toMatchObject({ name: sample.text, revoked: sample.revoke });
   }), { numRuns: 100, seed: 4044 });
 });
 

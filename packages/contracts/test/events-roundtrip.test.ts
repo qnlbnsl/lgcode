@@ -6,7 +6,7 @@ import * as Schema from "effect/Schema"
 import * as SchemaAST from "effect/SchemaAST"
 import { describe, expect, it } from "vitest"
 
-import { Event, EventEnvelope } from "../src/events.ts"
+import { EngineEvent, Event, EventEnvelope } from "../src/events.ts"
 import { EventId } from "../src/ids.ts"
 import { LifecycleState } from "../src/stateMachine.ts"
 
@@ -15,7 +15,7 @@ import { LifecycleState } from "../src/stateMachine.ts"
 // the forty-first event, written once when an account runs out). Copied here on purpose: the test must not read
 // the list it checks from the code under test. Plan wording -> tag:
 // "command refused" -> CommandRefused, "agent reload failed" -> AgentReloadFailed, and so on.
-const expectedTags = [
+const expectedEngineTags = [
   "AgentStarted",
   "AgentStartFailed",
   "SessionOpened",
@@ -42,6 +42,8 @@ const expectedTags = [
   "DeliverySent",
   "DeliveryAccepted",
   "DeliveryRequeued",
+  "DeliveryHeld",
+  "DeliveryReleased",
   "DeliveryReturned",
   "DeliveryWithdrawn",
   "AgentCrashed",
@@ -54,10 +56,35 @@ const expectedTags = [
   "AccountAvailable",
   "AccountOutOfUsage",
   "HarnessChanged",
-  "DeviceAdded",
-  "DeviceRevoked",
   "CommandRefused"
 ]
+
+// The shared union has the engine inventory plus these client declarations.
+// Keep the expected list independent of the production event-tag inventory.
+const expectedClientTags = [
+  "client.AlertBaseline", "client.AlertRaised", "client.AlertDelivered", "client.AlertDeliveryFailed",
+  "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
+  "client.AlertCarrierTokenSet", "client.AlertCarrierTokenCleared", "client.WebSettingsChanged",
+  "client.WebServerDown", "client.WebServerUp"
+]
+const expectedBoardTags = [
+  "board.ChannelOpened",
+  "board.ChannelMembersChanged",
+  "board.ManagerChanged",
+  "board.PostWritten",
+  "board.PostAcknowledged",
+  "board.AddresseeResolved",
+  "board.PostClosed",
+  "board.WakeBuilt",
+  "board.Read",
+]
+const expectedRolesTags = [
+  "roles.RoleFileSet", "roles.SettingsChanged", "roles.Snoozed", "roles.SheepdogBaseline", "roles.StallNoticePlanned",
+  "roles.TeamIdleReported", "roles.StallSeen", "roles.ReplaceAdvised", "roles.RunawayReported",
+  "roles.CapacityRetried", "roles.CrashAdmitted", "roles.CrashRetried", "roles.GaveUp",
+  "roles.RoleAdviceBroken", "roles.CacheFlushed", "roles.CompactRequested", "roles.StallEnded"
+]
+const expectedTags = [...expectedEngineTags, ...expectedBoardTags, ...expectedClientTags, ...expectedRolesTags]
 
 const tagOf = (member: { readonly ast: SchemaAST.AST }): string => {
   const ast = member.ast
@@ -70,10 +97,39 @@ const tagOf = (member: { readonly ast: SchemaAST.AST }): string => {
 const members = Event.members
 const byTag = new Map(members.map((member) => [tagOf(member), member] as const))
 
+describe("TurnEnded usage (foundry roles 7c)", () => {
+  const decode = Schema.decodeUnknownSync(Event)
+  const encode = Schema.encodeSync(Event)
+  // The plan specifies the values, but not their wire names. These tests
+  // propose ACP token names and optional numeric request/lifetime fields.
+  const samples = [
+    ["U06a old event", { _tag: "TurnEnded", agentId: "agent-usage", compact: false }],
+    ["U06b reported context only", { _tag: "TurnEnded", agentId: "agent-usage", compact: false, usage: { used: 0 } }],
+    ["U06c last request and cache lifetimes", { _tag: "TurnEnded", agentId: "agent-usage", compact: true, usage: {
+      used: 1_234, requestStartedAt: 1_798_761_600_123, inputTokens: 17, cachedReadTokens: 31,
+      cachedWriteTokens: 120, cachedWrite5mTokens: 20, cachedWrite1hTokens: 100,
+    } }],
+  ] as const
+  for (const [name, wire] of samples) {
+    it(`${name}: decoding and JSON round-trip preserve reported fields without requiring absent ones (catches stripping usage, losing the split or making new fields mandatory)`, () => {
+      const decoded = decode(wire)
+      expect(decoded).toEqual(wire)
+      expect(decode(JSON.parse(JSON.stringify(encode(decoded))))).toEqual(wire)
+    })
+  }
+})
+
 describe("event tags", () => {
   // Catches: an event dropped from, added to, or renamed in the union; two members sharing a tag
   // (the second would never decode).
-  it("are exactly the 41 events (task 3d's 39, row 70's AgentStartFailed and AccountOutOfUsage), each once", () => {
+  it("keeps exactly the engine event inventory, including capacity hold and release, each once", () => {
+    const tags = EngineEvent.members.map(tagOf)
+    expect(tags).toHaveLength(expectedEngineTags.length)
+    expect(new Set(tags).size, "duplicate engine tags").toBe(tags.length)
+    expect([...tags].sort()).toEqual([...expectedEngineTags].sort())
+  })
+
+  it("contains exactly the engine, board, client and roles events, each once", () => {
     const tags = members.map(tagOf)
     expect(tags).toHaveLength(expectedTags.length)
     expect(new Set(tags).size, "duplicate tags").toBe(tags.length)

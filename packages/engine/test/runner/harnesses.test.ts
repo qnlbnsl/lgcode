@@ -45,7 +45,8 @@ const program = async (directory: string, name: string, mode = 0o755) => {
 }
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), "shephrd-harnesses-"))
+  // Keep the formerly random `npx` ancestor deterministic (issue 361).
+  root = await mkdtemp(join(tmpdir(), "shephrd-harnesses-npx-"))
   binDirectory = join(root, "bin")
   pathDirectory = join(root, "path-one")
   otherPathDirectory = join(root, "path-two")
@@ -79,7 +80,8 @@ live("resolves the four harnesses to absolute adapter paths with the documented 
     )
     for (const harness of result.harnesses) {
       assert.match(harness.adapterPath, /^\//)
-      assert.notInclude(harness.adapterPath, "npx")
+      // Exact paths and argument vectors above reject an npx invocation
+      // without rejecting a legitimate ancestor containing that substring.
       assert.notInclude([...harness.adapterArguments], "-y")
     }
   }))

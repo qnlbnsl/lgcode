@@ -73,7 +73,7 @@ live("6.6 F-1 a detached helper that holds stderr open does not keep the runner 
   return withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
     const spawn = yield* spawnFor(rig, harness, account);
     yield* context.runner.start(spawn.input);
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery: deliveryFor(spawn.agentId, "go") });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery: deliveryFor(spawn.agentId, "go") });
     const { pids } = yield* withPids(echo, "helperPids");
     for (const pid of pids) helpers.add(pid);
     // The helper is its own session leader, outside the adapter's group, and it is still running.
@@ -149,7 +149,7 @@ live("6.1 F-2 (PB-A1) a child in the adapter's own process group is gone after t
   return withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
     const spawn = yield* spawnFor(rig, harness, account);
     yield* context.runner.start(spawn.input);
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery: deliveryFor(spawn.agentId, "go") });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery: deliveryFor(spawn.agentId, "go") });
     const { echo: written, pids } = yield* withPids(echo, "grandchildPids");
     const child = pids[0]!;
     expect(gone(child)).toBe(false);
@@ -171,7 +171,7 @@ live("6.1 F-2 (PB-A1) a child in the adapter's own process group is gone after t
   return withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
     const spawn = yield* spawnFor(rig, harness, account);
     yield* context.runner.start(spawn.input);
-    yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, delivery: deliveryFor(spawn.agentId, "go") });
+    yield* context.runner.prompt({ sentSequence: 1, agentId: spawn.agentId, incarnation: spawn.incarnation, delivery: deliveryFor(spawn.agentId, "go") });
     const { echo: written, pids } = yield* withPids(echo, "grandchildPids");
     const child = pids[0]!;
     expect(gone(child)).toBe(false);

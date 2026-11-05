@@ -2,6 +2,9 @@
 // protocol test mode it also removes arbitrary copied-library causes,
 // annotations and method names, preserving only fixed diagnostic categories.
 const messages = new Set([
+  "piece table failed",
+  "web server disabled: web password is unset or shorter than eight characters",
+  "web server status could not be recorded",
   "debug RPC group enabled", "request failed: defect", "adapter frame dropped: malformed",
   "adapter request refused: unsupported", "permission answer delivery failed",
   "adapter content dropped: no active turn", "adapter update dropped: malformed",
@@ -27,13 +30,26 @@ const fixedMessage = (message: unknown): boolean => {
   return new Set(ids).size === ids.length && ids.every((id, index) => index === 0 || order.indexOf(id) > order.indexOf(ids[index - 1]!));
 };
 
+const pieceNamespaces = new Set(["client", "board", "roles"]);
+const pieceTables = new Set(["views", "snapshotSections", "pieceVisibility", "reach", "holdUnsettled", "requestHeld", "sourceRules", "secretKeep", "alertSources", "openMatters"]);
+const errorClasses = new Set(["TypeError", "RangeError", "SyntaxError", "ReferenceError", "Error", "Unknown"]);
+const pieceAnnotations = (message: unknown, value: unknown) => {
+  if (message !== "piece table failed" || value === null || typeof value !== "object") return {};
+  const { namespace, table, errorClass } = value as Record<string, unknown>;
+  if (typeof namespace !== "string" || !pieceNamespaces.has(namespace)
+    || typeof table !== "string" || !pieceTables.has(table)
+    || typeof errorClass !== "string" || !errorClasses.has(errorClass)) return {};
+  return { annotations: { namespace, table, errorClass } };
+};
+
 export const serviceLog = (protocol: boolean, write: (line: string) => void) => (line: string): void => {
   if (protocol) { write(line); return; }
   try {
-    const entry = JSON.parse(line) as { timestamp: string; level: string; message: unknown };
+    const entry = JSON.parse(line) as { timestamp: string; level: string; message: unknown; annotations?: unknown };
     write(JSON.stringify({
       timestamp: entry.timestamp, level: entry.level,
       message: fixedMessage(entry.message) ? entry.message : "service diagnostic",
+      ...pieceAnnotations(entry.message, entry.annotations),
     }));
   } catch { write('{"message":"service diagnostic"}'); }
 };

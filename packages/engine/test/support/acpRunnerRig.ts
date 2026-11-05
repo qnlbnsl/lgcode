@@ -344,7 +344,7 @@ export const withAcpRunner = <A, E>(rig: RunnerRig, options: RunnerOptions, body
       runner, events, eventsAfter: (count) => events.slice(count), waitFor: waiter(events), logLines: lines, secrets,
     });
   }).pipe(
-    Effect.provide(runnerLayer(rig, options, secrets)),
+    Effect.provide(runnerLayer(rig, options, secrets).pipe(Layer.provide(redactor.layer))),
     Effect.provide(loggerFor(redactor.redactText, lines)),
     Effect.scoped,
   );
@@ -360,7 +360,7 @@ export interface EngineContext extends RunnerContext {
 // runs on every append. `setup` writes the harness and the account through
 // the log before the body runs.
 export const withEngine = <A, E>(
-  rig: RunnerRig, options: RunnerOptions & { readonly harness: HarnessSettings; readonly accounts: ReadonlyArray<Account> },
+  rig: RunnerRig, options: RunnerOptions & { readonly harness: HarnessSettings; readonly accounts: ReadonlyArray<Account>; readonly capacityHoldCondition?: import("./handlerRig.ts").Fakes["capacityHoldCondition"] },
   body: (context: EngineContext) => Effect.Effect<A, E, Scope.Scope | CommandHandler.CommandHandler | EventLog.EventLog | Views.Views | SqlClient.SqlClient | Runner>,
 ) => {
   const secrets = fakeSecretsWith(options.secrets, options.secretStore);
@@ -372,7 +372,9 @@ export const withEngine = <A, E>(
     return { ...real, events: real.events.pipe(Stream.tap((event) => Effect.sync(() => { events.push(event); }))) } as RunnerShape;
   })).pipe(Layer.provide(runnerLayer(rig, options, secrets)));
   const log = EventLog.layer.pipe(Layer.provideMerge(Views.layer), Layer.provide(redactor.layer));
-  const services = CommandHandler.layer({ home: rig.home, stateFolder: rig.stateFolder, pluginRoot: rig.pluginRoot }).pipe(
+  const services = CommandHandler.layer({ home: rig.home, stateFolder: rig.stateFolder, pluginRoot: rig.pluginRoot,
+    ...(options.capacityHoldCondition === undefined ? {} : { capacityHoldCondition: options.capacityHoldCondition }),
+  }).pipe(
     Layer.provideMerge(log),
     Layer.provideMerge(tapped),
     Layer.provide(secrets.layer),

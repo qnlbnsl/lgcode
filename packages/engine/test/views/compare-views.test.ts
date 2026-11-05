@@ -38,8 +38,8 @@ it.effect("4.6 dropped event: catches comparing the live views to themselves or 
   withViews(home, Effect.gen(function* () {
     yield* registerRebuildCheck({ expectDifference: true });
     const values = [...ready,
-      event({ _tag: "DeviceAdded", deviceId: "phone", name: "Phone" }),
-      event({ _tag: "DeviceRevoked", deviceId: "phone" }),
+      event({ _tag: "AccountChanged", accountId: "phone", account: { id: "phone", harness: "first", displayName: "Phone", enabled: true } }),
+      event({ _tag: "AccountChanged", accountId: "phone", account: { id: "phone", harness: "first", displayName: "Phone", enabled: false } }),
       event({ _tag: "AgentGrouped", agentId: "agent-a", groups: ["review"] }),
     ];
     yield* append("drop-revocation", values);
@@ -47,15 +47,15 @@ it.effect("4.6 dropped event: catches comparing the live views to themselves or 
     // The mutation drops a middle event, not the head. Both snapshots have N,
     // so a sequence-only comparison cannot detect this corruption.
     expect((yield* views.snapshot).sequence).toBe(values.length);
-    expect((yield* views.snapshot).devices["phone"]).toMatchObject({ revoked: false });
+    expect((yield* views.snapshot).accounts["phone"]).toMatchObject({ enabled: true });
     const result = yield* compareViews();
     expect(result.sequence).toBe(values.length);
-    expect(result.differences).toContainEqual({ path: ["devices", "phone", "revoked"], live: false, rebuilt: true });
+    expect(result.differences).toContainEqual({ path: ["accounts", "phone", "enabled"], live: true, rebuilt: false });
     expect(result.differences).toHaveLength(1);
   }), {
     replace: (real) => ({
       ...real,
-      applyCommitted: (batch) => real.applyCommitted(batch.filter((row) => row.event._tag !== "DeviceRevoked")),
+      applyCommitted: (batch) => real.applyCommitted(batch.filter((row) => !(row.event._tag === "AccountChanged" && row.event.account?.enabled === false))),
     }),
   }),
 );
@@ -89,7 +89,7 @@ it.effect("4c F2 stale caller read: catches rebuilding to a head read before a l
     const sql = yield* SqlClient.SqlClient;
     const oldHead = yield* readOnly(sql<{ head: number }>`SELECT COALESCE(MAX(sequence), 0) AS head FROM events`);
     expect(oldHead).toEqual([{ head: 3 }]);
-    yield* append("after-head-read", [event({ _tag: "DeviceAdded", deviceId: "phone", name: "Phone" })]);
+    yield* append("after-head-read", [event({ _tag: "AccountChanged", accountId: "phone", account: { id: "phone", harness: "first", displayName: "Phone", enabled: true } })]);
     expect(yield* compareViews()).toEqual({ sequence: 4, differences: [] });
   })),
 );
@@ -98,18 +98,18 @@ it.effect("4c F2 lagging projection: catches treating the live sequence as the d
   withViews(home, Effect.gen(function* () {
     yield* registerRebuildCheck({ expectDifference: true });
     yield* append("ready", ready);
-    yield* append("dropped-head", [event({ _tag: "DeviceAdded", deviceId: "phone", name: "Phone" })]);
+    yield* append("dropped-head", [event({ _tag: "AccountChanged", accountId: "phone", account: { id: "phone", harness: "first", displayName: "Phone", enabled: true } })]);
     const result = yield* compareViews();
     expect(result.sequence).toBe(4);
     expect(result.differences).toContainEqual({ path: ["sequence"], live: 3, rebuilt: 4 });
     expect(result.differences).toContainEqual({
-      path: ["devices", "phone"], live: undefined, rebuilt: { deviceId: "phone", name: "Phone", revoked: false },
+      path: ["accounts", "phone"], live: undefined, rebuilt: { id: "phone", harness: "first", displayName: "Phone", enabled: true, status: "available" },
     });
     expect(result.differences).toHaveLength(2);
   }), {
     replace: (real) => ({
       ...real,
-      applyCommitted: (batch) => real.applyCommitted(batch.filter((row) => row.event._tag !== "DeviceAdded")),
+      applyCommitted: (batch) => real.applyCommitted(batch.filter((row) => !(row.event._tag === "AccountChanged" && row.event.accountId !== "primary"))),
     }),
   }),
 );
@@ -151,17 +151,17 @@ it.effect("4c F1 comparison lookup: catches reporting an inherited device member
   withViews(home, Effect.gen(function* () {
     yield* registerRebuildCheck({ expectDifference: true });
     yield* append("drop-inherited-device", [
-      event({ _tag: "DeviceAdded", deviceId: "constructor", name: "Phone" }),
+      event({ _tag: "AccountChanged", accountId: "constructor", account: { id: "constructor", harness: "first", displayName: "Phone", enabled: true } }),
       ...ready,
     ]);
     const result = yield* compareViews(sequence(4));
     expect(result.differences).toEqual([{
-      path: ["devices", "constructor"], live: undefined, rebuilt: { deviceId: "constructor", name: "Phone", revoked: false },
+      path: ["accounts", "constructor"], live: undefined, rebuilt: { id: "constructor", harness: "first", displayName: "Phone", enabled: true, status: "available" },
     }]);
   }), {
     replace: (real) => ({
       ...real,
-      applyCommitted: (batch) => real.applyCommitted(batch.filter((row) => row.event._tag !== "DeviceAdded")),
+      applyCommitted: (batch) => real.applyCommitted(batch.filter((row) => !(row.event._tag === "AccountChanged" && row.event.accountId !== "primary"))),
     }),
   }),
 );
@@ -176,7 +176,7 @@ it.live("4.6 writer snapshot: catches reading live views between durable COMMIT 
     yield* registerRebuildCheck();
       yield* append("ready", ready);
       hold = true;
-      const writing = yield* Effect.forkChild(append("device", [event({ _tag: "DeviceAdded", deviceId: "phone", name: "Phone" })]), { startImmediately: true });
+      const writing = yield* Effect.forkChild(append("device", [event({ _tag: "AccountChanged", accountId: "phone", account: { id: "phone", harness: "first", displayName: "Phone", enabled: true } })]), { startImmediately: true });
       yield* Deferred.await(committed);
       const sql = yield* SqlClient.SqlClient;
       // This query is on a real read connection: prove the event committed
@@ -268,7 +268,7 @@ it.live("4.6 fixed head: catches moving the rebuild bound beyond the head captur
       const comparing = yield* Effect.forkChild(compareViews(sequence(3)), { startImmediately: true });
       yield* Deferred.await(captured);
       const writing = yield* Effect.forkChild(append("later-device", [
-        event({ _tag: "DeviceAdded", deviceId: "phone", name: "Phone" }),
+        event({ _tag: "AccountChanged", accountId: "phone", account: { id: "phone", harness: "first", displayName: "Phone", enabled: true } }),
       ]), { startImmediately: true });
       yield* Deferred.succeed(release, undefined);
       expect(yield* Fiber.join(comparing)).toEqual({ sequence: 3, differences: [] });

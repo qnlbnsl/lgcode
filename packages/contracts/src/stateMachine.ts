@@ -1,4 +1,6 @@
 import * as Schema from "effect/Schema"
+import { boardEventTags } from "./board/events.ts"
+import { clientEventTags } from "./client/events.ts"
 import type { Event } from "./events.ts"
 import { EpochMilliseconds } from "./ids.ts"
 
@@ -75,8 +77,14 @@ type EventEffect = "invalid" | "keep" | "transition" | StateName
 const allStates = (effect: EventEffect): Record<StateName, EventEffect> => ({
   starting: effect, working: effect, idle: effect, paused: effect, interrupted: effect, crashed: effect, stopped: effect
 })
+// Piece events cannot change the engine's lifecycle.
+export const keepInEveryState = <const T extends ReadonlyArray<string>>(tags: T): Record<T[number], Record<StateName, EventEffect>> =>
+  Object.fromEntries(tags.map((tag) => [tag, allStates("keep")])) as Record<T[number], Record<StateName, EventEffect>>
 // Explicit keys make every new event require a decision for all seven states.
 const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
+  ...keepInEveryState(boardEventTags),
+  ...keepInEveryState(clientEventTags),
+  ...keepInEveryState(rolesEventTags),
   AgentStarted: allStates("invalid"),
   AgentStartFailed: { ...allStates("invalid"), starting: "stopped" },
   SessionOpened: { ...allStates("invalid"), starting: "idle" },
@@ -103,6 +111,8 @@ const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
   DeliverySent: { ...allStates("invalid"), idle: "working", working: "keep" },
   DeliveryAccepted: allStates("keep"),
   DeliveryRequeued: allStates("keep"),
+  DeliveryHeld: { ...allStates("invalid"), working: "idle" },
+  DeliveryReleased: allStates("keep"),
   DeliveryReturned: allStates("keep"),
   DeliveryWithdrawn: allStates("keep"),
   AgentCrashed: { ...allStates("invalid"), starting: "crashed", working: "crashed", idle: "crashed", paused: "crashed" },
@@ -115,8 +125,7 @@ const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
   AccountOutOfUsage: allStates("keep"),
   AccountAvailable: allStates("keep"),
   HarnessChanged: allStates("keep"),
-  DeviceAdded: allStates("keep"),
-  DeviceRevoked: allStates("keep"),
   CommandRefused: allStates("keep")
 }
 export const eventEffect = (state: StateName, event: Event["_tag"]): EventEffect => eventTable[event][state]
+import { rolesEventTags } from "./roles/events.ts"

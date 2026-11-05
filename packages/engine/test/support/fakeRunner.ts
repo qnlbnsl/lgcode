@@ -94,6 +94,9 @@ export interface TurnEndedEvent {
   readonly agentId: AgentId;
   readonly incarnation: string;
   readonly deliveryId: DeliveryId;
+  // Fixtures may omit this to end the latest send. Race tests name the
+  // actual old reservation instead, just as the real runner does.
+  readonly sentSequence?: number;
 }
 
 // `exited`: the agent's process ended (row 32). Fix round 1 of unit 5c,
@@ -128,6 +131,7 @@ export interface PromptReplyEvent {
   readonly deliveryId: string;
   readonly outcome:
     | { readonly _tag: "success" }
+    | { readonly _tag: "capacity"; readonly error: string }
     | { readonly _tag: "pause"; readonly reason: "out-of-usage" | "signed-out"; readonly error: string; readonly resetAt?: number }
     | { readonly _tag: "error"; readonly error: string };
 }
@@ -298,11 +302,20 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
             ORDER BY sequence DESC LIMIT 1`;
           lastSent = rows[0] === undefined ? undefined : (JSON.parse(rows[0].payload_json) as { deliveryId: DeliveryId }).deliveryId;
         }
-        const complete: FakeRunnerEvent = event._tag === "exited" && !("incarnation" in event)
+        let complete: FakeRunnerEvent = event._tag === "exited" && !("incarnation" in event)
           ? { ...event, incarnation: yield* currentIncarnation(event.agentId) }
           : event._tag === "turnEnded" && !("deliveryId" in event)
             ? { ...event, deliveryId: lastDelivery.get(event.agentId) ?? lastSent ?? "no-delivery" as DeliveryId }
             : event as FakeRunnerEvent;
+        if (complete._tag === "turnEnded" && complete.sentSequence === undefined) {
+          const sql = yield* SqlClient.SqlClient;
+          const rows = yield* sql<{ sequence: number }>`
+            SELECT sequence FROM events WHERE event_type = 'DeliverySent'
+            AND json_extract(payload_json, '$.agentId') = ${complete.agentId}
+            AND json_extract(payload_json, '$.deliveryId') = ${complete.deliveryId}
+            ORDER BY sequence DESC LIMIT 1`;
+          complete = { ...complete, sentSequence: rows[0]?.sequence ?? 0 };
+        }
         if (complete._tag === "exited" && complete.incarnation === incarnations.get(complete.agentId)) incarnations.delete(complete.agentId);
         noteReplay(complete);
         yield* PubSub.publish(pubsub, complete);

@@ -1,11 +1,13 @@
 import {
   EventSequence as EventSequenceSchema, eventEffect,
-  type Account, type Actor, type AgentId, type Delivery, type Event, type EventEnvelope, type EventSequence, type LifecycleState,
-  type PermissionOption, type SessionReference, type WaitMember,
+  type Account, type Actor, type Caller, type PermissionAction, type AgentId, type Delivery, type Event, type EventEnvelope, type EventSequence, type LifecycleState,
+  pieceNamespaces, EngineEvent, type PieceNamespace, type PermissionOption, type SessionReference, type WaitMember,
 } from "@shephrd/contracts";
 import * as Schema from "effect/Schema";
+import { guardPiece } from "../pieces/guardPiece.ts";
+import { pieceViews, type PieceView } from "../pieces/viewTables.ts";
 
-// The eight views. Every record keeps the plain data the log holds, so a
+// The engine views. Every record keeps the plain data the log holds, so a
 // client can read it without the log. Nothing here is a second source of
 // truth: the log is, and `rebuild` folds it from sequence 1.
 interface AgentRow {
@@ -29,9 +31,11 @@ interface AgentRow {
   // Fix round 1, F8 and row 67: true from the sending of a compact delivery
   // until that turn ends or the agent stops working.
   readonly compacting: boolean;
+  readonly capacityHeld: boolean;
 }
 
 interface RequestRow {
+  readonly action?: PermissionAction;
   readonly permissionRequestId: string;
   readonly agentId: AgentId;
   readonly status: "open" | "answered" | "cancelled";
@@ -42,7 +46,7 @@ interface RequestRow {
   readonly options: ReadonlyArray<PermissionOption>;
   readonly settingsWrite: boolean;
   readonly answer?: { readonly _tag: "selected"; readonly optionId: string } | { readonly _tag: "cancelled" };
-  readonly answeredBy?: Actor;
+  readonly answeredBy?: Caller;
   readonly reason?: string;
 }
 
@@ -83,13 +87,10 @@ type AccountRow = Account & {
   readonly reason?: string;
 };
 
-interface DeviceRow {
-  readonly deviceId: string;
-  readonly name: string;
-  readonly revoked: boolean;
-}
-
-interface State {
+export interface State {
+  readonly client: unknown;
+  readonly board: unknown;
+  readonly roles: unknown;
   readonly sequence: EventSequence;
   readonly agents: Readonly<Record<string, AgentRow>>;
   readonly threads: Readonly<Record<string, ReadonlyArray<EventEnvelope>>>;
@@ -98,7 +99,6 @@ interface State {
   readonly waits: Readonly<Record<string, WaitRow>>;
   readonly deliveries: Readonly<Record<string, DeliveryRow>>;
   readonly accounts: Readonly<Record<string, AccountRow>>;
-  readonly devices: Readonly<Record<string, DeviceRow>>;
 }
 
 const zero = Schema.decodeUnknownSync(EventSequenceSchema)(0);
@@ -111,16 +111,20 @@ type Keyed<T> = Readonly<Record<string, T>>;
 
 const keyed = <T>(): Keyed<T> => Object.create(null) as Keyed<T>;
 
-export const emptyViews = (): State => ({
+export const emptyViews = (views: Readonly<Record<PieceNamespace, PieceView>> = pieceViews): State => ({
+  client: guardPiece("views", "client", () => views.client.empty(), undefined),
+  board: guardPiece("views", "board", () => views.board.empty(), undefined),
+  roles: guardPiece("views", "roles", () => views.roles.empty(), undefined),
   sequence: zero, agents: keyed(), threads: keyed(), requests: keyed(), questions: keyed(), waits: keyed(),
-  deliveries: keyed(), accounts: keyed(), devices: keyed(),
+  deliveries: keyed(), accounts: keyed(),
 });
 
 // The agent whose thread an event belongs to. `DeliveryQueued` names its
 // agent only inside the delivery, so the log's agent column misses it
-// (issue 31). Account, device and harness events belong to no thread.
-const threadAgent = (event: Event): AgentId | undefined =>
-  event._tag === "DeliveryQueued" ? event.delivery.target : "agentId" in event ? event.agentId : undefined;
+// (issue 31). Account and harness events belong to no thread.
+const engineTags = new Set(Object.keys(EngineEvent.pipe(Schema.toTaggedUnion("_tag")).cases));
+export const threadAgent = (event: Event): AgentId | undefined =>
+  !engineTags.has(event._tag) ? undefined : event._tag === "DeliveryQueued" ? event.delivery.target : "agentId" in event ? event.agentId : undefined;
 
 const lookup = <T>(record: Keyed<T>, key: string): T | undefined =>
   Object.hasOwn(record, key) ? record[key] : undefined;
@@ -180,7 +184,7 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
       ...(event.model === undefined ? {} : { model: event.model }),
       ...(event.effort === undefined ? {} : { effort: event.effort }),
       permission: event.permission, folder: event.folder, runMode: event.runMode, state: { _tag: "starting" },
-      compacting: false,
+      compacting: false, capacityHeld: false,
     });
     case "SessionOpened": return change(state.agents, event.agentId, (row) => ({
       ...row, state: nextState(row.state, event), session: event.session,
@@ -195,6 +199,8 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
       const compacting = next._tag === "working" && lookup(state.deliveries, event.deliveryId)?.content._tag === "compact";
       return next === row.state && compacting === row.compacting ? row : { ...row, state: next, compacting };
     });
+    case "DeliveryHeld":
+    case "DeliveryReleased":
     case "AgentStartFailed":
     case "TurnStarted":
     case "TurnEnded":
@@ -205,27 +211,38 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
     case "AgentStopped": return change(state.agents, event.agentId, (row) => {
       const next = nextState(row.state, event);
       const compacting = row.compacting && event._tag !== "TurnEnded" && next._tag === "working";
-      return next === row.state && compacting === row.compacting ? row : { ...row, state: next, compacting };
+      const capacityHeld = event._tag === "DeliveryHeld" ? true
+        : event._tag === "DeliveryReleased" || event._tag === "AgentStopped" || event._tag === "AgentCrashed" ? false : row.capacityHeld;
+      return next === row.state && compacting === row.compacting && capacityHeld === row.capacityHeld
+        ? row : { ...row, state: next, compacting, capacityHeld };
     });
     default: return state.agents;
   }
 };
 
+const withoutAction = ({ action: _action, ...row }: RequestRow) => row;
+export const permissionAction = (event: PermissionAction): PermissionAction => Object.fromEntries(
+  ["toolKind", "toolInput", "locations", "inputRedacted", "inputTruncated"].flatMap((key) => {
+    const value = event[key as keyof PermissionAction];
+    return value === undefined ? [] : [[key, value]];
+  }),
+);
 const requestsAfter = (state: State, event: Event): State["requests"] => {
   switch (event._tag) {
     case "PermissionRequested": return put(state.requests, event.permissionRequestId, {
       permissionRequestId: event.permissionRequestId, agentId: event.agentId, status: "open", holder: event.holder,
       deliveryId: event.deliveryId, toolCallId: event.toolCallId, description: event.description,
       options: event.options, settingsWrite: event.settingsWrite,
+      ...(Object.keys(permissionAction(event)).length === 0 ? {} : { action: permissionAction(event) }),
     });
     case "PermissionMoved": return change(state.requests, event.permissionRequestId, (row) => ({
       ...row, holder: event.to, deliveryId: event.deliveryId,
     }));
     case "PermissionAnswered": return change(state.requests, event.permissionRequestId, (row) => ({
-      ...row, status: "answered", answer: event.answer, answeredBy: event.answeredBy,
+      ...withoutAction(row), status: "answered", answer: event.answer, answeredBy: event.answeredBy,
     }));
     case "PermissionCancelled": return change(state.requests, event.permissionRequestId, (row) => ({
-      ...row, status: "cancelled", reason: event.reason,
+      ...withoutAction(row), status: "cancelled", reason: event.reason,
     }));
     default: return state.requests;
   }
@@ -323,22 +340,16 @@ const accountsAfter = (state: State, event: Event): State["accounts"] => {
   }
 };
 
-const devicesAfter = (state: State, event: Event): State["devices"] => {
-  switch (event._tag) {
-    case "DeviceAdded": return put(state.devices, event.deviceId, {
-      deviceId: event.deviceId, name: event.name, revoked: false,
-    });
-    case "DeviceRevoked": return change(state.devices, event.deviceId, (row) => ({ ...row, revoked: true }));
-    default: return state.devices;
-  }
-};
-
-// Pure and total: it returns a new state, changes neither input, and never
-// fails. Live updates and `rebuild` both run exactly this function.
-export const apply = (state: State, envelope: EventEnvelope): State => {
+// Live publication and rebuilding use this same pure fold.
+export const applyWith = (state: State, envelope: EventEnvelope, views: Readonly<Record<PieceNamespace, PieceView>> = pieceViews): State => {
   const event = envelope.event;
   const owner = threadAgent(event);
-  return {
+  const pieces = { client: state.client, board: state.board, roles: state.roles };
+  for (const namespace of pieceNamespaces) {
+    pieces[namespace] = guardPiece("views", namespace, () => views[namespace].reduce(state[namespace], event, envelope.sequence), state[namespace]);
+  }
+  const next: State = {
+    ...pieces,
     sequence: envelope.sequence,
     agents: agentsAfter(state, event),
     threads: owner === undefined
@@ -349,6 +360,14 @@ export const apply = (state: State, envelope: EventEnvelope): State => {
     waits: waitsAfter(state, envelope),
     deliveries: deliveriesAfter(state, event),
     accounts: accountsAfter(state, event),
-    devices: devicesAfter(state, event),
   };
+  for (const namespace of pieceNamespaces) {
+    pieces[namespace] = guardPiece("views", namespace, () => {
+      const observe = views[namespace].observe;
+      return observe === undefined ? next[namespace] : observe(next, event, envelope.sequence);
+    }, next[namespace]);
+  }
+  return { ...next, ...pieces };
 };
+
+export const apply = (state: State, envelope: EventEnvelope): State => applyWith(state, envelope);

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, resolve } from "node:path";
-import { comparePermission, DeliveryId, Event, type PermissionLevel, type SessionReference } from "@shephrd/contracts";
+import { comparePermission, DeliveryId, ThreadContent, type PermissionLevel, type SessionReference, type TurnUsage } from "@shephrd/contracts";
 import { AcpClient, layerChildProcess } from "@shephrd/t3-effect-acp/client";
 import { AcpRequestError } from "@shephrd/t3-effect-acp/errors";
 import type { AgentCapabilities } from "@shephrd/t3-effect-acp/schema-v1";
@@ -59,19 +59,21 @@ export interface AcpRunnerOptions {
   // shares one registry with its own redactor; without one the runner keeps
   // its own, so its redaction still covers them.
   readonly credentials?: CredentialRegistry;
-  readonly classifyError?: (input: { harness: string; text: string }) => "out-of-usage" | "signed-out" | undefined;
+  readonly classifyError?: (input: { harness: string; text: string }) => "out-of-usage" | "signed-out" | "capacity" | undefined;
 }
 type Spawn = Parameters<Runner["Service"]["start"]>[0];
 type Send = Parameters<Runner["Service"]["prompt"]>[0];
 type Hold = Effect.Success<ReturnType<typeof makePermissionHold>>;
 interface Turn {
   readonly deliveryId: Send["delivery"]["id"];
+  readonly sentSequence: number;
   replied: boolean;
   idle: boolean;
   ended: boolean;
   text: string;
   error?: string;
   resetAt?: number;
+  usage?: TurnUsage;
 }
 interface Process {
   readonly input: Spawn;
@@ -107,6 +109,19 @@ interface Process {
   sent?: Deferred.Deferred<void, RunnerRejected>;
 }
 const rejected = (reason: string) => new RunnerRejected({ reason });
+const tokenCount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+// The pinned ACP Usage has only these input counters. Do not infer request
+// times or cache lifetimes from arbitrary _meta. In particular, Claude 0.99.1
+// reports a turn tally here, not a verified last-request snapshot.
+const terminalUsage = (value: unknown): TurnUsage | undefined => {
+  if (typeof value !== "object" || value === null) return undefined;
+  const source = value as Record<string, unknown>;
+  const usage: Record<string, number> = {};
+  for (const key of ["inputTokens", "cachedReadTokens", "cachedWriteTokens"] as const) {
+    if (tokenCount(source[key])) usage[key] = source[key];
+  }
+  return Object.keys(usage).length === 0 ? undefined : usage;
+};
 const recordTurnError = (turn: Turn, error: unknown) => {
   turn.error = JSON.stringify(error);
   const resetAt = resetTimeFromError(error);
@@ -199,7 +214,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     }
     return yield* redactText(clean);
   }));
-  const threadContent = Event.pipe(Schema.toTaggedUnion("_tag")).cases.ThreadItem.fields.content;
+  const threadContent = ThreadContent;
   const emit = (event: RunnerEvent) => Queue.offer(events, event).pipe(Effect.asVoid);
   // Records one replayed update for the load's result. Breaks in a row are
   // kept as one, so a long replay of other content stays small.
@@ -269,11 +284,14 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       ? (configuration.classifyError ?? classifyError)({ harness, text: clean }) : undefined;
     const classification = turn.error !== undefined || candidate === "out-of-usage" ? candidate : undefined;
     yield* emit({ _tag: "promptReply", ...identity(entry), deliveryId: turn.deliveryId,
-      outcome: classification !== undefined ? { _tag: "pause", reason: classification, error: clean,
+      outcome: classification === "capacity" ? { _tag: "capacity", error: clean } : classification !== undefined ? { _tag: "pause", reason: classification, error: clean,
         ...(classification === "out-of-usage" && turn.error !== undefined && turn.resetAt !== undefined ? { resetAt: turn.resetAt } : {}) }
         : turn.error !== undefined ? { _tag: "error", error: clean } : { _tag: "success" } });
     if (entry.turn === turn) delete entry.turn;
-    yield* emit({ _tag: "turnEnded", ...identity(entry), deliveryId: turn.deliveryId });
+    yield* emit({ _tag: "turnEnded", ...identity(entry), deliveryId: turn.deliveryId,
+      sentSequence: turn.sentSequence,
+      ...(turn.usage === undefined ? {} : { usage: turn.usage }),
+    });
   });
   const setMode = (entry: Process, permission: PermissionLevel) => Effect.gen(function* () {
     const mode = entry.input.harness.permissionMapping[permission];
@@ -316,6 +334,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     // Fix round 2, F-1: a field the harness cannot apply would run the agent on
     // another login than the account names, so it is refused here as well as
     // when the account is set.
+    if (input.account.secret?.startsWith("secret:client.") || Object.values(input.account.environment ?? {}).some((value) => value.startsWith("secret:client."))) return yield* rejected("reserved secret reference");
     const unsupported = loginRefusal(harness.id, input.account);
     if (unsupported !== undefined) return yield* rejected(unsupported);
     const resolvedSecrets = [input.token];
@@ -484,9 +503,18 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           }
           return;
         }
+        if (update.sessionUpdate === "usage_update") {
+          // Replay and updates outside a turn must never seed the next turn.
+          if (!current.loading && current.turn !== undefined && !current.turn.ended && tokenCount(update.used)) {
+            current.turn.usage = { ...current.turn.usage, used: update.used };
+          }
+          return;
+        }
         if (update.sessionUpdate === "state_update" && update.state === "idle") {
           yield* drainMessages(current, true);
-          if (current.turn !== undefined) {
+          if (!current.loading && current.turn !== undefined && !current.turn.ended) {
+            const usage = terminalUsage(update.usage);
+            if (usage !== undefined) current.turn.usage = { ...current.turn.usage, ...usage };
             current.turn.idle = true;
             // ACP v2 puts the prompt's terminal error in its idle update;
             // the raw request reply is only an acknowledgement.
@@ -570,7 +598,39 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         const mapped = yield* Effect.forEach(request.options, (option) => Effect.gen(function* () {
           return mapPermissionOption(harness.id, { ...option, name: yield* redactText(option.name, processEntry.covered), kind: yield* redactText(option.kind, processEntry.covered) });
         }));
-        yield* emit({ _tag: "permissionRequested", ...identity(processEntry), permissionRequestId: hold.id,
+        // Redact the whole decoded value before applying either byte cap.
+        const fields: import("@shephrd/contracts").PermissionAction = yield* Effect.gen(function* () {
+          const result: Record<string, unknown> = {};
+          if (tool.kind != null) result.toolKind = tool.kind;
+          if (tool.rawInput !== undefined) {
+            const clean = yield* cleanStructure(tool.rawInput, processEntry.covered);
+            const encoded = JSON.stringify(clean);
+            if (encoded !== JSON.stringify(tool.rawInput)) result.inputRedacted = true;
+            if (Buffer.byteLength(encoded) > 8192) {
+              result.inputTruncated = true;
+              // A cut remains valid JSON, even for multibyte text and escapes.
+              const characters = Array.from(encoded);
+              let low = 0, high = Math.min(characters.length, 8192);
+              while (low < high) {
+                const middle = Math.ceil((low + high) / 2);
+                if (Buffer.byteLength(JSON.stringify(characters.slice(0, middle).join(""))) <= 8192) low = middle;
+                else high = middle - 1;
+              }
+              result.toolInput = characters.slice(0, low).join("");
+            } else result.toolInput = clean;
+          }
+          if (tool.locations != null) {
+            const clean = (yield* cleanStructure(tool.locations, processEntry.covered)) as Array<{ path: string; line?: number }>;
+            const bounded: Array<{ path: string; line?: number }> = [];
+            for (const location of clean.slice(0, 16)) {
+              if (Buffer.byteLength(JSON.stringify([...bounded, location])) > 2048) break;
+              bounded.push(location);
+            }
+            result.locations = bounded;
+          }
+          return result;
+        });
+        yield* emit({ _tag: "permissionRequested", ...fields, ...identity(processEntry), permissionRequestId: hold.id,
           toolCallId: tool.toolCallId, description, options: mapped, settingsWrite: settingsWrite((tool.locations ?? []).map((location) => location.path), folder, environment.CLAUDE_CONFIG_DIR) });
         return { outcome: yield* Deferred.await(hold.answer) };
       }));
@@ -635,7 +695,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     if (input.delivery.target !== input.agentId || (!compact && input.delivery.content._tag !== "prompt" && input.delivery.content._tag !== "carry-on")) return yield* rejected("delivery does not match send");
     if (entry.turn !== undefined && !entry.turn.ended) return yield* rejected("agent already has a turn");
     const text = compact ? yield* compactPrompt(entry.commands) : input.delivery.content._tag === "prompt" || input.delivery.content._tag === "carry-on" ? input.delivery.content.text : "";
-    const turn: Turn = { deliveryId: input.delivery.id, replied: false, idle: false, ended: false, text: "" };
+    const turn: Turn = { deliveryId: input.delivery.id, sentSequence: input.sentSequence, replied: false, idle: false, ended: false, text: "" };
     entry.turn = turn;
     const sent = yield* Deferred.make<void, RunnerRejected>();
     entry.sent = sent;
@@ -645,7 +705,12 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       Effect.result, Effect.flatMap((reply) => Effect.gen(function* () {
         if (reply._tag === "Failure") yield* Deferred.fail(sent, rejected("prompt send failed"));
         if (entry.stopped || entry.dead) return;
-        const response = reply._tag === "Success" ? reply.success as { error?: unknown } : undefined;
+        const response = reply._tag === "Success" ? reply.success as { error?: unknown; usage?: unknown } : undefined;
+        // ACP v1 delivers its terminal usage on the prompt reply instead.
+        if (entry.version === 1) {
+          const usage = terminalUsage(response?.usage);
+          if (usage !== undefined) turn.usage = { ...turn.usage, ...usage };
+        }
         const error = reply._tag === "Failure" ? reply.failure : response?.error;
         if (error !== undefined) recordTurnError(turn, error);
         turn.replied = true;

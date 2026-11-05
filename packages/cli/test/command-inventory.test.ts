@@ -12,7 +12,11 @@ it("X61 (T-6) catches a command recognition or top-level help inventory omitting
   // P01 independently invokes every command's help in a real CLI child.
   // Deriving this inventory from the group also protects future RPC additions.
   for (const command of CommandsRpcGroup.requests.keys()) {
-    expect(matchCommand([...command.split(" "), "--help"])).toEqual({ command, rest: ["--help"] });
+    const words = command === "debug.compare-views" ? [command] : command.replaceAll(".", " ").split(" ");
+    for (const spelling of [words, command.split(" ")]) {
+      expect(matchCommand([...spelling, "--input", "{}", "--help"]))
+        .toEqual({ command, rest: ["--input", "{}", "--help"] });
+    }
     expect(lines).toContain(`  ${command}`);
   }
 });

@@ -5,7 +5,7 @@
 //   revocation wrote side rows only and published no event.
 // - Ruling 7: an idle connection whose credential was revoked side-row-only
 //   closes within one second (the 100 ms poll in `api/server.ts`).
-// - Ruling 2: `debug.compare-views` is owner-only, so a paired device is
+// - Ruling 2: `debug.compare-views` is owner-only, so an agent is
 //   refused.
 // The server is built in process over the real command handler, log and
 // views, with the fake runner, as in `auth.test.ts`. Every credential is
@@ -23,7 +23,7 @@ import type WebSocket from "ws";
 import * as Server from "../../src/api/server.ts";
 import { makeFakeRunner } from "../support/fakeRunner.ts";
 import {
-  appendSetup, makeFakeSecrets, makeRig, provideRig, removeRig, seedAccount, seedAgent, seedDevice, seedHarness,
+  appendSetup, makeFakeSecrets, makeRig, provideRig, removeRig, seedAccount, seedAgent, seedHarness,
 } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { compareViews, kindOf } from "../support/serviceProcess.ts";
@@ -119,20 +119,6 @@ const expectNotServed = (connection: Recorded, id: string, what: string, reason:
   connection.socket.terminate();
 });
 
-live("fix1 T-1 ruling 1: a device's new subscribe sent at once after a side-row-only revocation is refused with invalid credential or finds the connection closed, never served a chunk, in 5 of 5 runs (breaks if subscribe does not re-check the credential per request and relies on the 100 ms poll)", () =>
-  withServer(false, (socket) => Effect.gen(function* () {
-    for (let run = 1; run <= 5; run++) {
-      const device = yield* seedDevice(`Phone ${run}`);
-      const connection = yield* open(socket, device.credential);
-      connection.send(requestFrame("1", "subscribe", { requestId: `request-before-${run}`, after: 0 }));
-      const served = yield* within(5_000, () => chunksFor(connection, "1").length > 0);
-      expect(served, `run ${run}: the subscribe before revocation returned no chunk`).toBe(true);
-      // Side rows only: no event is written, so nothing is published.
-      yield* appendSetup([], { revokeDevices: [device.deviceId] });
-      connection.send(requestFrame("2", "subscribe", { requestId: `request-after-${run}`, after: 0 }));
-      yield* expectNotServed(connection, "2", `run ${run}`, "invalid credential");
-    }
-  })));
 
 live("fix1 T-1 ruling 1: with the debug group on, an agent's debug.compare-views sent at once after a side-row-only token revocation is refused or finds the connection closed, never answered with a result, in 5 of 5 runs (breaks if debug.compare-views serves a revoked credential)", () =>
   withServer(true, (socket) => Effect.gen(function* () {
@@ -151,31 +137,15 @@ live("fix1 T-1 ruling 1: with the debug group on, an agent's debug.compare-views
     }
   })));
 
-live("fix1 T-2 ruling 7: an idle device connection closes within 1 second of a side-row-only revocation that publishes no event (breaks if the 100 ms credential poll is removed, leaving only the event-driven check)", () =>
-  withServer(false, (socket) => Effect.gen(function* () {
-    const device = yield* seedDevice("Idle tablet");
-    const other = yield* seedDevice("Idle laptop");
-    const idle = yield* open(socket, device.credential);
-    const control = yield* open(socket, other.credential);
-    // Both connections stay open while nothing changes.
-    yield* Effect.sleep(300);
-    expect([idle.closed(), control.closed()]).toEqual([false, false]);
-    yield* appendSetup([], { revokeDevices: [device.deviceId] });
-    const closed = yield* within(1_000, idle.closed);
-    expect(closed, "the revoked device's idle connection stayed open for 1 second after a side-row-only revocation").toBe(true);
-    // Rule 4: revoking one device leaves another device's connection open.
-    expect(control.closed()).toBe(false);
-    control.socket.terminate();
-  })));
 
-live("fix1 T-3 ruling 2: with the debug group on, a paired device's debug.compare-views is refused while the owner's call still returns equal views (breaks if the debug RPC admits any credential without an agent id, as a device has)", () =>
+live("fix1 T-3 ruling 2: with the debug group on, an agent's debug.compare-views is refused while the owner's call still returns equal views (breaks if the debug RPC admits any credential without an agent id, as a device has)", () =>
   withServer(true, (socket) => Effect.gen(function* () {
-    const device = yield* seedDevice("Paired phone");
+    const agent = yield* seedAgent({ id: "debug-agent" });
     yield* Effect.scoped(Effect.gen(function* () {
-      const asDevice = yield* connect(socket, device.credential);
-      expect(kindOf(yield* compareViews(asDevice))).toBe("refused");
+      const asAgent = yield* connect(socket, agent.token);
+      expect(kindOf(yield* compareViews(asAgent))).toBe("refused");
       // The device's connection itself still works: the refusal is the RPC's.
-      yield* asDevice.harnesses({ requestId: "request-device-harnesses", operation: "list" } as never);
+      yield* asAgent.ask({ requestId: "request-agent-ask", text: "Question." } as never);
       const owner = yield* connect(socket, ownerSecret);
       const exit = yield* compareViews(owner);
       expect(kindOf(exit)).toBe("success");

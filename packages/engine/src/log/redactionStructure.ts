@@ -10,26 +10,37 @@ export interface RedactionStructure {
 }
 
 const identity: RedactionStructure = { identity: true };
-const actor: RedactionStructure = { fields: { agentId: identity } };
+const actor: RedactionStructure = { fields: { agentId: identity, service: identity, rule: identity, namespace: identity } };
 const account: RedactionStructure = { identity: true, fields: {
   id: identity, harness: identity, environment: { freeText: true },
 } };
 const harness: RedactionStructure = { identity: true, fields: { id: identity } };
-const member: RedactionStructure = { identity: true, fields: { agentId: identity } };
+const member: RedactionStructure = { identity: true, fields: { agentId: identity, service: identity, rule: identity, namespace: identity } };
 const delivery: RedactionStructure = { fields: {
-  id: identity, target: identity, sender: actor, source: { fields: { id: identity } },
+  id: identity, target: identity, sender: actor, source: { fields: { id: identity, namespace: identity } },
 } };
 
 export const eventStructure: RedactionStructure = { fields: {
-  agentId: identity, accountId: identity, deliveryId: identity, deviceId: identity,
-  permissionRequestId: identity, questionId: identity, waitId: identity,
-  account, harness, parent: actor, sender: actor, holder: actor, answeredBy: actor, from: actor, to: actor,
-  delivery, firstPromptDelivery: delivery, subject: { fields: { id: identity } },
+  agentId: identity, accountId: identity, deliveryId: identity,
+  roleFileHash: identity, noticeRecipient: identity, postId: identity, stalledPostId: identity,
+  channelId: identity, wakeId: identity, anchorAgentId: identity, targetAgentId: identity,
+  decidingPostId: identity, replyToPostId: identity,
+  permissionRequestId: identity, questionId: identity, waitId: identity, alertId: identity, alertKey: identity, carrierGeneration: identity,
+  account, harness, parent: actor, sender: actor, holder: actor, answeredBy: actor, from: actor,
+  to: { ...actor, elements: actor }, author: actor, reader: actor, opener: actor, closer: actor, manager: actor, addressee: actor,
+  membersAdded: { elements: member }, membersRemoved: { elements: member },
+  carried: { elements: identity }, mustReply: { elements: identity }, completions: { elements: identity },
+  reminders: { elements: identity }, postIds: { elements: identity },
+  noAnswers: { elements: { fields: { postId: identity, addressee: actor } } },
+  toolInput: { freeText: true },
+  completionReplyText: { elements: identity },
+  delivery, firstPromptDelivery: delivery, subject: { fields: { id: identity, namespace: identity } },
   member, members: { elements: member }, process: { fields: { bootId: identity } },
 } };
 
 export const receiptStructure: RedactionStructure = { fields: {
-  requestId: identity, agentId: identity, deliveryId: identity, questionId: identity, waitId: identity,
+  requestId: identity, agentId: identity, deliveryId: identity, questionId: identity, waitId: identity, alertId: identity,
+  roleFileHash: identity, channelId: identity, postId: identity, wakeId: identity,
   accounts: { elements: account }, harnesses: { elements: harness }, members: { elements: member },
   envelopes: { elements: { fields: {
     eventId: identity, requestId: identity, agentId: identity, caller: actor, event: eventStructure,

@@ -1,15 +1,41 @@
 import * as Schema from "effect/Schema"
+import { BoardEvent } from "./board/events.ts"
+import { ClientEvent } from "./client/events.ts"
 import { Account } from "./accounts.ts"
 import { HarnessSettings, RunMode } from "./harnesses.ts"
-import { AccountId, AgentId, BootId, DeliveryId, DeviceId, EpochMilliseconds, EventId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
+import { AccountId, AgentId, BootId, DeliveryId, EpochMilliseconds, EventId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
 import { PermissionLevel } from "./permission.ts"
 import { LifecycleState } from "./stateMachine.ts"
+import { RolesEvent } from "./roles/events.ts"
 
 export const Actor = Schema.Union([
   Schema.TaggedStruct("owner", {}),
   Schema.TaggedStruct("agent", { agentId: AgentId })
 ])
 export type Actor = typeof Actor.Type
+
+export const Caller = Schema.Union([
+  Actor,
+  Schema.TaggedStruct("service", { service: Schema.NonEmptyString, rule: Schema.optionalKey(Schema.NonEmptyString) }),
+  Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles"]) })
+])
+export type Caller = typeof Caller.Type
+export const Sender = Schema.Union([
+  Actor,
+  Schema.TaggedStruct("service", { service: Schema.NonEmptyString }),
+  Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles"]) })
+])
+export type Sender = typeof Sender.Type
+
+export const PermissionActionFields = {
+  toolKind: Schema.optionalKey(Schema.Literals(["read", "edit", "delete", "move", "search", "execute", "think", "fetch", "switch_mode", "other"])),
+  toolInput: Schema.optionalKey(Schema.Unknown),
+  locations: Schema.optionalKey(Schema.Array(Schema.Struct({ path: Schema.String, line: Schema.optionalKey(Schema.Int) }))),
+  inputRedacted: Schema.optionalKey(Schema.Boolean),
+  inputTruncated: Schema.optionalKey(Schema.Boolean)
+}
+export type PermissionAction = typeof PermissionAction.Type
+export const PermissionAction = Schema.Struct(PermissionActionFields)
 
 export const SessionReference = Schema.Union([
   Schema.TaggedStruct("acp", { sessionId: Schema.NonEmptyString }),
@@ -20,17 +46,25 @@ export type SessionReference = typeof SessionReference.Type
 export const Delivery = Schema.Struct({
   id: DeliveryId,
   target: AgentId,
-  sender: Actor,
+  sender: Sender,
   content: Schema.Union([
     Schema.TaggedStruct("prompt", { text: Schema.String }),
     Schema.TaggedStruct("compact", {}),
     Schema.TaggedStruct("carry-on", { text: Schema.String })
   ]),
+  // Evidence for automatic cache work, revalidated at dispatch. Manual work
+  // carries no cache evidence and keeps its ordinary queue semantics.
+  cache: Schema.optionalKey(Schema.Struct({
+    agentId: AgentId, sequence: EventSequence, session: Schema.NonEmptyString,
+    expiry: EpochMilliseconds, contextTokens: Schema.Int,
+    action: Schema.Literals(["flush", "compact"])
+  })),
   // A moved or cancelled request withdraws its delivery atomically.
   source: Schema.optionalKey(Schema.Union([
     Schema.TaggedStruct("permission", { id: PermissionRequestId }),
     Schema.TaggedStruct("question", { id: QuestionId }),
-    Schema.TaggedStruct("wait", { id: WaitId })
+    Schema.TaggedStruct("wait", { id: WaitId }),
+    Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles"]), id: Schema.NonEmptyString })
   ]))
 })
 export type Delivery = typeof Delivery.Type
@@ -50,6 +84,25 @@ export const WaitMember = Schema.Struct({
 })
 export type WaitMember = typeof WaitMember.Type
 
+// Usage is an optional numeric snapshot, never raw adapter metadata. `used`
+// is the latest reported context size. Terminal counters retain the adapter's
+// scope, which can cover the whole turn. They do not prove last-request usage.
+const TokenCount = Schema.Int.check(
+  Schema.isGreaterThanOrEqualTo(0),
+  Schema.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER)
+)
+export const TurnUsage = Schema.Struct({
+  used: Schema.optionalKey(TokenCount),
+  inputTokens: Schema.optionalKey(TokenCount),
+  cachedReadTokens: Schema.optionalKey(TokenCount),
+  cachedWriteTokens: Schema.optionalKey(TokenCount),
+  // These normalized request fields are absent unless a source reports them.
+  requestStartedAt: Schema.optionalKey(EpochMilliseconds),
+  cachedWrite5mTokens: Schema.optionalKey(TokenCount),
+  cachedWrite1hTokens: Schema.optionalKey(TokenCount)
+})
+export type TurnUsage = typeof TurnUsage.Type
+
 const ProcessIdentity = Schema.Struct({
   groupId: Schema.Int.check(Schema.isGreaterThanOrEqualTo(2)),
   bootId: BootId,
@@ -58,7 +111,7 @@ const ProcessIdentity = Schema.Struct({
   executable: Schema.NonEmptyString
 })
 
-const ThreadContent = Schema.Union([
+export const ThreadContent = Schema.Union([
   Schema.TaggedStruct("text", { text: Schema.String }),
   Schema.TaggedStruct("plan", { entries: Schema.Array(Schema.Struct({
     content: Schema.String,
@@ -73,7 +126,13 @@ const ThreadContent = Schema.Union([
     input: Schema.optionalKey(Schema.String),
     output: Schema.optionalKey(Schema.String)
   }),
-  Schema.TaggedStruct("file-change", { path: Schema.String, diff: Schema.String })
+  Schema.TaggedStruct("file-change", {
+    // The adapter's tool-call identity, independent of the thread item's id.
+    // Older events and adapter updates without an identity remain readable.
+    callId: Schema.optionalKey(Schema.NonEmptyString),
+    path: Schema.String,
+    diff: Schema.String
+  })
 ])
 
 const agent = { agentId: AgentId }
@@ -85,7 +144,7 @@ const account = { accountId: AccountId }
 
 // Event payloads only. Sequence, time and caller belong to the log envelope.
 // All text must pass through the engine's redactor before the log writer.
-export const Event = Schema.Union([
+export const EngineEvent = Schema.Union([
   Schema.TaggedStruct("AgentStarted", {
     ...agent,
     name: Schema.NonEmptyString,
@@ -109,12 +168,12 @@ export const Event = Schema.Union([
     process: Schema.optionalKey(ProcessIdentity),
     reloadable: Schema.Boolean
   }),
-  Schema.TaggedStruct("PromptSent", { ...delivery, sender: Actor, text: Schema.String }),
+  Schema.TaggedStruct("PromptSent", { ...delivery, sender: Sender, text: Schema.String }),
   Schema.TaggedStruct("ThreadItem", {
     ...agent, itemId: Schema.NonEmptyString, content: ThreadContent, replay: Schema.Boolean
   }),
   Schema.TaggedStruct("TurnStarted", { ...agent }),
-  Schema.TaggedStruct("TurnEnded", { ...agent, compact: Schema.Boolean }),
+  Schema.TaggedStruct("TurnEnded", { ...agent, compact: Schema.Boolean, usage: Schema.optionalKey(TurnUsage) }),
   Schema.TaggedStruct("StateChanged", { ...agent, state: LifecycleState }),
   Schema.TaggedStruct("ModeChanged", { ...agent, mode: Schema.String, level: PermissionLevel }),
   Schema.TaggedStruct("ModeRefused", { ...agent, mode: Schema.String, ceiling: PermissionLevel, reason: Schema.String }),
@@ -125,11 +184,12 @@ export const Event = Schema.Union([
     toolCallId: Schema.NonEmptyString,
     description: Schema.String,
     options: Schema.Array(PermissionOption).check(Schema.isMinLength(1)),
-    settingsWrite: Schema.Boolean
+    settingsWrite: Schema.Boolean,
+    ...PermissionActionFields
   }),
   Schema.TaggedStruct("PermissionAnswered", {
     ...permission,
-    answeredBy: Actor,
+    answeredBy: Caller,
     answer: Schema.Union([
       Schema.TaggedStruct("selected", { optionId: Schema.NonEmptyString }),
       Schema.TaggedStruct("cancelled", {})
@@ -159,7 +219,9 @@ export const Event = Schema.Union([
   Schema.TaggedStruct("DeliverySent", { ...delivery, method: RunMode }),
   Schema.TaggedStruct("DeliveryAccepted", { ...delivery }),
   Schema.TaggedStruct("DeliveryRequeued", { ...delivery, reason: Schema.String }),
-  Schema.TaggedStruct("DeliveryReturned", { ...delivery, sender: Actor, reason: Schema.String }),
+  Schema.TaggedStruct("DeliveryHeld", { ...delivery, reason: Schema.Literal("capacity") }),
+  Schema.TaggedStruct("DeliveryReleased", { ...agent, holdSequence: Schema.optionalKey(EventSequence) }),
+  Schema.TaggedStruct("DeliveryReturned", { ...delivery, sender: Sender, reason: Schema.String, cause: Schema.optionalKey(Schema.Literal("capacity")) }),
   Schema.TaggedStruct("DeliveryWithdrawn", { ...delivery, reason: Schema.String }),
   Schema.TaggedStruct("AgentCrashed", {
     ...agent, exitCode: Schema.NullOr(Schema.Int), signal: Schema.NullOr(Schema.String), stderr: Schema.String
@@ -174,20 +236,32 @@ export const Event = Schema.Union([
   Schema.TaggedStruct("AccountOutOfUsage", { ...account, resetAt: Schema.optionalKey(EpochMilliseconds) }),
   Schema.TaggedStruct("AccountAvailable", { ...account, cause: Schema.Literals(["usage reset", "owner cleared"]) }),
   Schema.TaggedStruct("HarnessChanged", { harness: HarnessSettings }),
-  Schema.TaggedStruct("DeviceAdded", { deviceId: DeviceId, name: Schema.String }),
-  Schema.TaggedStruct("DeviceRevoked", { deviceId: DeviceId }),
   // Keep this minimal: a refused request may contain a secret-setting value.
-  Schema.TaggedStruct("CommandRefused", { command: Schema.NonEmptyString, reason: Schema.String })
+  Schema.TaggedStruct("CommandRefused", { command: Schema.NonEmptyString, reason: Schema.String, sourceSequence: Schema.optionalKey(EventSequence) })
 ])
+// Later pieces merge their event unions here, in namespace order.
+// Keep each member type while avoiding Effect's tuple-recursion limit as the
+// shared event list grows. Engine-only field schemas are exported directly.
+const eventMembers: ReadonlyArray<typeof EngineEvent.members[number] | typeof BoardEvent.members[number] | typeof ClientEvent.members[number] | typeof RolesEvent.members[number]> = [
+  ...EngineEvent.members, ...BoardEvent.members, ...ClientEvent.members, ...RolesEvent.members
+]
+export const Event = Schema.Union(eventMembers)
 export type Event = typeof Event.Type
 
 export const EventEnvelope = Schema.Struct({
   sequence: EventSequence,
   eventId: EventId,
   occurredAt: EpochMilliseconds,
-  caller: Actor,
+  caller: Caller,
   requestId: Schema.optionalKey(RequestId),
   agentId: Schema.optionalKey(AgentId),
   event: Event
 })
 export type EventEnvelope = typeof EventEnvelope.Type
+
+export const eventGroups = [
+  { namespace: "engine", events: EngineEvent },
+  { namespace: "board", events: BoardEvent },
+  { namespace: "client", events: ClientEvent },
+  { namespace: "roles", events: RolesEvent }
+] as const

@@ -210,14 +210,14 @@ describe("command refused event", () => {
 
   // Catches (row 55): the refused event gaining a field for the request, which would copy the
   // request body (and any secret in it) into the event log.
-  it("has exactly the fields _tag, command and reason", () => {
+  it("has exactly the fields _tag, command, reason and optional sourceSequence", () => {
     const member = Event.members.find((candidate) =>
       candidate.ast._tag === "Objects" &&
       candidate.ast.propertySignatures.some((p) => p.name === "_tag" && (p.type as SchemaAST.Literal).literal === "CommandRefused")
     )
     expect(member, "CommandRefused member of Event").toBeDefined()
     const fields = (member!.ast as SchemaAST.Objects).propertySignatures.map((p) => String(p.name))
-    expect(fields.sort()).toEqual(["_tag", "command", "reason"])
+    expect(fields.sort()).toEqual(["_tag", "command", "reason", "sourceSequence"])
   })
 
   // Catches: a request body riding along and being kept: decoding strips or refuses it, and the

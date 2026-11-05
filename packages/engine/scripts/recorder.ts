@@ -1,9 +1,9 @@
 import { spawn } from "node:child_process"
-import { mkdir, mkdtemp, chmod, writeFile, realpath } from "node:fs/promises"
+import { mkdir, mkdtemp, chmod, writeFile, realpath, readFile, readdir } from "node:fs/promises"
 import { join, relative, isAbsolute } from "node:path"
 import { tmpdir } from "node:os"
 import { createInterface } from "node:readline"
-import type { HarnessSettings } from "@shephrd/contracts"
+import type { HarnessSettings, PermissionLevel } from "@shephrd/contracts"
 import * as Effect from "effect/Effect"
 import * as Logger from "effect/Logger"
 import { buildBaseEnvironment } from "../src/runner/baseEnvironment.ts"
@@ -71,6 +71,11 @@ interface RecordOptions {
   readonly homeDirectory: string
   readonly parentEnvironment: Readonly<Record<string, string | undefined>>
   readonly prompt: string
+  readonly scenario?: string
+  readonly permission?: PermissionLevel
+  readonly harness?: string
+  /** An explicit filename requires exactly one selected harness. */
+  readonly outputPath?: string
   readonly errorSamples?: ReadonlyArray<ErrorSample>
   /** The owner-run entry point also probes authentication with an empty home. */
   readonly captureSignedOut?: boolean
@@ -82,10 +87,58 @@ type RecordResult =
   | { readonly harness: string; readonly status: "failed"; readonly reason: FailureReason }
 type Frame = Record<string, any>
 
-type FailureReason = "start" | "initialize" | "read-only mode" | "prompt" | "timeout" | "other"
+type FailureReason = "start" | "initialize" | "read-only mode" | "permission mode" | "prompt" | "timeout" | "other"
 class RecordingError extends Error {
   readonly reason: FailureReason | undefined
   constructor(message: string, reason?: FailureReason) { super(message); this.reason = reason }
+}
+
+// A leader closing its streams says nothing about descendants in its group.
+// Keep the escalation owned by cleanup until no executable group member remains.
+async function cleanupGroup(pid: number | undefined, closed: Promise<unknown>): Promise<void> {
+  if (pid === undefined) { await closed; return }
+  const signal = (name: NodeJS.Signals) => {
+    try { process.kill(-pid, name) }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw new RecordingError("Unable to terminate recording process group")
+    }
+  }
+  const exists = () => {
+    try { process.kill(-pid, 0); return true }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ESRCH") return false
+      throw new RecordingError("Unable to inspect recording process group")
+    }
+  }
+  const running = async () => {
+    if (!exists()) return false
+    if (process.platform !== "linux") return true
+    // Linux can retain killed orphans as zombies until init reaps them.
+    // They cannot execute or hold the workspace. Inspect only state and group.
+    for (const entry of await readdir("/proc")) {
+      if (!/^\d+$/.test(entry)) continue
+      let stat: string
+      try { stat = await readFile(`/proc/${entry}/stat`, "utf8") }
+      catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT" || (error as NodeJS.ErrnoException).code === "ESRCH") continue
+        throw new RecordingError("Unable to inspect recording process group")
+      }
+      const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ")
+      if (Number(fields[2]) === pid && fields[0] !== "Z" && fields[0] !== "X") return true
+    }
+    return false
+  }
+  const pause = () => new Promise<void>((resolve) => setTimeout(resolve, 25))
+  signal("SIGTERM")
+  const graceful = Date.now() + 1000
+  while (exists() && Date.now() < graceful) await pause()
+  if (exists()) signal("SIGKILL")
+  await closed
+  const forced = Date.now() + 1000
+  while (await running()) {
+    if (Date.now() >= forced) throw new RecordingError("Recording process group cleanup was not confirmed")
+    await pause()
+  }
 }
 
 // Use the already resolved program, without adapter arguments, a shell or account credentials.
@@ -107,21 +160,23 @@ async function cliVersion(settings: HarnessSettings, environment: Record<string,
   signal.addEventListener("abort", kill, { once: true })
   const timer = setTimeout(kill, 10_000)
   if (signal.aborted) kill()
+  const closed = new Promise<number | null>((resolve) => child.once("close", resolve))
   try {
-    const code = await new Promise<number | null>((resolve) => child.once("close", resolve))
+    const code = await closed
     if (failed || code !== 0) return undefined
     const line = output.split(/\r?\n/).find((line) => line.trim())
     return line === undefined ? undefined : scrub(line.trim()).trim().slice(0, 100) || undefined
   } finally {
     clearTimeout(timer)
     signal.removeEventListener("abort", kill)
+    await cleanupGroup(child.pid, closed)
   }
 }
 
 const safeName = (name: string) => /^[a-z][a-z0-9-]*$/.test(name)
 
 async function recordOne(settings: HarnessSettings, environment: Record<string, string>, workspace: string,
-  prompt: string, scrub: (text: string, sessionIds?: ReadonlySet<string>) => string, signal: AbortSignal, signedOut?: (text: string) => void) {
+  prompt: string, scrub: (text: string, sessionIds?: ReadonlySet<string>) => string, signal: AbortSignal, permission: PermissionLevel, signedOut?: (text: string) => void) {
   // No ACP debug callbacks: these are the actual transport frames, scrubbed before retention.
   const child = spawn(settings.adapterPath, [...settings.adapterArguments], { cwd: workspace, env: environment, detached: true, stdio: ["pipe", "pipe", "pipe"] })
   const terminate = (signal: NodeJS.Signals) => {
@@ -214,15 +269,15 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
     if (![1, 2].includes(initialized.protocolVersion)) throw new RecordingError("Adapter negotiated an unsupported protocol version")
     // Shipped adapters can report a v1-shaped response even with protocolVersion 2.
     const v2 = initialized.info !== undefined
-    stage = "read-only mode"
+    stage = permission === "read-only" ? "read-only mode" : "permission mode"
     const session = await request("session/new", { cwd: workspace, mcpServers: [] })
     const mode = (session.configOptions as Array<Frame> | undefined)?.find((option) => option.category === "mode")
     if (!mode) throw new RecordingError("Adapter has no mode configuration option")
-    const value = settings.permissionMapping["read-only"]
+    const value = settings.permissionMapping[permission]
     const configId = mode.configId ?? mode.id
     const changed = await request("session/set_config_option", { sessionId: session.sessionId, configId, ...(v2 ? { type: "id" } : {}), value })
     if (!changed.configOptions?.some((option: Frame) => (option.configId ?? option.id) === configId && option.currentValue === value)) {
-      throw new RecordingError("Adapter did not confirm read-only mode")
+      throw new RecordingError("Adapter did not confirm the selected permission mode")
     }
     stage = "prompt"
     const idle = v2 ? new Promise<void>((resolve, reject) => { idleResolve = resolve; idleReject = reject }) : Promise.resolve()
@@ -239,18 +294,20 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
     signal.removeEventListener("abort", abort)
     idleReject = undefined
     child.stdin.end()
-    terminate("SIGTERM")
-    const killTimer = setTimeout(() => terminate("SIGKILL"), 1000)
-    await closed
-    clearTimeout(killTimer)
-    await reader
-    lines.close()
+    try { await cleanupGroup(child.pid, closed) }
+    finally { await reader; lines.close() }
   }
 }
 
 // The recording itself, apart from Effect, so a caller that owns a cancellation
 // signal (`pnpm live-check`) can await the end of the recorder's process-group cleanup.
 export const runRecording = async (options: RecordOptions, signal: AbortSignal) => {
+    const harnesses = options.harnesses.filter((harness) => options.harness === undefined || harness.id === options.harness)
+    if (options.harness !== undefined && harnesses.length === 0) throw new RecordingError("Unknown selected harness")
+    if (options.outputPath !== undefined && harnesses.length !== 1) throw new RecordingError("An output filename requires one harness")
+    if (options.scenario !== undefined && !safeName(options.scenario)) throw new RecordingError("Invalid scenario name")
+    const permission = options.permission ?? "read-only"
+    if (!["read-only", "ask", "edit", "full"].includes(permission)) throw new RecordingError("Invalid permission level")
     const lexicalTemporaryPath = relative(tmpdir(), options.temporaryRoot)
     if (lexicalTemporaryPath.startsWith("..") || isAbsolute(lexicalTemporaryPath)) throw new RecordingError("Recording workspaces must be inside the system temporary folder")
     for (const sample of options.errorSamples ?? []) {
@@ -278,29 +335,29 @@ export const runRecording = async (options: RecordOptions, signal: AbortSignal) 
     for (const source of [options.parentEnvironment, ...options.harnesses.map((harness) => harness.accountVariables ?? {})]) {
       for (const value of Object.values(source)) allEnvironment[String(secretIndex++)] = value
     }
-    for (const harness of options.harnesses) {
+    for (const harness of harnesses) {
       if (!harness.settings) { results.push({ harness: harness.id, status: "skipped", reason: "Harness is not installed" }); continue }
       try {
         const workspace = await mkdtemp(join(options.temporaryRoot, `${harness.id}-`))
         await chmod(workspace, 0o700)
         const environment = buildBaseEnvironment({ parent: options.parentEnvironment, ...(harness.accountVariables ? { accountVariables: harness.accountVariables } : {}) })
         const scrub = (text: string, sessionIds?: ReadonlySet<string>) => scrubText(text, { homeDirectory: options.homeDirectory, workspace, environment: { ...allEnvironment, ...environment }, ...(sessionIds ? { sessionIds } : {}) })
-        const recording = await recordOne(harness.settings, environment, workspace, options.prompt, scrub, signal)
+        const recording = await recordOne(harness.settings, environment, workspace, options.prompt, scrub, signal, permission)
         const fallback = recording.version ? undefined : await cliVersion(harness.settings,
           buildBaseEnvironment({ parent: options.parentEnvironment }), workspace, scrub, signal)
         const version = recording.version ?? fallback ?? "unknown"
         const versionSource = recording.version ? "adapter" : fallback ? "cli" : "unknown"
-        const header = { type: "transcript_start", provider: harness.id, protocol: "acp", version, scenario: "read-only-greeting", metadata: { protocolVersion: recording.protocolVersion, versionSource } }
+        const header = { type: "transcript_start", provider: harness.id, protocol: "acp", version, scenario: options.scenario ?? "read-only-greeting", metadata: { protocolVersion: recording.protocolVersion, versionSource } }
         const text = [header, ...recording.entries, { type: "runtime_exit", status: "success" }].map((entry) => scrub(JSON.stringify(entry), recording.sessionIds)).join("\n") + "\n"
-        const file = join(options.outputDirectory, `${harness.id}.ndjson`)
+        const file = options.outputPath ?? join(options.outputDirectory, `${harness.id}.ndjson`)
         await writeFile(file, text, { mode: 0o600 })
         // The caller owns outputDirectory. Do not echo its private home path in results.
         results.push({ harness: harness.id, status: "recorded", file: scrub(file), workspace, droppedExtensionFrames: recording.droppedExtensionFrames })
       } catch (error) { markFailed(harness.id, error) }
     }
-    const samples: ErrorSample[] = [...options.errorSamples ?? []]
+    const samples: ErrorSample[] = (options.errorSamples ?? []).filter((sample) => options.harness === undefined || sample.harness === options.harness)
     if (options.captureSignedOut) {
-      for (const harness of options.harnesses) {
+      for (const harness of harnesses) {
         if (!harness.settings || results.find((result) => result.harness === harness.id)?.status !== "recorded") continue
         try {
           const homeDirectory = await mkdtemp(join(options.temporaryRoot, `${harness.id}-signed-out-home-`))
@@ -314,7 +371,7 @@ export const runRecording = async (options: RecordOptions, signal: AbortSignal) 
           let captured: string | undefined
           try {
             await recordOne(harness.settings, environment, workspace, options.prompt,
-              (text) => scrubText(text, { homeDirectory: options.homeDirectory, workspace, environment: { ...allEnvironment, ...environment } }), signal,
+              (text) => scrubText(text, { homeDirectory: options.homeDirectory, workspace, environment: { ...allEnvironment, ...environment } }), signal, permission,
               (text) => { captured = text })
           } catch (error) {
             // An authentication refusal is the expected outcome of this probe.

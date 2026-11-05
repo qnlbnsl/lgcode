@@ -15,9 +15,9 @@ import type * as Redactor from "../../src/log/Redactor.ts";
 import * as Views from "../../src/views/Views.ts";
 import { incarnationOf, makeFakeRunner } from "../support/fakeRunner.ts";
 import {
-  agentCredential, agentIdOf, appendSetup, call, deviceCredential, eventOf, failureOf, headSequence, logAfter,
+  agentCredential, agentIdOf, appendSetup, call, eventOf, failureOf, headSequence, logAfter,
   makeFakeSecrets, makeRig, ownerCredential, provideRig, readLog, removeRig, rotateToken, seedAccount, seedAgent,
-  seedDevice, seedHarness, success, type Fakes, type Rig,
+  seedHarness, success, type Fakes, type Rig,
 } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import {
@@ -248,11 +248,11 @@ it.live("5.5 runner after commit: catches answerPermission called inside the wri
     expect(seen).toEqual(["answered"]);
   })).pipe(Effect.orDie));
 
-for (const [who, optionId] of [["the owner", "always"], ["a device", "once-full"]] as const) {
+for (const [who, optionId] of [["the owner", "always"], ["the owner", "once-full"]] as const) {
   it.live(`5.5 ${who} answers an agent-held request: catches the owner being held to the holder rule, to the agent ceiling, or recorded as someone else`, () =>
     withRig((fakes) => Effect.gen(function* () {
       const { id } = yield* family(fakes);
-      const credential = who === "the owner" ? ownerCredential : deviceCredential((yield* seedDevice()).credential);
+      const credential = ownerCredential;
       const before = yield* headSequence;
       success(yield* call(credential, "answer", answer(id, optionId)));
       expect(tagged(yield* logAfter(before), "PermissionAnswered")).toEqual([

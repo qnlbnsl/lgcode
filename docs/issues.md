@@ -974,11 +974,13 @@ Unit 6b: `accounts/SecretStore.ts` keeps the store-before-commit order, so a com
 ## 58. A refusal by the state table or by rights is stored as the request's receipt
 
 Found: 2026-11-01, in the focused review of unit 5b.
-State: open; the current behaviour is kept until the plan's owner of row 30 rules on it.
+State: the receipt policy is retained. The board reply retry defect is fixed in foundation finding FR-006 on 2026-11-04.
 
 What happens: when the state table or the rights check refuses a command, the handler stores the refusal as the receipt for that caller and request id (`packages/engine/src/commands/CommandHandler.ts`, the refusal branch of `execute`). A retry with the same request id after the agent's state has changed returns the old "command refused".
 Why it matters: row 30 names only "no usable account" and "database busy" as temporary refusals that write no receipt. A state refusal also depends on state, so a client that retries with the same request id never sees the new outcome.
-What should happen: either the plan's decision log confirms that a state or rights refusal is final for its request id, and clients must send a new request id, or these refusals stop writing a receipt. Engine-lead's reading for now: it is final, as row 30 reads.
+What changed: the owner-approved foundation fix scope keeps a definite refusal final for that attempt. The web board reply form preserves the draft and ends the attempt when it receives the server's `CommandError`. The owner's next send gets a fresh request identifier, so restored membership is checked again. An uncertain transport or connection outcome keeps the same identifier for unchanged text. A confirmed write is never resent after a failed refresh.
+
+Verification: `packages/web/test/subjects/board-handler-recovery.test.tsx` exercises the real planner, SQLite receipts and views through the reply form. It removes and restores the original author's channel membership, proves that the old identifier still replays the refusal, and sends the unchanged draft successfully with a fresh identifier. It also loses a response after commit, as both a typed transport failure and a connection exception, and proves that an unchanged retry creates only one stored reply. The board contract and criterion 7.3 now state this retry policy.
 
 ## 59. A read failure inside a writer turn latches the whole writer
 
@@ -1232,7 +1234,7 @@ settings paths are also owner-routed.
 ## 74. Requests asked by a crashed or stopped agent remain open
 
 Found: 2026-11-01, in the review of unit 5c.
-State: crash permission cancellation is fixed in unit 6c. Stop and recovery closure remain open, and question closure needs an owner decision (issue 113).
+State: Crash permission cancellation is fixed in unit 6c. Stop permission cancellation is fixed in foundation unit 1b and verified by the composed client regression on 2026-11-05. The historical recovery and question decisions are recorded below and in issue 113.
 
 What happens: no current writer emits `PermissionCancelled` or closes the
 questions asked by an agent that crashes or stops. Moving the subjects it
@@ -1271,7 +1273,9 @@ The crash cancellation in `packages/engine/src/recovery/crash.ts` does not
 cover this stop path.
 Score: MINOR, severity 4 × fallout 3 × probability 6 = 72, band schedule.
 The owner deferred this finding on 2026-11-03.
-The stop closure remains open under this issue.
+The stop closure was deferred under this issue at that time.
+
+Update on 2026-11-05: The stop command now cancels the asker's permissions and withdraws their queued notices. The foundation regression verifies simultaneous asking and holding, transfer of a grandchild's duty, stop and resume, a real owner wait after new work, and the release of the prior holder's queue. Questions intentionally remain open. Issue 313 records the same stop cause.
 
 ## 75. The wait contract has no owner waiter
 
@@ -1371,6 +1375,21 @@ What unit 6a changed: each process retains the current delivery and emits
 one `promptReply` followed by one `turnEnded` for it. Version 2 waits for
 both the protocol reply and idle state, in either order. A later idle error
 is therefore retained even when the prompt acknowledgement arrived early.
+
+Found again: 2026-11-04, in foundation review record FR-016. A capacity
+release can resend an unaccepted delivery with the same identifier before
+the previous attempt's end is consumed. The identifier check alone then
+ends the retry and clears the capacity outage count.
+
+What the foundation fix changed: `Runner.prompt` and `Runner.compact` take
+the sequence of the reserved `DeliverySent` event. The runner retains that
+sequence for the turn and includes it as `sentSequence` on `turnEnded`.
+The delivery planner requires both the delivery identifier and the send
+sequence to match the current turn. The stored event format is unchanged.
+The regression in `packages/engine/test/runner/capacity-attempt-end.test.ts`
+delivers an old end after owner and holder releases, before and after the
+retry is accepted. It checks that the retry keeps working, its outage count
+stays one, and a waiting parent wakes only after the retry's own completion.
 
 ## 84. A queued answer to a stopped or crashed agent was lost
 
@@ -2821,6 +2840,26 @@ table below names, for each one, the lower-level test file that covers it, or
 says "not covered". A file is named only when it exists in
 `packages/engine/test` and its test titles speak about the clause. Its
 assertions were matched by title, not audited line by line.
+
+The foundation review also identified board-specific proof gaps in records
+FR-047, FR-062, FR-063, FR-072, FR-076, FR-101, FR-112, and FR-122.
+The collection and restart scenarios now correlate board manifests with
+delivery identifiers and count through an independent completed prompt.
+The acknowledgement matrix uses actual questions, returned deliveries,
+capacity holds, and both wait modes.
+The recovered withdrawal matrix invokes the dispatcher, reactor, and answer
+command, and checks the order within each committed batch.
+The error matrix sends authenticated current-incarnation events through the
+runner handler and reopens the database after each error.
+The deferral matrix covers both stages and runs a mutual-question control
+with the sheepdog active.
+The alert matrix covers reverse resolution order, a fresh baseline from
+rebuilt state, and an owner wait whose status and stream are offset.
+The recovery matrices cover complete committed checkpoints, actual service
+kills, repeated reactor runs, and later replies and lifecycle changes.
+These checks live in `packages/engine/test/board/` and
+`packages/engine/test/acceptance/board-*.test.ts`.
+They do not close the other omissions listed below.
 
 | Clause not checked by the acceptance suite | Covered at a lower level by |
 |---|---|
@@ -5375,3 +5414,2398 @@ item instead of dropping the terminal or failing the drain.
 Add a runner-to-log test for the short explicit-secret collisions.
 The existing terminal tests use a long secret, and the existing structure
 tests exercise the event-log redactor without this publication step.
+
+## 300. `OwnerNeeded.reason` is free text with three producers
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: `OwnerNeeded.reason` is free text, written in three places: `routing/holders.ts:49`, `recovery/crash.ts:69` and `routing/deliveries.ts:194`. A client that maps reasons to alert kinds breaks without a sign if a reason string changes.
+What should happen: The client API plan pins the reasons with a contract test.
+Why it matters: A changed reason string would silently stop an owner alert from being raised.
+
+## 301. Effect's `RpcGroup.merge` silently replaces a command with the same name
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: In Effect 4.0.5, `RpcGroup.merge` replaces a command whose name is already present, and says nothing.
+What should happen: Composing several command groups needs a test that every command name is unique.
+Why it matters: A command could vanish from the served API without any error.
+
+## 302. A delivery's text is wrapped as data only for an agent sender
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: `packages/engine/src/routing/envelope.ts:23` wraps a delivery's text as data only when its sender is an agent (`sender._tag === "agent"`). A new sender kind, such as a service or a piece, would go out unwrapped.
+What should happen: The rule becomes "every sender but the owner". The client API contract's edit E15 makes that change.
+Why it matters: Unwrapped text from a new sender could be read by an agent as an instruction.
+
+## 303. The root `pnpm -r test` runs no tests, and the engine package has no `test` script
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: The root `pnpm -r test` passes without checking anything (client API row 111). The engine package has only a `typecheck` script, so `pnpm --filter @shephrd/engine test` also runs nothing. Tests run only through the root `vitest run`.
+What should happen: Not decided. The real gate is the root `pnpm check`.
+Why it matters: A passing test command that checks nothing gives false confidence.
+
+## 304. Question rows from a stopped or crashed asker stay open
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: Engine question rows from a stopped or crashed asker stay open in the views, and answering one queues a reply to a dead agent (client API row 107).
+What should happen: Not decided. Question closure stays with issue 113.
+Why it matters: The owner is shown questions nobody can receive an answer to.
+
+## 305. Secret collection at start-up deletes the secrets a piece keeps
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: `collectSecrets` deletes every secret that no account uses, so a piece cannot keep its own secret.
+What should happen: Client API edit E27 (row 94) lets a piece keep its secrets.
+Why it matters: A piece that needs a stored secret would lose it at the next start.
+
+## 306. `packages/client` imports Node modules at its root, so a browser cannot use it
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: The client package imports Node modules at its root.
+What should happen: Client API edit E26 (row 110) makes the package usable from a browser.
+Why it matters: The web page cannot use the shared client library.
+
+## 307. The client's stream dispatch calls `subscribe` for every streaming command
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: The stream dispatch in `packages/client` calls `subscribe` for every streaming command.
+What should happen: Client API edit E24 (row 109) dispatches each streaming command to its own call.
+Why it matters: A streaming command other than `subscribe` would read the wrong stream.
+
+## 308. The client's typed decoder rejects an unknown event tag
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: The client's typed Remote Procedure Call decoder rejects an unknown event tag before any handler sees it, so a newer server stops an older client's stream.
+What should happen: Client API edit E25 (row 109) lets a client pass an unknown tag through.
+Why it matters: Adding an event kind to the server would break every client that is not updated.
+
+## 309. Engine events have no size bound
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: One large engine event can exceed a message budget (client API row 105).
+What should happen: Not decided.
+Why it matters: An oversized event cannot be sent to a client.
+
+## 310. A phone alert can arrive twice
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: A phone alert can arrive twice, because delivery is at least once (client API row 106).
+What should happen: Not decided. The duplicate is accepted until a rule says otherwise.
+Why it matters: The owner may be alerted twice for one matter.
+
+## 311. ntfy's default access can leave topics open
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: The default access on an ntfy server can leave topics open, and Shephrd cannot check the owner's server (client API row 115). The setup document advises deny-all.
+What should happen: The owner sets deny-all on the ntfy server, as the setup document advises.
+Why it matters: Anyone who learns a topic name could read the owner's alerts or send false ones.
+
+## 312. The `accounts` read and `AccountChanged` carry environment values as entered
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: A plain value under a name that does not look like a secret reaches every client and the log (`contracts/src/accounts.ts:9-16`, client API row 141).
+What should happen: Not decided.
+Why it matters: A secret stored under an ordinary name would be written to the log and shown to clients.
+
+## 313. A permission request's row stayed open after `stop`
+
+Found: 2026-11-03, while planning the client application programming interface (API).
+State: fixed by the stop command and verified by the foundation client regressions on 2026-11-05.
+
+What happened: A stopped asker's permission could remain open for its obsolete process.
+
+What changed: The stop command cancels the asker's permissions and withdraws their queued notices. It transfers duties held for other askers. Questions remain open. The composed regression stops and resumes an asker that also holds a grandchild's permission. It isolates the preserved question, completes a real owner wait after new work, and positively drains the prior holder's queue before checking that obsolete notices were never sent. The original stop-batch and parent-wait assertions remain covered.
+
+Why it matters: A resumed session does not inherit a permission that only its old process could answer.
+
+## 314. A failing alert adds one event every 10 minutes
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: An alert that keeps failing adds one small event every 10 minutes while the carrier is down (client API row 131).
+What should happen: Not decided.
+Why it matters: A long outage grows the event log without end.
+
+## 315. The number of agents in `client.snapshot` is not capped
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: Stopped agents can grow the snapshot, and only a fixture test bounds the whole (client API row 137).
+What should happen: Not decided.
+Why it matters: A long-lived installation could exceed the snapshot's size budget.
+
+## 316. An answered question's withdrawal can strand a reloaded holder as working
+
+Found: 2026-11-03, while planning the client API plan.
+State: fixed in the central withdrawal guard, with producer integration verified on 2026-11-05.
+
+What happens: A withdrawal for an answered question can leave a reloaded holder marked as working with nothing to send (`routing/questions.ts:27`, `recovery/reload.ts:84-98`).
+What should happen: Unit 1b fixes it through edit E17 (client API row 173).
+Why it matters: The agent never takes new work and the team stalls.
+
+The central withdrawal repair is now exercised through the real answer
+command, dispatcher, and board reactor in
+`packages/engine/test/board/recovered-withdrawals.test.ts`.
+Each case reconstructs the reloaded state and opens an engine wait.
+The final withdrawal, idle transition, and wait resolution must share a
+request identifier and appear in that order.
+Queued and sent controls retain the open wait.
+
+## 317. `SecretStore.resolve` cannot tell a missing value from a failed read
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: `accounts/SecretStore.ts:66-72`: `resolve` returns nothing both for a missing value and for a failed read. The carrier treats both as a failed attempt (client API row 168).
+What should happen: Not decided.
+Why it matters: A caller cannot report the real cause of a failure.
+
+## 318. `project` gives a piece's reducer placeholder envelopes
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: `routing/waits.ts:28-31`: `project` gives a piece's reducer placeholder envelopes, with the caller owner and time zero. A reducer now reads only the event and the sequence (client API row 161).
+What should happen: Not decided.
+Why it matters: A reducer that reads more than the event and the sequence would see false values.
+
+## 319. A very large reply cannot reach a very slow link
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: A reply of about 3 mebibytes cannot reach a link of about 500 kilobits per second, because the link misses two heartbeats on the read connection (client API row 160).
+What should happen: Not decided.
+Why it matters: A client on a very slow link cannot read a very large reply.
+
+## 320. Another local user can hold the web server's loopback port while it is down
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: While the web server is down, another local user can hold its loopback port and serve a long-cached page (client API row 167).
+What should happen: The owner is told. Not otherwise decided.
+Why it matters: A browser could be shown a page that did not come from Shephrd.
+
+## 321. An agent that runs `shephrd client subscribe` reads events with no data envelope
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: This is how the engine's `subscribe` works today (client API row 166).
+What should happen: Not decided.
+Why it matters: Event text read by an agent is not marked as data, so it could be read as an instruction.
+
+## 322. `runner/translate.ts` drops the tool-call id from file-change content
+
+Found: 2026-11-03, while planning the client API plan.
+State: fixed and independently verified in the foundation fix run.
+
+What happened: A Codex diff lost the tool-call identity before it reached the event log.
+What changed: Both diff shapes retain the optional `content.callId` through the runner and persistence.
+The web permission view joins that field to the request's `toolCallId`.
+It no longer treats an independently generated thread-item identity as a tool-call identity.
+Old file-change events still decode, and a missing correlation keeps the fixed missing-input warning.
+The runner regression covers two edits of one path, unrelated calls, a locations-only request, and redacted diff text.
+The web regression renders both translated diff shapes and checks that only the matching action is shown.
+Why it matters: A client cannot show which request a changed file belongs to.
+
+## 323. A Herdr pane starts from Herdr's environment, not the engine's
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: A Herdr pane's command starts from Herdr's environment and not the engine's, so `SHEPHRD_WEB_PASSWORD` could reach it (client API row 188, TM-PB-6).
+What should happen: The interactive mode plan clears `SHEPHRD_WEB_PASSWORD` in a pane's command.
+Why it matters: An agent in a pane could read the owner's web password.
+
+## 324. The engine design still names paired devices and device credentials
+
+Found: 2026-11-03, while planning the client API plan.
+State: open.
+
+What happens: `docs/specs/2026-11-01-engine-design.md` still names paired devices and device credentials.
+What should happen: Client API rows 184 and 189 replace those parts, so the design's text should be brought up to date.
+Why it matters: A reader of the design would build a pairing that was dropped.
+
+## 325. A board question's author looks settled to the engine
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: An agent that posts a question needing a reply, then ends its turn, counts as settled in `routing/waits.ts:settled`, so a `wait` on it ends early.
+What should happen: Not decided.
+Why it matters: A parent's wait ends before the question is answered.
+
+## 326. Board posts cannot be deleted or purged
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: A post's text stays in `board.PostWritten`, in every wake's `DeliveryQueued`, in the engine's `PromptSent`, in client caches and in harness session files. Command receipts copy every committed envelope, including post text and wake bodies. The log is append-only. A purge path is not planned (board review round 1, threat m3, and round 2, R2-TM-4).
+What should happen: Not decided. Any purge path must also cover the receipts table.
+Why it matters: A secret posted by mistake cannot be removed.
+
+## 327. No rule makes every piece size its events against the listener's limit
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: The network listener's 1 mebibyte message limit bounds piece events and read pages. The board caps a wake body at 256 kibibytes and a read page at 512 kibibytes, but nothing makes every piece do the same (board review round 1, threat M5).
+What should happen: Not decided.
+Why it matters: A piece event over the limit could not be sent.
+
+## 328. Channels are not a confidentiality boundary
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: Every agent runs as the owner's Unix user and can read the event log on disk, so any agent can read every channel's posts. SECURITY.md accepts this for now (board review round 1, threat m2).
+What should happen: Not decided. Accepted for now.
+Why it matters: A private channel is not private from other agents.
+
+## 329. The engine checks the permission ceiling at `start` but not at `prompt`
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: The engine's design states the rule for `prompt` too (`commands/prompt.ts`, `identity/ceiling.ts`) (board review round 2, logic m7).
+What should happen: The ceiling is checked at `prompt` as the design states.
+Why it matters: A prompt could ask for more than the ceiling allows.
+
+## 330. The agents view keeps only an agent's current mode
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: `ModeChanged` overwrites the start ceiling, which survives only in `AgentStarted`. A piece that needs the ceiling must keep it itself (board review round 2, threat S2).
+What should happen: Not decided.
+Why it matters: Each piece that needs the ceiling must repeat the bookkeeping.
+
+## 331. The board's view keeps every post's text in memory
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: Posts cannot be deleted, so the service's memory grows with board history (board review round 2, threat S1).
+What should happen: Not decided.
+Why it matters: A long-running service uses more memory without bound.
+
+## 332. Recovery leaves an interrupted agent with a session that cannot reload, and writes no event
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: A follower of the board must apply the `waits.ts` test itself (board review round 2, R2-A3).
+What should happen: Not decided.
+Why it matters: Each follower may judge the same agent differently.
+
+## 333. A hang in the middle of a turn is not caught by the board
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: A hang in the middle of a turn ends no turn, so the board's reminder for an unanswered question never fires. A turn's end sends one reminder, and the next marks the agent `no-answer` and tells the asker once (board contract v15, rows 153 and 156). Only the roles plan's sheepdog catches a hang, at its two-hour runaway limit (board review round 3, logic M4, threat T3-6).
+What should happen: Not decided. The owner accepted this as a stated limit on 2026-11-03.
+Why it matters: The asker waits up to two hours for an agent that has hung.
+
+## 334. Open questions that the owner writes have no per-author cap
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: The 64-question cap applies to agents only.
+What should happen: Not decided.
+Why it matters: The owner could fill the board with open questions.
+
+## 335. The dispatcher waited after a send-time withdrawal
+
+Found: 2026-11-03, while planning the message board plan.
+State: fixed. Its regression was strengthened on 2026-11-05 for foundation
+review record FR-066.
+
+What happens: The dispatcher waited instead of going on to the agent's next queued delivery (board review round 3, logic m4).
+What should happen: The client API contract's item 15 requires it to go on (ruling L23, `ced973b`), so the engine must be changed to match.
+Why it matters: An agent's queue stalls behind a delivery that was withdrawn.
+
+Validation: Both refused and thrown reach checks now queue three entries.
+The runner must receive exactly the reachable successor, with its valid
+incarnation. The withdrawn entry remains absent, and the third entry stays
+queued. Temporary duplicate-send and continuation-overdrain faults fail the
+corrected assertions.
+
+## 336. A refused duty is retried after every later batch that touches it
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: With the board's reactor written as level rules, a duty the engine keeps refusing is retried after each later batch that touches it, and each retry writes one `CommandRefused`.
+What should happen: Not decided.
+Why it matters: A defect that makes a reactor batch always fail would grow the log by one event per touching batch.
+
+## 337. The dispatcher wrote a send-time withdrawal without its wait checks
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: A parent's wait on an idle target could stay open (board review round 4, logic m7).
+What should happen: Client API v5 edit E18 requires the wait checks (lead ruling L30).
+Why it matters: A parent waits for a target that will never answer.
+
+## 338. Alerts for matters that exist before the alert reactor's first start are never raised
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: The alert reactor raises `baseline` alerts at its first start by a level scan over the current views, but a piece's alert source is a pure function of one envelope and offers no scan. An open board post that needs the owner's reply, if it exists before that first start, never gets an alert. This matters only if the board lands before the alert reactor (client API unit 6a).
+What should happen: Not decided.
+Why it matters: The owner would not be alerted to a question that was already waiting.
+
+## 339. A very full board wake is larger than 256 kibibytes in the log
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: A `DeliveryQueued` and a `PromptSent` can exceed 256 kibibytes, because the engine's envelope and the event's fields are added to a 256 kibibyte body. In `client.subscribe` they become `client.Oversized` markers, so the owner's phone must tap to see them.
+What should happen: Accepted (board row 127). Recorded so it does not look like a bug.
+Why it matters: Without this note the oversized markers look like a defect.
+
+## 340. A piece's ids are treated as text by the redactor unless the piece adds table entries
+
+Found: 2026-11-03, while planning the message board plan.
+State: open.
+
+What happens: The engine's redactor at `9e386b0` has fixed structure tables (`log/redactionStructure.ts`) that name each id field. The client API contract v12 has no edit or table for a piece's ids.
+What should happen: The board adds its entries as B13. The roles and client API plans must do the same.
+Why it matters: A piece that forgets gets its ids redacted as text.
+
+The roles persistence proof was strengthened on 2026-11-04 for foundation review
+finding FR-067. A nonempty collision batch now passes through the real redactor
+and event writer. The test checks Structured Query Language (SQL) event rows,
+receipt envelopes, agent and board joins, read marking, and rebuilt equality.
+Free text remains redacted. A temporary roles-only writer mutation is rejected
+by this test while the older isolated and empty-event checks still pass.
+This closes the roles proof gap without claiming first-use execution.
+
+## 341. A "model at capacity" error is returned to the sender as a failed delivery
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: A "model at capacity" or "529 overloaded" error is returned to the sender as a failed delivery (`packages/engine/src/runner/classify.ts:classifyError`, `routing/deliveries.ts:failed`), which wakes the parent with a prompt for each error.
+What should happen: Decision row 11, WS-7b, holds the delivery and releases it later.
+Why it matters: A capacity outage wakes parents again and again.
+
+## 342. No event records an agent's token or prompt-cache usage
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `runner/translate.ts` ignores every session update except message chunks, plan and tool calls.
+What should happen: Decision row 11, WS-7c, records usage.
+Why it matters: Compaction cannot be timed for Codex or other harnesses.
+
+## 343. A standing rule answered from outside the engine arrives after the request was delivered
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: The request has already been delivered to an idle holder, so the holder still pays a wake.
+What should happen: Decision row 11, WS-7a, answers it inside the engine.
+Why it matters: Each such request costs a full agent turn.
+
+## 344. The runner drops the tool `kind` and the permission request's own `rawInput`
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `packages/engine/src/runner/translate.ts:37-41` and `packages/engine/src/runner/AcpRunner.ts:400-416` drop them, so nothing in the log says which tool asked for a permission or exactly what it will run.
+What should happen: The roles plan's WS-7a proposes optional fields (row 53).
+Why it matters: A standing rule cannot match a request precisely.
+
+## 345. Resuming a crashed agent queues no carry-on for an unfinished delivery
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: A delivery the agent had accepted but not finished gets no carry-on (`packages/engine/src/commands/resume.ts:48`, `packages/engine/src/recovery/reload.ts:80-98`), so a reloaded agent sits idle.
+What should happen: The roles' crash rule sends its own carry-on prompt (row 42).
+Why it matters: The resumed agent does nothing until someone prompts it.
+
+## 346. The board marks a capacity-returned wake undeliverable within seconds
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: The board retries a returned wake once at once and then marks the addressee `undeliverable`, so a model-capacity outage ends a board addressee's part of a post within seconds.
+What should happen: The engine holds capacity errors (roles WS-7b). The board's planner should consider skipping the immediate retry for a capacity return.
+Why it matters: A short outage permanently fails board wakes.
+
+## 347. The recorded fixtures hold no tool call and no permission request
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `packages/testing/fixtures/claude.ndjson` and `codex.ndjson` hold neither, so no test can pin a harness's shell-permission shape from them.
+What should happen: The roles plan adds a recording task (2g).
+Why it matters: A permission matcher cannot be tested against real traffic.
+
+## 348. The runner-event batch is appended with the caller `owner`
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `packages/engine/src/commands/CommandHandler.ts:148` appends it as `owner`, and any failure in it drops the whole batch (lines 174 to 176). Anything an automatic answer writes there would be recorded as the owner's.
+What should happen: Not decided.
+Why it matters: The log would show an automatic answer as the owner's own.
+
+## 349. `TurnStarted` is declared but never written
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `TurnStarted` is declared in `packages/contracts/src/events.ts` (line 116) and nothing writes it.
+What should happen: Not decided.
+Why it matters: A reader that expects the event gets nothing.
+
+## 350. A `ThreadItem`'s tool input has no stated maximum
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: A single huge tool call makes a large event.
+What should happen: Not decided.
+Why it matters: One tool call can exceed a message budget.
+
+## 351. The ceiling's path resolver is synchronous
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `packages/engine/src/identity/ceiling.ts` uses `lstatSync`, so resolution on a slow or network file system blocks the event loop for every agent.
+What should happen: Not decided.
+Why it matters: One slow file system stalls all agents.
+
+## 352. One shared stream fiber carries every agent's runner events, and `answerPermission` is awaited inside it
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `packages/engine/src/commands/CommandHandler.ts:177` awaits `answerPermission` inside the shared fiber, so one slow adapter answer stalls the runner events of all agents.
+What should happen: Not decided.
+Why it matters: One slow agent delays every other agent.
+
+## 353. `isHarnessSettings` treats every path under a harness folder as a settings path
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: `isHarnessSettings` at `packages/engine/src/identity/ceiling.ts:317-322` treats every path under a `.claude/`, `.codex/`, `.gemini/` or `.cursor/` folder as a settings path, without regard to case. Every file edit in a worktree under `.claude/worktrees/` goes to the owner (roles row 85).
+What should happen: Narrowing the test to the settings files and folders inside a harness folder would fix it, but it relaxes a protection, so it is the owner's decision. Foundry worktrees move to `<repo>/.worktrees/`, which avoids the problem.
+Why it matters: Every file edit by an agent in a Foundry worktree waits for the owner.
+
+## 354. `git clean -ffdX` at a repository root would remove all of `.worktrees/`
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: A dry run showed that `git clean -ffdX` at a repository root would remove all of `.worktrees/`, unmerged work included. The ignore line does not protect against it.
+What should happen: Not decided. For the worktree plan.
+Why it matters: Unmerged work in worktrees could be lost with one command.
+
+## 355. A new worktree starts from the last commit, so uncommitted changes do not reach a child
+
+Found: 2026-11-03, while planning the foundry roles plan.
+State: open.
+
+What happens: A lead's uncommitted changes do not reach a child's new worktree (tested).
+What should happen: Not decided. For the worktree plan.
+Why it matters: A child starts from older files than the lead sees.
+
+## 356. The recorder fake-agent test failed at the base commit in one environment
+
+Found: 2026-11-04, by the builder or test writer of unit r3p, during the foundation build.
+State: open, for the final review.
+
+What happens: The existing recorder fake-agent test failed during initialization at the base commit in this environment. The new tests use a synchronous transport double and do not repair that separate failure.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+The foundation review investigation retained the exact failing status assertion
+from `/tmp/r3p-recorder-existing.log`. The archived result describes persistent
+initialization failures in a run with 107 failing files. It does not describe
+an unchanged failing-then-passing recorder case. The archived assertion omits
+the returned failure categories. Current focused execution passes, but does
+not establish the historical cause. This part of FR-158 remains open.
+
+## 357. The source boundary check for tables is not a full data-flow analysis
+
+Found: 2026-11-04, by the builder or test writer of unit a1a, during the foundation build.
+State: open, for the final review.
+
+What happens: The source boundary check masks guarded closures and recognizes direct indexed calls into the named tables. It is a supplemental guard, not a complete alias/data-flow analysis. Runtime throwing-reducer and snapshot cases supply independent behavior checks for the 1a tables.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+The repair for foundation review record FR-026 adds entry resolution, observer
+property access, simple assignment aliases, and renamed destructuring aliases
+to this supplemental check. Runtime regressions independently exercise absent
+entries, null entries, throwing accessors, and observer failures through
+projection, live publication, and rebuilding. The source check remains a
+bounded check, rather than a general data-flow analysis.
+
+## 358. Criterion 2.3 says every reply carries a request identifier, but stream markers carry none
+
+Found: 2026-11-04, by the builder or test writer of unit a2, during the foundation build.
+State: fixed as a documentation conflict in foundation review record FR-151.
+
+What happened: Criterion 2.3 and the generic contract wording said every
+reply carried a request identifier. Stream items instead carry event sequence
+numbers, including checkpoint and oversized markers.
+
+What changed: The criterion and both generic contract statements distinguish
+payloads, unary replies and errors from stream items. The existing identity
+and reconnection tests keep their expectations. No schema changed.
+
+## 359. The contract names no largest alert event or alert-list page
+
+Found: 2026-11-04, by the builder or test writer of unit a2, during the foundation build.
+State: open, for the final review.
+
+What happens: The contract does not state a concrete largest client alert event or alert-list page. The size tests cover the board’s encoded wake, its whole-event page, and the stated future board and roles event payload budgets. Complete maximum-page fixtures must be supplied when those pieces install their contracts.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 360. Concurrent service startup timed out once in the merge gate
+
+Found: 2026-11-04, by the builder or test writer of unit r1, during the foundation build.
+State: open, for the final review.
+
+What happens: The first full merge gate observed an intermittent concurrent-service startup timeout. The unchanged focused rerun and complete gate rerun both passed. The cause has not been established.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+The FR-158 investigation located the original timeout while waiting for the
+survivor's socket in `/tmp/foundation-r1-merge-check.log`. The fixture discards
+the child's standard error, so that log cannot distinguish an exited survivor
+from a delayed listener. Bounded focused startup contests preserve the existing
+exclusive-lock and survivor assertions. Passing contests do not establish the
+historical cause. This issue remains open.
+
+## 361. A harness test rejects any adapter path containing `npx`, including random temporary folders
+
+Found: 2026-11-04, by the builder or test writer of unit b1, during the foundation build.
+State: fixed during the foundation review repair of FR-152.
+
+What happens: `packages/engine/test/runner/harnesses.test.ts:82` rejects any adapter path containing the substring `npx`, including its random temporary directory. The whole gate generated `/tmp/shephrd-harnesses-bQtnpx/`, causing a false positive. The isolated case passed on rerun. The lead should narrow the assertion to the executable or invocation.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+The fixture now always uses an ancestor containing `npx`, which deterministically
+failed the old substring assertion. Exact expected executable paths and argument
+vectors reject an actual package-runner invocation without rejecting that valid
+ancestor. Temporary executable and argument faults are checked separately.
+The runtime resolver did not need a change.
+
+## 362. The board plan's engine-change table still says seven tools and eight events
+
+Found: 2026-11-04, by the builder or test writer of unit b1, during the foundation build.
+State: fixed as a documentation conflict in foundation review record FR-153.
+
+What happened: The engine-change table retained counts from before the
+acknowledgement command and event were added.
+
+What changed: Both tool counts in row B1 now say eight. The event count in
+row B2 now says nine. The counts agree with the current command access
+table, event union and exact inventory tests. No command or event changed.
+
+## 363. An agent named `owner` shares its reader records with the human owner
+
+Found: 2026-11-04, by the builder or test writer of unit b2a, during the foundation build.
+State: open, for the final review.
+
+What happens: AgentId accepts the literal owner, but the required raw-agent-id-or-owner convention aliases that agent with the human owner in readState, dispositions, takenAt, and other reader-keyed records. A synthetic owner read advanced the position stored for an agent with id owner. The lead should settle whether to reserve that id or change the shared reader-key convention before building the consumers. This unit follows the frozen tests' stated convention and does not change contracts outside its scope.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 364. A web-down alert can be missed when the outage is disabled at once
+
+Found: 2026-11-04, by the builder or test writer of unit a5, during the foundation build.
+State: closed with controlled evidence during the FR-158 investigation.
+
+What happens: The focused run intermittently observed no web-down alert when an outage was disabled immediately after its source event appeared. The unchanged isolated file and the full check both passed afterward. A timing race is suspected: the existing alert reactor evaluates a source against the current snapshot, so a rapid settings change can make that source already closed when consumed. This continuation did not change the reactor or the frozen assertion. The collector should retain this observation when assessing intermittent failures.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+Commit `06ebd4a7b1f9789dcf7c69c9e2c83ccf93712cbb` already added an alert-creation
+wait before disabling the outage in this test. A controlled delayed follower
+reproduces the historical missing-alert assertion after the outage is disabled.
+An independent later alert proves that the follower consumed that source interval.
+The production source policy deliberately suppresses an alert whose subject is
+already closed. The existing guard establishes the open alert before testing
+its removal. This evidence concerns the test's missing precondition, rather
+than a failure to clear an established alert.
+
+## 365. An action record larger than the page budget cannot be read through `roles.actions.list`
+
+Found: 2026-11-04, by the builder or test writer of unit r2, during the foundation build.
+State: fixed during the foundation review repair of FR-154.
+
+What happened: The action-event schema permits an individual encoded record
+larger than the action page budget. The history read refused an oversized
+singleton instead of sending it whole, blocking traversal to older records.
+
+What changed: The reader returns an oversized first action whole on its own
+page. Its exclusive continuation reaches the older history. Regressions cover
+the byte boundary, filtering, ordinary controls, and a 300 KiB group assigned
+through the public command and recorded by the real idle-rule producer.
+No stored record is removed or cut.
+
+## 366. The transcript fallback schedules nothing for a long Claude project folder
+
+Found: 2026-11-04, by the builder or test writer of unit r9, during the foundation build.
+State: open, for the final review.
+
+What happens: The transcript fallback refuses a Claude project-folder key longer than 200 characters, because Claude Code hashes such keys in its own way. Shephrd then schedules nothing rather than guess a path. An agent in such a folder gets no cache timing from this fallback.
+Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
+
+## 367. The board restart acceptance case failed once in a full check
+
+Found: 2026-11-04, by the builder or test writer of unit r12, during the foundation build.
+State: fixed during the FR-158 investigation.
+
+What happens: The first full `pnpm check` for unit r12 failed the board restart's sent-wake case, because no reminder wake was present. All three cases passed in an isolated rerun, and the next full check passed with no source change. Unit b5 had already repaired a startup race in this area, at an earlier commit, so that repair did not remove every timing dependency.
+Why it matters: An intermittent failure can block a merge, and it may hide a real readiness or scheduling fault. It waits for the final review.
+
+The sent-wake fixture now holds the recovered response turn behind a file
+barrier. The old assertion deterministically sees no reminder at that boundary.
+Socket readiness permits the response to remain working, while a reminder is
+due only after that response ends. The corrected test observes the recovered
+prompt reaching the restarted adapter, proves that its turn has not ended,
+releases it, and waits for the reminder before counting the complete observed
+wake history.
+The original one-wake and open-matter assertions remain.
+
+The earlier unit b5 failure concerned a completion send after a non-reloadable
+recipient was resolved. Its existing boot-recovery guard is separate from this
+later reminder boundary. Neither repair establishes the causes of issues 356
+or 360, and neither is attributed to the separate auxiliary alert barrier.
+
+## 368. A lead can be reported stalled while its workers work
+
+Found: 2026-11-04, by the builder or test writer of unit r13, during the foundation build.
+State: fixed as a documentation conflict in foundation review record FR-156.
+
+What happened: The roles plan's clock summary and acceptance wording omitted
+decision 88's owed-reply exception. Criterion 4.3 also denied that exception
+before requiring it later in the same row. The recipe repeated the broad
+waiting exclusion.
+
+What changed: The clock summary, criteria 4.3 and 8.2, and the recipe now
+preserve the exception. The owner-authored acceptance assignment does not
+qualify. An eligible idle orchestrator's assignment can qualify when its
+author reaches no busy work outside the lead. The evaluator and existing
+ordinary-waiting and owed-reply tests keep their behavior.
+
+## 369. The live-check scripts depend on the order of their imports
+
+Found: 2026-11-04, by the builder or test writer of unit r14, during the foundation build.
+State: fixed for foundation review record FR-157.
+
+What happened: Importing the existing live driver before the existing live runner caused a circular module initialization error for `pieceViews` under plain Node.js. The live entry point depended on a runner-first import convention.
+
+The FR-013 regression also encountered this import-order sensitivity. Importing the alert reactor before the service test helpers left the client reactor registration incompletely initialized under Vitest. Loading the helpers first was the earlier workaround.
+
+What changed: The engine composition resolves its piece-view and reactor values on access after module initialization. It caches the reactor table so the web listener's startup identity check remains valid. It no longer reads the unfinished view table or combines unfinished reactor effects while constructing the registry. Plain Node regressions start with the driver, the alert reactor, and the view table, and require all registered views, reactors and representative commands. The roles entry point now imports the driver before the runner.
+
+Why it matters: The owner-run checks can start without their previous import-order convention.
+
+## 370. Two browser assertions reject supported thread navigation
+
+Found: 2026-11-04, while repairing foundation review records FR-086 and FR-092.
+State: fixed.
+
+What happened: The administration browser test expected `/threads/phone-worker`, but the production link uses `/#/thread/phone-worker`. The phone browser test required a Hypertext Transfer Protocol (HTTP) 200 response from a hash-only navigation. Playwright returns no response for that navigation. Both assertions stopped the later behavior checks.
+
+What changed: The administration test pins the supported hash link, follows it, and reads the question before continuing through every settings check. The phone test checks the exact alert route and retained document. It checks the permission answer, the runner's agent and option, and output emitted only after approval. Reloading the thread independently reads back the committed answer and agent output. Only that fresh-document reload requires HTTP 200. Existing width and browser-storage checks remain in place.
+
+Why it matters: These tests now reach their administration and permission-flow assertions. Temporary production mutations verify that a wrong administration link and missing navigation handlers are rejected. The separate Hypertext Transfer Protocol Secure (HTTPS) fixture update belongs to the public-address repair in FR-001. The Phase 2 repair for FR-048 adds independent production-bundle width cases for the login, situation, thread, alerts and settings pages. Each waits for its real content, measures the document and body against the 360-pixel viewport, and reports its own outcome. The existing navigation, administration, thread and storage checks remain. Temporary page-specific overflow mutations fail all five cases at their width assertions.
+
+## 371. Enabling an initially disabled sheepdog skips cache initialization
+
+Found: 2026-11-04, in the foundation review, record FR-008.
+State: fixed in the foundation fix for FR-008.
+
+What happened: An enabled startup initialized each sheepdog rule, but a switch from off to on only re-armed timers. The cache rule therefore kept an empty target map and never loaded the configured home or harness cache lifetimes. Existing eligible turns received no cache maintenance. Later turns with unsplit context usage also received none until a harness settings change or an enabled restart loaded the lifetime.
+What changed: A switch from off to on now runs the same rule initialization as an enabled startup before arming timers. The cache rule reloads settings and reconstructs targets from current agents and their recorded turns. A future deadline keeps its original expiry. A missed cache deadline is dropped. Repeated activation does not repeat an action.
+Verification: The socket-level cache runtime tests cover settings committed before disabled startup, existing and subsequent unsplit turns, missed deadlines, repeated activation, and Claude transcript reconstruction from the default home and both account-specific home settings. Five regression cases failed against the unfixed loop because no compaction was delivered. The missed-deadline case already passed and remains a guard against extending expiry at activation.
+
+## 372. The owner conversation clients omit outgoing sources and delivery history
+
+Found: 2026-11-04, in foundation review finding FR-002.
+State: fixed and independently verified in the foundation fix run.
+
+What happened: The browser filtered out queued deliveries whose target is nested
+inside the delivery. The terminal viewer required an envelope agent identity,
+which those deliveries do not have. The browser displayed `PromptSent`, although
+the engine records a first prompt inside `AgentStarted` and later prompts inside
+`DeliveryQueued`. It also omitted question answers and delivery states.
+Oversized sources could not be recovered from a current snapshot after the
+delivery had settled. A terminal reconnect could skip events missed during the
+disconnection.
+
+What changed: Both clients select queued sources by their delivery target.
+The browser renders first and later prompt sources, question answers, and the
+delivery history joined by delivery identity. It reads oversized display events
+by sequence before advancing its stream cursor. The terminal viewer reloads
+the selected thread when reconnecting. The engine's visibility rules remain
+the authority for every read.
+
+Verification: The conversation history regressions cover split pages, sources
+without a top-level agent identity, later delivery states, and oversized live
+sources across reconnect. A browser regression exercises both clients against
+the public engine interface for first and later prompts, a question answer,
+a board delivery, an oversized prompt, and history after reopening.
+
+Why it matters: The owner can read the conversation and its delivery outcome
+from either client without exporting the durable event log.
+
+## 373. A configured public HTTP page cannot generate browser request identifiers
+
+Found: 2026-11-04, while fixing foundation review record FR-001.
+State: fixed in the commit that adds this entry.
+
+What happens: The public address accepted plain Hypertext Transfer Protocol
+(HTTP), and the remote access guide offered a non-loopback HTTP page.
+Browsers do not expose `crypto.randomUUID` there, so the logged-in page cannot
+generate the identifiers needed for its application programming interface
+(API) requests.
+What should happen: By the owner's 2026-11-04 decision, every configured public
+address requires Hypertext Transfer Protocol Secure (HTTPS).
+The schema, engine and web settings refuse HTTP with a clear explanation.
+Local HTTP remains available at `127.0.0.1`, including through a Secure Shell
+(SSH) local forward with identical ports on the browser device and server.
+Why it matters: The supported remote dashboard journey needs the browser's
+secure-context APIs after login.
+The change keeps the existing request identifiers and retry behavior.
+Regression evidence: The pre-fix schema, engine and settings-page tests accept
+HTTP and fail the new refusal checks.
+The production-shell browser test checks login and an actual outgoing request
+identifier at `http://127.0.0.1:<port>`.
+The phone and board alert browser fixtures use a real local HTTPS proxy while
+retaining their link, answer and readback checks.
+Second-round clarification: The owner's later 2026-11-04 ruling accepts a
+self-signed certificate at the external proxy.
+The first fix's guide, security rule, plan and three contract copies incorrectly
+required certificate trust.
+Those requirements now describe the expected browser certificate warning and
+the accepted continuation without installing trust.
+Shephrd still holds no certificate and serves only HTTP on loopback.
+The existing browser fixtures ignore certificate errors for the self-signed
+proxy and prove login and authenticated requests without installing trust.
+Their comments now describe that bypass accurately.
+
+## 374. Replacing a queued board wake drops a read question before acknowledgement
+
+Found: 2026-11-04, while fixing foundation review record FR-007.
+State: fixed by the FR-007 repair on `fix/foundation-007`.
+
+What happened: A read marked an original question as taken without acknowledging
+it. Closing or acknowledging another question, or merging a new question,
+withdrew the mixed wake. Replacement retained reminders but selected original
+questions only when unread, so the read question lost its queued safety net.
+The post remained stored and open, but recovery could need a later turn end.
+
+What changed: Replacement carries the withdrawn wake's original reply duties
+forward from stored wake history, independently of unread digest selection.
+This also covers replacement deferred to another reactor transaction.
+Acceptance of any copy ends the original wake duty.
+Current reach, open status, acknowledgement, disposition, reservations and byte
+limits still govern them.
+The plan's cleanup paragraph now follows decision 152's acknowledgement rule.
+
+Validation: `packages/engine/test/board/wake-replacement.test.ts` reproduces
+the read-then-close, read-then-acknowledge and read-then-merge cases before
+any turn end. It checks replacement manifests, actual prompt delivery, status,
+an open wait and log rebuilds. It also checks that replacement preserves owed
+completion debt and does not duplicate a question reserved by a sent wake.
+It covers deferred reactor replacement, the transition to a reminder after an
+eligible turn end, and the end of the original duty after acceptance.
+
+## 375. The terminal permission context omits correlated file changes
+
+Found: 2026-11-04, while repairing foundation review record FR-005.
+State: fixed and independently verified in the foundation fix run.
+
+What happened: `packages/viewer/src/actions.ts` accepted only tool-call content when a permission request had no input. It omitted file-change content even when the content carried the request's tool-call identity. The upstream identity repair in issue 322 could not repair this independent filter.
+
+What changed: The terminal helper includes file changes whose `content.callId` matches the request's `toolCallId`. It keeps the request read first, the thread's page and item order, and the existing warnings for missing, redacted or truncated input. It never joins a diff by its path or thread-item identity.
+
+Validation: `packages/viewer/test/request-file-change.test.ts` covers a locations-only request, matching diffs across pages, a diff as the only input, and unrelated and uncorrelated diffs. It also checks that partial-input warnings remain visible. The matching-diff regression failed against the unfixed helper before the filter changed.
+
+Why it matters: The owner can review a correlated edit before answering its permission request in the terminal viewer.
+
+## 376. A cached piece hold prevented the owner wait from refreshing it
+
+Found: 2026-11-04, in foundation review record FR-009.
+State: fixed.
+
+What happened: The client wait filtered its refresh candidate through cached
+piece holds. A permission answer or an accepted board completion followed by a
+turn end could clear the actual hold without a later piece event. The stale
+hold then prevented the read that would observe the release.
+
+What changed: The refresh trigger uses engine eligibility before piece holds.
+The final result still applies every current piece hold after the published
+sequence gate. A failed refresh retries from the applied cursor without needing
+a new event. A quiet held member does not cause polling.
+
+Verification: `packages/client/test/wait-piece-refresh.test.ts` covers both
+release paths in both wait modes. It also checks persistent holds, queued
+deliveries, split batches, and a failed read followed by a quiet reconnect.
+
+Why it matters: The owner's wait can finish after the promised work completes,
+without cancellation or unrelated board activity.
+
+## 377. A failed board snapshot section stopped the owner wait before status recovery
+
+Found: 2026-11-04, while repairing foundation review record FR-012.
+State: fixed.
+
+What happened: `packages/client/src/waitForAgents.ts` rejected every snapshot with a failed section. It discovered the piece condition reads only from successful sections. A failed board snapshot therefore stopped the owner wait even when `board.status` could still return complete condition lists.
+
+What changed: The helper identifies the board condition read from an explicit namespace table. It includes a failed board section in that discovery. It recovers `holdsUnsettled` and `ownerHeld` from the independent status read before deciding whether to end the wait. The existing published-sequence gate and failed-read retry remain in use.
+
+Why it matters: A snapshot-hook failure no longer forces the owner to restart a wait. Held targets keep waiting, owner-held targets return `request-held`, and released targets settle only after the stream reaches the lists' published sequence. The client regression covers both wait modes and a failed status read on a quiet log. The existing engine test still checks that a held publication exposes only the previous published lists and that status survives a failed snapshot hook.
+
+## 378. Plain-channel additions used immediate parents instead of effective holders
+
+Found: 2026-11-04, while fixing foundation review record FR-010.
+State: fixed in the foundation fix branch.
+
+What happened: `board/access.ts` checked immediate parent links when an agent
+manager added a member. An idle manager could not add a descendant through a
+paused, starting, interrupted, crashed or stopped intermediary. A manager also
+could not add its own effective holder through an unavailable ancestor.
+
+What changed: Plain-channel additions use the engine's `holderAbove` rule in
+both directions. The management check and the stored manager seat retain their
+existing rules. The shared access fixture now opens the agents' sessions, so
+its baseline holders are idle instead of starting. Existing assertions remain.
+New pure and authenticated command regressions cover unavailable intermediaries,
+available intermediaries, the manager's own holder and the owner's override.
+
+Why it matters: The contract permits a manager to add agents it holds, even
+when their immediate parents cannot act. The fix restores that delegated
+operation without changing stored membership when an agent's state changes.
+
+## 379. The sheepdog lost its event-position switch when refreshing live state
+
+Status: Fixed in the foundation review corrections for finding FR-011.
+
+What happened: The sheepdog loop kept the switch at its subscriber cursor, but the production rules fetched Views again and used the latest switch. When consumption lagged behind a switch-off, an eligible earlier event could lose its advice notice or crash retry.
+
+What changed: The rules retain the cursor switch while refreshing the current lifecycle, settings limits, and action records. The regression holds the consumer before advice and crash events, commits switch-off, and then checks their outcomes through the production rules. It also proves that events committed while off remain ignored after re-enabling.
+
+Validation: The pre-off advice and crash cases failed against the unfixed rules with missing action records. The rules and loop suites cover these cases together with duplicate suppression, refused admission, and recovery lifecycle boundaries.
+
+## 380. A stop and resume during alert follower lag suppress the returning question
+
+Found: 2026-11-04, while repairing foundation review record FR-013.
+State: fixed.
+
+What happened: The alert reactor checked a stop or crash against the latest snapshot. If the agent had already resumed, the old question alert stayed open. Its key suppressed the replacement alert. A delivered alert therefore kept its delivered mark, and a baseline alert kept its push exclusion.
+
+What changed: A stop or crash closes an earlier question or approval alert according to the lifecycle event's sequence. A question source or resume from before a later stop or crash cannot raise an obsolete alert. The latest resume renews an open owner-held question with the same key and a fresh alert identifier.
+
+Why it matters: The returning question can notify the owner again after follower lag. The regression covers stopped and crashed agents with delivered and baseline alerts. Both lifecycle commits precede catch-up, either in the same service or across a restart. The real stop and resume commands, durable alert state, local carrier requests, and another restart are checked. The local carrier receives the replacement identifier exactly once. The test also rejects sources from obsolete runs. It does not verify a notification on the owner's physical phone.
+
+## 381. A failed viewer refresh leaves an acknowledged action available to resend
+
+Found: 2026-11-04, while repairing foundation review record FR-014.
+State: fixed.
+
+What happened: The terminal viewer cleared a prompt or answer only after its following snapshot read succeeded. A failed read left the acknowledged draft or permission controls active. Pressing Enter sent another action with a new request identifier. An uncertain send also received a new identifier when the owner retried it.
+
+What changed: The viewer retires acknowledged prompts and answers before refreshing its snapshot. It reports a failed refresh separately from the successful send. The connection retains an uncertain attempt's body and identifier for an unchanged retry. A confirmed send, a definite command refusal, or an edited body ends that attempt. Retry state lasts for the current viewer connection.
+
+Verification: `packages/viewer/test/send-recovery.test.tsx` drives the real Ink terminal interface and socket client. Its prompt, question and permission cases assert one write after acknowledgement and refresh failure. Its lost-acknowledgement prompt case uses the real command handler, delivery planner and SQLite receipts to check one durable receipt and delivery after retry. The answer cases check stable identifiers after transport failure and fresh identifiers after confirmation, refusal or an edit.
+
+## 382. A concurrent alert scan could retry before the latest failure's deadline
+
+Found: 2026-11-04, while investigating foundation review finding FR-015.
+State: fixed in the foundation fix for FR-015.
+
+What happens: Retired-token cleanup can suspend a delivery scan after it reads
+the client view. Another scan can send and record a failure in that same
+generation before the suspended scan claims the released delivery key. The
+claimant used the earlier view's retry deadline, even though it selected the
+next attempt from the current view.
+
+Why it matters: The next send could arrive before the required delay from the
+latest failure. The controlled regression in
+`packages/engine/test/client/alert-delivery-race.test.ts` holds real token
+cleanup and carrier responses. It also pauses the worker's self-scan at its
+snapshot read after key release, to give the stale scan the claim. The unfixed
+worker sends early after both the first and the second failure.
+
+What changed: The claimant reads the current failure while holding its delivery
+key. It recomputes the deadline after each wait. It validates the failure
+sequence again after the database read, together with the current generation
+and pending conditions. The regression checks the five-second and thirty-second
+deadlines and increasing attempt numbers.
+
+## 383. Delivery failure diagnostics did not reach the alerts page
+
+Found: 2026-11-04, while repairing foundation review record FR-017.
+State: fixed.
+
+What happened: The delivery worker recorded a safe failure reason and the fifth
+failure's `final` mark, but the client projection dropped those fields. The
+alert-list contract, read and page exposed only the alert's open or cleared
+lifecycle, so the owner could not see that delivery was still failing.
+
+What changed: The projection retains the last outcome for the current delivery
+generation. The owner read and public schema expose its outcome and attempt,
+with a fixed safe reason and `final` for failures. The page renders "Failed",
+"Still failing" or "Delivered" separately from the alert's lifecycle. The
+command-line list retains the same fields in its reply. A successful attempt
+replaces the failure, and a generation change cannot reuse an old failure.
+
+Why it matters: The owner can diagnose a carrier outage or a missing backing
+token while durable retries continue. Regression tests exercise the writer,
+read, public schema, rebuild, restart, recovery, generation changes, clear,
+page rendering and command-line output. No live carrier or phone was used.
+
+
+## 384. An integrated alert test still expects the earlier delivery projection
+
+Found: 2026-11-04, by the full merge check combining foundation review repairs FR-013 and FR-017.
+State: fixed.
+
+What happened: The lifecycle regression expected the private delivery row's earlier `delivered` boolean. The diagnostics repair replaced it with the explicit `status` field. All eight lifecycle matrix cases failed at this one assertion after integration.
+
+What changed: The assertion now requires `status: "delivered"` and the same first-attempt count. The existing durable delivery event, exact carrier request, renewal identity, and restart assertions remain. The production behavior is unchanged.
+
+Validation: The initial complete merge check is archived with eight failures at the old assertion. The corrected lifecycle, retry-race, and delivery-diagnostics suites run together before the repaired full merge check.
+
+## 385. Sparse omission metadata can refuse an otherwise small hand-off
+
+Found: 2026-11-04, while fixing foundation review finding FR-003.
+State: fixed by bounded omission pages in `roles.handoff` and continuation
+identifier preservation in the Model Context Protocol (MCP) connector.
+
+What happens: The previous selector budgeted all exact omission ranges before
+the original brief or latest exchange. A worker history interleaved with other
+events could produce thousands of separate ranges. Their metadata exceeded
+the reply budget, and the hand-off refused even when its priority sections
+were small.
+
+The selector now reserves one bounded omission page before selecting content.
+Each reply lists at most 64 exact ranges and provides a continuation cursor
+when more remain. The cursor preserves the original history boundary and
+request identifier. Every continuation checks current management rights.
+The 5,000-item interleaved-history regression checks the public socket replies,
+both encoded budgets, whole small priority sections and complete exact recovery.
+
+The first-round verifier found that the MCP connector generated a new request
+identifier for each tool call. Its schema has no top-level identifier
+parameter, so an agent could not meet the continuation's original-identifier
+requirement. The connector now uses the returned cursor's identifier for
+hand-off continuations. A second regression runs the real MCP command and
+engine, recovers all 150 interleaved historical items across three omission
+pages, reads their full content, preserves the original summary after later
+activity and refuses a continuation after the lead loses management rights.
+
+Why it matters: A long worker history must remain recoverable without widening
+sequence ranges across unrelated events or refusing the summary.
+
+
+## 386. The board-alert browser test uses an ambiguous reply locator
+
+Found: 2026-11-04, by the combined first-phase browser gate after the FR-002 conversation-history repair.
+State: fixed.
+
+What happened: The reply text appears in its board subject and in the newly visible outgoing delivery. The browser test matched both elements with one global substring locator. The page displayed the reply correctly, but the locator failed its strict uniqueness check.
+
+What changed: The browser assertion selects the exact reply inside the named Board post region. The exact single runner wake, removed reply form, and durable alert-clear assertions remain. Production code is unchanged.
+
+Validation: The corrected browser case passed. A temporary rendering mutation kept the outgoing reply visible while replacing the subject reply. Two explicit browser preconditions established that state, and the corrected locator then failed at the missing subject reply. The production file and temporary proof assertions were restored byte-for-byte before the commit.
+
+## 387. The alert lifecycle test leaves an auxiliary delivery unfinished
+
+Found: 2026-11-05, by the command-line batch's complete check during the foundation repairs.
+State: fixed.
+
+What happened: The lifecycle regression waited for its auxiliary barrier alert to be raised. It did not wait for that alert to be delivered before closing the service scope and counting carrier requests. The next restart could correctly deliver both this unfinished alert and the new restart barrier. The exact total then failed even though the renewed question was sent once.
+
+What changed: The regression waits for the auxiliary barrier's durable delivery before ending that scope. It retains the exact request total, renewed identity, per-question request count, clear events, and restart checks. Production code is unchanged.
+
+Validation: A controlled finite delay reproduces the old count failure with no production changes. The same delay passes with the delivery wait, and confirms that the auxiliary request has completed before the first scope ends. The worker's independent baseline reproduction and the lead's failed and passing proof logs are archived in the foundation fix run.
+
+## 388. Idle-team nudges bypassed the board
+
+Found: 2026-11-04, while fixing foundation review finding FR-019.
+State: fixed.
+
+What happened: The sheepdog prompted every top agent through the engine, even
+though roles decision 60 requires a direct board post with no reply, followed
+by a flush. Only the holder notice had a board record.
+
+What changed: Each top receives a service-authored direct board post and a
+flush under deterministic per-top identities. Shared holders still receive
+one notice per group and occurrence. An owner-held top still receives a board
+nudge, and the owner's notice remains the roles event. The regression checks
+the top posts and flush receipts separately from the shared holder receipt.
+It also checks sheepdog turn classification, hourly repeats, restart deduplication,
+snooze, and a disabled board.
+
+Why it matters: The nudge now follows the promised board history and wake path.
+
+## 389. A later session hid an existing crash continuation
+
+Found: 2026-11-04, while fixing foundation review finding FR-044.
+State: fixed.
+
+What happened: An open crash admission treated a carry-on as absent when a
+later reload preserved it but opened a newer session. The session sequence
+comparison sent an unnecessary sheepdog continuation.
+
+What changed: The rule recognizes a carry-on queued after the admitted crash,
+even when another session opens afterward. Earlier crashes' carry-ons do not
+satisfy that guard. Deterministic service request identifiers remain in use.
+The regression admits a crash, accepts ordinary owner work, creates an engine
+carry-on through the reload transaction builder, preserves it through another
+reload, and restarts the sheepdog twice. It requires one logical continuation
+and one outcome notice. Existing no-carry and service-receipt restart cases
+remain covered.
+
+Why it matters: Recovery does not add work that the engine already preserved.
+
+## 390. Action history used a different continuation field from other paged reads
+
+Found: 2026-11-04, while repairing foundation review record FR-030.
+State: fixed.
+
+What happened: The action-history schema and handler accepted `before`, while
+the shared paged-read contract requires callers to pass `next` back as `after`.
+A generic caller repeated the newest page.
+
+What changed: The schema, handler, command-line parity fixture and snapshot
+recovery caller use `after`. Newest-first history uses an exclusive descending
+comparison. Authenticated regressions check filtering, ordering, uniqueness,
+termination, and the item and byte caps.
+
+## 391. A role file could expand beyond admission budgets during final redaction
+
+Found: 2026-11-04, while repairing foundation review record FR-046.
+State: fixed.
+
+What happened: The planner validated original and redacted content, then sent
+the redacted content through the writer's redactor again. Replacement markers
+could expand beyond the checked budgets. A registry refresh could also change
+the representation between planning and the write.
+
+What changed: The planner sends the original content to the writer. The writer
+validates its final redacted document before inserting any event or receipt.
+A refused document rolls back without latching a database failure. Regressions
+use the real redactor and SQLite, check stored bytes, preserve the previous
+file and hash on refusal, and prove a later valid write still succeeds.
+
+## 392. Handoff and roles-event tests did not prove their required boundaries
+
+Found: 2026-11-04, while repairing foundation review records FR-054, FR-057,
+and FR-115.
+State: fixed.
+
+What happened: Handoff tests did not combine a real 500-item queued/sent split
+with all four caller cases. The large-tool assertion did not require any output
+to survive. The contracts size fixture used a tolerant non-event instead of an
+admitted role file.
+
+What changed: A handoff regression places the queued prompt at item 500 and its
+sent event at item 501 through actual writers. It checks owner pairing, the
+intentional agent marker, fresh rights after parent recovery, replay refusal,
+and replacement refusal. The large-tool case requires a stable output prefix.
+A valid 64 KiB role file with escaping and multibyte advice passes real admission,
+strict event and envelope round trips, and actual stream and page frame checks.
+The invalid control-character case remains a separate refusal test. Temporary
+mutations establish that each strengthened test rejects its assigned fault.
+
+## 393. Automatic cache actions used state from outside their acceptance transaction
+
+Found: 2026-11-04, foundation review records FR-021 and FR-024.
+State: fixed.
+
+What happened: Queued work, holds, new turns or fresh sessions could arrive after the final eligibility read. The flush-versus-compact choice also used an older board unread count. An accepted automatic compact could wait in the queue beyond the evidence that justified it.
+
+What changed: The internal cache service now selects and accepts the action from one writer snapshot. Dispatch revalidates the recorded cache evidence in its own writer transaction. It withdraws an obsolete automatic delivery and continues the queue. The owner's manual compact and flush retain their ordinary behavior.
+
+Verification: Service regressions inject each of the four eligibility races after the final read. Another injects two informational posts after status captured zero and requires a two-post flush. Delayed-dispatch regressions cover expiry, competing work, new turns, new sessions and disabled settings. Manual delivery controls remain.
+
+## 394. Transcript fallback could reuse an earlier request's context usage
+
+Found: 2026-11-04, foundation review record FR-022.
+State: fixed.
+
+What happened: The bounded transcript reader selected an earlier eligible row when the current request's usage was missing or incomplete. The cache rule could label its context and timestamp as current.
+
+What changed: The reader must correlate its latest usable row with the selected turn's time bounds and any normalized request timestamp. A later user request, malformed tail or incomplete assistant usage invalidates the earlier result. Only a proven current read-only request can inherit an earlier write lifetime. The expiry helper rejects a request timestamp outside the turn. Normalized context usage retains independent authority.
+
+Verification: Parser and composed service tests cover stale high usage with missing, malformed, partial and future current evidence. Positive controls cover a current read-only request and normalized context authority.
+
+## 395. A fresh session could inherit an old session's cache target
+
+Found: 2026-11-04, foundation review record FR-031.
+State: fixed.
+
+What happened: A refresh could combine an old session's turn and usage with the current session identifier after the owner enabled a harness lifetime.
+
+What changed: Every refresh requires the end event and its starting delivery to belong to the current session interval. A fresh session without a request cannot acquire a target. Reloading the same session keeps legitimate evidence.
+
+Verification: Socket-level stop and fresh-resume regressions cover late lifetime changes and startup reconstruction. Existing same-session late-setting and read-renewal controls remain.
+
+## 396. The unconfigured cache lifetime had no composed negative regression
+
+Found: 2026-11-04, foundation review record FR-060.
+State: fixed.
+
+What happened: Existing tests checked configured lifetime behavior without proving that valid context alone could not schedule an unconfigured cache.
+
+What changed: Pure and composed tests now use valid context with no lifetime split, prior write, transcript or setting. They assert an empty timer set and no action after two hours.
+
+Verification: A temporary implicit one-hour default makes both regressions fail. The mutation is restored before committing.
+
+## 397. The missing-transcript test returned before opening the file
+
+Found: 2026-11-04, foundation review record FR-073.
+State: fixed.
+
+What happened: The missing leaf had a basename that did not match the session identifier. The path guard masked missing-file handling.
+
+What changed: The test uses an absent leaf with the valid session basename in an existing directory. The existing bounded-tail file is its positive control.
+
+Verification: A temporary throw from the valid-path open failure makes the corrected test fail. The mutation is restored before committing.
+
+## 398. Automatic capacity retries lacked history and a transactional hold check
+
+Found: 2026-11-04, while repairing foundation review records FR-018 and FR-039.
+State: fixed.
+
+What happened: The capacity timer used an action descriptor only for its release
+request identifier. It never recorded the successful retry in the roles history.
+The release planner also accepted whichever hold was current, even when the
+timer had selected an older hold of the same delivery.
+
+What changed: An automatic release supplies the expected hold sequence. The
+release planner checks that sequence inside the writer transaction. A successful
+release preserves it in `DeliveryReleased.holdSequence`. The production capacity
+rule records that committed success while consuming its event. A restart can
+complete the missing action without releasing the hold again. A refused or stale
+release creates no successful retry record. An ordinary owner release keeps its
+existing behavior when no expected sequence is supplied.
+
+Validation: The regressions failed first with a missing retry counter and a newer
+hold released by an old timer. The corrected tests check twelve retries, the
+outage reset, a refusal, an interleaved owner release and replacement hold, the
+new hold's own deadline, interrupted recording, two recovery startups, the owner
+action listing, and the live views against a rebuild.
+
+## 399. An unknown role kind inherited a matching named role's limits
+
+Found: 2026-11-04, while repairing foundation review record FR-028.
+State: fixed.
+
+What happened: `chef:builder` and `:builder` received generic worker advice, but
+selected the loaded builder's limits. A builder limit of zero capacity retries
+therefore refused a hold that the generic worker defaults would admit.
+
+What changed: Named settings and the direct age-limit lookup require a known
+role kind. Unknown kinds retain the worker defaults and global settings. Their
+existing diagnostic flags remain available. Known `worker:builder` overrides
+still apply.
+
+Validation: Pure regressions distinguish capacity, stall and age settings. Real
+socket reads and capacity outcomes cover loaded role files, generic advice,
+unknown-kind holds, and the known builder's refused hold.
+
+## 400. Crash and roles recovery tests omitted meaningful fault boundaries
+
+Found: 2026-11-04, while repairing foundation review records FR-055, FR-058 and
+FR-069.
+State: fixed.
+
+What happened: The crash window test had no timestamp for its earlier admission.
+The refused-admission test could pass without handling the crash. The generic
+action recovery test used release as a substitute for other engine commands.
+It did not exercise a committed resume before its hook, successful notice
+flushes, or an owner stop and manual resume ahead of sheepdog catch-up.
+
+What changed: A schema-valid admission at 45 minutes distinguishes the full
+hour from a shortened window. The refusal case requires the exact service
+command, request identifier and admission attempt. New tests run production
+rules and planners across actual resume, prompt, release, compaction and flush
+boundaries. They rebuild the database, execute the real recovery startup twice,
+and compare logical command, delivery, notice and action identities. The owner
+stop and manual resume use the authenticated socket command path before a later
+marker proves that sheepdog catch-up completed.
+
+The new command boundary tests also exposed production omissions. A committed
+compaction or flush could leave its action record missing because its target
+was already busy at restart. A committed idle nudge could lose its notice when
+recovery changed the group's idle origin. Startup now completes these accepted
+commands from their durable service events and deterministic request identities
+before applying current guards. It neither sends the command again nor changes
+receipt hook replay semantics. A flushed stall nudge can also stop its original
+clock before the action is recorded. Stall startup completes the posted nudge
+or replacement notice from its original deterministic identity.
+
+Validation: The cache tests failed first with missing action records. Temporary
+mutations test the shortened crash window, an ignored crash, and duplicate
+logical effects. No live harness recordings or owner phone are required for
+these local deterministic regressions.
+
+
+## 401. Recovery completion used identities superseded by other foundation repairs
+
+Found: 2026-11-05, while composing the independently verified capacity, cache, handoff and runtime batches.
+State: fixed.
+
+What happened: The initial combined recovery matrix failed four cases. Cache completion still looked for separate command identities after cache acceptance became atomic. Idle completion still looked for engine prompts after idle nudges moved to board posts. The first action page also supplied a cursor that selected no records under the corrected descending contract.
+
+What changed: Cache completion recognizes the durable marked delivery and validates its canonical atomic acceptance identity. Idle completion recognizes the durable board nudge, completes its flush, and resolves the effective holder before sending the shared group notice and recording the action. The first page omits its cursor. Four idle interruption cases replace the old prompt fixture while retaining exact identities, two recovery startups, and the prohibition on engine prompts.
+
+Validation: The original combined matrix failed four cases. The strengthened board regression then failed with the action missing after a committed nudge. All nineteen final recovery cases pass. The run folder retains both failing logs and the corrected matrix log. A fresh composition review is assigned to the live-check batch and its independent verifier before the run closes.
+
+## 402. A delivered stall nudge can lose its episode before its action is recorded
+
+Found: 2026-11-04, in foundation review record FR-023.
+State: fixed.
+
+What happened: Posting and flushing a nudge could queue and send a board wake
+before the action record was written. A no-progress turn then changed the
+stall clock's origin. Recovery had no durable copy of the original episode
+identity and could repeat the first occurrence instead of escalating.
+
+What changed: The automatic stall rule records `roles.StallNoticePlanned`
+before sending a notice. The roles view retains its original post, agent,
+origin, recipient, kind and occurrence until the matching action is recorded.
+Recovery finishes that notice using the original command receipts. Different
+posts that share an origin retain separate pending identities.
+
+Validation: The automatic-rule regressions interrupt recording after a real
+board wake is queued, complete the delivered no-progress turn, and restart
+from the database. Both first and second occurrences retain their count,
+complete the second holder notice, and advance without duplicate posts or
+wakes. The original implementation failed both occurrence assertions. The new event
+also has an independent wire sample for round-trip, lifecycle-state and
+owner-only subscription checks.
+
+## 403. Consumption before a notice record is forgotten
+
+Found: 2026-11-04, in foundation review record FR-029.
+State: fixed.
+
+What happened: A board read or accepted wake marked only action records that
+already existed. A late action started unread even when its recipient had
+consumed its board post. A later recipient failure could reroute that notice.
+
+What changed: The roles fold retains consumed post identities per recipient.
+A late action derives its read state from that durable fold. Reads by another
+recipient and reads of another post do not consume the notice.
+
+Validation: Pure regressions cover both consumption paths before and after
+recording. Composed regressions interrupt after posting and flushing, consume
+the notice, restart, record it late, and crash its recipient. Consumed notices
+do not reroute. The unread control reroutes once. The original fold failed
+both consumption-before-record cases.
+
+## 404. Repeat-suppression tests omitted seeded key separation
+
+Found: 2026-11-04, in foundation review record FR-051.
+State: fixed as a regression-proof gap.
+
+What happened: Positive runaway and role-advice tests did not establish all
+old-key and new-key distinctions. No duplicate production notice was observed.
+
+What changed: Seeded runaway tests distinguish agent, turn and age origins.
+Seeded advice tests distinguish agents and kinds, including owner-addressed
+posts. A production advice sequence repeats commands across three service
+lifetimes while another worker and another kind remain eligible.
+
+Validation: Temporary mutations remove suppression, broaden runaway keys,
+broaden advice keys, and remove advice reconstruction. The corresponding
+strengthened assertions must fail before the original source is restored.
+
+## 405. Stall scenario names claimed transitions their fixtures never performed
+
+Found: 2026-11-04, in foundation review record FR-082.
+State: fixed as a regression-proof gap.
+
+What happened: The cycle-only test called the per-post evaluator with no
+post episode. The account and permission cases supplied disconnected elapsed
+snapshots. They did not prove a fresh lead clock after real state changes.
+
+What changed: The cycle test calls the team-idle evaluator. A runtime sequence
+keeps both reciprocal obligations open across restart and reaches the configured
+hour. Separate lead sequences apply account unavailability and recovery, or a
+permission request to that idle lead followed by the owner's real stop command. They check the
+lost origin, cancellation, restored origin, restart, and full new lead interval.
+The lead uses a separate available account, so its own pause cannot mask a
+broken dependency on its child's unavailable account.
+The old pure fixtures now claim only the snapshot behavior they check.
+
+Validation: Temporary mutations preserve an old origin, treat open obligations
+as busy, and omit permission cancellation. The corresponding transition or
+cycle assertions must fail before the original source is restored.
+
+## 406. Startup tests did not exercise historical crash rules or require later work
+
+Found: 2026-11-04, in foundation review record FR-102.
+State: fixed as a regression-proof gap.
+
+What happened: The recovery-barrier fixture had no production crash rule.
+The lagged-switch fixture discarded an eventual result for the after-on event.
+Both tests could pass without the behavior their names promised.
+
+What changed: Production crash rules now wait behind the recovery barrier.
+The test checks the captured historical head, no old admission, no resume or
+prompt, and admission of a later crash. The switch test explicitly requires
+one before-off and one after-on observation across another restart.
+
+Validation: Temporary historical replay and skipped switch-on work must fail
+the strengthened assertions before the original source is restored.
+
+## 407. The stall runtime test could not observe closure of an owner alert
+
+Found: 2026-11-04, in foundation review record FR-119.
+State: fixed as a regression-proof gap.
+
+What happened: The fixture disabled the client alert reactor, addressed the
+stall to a lead, and used direct prompts. It did not create the owner alert
+or either board wake required by the criterion.
+
+What changed: The runtime test uses the production reactor table. It observes
+an open owner stall alert, delivers a sheepdog-only board wake, and checks
+that the same alert remains open. It then delivers a mixed board wake and
+checks one stall end and one clear of that exact alert through the client API.
+
+Validation: Temporary mutations classify every wake as sheepdog-only or omit
+the client stall-end source. Both must fail the composed assertions before
+the original source is restored. The existing classifier cases also cover
+another author, completions, reminders and no-answer duties.
+
+## 408. A piece observer could escape the fold's failure guard
+
+Found: 2026-11-04, while repairing foundation review record FR-026.
+State: fixed.
+
+What happened: The fold resolved the piece observer before entering its guard.
+An absent entry, a null entry, or a throwing accessor could stop projection,
+publication, or rebuilding instead of retaining the piece fallback.
+
+What changed: The fold resolves and invokes the observer inside one guard.
+The regression covers each resolution fault, a throwing observer, and a
+healthy observer through the service writer and the durable rebuild.
+
+## 409. An undefined optional side-row value could latch the writer
+
+Found: 2026-11-04, while repairing foundation review record FR-033.
+State: fixed.
+
+What happened: The side-row type allowed an undefined namespaced entry.
+The writer treated that entry as malformed.
+The transaction rolled back.
+The writer retained the failure for all later writes.
+
+What changed: An undefined entry now has the same meaning as an omitted entry.
+Planner, marked-read, and reactor regressions cover omitted, undefined, empty,
+and populated rows. Each case checks receipts, a healthy follow-up write,
+and rebuilding. A genuinely malformed row still rolls back and latches.
+
+## 410. The normal service log discarded the identity of a failing piece
+
+Found: 2026-11-04, while repairing foundation review record FR-042.
+State: fixed.
+
+What happened: The piece guard and service drain produced safe diagnostic
+categories.
+The final normal sink replaced the message.
+It also removed the namespace, table, and error class.
+
+What changed: The sink preserves the fixed piece-failure message and permits
+only the three fields with their bounded category values. The regression
+runs a throwing reducer through the service drain, the redacting logger,
+and both sink modes. It checks throttling and continued engine writes.
+Arbitrary exception text, causes, and annotations remain excluded from the
+normal sink.
+
+## 411. Composed service flows lacked a throwing-piece regression
+
+Found: 2026-11-04, while repairing foundation review record FR-078.
+State: fixed as a regression-proof gap.
+
+What happened: Existing tests covered individual consumers and raw appends.
+They did not compose commands, adapter permission requests, stopping, and
+recovery with the failing piece installed.
+
+What changed: A service regression starts agents, prompts them, answers a
+permission, stops an agent with a pending request, and closes the service.
+It reopens the same database with the failing piece, runs actual recovery,
+checks durable permission states and receipt replay, and compares the live
+views with a rebuild. A second regression uses the real Agent Client Protocol
+(ACP) runner, a scripted adapter subprocess, authenticated socket commands,
+and a real session reload after reopening the database.
+
+## 412. Piece planner registration accepted the broader engine plan
+
+Found: 2026-11-04, while repairing foundation review record FR-087.
+State: fixed.
+
+What happened: The composition table accepted an engine plan for every key.
+A piece planner could omit its reply, and a wider variable could carry an
+engine after-commit hook past the piece type's excess-property check.
+
+What changed: Namespaced registrations require a piece plan with a reply and
+an explicitly forbidden hook. Engine registrations retain engine hooks.
+Compile fixtures cover wider variables at composition and fixture boundaries.
+The existing receipt replay regressions remain.
+
+## 413. The piece-writer matrix did not prove every independent guard
+
+Found: 2026-11-04, while repairing foundation review record FR-090.
+State: fixed as a regression-proof gap.
+
+What happened: The matrix lacked known delivery ownership and status cases,
+a foreign existing-table side row, and an open wait changed by the batch.
+Its partial assertions could miss an extra refusal write.
+
+What changed: The matrix covers planner writes, direct marked reads, reactor
+writes, and marked reads over the authenticated socket. It compares the exact
+event delta, caller, receipt delta, unchanged prior rows, side rows, and wait
+state. Valid owned withdrawals and wait-changing batches provide controls.
+Temporary mutations verify each independent guard and refusal-write check.
+
+## 414. The piece return-policy test accepted an extra engine event
+
+Found: 2026-11-04, while repairing foundation review record FR-098.
+State: fixed as a regression-proof gap.
+
+What happened: The return-policy branch checked for the expected event's
+presence and the absence of a queued notice. An extra withdrawal still passed.
+
+What changed: All stopped or crashed, queued or sent return cases require the
+exact returned singleton. The withdrawal, throwing-rule, and no-notice checks
+remain. A temporary extra-withdrawal mutation must fail the corrected test.
+
+## 415. The reactor test did not distinguish construction before the permit
+
+Found: 2026-11-04, while repairing foundation review record FR-110.
+State: fixed as a regression-proof gap.
+
+What happened: The old sequence-only test passed when reactor construction
+moved immediately before the writer transaction.
+
+What changed: The regression holds the real writer permit, starts a reactor,
+and proves construction has not entered. The earlier transaction commits
+before releasing the permit. The reactor then checks its transaction entry
+and fresh projected state. A temporary hoisted-construction mutation must fail.
+The existing projected-reach regression remains.
+
+## 416. Service-only command help claimed owner terminal access
+
+Found: 2026-11-04, while repairing foundation review finding FR-027.
+State: fixed.
+
+What happened: The command-line help treated the absence of agent access as
+owner-only access. The help for `roles.record`, whose only caller is a service,
+therefore claimed that the owner could call it from the terminal.
+
+What changed: The help lists the actual allowed caller kinds. The owner-terminal
+statement appears only for commands whose sole caller kind is the owner.
+Installed-command help checks cover service-only, agent-only, owner-only,
+owner-and-agent, and owner-agent-service combinations.
+
+## 417. The release tool had no purpose description
+
+Found: 2026-11-04, while repairing foundation review finding FR-032.
+State: fixed.
+
+What happened: The Model Context Protocol (MCP) inventory derived `release` from
+the command group, but its separate description table omitted that command.
+An agent discovering tools received no explanation of its capacity-hold purpose.
+
+What changed: The description names that purpose. The real `tools/list` check
+requires a meaningful description for every offered tool and checks the capacity
+hold meaning of `release`. Its explicit inventory and access exclusions remain.
+
+## 418. JSON thread export lost its local destination
+
+Found: 2026-11-04, while repairing foundation review finding FR-037.
+State: fixed.
+
+What happened: Generic JavaScript Object Notation (JSON) input returned from the
+parser before export-specific validation and dropped the output path. The
+command then connected and read a thread before failing at the local file open.
+An empty path also reached the filesystem, and a blank path could create a file.
+
+What changed: Thread export accepts its documented positional agent and `--out`
+form. It refuses JSON input and empty or blank output paths as usage errors
+before any connection or remote procedure call. Regression checks retain the
+existing destination, verify that no connection or request occurs for invalid
+arguments, and preserve paged export, local-only paths and mode 0600.
+
+## 419. Command groups used a different order from the fixed contract
+
+Found: 2026-11-04, while repairing foundation review finding FR-052.
+State: fixed.
+
+What happened: Both the command-group declarations and the merged request map
+put the board before the client. Contract edit E1 requires engine, client,
+board, then roles. Existing sorted inventory checks did not detect this drift.
+
+What changed: Both declarations follow the specified order. A literal namespace
+expectation checks the declarations and the contiguous request blocks through
+the contracts and the engine's composed lists. The independent uniqueness and
+engine inventory checks remain.
+
+## 420. The roles registration check pinned only two command kinds
+
+Found: 2026-11-04, while repairing foundation review finding FR-059.
+State: fixed.
+
+What happened: The G06 registration check omitted seven of the nine enabled
+roles commands. Other behavioral tests, including A04, already protected
+particular reads, but did not complete the required structural check.
+
+What changed: G06 checks all nine enabled commands in their specified planner
+or read table and requires their absence from the other table. A temporary
+wrong-kind move of `roles.actions.list` proves that the expanded check rejects
+that fault. The production registration and A04 remain unchanged.
+
+## 421. Spaced client commands lacked whole-group regression coverage
+
+Found: 2026-11-04, while repairing foundation review finding FR-099.
+State: fixed.
+
+What happened: The inventory and installed-command parity checks expanded dots
+only for board commands. Twelve client command names lacked checks for their
+fully spaced forms, including the nested settings setters.
+
+What changed: Every installed dotted command except `debug.compare-views` has
+fully spaced inventory matching, remaining-argument, help and dispatch coverage.
+The dotted forms keep their installed-command checks. Explicit nested settings
+checks guard longest matching, and the dedicated standard-input-only secret
+checks remain. A temporary mutation removing only the spaced spelling of
+`client.web.settings.set` proves that the strengthened checks detect that fault.
+
+## 422. Opening a channel did not enforce its manager's unique names
+
+Found: 2026-11-05, while fixing foundation review record FR-034.
+State: fixed.
+
+What happened: A fresh request identifier could open another plain or group
+channel with a name already held by the same manager.
+
+What changed: The opener checks the stored channel names and managers inside
+the command's serialized writer transaction. Plain and group channels share
+this namespace. Another manager can use the same name. An exact request retry
+still replays its original receipt.
+
+Validation: The new plain and group handler regressions rejected the unfixed
+code. They cover distinct requests, exact replay, different managers, cross-kind
+collisions, and two concurrent opens.
+
+## 423. A disappearing board cursor restarted its filtered page
+
+Found: 2026-11-05, while fixing foundation review record FR-035.
+State: fixed.
+
+What happened: Paging resolved its anchor inside the current selected result.
+Closing, resolving, or hiding that anchor restarted the page at its beginning.
+
+What changed: Paging resolves the anchor in the full stable order before
+applying the current result selection. Post reads and status details use post
+sequences. Channel reads use their stored order. Current authorization, encoded
+byte limits, and reads without receipts remain in force.
+
+Validation: Real handler regressions reproduced repeated earlier posts before
+the fix. They cover closed, resolved, and newly hidden incoming anchors, status
+incoming details, and own-open status details.
+
+## 424. Four board regression proofs lacked discriminating fixtures
+
+Found: 2026-11-05, while fixing foundation review records FR-096, FR-113,
+FR-118, and FR-123.
+State: fixed.
+
+What happened: The page fixture never exceeded the singleton budget. Rebuild
+coverage omitted a complete stop and addressed-post batch. A whole-event
+substring assertion rejected valid identity values. The dispatcher regression
+observed only the already reserved send order.
+
+What changed: A schema-valid replay fixture now produces an encoded singleton
+above 512 kibibytes and follows its cursor. Both stop/post/read orders compare
+independent expected state with projection, durable live state, and a reopened
+rebuild. Deterministic universally unique identifiers containing the registered
+text value exercise free-text redaction alongside exact typed identities,
+wake manifests, delivery sources, and receipt joins. Both reservation orders
+run four controlled concurrent merge/close iterations and compare runner calls
+with surviving wakes and committed withdrawals. The existing exact-output
+terminal and Model Context Protocol tests remain unchanged.
+
+Validation: Temporary production mutations exercise each new proof. No
+production change is needed for these four test findings.
+
+## 425. A manager transfer has no channel-name collision policy
+
+Found: 2026-11-05, while checking the manager-transfer scope of FR-034.
+State: open, awaiting an owner policy decision.
+
+What happens: The board contract requires unique names per manager. It also
+requires a stopped manager's channels to move to its available ancestor or the
+owner. Independently opened same-name channels can therefore meet at one
+successor. The transfer event cannot rename a channel. The contract states no
+collision outcome.
+
+What remains: Choose the collision policy before changing transfers. The
+opening fix prevents new collisions within an existing manager's namespace.
+It does not refuse required transfers or invent a new channel name.
+
+## 426. Board recovery polling reads public dispositions as a keyed object
+
+Found: 2026-11-05, while fixing foundation review record FR-097.
+State: fixed in the board recovery acceptance helper.
+
+What happens: The owner snapshot publishes an array of addressee and
+disposition rows.
+The recovery helper indexed that array by an agent identifier.
+A terminal recipient already resolved as gone therefore looked unresolved.
+An all-reply collection with another pending recipient could keep boot
+waiting until its deadline.
+
+What changed: The helper consumes the public `BoardPost` disposition type
+and finds the matching addressee in its array.
+The regression uses the actual snapshot producer with a crashed or
+non-reloadable gone recipient and another pending, blocked recipient.
+Both cases failed with the recovery timeout before the fix.
+The helper still treats no-answer as provisional and waits for actionable
+notifications.
+Blocked notifications and failed or truncated snapshot sections retain
+their existing behavior.
+
+
+## 427. An idle reload suppresses a completed board response
+
+Found: 2026-11-05, while extending the recovery checkpoints for FR-112.
+State: fixed.
+
+What happened: A service killed after an original or reminder response ended,
+but before the reactor committed its next duty, reloaded the idle agent.
+The new interruption, starting state and session-open events hid the earlier
+response turn.
+Recovery queued no carry-on for that idle agent, so the pending reminder or
+no-answer disposition needed an unrelated prompt to progress.
+The actual service kill regression failed at all three completed-response
+checkpoints before the fix.
+
+What changed: The board recognizes the complete idle reload sequence in its
+durable thread and preserves the earlier completed response.
+A working or paused interruption still requires a later response turn.
+An incomplete reload remains unsettled.
+The contract now distinguishes idle and working reloads.
+The deferral matrix distinguishes a working interruption from an idle reload.
+The process checkpoints cover the already completed idle response.
+The regression kills the real service at complete transaction boundaries.
+
+## 428. Capacity acceptance observed only an early counter and board wakes
+
+Found: 2026-11-05, while repairing foundation review records FR-050 and FR-071.
+State: fixed.
+
+What happened: The Foundry capacity fixture copied its blocking-wait counter
+before completing the worker. A later premature client reply escaped the
+assertion. The lead-wake metric counted only board wake events, so engine-only
+lead deliveries also escaped it.
+
+What changed: The fixture records every client reply against the committed
+worker completion sequence. It checks the wait satisfaction sequence after
+that completion. It counts all lead delivery sends and runner prompts from
+the capacity interval, with startup work explicitly excluded. Temporary faults
+show that the old fixture accepted a late premature reply and extra lead work
+during both hold and release. The corrected fixture rejects all three cases.
+
+## 429. Board membership tests did not reserve concurrent writers in both orders
+
+Found: 2026-11-05, while repairing foundation review record FR-083.
+State: fixed.
+
+What happened: Sequential label changes did not prove that queue and send
+checks use membership protected by the writer permit.
+
+What changed: Socket tests reserve each writer order at queue and send, with
+six repetitions of each case. The second operation attempts its writer
+acquisition while publication by the first operation is held. Withdrawn
+identities never enter runner calls. A send reserved before removal remains
+permitted. A temporary stale-snapshot fault is rejected.
+
+## 430. Addressee tests stopped collecting at the first correct send
+
+Found: 2026-11-05, while repairing foundation review record FR-084.
+State: fixed.
+
+What happened: The question and reply collections ended on their expected
+recipient. An extra later send was outside the asserted intervals.
+
+What changed: A companion socket test drains the real board lifecycle and
+all four dispatchers to a fixed point. It checks each complete recipient
+multiset, preserves the exact boundary between phases, and checks the final
+interval after both expected turns finish. Temporary extra deliveries after
+the correct question and completion sends are both rejected. The existing
+service-process scenario remains in place.
+
+## 431. Production board wakes had no sent-text event for their target
+
+Found: 2026-11-05, while repairing foundation review record FR-074.
+State: fixed.
+
+What happened: The dispatcher committed the send identity but omitted the
+existing `PromptSent` event. The board's criterion 5.14 therefore could not
+observe sent wake text through the target's subscription or event read.
+The queue envelope remains owner-only under the engine's visibility rule.
+
+What changed: Every text send commits its `PromptSent` beside `DeliverySent`.
+The existing delivery identity, incarnation, and send sequence still govern
+the runner call. A production-built wake crosses the oversized stream limit
+and is recovered whole by owner and target event and thread reads. The test
+uses a large valid target identity to exercise event-metadata overhead beyond
+the wake builder's reserved body space. Board events remain whole. Agent pages
+cover quotes, backslashes, control characters, four-byte text, singleton
+progress, exact cursors and read marks, fresh boundaries, and captured wire
+frames. The command line and Model Context Protocol forward the labelled
+board-read data unchanged.
+The thread pagination boundary also preserves the sent-text event and checks
+its complete delivery identity, sender, and text after the dispatch event.
+
+## 432. An invalid agent recovery wrapper escaped typed failure handling
+
+Found: 2026-11-05, while repairing foundation review record FR-025.
+State: fixed.
+
+What happened: The client parsed an agent's recovery data and accessed its envelope before validating the wrapper. JSON null caused a defect. Automatic subscription recovery only handles typed failures.
+
+What changed: The shared client core validates the complete wrapper with the wire schema before accessing its envelope. Node and browser socket regressions exercise null, missing and invalid envelopes, invalid JSON and malformed framing. They require a retry from the cursor before the marker, ordered delivery after a valid retry, and a typed client error on exhaustion.
+
+## 433. A thread read accepted a cursor beyond the durable log head
+
+Found: 2026-11-05, while repairing foundation review record FR-040.
+State: fixed.
+
+What happened: The thread reader checked numeric cursor validity but returned an empty final page when the cursor exceeded the durable log head.
+
+What changed: The reader compares the cursor with SQLite's durable head on the read connection. Equality remains valid. The published view still bounds the page. Regressions cover empty and populated logs, the public thread read, and a published view behind the durable log.
+
+## 434. Client regressions omitted control-state and temporal boundaries
+
+Found: 2026-11-05, while repairing foundation review records FR-056, FR-077, FR-095, FR-100, FR-103, FR-111 and FR-114.
+State: fixed in the regression suite.
+
+What happened: Snapshot replay compared identities without the changing control fields. Capacity parity omitted the hold boolean. Several wait fixtures could pass despite stale state or an omitted retry. The visibility fixtures reopened subscriptions after availability changes. The frame-boundary fixture stopped at its oversized marker.
+
+What changed: Snapshot replay compares groups, lifecycle, counts and holders before, during and after publication for the owner and a fixed agent read set. The fold property compares capacity holds through release, stop and crash. Both wait modes begin with an empty held queue. The quiet retry respects its cursor. The resumed-member case publishes a complete boundary while one member works. The permission matrix covers an answered suffix and a genuinely held control in both delivery phases and modes. Both socket subscription surfaces remain open through pause, crash and recovery, and replay old events with recovered rights. A separate current-holder oracle replaces the static event matrix. The transport-boundary stream must deliver ordered catch-up and live tails after its marker. Temporary fault mutations verify the strengthened assertions.
+
+## 435. The first alert scan selected a different silent recipient from the live follower
+
+Found: 2026-11-05, foundation review record FR-041.
+State: fixed.
+
+What happened: The live follower kept the first no-answer resolution for an owner post. The first-start scan instead chose the first silent recipient in the post's recipient list. Reversed resolution order therefore linked the same matter to different agent threads.
+
+What changed: The board fold retains the first agent whose no-answer resolution raised the owner's alert. The first-start scan uses that replayed identity for as long as the post remains open.
+
+Validation: Reversed two-recipient scenarios compare the live and rebuilt alert keys, kinds, subjects, agent identifiers, and production thread routes. Both closing the post and dismissing its alert clear one alert without raising a duplicate. The regression failed against the original scan.
+
+## 436. Alert list reads ignored the encoded page budget
+
+Found: 2026-11-05, foundation review record FR-045.
+State: fixed.
+
+What happened: The alert reader applied only the item-count limit. Two individually valid piece subjects could exceed the 900 kibibyte budget together, without returning a continuation cursor.
+
+What changed: The reader counts the complete encoded items, including array punctuation, escaping, timestamps, and delivery metadata. It retains the first whole item even when that item exceeds the budget. When another matching row remains, the cursor identifies the last included row.
+
+Validation: The public command path covers large escaped and multibyte subjects, exact and one-byte-over boundaries, status filtering, cleared rows, the count limit, an oversized first item, and cursor progress. The over-budget cases failed against the original reader.
+
+## 437. The carrier configuration test inspected baseline exclusion before work completed
+
+Found: 2026-11-05, foundation review record FR-061.
+State: fixed.
+
+What happened: The test waited for one ordinary alert's delivery and then immediately asserted that no baseline alert had been sent. A delayed worker could run after those assertions.
+
+What changed: A test helper observes the production delivery follower through its existing services. A subsequent reconciliation scan and joins of its worker fibers establish completion before the negative assertions. The test checks both successful and failed baseline attempts.
+
+Validation: A temporary fault that permits baseline delivery and delays its worker is rejected by the corrected test. The fault is restored before committing.
+
+## 438. The first-start tests did not start with a persisted carrier
+
+Found: 2026-11-05, foundation review record FR-070.
+State: fixed.
+
+What happened: Existing first-start coverage had no carrier configuration before the initial scan. It could not prove suppression of baseline delivery together with later live delivery.
+
+What changed: The new scenario persists a carrier and an open question with the client follower absent. It then starts the real follower and sender against a local fake carrier. It waits for a later live question to be delivered and for delivery work to complete.
+
+Validation: The scenario requires exactly one carrier request and one delivered live alert, with no baseline delivery or failure attempt. Temporary baseline-send and disabled-all-sends faults are rejected. No physical phone is involved.
+
+## 439. The alert crash fixtures missed the required process-death boundaries
+
+Found: 2026-11-05, foundation review record FR-075.
+State: fixed.
+
+What happened: The source crash fixture had no active client follower. The baseline fixture injected a handled database failure instead of killing the writer inside its transaction.
+
+What changed: A child now parks the real follower after it reads the source envelope and before appending its reaction. A second child parks after all baseline rows are staged on the transaction's writer connection and before commit. The parent kills each child with the SIGKILL signal.
+
+Validation: The parent verifies the durable source and absent reaction, or complete absence of baseline rows after rollback. Two reopens require one recovered alert or one complete baseline, stable alert identifiers, and progress on later sources. Temporary lost-source and split-baseline faults are rejected. The handled-write-failure and recovery-gate scenarios remain.
+
+
+## 440. Two new alert regressions selected different baseline threads
+
+Found: 2026-11-05, while integrating the foundation board-recovery and alert repairs.
+State: fixed.
+
+What happened: The new first-start recovery fixture expected recipient-list order.
+The independently verified alert repair preserves the first actual no-answer resolution.
+The combined test failed with the correct recovered agent identity.
+
+What changed: Both regressions remain.
+The first-start fixture now expects the first resolved agent and explains that rule.
+Its baseline, subject, unique-key, no-delivery and close assertions remain.
+The separate live-versus-rebuild tests retain exact thread routes through close and dismiss.
+
+Validation: The combined four-test file failed only at the old recipient-order expectation.
+The same tests pass after that expectation is reconciled with the cause repair.
+The run retains both logs and the complete resolution diff.
+
+## 441. The backoff independence test dismissed the first alert
+
+Found: 2026-11-05, while repairing foundation review record FR-053.
+State: fixed.
+
+What happened: The regression cleared the failed alert before raising another.
+It did not prove that a sleeping retry leaves another open alert free to send.
+
+What changed: A separate controlled-clock regression keeps the first alert open
+with one failed attempt. It requires the second alert to deliver before the
+first retry deadline. It then advances to that deadline and checks attempt two.
+The existing clear-during-backoff regression remains.
+
+Verification: A temporary serialization guard prevents the second delivery and
+fails the new regression. The production worker is restored before committing.
+
+## 442. Socket closure was treated as a persisted delivery outcome
+
+Found: 2026-11-05, while repairing foundation review record FR-081.
+State: fixed.
+
+What happened: The large-response test checked the event log once immediately
+after observing socket closure. The delivery continuation could still be
+waiting to write its outcome.
+
+What changed: The test waits for the alert-specific persisted failed attempt.
+A controlled delay after the real transport closes keeps this boundary visible.
+
+Verification: The earlier assertion fails with that delay. The corrected wait
+passes with the real writer. A temporary omission of the failed-attempt write
+fails the corrected regression. This establishes a scheduling proof gap rather
+than an observed intermittent test failure rate.
+
+## 443. The accepted-send crash fixture signalled before the failed write latched
+
+Found: 2026-11-05, while repairing foundation review record FR-104.
+State: fixed.
+
+What happened: The child reported the raised alert before its delivery write
+failed. Killing it after the carrier accepted the request did not prove that
+the live delivery reactor stopped or that the writer latched.
+
+What changed: The child observes the composed reactor's write-failure exit and
+the service supervisor's stop decision. It removes the database trigger and
+probes the same writer to prove that the failure remains latched. The parent
+advances the live child's clock past retry deadlines and checks a stable
+request count before killing it. The restart still proves at-least-once delivery.
+
+Verification: Temporary faults exercise swallowed worker errors, a missing
+writer latch, and supervisor restart after write failure. Production source is
+restored before committing.
+
+## 444. Large and slowly streaming carrier responses lacked later-progress checks
+
+Found: 2026-11-05, while repairing foundation review record FR-106.
+State: fixed.
+
+What happened: The large-body test ended after its first outcome. No direct
+fixture exercised a slowly streaming response body and a later alert source.
+
+What changed: The large-body case waits for socket closure and a persisted
+failed attempt before raising a new source and requiring delivery. A separate
+streaming-body fixture writes repeated chunks without ending. It checks the
+ten-second timeout, socket closure, persisted failure, and a later source's
+first-attempt delivery before the failed alert can retry.
+
+Verification: A temporary worker fault that blocks later alerts after a failure
+makes both progress checks fail. No physical phone or external carrier was used.
+
+## 445. The real web service fixtures skipped their live-view rebuild comparison
+
+Found: 2026-11-05, while repairing foundation review record FR-068.
+State: fixed.
+
+What happened: The child services opened durable event logs, but the parent
+fixtures declared that they had no log to compare.
+Setup, running and restarted instances closed without comparing live views.
+
+What changed: Each web child has a scoped stop operation that calls the existing
+owner-only debug comparison before stopping the process.
+Explicit stops and scope cleanup use that same operation.
+The no-password, environment, redaction and durable-outage fixtures use it.
+Comparison failures report no live values.
+
+Verification: A temporary live-only projection field passes the original
+fixtures and fails all three assigned child-service test files.
+The mutation is restored before committing.
+
+## 446. The heartbeat test did not require survival at the second tick
+
+Found: 2026-11-05, while repairing foundation review record FR-105.
+State: fixed.
+
+What happened: The missed-heartbeat test waited through the second tick without
+checking that the nonresponding connection remained open.
+It could accept termination after one unanswered heartbeat.
+
+What changed: The test requires both connections to remain open at 50 seconds,
+after allowing network processing.
+It still requires the nonresponding connection to close at 75 seconds.
+The healthy connection remains its positive control.
+
+Verification: A temporary one-miss threshold passes the original test and fails
+the new 50-second assertion.
+The mutation is restored before committing.
+
+## 447. The disable test proved eventual closure without proving its order
+
+Found: 2026-11-05, while repairing foundation review record FR-107.
+State: fixed.
+
+What happened: Polling until a port refused connections did not establish that
+the server had stopped accepting before the settings command returned.
+
+What changed: One test retains an accepted web connection and checks its closure.
+Another observes real listener-close and accepted-socket-destroy operations.
+It requires both operations before settings completion.
+It does not require synchronous close delivery to the peer.
+
+Verification: Temporarily delaying listener teardown passes the original test
+and fails the new ordering assertion.
+The mutation is restored before committing.
+
+## 448. The session-expiry test advanced only Effect time
+
+Found: 2026-11-05, while repairing foundation review record FR-109.
+State: fixed.
+
+What happened: A session lifetime implemented with the JavaScript wall clock
+could survive the test's adjustment of Effect time alone.
+
+What changed: The test advances Date.now after session creation as well as the
+Effect test clock.
+It restores the wall-clock observer through scope cleanup.
+Network timers and engine followers continue to use real scheduling.
+
+Verification: A temporary wall-clock session lifetime passes the original test
+and fails the updated session check.
+The mutation is restored before committing.
+
+## 449. The bind-retry test reset the supervisor before proving repeated recovery
+
+Found: 2026-11-05, while repairing foundation review record FR-116.
+State: fixed.
+
+What happened: The outage test replaced the listener after one failed retry.
+A supervisor that retried only once per lifetime could pass.
+
+What changed: A new regression holds one port through two failed retries of one
+supervisor, then releases it and requires its next attempt to succeed.
+It observes actual bind attempts at each 30-second boundary.
+The existing restart, outage and disable controls remain.
+
+Verification: A temporary one-retry supervisor passes the original outage test
+and fails the new repeated-retry assertion.
+The mutation is restored before committing.
+
+## 450. The proxy-mode test changed the public address at the same time
+
+Found: 2026-11-05, while repairing foundation review record FR-117.
+State: fixed.
+
+What happened: The proxy-mode invalidation fixture also changed publicAddress.
+It could pass when only address changes invalidated connections.
+
+What changed: Separate cases toggle only proxyMode in both directions.
+Each starts with a canonical public address and two established connections.
+Each requires both connections to close.
+The other setting-change cases remain.
+
+Verification: Temporarily retaining connections for a proxy-only change passes
+the original setting-change tests and fails both new direction cases.
+The mutation is restored before committing.
+
+## 451. Loading a large action did not update its permission request's context
+
+Found: 2026-11-05, foundation review record FR-038.
+State: fixed.
+
+What happened: A loaded content event stayed inside its placeholder component.
+The thread watcher retained the marker, so the matching permission request still
+showed the missing-input warning and lacked its local action context.
+
+What changed: Successful content recovery enters the watcher's shared map by
+sequence. Later publications retain the event without duplicating its marker.
+Regressions cover live large actions, request-local context before Allow,
+reconnection, unrelated identities, and retained partial-input warnings.
+
+## 452. Situation lane tests did not distinguish questions or recovery states
+
+Found: 2026-11-05, foundation review record FR-085.
+State: fixed.
+
+What happened: The fixtures exercised permissions, working agents, and idle
+agents, but no question-only agent or paused, interrupted, or crashed agent.
+
+What changed: Isolated fixtures require each predicate to place its agent only
+in Needs you. Controlled live updates check entry, exit, and precedence while
+retaining permission, working, and idle controls. Temporary mutations remove
+each predicate and reverse precedence to verify the assertions reject them.
+
+## 453. A navigation test could count Strict Mode's earlier cancellation
+
+Found: 2026-11-05, foundation review record FR-089.
+State: fixed.
+
+What happened: An aggregate finalizer count could pass because React's Strict
+Mode replay cancelled an earlier read before navigation.
+
+What changed: The test identifies the active read generation before navigation
+and requires that generation's finalizer afterward. Alerts and Settings are
+covered with and without Strict Mode. A temporary mutation preserves replay
+cancellation while omitting navigation cancellation.
+
+## 454. The unknown-event thread test only covered history
+
+Found: 2026-11-05, foundation review record FR-094.
+State: fixed.
+
+What happened: The named compatibility test did not deliver an unknown event
+through the mounted thread's live subscription.
+
+What changed: A controlled subscription emits unknown and supported events after
+mounting. The test requires subsequent content, a usable prompt, and reconnect
+cursors that include unknown events. Temporary mutations stop live continuation
+or skip the unknown event's cursor advancement.
+
+## 455. Recovery tests omitted the period before context was available
+
+Found: 2026-11-05, foundation review record FR-108.
+State: fixed.
+
+What happened: Awaiting recovered content before inspecting the answer controls
+could miss premature publication while an event read was pending.
+The new rejection case also exposed partial history with enabled controls after
+another request's initial context recovery failed.
+
+What changed: Gated snapshot and oversized live recovery tests inspect the
+pending interval before releasing context. They require no premature answer
+command and verify context before enabled controls. The watcher now withholds
+partial history until initial recovery finishes. Rejection and cancellation
+remain non-actionable. A temporary early-publication mutation is rejected.
+
+## 456. Matching-context assertions could read the ordinary thread article
+
+Found: 2026-11-05, foundation review record FR-121.
+State: fixed.
+
+What happened: Container-wide assertions could pass when the matching file
+change appeared only outside its permission request.
+
+What changed: The test requires the path and diff inside the identified request,
+unfolded and before its own Allow control. It separately retains the ordinary
+article. Temporary absent, collapsed, and below-control mutations are rejected.
+
+## 457. A placeholder test could not count an extra state-event placeholder
+
+Found: 2026-11-05, foundation review record FR-124.
+State: fixed.
+
+What happened: The generic placeholder did not name its event tag, so asserting
+that StateChanged text was absent could not detect an extra placeholder.
+
+What changed: Combined content and state input must yield exactly one placeholder.
+State-only input must yield none. The tests require lazy content reads and a
+separate snapshot recovery for state. A temporary state-placeholder mutation
+is rejected.
+
+## 458. A successful push-setting test omitted the acknowledged checkbox state
+
+Found: 2026-11-05, foundation review record FR-126.
+State: fixed.
+
+What happened: The test checked the command payload without inspecting the
+checkbox after the successful acknowledgement.
+
+What changed: The test gates the acknowledgement, requires a disabled pending
+checkbox, then requires an enabled unchecked checkbox without a refresh.
+A temporary mutation removes the saved-state update. The existing failed-save
+rollback test remains in place.
+
+## 459. The root acceptance gate omitted the required browser proofs
+
+Found: 2026-11-05, while repairing foundation review record FR-065.
+State: fixed as an acceptance-gate gap.
+
+What happened: The root `pnpm check` ran typechecking, Vitest and the credit
+check. It omitted Playwright. The old gate passed with an intentionally failing
+browser test present.
+
+What changed: The root gate now runs the complete Playwright suite after
+Vitest. `pnpm test:browser` also runs that suite independently. Browser
+execution has at most two workers. The client API plan records the Chromium
+prerequisites and the aggregate gate in decision 205. Vitest still excludes
+browser files because Playwright executes them.
+
+Validation: Discovery includes login, external navigation and foreign-origin
+checks. The repaired root gate executes and rejects the intentionally failing
+browser assertion. The temporary failure is removed before the final gate.
+
+## 460. The production-browser slow-link recovery proof was missing
+
+Found: 2026-11-05, while repairing foundation review record FR-080.
+State: fixed as a regression-proof gap.
+
+What happened: Unit tests covered oversized state and separate read and stream
+connections. They did not exercise the composed production browser on a slow
+link, as client API criterion 7.14 requires. No production recovery failure was
+established by that absence.
+
+What changed: A production-bundle Playwright scenario starts an agent with a
+300-kibibyte prompt and recovers large permission and harness changes. A real
+proxy then paces encoded WebSocket bytes at 500 kilobits per second while live
+state continues. The browser recovers a permission event over one mebibyte
+once, on the same surviving read connection. Its roster, request identities
+and counts converge. A controlled stream reconnect retains both requests, and
+the owner answers the recovered request.
+
+Validation: Chrome's debugger reads the initialized Effect pinger values in
+the production artifact before throttling starts. The read interval is 25
+seconds and its timeout is 50 seconds. The stream retains the five-second
+defaults. The encoded recovery reply is 1,049,303 bytes and takes about 16.9
+seconds. A temporary mutation restoring the read defaults fails the runtime
+option assertions. This automated fixture does not claim the separate owner
+phone or proxy checks.
+
+## 461. The board browser journey did not identify its read and completion effects
+
+Found: 2026-11-05, while repairing foundation review record FR-093.
+State: fixed as a regression-proof gap.
+
+What happened: Text visibility did not establish that following a notification
+left its post unread. A removed form did not establish an answered parent.
+An aggregate runner count did not identify the completion delivery.
+
+What changed: The scripted agent posts through the real authenticated Unix
+socket. A fake carrier sends the notification to the production browser.
+The test checks the durable owner read count before navigation, before the
+tap and after the tap. It checks the exact parent's answered outcome. It ties
+the completion wake to the original post, its owner reply, its target agent,
+the queued delivery, the sent delivery and the prompt received by the real
+agent process. Two controlled flushes and dispatch drains preserve one
+completion. The fixture uses the production state-folder permissions.
+
+Validation: Temporary mutations silently mark a linked post read, close its
+parent with the wrong outcome, or omit the completion reply manifest. Each
+fails its new discriminating assertion. The plain-text rendering, notification
+privacy, session-cookie and alert-clear checks remain.
+
+## 462. The terminal viewer integration peer accepted any request source sequence
+
+Found: 2026-11-05, while repairing foundation review record FR-088.
+State: fixed as a regression-proof gap.
+
+What happened: The fake event responder returned permission event 9 for every
+numeric sequence. The integration test could pass if the application requested
+the wrong source event.
+
+What changed: The peer refuses any sequence other than 9. The test independently
+checks the observed sequence, requires the context read before the answer, and
+keeps the context-reading and selected-answer assertions. A temporary wrong
+sequence in the application must fail the corrected integration test.
+
+## 463. Permission closure tests did not prove answered action removal
+
+Found: 2026-11-05, while repairing foundation review record FR-091.
+State: fixed as a regression-proof gap.
+
+What happened: The routing fixtures checked action removal only on cancellation.
+The reducer's answered fixture began without action data. A retained action in
+an answered row could escape both expectations.
+
+What changed: The routing and reducer tests independently assert populated
+action data before closure. Separate answer and cancellation projections require
+the action property to be absent. Status, selected answer, answering actor, and
+cancellation reason remain checked. Temporary action-retention mutations in each
+closure branch must fail the corrected tests.
+
+## 464. Foundry wrap-up assigned owner-only thread exports to agent leads
+
+Found: 2026-11-05, while repairing foundation review record FR-020.
+State: fixed as a documentation conflict.
+
+What happened: The recipe asked each lead to export conversations without
+an owner-side caller or handoff. The exporter requires structured owner
+pages. An agent receives an enveloped reply even when it may read a child's
+thread, so its export is refused.
+
+What changed: The owner exports the requested threads from an authenticated
+terminal and confirms the archive paths to each lead before reporting.
+Cleanup waits for those files to be saved in the run archive. This agrees
+with the owner client used by the live roles script. Agent credentials and
+data envelopes keep their existing boundaries.
+
+## 465. The Foundry channel example used a display name instead of a valid channel name
+
+Found: 2026-11-05, while repairing foundation review record FR-036.
+State: fixed as a documentation conflict.
+
+What happened: The Step 3 example used `Backend team`. The channel name
+schema refuses spaces, and the command line does not normalize the name.
+
+What changed: The example uses `backend-team`. The recipe states the existing
+letter-first, 64-character limit and allowed letters, digits, underscores
+and hyphens. The schema and command behavior are unchanged.
+
+## 466. The board read criterion promised services a plain post page
+
+Found: 2026-11-05, while repairing foundation review record FR-079.
+State: fixed as a documentation conflict.
+
+What happened: Criterion 5.16 grouped the owner and services together for
+plain `board.read` replies. The contract and command access table forbid
+service reads of posts.
+
+What changed: Criterion 5.16 now requires the owner's plain reply, the
+agent's unchanged data envelope, and refusal for a service. No access was
+widened, and the existing read and wrapping checks remain.
+
+## 467. The README said nothing was built after foundation implementation
+
+Found: 2026-11-05, while checking the foundation documentation repair scope.
+State: fixed as a documentation problem.
+
+What happened: The README's opening warning said nothing was built. The
+service composition already registers the engine, client, board and foundry
+supervision implementations. The foundation review and its repairs are in
+progress, so implementation presence does not mean release clearance.
+
+What changed: The warning describes the implemented foundation and ongoing
+review. It keeps standing permission rules, real-account checks and physical
+phone checks separate from completed implementation. It makes no claim that
+the build is released or cleared. The recipe and plan corrections in this
+change do not build roles units 3, 4 or 11a.
+
+## 468. Recording cleanup could leave a descendant running after the adapter closed
+
+Found: 2026-11-05, while repairing foundation review record FR-043.
+State: fixed.
+
+What happened: Closing the adapter resolved the recorder's close promise.
+The finalizer then cancelled group escalation before a descendant that
+ignored termination had exited. A descendant with released standard streams
+could outlive the recording and the caller's temporary-workspace removal.
+
+What changed: Recording completion awaits cleanup of the owned process group,
+including bounded forced termination after the leader has exited. The version
+probe uses the same cleanup. Linux liveness checks exclude killed zombies
+that cannot execute or hold the workspace. Real-process regressions cover
+successful recording, failure, cancellation and a version-probe descendant.
+
+## 469. The roles live check omitted a positive first-stall observation
+
+Found: 2026-11-05, while repairing foundation review record FR-064.
+State: open for the owner's real-account execution.
+
+What happened: The live workflow rejected a false stall during collection,
+but never observed a genuine idle obligation through its first production-minute
+stall. The in-process acceptance test did not supply the retained child-process
+proof required by post-build check 7.
+
+What changed: The owner-run workflow now gives one worker an unanswered post,
+waits for its production stall interval without changing the clock or limits,
+and requires one stall action, one nudge wake and the worker's later reply.
+Its private report retains the event identities and elapsed milliseconds.
+The owner must run `pnpm live-check:roles` and retain the authentic report.
+No real account or owner recording was used for this repair.
+
+## 470. The roles live observer could count evidence outside the selected wave
+
+Found: 2026-11-05, while repairing foundation review record FR-125.
+State: open for the owner's real-account execution after observer repair.
+
+What happened: Orientation evidence was not bound to the selected post or
+channel. Aggregate answered closure and acknowledgments could coexist with
+a terminal non-reply disposition instead of a reply from each worker.
+
+What changed: Each exact worker must supply an authenticated orientation reply
+on that wave and channel. Its replied disposition must name that reply as its
+deciding post. Manual positive and negative controls exercise the observer.
+The owner must rerun the real-account workflow before this proof gap closes.
+The unit 14 ruling against a new required automated suite remains in force.
+
+## 471. The service-resume test omitted failed setup attribution
+
+Found: 2026-11-05, while repairing foundation review finding FR-120.
+State: fixed.
+
+What happened: The focused service-caller test exercised only successful
+reloads. Its later-write query excluded owner rows before checking attribution.
+The correct production failure path therefore lacked proof that its later
+state and failure rows retain the service and its optional rule.
+
+What changed: Four cases reject the actual load or fresh-start setup, with
+and without a service rule. They inspect every target row after the command's
+watermark, including the later failure transaction, without filtering callers.
+They require the exact service, rule, failure state, transaction identity and
+revocation of both the old token and the setup token. The successful reload
+case remains and no longer excludes owner rows. Temporary faults separately
+replace the failure caller, discard its rule, omit token revocation and replace
+the success caller. No production attribution change is needed.

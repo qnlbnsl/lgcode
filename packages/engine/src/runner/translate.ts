@@ -26,12 +26,13 @@ export const translate = (value: unknown, replay: boolean): ReadonlyArray<Transl
     : update.sessionUpdate === "plan_update" && update.plan?.type === "items" ? update.plan.entries : undefined;
   if (Array.isArray(entries)) return [{ kind: "plan", text: JSON.stringify(entries), content: { _tag: "plan", entries } }];
   if (update.sessionUpdate !== "tool_call" && update.sessionUpdate !== "tool_call_update") return [];
+  const correlation = typeof update.toolCallId === "string" && update.toolCallId !== "" ? { callId: update.toolCallId } : {};
   const content = Array.isArray(update.content) ? update.content : [];
   const diffs: Translated[] = content.flatMap((part: any) => {
     if (part?.type !== "diff") return [];
-    if (typeof part.path === "string") return [{ kind: "file-change" as const, text: part.newText ?? "", content: { _tag: "file-change" as const, path: part.path, diff: part.newText ?? "" } }];
+    if (typeof part.path === "string") return [{ kind: "file-change" as const, text: part.newText ?? "", content: { _tag: "file-change" as const, ...correlation, path: part.path, diff: part.newText ?? "" } }];
     return (part.changes ?? []).filter((change: any) => typeof change.path === "string").map((change: any) => ({
-      kind: "file-change" as const, text: part.patch?.text ?? "", content: { _tag: "file-change" as const, path: change.path, diff: part.patch?.text ?? "" },
+      kind: "file-change" as const, text: part.patch?.text ?? "", content: { _tag: "file-change" as const, ...correlation, path: change.path, diff: part.patch?.text ?? "" },
     }));
   });
   if (diffs.length > 0) return diffs;

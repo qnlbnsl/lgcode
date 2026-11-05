@@ -176,7 +176,10 @@ a parent's rights reach only its own children, not its grandchildren. A lead
 that needs to act on a worker's worker asks the worker, or the owner acts.
 
 `subscribe` for an agent shows only its own thread and its children's. The
-owner sees everything.
+owner sees everything. The client API plan widens this by one case (lead
+ruling L29, 2026-11-03): an agent also sees an agent whose parent is
+unavailable and whose rights have passed up to it, for as long as that
+lasts, so an agent can always see an agent it may act on.
 
 ### 4. The agent runner
 

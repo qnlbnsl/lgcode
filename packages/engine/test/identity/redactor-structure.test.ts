@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { it } from "@effect/vitest";
-import { AgentId, RequestId, type Event } from "@shephrd/contracts";
+import { AgentId, Event, RequestId } from "@shephrd/contracts";
 import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -21,6 +21,24 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 const agentId = Schema.decodeUnknownSync(AgentId)("1b4e28ba-2fa1-4a64-8711-123456789abc");
 const instance = (secret: string) => makeRedactor({ secrets: () => [Redacted.make(secret)], tokenHashes: () => new Set() });
 const event = (text: string): Event => ({ _tag: "ThreadItem", agentId, itemId: "item", content: { _tag: "text", text }, replay: false });
+
+it.effect("board completionReplyText preserves a whole post id containing a registered secret", () => {
+  // A synthetic collision marker, never an actual credential.
+  const marker = "synthetic-collision";
+  const postId = `post-before-${marker}-after`;
+  const wake = Schema.decodeUnknownSync(Event)({
+    _tag: "board.WakeBuilt", wakeId: "wake", targetAgentId: "target", carried: [], mustReply: [],
+    completions: [postId], completionReplyText: [postId], reminders: [], noAnswers: [],
+  });
+  return Effect.gen(function* () {
+    const redactor = yield* Redactor;
+    const redacted = yield* redactor.redact(wake);
+    expect(redacted._tag).toBe("board.WakeBuilt");
+    if (redacted._tag !== "board.WakeBuilt") throw new Error("wrong event tag");
+    expect(redacted.completionReplyText).toEqual([postId]);
+    expect(yield* redactor.redact(event(marker))).toEqual(event("[REDACTED]"));
+  }).pipe(Effect.provide(instance(marker).layer));
+});
 
 it.effect.each(["x", "1", "text", "ThreadItem", agentId])(
   "A4 explicit secret %s preserves object keys, tags and a UUID agentId, but still redacts text",
@@ -71,7 +89,6 @@ it.effect.each([
   { _tag: "PermissionMoved", agentId: "acct", permissionRequestId: "acct", deliveryId: "acct", from: { _tag: "agent", agentId: "acct" }, to: { _tag: "owner" } },
   { _tag: "QuestionMoved", agentId: "acct", questionId: "acct", deliveryId: "acct", from: { _tag: "owner" }, to: { _tag: "agent", agentId: "acct" } },
   { _tag: "OwnerNeeded", agentId: "acct", reason: "safe", subject: { _tag: "permission", id: "acct" } },
-  { _tag: "DeviceRevoked", deviceId: "acct" },
   { _tag: "SessionOpened", agentId: "acct", session: { _tag: "acp", sessionId: "safe" }, protocolVersion: 2, reloadable: true,
     process: { groupId: 42, bootId: "acct", startTime: "123", userId: 1000, executable: "/tmp/safe" } },
 ])("A4 $_tag preserves nested branded identities even when they equal an explicit secret", (input) =>

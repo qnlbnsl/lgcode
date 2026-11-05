@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { PermissionRequestId, type Event } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+import type { EngineLists } from "../pieces/lists.ts";
 import type { Snapshot } from "../commands/internal.ts";
 import type { RunnerEvent } from "../runner/Runner.ts";
 import { targetGone } from "../routing/deliveries.ts";
@@ -52,7 +53,7 @@ export const makeStderrTail = (options: {
 // wait naming the child supplies the ancestor's notice. Queue any other
 // ancestor notice first, so it counts against that ancestor being settled.
 export const crashEvents = (
-  snapshot: Snapshot, event: Extract<RunnerEvent, { _tag: "exited" }>,
+  snapshot: Snapshot, event: Extract<RunnerEvent, { _tag: "exited" }>, lists?: EngineLists,
 ): ReadonlyArray<Event> => {
   const cancelled = Object.values(snapshot.requests)
     .filter((row) => row.agentId === event.agentId && row.status === "open")
@@ -64,7 +65,7 @@ export const crashEvents = (
     _tag: "AgentCrashed", agentId: event.agentId, exitCode: event.exitCode, signal: event.signal, stderr: event.stderr,
   }, ...cancelled];
   crashed.push(...moveHeld(project(snapshot, crashed), [event.agentId]));
-  crashed.push(...targetGone(project(snapshot, crashed), event.agentId, "crashed"));
+  crashed.push(...targetGone(project(snapshot, crashed), event.agentId, "crashed", lists));
   const holder = holderAbove(snapshot, event.agentId);
   if (holder._tag === "owner") return [...crashed, { _tag: "OwnerNeeded", agentId: event.agentId, reason: "agent crashed" }];
   const waiting = Object.values(snapshot.waits).some((wait) => wait.status === "open"

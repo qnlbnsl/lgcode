@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import {
-  AgentId, DeviceId, Event as EventSchema, RequestId,
+  AgentId, Event as EventSchema, RequestId,
   type Actor, type Event, type HarnessSettings, type LifecycleState, type PermissionLevel,
 } from "@shephrd/contracts";
 import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
@@ -17,7 +17,6 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import * as CommandHandler from "../../src/commands/CommandHandler.ts";
 import * as SecretStore from "../../src/commands/SecretStore.ts";
-import { mintDeviceCredential } from "../../src/identity/devices.ts";
 import { mintAgentToken } from "../../src/identity/tokens.ts";
 import * as EventLog from "../../src/log/EventLog.ts";
 import { migrate } from "../../src/log/migrations.ts";
@@ -97,6 +96,10 @@ export const makeFakeSecrets = (): FakeSecrets => {
 export interface Fakes {
   readonly runner: FakeRunner;
   readonly secrets: FakeSecrets;
+  // WS-7b: the production default declines until the roles condition exists.
+  // Tests inject only that pure policy; planning, dispatch and writes stay real.
+  readonly capacityHoldCondition?: (agentId: AgentId, snapshot: import("../../src/commands/internal.ts").Snapshot) => unknown;
+  readonly lists?: import("../../src/pieces/lists.ts").EngineLists;
   // The harness defaults the service loads on a first start and on
   // `harnesses reset`. A rig that leaves it out has none (fix round 1, N-1).
   readonly harnessDefaults?: Effect.Effect<ReadonlyArray<HarnessSettings>>;
@@ -113,16 +116,17 @@ export interface Fakes {
 export const provideRig = <A, E, R>(
   rig: Rig, fakes: Fakes, program: Effect.Effect<A, E, R>,
 ) => {
-  const baseLog = EventLog.layer.pipe(
-    Layer.provideMerge(Views.layer), Layer.provide(fakes.redactor ?? Redactor.layer),
+  const baseLog = EventLog.makeLayer(fakes.lists).pipe(
+    Layer.provideMerge(Views.makeLayer(fakes.lists)), Layer.provide(fakes.redactor ?? Redactor.layer),
   );
   const log = fakes.wrapLog === undefined ? baseLog : Layer.effect(EventLog.EventLog,
     Effect.map(EventLog.EventLog, fakes.wrapLog),
   ).pipe(Layer.provideMerge(baseLog));
   const services = CommandHandler.layer({
     home: rig.home, stateFolder: rig.stateFolder, pluginRoot: rig.pluginRoot,
+    ...(fakes.capacityHoldCondition === undefined ? {} : { capacityHoldCondition: fakes.capacityHoldCondition }),
     ...(fakes.harnessDefaults === undefined ? {} : { harnessDefaults: fakes.harnessDefaults }),
-  }).pipe(
+  }, fakes.lists).pipe(
     Layer.provideMerge(log),
     Layer.provide(Layer.merge(fakes.runner.layer, fakes.secrets.layer)),
   );
@@ -138,16 +142,14 @@ export const provideRig = <A, E, R>(
 };
 
 // A caller, as the transport hands it to the handler. The owner is
-// authenticated by the transport itself; devices and agents present a
+// authenticated by the transport itself; agents present a
 // credential the handler checks inside the writer (criterion 5.1).
 export type Credential =
   | { readonly _tag: "owner" }
-  | { readonly _tag: "device"; readonly credential: Redacted.Redacted<string> }
   | { readonly _tag: "agent"; readonly token: Redacted.Redacted<string> };
 
 export const ownerCredential: Credential = { _tag: "owner" };
 export const agentCredential = (raw: string): Credential => ({ _tag: "agent", token: Redacted.make(raw) });
-export const deviceCredential = (raw: string): Credential => ({ _tag: "device", credential: Redacted.make(raw) });
 
 // The test seam to the handler. The handler's static signature is its
 // builder's to choose, so the payload is cast here, in one place.
@@ -201,6 +203,7 @@ export type SeedState = "starting" | "working" | "idle" | "paused" | "interrupte
 
 export interface SeedAgent {
   readonly id: string;
+  readonly name?: string;
   readonly parent?: string | undefined; // an agent id; absent means the owner
   readonly state?: SeedState | undefined;
   readonly folder?: string | undefined;
@@ -218,7 +221,7 @@ export const seedAgent = (spec: SeedAgent) => Effect.gen(function* () {
   const token = mintAgentToken();
   const parent: Actor = spec.parent === undefined ? { _tag: "owner" } : { _tag: "agent", agentId: agentIdOf(spec.parent) };
   const events: Array<Event> = [decodeEvent({
-    _tag: "AgentStarted", agentId, name: `name-${spec.id}`, role: "worker", groups: spec.groups ?? [], parent,
+    _tag: "AgentStarted", agentId, name: spec.name ?? `name-${spec.id}`, role: "worker", groups: spec.groups ?? [], parent,
     harness: "first", account: "primary", permission: spec.permission ?? "ask", folder: spec.folder ?? defaultFolder,
     runMode: "acp", model: "test-model", effort: "high",
   })];
@@ -248,15 +251,6 @@ export const seedAgent = (spec: SeedAgent) => Effect.gen(function* () {
   });
   seedFakeProcess(yield* Runner, agentId, Redacted.value(token.token), !revoked);
   return { agentId, token: Redacted.value(token.token) };
-});
-
-export const seedDevice = (name = "Phone") => Effect.gen(function* () {
-  const deviceId = Schema.decodeUnknownSync(DeviceId)(`device-${randomUUID().slice(0, 8)}`);
-  const minted = mintDeviceCredential();
-  yield* appendSetup([decodeEvent({ _tag: "DeviceAdded", deviceId, name })], {
-    devices: [{ deviceId, name, tokenHash: minted.tokenHash, createdAt: 1, revokedAt: null }],
-  });
-  return { deviceId, credential: Redacted.value(minted.token) };
 });
 
 // A new token for an agent that already has one, revoking the earlier ones.

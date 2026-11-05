@@ -177,6 +177,5 @@ it.effect("4.1 startup: catches leaving the event database in rollback-journal m
   withLog(Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
     expect(yield* sql`PRAGMA journal_mode`).toEqual([{ journal_mode: "wal" }]);
-    expect(yield* sql`SELECT COUNT(*) AS n FROM devices`).toEqual([{ n: 0 }]);
   })),
 );

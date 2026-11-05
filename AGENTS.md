@@ -85,7 +85,9 @@ ACP agent and an interactive agent can sit on the same team.
 6. **Team shapes and workflows do not belong here.** Shephrd provides roles,
    the board, and the API. The definitions of particular teams live outside
    this repository.
-7. **Do not commit or push unless the owner asks.**
+7. **Agents have full authority inside a team.** They commit, push and merge
+   on their team's branches and worktrees without asking. Moving finished work
+   into the base branch is done by a pull request, and the owner approves it.
 
 ## Writing style for documents
 

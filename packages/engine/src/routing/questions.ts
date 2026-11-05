@@ -1,3 +1,4 @@
+import { senderOf } from "../routing/envelope.ts";
 import { randomUUID } from "node:crypto";
 import { QuestionId } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
@@ -20,6 +21,7 @@ export const ask = ({ actor, snapshot }: Input, payload: Payload<"ask">): Effect
 export const answerQuestion = (
   { actor, snapshot }: Input, payload: Extract<Payload<"answer">, { kind: "question" }>,
 ): Effect.Effect<Plan, ReturnType<typeof refused>> => {
+  if (actor._tag !== "owner" && actor._tag !== "agent") return Effect.fail(refused());
   const row = snapshot.questions[payload.id];
   if (row === undefined || row.status !== "open" || !mayActForHolder(snapshot, actor, row.holder)) return Effect.fail(refused());
   const deliveryId = freshDelivery();
@@ -27,7 +29,7 @@ export const answerQuestion = (
     _tag: "QuestionAnswered", agentId: row.agentId, questionId: payload.id, answeredBy: actor, text: payload.text, deliveryId,
   }, ...withdrawQueued(snapshot, row.deliveryId), {
     _tag: "DeliveryQueued", delivery: {
-      id: deliveryId, target: row.agentId, sender: actor, source: { _tag: "question", id: payload.id },
+      id: deliveryId, target: row.agentId, sender: senderOf(actor), source: { _tag: "question", id: payload.id },
       content: { _tag: "prompt", text: envelope(deliveryId,
         `Answer to question ${payload.id}:\n${actor._tag === "agent" ? escapeLeadingSlash(payload.text) : payload.text}`) },
     },

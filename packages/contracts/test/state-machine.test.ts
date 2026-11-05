@@ -6,6 +6,7 @@ import type * as SchemaAST from "effect/SchemaAST"
 import { describe, expect, it } from "vitest"
 
 import { Event } from "../src/events.ts"
+import { samples as boardEvents } from "./board/fixtures.ts"
 import {
   canTransition,
   commandOutcome,
@@ -18,6 +19,11 @@ import {
 
 type StateName = "starting" | "working" | "idle" | "paused" | "interrupted" | "crashed" | "stopped"
 const states: ReadonlyArray<StateName> = ["starting", "working", "idle", "paused", "interrupted", "crashed", "stopped"]
+
+it.each(boardEvents.map((event) => [event._tag, event] as const))("board 1.10 %s keeps all seven lifecycle states", (tag, wire) => {
+  expect(Schema.is(Event)(wire), `${tag} must join Event before the lifecycle table can keep it`).toBe(true)
+  for (const state of states) expect(eventEffect(state, tag as never), `${tag} in ${state}`).toBe("keep")
+})
 
 describe("lifecycle states", () => {
   // Catches: a state added or dropped (row 24 names exactly seven; "waiting on a permission" and
@@ -321,6 +327,8 @@ describe("event table: (lifecycle state, event) cells", () => {
     AgentStopped: { ...allStates("stopped"), stopped: "invalid" },
     AgentReloadFailed: { ...allStates("invalid"), interrupted: "keep", paused: "keep" },
     DeliveryQueued: { ...allStates("keep"), crashed: "invalid", stopped: "invalid" },
+    DeliveryHeld: { ...allStates("invalid"), working: "idle" },
+    DeliveryReleased: allStates("keep"),
     DeliverySent: { ...allStates("invalid"), idle: "working", working: "keep" }
   }
 
@@ -367,4 +375,12 @@ describe("event table: (lifecycle state, event) cells", () => {
       }
     }
   })
+})
+
+// WS-7b: assert the new cells independently of Event's current inventory, so
+// a missing declaration cannot silently skip the lifecycle behavior.
+it("CH01 catches a hold leaving a working agent working, or a release changing its lifecycle", () => {
+  expect(Schema.is(Event)({ _tag: "DeliveryHeld", agentId: "target", deliveryId: "delivery", reason: "capacity" }), "DeliveryHeld must enter the lifecycle table").toBe(true)
+  expect(eventEffect("working", "DeliveryHeld" as never)).toBe("idle")
+  for (const state of states) expect(eventEffect(state, "DeliveryReleased" as never)).toBe("keep")
 })

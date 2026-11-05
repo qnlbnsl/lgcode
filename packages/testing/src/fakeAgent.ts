@@ -28,7 +28,7 @@ type Step = DiagnosticStep | StepDiagnostic
   | { step: "plan"; entries: AcpSchema.PlanEntry[] }
   | { step: "tool_call"; toolCallId: string; title: string; kind: AcpSchema.ToolKind; status: AcpSchema.ToolCallStatus; output: string }
   | { step: "file_change"; toolCallId: string; path: string; operation: string; patch: string }
-  | { step: "permission"; toolCallId: string; title: string; options: AcpSchema.PermissionOption[]; locations?: Array<{ path: string }> }
+  | { step: "permission"; toolCallId: string; title: string; options: AcpSchema.PermissionOption[]; kind?: AcpSchema.ToolCallUpdate["kind"]; rawInput?: AcpSchema.ToolCallUpdate["rawInput"]; locations?: Array<{ path: string }> }
   | { step: "question"; message: string; requestedSchema: Record<string, unknown> }
   | { step: "mode_change"; configId: string; value: string }
   | { step: "config_options"; configOptions: AcpSchema.SessionConfigOption[] }
@@ -290,7 +290,7 @@ const program = Effect.gen(function*() {
           case "tool_call": yield* update({ sessionUpdate: "tool_call_update", toolCallId: step.toolCallId, title: step.title, kind: step.kind, status: step.status, content: [{ type: "content", content: { type: "text", text: step.output } }] }); break
           case "file_change": yield* update({ sessionUpdate: "tool_call_update", toolCallId: step.toolCallId, content: [{ type: "diff", changes: [{ operation: step.operation, path: step.path }], patch: { format: "git_patch", text: step.patch } }] } as AcpSchema.SessionNotification["update"]); break
           case "permission": {
-            const toolCall = { toolCallId: step.toolCallId, title: step.title, ...(step.locations === undefined ? {} : { locations: step.locations }) }
+            const toolCall = { toolCallId: step.toolCallId, title: step.title, ...(step.kind === undefined ? {} : { kind: step.kind }), ...(step.rawInput === undefined ? {} : { rawInput: step.rawInput }), ...(step.locations === undefined ? {} : { locations: step.locations }) }
             const response = yield* agent.client.requestPermission({ sessionId: request.sessionId, title: step.title, options: step.options, subject: { type: "tool_call", toolCall } })
             yield* text(response.outcome.outcome === "selected" ? `permission:selected:${response.outcome.optionId}` : "permission:cancelled")
             break

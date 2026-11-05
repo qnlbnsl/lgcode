@@ -3,7 +3,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { it } from "@effect/vitest";
-import { AgentId, BootId, DeviceId, RequestId, type Event } from "@shephrd/contracts";
+import { AgentId, BootId, RequestId, type Event } from "@shephrd/contracts";
 import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -13,7 +13,6 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 
 import * as Credential from "../../src/identity/credential.ts";
-import { mintDeviceCredential } from "../../src/identity/devices.ts";
 import { redactingLoggerLayer } from "../../src/identity/logger.ts";
 import { makeRedactor } from "../../src/identity/redactor.ts";
 import { mintAgentToken } from "../../src/identity/tokens.ts";
@@ -35,7 +34,6 @@ afterEach(() => {
 });
 
 const agentId = Schema.decodeUnknownSync(AgentId)("agent-a");
-const deviceId = Schema.decodeUnknownSync(DeviceId)("phone");
 const requestId = () => Schema.decodeUnknownSync(RequestId)(randomUUID());
 const textEvent = (text: string): Event => ({
   _tag: "ThreadItem", agentId, itemId: "text", content: { _tag: "text", text }, replay: false,
@@ -174,10 +172,10 @@ const encodings: ReadonlyArray<readonly [string, (raw: string) => string]> = [
   ["hex-mixed", (raw) => mixedHex(Buffer.from(raw).toString("hex"))],
 ];
 
-it.effect.each((["agent", "device"] as const).flatMap((kind) => encodings.map(([encoding, encode]) => ({ kind, encoding, encode }))))(
+it.effect.each((["agent"] as const).flatMap((kind) => encodings.map(([encoding, encode]) => ({ kind, encoding, encode }))))(
   "B7 $kind/$encoding: catches encoded stored credentials escaping the hash registry or unknown credentials being removed",
   ({ kind, encode }) => {
-    const mint = kind === "agent" ? mintAgentToken : mintDeviceCredential;
+    const mint = mintAgentToken;
     const live = mint();
     const raw = Redacted.value(live.token);
     const unknown = Redacted.value(mint().token);
@@ -185,14 +183,8 @@ it.effect.each((["agent", "device"] as const).flatMap((kind) => encodings.map(([
     return withLog(instance, Effect.gen(function* () {
       const log = yield* EventLog.EventLog;
       const sql = yield* SqlClient.SqlClient;
-      yield* log.append({ _tag: "owner" }, requestId(), "b".repeat(64), [kind === "agent"
-        ? { _tag: "TurnStarted", agentId }
-        : { _tag: "DeviceAdded", deviceId, name: "Phone" }], kind === "agent"
-        ? { agentTokens: [{ agentId, tokenHash: live.tokenHash, revokedAt: null }] }
-        : { devices: [{ deviceId, name: "Phone", tokenHash: live.tokenHash, createdAt: 1, revokedAt: null }] });
-      const rows = kind === "agent"
-        ? yield* sql<{ token_hash: string }>`SELECT token_hash FROM agent_tokens`
-        : yield* sql<{ token_hash: string }>`SELECT token_hash FROM devices`;
+      yield* log.append({ _tag: "owner" }, requestId(), "b".repeat(64), [{ _tag: "TurnStarted", agentId }], { agentTokens: [{ agentId, tokenHash: live.tokenHash, revokedAt: null }] });
+      const rows = yield* sql<{ token_hash: string }>`SELECT token_hash FROM agent_tokens`;
       expect(rows).toEqual([{ token_hash: live.tokenHash }]);
       const encoded = encode(raw);
       const unknownText = `unknown:${encode(unknown)}; safe`;
@@ -213,8 +205,8 @@ it.effect.each((["agent", "device"] as const).flatMap((kind) => encodings.map(([
   },
 );
 
-it.effect.each(["agent", "device"] as const)("B7 checksum bound/%s: catches hashing malformed encoded candidates before validating their checksum", (kind) => Effect.sync(() => {
-  const live = kind === "agent" ? mintAgentToken() : mintDeviceCredential();
+it.effect.each(["agent"] as const)("B7 checksum bound/%s: catches hashing malformed encoded candidates before validating their checksum", (kind) => Effect.sync(() => {
+  const live = mintAgentToken();
   const raw = Redacted.value(live.token);
   const bad = raw.slice(0, -1) + (raw.endsWith("0") ? "1" : "0");
   const hash = vi.spyOn(Credential, "sha256Hex");
@@ -232,25 +224,16 @@ it.effect.each(["agent", "device"] as const)("B7 checksum bound/%s: catches hash
   expect(hash.mock.calls.filter(([value]) => typeof value === "string")).toEqual([]);
 }));
 
-it.effect.each(["device-name", "process-executable"] as const)(
+it.effect.each(["process-executable"] as const)(
   "U5A-F02 B9 %s: catches free text bypassing redaction in side rows while events and receipts are sanitized",
   (field) => {
     const secret = "side-row-secret-0123456789";
-    const live = mintDeviceCredential();
     return withLog(redactorFor(secret), Effect.gen(function* () {
       const log = yield* EventLog.EventLog;
       const sql = yield* SqlClient.SqlClient;
-      const envelopes = yield* log.append({ _tag: "owner" }, requestId(), "d".repeat(64), [field === "device-name"
-        ? { _tag: "DeviceAdded", deviceId, name: `Phone ${secret}` }
-        : textEvent(`Executable /tmp/${secret}/runner`)], field === "device-name"
-        ? { devices: [{ deviceId, name: `Phone ${secret}`, tokenHash: live.tokenHash, createdAt: 1, revokedAt: null }] }
-        : { processes: [{ agentId, groupId: 42, bootId: Schema.decodeUnknownSync(BootId)("boot"), startTime: "123", userId: 1000, executable: `/tmp/${secret}/runner` }] });
-      const rows = field === "device-name"
-        ? yield* sql<{ name: string; token_hash: string }>`SELECT name, token_hash FROM devices`
-        : yield* sql<{ executable: string }>`SELECT executable FROM processes`;
-      expect.soft(rows).toEqual(field === "device-name"
-        ? [{ name: "Phone [REDACTED]", token_hash: live.tokenHash }]
-        : [{ executable: "/tmp/[REDACTED]/runner" }]);
+      const envelopes = yield* log.append({ _tag: "owner" }, requestId(), "d".repeat(64), [textEvent(`Executable /tmp/${secret}/runner`)], { processes: [{ agentId, groupId: 42, bootId: Schema.decodeUnknownSync(BootId)("boot"), startTime: "123", userId: 1000, executable: `/tmp/${secret}/runner` }] });
+      const rows = yield* sql<{ executable: string }>`SELECT executable FROM processes`;
+      expect.soft(rows).toEqual([{ executable: "/tmp/[REDACTED]/runner" }]);
       const events = yield* sql`SELECT payload_json FROM events`;
       const receipts = yield* sql`SELECT result_json FROM receipts`;
       for (const value of [envelopes, events, receipts]) {

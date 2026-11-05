@@ -12,6 +12,7 @@
 //   only from the `shephrdSocket` and `shephrdToken` arguments, never from `parent` or from the
 //   account's variables.
 import { spawnSync } from "node:child_process"
+import { randomBytes } from "node:crypto"
 
 import { assert, it } from "@effect/vitest"
 import { afterEach, vi } from "vitest"
@@ -20,6 +21,19 @@ import { buildBaseEnvironment } from "../../src/runner/baseEnvironment.ts"
 import { registerRebuildCheck } from "../support/rebuildCheck.ts"
 
 registerRebuildCheck({ noLog: true })
+
+it("5.17/E34 drops the web password from the parent and from account variables before a child is started", () => {
+  const password = randomBytes(32).toString("base64url")
+  const environment = buildBaseEnvironment({
+    parent: { PATH: process.env.PATH ?? "/usr/bin", SHEPHRD_WEB_PASSWORD: password },
+    accountVariables: { SHEPHRD_WEB_PASSWORD: password },
+  })
+  assert.isFalse(Object.hasOwn(environment, "SHEPHRD_WEB_PASSWORD"), "the web password variable reached the child environment")
+  assert.isFalse(Object.values(environment).some((value) => value.includes(password)), "the web password value reached the child environment")
+  const child = spawnSync(process.execPath, ["-e", "process.stdout.write(String(Object.hasOwn(process.env, 'SHEPHRD_WEB_PASSWORD')))"], { env: environment, encoding: "utf8" })
+  assert.equal(child.status, 0)
+  assert.equal(child.stdout, "false")
+})
 
 afterEach(() => {
   vi.unstubAllEnvs()
