@@ -1,10 +1,10 @@
-import { writeFileSync } from "node:fs";
+import { rmSync, writeFileSync } from "node:fs";
 
 import { afterEach, expect } from "@effect/vitest";
 import type { Event } from "@shephrd/contracts";
 import * as Effect from "effect/Effect";
 
-import { eventsUntil, isTag, requestId, scenario, since, stopAllServices, tagged } from "../support/acceptance.ts";
+import { eventsUntil, isTag, peekEcho, requestId, scenario, since, stopAllServices, tagged, waitFor } from "../support/acceptance.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 registerRebuildCheck({ noLog: true });
@@ -41,8 +41,13 @@ scenario("6.5 a queued board wake that was not sent before a service restart is 
 
 scenario("6.5 a sent board wake without replay proof may be delivered again after restart but remains one logical wake (breaks if restart builds duplicate board work)", (w) => Effect.gen(function* () {
   const gate = `${w.root.root}/board-sent-gate`;
-  const target = yield* w.start(w.owner, { name: "Sent target", prompt: "Ready.", script: { turns: [[], [{ step: "wait_for_file", path: gate }]] } });
+  const recoveredTurn = `${w.root.root}/board-recovered-turn`;
+  writeFileSync(recoveredTurn, "go");
+  const target = yield* w.start(w.owner, { name: "Sent target", prompt: "Ready.", script: { turns: [[{ step: "wait_for_file", path: recoveredTurn }], [{ step: "wait_for_file", path: gate }]] } });
   yield* eventsUntil(w.owner, 0, "the target's startup turn", (row) => row.event._tag === "TurnEnded" && row.agentId === target.agentId);
+  // The fake starts its turn script again when reloaded. Hold that turn so
+  // socket readiness cannot accidentally stand in for reminder readiness.
+  rmSync(recoveredTurn);
   const prior = yield* w.token(target);
   const channel = yield* w.owner["board.open"]({ requestId: requestId(), name: "sent-before-restart" } as never);
   const channelId = (channel as { channelId: string }).channelId;
@@ -52,10 +57,24 @@ scenario("6.5 a sent board wake without replay proof may be delivered again afte
   const sent = yield* eventsUntil(w.owner, before, "the board wake to be sent", isTag("DeliverySent", target.agentId));
   const delivery = sent.find((row) => row.event._tag === "DeliverySent")!.event as unknown as { deliveryId: string };
 
+  const beforeRestart = yield* w.watermark();
   yield* w.kill("SIGKILL");
   yield* w.boot();
-  yield* w.token(target, prior.pid);
+  const reloaded = yield* w.token(target, prior.pid);
   const owner = yield* w.reopenOwner();
+  // Boot may finish while the re-sent original or carry-on is still working.
+  // A reminder is due only after that response turn ends.
+  yield* waitFor("the recovered prompt to reach the restarted adapter", () => {
+    const echo = peekEcho(target.echo);
+    return echo?.pid === reloaded.pid && echo.inbound.some((frame) => frame.method === "session/prompt");
+  });
+  yield* eventsUntil(owner, beforeRestart, "the recovered response turn to be sent", isTag("DeliverySent", target.agentId));
+  const recovering = yield* since(owner, before);
+  expect(recovering.some((row) => row.sequence > beforeRestart && row.agentId === target.agentId && row.event._tag === "TurnEnded")).toBe(false);
+  expect(recovering.some((row) => row.event._tag === "board.WakeBuilt" && row.event.targetAgentId === target.agentId && row.event.reminders.length > 0)).toBe(false);
+  writeFileSync(recoveredTurn, "go");
+  yield* eventsUntil(owner, before, "the post-restart response turn to produce its reminder", (row) =>
+    row.event._tag === "board.WakeBuilt" && row.event.targetAgentId === target.agentId && row.event.reminders.length > 0);
   const history = yield* since(owner, before);
   const wakes = history.flatMap((row) => row.event._tag === "board.WakeBuilt"
     && (row.event as unknown as { targetAgentId: string }).targetAgentId === target.agentId
