@@ -63,11 +63,24 @@ export const capacityRule: SheepdogRule = {
     if (decision._tag !== "release") return;
     const action = { _tag: "roles.CapacityRetried", agentId: held.event.agentId, triggerSequence: held.sequence,
       noticeRecipient: noticeRecipient(ctx.snapshot, held.event.agentId), occurrence: count } as const;
-    yield* callForAction(action, "capacity", "release", {}, ctx.lists).pipe(
+    yield* callForAction(action, "capacity", "release", { expectedHoldSequence: held.sequence }, ctx.lists).pipe(
       Effect.catchTag("CommandRefused", () => Effect.void));
   }),
   onEvent: (ctx, envelope) => Effect.gen(function* () {
     const event = envelope.event;
+    // The release's event survives a kill before roles.record. Replaying this
+    // envelope completes the action with the same notice and record receipts.
+    if (event._tag === "DeliveryReleased" && event.holdSequence !== undefined
+      && envelope.caller._tag === "service" && envelope.caller.service === "roles.sheepdog") {
+      const thread = (ctx.snapshot.threads[event.agentId] ?? []).filter((row) => row.sequence < envelope.sequence);
+      const held = thread.find((row) => row.sequence === event.holdSequence);
+      if (held?.event._tag !== "DeliveryHeld") return;
+      const occurrence = capacityHoldCount({ ...ctx.snapshot, threads: { ...ctx.snapshot.threads, [event.agentId]: thread } }, event.agentId);
+      yield* sendNotice({ _tag: "roles.CapacityRetried", agentId: event.agentId, triggerSequence: held.sequence,
+        sourceSequence: ctx.sourceSequence as NoticeAction["sourceSequence"], occurrence,
+        noticeRecipient: noticeRecipient(ctx.snapshot, event.agentId) }, "capacity", ctx.lists);
+      return;
+    }
     if (event._tag !== "DeliveryReturned" || event.cause !== "capacity" || envelope.sequence <= ctx.baselinePosition) return;
     const roles = ctx.snapshot.roles as RolesView;
     const decision = capacityDecision({ event, now: 0, heldAt: 0, releasedCount: 0, capacityRetryLimit: 0,

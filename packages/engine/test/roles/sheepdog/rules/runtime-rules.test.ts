@@ -21,6 +21,7 @@ import { makeSheepdogLoop, type SheepdogRule } from "../../../../src/roles/sheep
 import { makeRules } from "../../../../src/roles/sheepdog/rules/runtime.ts";
 import { callForAction } from "../../../../src/roles/sheepdog/actions.ts";
 import { sheepdogCaller } from "../../../../src/roles/sheepdog/notices.ts";
+import { actionRequestId } from "../../../../src/roles/sheepdog/requests.ts";
 import { alertLog } from "../../../support/alertsRig.ts";
 import { fixtureClient } from "../../../support/fixturePiece.ts";
 import { makeFakeRunner, type FakeRunner } from "../../../support/fakeRunner.ts";
@@ -152,15 +153,24 @@ it.effect("switching the sheepdog back on restarts a runaway clock from its new 
 
 it.effect("a refused crash admission never resumes the agent", () => {
   const real = engineLists.planners["roles.record"]!;
+  const attempts: Array<{ readonly caller: unknown; readonly payload: Record<string, unknown> }> = [];
   const lists: EngineLists = { ...engineLists, planners: { ...engineLists.planners, "roles.record": (input, payload) =>
     (payload.action as { _tag: string })._tag === "roles.CrashAdmitted"
-      ? Effect.fail(refused())
+      ? Effect.sync(() => { attempts.push({ caller: input.actor, payload }); }).pipe(Effect.andThen(Effect.fail(refused())))
       : real(input, payload) } };
   return run(lists, (runner) => Effect.gen(function* () {
     yield* setup;
     yield* seedAgent({ id: "worker", state: "idle" });
-    yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId: "worker", exitCode: 1, signal: null, stderr: "detail" })]);
-    yield* eventually(rowsOf("CommandRefused"), (rows) => rows.length > 0);
+    const [crash] = yield* appendSetup([eventOf({ _tag: "AgentCrashed", agentId: "worker", exitCode: 1, signal: null, stderr: "detail" })]);
+    const requestId = actionRequestId({ rule: "crash", subject: "worker", triggerSequence: crash!.sequence,
+      kind: "roles.CrashAdmitted.record", recipient: "owner", occurrence: 1 });
+    const refusals = yield* eventually(rowsOf("CommandRefused"), (rows) => rows.some((row) => row.requestId === requestId));
+    expect(refusals.filter((row) => row.requestId === requestId)).toMatchObject([
+      { caller: sheepdogCaller, event: { _tag: "CommandRefused", command: "roles.record" } },
+    ]);
+    expect(attempts).toMatchObject([{ caller: sheepdogCaller, payload: { requestId,
+      action: { _tag: "roles.CrashAdmitted", agentId: "worker", triggerSequence: crash!.sequence, occurrence: 1 } } }]);
+    expect(attempts).toHaveLength(1);
     expect(runner.callsOf("load")).toHaveLength(0);
     expect(yield* actions("roles.CrashAdmitted")).toHaveLength(0);
   }));

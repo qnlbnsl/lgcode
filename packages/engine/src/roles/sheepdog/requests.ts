@@ -15,4 +15,16 @@ export const actionSubject = (action: { readonly _tag: string; readonly agentId:
 export const actionRequestId = (action: ActionIdentity): string => [
   "roles", action.rule, action.subject, String(action.triggerSequence), action.kind, action.recipient, String(action.occurrence),
 ].map(encodeURIComponent).join(":");
+// Only canonical action ids identify committed automatic effects on replay.
+export const parseActionRequestId = (id: string): ActionIdentity | undefined => {
+  try {
+    const parts = id.split(":").map(decodeURIComponent);
+    if (parts.length !== 7 || parts[0] !== "roles") return;
+    const action = { rule: parts[1]!, subject: parts[2]!, triggerSequence: Number(parts[3]), kind: parts[4]!,
+      recipient: parts[5]!, occurrence: Number(parts[6]) };
+    if (!Number.isSafeInteger(action.triggerSequence) || action.triggerSequence < 1
+      || !Number.isSafeInteger(action.occurrence) || action.occurrence < 1 || actionRequestId(action) !== id) return;
+    return action;
+  } catch { return; }
+};
 export const baselineRequestId = (sequence?: number): string => sequence === undefined ? "roles:baseline" : `roles:baseline:${sequence}`;

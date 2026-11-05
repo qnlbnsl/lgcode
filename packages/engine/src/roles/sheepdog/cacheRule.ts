@@ -8,7 +8,7 @@ import { Views } from "../../views/Views.ts";
 import type { RolesView } from "../view.ts";
 import type { RuleContext, SheepdogRule } from "./loop.ts";
 import { recordAction, sheepdogCaller } from "./notices.ts";
-import { actionRequestId } from "./requests.ts";
+import { actionRequestId, parseActionRequestId } from "./requests.ts";
 import { cacheAction, cacheExpiry, cacheLifetime } from "./rules/cache.ts";
 import { resolveSettings, roleSettings } from "./settings.ts";
 import type { TimerOrigin } from "./timers.ts";
@@ -50,6 +50,30 @@ export const makeCacheRule = (): SheepdogRule => {
   const targets = new Map<string, Target>();
   let lifetimes = new Map<string, number | undefined>();
   let home = "";
+  const completeAccepted = (context: RuleContext) => Effect.gen(function* () {
+    const roles = context.snapshot.roles as RolesView;
+    // A committed command can make the target busy before its action record
+    // is written. Recover that successful effect before applying idle guards.
+    for (let sequence = roles.position + 1; sequence <= context.snapshot.sequence; sequence++) {
+      const reply = yield* executeService(sheepdogCaller, "client.event", { requestId: `roles:cache-recover:${sequence}`, sequence }, context.lists);
+      const row = reply.envelope as EventEnvelope;
+      if (row.caller._tag !== "service" || row.caller.service !== "roles.sheepdog" || row.requestId === undefined) continue;
+      const event = row.event;
+      const target = event._tag === "DeliveryQueued" && event.delivery.content._tag === "compact" ? event.delivery.target
+        : event._tag === "board.WakeBuilt" ? event.targetAgentId : undefined;
+      if (target === undefined) continue;
+      const command = event._tag === "board.WakeBuilt" ? "board.flush" : "compact";
+      const trigger = parseActionRequestId(row.requestId)?.triggerSequence;
+      if (trigger === undefined || row.requestId !== actionRequestId({ rule: "cache", subject: target,
+        triggerSequence: trigger, kind: command, recipient: target, occurrence: 1 })) continue;
+      const tag = command === "compact" ? "roles.CompactRequested" : "roles.CacheFlushed";
+      if (roles.actions.some((action) => action._tag === tag && action.agentId === target && action.triggerSequence === trigger)) continue;
+      yield* recordAction({ _tag: tag, agentId: target, noticeRecipient: "owner", triggerSequence: trigger as EventSequence,
+        sourceSequence: context.sourceSequence as EventSequence, occurrence: 1,
+        notice: context.lists.boardEnabled === false ? "board-off" : "sent",
+      }, "cache", context.lists);
+    }
+  });
   const loadSettings = (context: RuleContext) => Effect.gen(function* () {
     const settings = yield* serviceCacheSettings(sheepdogCaller, context.lists);
     home = settings.home;
@@ -115,6 +139,7 @@ export const makeCacheRule = (): SheepdogRule => {
   return {
     onStart: (context) => Effect.gen(function* () {
       targets.clear();
+      yield* completeAccepted(context);
       yield* loadSettings(context);
       for (const agentId of Object.keys(context.snapshot.agents)) yield* refresh(context, agentId);
     }),

@@ -333,7 +333,7 @@ it.effect("action identities separate repeats, episodes, action kinds and recipi
   expect(actionRequestId({ ...base, subject: "a:b", recipient: "c" })).not.toBe(actionRequestId({ ...base, subject: "a", recipient: "b:c" }));
 })));
 
-it.effect("a crash between an engine command, notice post and record repeats none of the commands for every action kind", () => Effect.gen(function* () {
+it.effect("receipt plumbing deduplicates release and notice commands for every action schema", () => Effect.gen(function* () {
   yield* run(quiet, setup);
   const failing: EngineLists = { ...quiet, planners: { ...quiet.planners,
     "roles.record": () => Effect.fail(new LogWriteFailed({ reason: "database write failed" })),

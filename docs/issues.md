@@ -6328,3 +6328,81 @@ What happened: The reply text appears in its board subject and in the newly visi
 What changed: The browser assertion selects the exact reply inside the named Board post region. The exact single runner wake, removed reply form, and durable alert-clear assertions remain. Production code is unchanged.
 
 Validation: The corrected browser case passed. A temporary rendering mutation kept the outgoing reply visible while replacing the subject reply. Two explicit browser preconditions established that state, and the corrected locator then failed at the missing subject reply. The production file and temporary proof assertions were restored byte-for-byte before the commit.
+
+## 387. Automatic capacity retries lacked history and a transactional hold check
+
+Found: 2026-11-04, while repairing foundation review records FR-018 and FR-039.
+State: fixed.
+
+What happened: The capacity timer used an action descriptor only for its release
+request identifier. It never recorded the successful retry in the roles history.
+The release planner also accepted whichever hold was current, even when the
+timer had selected an older hold of the same delivery.
+
+What changed: An automatic release supplies the expected hold sequence. The
+release planner checks that sequence inside the writer transaction. A successful
+release preserves it in `DeliveryReleased.holdSequence`. The production capacity
+rule records that committed success while consuming its event. A restart can
+complete the missing action without releasing the hold again. A refused or stale
+release creates no successful retry record. An ordinary owner release keeps its
+existing behavior when no expected sequence is supplied.
+
+Validation: The regressions failed first with a missing retry counter and a newer
+hold released by an old timer. The corrected tests check twelve retries, the
+outage reset, a refusal, an interleaved owner release and replacement hold, the
+new hold's own deadline, interrupted recording, two recovery startups, the owner
+action listing, and the live views against a rebuild.
+
+## 388. An unknown role kind inherited a matching named role's limits
+
+Found: 2026-11-04, while repairing foundation review record FR-028.
+State: fixed.
+
+What happened: `chef:builder` and `:builder` received generic worker advice, but
+selected the loaded builder's limits. A builder limit of zero capacity retries
+therefore refused a hold that the generic worker defaults would admit.
+
+What changed: Named settings and the direct age-limit lookup require a known
+role kind. Unknown kinds retain the worker defaults and global settings. Their
+existing diagnostic flags remain available. Known `worker:builder` overrides
+still apply.
+
+Validation: Pure regressions distinguish capacity, stall and age settings. Real
+socket reads and capacity outcomes cover loaded role files, generic advice,
+unknown-kind holds, and the known builder's refused hold.
+
+## 389. Crash and roles recovery tests omitted meaningful fault boundaries
+
+Found: 2026-11-04, while repairing foundation review records FR-055, FR-058 and
+FR-069.
+State: fixed.
+
+What happened: The crash window test had no timestamp for its earlier admission.
+The refused-admission test could pass without handling the crash. The generic
+action recovery test used release as a substitute for other engine commands.
+It did not exercise a committed resume before its hook, successful notice
+flushes, or an owner stop and manual resume ahead of sheepdog catch-up.
+
+What changed: A schema-valid admission at 45 minutes distinguishes the full
+hour from a shortened window. The refusal case requires the exact service
+command, request identifier and admission attempt. New tests run production
+rules and planners across actual resume, prompt, release, compaction and flush
+boundaries. They rebuild the database, execute the real recovery startup twice,
+and compare logical command, delivery, notice and action identities. The owner
+stop and manual resume use the authenticated socket command path before a later
+marker proves that sheepdog catch-up completed.
+
+The new command boundary tests also exposed production omissions. A committed
+compaction or flush could leave its action record missing because its target
+was already busy at restart. A committed idle nudge could lose its notice when
+recovery changed the group's idle origin. Startup now completes these accepted
+commands from their durable service events and deterministic request identities
+before applying current guards. It neither sends the command again nor changes
+receipt hook replay semantics. A flushed stall nudge can also stop its original
+clock before the action is recorded. Stall startup completes the posted nudge
+or replacement notice from its original deterministic identity.
+
+Validation: The cache tests failed first with missing action records. Temporary
+mutations test the shortened crash window, an ignored crash, and duplicate
+logical effects. No live harness recordings or owner phone are required for
+these local deterministic regressions.

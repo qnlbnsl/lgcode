@@ -51,7 +51,8 @@ export const agentRoles = (input: RuleInput, agent: RuleAgent) => ({ ...agent, .
 export const limitsFor = (input: RuleInput, agent: RuleAgent) => resolveSettings(input.roles.settings ?? {}, roleSettings(input.roles.file ?? null, agent.role ?? ""));
 export const isWorker = (agent: RuleAgent) => parseRole(agent.role ?? "").kind === "worker";
 export const ageLimitFor = (input: RuleInput, agent: RuleAgent): number | undefined => {
-  const name = parseRole(agent.role ?? "").name;
+  const parsed = parseRole(agent.role ?? "");
+  const name = parsed.flags.length === 0 ? parsed.name : undefined;
   const custom = name === undefined ? undefined : own(input.roles.file?.roles, name)?.limits.ageMinutes;
   return custom ?? (isWorker(agent) ? limitsFor(input, agent).ageMinutes : undefined);
 };
