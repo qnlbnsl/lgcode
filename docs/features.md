@@ -177,11 +177,21 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 - **Four phone alerts** (idea). The phone is alerted only for an owner
   question, an agent stuck on an approval, a stall that reached the owner, and
   a failed run. See research item 11.
-- **Shephrd runs as its own user** (agreed). Shephrd gets its own Unix
-  user, so its state folder, credentials and account keys are out of reach of
-  the agents, which keep running as the owner's user. There are several ways
-  to set it up. The owner deferred it on 2026-11-01; it comes before remote
-  access is built.
+- **Agents run in a sandbox** (agreed, 2026-11-05). Each agent runs inside
+  bubblewrap, wrapped around the whole harness. Only its worktree is writable
+  and `.sheprd` is mounted read-only. The owner's home folder, Shephrd's state
+  folder and other processes are not visible. This replaces the earlier plan
+  for Shephrd to run as its own Unix user, because bubblewrap needs no root
+  access at install and leaves worktree files owned by the owner. Real Codex
+  and Claude command-line runs worked this way on 2026-11-05, in a manual test.
+  It is not built.
+  A harness's login stays visible inside its sandbox, and how to hide it from
+  the commands an agent runs is still open.
+- **Agents use API keys without holding them** (idea, 2026-11-05). The
+  engine runs a tool server such as Firecrawl's outside the sandbox with the
+  key, and agents call the tool. A proxy that swaps a placeholder for the real
+  key may follow for scripts. Trusted steps such as test commands run outside
+  the agent's sandbox. It is not built.
 - **macOS support for the ancestry check, engine and client** (agreed). Version
   1 runs on Linux only, so the client refuses to send the owner credential on
   any other system, and the engine refuses it too. The owner agreed on

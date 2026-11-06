@@ -39,17 +39,18 @@ permission ceiling, the folder rule and the approval routing) therefore stop
 an agent's mistakes, not a deliberately hostile agent. Where a harness
 supports it, Shephrd adds a rule that forbids its agents to read the state
 folder, but that rule is a guard against accidents, not a wall. The owner
-accepted this limit on 2026-11-01. The real fix is to run Shephrd as its own
-user, so its private files are out of the agents' reach. It is still
-planned. On 2026-11-03 the owner approved building remote access before it,
-so that Shephrd is in use sooner. Until it is built, any agent can read
-Shephrd's state folder, including the stored account keys.
+accepted this limit on 2026-11-01. The real fix is to run each agent in a
+sandbox, so Shephrd's private files are out of its reach. The owner chose
+this on 2026-11-05, in place of the earlier plan to run Shephrd as its own
+user. It is still planned. On 2026-11-03 the owner approved building remote
+access before it, so that Shephrd is in use sooner. Until it is built, any
+agent can read Shephrd's state folder, including the stored account keys.
 
 Agents can also read the web password. Agents run as the owner's user, so an
 agent can read the engine's first environment through `/proc`, even though the
 engine deletes the variable and agents do not inherit it. The password protects
 against the network. It is not a boundary against an agent on the same user
-until the own-user setup exists. The owner accepted this limit on 2026-11-03.
+until the sandbox exists. The owner accepted this limit on 2026-11-03.
 
 The part of Shephrd that needs the most care is its client API, because it
 lets a web page, a desktop app, or a phone control agents that can run
