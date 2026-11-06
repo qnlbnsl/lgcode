@@ -8152,7 +8152,7 @@ the assigned brief in `cursor-proof.md`.
 ## 490. Cursor restores the previous MCP provider name on reload
 
 Found: 2026-11-05, during the requested real Cursor reload proof.
-State: fixed on `area/shephrd-tools`, with a live rerun outstanding.
+State: fixed on `area/shephrd-tools`, with a successful live stop/resume proof.
 
 The read-only Auto session loaded successfully. Its one permitted extra
 prompt called `roles.orient` using the provider name from the conversation.
@@ -8166,5 +8166,17 @@ history, in a file with mode 0600. The replacement process uses that same
 name and grants only that server's rule. Other agents receive different
 names. An invalid saved identity refuses startup. A regression starts,
 stops, and loads the runner, then inspects both the ACP server identity and
-the replacement process's native allow rule. The single extra live prompt
-was already used, so the correction has no subsequent live claim.
+the replacement process's native allow rule. The first brief's single extra
+live prompt was already used, so that follow-up left live verification open.
+
+The owner then authorized one more real reload proof. On commit `6bea2c4`,
+a Cursor Auto agent in ask mode completed `roles.orient` and `ask`, ended
+its turn, stopped, and resumed the same session. The second prompt completed
+both calls and ended its turn. Neither turn requested permission.
+The database is `/tmp/shephrd-live-E1UN83/state/events.sqlite`.
+The initial orientation, question, and turn end are at sequences 51, 55,
+and 61. The agent stopped at sequence 62 and reloaded at sequence 66.
+The second orientation, question, and turn end are at sequences 89, 93,
+and 98. The session and provider identity stayed the same.
+The detailed evidence and remaining limits are recorded in `cursor-proof.md`
+beside the assigned brief. No application fix was needed for this run.
