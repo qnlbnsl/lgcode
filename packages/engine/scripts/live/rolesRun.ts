@@ -17,7 +17,7 @@ import { FLUSH_MARKER, ROLES_GROUP, rolesLeadPrompt, STALL_MARKER, WAVE_MARKER }
 import { startLiveService, type LiveService } from "./service.ts";
 import { eventsUntil, findLeaks, head, readOwnerCredentialFrom, redactSecrets, redactShapes, requestId, since } from "./support.ts";
 
-const HELP = `Usage: pnpm live-check:roles [--help] [--dry-run]
+const HELP = `Usage: pnpm live-check:roles [--help] [--dry-run] [--skip-timed-flush]
 
 Owner-only live check for roles plan WS-8, task 8c. Uses the signed-in Claude
 Code lead and two signed-in Codex workers through their real adapters. Starts
@@ -40,8 +40,11 @@ provider failures or kill real agent sessions to simulate them.
 --dry-run prints the exact prompts and steps without starting anything or
 reading the account homes. --help prints this text. Model, effort and timeout
 variables are the same SHEPHRD_LIVE_* variables as pnpm live-check.
+--skip-timed-flush skips the cache-timer step and continues to first-stall.
+The report marks that step SKIP and the run remains incomplete with exit 1.
 The default total limit is 30 minutes; set SHEPHRD_LIVE_TOTAL_TIMEOUT_SECONDS
-above 4200 when checking a one-hour cache plus the first stall. No permission is auto-approved.`;
+above 4200 when checking a one-hour cache plus the first stall. Only Shephrd's
+own tools are approval-free; other tools retain their normal permission path.`;
 
 const STEPS = [
   { id: "service", title: "the isolated engine serves its authenticated socket" },
@@ -181,7 +184,7 @@ const timedFlush = (owner: Client, leadId: AgentId, channelId: string, totalTime
   yield* waitIdle(owner, [leadId], 30_000);
 });
 
-const firstStall = (owner: Client, workerId: AgentId, totalTimeout: number, reporter: Reporter) => Effect.gen(function* () {
+export const firstStall = (owner: Client, workerId: AgentId, totalTimeout: number, reporter: Reporter) => Effect.gen(function* () {
   const settings = yield* owner["roles.settings.get"]({ requestId: requestId() } as never);
   // A plain worker has no named role override. Read the configured production
   // limit and leave it unchanged; no TestClock, fake usage or manual flush.
@@ -192,11 +195,35 @@ const firstStall = (owner: Client, workerId: AgentId, totalTimeout: number, repo
   yield* eventsUntil(owner, mark, "the worker to acknowledge its idle obligation", ({ event }) =>
     event._tag === "board.PostAcknowledged" && event.postId === post.postId && event.addressee._tag === "agent"
       && event.addressee.agentId === workerId, 300_000);
+  // The board sends one reminder after the first unanswered turn. Ending
+  // that reminder turn records no-answer, which leaves the post open and
+  // eligible for the sheepdog. Its clock restarts at that later turn end.
+  const prepared = yield* eventsUntil(owner, mark, "the board reminder and its unanswered turn", ({ event }) =>
+    event._tag === "board.AddresseeResolved" && event.postId === post.postId
+      && event.addressee._tag === "agent" && event.addressee.agentId === workerId
+    || event._tag === "board.PostClosed" && event.postId === post.postId, 300_000);
+  const reminder = prepared.find(({ event }) => event._tag === "board.WakeBuilt" && event.targetAgentId === workerId
+    && event.reminders.includes(post.postId));
+  const noAnswer = prepared.find(({ event }) => event._tag === "board.AddresseeResolved" && event.postId === post.postId
+    && event.addressee._tag === "agent" && event.addressee.agentId === workerId && event.disposition === "no-answer");
+  const reminderWakeId = reminder?.event._tag === "board.WakeBuilt" ? reminder.event.wakeId : undefined;
+  const reminderDelivery = reminderWakeId === undefined ? undefined : prepared.find(({ event }) =>
+    event._tag === "DeliveryQueued" && event.delivery.target === workerId && event.delivery.source?._tag === "piece"
+      && event.delivery.source.namespace === "board" && event.delivery.source.id === reminderWakeId);
+  const reminderDeliveryId = reminderDelivery?.event._tag === "DeliveryQueued" ? reminderDelivery.event.delivery.id : undefined;
+  const accepted = reminderDeliveryId === undefined ? undefined : prepared.find(({ event }) =>
+    event._tag === "DeliveryAccepted" && event.agentId === workerId && event.deliveryId === reminderDeliveryId);
+  const reminderEnd = prepared.findLast((row) => row.event._tag === "TurnEnded" && row.agentId === workerId
+    && accepted !== undefined && row.sequence > accepted.sequence && noAnswer !== undefined && row.sequence < noAnswer.sequence);
+  requireCheck(reminder !== undefined && noAnswer !== undefined && reminderEnd !== undefined,
+    "the worker did not finish the board reminder with a no-answer disposition");
   yield* waitIdle(owner, [workerId], 300_000);
   const idle = yield* since(owner, mark);
-  requireCheck(!idle.some(({ event }) => event._tag === "board.AddresseeResolved" && event.postId === post.postId)
+  requireCheck(!idle.some(({ event }) => event._tag === "board.AddresseeResolved" && event.postId === post.postId && event.disposition !== "no-answer")
+    && !idle.some(({ event }) => event._tag === "board.PostClosed" && event.postId === post.postId)
     && !idle.some(({ event }) => event._tag === "roles.StallSeen" && event.stalledPostId === post.postId),
     "the worker did not leave a genuine idle unanswered obligation");
+  reporter.note(`Observed board reminder sequence ${reminder!.sequence}, reminder turn end ${reminderEnd!.sequence}, and no-answer sequence ${noAnswer!.sequence}.`);
   reporter.note(`Waiting for the first stall with the unchanged ${stallMillis / 60_000}-minute production limit.`);
   const stalled = yield* eventsUntil(owner, mark, "the first production-minute stall", ({ event }) =>
     event._tag === "roles.StallSeen" && event.agentId === workerId && event.stalledPostId === post.postId, totalTimeout);
@@ -207,7 +234,12 @@ const firstStall = (owner: Client, workerId: AgentId, totalTimeout: number, repo
   const obligation = stalled.find(({ event }) => event._tag === "board.PostWritten" && event.postId === post.postId)?.event;
   if (obligation?._tag !== "board.PostWritten") return yield* Effect.die(new CheckFailed("the idle obligation is missing"));
   const origin = stalled.find((row) => row.sequence === stall.triggerSequence);
+  const noticeBoundary = stalled.find(({ event }) => event._tag === "roles.StallNoticePlanned"
+    && event.agentId === workerId && event.stalledPostId === post.postId && event.triggerSequence === stall.triggerSequence
+    && event.occurrence === 1)?.sequence ?? action.sequence;
+  const lastIdle = stalled.findLast((row) => row.event._tag === "TurnEnded" && row.agentId === workerId && row.sequence < noticeBoundary);
   requireCheck(origin?.event._tag === "TurnEnded" && origin.agentId === workerId
+    && origin.sequence === lastIdle?.sequence && origin.sequence >= reminderEnd!.sequence
     && action.occurredAt - origin.occurredAt >= stallMillis, "the first stall did not wait production minutes after the worker became idle");
   requireCheck(stall.occurrence === 1 && stall.noticeRecipient === workerId && stall.notice === "sent"
     && stall.postId !== undefined, "the first stall did not record its one worker nudge");
@@ -231,15 +263,16 @@ const firstStall = (owner: Client, workerId: AgentId, totalTimeout: number, repo
 });
 
 export const rolesMain = async (argv: ReadonlyArray<string>, environment: Readonly<Record<string, string | undefined>>): Promise<number> => {
-  const args = parseArguments(argv);
+  const skipTimedFlush = argv.includes("--skip-timed-flush");
+  const args = parseArguments(argv.filter((argument) => argument !== "--skip-timed-flush"));
   if (args.kind === "error") { process.stdout.write(`${HELP}\nUnknown argument.\n`); return 2; }
   if (args.kind === "help") { process.stdout.write(`${HELP}\n`); return 0; }
   const config = liveConfig(environment);
   if (args.kind === "dry-run") {
     process.stdout.write(`${HELP}\n\nNothing is started, sent or read.\nModels: ${config.leadModel} (${config.leadEffort}), ${config.workerModel} (${config.workerEffort}).\n`
       + `${rolesLeadPrompt(config, ["/tmp/shephrd-live-EXAMPLE/work/worker-1", "/tmp/shephrd-live-EXAMPLE/work/worker-2"])}\n`
-      + `Owner's later board post: ${FLUSH_MARKER}, reply:none, to:[], on the team channel.\n`
-      + STEPS.map((step) => `${step.id}: ${step.title}`).join("\n") + "\n");
+      + (skipTimedFlush ? "" : `Owner's later board post: ${FLUSH_MARKER}, reply:none, to:[], on the team channel.\n`)
+      + STEPS.map((step) => `${skipTimedFlush && step.id === "timed-flush" ? "SKIP " : ""}${step.id}: ${step.title}`).join("\n") + "\n");
     return 0;
   }
 
@@ -284,7 +317,8 @@ export const rolesMain = async (argv: ReadonlyArray<string>, environment: Readon
         }));
         const wave = yield* checked(reporter, STEPS[2], runWave(owner, live, environment));
         reporter.note("Observed one Claude lead, two Codex children, three matching orientation identities, two acknowledgments, two authenticated replies to the selected wave and one completion wake.");
-        yield* checked(reporter, STEPS[3], timedFlush(owner, wave.leadId, wave.channelId, config.totalTimeout));
+        if (skipTimedFlush) reporter.skip(STEPS[3], "--skip-timed-flush was requested; the full check remains incomplete");
+        else yield* checked(reporter, STEPS[3], timedFlush(owner, wave.leadId, wave.channelId, config.totalTimeout));
         yield* checked(reporter, STEPS[4], firstStall(owner, wave.workerId, config.totalTimeout, reporter));
       }));
       // Export evidence even if a journey assertion failed. Owner reads only,
@@ -338,7 +372,8 @@ export const rolesMain = async (argv: ReadonlyArray<string>, environment: Readon
     reporter.note(controller.signal.aborted ? "The run was cancelled or exceeded its total time limit." : "The run ended.");
     reporter.note(`Report and exports: ${archive}`);
     const code = reporter.exitCode(STEPS);
-    reporter.note(`Result: ${code === 0 ? "PASS" : "FAIL"}. This is the real-account check; no phone check was performed.`);
+    const incomplete = skipTimedFlush && reporter.results().every((row) => row.passed || row.id === "timed-flush");
+    reporter.note(`Result: ${code === 0 ? "PASS" : incomplete ? "INCOMPLETE" : "FAIL"}. This is the real-account check; no phone check was performed.`);
     writeFileSync(join(archive, "report.md"), `${lines.map(safe).join("\n")}\n`, { mode: 0o600 });
   }
   return reporter.exitCode(STEPS);

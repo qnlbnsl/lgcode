@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { leadPromptFor, liveConfig } from "../../scripts/live/driver.ts";
 import { fill, LEAD_PROMPT, placeholdersOf, PROMPTS, WORKER_PROMPT } from "../../scripts/live/prompts.ts";
+import { rolesLeadPrompt, ROLES_WORKER_PROMPT, STALL_MARKER } from "../../scripts/live/rolesPrompts.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 registerRebuildCheck({ noLog: true });
@@ -13,6 +14,22 @@ const inputsOf = (text: string): ReadonlyArray<Record<string, unknown>> =>
   [...text.matchAll(/with exactly this input: (\{.*\})$/gm)].map((match) => JSON.parse(match[1]!) as Record<string, unknown>);
 
 describe("the live-check prompts", () => {
+  it("keeps the roles stall obligation unanswered through the board reminder until the sheepdog's notice", () => {
+    const reminder = ROLES_WORKER_PROMPT.split("\n").find((line) => line.startsWith("A later wake from the board"));
+    expect(reminder).toContain(`reminding you about ${STALL_MARKER} is expected`);
+    expect(reminder).toContain("This board reminder is not the sheepdog's notice");
+    expect(reminder).toContain('even if it says "Reply, even to say you have nothing to add."');
+    expect(reminder).toContain("On this reminder turn, do not reply and do not call board.post.");
+    expect(reminder).toContain("Leave the saved obligation unanswered and end that turn with the word waiting.");
+    expect(ROLES_WORKER_PROMPT).toContain("Replying to the saved obligation is correct only after a subsequent board wake containing a notice authored by the service roles.sheepdog.");
+
+    // Both start inputs sent to the real lead must carry this instruction.
+    const starts = rolesLeadPrompt(liveConfig({}), ["/tmp/worker-1", "/tmp/worker-2"])
+      .split("\n").filter((line) => line.startsWith('{"name":')).map((line) => JSON.parse(line) as { prompt: string });
+    expect(starts).toHaveLength(2);
+    expect(starts.map((start) => start.prompt)).toEqual([ROLES_WORKER_PROMPT, ROLES_WORKER_PROMPT]);
+  });
+
   it("fills the four placeholders of the lead prompt into two valid start inputs for a Codex worker (breaks if a placeholder is renamed, or a folder or prompt breaks the JSON)", () => {
     expect([...placeholdersOf(LEAD_PROMPT)].sort()).toEqual(["WORKER_EFFORT", "WORKER_FOLDER", "WORKER_MODEL", "WORKER_PROMPT_JSON"]);
     const filled = leadPromptFor(liveConfig({}), "/tmp/shephrd-live-x/work/project");

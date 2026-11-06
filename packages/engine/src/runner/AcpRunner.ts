@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { comparePermission, DeliveryId, ThreadContent, type PermissionLevel, type SessionReference, type TurnUsage } from "@shephrd/contracts";
 import { AcpClient, layerChildProcess } from "@shephrd/t3-effect-acp/client";
 import { AcpRequestError } from "@shephrd/t3-effect-acp/errors";
@@ -39,6 +39,7 @@ import { buildBaseEnvironment } from "./baseEnvironment.ts";
 import { harnessLogin, homeConflict, loginRefusal } from "./harnesses.ts";
 import { classifyError } from "./classify.ts";
 import { mcpScriptPath, withShephrdMcp } from "./codexMcp.ts";
+import { cursorMcpConfig, cursorModelId, cursorServerName } from "./cursorMcp.ts";
 import { compactPrompt } from "./compact.ts";
 import { setConfig, type ConfigOption } from "./config.ts";
 import { denyArguments } from "./denyRead.ts";
@@ -391,8 +392,20 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     const covered = () => credentials.healthy(credentialSource);
     const args = yield* Effect.try({ try: () => [...harness.adapterArguments, ...denyArguments(harness, input.folder, configuration.stateFolder, environment)], catch: () => rejected("deny rule cannot be resolved") });
     const scope = yield* Scope.fork(lifetime);
+    let serverName = "shephrd";
     let entry: Process | undefined;
     return yield* Effect.gen(function* () {
+      if (harness.id === "cursor") {
+        const settings = yield* Effect.acquireRelease(
+          Effect.try({ try: () => {
+            const sessions = join(configuration.stateFolder, "cursor-sessions", input.agentId);
+            serverName = cursorServerName(sessions);
+            return cursorMcpConfig(environment, serverName, input.folder, sessions);
+          }, catch: () => rejected("account tool server configuration cannot be prepared") }),
+          (settings) => Effect.sync(settings.remove),
+        ).pipe(Scope.provide(scope));
+        environment.CURSOR_CONFIG_DIR = settings.directory;
+      }
       // No asynchronous work separates the final grant check from spawn.
       const folder = yield* folderForSpawn(input.grant, session === undefined ? "start" : "reload").pipe(Effect.mapError(() => rejected("folder grant is no longer valid")));
       if (folder !== input.folder) return yield* rejected("spawn folder differs from grant");
@@ -602,6 +615,33 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         for (const option of request.options) {
           if ((yield* redactText(option.optionId, processEntry.covered)) !== option.optionId) return yield* AcpRequestError.invalidParams("Permission option refused");
         }
+        // Gemini CLI 0.67.0, acpSession.ts sendUpdateAndExecuteToolCall:
+        // the published bundle gemini-QWDTSJTS.js includes server_name and
+        // tool_name only for ToolMcpConfirmationDetails. newSessionConfig
+        // replaces client-supplied servers without carrying their trust flag,
+        // so a session-scoped native server trust setting is unavailable.
+        // Never infer identity from the title, arguments, or a tool-name prefix.
+        const meta = tool._meta?.["gemini-cli"] as { mcp?: { server_name?: unknown; tool_name?: unknown } } | undefined;
+        const geminiOwn = harness.id === "gemini" && meta?.mcp?.server_name === "shephrd"
+          && typeof meta.mcp.tool_name === "string" && /^[A-Za-z0-9_-]+$/.test(meta.mcp.tool_name);
+        // Claude's plan mode still invokes canUseTool for an allowed MCP tool
+        // (verified with Haiku). claude-agent-acp 0.99.1 canUseTool forwards
+        // SDK 0.3.312's mcpServer verbatim in claudeCode _meta. The v2 renderer
+        // supplies toolCall.name; v1 keeps toolName in claudeCode _meta.
+        // The SDK calls process servers supplied via query options "dynamic";
+        // user/project/plugin servers are distinct sources. A title alone, or
+        // a matching name from one of those sources, never grants approval.
+        const claude = tool._meta?.claudeCode as { mcpServer?: { name?: unknown; source?: unknown }; toolName?: unknown } | undefined;
+        const claudeToolName = tool.name ?? claude?.toolName;
+        const claudeOwn = harness.id === "claude" && claude?.mcpServer?.name === "shephrd" && claude.mcpServer.source === "dynamic"
+          && typeof claudeToolName === "string" && /^mcp__shephrd__[A-Za-z0-9_-]+$/.test(claudeToolName)
+          && (claude.toolName === undefined || claude.toolName === claudeToolName);
+        if ((geminiOwn || claudeOwn) && processEntry.ready && !processEntry.stopped && !processEntry.dead && processEntry.covered()) {
+          const once = request.options.filter((option) => option.kind === "allow_once");
+          if (once.length === 1 && new Set(request.options.map((option) => option.optionId)).size === request.options.length) {
+            return { outcome: { outcome: "selected" as const, optionId: once[0]!.optionId } };
+          }
+        }
         const hold = yield* makePermissionHold(request.options);
         processEntry.holds.set(hold.id, hold);
         processEntry.responses.set(context.requestId, hold.delivered);
@@ -648,16 +688,22 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       const initialized = yield* client.agent.initialize({ protocolVersion: 2, clientInfo: { name: "shephrd", version: "0.0.1" }, clientCapabilities: {} }).pipe(Effect.mapError(() => rejected("adapter initialization failed")));
       processEntry.version = initialized.protocolVersion;
       if (initialized.agentCapabilities !== undefined) processEntry.capabilities = initialized.agentCapabilities;
-      const mcpServers = harness.id === "codex" ? [] : [{ type: "stdio" as const, name: "shephrd", command: process.execPath, args: [mcpScriptPath, "mcp"],
+      const mcpServers = harness.id === "codex" ? [] : [{ type: "stdio" as const, name: serverName, command: process.execPath, args: [mcpScriptPath, "mcp"],
         env: [{ name: "SHEPHRD_SOCKET", value: configuration.socketPath }, { name: "SHEPHRD_TOKEN", value: Redacted.value(input.token) }] }];
+      // claude-agent-acp 0.99.1 createSession passes _meta.claudeCode.options
+      // to SDK query; allowedTools is session-local on new/load/resume.
+      // The SDK's mcp__<server> rule allows every tool on exactly that server.
+      // Neither this nor the Codex/Cursor settings changes the agent's mode.
+      const sessionOptions = harness.id === "claude"
+        ? { _meta: { claudeCode: { options: { allowedTools: ["mcp__shephrd"] } } } } : {};
       // Row 66 and issue 93: reload only through a method this peer
       // advertised at initialize, `session/load` first, else `session/resume`.
       const loads = processEntry.capabilities?.loadSession === true;
       const resumes = processEntry.capabilities?.sessionCapabilities?.resume !== undefined && processEntry.capabilities?.sessionCapabilities?.resume !== null;
       if (session !== undefined && !loads && !resumes) return yield* rejected("adapter cannot reload");
-      const opened = yield* (session === undefined ? client.agent.createSession({ cwd: folder, mcpServers })
-        : loads ? client.agent.loadSession({ sessionId: session.sessionId, cwd: folder, mcpServers })
-        : client.agent.resumeSession({ sessionId: session.sessionId, cwd: folder, mcpServers })).pipe(Effect.mapError((error) => {
+      const opened = yield* (session === undefined ? client.agent.createSession({ cwd: folder, mcpServers, ...sessionOptions })
+        : loads ? client.agent.loadSession({ sessionId: session.sessionId, cwd: folder, mcpServers, ...sessionOptions })
+        : client.agent.resumeSession({ sessionId: session.sessionId, cwd: folder, mcpServers, ...sessionOptions })).pipe(Effect.mapError((error) => {
           const text = JSON.stringify(error);
           const signedOut = /authentication required/i.test(text);
           return new RunnerRejected({ reason: "adapter session failed", startFailure: signedOut
@@ -670,7 +716,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       yield* drainTerminals(processEntry);
       processEntry.loading = false;
       processEntry.options = (opened.configOptions ?? []) as ReadonlyArray<ConfigOption>;
-      if (input.model !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "model", input.model, processEntry.version);
+      if (input.model !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "model", harness.id === "cursor" ? cursorModelId(input.model, processEntry.options) : input.model, processEntry.version);
       if (input.effort !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "thought_level", input.effort, processEntry.version);
       yield* setMode(processEntry, input.permission);
       processEntry.ready = true;

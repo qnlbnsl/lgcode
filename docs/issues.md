@@ -8004,3 +8004,229 @@ through the real probe driver. They also check historical output, terminal
 snapshots, replacement updates, omitted fields, and empty results.
 The assigned run folder contains the round 2 check logs and result report.
 No deferred security issue was repaired to improve the live-check count.
+
+## 484. Shephrd's own tools can wait for harness approval
+
+Found: 2026-11-05, during the roles live check's `wave` step.
+State: fixed on `area/shephrd-tools`.
+
+A Claude lead in ask mode requested permission for `mcp__shephrd__roles_orient`.
+The run waited five minutes because nobody answered that request.
+The owner decided that Shephrd's own tools need no harness approval on any
+harness or permission mode. Codex already had this setting through issue 236.
+
+Claude's pinned `claude-agent-acp` 0.99.1 accepts
+`_meta.claudeCode.options.allowedTools` on session creation and reload.
+The runner supplies the server rule `mcp__shephrd` to the Agent Software
+Development Kit 0.3.312. It does not write a settings file.
+The real Haiku read-only proof found that plan mode still asks despite this
+rule. The runner answers once when the SDK's structured server identity is
+`shephrd` from source `dynamic`, with the matching structured tool name.
+Protocol version 2 puts that name in `toolCall.name`.
+Protocol version 1 puts it in `_meta.claudeCode.toolName`.
+Configured and plugin sources with the same name keep their normal hold.
+Codex keeps its existing server-specific `default_tools_approval_mode`.
+
+Gemini is not installed here. The published Gemini CLI 0.67.0 bundle's
+`AcpSession` attaches `_meta['gemini-cli'].mcp.server_name` and `tool_name`
+to an MCP permission request. Its session configuration discards server
+trust for client-supplied servers. The runner answers the unique one-time
+allow option only when this structured identity names its own server.
+Missing identity, another server, or ambiguous options keep the normal hold.
+Older Gemini versions without this metadata still require a person's answer.
+
+Cursor 2026.10.14-941492e drops the provider identity from permission requests.
+Its `InteractivePermissionsService.shouldBlockMcp` can reject a read-only
+call before asking the client. The runner therefore uses a private copy of
+`cli-config.json` through `CURSOR_CONFIG_DIR`. It adds one native
+`Mcp(server:*)` allow rule for a fresh, random server name. The random name
+keeps Cursor's case-insensitive matcher from matching an owner's other server.
+The process scope removes the copy after the child stops. The owner's files
+stay unchanged. Neither the global `--approve-mcps` flag nor a mode bypass
+is used.
+Cursor's session history stays in the engine's per-agent state directory.
+The disposable settings directory links to it so that a reload can recover
+the conversation. See issues 488 and 489 for the real Cursor follow-up.
+
+The source comments in `AcpRunner.ts`, `codexMcp.ts`, and `cursorMcp.ts`
+identify the adapter versions and source entry points. The runner tests cover
+every harness and permission mode, session creation and reload, other servers,
+native tools, uncertain Gemini identity, and private Cursor settings cleanup.
+Every Shephrd call still passes through the existing authenticated engine
+handlers and their caller-rights checks. An API question still reaches its
+recipient; only the harness approval prompt is exempt.
+Real verification and the full check results are recorded beside the assigned
+brief in `.scratch/foundry-runs/foundation-plans-1/shephrd-tools/result.md`.
+
+## 485. Cursor's native login store is missing from credential redaction
+
+Found: 2026-11-05, while reading Cursor's installed permission implementation.
+State: open. This is outside the approval change.
+
+`credentialSourceFor` currently has no Cursor file paths because its original
+scouting established only an environment key. Cursor 2026.10.14-941492e's
+credential manager uses `XDG_CONFIG_HOME/cursor/auth.json` on Linux, or
+`HOME/.config/cursor/auth.json` when that variable is absent. A token that
+exists only in that file is therefore absent from the engine's credential
+registry. Explicit account secrets remain registered as before.
+The source is the installed `index.js` credential manager's `getAuthFilePath`
+and `readAuthData` methods. No credential values were read for this finding.
+The registry needs this source, its refresh behavior, and regression coverage
+before Cursor's native login can be claimed to have the same coverage as
+Claude and Codex.
+
+## 486. The live check relies on a Shephrd permission prompt for Claude options
+
+Found: 2026-11-05, in the first approval-free tools live check.
+State: fixed on `area/shephrd-tools`.
+
+The `permission-kinds` observation ran immediately after `sandbox-mcp`.
+Its only Claude permission evidence came from the Shephrd call that no
+longer asks. The step failed with no observed Claude options.
+The observation now follows `always-allow`, which attempts a native command
+and records its real offered options. The option checks still require
+observed evidence for both harnesses. No accepted outcome or security gate
+was relaxed. The independent probe order and its regression tests were updated.
+
+## 487. A Codex live probe can choose web search instead of the requested MCP tool
+
+Found: 2026-11-05, in the second approval-free tools live check.
+State: open. This is separate from the permission change.
+
+The `sandbox-mcp` prompt required exactly one Shephrd `ask` call and prohibited
+other tools. The Claude call completed and created its authenticated question.
+The Codex turn issued a native web search with an empty query instead.
+The existing strict probe rejected this unexpected call. It did not treat the
+agent's reply as tool evidence. The Codex approval configuration was unchanged.
+The separate Luna proof completed `roles.orient` and `ask` without permission.
+
+Evidence: `/tmp/shephrd-live-BNBMph/state/events.sqlite`, read-only.
+The unexpected web search is at sequences 157 and 158.
+After reload, the same Codex agent repeated its hold command and ended its
+turn without the requested MCP question. The strict reload observation timed
+out. Its turn ends at sequence 930. The run passed 17 of 23 steps, and its
+log is saved beside the assigned brief as `live-check-attempt-2.log`.
+The cause of this model behavior is not established. The probe's allowed
+inputs and accepted outcomes remain unchanged.
+
+## 488. Cursor's Auto model uses a different protocol identifier
+
+Found: 2026-11-05, during the requested real Cursor proof.
+State: fixed on `area/shephrd-tools`.
+
+The installed Cursor version `2026.10.14-941492e` lists `auto` in its terminal
+model catalog. Its Agent Client Protocol (ACP) session instead advertises
+`default[]`, named `Auto`. Sending `auto` as a configuration value failed
+before a model prompt was sent. The permitted fallback `grok-4.7-medium`
+was also refused before a prompt. Both failures were recorded as
+`AgentStartFailed` with reason `model-refused`.
+
+The source is `6136.index.js`, in `buildVariantModelConfigOptions` and
+`applyVariantModelConfigOption`. A direct, prompt-free ACP inspection confirmed
+the advertised value. The runner now translates the requested Cursor model
+`auto` only when the exact option `default[]`, named `Auto`, is advertised
+once. A native `auto` option takes precedence. No other model is substituted.
+Creation, load, and resume tests inspect the actual configuration frame.
+Uncertain and duplicate options retain the original request and its refusal.
+
+## 489. Disposable Cursor settings also contain its session history
+
+Found: 2026-11-05, while preparing the real Cursor reload proof.
+State: fixed on `area/shephrd-tools`.
+
+Cursor `2026.10.14-941492e` stores its ACP session databases beneath
+`CURSOR_CONFIG_DIR/acp-sessions`. Its installed `6136.index.js`, in
+`acp-storage.ts`, resolves this path for both new sessions and session load.
+Removing the private settings directory would also remove the conversation
+needed by a replacement process. This was found by source inspection before
+attempting the requested reload.
+
+The runner now links the disposable directory's `acp-sessions` entry to
+`cursor-sessions/<agentId>` inside the engine's state folder. The directory
+has mode 0700. Each agent gets its own history. Settings and approval rules
+still disappear when the child stops. The owner's files remain unchanged.
+The runner tests verify the link, its permissions, and retained history
+after process cleanup. The real run's observed results are recorded beside
+the assigned brief in `cursor-proof.md`.
+
+## 490. Cursor restores the previous MCP provider name on reload
+
+Found: 2026-11-05, during the requested real Cursor reload proof.
+State: fixed on `area/shephrd-tools`, with a successful live stop/resume proof.
+
+The read-only Auto session loaded successfully. Its one permitted extra
+prompt called `roles.orient` using the provider name from the conversation.
+The replacement process had a new random name and a native allow rule for
+that new name. Cursor therefore requested human approval for the old name.
+The request is at sequence 80 in
+`/tmp/shephrd-live-C4DAkt/state/events.sqlite`.
+
+The runner now persists each agent's unguessable name beside its session
+history, in a file with mode 0600. The replacement process uses that same
+name and grants only that server's rule. Other agents receive different
+names. An invalid saved identity refuses startup. A regression starts,
+stops, and loads the runner, then inspects both the ACP server identity and
+the replacement process's native allow rule. The first brief's single extra
+live prompt was already used, so that follow-up left live verification open.
+
+The manager then sent one more real reload proof assignment. On commit `6bea2c4`,
+a Cursor Auto agent in ask mode completed `roles.orient` and `ask`, ended
+its turn, stopped, and resumed the same session. The second prompt completed
+both calls and ended its turn. Neither turn requested permission.
+The database is `/tmp/shephrd-live-E1UN83/state/events.sqlite`.
+The initial orientation, question, and turn end are at sequences 51, 55,
+and 61. The agent stopped at sequence 62 and reloaded at sequence 66.
+The second orientation, question, and turn end are at sequences 89, 93,
+and 98. The session and provider identity stayed the same.
+The detailed evidence and remaining limits are recorded in `cursor-proof.md`
+beside the assigned brief. No application fix was needed for this run.
+
+## 491. The roles live check rejected the board's expected no-answer disposition
+
+Found: 2026-11-05, after the owner's roles check at `5dd41b7`.
+State: fixed on `area/shephrd-tools`; the owner must repeat the real stall check.
+
+The wave and timed flush passed in `run-TnMigw`. The first-stall check
+rejected every `board.AddresseeResolved` event, including `no-answer`.
+The worker ended its initial turn at sequence 280. The board sent its
+reminder at 281. The worker ended the reminder turn at 305, and the board
+recorded `no-answer` at 306. The check stopped before awaiting a stall.
+
+The product correctly leaves that addressee eligible in `stall.ts`.
+The board keeps the all-mode post open after `no-answer`. The stall view
+restarts its timer at each eligible worker turn end, so sequence 305 is
+the origin in this case. Sequence 280 would start the timer too early.
+
+The check now requires the matching reminder, its accepted delivery, the
+reminder turn end and the no-answer disposition. It still rejects an early
+reply or closure. The first nudge must use the latest worker turn end
+before the planned notice and wait the unchanged production interval.
+Regression tests cover that sequence, later idle turns, missing reminder
+evidence, early replies, early or stale timers and duplicate stall actions.
+
+The owner can use `--skip-timed-flush` to avoid repeating the cache wait.
+That step is reported as skipped. A run whose other steps pass reports
+`INCOMPLETE` and exits with code 1. A scripted client regression exercises
+the remaining journey, exports and cleanup without starting real agents.
+No real roles run was performed for this fix.
+
+## 492. The roles worker prompt did not cover the board's stall reminder
+
+Found: 2026-11-05, during the owner's roles check at `bac865a`.
+State: fixed on `area/shephrd-tools`; the owner must repeat the real stall check.
+
+The Luna worker left the initial obligation unanswered and ended its turn
+at sequence 272. The board sent its reminder at 273. That reminder asks
+for a reply even when the recipient has nothing to add. The worker replied
+at 281, and the post closed as answered at 283 in `run-AMeu00`.
+The product behaved correctly, and the check correctly rejected the early
+reply. The worker's prompt had not explicitly covered the reminder turn.
+
+The prompt now identifies the reminder about `roles-live-first-stall` as
+expected. It distinguishes that reminder from the sheepdog's notice.
+The worker must leave the obligation unanswered, must not call `board.post`,
+and must end the reminder turn with the word waiting. It may reply only
+after a notice authored by `roles.sheepdog`. A prompt regression checks
+these instructions and their inclusion in both worker start inputs.
+The check's assertions and the product code are unchanged.
+No real roles run was performed for this prompt fix.

@@ -32,8 +32,8 @@ describe("live probe outcome gates", () => {
     const { reporter, exit, lines } = await run();
     expect(exit._tag).toBe("Success");
     expect(reporter.results().map((row) => row.id)).toEqual([
-      "sandbox-mcp", "permission-kinds", "removed-variables", "state-read",
-      "slash-up", "slash-down", "always-allow", "reload", "token-scan",
+      "sandbox-mcp", "removed-variables", "state-read",
+      "slash-up", "slash-down", "always-allow", "permission-kinds", "reload", "token-scan",
     ]);
     expect(lines.every((line) => line.includes("claude:") && line.includes("codex:"))).toBe(true);
   });
