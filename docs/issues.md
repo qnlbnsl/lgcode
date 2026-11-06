@@ -8004,3 +8004,104 @@ through the real probe driver. They also check historical output, terminal
 snapshots, replacement updates, omitted fields, and empty results.
 The assigned run folder contains the round 2 check logs and result report.
 No deferred security issue was repaired to improve the live-check count.
+
+## 484. Shephrd's own tools can wait for harness approval
+
+Found: 2026-11-05, during the roles live check's `wave` step.
+State: fixed on `area/shephrd-tools`.
+
+A Claude lead in ask mode requested permission for `mcp__shephrd__roles_orient`.
+The run waited five minutes because nobody answered that request.
+The owner decided that Shephrd's own tools need no harness approval on any
+harness or permission mode. Codex already had this setting through issue 236.
+
+Claude's pinned `claude-agent-acp` 0.99.1 accepts
+`_meta.claudeCode.options.allowedTools` on session creation and reload.
+The runner supplies the server rule `mcp__shephrd` to the Agent Software
+Development Kit 0.3.312. It does not write a settings file.
+The real Haiku read-only proof found that plan mode still asks despite this
+rule. The runner answers once when the SDK's structured server identity is
+`shephrd` from source `dynamic`, with the matching structured tool name.
+Protocol version 2 puts that name in `toolCall.name`.
+Protocol version 1 puts it in `_meta.claudeCode.toolName`.
+Configured and plugin sources with the same name keep their normal hold.
+Codex keeps its existing server-specific `default_tools_approval_mode`.
+
+Gemini is not installed here. The published Gemini CLI 0.67.0 bundle's
+`AcpSession` attaches `_meta['gemini-cli'].mcp.server_name` and `tool_name`
+to an MCP permission request. Its session configuration discards server
+trust for client-supplied servers. The runner answers the unique one-time
+allow option only when this structured identity names its own server.
+Missing identity, another server, or ambiguous options keep the normal hold.
+Older Gemini versions without this metadata still require a person's answer.
+
+Cursor 2026.10.14-941492e drops the provider identity from permission requests.
+Its `InteractivePermissionsService.shouldBlockMcp` can reject a read-only
+call before asking the client. The runner therefore uses a private copy of
+`cli-config.json` through `CURSOR_CONFIG_DIR`. It adds one native
+`Mcp(server:*)` allow rule for a fresh, random server name. The random name
+keeps Cursor's case-insensitive matcher from matching an owner's other server.
+The process scope removes the copy after the child stops. The owner's files
+stay unchanged. Neither the global `--approve-mcps` flag nor a mode bypass
+is used.
+
+The source comments in `AcpRunner.ts`, `codexMcp.ts`, and `cursorMcp.ts`
+identify the adapter versions and source entry points. The runner tests cover
+every harness and permission mode, session creation and reload, other servers,
+native tools, uncertain Gemini identity, and private Cursor settings cleanup.
+Every Shephrd call still passes through the existing authenticated engine
+handlers and their caller-rights checks. An API question still reaches its
+recipient; only the harness approval prompt is exempt.
+Real verification and the full check results are recorded beside the assigned
+brief in `.scratch/foundry-runs/foundation-plans-1/shephrd-tools/result.md`.
+
+## 485. Cursor's native login store is missing from credential redaction
+
+Found: 2026-11-05, while reading Cursor's installed permission implementation.
+State: open. This is outside the approval change.
+
+`credentialSourceFor` currently has no Cursor file paths because its original
+scouting established only an environment key. Cursor 2026.10.14-941492e's
+credential manager uses `XDG_CONFIG_HOME/cursor/auth.json` on Linux, or
+`HOME/.config/cursor/auth.json` when that variable is absent. A token that
+exists only in that file is therefore absent from the engine's credential
+registry. Explicit account secrets remain registered as before.
+The source is the installed `index.js` credential manager's `getAuthFilePath`
+and `readAuthData` methods. No credential values were read for this finding.
+The registry needs this source, its refresh behavior, and regression coverage
+before Cursor's native login can be claimed to have the same coverage as
+Claude and Codex.
+
+## 486. The live check relies on a Shephrd permission prompt for Claude options
+
+Found: 2026-11-05, in the first approval-free tools live check.
+State: fixed on `area/shephrd-tools`.
+
+The `permission-kinds` observation ran immediately after `sandbox-mcp`.
+Its only Claude permission evidence came from the Shephrd call that no
+longer asks. The step failed with no observed Claude options.
+The observation now follows `always-allow`, which attempts a native command
+and records its real offered options. The option checks still require
+observed evidence for both harnesses. No accepted outcome or security gate
+was relaxed. The independent probe order and its regression tests were updated.
+
+## 487. A Codex live probe can choose web search instead of the requested MCP tool
+
+Found: 2026-11-05, in the second approval-free tools live check.
+State: open. This is separate from the permission change.
+
+The `sandbox-mcp` prompt required exactly one Shephrd `ask` call and prohibited
+other tools. The Claude call completed and created its authenticated question.
+The Codex turn issued a native web search with an empty query instead.
+The existing strict probe rejected this unexpected call. It did not treat the
+agent's reply as tool evidence. The Codex approval configuration was unchanged.
+The separate Luna proof completed `roles.orient` and `ask` without permission.
+
+Evidence: `/tmp/shephrd-live-BNBMph/state/events.sqlite`, read-only.
+The unexpected web search is at sequences 157 and 158.
+After reload, the same Codex agent repeated its hold command and ended its
+turn without the requested MCP question. The strict reload observation timed
+out. Its turn ends at sequence 930. The run passed 17 of 23 steps, and its
+log is saved beside the assigned brief as `live-check-attempt-2.log`.
+The cause of this model behavior is not established. The probe's allowed
+inputs and accepted outcomes remain unchanged.

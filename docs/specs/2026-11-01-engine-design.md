@@ -194,8 +194,12 @@ There is one runner for each agent in ACP mode. The runner:
 - Opens an ACP session and records the session id, which `resume` needs.
 - Turns everything the agent streams into events: text, plan, tool calls,
   changed files and the end of each turn.
-- Turns an ACP permission request into a "permission requested" event and
-  holds the agent until an "answer" event is written.
+- Lets an agent call Shephrd's own tools without an approval prompt in every
+  permission mode, by the owner's decision on 2026-11-05. The engine still
+  authenticates each call and checks its caller's rights.
+- Turns other ACP permission requests into a "permission requested" event
+  and holds the agent until an "answer" event is written. A request whose
+  server identity is uncertain follows this same path.
 - Sends `compact` as the harness's own compact command when the adapter
   advertises one in its list of available commands. Otherwise `compact` is
   refused with the reason "not supported by this harness".
@@ -234,9 +238,11 @@ narrowest to widest, is: read only, ask before every change, edit files
 without asking, and full access. Each harness maps its own modes onto this
 scale in its settings.
 
-An answer to a permission request is only ever an authenticated `answer`
-command. It is never read out of an agent's text. That keeps SECURITY.md's
-rule that agent text is data, not a command.
+An answer to a permission request routed to a person is an authenticated
+`answer` command. It is never read out of an agent's text. Shephrd's own
+server is exempt from the harness approval prompt. This exemption does not
+change the authentication or authorization of its commands. That keeps
+SECURITY.md's rule that agent text is data, not a command.
 
 ### 6. The doors
 

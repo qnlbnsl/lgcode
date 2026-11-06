@@ -16,7 +16,7 @@ afterEach(() => { for (const fixture of fixtures.splice(0)) fixture.dispose(); }
 
 // Hand-derived order: the expected list deliberately does not come from the
 // production ALL_STEPS list that the runner also uses to decide its exit code.
-const ids = ["startup-hook", "service", "setup", "lead", "wide-start", "worker-start", "session", "live-view", "routed", "pass-up", "owner-answer", "wake", "sandbox-mcp", "permission-kinds", "removed-variables", "state-read", "slash-up", "slash-down", "always-allow", "reload", "token-scan", "final", "recording"];
+const ids = ["startup-hook", "service", "setup", "lead", "wide-start", "worker-start", "session", "live-view", "routed", "pass-up", "owner-answer", "wake", "sandbox-mcp", "removed-variables", "state-read", "slash-up", "slash-down", "always-allow", "permission-kinds", "reload", "token-scan", "final", "recording"];
 const printed = (lines: string[]) => lines.flatMap((line) => /^(PASS|FAIL|SKIP) ([a-z-]+):/.exec(line)?.slice(1) ?? []);
 
 describe("the real runner and flow against a controlled API", () => {

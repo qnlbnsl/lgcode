@@ -28,6 +28,12 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 
 ## 1. The foundry: roles and their lifecycle
 
+- **Shephrd tools need no harness approval** (agreed, 2026-11-05). An agent
+  can call Shephrd's own Model Context Protocol server in every permission
+  mode on Claude, Codex, Gemini, and Cursor. The engine authenticates every
+  call and checks the caller's existing rights. Other servers and native
+  file and command tools continue following the selected mode. The settings
+  belong to the managed session or process, not the owner's harness settings.
 - **Orchestrator** (idea). The top-level agent. It receives the owner's goal,
   decides which teams to staff, and talks to team leads, not to workers.
 - **Team leads** (idea). One per team. A lead plans its team's work, hands it

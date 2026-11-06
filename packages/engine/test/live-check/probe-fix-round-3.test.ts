@@ -170,7 +170,7 @@ it("issue 238: each probe closes its acquired resources before the next probe ru
     return yield* original.observe(id, given);
   }) };
   expect(await main([], { ...a.deps, probes })).toBe(1);
-  expect(seen).toEqual(["sandbox-mcp", "permission-kinds", "removed-variables", "state-read", "slash-up", "slash-down", "always-allow", "reload", "token-scan"]);
+  expect(seen).toEqual(["sandbox-mcp", "removed-variables", "state-read", "slash-up", "slash-down", "always-allow", "permission-kinds", "reload", "token-scan"]);
   expect([...active]).toEqual([]);
 });
 

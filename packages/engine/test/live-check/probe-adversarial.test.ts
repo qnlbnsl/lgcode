@@ -332,6 +332,15 @@ describe("always-allow (SEC-PB-4) answers always only for the owner-held exact c
     expect(run.rows[0]!.detail).toContain("lcp-persistent-permission-probe");
   });
 
+  it("approval-free MCP calls leave no Claude options until the native command probe, whose options still satisfy permission-kinds", async () => {
+    const engine = make();
+    engine.permission(WORKER, "journey-command", [ONCE, REJECT]);
+    expect((await runProbe(engine, "permission-kinds")).passed).toBe(false);
+    engine.script = plan((command) => ({ command }));
+    expect((await runProbe(engine, "always-allow")).passed).toBe(true);
+    expect((await runProbe(engine, "permission-kinds")).passed).toBe(true);
+  });
+
   it("does not answer always for the exact command when it runs outside the run's work folder", async () => {
     const engine = make();
     engine.script = plan((command) => ({ command, cwd: "/home" }));
