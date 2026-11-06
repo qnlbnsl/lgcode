@@ -1,0 +1,17 @@
+{
+  "name": "@sheprd/herdr-plugin",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=26.13 <27" },
+  "scripts": { "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@sheprd/client": "workspace:*",
+    "@sheprd/viewer": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

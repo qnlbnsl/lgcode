@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   checkStartupHook, listServicesFromProc, type ServiceProcess, type StartupHookDeps,
-} from "../../scripts/live/startupHook.ts";
+} from "../../../../plugins/herdr/src/startupHook.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 registerRebuildCheck({ noLog: true });

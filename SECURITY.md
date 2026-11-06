@@ -17,7 +17,8 @@ security" in the subject line.
 
 Include these details:
 
-- The Sheprd version or commit, the Herdr version, and the platform.
+- The Sheprd version or commit and the platform.
+- The Herdr version, if the optional plugin is involved.
 - The impact: what an attacker can read, change, or run.
 - A minimal reproduction.
 
@@ -26,8 +27,8 @@ session cookies, and raw provider responses before you send anything.
 
 ## What Sheprd protects, and what it does not
 
-Sheprd runs with the same local-user permissions as Herdr. It is not a
-sandbox. The coding agents it manages can run commands and change files as
+Sheprd runs with the permissions of the local user who starts it.
+It is not a sandbox. The coding agents it manages can run commands and change files as
 that user, and Sheprd does not stop them. Run untrusted repositories inside
 an external sandbox.
 

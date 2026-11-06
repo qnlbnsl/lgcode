@@ -45,7 +45,7 @@ import * as childProcess from "node:child_process";
 import * as net from "node:net";
 import * as http from "node:http";
 import { main, realDeps } from "../../scripts/live/run.ts";
-import { checkStartupHook, realStartupHookDeps } from "../../scripts/live/startupHook.ts";
+import { checkStartupHook, realStartupHookDeps } from "../../../../plugins/herdr/src/startupHook.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 registerRebuildCheck({ noLog: true });

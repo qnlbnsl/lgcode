@@ -6,11 +6,15 @@ one set of rules.
 
 ## What this project is
 
-Sheprd is a plugin for [Herdr](https://github.com/herdrdev/herdr). It runs
+Sheprd is a standalone program with a web page and an optional
+[Herdr plugin](plugins/herdr/README.md). It runs
 teams of coding agents (an orchestrator, team leads, and workers), connects
 them through a strict message board, and exposes everything through an
 authenticated client API for web, desktop, and mobile apps. Read
 [README.md](README.md) before starting any task.
+Start it without Herdr through `./bin/sheprd serve --detach`.
+Set `SHEPRD_WEB_PASSWORD` on the service to enable the web page.
+The core must not import the optional plugin.
 
 Sheprd is a separate project from
 [Herdr Synapse](https://github.com/vitalysim/herdr-synapse), which inspired
@@ -49,7 +53,7 @@ decided by the owner on 2026-10-30:
 - **ACP mode** is built first. Sheprd runs the agent as a child process and
   drives it through the Agent Client Protocol.
 - **Interactive mode** is built second. Sheprd opens the harness's normal
-  terminal program in a Herdr pane.
+  terminal program in a Herdr pane through the optional plugin.
 
 The board, the roster, and the thread view must not depend on which mode an
 agent uses. Keep the mode-specific code behind one delivery interface, so an
@@ -82,9 +86,9 @@ ACP agent and an interactive agent can sit on the same team.
 5. **The client API is the product's surface.** Anything the owner can do
    from the terminal must also be possible through the API, so a web or
    mobile client is never a second-class citizen.
-6. **Team shapes and workflows do not belong here.** Sheprd provides roles,
-   the board, and the API. The definitions of particular teams live outside
-   this repository.
+6. **Ship a default workflow that people can override.** Sheprd provides
+   roles, the board, the API, and a default workflow. People can supply
+   their own team definitions and workflow instructions.
 7. **Agents have full authority inside a team.** They commit, push and merge
    on their team's branches and worktrees without asking. Moving finished work
    into the base branch is done by a pull request, and the owner approves it.

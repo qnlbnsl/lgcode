@@ -34,10 +34,6 @@ const main = (argv: ReadonlyArray<string>, environment: Readonly<Record<string, 
         out("Usage: sheprd view\n\nRead live agent threads in an owner terminal.\nUse Up/Down to select an agent, PgUp/PgDn to scroll, p to prompt, a to inspect a request, and q to quit.\n")
         return 0
       }
-      if (argv.length === 2 && argv[1] === "--open-pane") {
-        const { openViewerPane } = yield* Effect.promise(() => import("../../viewer/src/openPane.ts"))
-        return yield* Effect.promise(() => openViewerPane(environment))
-      }
       if (argv.length !== 1) { err("usage: sheprd view\n"); return 2 }
       const { runViewer } = yield* Effect.promise(() => import("../../viewer/src/run.ts"))
       return yield* runViewer(environment)

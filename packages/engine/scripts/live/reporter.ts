@@ -9,6 +9,7 @@ export interface StepResult {
   readonly id: string;
   readonly title: string;
   readonly passed: boolean;
+  readonly optional?: boolean;
   readonly reason: string;
   readonly milliseconds: number;
 }
@@ -17,8 +18,9 @@ export interface Reporter {
   // Runs one step. A thrown error, or a rejected promise, fails the step with
   // its message. The caller decides whether the run goes on.
   readonly step: <A>(spec: StepSpec, body: () => Promise<A>, reason?: (value: A) => string) => Promise<{ readonly passed: true; readonly value: A } | { readonly passed: false }>;
-  // Records a step that did not run because an earlier one failed.
-  readonly skip: (spec: StepSpec, because: string) => void;
+  // Records a step that did not run. Only an explicitly optional skip is
+  // permitted on a successful run.
+  readonly skip: (spec: StepSpec, because: string, optional?: boolean) => void;
   readonly note: (text: string) => void;
   // Records a step whose result the caller already knows (an effect-based step runner).
   readonly pass: (spec: StepSpec, reason: string, milliseconds?: number) => void;
@@ -78,17 +80,17 @@ export const createReporter = (
     },
     pass: (spec, reason, milliseconds) => { record(spec, true, reason, clock(), milliseconds); },
     fail: (spec, reason, milliseconds) => { record(spec, false, reason, clock(), milliseconds); },
-    skip: (spec, because) => {
-      results.push({ id: spec.id, title: spec.title, passed: false, reason: oneLine(because), milliseconds: 0 });
+    skip: (spec, because, optional = false) => {
+      results.push({ id: spec.id, title: spec.title, passed: false, ...(optional ? { optional: true } : {}), reason: oneLine(because), milliseconds: 0 });
       write(`SKIP ${spec.id}: ${spec.title} (${oneLine(because)})`);
     },
     note: (text) => write(`     ${oneLine(text, 600)}`),
     results: () => results,
     printed: () => raw.join("\n"),
-    failed: () => results.some((result) => !result.passed),
+    failed: () => results.some((result) => !result.passed && !result.optional),
     exitCode: (expected) => {
       const ran = new Set(results.map((result) => result.id));
-      return results.every((result) => result.passed) && expected.every((spec) => ran.has(spec.id)) ? 0 : 1;
+      return results.every((result) => result.passed || result.optional === true) && expected.every((spec) => ran.has(spec.id)) ? 0 : 1;
     },
   };
 };

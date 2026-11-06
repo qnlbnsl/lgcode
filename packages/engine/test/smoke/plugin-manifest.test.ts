@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
-const text = readFileSync(fileURLToPath(new URL("../../../../herdr-plugin.toml", import.meta.url)), "utf8");
+const text = readFileSync(fileURLToPath(new URL("../../../../plugins/herdr/herdr-plugin.toml", import.meta.url)), "utf8");
 const sections: Array<{ kind: string; body: string }> = [];
 for (const line of text.split("\n")) {
   const header = /^\s*\[\[?([\w.-]+)\]\]?\s*(?:#.*)?$/.exec(line);

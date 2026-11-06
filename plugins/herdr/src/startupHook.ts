@@ -2,10 +2,10 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { request } from "node:http";
 import { join, resolve } from "node:path";
 
-import { stateFolder } from "../../src/api/stateFolder.ts";
+import { stateFolder } from "@sheprd/client";
 
 // Unit 8c: the startup-hook check (criterion 8.6). Herdr's `[[startup]]` entry
-// runs `./bin/sheprd serve --detach` against the real home when Herdr starts.
+// runs `sheprd serve --detach` when Herdr starts.
 // This check shows that this started exactly one service for that home.
 //
 // It only reads, and it reads little:

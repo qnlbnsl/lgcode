@@ -52,6 +52,15 @@ describe("the reporter", () => {
     expect(reporter.exitCode([a, b])).toBe(1);
   });
 
+  it("allows an explicitly optional skip while preserving missing and failed step checks", () => {
+    const { reporter } = make();
+    reporter.skip(a, "the optional plugin is absent", true);
+    reporter.pass(b, "the core check passed");
+    expect(reporter.failed()).toBe(false);
+    expect(reporter.exitCode([a, b])).toBe(0);
+    expect(reporter.exitCode([a, b, { id: "missing", title: "missing" }])).toBe(1);
+  });
+
   it("folds a reason onto one line and cuts a very long one (breaks if a stack buries the other steps)", () => {
     expect(oneLine("line one\n   line two\n\n")).toBe("line one line two");
     const long = oneLine("x".repeat(5_000));

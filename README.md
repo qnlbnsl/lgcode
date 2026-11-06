@@ -1,15 +1,16 @@
 # Sheprd
 
-Sheprd is a plugin for [Herdr](https://github.com/herdrdev/herdr) that runs
-teams of coding agents as a small company: an orchestrator at the top, team
-leads under it, and workers under each lead. They coordinate through a strict
-message board that is built for efficiency, so no agent is woken, and no turn
-is spent, without a reason.
+Sheprd is a standalone program that runs teams of coding agents as a small
+company. An orchestrator directs team leads, and each lead directs workers.
+The agents coordinate through a strict message board.
+The engine, board, authenticated application programming interface (API), and
+web page are the core program.
 
-Sheprd also exposes its state through a network application programming
-interface (API). The goal is that a person can start a Herdr server, install
-Sheprd, and then set up and steer their teams from a web page, a desktop
-app, or a phone, with every agent conversation available as a thread.
+An optional [Herdr plugin](plugins/herdr/README.md) connects the core program
+to [Herdr](https://github.com/herdrdev/herdr) for terminal panes and future
+interactive sessions.
+The core runs without Herdr installed.
+Sheprd ships a default workflow that people can override.
 
 > [!WARNING]
 > Sheprd is under development. The engine, authenticated client API, message
@@ -31,8 +32,7 @@ direction, so it is a separate project with its own codebase.
 Thank you, Vitaly, for building Synapse and for releasing it under the
 Apache License 2.0.
 
-Sheprd also depends on Herdr itself, which hosts the agents and provides the
-terminal and session APIs that Sheprd uses.
+The optional plugin uses Herdr to host terminal panes.
 
 Sheprd borrows ideas, and some code, from
 [T3 Code](https://github.com/pingdotgg/t3code) by T3 Tools Inc., released
@@ -56,9 +56,44 @@ These are the intended pieces. Each one is tracked in more detail in
   app, and a future mobile app all use. Nothing a client can do is reserved
   for the terminal.
 
-The team shapes and workflows themselves (which teams exist, what each role is
-told to do) are not part of Sheprd. Sheprd is the machinery; the workflows
-live elsewhere and are loaded into it.
+Sheprd ships a default workflow, and people can override it with their own
+team definitions and instructions.
+
+## Start Sheprd without Herdr
+
+This checkout needs Node.js 26 and pnpm.
+From the repository root, select Node.js and install the dependencies:
+
+```sh
+nvm use
+pnpm install --frozen-lockfile
+pnpm --filter @sheprd/web build
+```
+
+Start the service with a web password in its environment:
+
+```sh
+read -rs SHEPRD_WEB_PASSWORD
+export SHEPRD_WEB_PASSWORD
+./bin/sheprd serve --detach
+unset SHEPRD_WEB_PASSWORD
+```
+
+The `read` command above works in Bash and Zsh.
+Enter a long, random password at its prompt, then press Enter.
+Open `http://127.0.0.1:8787` and log in with that password.
+The web password must contain at least eight characters.
+The engine's default state folder is `~/.local/state/sheprd`.
+Set `SHEPRD_HOME` on the service and command processes to use another folder.
+The service continues running after the launching terminal closes.
+The terminal thread viewer is available through `./bin/sheprd view`.
+
+The service command also works without a web password.
+In that case, the authenticated Unix socket is available and the web server
+stays off.
+See [remote access](docs/remote-access.md) before using a proxy or a phone.
+An installer, startup at login, and loading project configuration from
+`.sheprd` are the next piece of work.
 
 ## Documents
 

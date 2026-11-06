@@ -5,22 +5,22 @@ min_herdr_version = "0.8.2"
 platforms = ["linux"]
 
 [[startup]]
-command = ["./bin/sheprd", "serve", "--detach"]
+command = ["sheprd", "serve", "--detach"]
 
 [[actions]]
 id = "serve"
 title = "Start Sheprd"
 contexts = ["global"]
-command = ["./bin/sheprd", "serve", "--detach"]
+command = ["sheprd", "serve", "--detach"]
 
 [[actions]]
 id = "view"
 title = "View Sheprd threads"
 contexts = ["global"]
-command = ["./bin/sheprd", "view", "--open-pane"]
+command = ["node", "./src/openPane.ts"]
 
 [[panes]]
 id = "view"
 title = "Sheprd threads"
 placement = "split"
-command = ["./bin/sheprd", "view"]
+command = ["sheprd", "view"]

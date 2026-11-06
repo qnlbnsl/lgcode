@@ -19,12 +19,13 @@ import { PROMPTS, placeholdersOf, WORKER_PROMPT } from "./prompts.ts";
 import { realRecord, recordLive, type RecordingDeps } from "./recording.ts";
 import { createReporter, messageOf, StepCancelled } from "./reporter.ts";
 import { startLiveService, type LiveService } from "./service.ts";
-import { checkStartupHook, realStartupHookDeps, type StartupHookDeps } from "./startupHook.ts";
+import { checkStartupHook, realStartupHookDeps, type StartupHookDeps, type StartupHookResult } from "../../../../plugins/herdr/src/startupHook.ts";
+import { checkPluginHook } from "../../../../plugins/herdr/src/checkHook.ts";
 import { ALL_STEPS, RECORDING_STEP, SERVICE_STEP, SETUP_STEP, STARTUP_HOOK_STEP } from "./steps.ts";
 import { readOwnerCredentialFrom, recordReplies, redactSecrets, redactShapes } from "./support.ts";
 
-// Unit 8c: `pnpm live-check` (criterion 8.6). The owner runs it on the Herdr
-// host. It is never part of `pnpm check`: it uses the owner's real Claude Code
+// Unit 8c: `pnpm live-check` (criterion 8.6). This runs on a standalone
+// or Herdr host. It is separate from `pnpm check`: it uses real Claude Code
 // and Codex accounts and re-writes the recorded fixtures.
 
 export const HELP = `Usage: pnpm live-check [--dry-run] [--help]
@@ -37,8 +38,9 @@ adapters, in a fresh folder under /tmp, and prints one line for each step.
              starts no adapter, and reads no real home. Exits 0.
   --help     Prints this text.
 
-Needs Claude Code and Codex signed in on this machine, and Herdr's startup hook
-to have started the service. Exits 0 only when every step passes.
+Needs Claude Code and Codex signed in on this machine. The Herdr plugin hook
+is checked in private state when Herdr is installed, and skipped otherwise.
+Exits 0 only when every applicable step passes.
 
 Optional variables: ${Object.values(LIVE_VARIABLES).join(", ")}.`;
 
@@ -108,7 +110,7 @@ export const dryRunText = (config: LiveConfig = liveConfig({})): string => {
     "The re-record step (scripts/live/recording.ts, scripts/recorder.ts) then starts more model sessions, each sent the RECORDER_PROMPT above:",
     "- one Claude Code recording and one Codex recording, each in a new temporary folder;",
     "- after a recording succeeds, one signed-out probe for that harness: the adapter is started with an empty temporary home and no account variables, and is expected to be refused for authentication.",
-    "Only startup-hook, service, setup, lead and worker-start are hard stops because later work needs the service and both agents. Other journey failures are recorded and independent steps still run. With no worker permission request, routed, pass-up, owner-answer and wake are skipped with that named precondition (issue 272). The probes sandbox-mcp through token-scan continue after a journey or probe failure when their own preconditions hold: the service answers and prompt-producing probes have their needed agents alive and idle, with no pending permission of their own, open waits or queued deliveries. The read-only permission-kinds and token-scan probes do not need idle agents. A probe with unavailable preconditions is skipped with its reason; final still runs after a journey or probe failure; recording requires every earlier step to pass. Any failure keeps the overall exit nonzero.",
+    "Only startup-hook, service, setup, lead and worker-start are hard stops because later work needs the service and both agents. An absent optional Herdr plugin skips startup-hook without failing the run. Other journey failures are recorded and independent steps still run. With no worker permission request, routed, pass-up, owner-answer and wake are skipped with that named precondition (issue 272). The probes sandbox-mcp through token-scan continue after a journey or probe failure when their own preconditions hold: the service answers and prompt-producing probes have their needed agents alive and idle, with no pending permission of their own, open waits or queued deliveries. The read-only permission-kinds and token-scan probes do not need idle agents. A probe with unavailable preconditions is skipped with its reason; final still runs after a journey or probe failure; recording requires every earlier step to pass. Any failure keeps the overall exit nonzero.",
     `After a journey failure, preparation denies leftover permission requests without approving work and waits at most 30 seconds for the same agents and queued wakes to settle. Before a probe that sends turns, its agents get at most 30 seconds to be idle with nothing held or queued, and otherwise that probe is skipped with the reason.`,
     `The configured whole-run limit is ${config.totalTimeout / 1000} seconds, followed by at most 30 seconds of cancellation grace and up to 20 seconds of service cleanup with the standard wrapper. Agent event waits are bounded by ${config.agentTimeout / 1000} seconds; readiness is bounded separately.`,
     "The probe prompts above add turns to the same two sessions. The reload step restarts the service twice: one working-turn carry-on, then one pending-envelope replay. Each uses SIGKILL on this run's service child only.",
@@ -128,6 +130,7 @@ export interface RunDeps {
   readonly write: (line: string) => void;
   readonly environment: Readonly<Record<string, string | undefined>>;
   readonly hook: StartupHookDeps;
+  readonly pluginHook?: (signal: AbortSignal) => Promise<StartupHookResult | undefined>;
   readonly startService: () => LiveService;
   readonly connectOwner: (state: string) => Effect.Effect<Client, unknown, Scope.Scope>;
   readonly harnessSettings: () => Promise<ReadonlyArray<HarnessSettings>>;
@@ -151,6 +154,7 @@ const fixturesFolder = fileURLToPath(new URL("../../../testing/fixtures", import
 export const realDeps = (environment: Readonly<Record<string, string | undefined>>, write: (line: string) => void): RunDeps => ({
   write, environment,
   hook: realStartupHookDeps(environment),
+  pluginHook: (signal) => checkPluginHook(environment, signal),
   startService: () => startLiveService(environment),
   connectOwner: (state) => connect({ environment: { SHEPRD_HOME: state }, attempts: 1 }),
   harnessSettings: async () => (await Effect.runPromise(resolveHarnessDefaults({
@@ -233,12 +237,21 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
   };
 
   const body = async (): Promise<void> => {
-    const hook = await reporter.step(STARTUP_HOOK_STEP, async () => {
-      const result = await abortable(checkStartupHook(deps.hook));
-      if (!result.passed) throw new Error(result.reason);
-      return result;
-    }, (result) => result.reason);
-    if (!hook.passed || controller.signal.aborted) return;
+    try {
+      const result = deps.pluginHook === undefined
+        ? await abortable(checkStartupHook(deps.hook))
+        : await abortable(deps.pluginHook(controller.signal));
+      if (result === undefined) reporter.skip(STARTUP_HOOK_STEP, "Herdr is not installed; the optional plugin hook is not applicable", true);
+      else {
+        if (!result.passed) { reporter.fail(STARTUP_HOOK_STEP, result.reason); return; }
+        reporter.pass(STARTUP_HOOK_STEP, result.reason);
+      }
+    } catch (error) {
+      if (error instanceof StepCancelled) throw error;
+      reporter.fail(STARTUP_HOOK_STEP, messageOf(error));
+      return;
+    }
+    if (controller.signal.aborted) return;
 
     const replies: Array<string> = [];
     const journey = Effect.scoped(Effect.gen(function* () {
@@ -365,12 +378,12 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
 
   if (reporter.failed()) {
     const ran = new Set(reporter.results().map((result) => result.id));
-    const hardStop = reporter.results().find((row) => !row.passed && ["startup-hook", "service", "setup", "lead", "worker-start"].includes(row.id));
+    const hardStop = reporter.results().find((row) => !row.passed && !row.optional && ["startup-hook", "service", "setup", "lead", "worker-start"].includes(row.id));
     const unavailable = hardStop === undefined
-      ? `the run ended before this step could be evaluated; failed: ${reporter.results().filter((row) => !row.passed).map((row) => row.id).join(", ")}`
+      ? `the run ended before this step could be evaluated; failed: ${reporter.results().filter((row) => !row.passed && !row.optional).map((row) => row.id).join(", ")}`
       : `precondition unavailable: ${hardStop.id} failed; ${["startup-hook", "service"].includes(hardStop.id) ? "the run has no ready service" : hardStop.id === "setup" ? "the run's accounts and folders were not prepared" : "the required agents were not started"}`;
     for (const spec of ALL_STEPS) if (!ran.has(spec.id)) reporter.skip(spec, spec.id === "recording"
-      ? `requires every earlier step to pass; failed: ${reporter.results().filter((row) => !row.passed && row.id !== "recording").map((row) => row.id).join(", ")}`
+      ? `requires every earlier step to pass; failed: ${reporter.results().filter((row) => !row.passed && !row.optional && row.id !== "recording").map((row) => row.id).join(", ")}`
       : unavailable);
     if (service !== undefined) {
       reporter.note(`The run's folder is kept at ${service.root}; the service's log is ${service.logFile}. The real service was not touched.`);
@@ -380,8 +393,10 @@ export const main = async (argv: ReadonlyArray<string>, deps: RunDeps): Promise<
     service.remove();
   }
   const code = reporter.exitCode(ALL_STEPS);
+  const optionalSkipped = reporter.results().filter((result) => result.optional).length;
   deps.write(code === 0
-    ? `live-check: all ${ALL_STEPS.length} steps passed`
+    ? optionalSkipped === 0 ? `live-check: all ${ALL_STEPS.length} steps passed`
+      : `live-check: all ${ALL_STEPS.length - optionalSkipped} applicable steps passed (${optionalSkipped} optional step skipped)`
     : `live-check: failed (${reporter.results().filter((result) => result.passed).length} of ${ALL_STEPS.length} steps passed)`);
   open = false;
   return code;

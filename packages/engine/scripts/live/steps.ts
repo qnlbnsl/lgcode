@@ -6,7 +6,7 @@ export interface StepSpec {
   readonly title: string;
 }
 
-export const STARTUP_HOOK_STEP = { id: "startup-hook", title: "Herdr's startup hook started exactly one service for the real home" } as const;
+export const STARTUP_HOOK_STEP = { id: "startup-hook", title: "the optional Herdr plugin hook starts exactly one service in private state" } as const;
 export const SERVICE_STEP = { id: "service", title: "a fresh service starts in a new /tmp folder, with its own owner credential" } as const;
 export const SETUP_STEP = { id: "setup", title: "Claude Code and Codex are registered, each with the account that is signed in on this machine" } as const;
 

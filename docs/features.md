@@ -26,6 +26,21 @@ An earlier, much longer list of message-board features was written for the
 Synapse fork. It is at `docs/message-board/features.md` in the
 `herdr-synapse` checkout, and it is the main input for section 2 below.
 
+## The next piece: installation and configuration
+
+- **Standalone installer and startup at login** (agreed, 2026-11-05).
+  Install the `sheprd` command and let the owner start the service at login.
+  The engine, board, and website run without Herdr.
+  The optional plugin lives in `plugins/herdr` and calls the installed command.
+  The installer and login integration are not built by the rename and split.
+- **Project configuration in `.sheprd`** (agreed, 2026-11-05).
+  Define the folder's contents and loading rules in the next piece.
+  Agents can read the folder, and changes require the owner through the
+  existing settings protection.
+- **An overridable default workflow** (agreed, 2026-11-05).
+  Sheprd ships a default workflow.
+  People can override its team definitions and instructions.
+
 ## 1. The foundry: roles and their lifecycle
 
 - **Repeat the roles stall check without the cache wait** (agreed,
@@ -66,7 +81,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
     almost for free. Claude Code and Codex need their adapters,
     `claude-agent-acp` and `codex-acp`.
   - **Interactive mode** (built second). Sheprd opens the harness's normal
-    terminal program in a Herdr pane, as Herdr Synapse does, and the owner
+    terminal program in a Herdr pane through the optional plugin, and the owner
     can watch it and type into it. Use this for Claude when the 5-hour limit
     matters: Claude in ACP mode runs through the Agent SDK, which T3 Code
     reports drains the 5-hour limit faster than interactive Claude Code.

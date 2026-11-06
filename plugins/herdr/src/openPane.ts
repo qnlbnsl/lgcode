@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { resolveIdentity, type Environment } from "@sheprd/client";
-import { connectViewer } from "./connection.ts";
+import { connectViewer } from "@sheprd/viewer/connection";
 
 // Herdr action commands run in the background. The action opens the declared
 // pane, whose terminal runs `sheprd view` with the same owner identity checks.
@@ -20,3 +20,5 @@ export const openViewerPane = async (environment: Environment): Promise<number> 
   process.stderr.write("sheprd: the owner viewer pane could not be opened.\n");
   return 1;
 };
+
+process.exitCode = await openViewerPane(process.env);
