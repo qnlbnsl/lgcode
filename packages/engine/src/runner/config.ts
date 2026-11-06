@@ -7,6 +7,7 @@ export interface ConfigOption {
   readonly configId?: string;
   readonly category?: string | null;
   readonly currentValue?: unknown;
+  readonly options?: unknown;
 }
 export const setConfig = (client: AcpClient["Service"], sessionId: string, options: ReadonlyArray<ConfigOption>, category: string, value: string, version: number) => Effect.gen(function* () {
   const startFailure = category === "model" ? "model-refused" : category === "thought_level" ? "effort-refused" : "mode-refused";

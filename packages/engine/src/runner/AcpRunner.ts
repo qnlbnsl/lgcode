@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { comparePermission, DeliveryId, ThreadContent, type PermissionLevel, type SessionReference, type TurnUsage } from "@shephrd/contracts";
 import { AcpClient, layerChildProcess } from "@shephrd/t3-effect-acp/client";
 import { AcpRequestError } from "@shephrd/t3-effect-acp/errors";
@@ -39,7 +39,7 @@ import { buildBaseEnvironment } from "./baseEnvironment.ts";
 import { harnessLogin, homeConflict, loginRefusal } from "./harnesses.ts";
 import { classifyError } from "./classify.ts";
 import { mcpScriptPath, withShephrdMcp } from "./codexMcp.ts";
-import { cursorMcpConfig } from "./cursorMcp.ts";
+import { cursorMcpConfig, cursorModelId, cursorServerName } from "./cursorMcp.ts";
 import { compactPrompt } from "./compact.ts";
 import { setConfig, type ConfigOption } from "./config.ts";
 import { denyArguments } from "./denyRead.ts";
@@ -392,12 +392,16 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     const covered = () => credentials.healthy(credentialSource);
     const args = yield* Effect.try({ try: () => [...harness.adapterArguments, ...denyArguments(harness, input.folder, configuration.stateFolder, environment)], catch: () => rejected("deny rule cannot be resolved") });
     const scope = yield* Scope.fork(lifetime);
-    const serverName = harness.id === "cursor" ? `shephrd-${randomUUID()}` : "shephrd";
+    let serverName = "shephrd";
     let entry: Process | undefined;
     return yield* Effect.gen(function* () {
       if (harness.id === "cursor") {
         const settings = yield* Effect.acquireRelease(
-          Effect.try({ try: () => cursorMcpConfig(environment, serverName, input.folder), catch: () => rejected("account tool server configuration cannot be prepared") }),
+          Effect.try({ try: () => {
+            const sessions = join(configuration.stateFolder, "cursor-sessions", input.agentId);
+            serverName = cursorServerName(sessions);
+            return cursorMcpConfig(environment, serverName, input.folder, sessions);
+          }, catch: () => rejected("account tool server configuration cannot be prepared") }),
           (settings) => Effect.sync(settings.remove),
         ).pipe(Scope.provide(scope));
         environment.CURSOR_CONFIG_DIR = settings.directory;
@@ -712,7 +716,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       yield* drainTerminals(processEntry);
       processEntry.loading = false;
       processEntry.options = (opened.configOptions ?? []) as ReadonlyArray<ConfigOption>;
-      if (input.model !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "model", input.model, processEntry.version);
+      if (input.model !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "model", harness.id === "cursor" ? cursorModelId(input.model, processEntry.options) : input.model, processEntry.version);
       if (input.effort !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "thought_level", input.effort, processEntry.version);
       yield* setMode(processEntry, input.permission);
       processEntry.ready = true;

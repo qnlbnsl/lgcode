@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readlinkSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { it } from "@effect/vitest";
@@ -10,6 +10,7 @@ import {
   removeRunnerRig, spawnFor, withAcpRunner, writeFakeAdapter, type RunnerRig,
 } from "../support/acpRunnerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
+import { cursorModelId, cursorServerName } from "../../src/runner/cursorMcp.ts";
 
 let rig: RunnerRig;
 beforeEach(() => {
@@ -22,6 +23,54 @@ registerRebuildCheck({ noLog: true });
 
 const live = (name: string, test: () => Effect.Effect<unknown, unknown, any>) =>
   it.live(name, () => test() as Effect.Effect<unknown, unknown, never>, 60_000);
+
+for (const method of ["new", "load", "resume"] as const) {
+  live(`Cursor session/${method} selects the advertised Auto model rather than another default`, () =>
+    withAcpRunner(rig, {}, ({ runner }) => Effect.gen(function* () {
+      const echo = echoFile(rig);
+      const mode = { configId: "mode", name: "Mode", category: "mode", type: "select", currentValue: "default", options: [{ value: "default", name: "Ask" }] };
+      const model = { configId: "model", name: "Model", category: "model", type: "select", currentValue: "expensive-model", options: [{ value: "default[]", name: "Auto" }, { value: "expensive-model", name: "Other" }] };
+      const spawn = yield* spawnFor(rig, harnessFor("cursor", writeFakeAdapter(rig)),
+        accountFor("cursor", { protocolVersion: method === "load" ? 1 : 2, strictConfigOptions: true, configOptions: [mode, model], turns: [] }, echo), { model: "auto" });
+      if (method === "new") yield* runner.start(spawn.input);
+      else yield* runner.load({ ...spawn.input, session: { _tag: "acp", sessionId: "existing-cursor-session" } });
+      const seen = yield* readEcho(echo);
+      expect(framesOf(seen, "session/set_config_option").filter(frame => frame.params.configId === "model").map(frame => frame.params.value)).toEqual(["default[]"]);
+    })));
+}
+
+it("Cursor Auto resolution requires the exact advertised option and preserves all other selections", () => {
+  const options = (values: unknown) => [{ category: "model", options: values }];
+  expect(cursorModelId("auto", options([{ value: "default[]", name: "Other" }]))).toBe("auto");
+  expect(cursorModelId("auto", options([{ value: "default[]", name: "Auto" }, { value: "default[]", name: "Auto" }]))).toBe("auto");
+  expect(cursorModelId("auto", options([{ value: "default[]", name: "Auto" }, { value: "auto", name: "Auto" }]))).toBe("auto");
+  expect(cursorModelId("grok-4.7-medium", options([{ value: "default[]", name: "Auto" }]))).toBe("grok-4.7-medium");
+  expect(cursorModelId("auto", [])).toBe("auto");
+});
+
+it("Cursor retains its unguessable provider identity on reload and keeps agents distinct", () => {
+  const sessions = join(rig.stateFolder, "cursor-sessions", "first");
+  const name = cursorServerName(sessions);
+  expect(cursorServerName(sessions)).toBe(name);
+  expect(cursorServerName(join(rig.stateFolder, "cursor-sessions", "second"))).not.toBe(name);
+  expect(statSync(join(sessions, "shephrd-server-name")).mode & 0o777).toBe(0o600);
+  writeFileSync(join(sessions, "shephrd-server-name"), "external");
+  expect(() => cursorServerName(sessions)).toThrow("Invalid Cursor server identity");
+});
+
+live("Cursor reload reuses only that agent's original server identity and native allow rule", () =>
+  withAcpRunner(rig, {}, ({ runner }) => Effect.gen(function* () {
+    const echo = echoFile(rig);
+    const spawn = yield* spawnFor(rig, harnessFor("cursor", writeFakeAdapter(rig)), accountFor("cursor", { protocolVersion: 1, turns: [] }, echo));
+    yield* runner.start(spawn.input);
+    const first = yield* readEcho(echo, current => framesOf(current, "session/new").length > 0);
+    const name = framesOf(first, "session/new")[0]!.params.mcpServers[0].name;
+    yield* runner.stop({ agentId: spawn.agentId });
+    yield* runner.load({ ...spawn.input, session: { _tag: "acp", sessionId: "saved-cursor-session" } });
+    const loaded = yield* readEcho(echo, current => framesOf(current, "session/load").length > 0);
+    expect(framesOf(loaded, "session/load")[0]!.params.mcpServers[0].name).toBe(name);
+    expect(JSON.parse(readFileSync(join(loaded.env.CURSOR_CONFIG_DIR!, "cli-config.json"), "utf8")).permissions.allow).toEqual([`Mcp(${name}:*)`]);
+  })));
 
 for (const method of ["new", "load", "resume"] as const) {
   live(`issue 236: session/${method} configures only the Shephrd server approval-free without embedding its token`, () =>
@@ -146,6 +195,9 @@ for (const harnessId of ["claude", "codex", "gemini", "cursor"]) {
             permissions: { allow: ["Read(**)", `Mcp(${server}:*)`], deny: ["Shell(rm)"] } });
           expect(readFileSync(join(privateDirectory!, "mcp.json"), "utf8")).toBe(servers);
           expect(readFileSync(join(privateDirectory!, "cli-config.json"), "utf8")).not.toContain(spawn.token);
+          expect(readlinkSync(join(privateDirectory!, "acp-sessions"))).toBe(join(rig.stateFolder, "cursor-sessions", spawn.agentId));
+          expect(statSync(join(privateDirectory!, "acp-sessions")).mode & 0o777).toBe(0o700);
+          writeFileSync(join(privateDirectory!, "acp-sessions", "session-proof"), "retained history");
         }
         yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, sentSequence: 1, delivery: deliveryFor(spawn.agentId, "go") });
         for (const toolCallId of ["external", "shell"]) {
@@ -155,7 +207,10 @@ for (const harnessId of ["claude", "codex", "gemini", "cursor"]) {
         }
         expect(context.events.filter((event) => event._tag === "permissionRequested")).toHaveLength(2);
         yield* context.runner.stop({ agentId: spawn.agentId });
-        if (harnessId === "cursor") expect(existsSync(privateDirectory!)).toBe(false);
+        if (harnessId === "cursor") {
+          expect(existsSync(privateDirectory!)).toBe(false);
+          expect(readFileSync(join(rig.stateFolder, "cursor-sessions", spawn.agentId, "session-proof"), "utf8")).toBe("retained history");
+        }
         expect(readFileSync(join(source, "cli-config.json"), "utf8")).toBe(original);
         expect(readFileSync(join(source, "mcp.json"), "utf8")).toBe(servers);
       })));

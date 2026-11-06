@@ -8044,6 +8044,9 @@ keeps Cursor's case-insensitive matcher from matching an owner's other server.
 The process scope removes the copy after the child stops. The owner's files
 stay unchanged. Neither the global `--approve-mcps` flag nor a mode bypass
 is used.
+Cursor's session history stays in the engine's per-agent state directory.
+The disposable settings directory links to it so that a reload can recover
+the conversation. See issues 488 and 489 for the real Cursor follow-up.
 
 The source comments in `AcpRunner.ts`, `codexMcp.ts`, and `cursorMcp.ts`
 identify the adapter versions and source entry points. The runner tests cover
@@ -8105,3 +8108,63 @@ out. Its turn ends at sequence 930. The run passed 17 of 23 steps, and its
 log is saved beside the assigned brief as `live-check-attempt-2.log`.
 The cause of this model behavior is not established. The probe's allowed
 inputs and accepted outcomes remain unchanged.
+
+## 488. Cursor's Auto model uses a different protocol identifier
+
+Found: 2026-11-05, during the requested real Cursor proof.
+State: fixed on `area/shephrd-tools`.
+
+The installed Cursor version `2026.10.14-941492e` lists `auto` in its terminal
+model catalog. Its Agent Client Protocol (ACP) session instead advertises
+`default[]`, named `Auto`. Sending `auto` as a configuration value failed
+before a model prompt was sent. The permitted fallback `grok-4.7-medium`
+was also refused before a prompt. Both failures were recorded as
+`AgentStartFailed` with reason `model-refused`.
+
+The source is `6136.index.js`, in `buildVariantModelConfigOptions` and
+`applyVariantModelConfigOption`. A direct, prompt-free ACP inspection confirmed
+the advertised value. The runner now translates the requested Cursor model
+`auto` only when the exact option `default[]`, named `Auto`, is advertised
+once. A native `auto` option takes precedence. No other model is substituted.
+Creation, load, and resume tests inspect the actual configuration frame.
+Uncertain and duplicate options retain the original request and its refusal.
+
+## 489. Disposable Cursor settings also contain its session history
+
+Found: 2026-11-05, while preparing the real Cursor reload proof.
+State: fixed on `area/shephrd-tools`.
+
+Cursor `2026.10.14-941492e` stores its ACP session databases beneath
+`CURSOR_CONFIG_DIR/acp-sessions`. Its installed `6136.index.js`, in
+`acp-storage.ts`, resolves this path for both new sessions and session load.
+Removing the private settings directory would also remove the conversation
+needed by a replacement process. This was found by source inspection before
+attempting the requested reload.
+
+The runner now links the disposable directory's `acp-sessions` entry to
+`cursor-sessions/<agentId>` inside the engine's state folder. The directory
+has mode 0700. Each agent gets its own history. Settings and approval rules
+still disappear when the child stops. The owner's files remain unchanged.
+The runner tests verify the link, its permissions, and retained history
+after process cleanup. The real run's observed results are recorded beside
+the assigned brief in `cursor-proof.md`.
+
+## 490. Cursor restores the previous MCP provider name on reload
+
+Found: 2026-11-05, during the requested real Cursor reload proof.
+State: fixed on `area/shephrd-tools`, with a live rerun outstanding.
+
+The read-only Auto session loaded successfully. Its one permitted extra
+prompt called `roles.orient` using the provider name from the conversation.
+The replacement process had a new random name and a native allow rule for
+that new name. Cursor therefore requested human approval for the old name.
+The request is at sequence 80 in
+`/tmp/shephrd-live-C4DAkt/state/events.sqlite`.
+
+The runner now persists each agent's unguessable name beside its session
+history, in a file with mode 0600. The replacement process uses that same
+name and grants only that server's rule. Other agents receive different
+names. An invalid saved identity refuses startup. A regression starts,
+stops, and loads the runner, then inspects both the ACP server identity and
+the replacement process's native allow rule. The single extra live prompt
+was already used, so the correction has no subsequent live claim.
