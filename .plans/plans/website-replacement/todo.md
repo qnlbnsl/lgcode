@@ -110,9 +110,9 @@ stored events, commands, a client API section and agent tools.
 
 ## What the mock does not show yet
 
-The current page does these, and the replacement must keep them. They need a place
-in the mock. The mock session should design them, and until then the builder places
-them plainly.
+The current page does these, and the replacement must keep them. The mock session
+started designing them on 2026-11-06. Reread the mock when it finishes, and tick
+each item that now has a place.
 
 - [ ] Log in, log out and session expiry.
 - [ ] Connection state and the last received state while reconnecting.
