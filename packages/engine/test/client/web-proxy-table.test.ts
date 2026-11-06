@@ -35,18 +35,18 @@ const cases = [
 
 for (const row of cases) {
   it(`10.2 https ${row.id}: catches the wrong proxy-table decision or trusting X-Forwarded-Proto for Secure`, async () => {
-    const publicAddress = "https://shephrd.example.test:9443";
+    const publicAddress = "https://sheprd.example.test:9443";
     await withWeb((ctx) => Effect.gen(function* () {
       const { cookie } = yield* login(ctx);
       const origin = row.origin === "local" ? ctx.origin : row.origin === "public" ? publicAddress
-        : row.origin === "missing" ? undefined : row.origin === "other-scheme" ? "http://shephrd.example.test:9443"
-        : row.origin === "other-port" ? "https://shephrd.example.test:9444" : "https://evil.invalid";
+        : row.origin === "missing" ? undefined : row.origin === "other-scheme" ? "http://sheprd.example.test:9443"
+        : row.origin === "other-port" ? "https://sheprd.example.test:9444" : "https://evil.invalid";
       // No forwarded protocol is needed. When present, its value changes no
       // public row. Local rows with that header become public and are tested
       // separately by forwarded-only.
       const protocols = row.id === "local" ? [undefined] : [undefined, "https", "http", "nonsense"];
       for (const protocol of protocols) {
-        const headers = { Host: row.host === "local" ? ctx.host : row.host === "foreign" ? "proxy-upstream.internal" : "shephrd.example.test:9443", Origin: origin,
+        const headers = { Host: row.host === "local" ? ctx.host : row.host === "foreign" ? "proxy-upstream.internal" : "sheprd.example.test:9443", Origin: origin,
           ...(row.forwarded ? { "X-Forwarded-For": "untrusted-value" } : {}),
           ...(protocol === undefined ? {} : { "X-Forwarded-Proto": protocol }), Cookie: cookie };
         const probe = yield* Effect.promise(() => post(ctx, "/api/session", undefined, headers));
@@ -67,5 +67,5 @@ for (const row of cases) {
 for (const header of forwarded) {
   it(`10.2 proxy on detects ${header}: catches classifying a forwarded loopback request as local`, async () => withWeb((ctx) => Effect.gen(function* () {
     expect((yield* Effect.promise(() => post(ctx, "/api/login", { password: ctx.password }, { [header]: "ignored" }))).status).toBe(403);
-  }), { settings: { proxyMode: true, publicAddress: "https://shephrd.example.test" } }));
+  }), { settings: { proxyMode: true, publicAddress: "https://sheprd.example.test" } }));
 }

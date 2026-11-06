@@ -72,11 +72,11 @@ describe("the read-only startup-hook boundary", () => {
       const folder = join(proc, String(index + 4000));
       mkdirSync(folder);
       writeFileSync(join(folder, "cmdline"), "node\0/work/packages/engine/src/service.ts\0");
-      writeFileSync(join(folder, "environ"), `SHEPHRD_HOME=${state}\0HOME=${root}/home\0`);
+      writeFileSync(join(folder, "environ"), `SHEPRD_HOME=${state}\0HOME=${root}/home\0`);
     }
     const kill = vi.spyOn(process, "kill").mockImplementation(() => { throw new Error("startup-hook must not signal"); });
     io.root = root;
-    const hook = realStartupHookDeps({ SHEPHRD_HOME: state, HOME: join(root, "home"), XDG_STATE_HOME: join(root, "xdg"), CODEX_HOME: join(root, "codex") }, proc);
+    const hook = realStartupHookDeps({ SHEPRD_HOME: state, HOME: join(root, "home"), XDG_STATE_HOME: join(root, "xdg"), CODEX_HOME: join(root, "codex") }, proc);
     const probes: string[] = [];
     const result = await checkStartupHook({ ...hook, answers: async (path) => { probes.push(path); return false; }, sleep: async () => undefined });
     expect(result.passed).toBe(false);
@@ -101,7 +101,7 @@ describe("dry-run I/O isolation", () => {
     const kill = vi.spyOn(process, "kill").mockImplementation(() => { throw new Error("no process may be signalled"); });
     const lines: string[] = [];
     io.root = root;
-    const deps = realDeps({ HOME: join(root, "home"), SHEPHRD_HOME: join(root, "state"), XDG_STATE_HOME: join(root, "xdg"), CODEX_HOME: join(root, "codex"), PATH: "" }, (line) => { lines.push(line); });
+    const deps = realDeps({ HOME: join(root, "home"), SHEPRD_HOME: join(root, "state"), XDG_STATE_HOME: join(root, "xdg"), CODEX_HOME: join(root, "codex"), PATH: "" }, (line) => { lines.push(line); });
     expect(await main(argv, deps)).toBe(argv[0] === "--unknown" ? 2 : 0);
     expect(io.calls).toEqual([]);
     expect(spawn).not.toHaveBeenCalled();
@@ -116,7 +116,7 @@ describe("dry-run I/O isolation", () => {
     const root = rootFor();
     const lines: string[] = [];
     io.root = root;
-    const deps = realDeps({ HOME: join(root, "home"), SHEPHRD_HOME: join(root, "state"), XDG_STATE_HOME: join(root, "xdg"), CODEX_HOME: join(root, "codex") }, (line) => { lines.push(line); });
+    const deps = realDeps({ HOME: join(root, "home"), SHEPRD_HOME: join(root, "state"), XDG_STATE_HOME: join(root, "xdg"), CODEX_HOME: join(root, "codex") }, (line) => { lines.push(line); });
     expect(await main(["--unknown", help], deps)).not.toBe(0);
     expect(io.calls).toEqual([]);
     expect(lines.join("\n")).toContain("Unknown argument");

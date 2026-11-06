@@ -1,9 +1,9 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { settled, type AgentId, type Event } from "@shephrd/contracts";
-import { WakeId, type BoardAddressee, type BoardAuthor } from "@shephrd/contracts/board/ids";
-import { boardLimits } from "@shephrd/contracts/board/limits";
-import type { BoardCompletion } from "@shephrd/contracts/board/schemas";
-import type { BoardPostView, BoardView, BoardWakeView } from "@shephrd/contracts/board/view";
+import { settled, type AgentId, type Event } from "@sheprd/contracts";
+import { WakeId, type BoardAddressee, type BoardAuthor } from "@sheprd/contracts/board/ids";
+import { boardLimits } from "@sheprd/contracts/board/limits";
+import type { BoardCompletion } from "@sheprd/contracts/board/schemas";
+import type { BoardPostView, BoardView, BoardWakeView } from "@sheprd/contracts/board/view";
 import * as Schema from "effect/Schema";
 import type { PiecePlan, Snapshot } from "../commands/internal.ts";
 import { escapeLeadingSlash } from "../routing/envelope.ts";

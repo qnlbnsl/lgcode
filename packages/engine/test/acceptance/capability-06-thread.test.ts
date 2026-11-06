@@ -69,7 +69,7 @@ scenario("6 thread: a client that connects after the turn replays the same threa
   const replay = yield* eventsUntil(w.owner, before, "the replayed turn end", isTag("TurnEnded", agent.agentId));
   expect(contents(replay, agent.agentId)).toEqual(contents(live, agent.agentId));
   const printed = contents(live, agent.agentId).map((item) => item.text ?? "").join("");
-  expect(printed, "the step did not print the environment, so the redaction was not exercised").toContain("SHEPHRD_TOKEN=");
+  expect(printed, "the step did not print the environment, so the redaction was not exercised").toContain("SHEPRD_TOKEN=");
   expect(printed).toContain("start");
   expect(printed).toContain("end");
   expect(printed).not.toContain(token);

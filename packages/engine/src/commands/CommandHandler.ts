@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   EventEnvelope, commandOutcome, publicAddressError,
   type Caller, type Event, type HarnessSettings, type RequestId,
-} from "@shephrd/contracts";
+} from "@sheprd/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -48,7 +48,7 @@ export class CommandHandler extends Context.Service<CommandHandler, {
   readonly cache: (target: CacheTarget) => Effect.Effect<"flush" | "compact" | undefined, CommandRefused | LogWriteFailed>;
   readonly input: (actor: Caller) => Effect.Effect<Input>;
   readonly execute: (credential: Credential, name: string, payload: unknown) => Effect.Effect<Record<string, unknown>, CommandRefused | LogWriteFailed>;
-}>()("shephrd/engine/commands/CommandHandler") {}
+}>()("sheprd/engine/commands/CommandHandler") {}
 
 const canonical = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;

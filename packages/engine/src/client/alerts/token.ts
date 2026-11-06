@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { carrierTokenReference, type CarrierSettings } from "@shephrd/contracts";
+import { carrierTokenReference, type CarrierSettings } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import { refused, type Input, type Snapshot } from "../../commands/internal.ts";

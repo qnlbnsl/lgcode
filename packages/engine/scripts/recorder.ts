@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, chmod, writeFile, realpath, readFile, readdir } from "n
 import { join, relative, isAbsolute } from "node:path"
 import { tmpdir } from "node:os"
 import { createInterface } from "node:readline"
-import type { HarnessSettings, PermissionLevel } from "@shephrd/contracts"
+import type { HarnessSettings, PermissionLevel } from "@sheprd/contracts"
 import * as Effect from "effect/Effect"
 import * as Logger from "effect/Logger"
 import { buildBaseEnvironment } from "../src/runner/baseEnvironment.ts"
@@ -264,7 +264,7 @@ async function recordOne(settings: HarnessSettings, environment: Record<string, 
   if (signal.aborted) abort()
   const timer = setTimeout(() => { fail(new RecordingError("Recording timed out", "timeout")); terminate("SIGTERM") }, 60_000)
   try {
-    const info = { name: "shephrd-recorder", version: "0.0.1" }
+    const info = { name: "sheprd-recorder", version: "0.0.1" }
     const initialized = await request("initialize", { protocolVersion: 2, info, clientInfo: info, capabilities: {}, clientCapabilities: {} })
     if (![1, 2].includes(initialized.protocolVersion)) throw new RecordingError("Adapter negotiated an unsupported protocol version")
     // Shipped adapters can report a v1-shaped response even with protocolVersion 2.

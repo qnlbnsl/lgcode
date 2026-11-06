@@ -7,7 +7,7 @@ import { afterEach, expect, it, vi } from "vitest"
 import { App } from "../src/index.ts"
 
 const browser = vi.hoisted(() => ({ client: undefined as unknown }))
-vi.mock("@shephrd/client/browser", async () => {
+vi.mock("@sheprd/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(browser.client) }
 })
@@ -159,10 +159,10 @@ it("sends all web settings, including proxy and enable controls", async () => {
   input("port").value = "8899"
   input("heartbeatSeconds").value = "40"
   input("proxyMode").checked = true
-  input("publicAddress").value = "https://shephrd.example"
+  input("publicAddress").value = "https://sheprd.example"
   await submit(container, "Web server settings")
   expect(set).toHaveBeenCalledWith(expect.objectContaining({ settings: {
-    enabled: false, port: 8899, heartbeatSeconds: 40, proxyMode: true, publicAddress: "https://shephrd.example"
+    enabled: false, port: 8899, heartbeatSeconds: 40, proxyMode: true, publicAddress: "https://sheprd.example"
   } }))
 })
 

@@ -1,4 +1,4 @@
-// Failure rule 2: Shephrd itself restarts. The service runs as a child process,
+// Failure rule 2: Sheprd itself restarts. The service runs as a child process,
 // is killed with SIGKILL in the middle of a turn, and is started again on the
 // same folder. Agents that were running are marked interrupted, their open
 // permission requests close, each session is reloaded without a model turn,
@@ -8,7 +8,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, expect } from "@effect/vitest";
-import type { EventEnvelope } from "@shephrd/contracts";
+import type { EventEnvelope } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 

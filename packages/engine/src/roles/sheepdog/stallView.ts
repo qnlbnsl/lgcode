@@ -1,5 +1,5 @@
-import type { Event } from "@shephrd/contracts";
-import { settled } from "@shephrd/contracts/settled";
+import type { Event } from "@sheprd/contracts";
+import { settled } from "@sheprd/contracts/settled";
 import type { Snapshot } from "../../commands/internal.ts";
 import { boardStatus } from "../../board/status.ts";
 import type { RolesView, StallClock } from "../view.ts";

@@ -61,7 +61,7 @@ it("H17 recovers every sparse omission through the real MCP tool without losing 
       socket: context.socket, work: context.rig.work, bin: context.rig.root };
     const child = startCli(root, ["mcp"], {
       PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: context.rig.home,
-      SHEPHRD_HOME: context.rig.stateFolder, SHEPHRD_SOCKET: context.socket, SHEPHRD_TOKEN: lead.token,
+      SHEPRD_HOME: context.rig.stateFolder, SHEPRD_SOCKET: context.socket, SHEPRD_TOKEN: lead.token,
     });
     // Stop and await the connector before the engine scope and rig disappear,
     // including on the expected pre-fix failing assertion.

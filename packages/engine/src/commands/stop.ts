@@ -1,5 +1,5 @@
 import * as Effect from "effect/Effect";
-import { WaitId, PermissionRequestId, type Event } from "@shephrd/contracts";
+import { WaitId, PermissionRequestId, type Event } from "@sheprd/contracts";
 import * as Schema from "effect/Schema";
 import { targetGone } from "../routing/deliveries.ts";
 import { moveHeld, withdrawQueued } from "../routing/holders.ts";

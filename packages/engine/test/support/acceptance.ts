@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { it, expect } from "@effect/vitest";
-import { connect, type Client, type ClientError } from "@shephrd/client";
+import { connect, type Client, type ClientError } from "@sheprd/client";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -22,8 +22,8 @@ import { waitForBoardRecovery } from "./boardRecovery.ts";
 
 // Unit 8b: the acceptance harness (plan tasks 8b.1 and 8b.2, criteria 8.3 to
 // 8.5). A scenario starts the real service (`src/service.ts`) as a child
-// process with `SHEPHRD_TEST_DEBUG=1`, in a short /tmp folder of its own, and
-// then talks to it only through `@shephrd/client` over the socket: the owner
+// process with `SHEPRD_TEST_DEBUG=1`, in a short /tmp folder of its own, and
+// then talks to it only through `@sheprd/client` over the socket: the owner
 // with the real owner credential, an agent with the token that the fake agent
 // recorded in its own environment. A scenario reads no database and imports
 // nothing from `src/`. The one exception is `plantDatabaseFault`, which
@@ -122,7 +122,7 @@ export interface World {
   readonly watermark: () => Effect.Effect<number>;
 }
 
-export const ownerEnvironment = (root: ServiceRoot): Record<string, string> => ({ SHEPHRD_HOME: root.state });
+export const ownerEnvironment = (root: ServiceRoot): Record<string, string> => ({ SHEPRD_HOME: root.state });
 
 const connectOwner = (root: ServiceRoot) => connect({ environment: ownerEnvironment(root), attempts: 1 });
 
@@ -237,13 +237,13 @@ export const scenario = (
       try {
         for (const name of readdirSync(root.root)) {
           if (!/^echo-.*\.json$/.test(name)) continue;
-          const token = peekEcho(join(root.root, name))?.env.SHEPHRD_TOKEN;
+          const token = peekEcho(join(root.root, name))?.env.SHEPRD_TOKEN;
           if (token !== undefined) secrets.add(token);
         }
       } catch { /* the folder is gone or a file is half written; the next look reads it */ }
     };
     const boot: World["boot"] = (bootOptions = {}) => Effect.gen(function* () {
-      const service = startService(root, { env: { SHEPHRD_TEST_DEBUG: "1", ...options.env, ...bootOptions.env } });
+      const service = startService(root, { env: { SHEPRD_TEST_DEBUG: "1", ...options.env, ...bootOptions.env } });
       current = service;
       incarnations.push(service);
       yield* waitServing(root, service);
@@ -261,7 +261,7 @@ export const scenario = (
         service.child.kill(signal);
         return yield* Effect.promise(() => service.exit);
       }),
-      asAgent: (token) => connect({ environment: { SHEPHRD_SOCKET: root.socket, SHEPHRD_TOKEN: token }, attempts: 1 }).pipe(
+      asAgent: (token) => connect({ environment: { SHEPRD_SOCKET: root.socket, SHEPRD_TOKEN: token }, attempts: 1 }).pipe(
         Effect.provideService(Scope.Scope, scope), Effect.map((client) => recordReplies(client, replies)),
       ),
       prepare: (spec = {}) => Effect.gen(function* () {
@@ -308,9 +308,9 @@ export const scenario = (
       }),
       token: (agent, notPid) => waitFor("the fake agent's environment", () => {
         const echo = peekEcho(agent.echo);
-        if (echo === undefined || echo.pid === notPid || echo.env.SHEPHRD_TOKEN === undefined) return undefined;
-        secrets.add(echo.env.SHEPHRD_TOKEN);
-        return { token: echo.env.SHEPHRD_TOKEN, pid: echo.pid, echo };
+        if (echo === undefined || echo.pid === notPid || echo.env.SHEPRD_TOKEN === undefined) return undefined;
+        secrets.add(echo.env.SHEPRD_TOKEN);
+        return { token: echo.env.SHEPRD_TOKEN, pid: echo.pid, echo };
       }),
       watermark: () => head(owner!),
     };

@@ -6,8 +6,8 @@ playwright-report/
 test-results/
 **/test/.state/
 **/tests/.state/
-**/test/**/shephrd-state/
-**/tests/**/shephrd-state/
+**/test/**/sheprd-state/
+**/tests/**/sheprd-state/
 **/test/**/*.sqlite*
 **/tests/**/*.sqlite*
 .foundry/

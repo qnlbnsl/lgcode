@@ -1,4 +1,4 @@
-import { pieceNamespaces, type PieceNamespace, type Event } from "@shephrd/contracts";
+import { pieceNamespaces, type PieceNamespace, type Event } from "@sheprd/contracts";
 import { threadAgent } from "../views/apply.ts";
 import type { Migration } from "../pieces/lists.ts";
 import * as Data from "effect/Data";

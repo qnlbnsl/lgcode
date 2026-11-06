@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium, expect, type Browser, type Page } from "@playwright/test";
 import { build } from "vite";
-import { connect, type Client } from "@shephrd/client";
-import type { AgentId, RequestId, AccountId, HarnessId } from "@shephrd/contracts";
+import { connect, type Client } from "@sheprd/client";
+import type { AgentId, RequestId, AccountId, HarnessId } from "@sheprd/contracts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -66,7 +66,7 @@ const main = async () => {
     scope = await run(Scope.make());
     for (let attempt = 0; ; attempt++) {
       try {
-        owner = await run(connect({ environment: { SHEPHRD_HOME: service.state }, attempts: 1 }).pipe(Scope.provide(scope)));
+        owner = await run(connect({ environment: { SHEPRD_HOME: service.state }, attempts: 1 }).pipe(Scope.provide(scope)));
         return;
       } catch {
         if (attempt >= 299 || service.exited()) throw new Error("Private engine did not become ready");

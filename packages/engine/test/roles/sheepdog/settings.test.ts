@@ -1,6 +1,6 @@
 import * as Schema from "effect/Schema";
 import { expect, it } from "vitest";
-import { RolesSettings } from "@shephrd/contracts";
+import { RolesSettings } from "@sheprd/contracts";
 import { resolveSettings } from "../../../src/roles/sheepdog/settings.ts";
 import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
 

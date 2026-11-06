@@ -9,12 +9,12 @@ Sign in to that account's private folder before starting an agent with it.
 The private folder is `providers/codex/<account-id>/shadow` under the engine's
 state folder. For an extra account, an explicit home or `CODEX_HOME` selects
 the shared settings and sessions. Its authentication still stays private.
-Shephrd does not copy the default account's credentials into extra accounts.
+Sheprd does not copy the default account's credentials into extra accounts.
 
 Set the model and the effort separately.
 For example, use model `gpt-6.1-sol` and effort `high`.
 The model string `gpt-6.1-sol[high]` is sent as a model name and is refused.
-Shephrd does not silently switch a refused model.
+Sheprd does not silently switch a refused model.
 
 A failed start appears in the situation page's stopped section.
 Its thread shows a fixed explanation.

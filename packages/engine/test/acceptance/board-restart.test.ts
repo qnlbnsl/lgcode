@@ -1,7 +1,7 @@
 import { rmSync, writeFileSync } from "node:fs";
 
 import { afterEach, expect } from "@effect/vitest";
-import type { Event } from "@shephrd/contracts";
+import type { Event } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 
 import { drainAgent, eventsUntil, isTag, peekEcho, requestId, scenario, since, stopAllServices, tagged, waitFor } from "../support/acceptance.ts";

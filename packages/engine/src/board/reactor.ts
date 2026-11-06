@@ -1,6 +1,6 @@
 import { transferName } from "./transferName.ts";
-import type { AgentId, Event, EventEnvelope } from "@shephrd/contracts";
-import type { BoardPostView } from "@shephrd/contracts/board/view";
+import type { AgentId, Event, EventEnvelope } from "@sheprd/contracts";
+import type { BoardPostView } from "@sheprd/contracts/board/view";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Stream from "effect/Stream";

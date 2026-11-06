@@ -13,11 +13,11 @@ const readJson = (path: string): { dependencies?: Record<string, string> } =>
   JSON.parse(readFileSync(join(repoRoot, path), "utf8"));
 
 const edges: ReadonlyArray<readonly [string, string, string]> = [
-  ["engine", "@shephrd/t3-effect-acp", "@shephrd/t3-effect-acp/client"],
-  ["engine", "@shephrd/t3-node-sqlite", "@shephrd/t3-node-sqlite/nodeSqliteClient"],
-  ["engine", "@shephrd/t3-provider-instance", "@shephrd/t3-provider-instance/providerInstance"],
-  ["testing", "@shephrd/t3-effect-acp", "@shephrd/t3-effect-acp/agent"],
-  ["testing", "@shephrd/t3-provider-testing", "@shephrd/t3-provider-testing/replayTranscript"],
+  ["engine", "@sheprd/t3-effect-acp", "@sheprd/t3-effect-acp/client"],
+  ["engine", "@sheprd/t3-node-sqlite", "@sheprd/t3-node-sqlite/nodeSqliteClient"],
+  ["engine", "@sheprd/t3-provider-instance", "@sheprd/t3-provider-instance/providerInstance"],
+  ["testing", "@sheprd/t3-effect-acp", "@sheprd/t3-effect-acp/agent"],
+  ["testing", "@sheprd/t3-provider-testing", "@sheprd/t3-provider-testing/replayTranscript"],
 ];
 
 describe("copied package edges", () => {
@@ -37,11 +37,11 @@ describe("copied package edges", () => {
   it("adds no first-party edge to the source-control copy (it has no planned consumer)", () => {
     for (const consumer of readdirSync(join(repoRoot, "packages"))) {
       const dependencies = readJson(`packages/${consumer}/package.json`).dependencies ?? {};
-      expect(Object.keys(dependencies), consumer).not.toContain("@shephrd/t3-source-control");
+      expect(Object.keys(dependencies), consumer).not.toContain("@sheprd/t3-source-control");
     }
   });
 
-  it("keeps the copies free of edges to the six first-party packages (breaks if a copy imports Shephrd code)", () => {
+  it("keeps the copies free of edges to the six first-party packages (breaks if a copy imports Sheprd code)", () => {
     const base = join(repoRoot, "third_party/t3code");
     for (const directory of readdirSync(base, { withFileTypes: true }).filter((entry) => entry.isDirectory() && entry.name !== "node_modules")) {
       const manifest = JSON.parse(readFileSync(join(base, directory.name, "package.json"), "utf8")) as {
@@ -50,7 +50,7 @@ describe("copied package edges", () => {
       };
       const names = Object.keys({ ...manifest.dependencies, ...manifest.devDependencies });
       for (const name of names) {
-        expect(name, `${directory.name} depends on ${name}`).not.toMatch(/^@shephrd\/(client|cli|contracts|engine|mcp|testing)$/);
+        expect(name, `${directory.name} depends on ${name}`).not.toMatch(/^@sheprd\/(client|cli|contracts|engine|mcp|testing)$/);
       }
     }
   });

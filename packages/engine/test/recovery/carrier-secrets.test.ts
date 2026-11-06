@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -23,7 +23,7 @@ import { asEvent } from "../support/fixturePiece.ts";
 
 it("1.39 actual restart keeps a selected piece token, removes abandoned/replaced secrets, keeps it after account removal and collects it after clear", async () => {
   const rig = makeRig();
-  vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
+  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
   const lists = await rulesFixture();
   const reference = "secret:client.alerts.carrier.active";
   lists.secretKeep.client = (view) => (view.client as { records: Array<{ id: string }> }).records.at(-1)?.id === "active" ? [reference] : [];

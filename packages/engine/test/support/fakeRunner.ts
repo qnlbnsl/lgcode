@@ -1,4 +1,4 @@
-import type { AgentId, DeliveryId, PermissionOption, SessionReference } from "@shephrd/contracts";
+import type { AgentId, DeliveryId, PermissionOption, SessionReference } from "@sheprd/contracts";
 import type * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -73,7 +73,7 @@ const defaultCapabilities: RunnerCapabilities = {
 // is the runner's own id for the held request, unique across agents; the
 // engine records it as the request's `permissionRequestId` and passes it back
 // as `requestId` to `answerPermission`. The options arrive already mapped onto
-// Shephrd's scale (task 6a.3, rows 35b and 56), and `settingsWrite` says the
+// Sheprd's scale (task 6a.3, rows 35b and 56), and `settingsWrite` says the
 // tool would write a harness settings path.
 export interface PermissionRequestedEvent {
   readonly _tag: "permissionRequested";

@@ -26,7 +26,7 @@ it.each(["before-send", "after-acceptance", "backoff"])("6.11 SIGKILL %s keeps o
   const rig = makeRig(); const server = await ntfyServer();
   if (phase === "backoff") server.respond(({ response }) => { response.writeHead(503); response.end(); });
   const child = spawn(process.execPath, [fileURLToPath(new URL("../support/carrierCrashChild.ts", import.meta.url)), JSON.stringify({ rig, origin: server.origin, phase })], {
-    env: { PATH: process.env.PATH, HOME: rig.home, SHEPHRD_HOME: rig.stateFolder }, stdio: ["ignore", "ignore", "pipe", "ipc"],
+    env: { PATH: process.env.PATH, HOME: rig.home, SHEPRD_HOME: rig.stateFolder }, stdio: ["ignore", "ignore", "pipe", "ipc"],
   });
   const exit = once(child, "exit");
   try {

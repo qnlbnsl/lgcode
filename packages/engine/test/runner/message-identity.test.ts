@@ -1,4 +1,4 @@
-import { groupThreadItems, toolText } from "@shephrd/contracts/thread";
+import { groupThreadItems, toolText } from "@sheprd/contracts/thread";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -8,7 +8,7 @@ import { call, ownerCredential, readLog, success } from "../support/handlerRig.t
 import { eventually, tagged } from "../support/routingRig.ts";
 
 let rig: RunnerRig;
-beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig); });
 it.live("preserves reply identity for fragments and separates adapter messages and later turns", () => {
   const frame = (messageId: string, text: string) => ({ step: "raw_frame", frame: JSON.stringify({ jsonrpc: "2.0", method: "session/update", params: {
@@ -49,7 +49,7 @@ it.live("folds repeated real-shaped tool updates without repeating command text 
     const displayed = groupThreadItems(rows).filter((row) => row.event._tag === "ThreadItem");
     expect(displayed).toHaveLength(1);
     expect(displayed[0]?.event, JSON.stringify(rows.filter((row) => ["ThreadItem", "TurnStarted", "SessionOpened"].includes(row.event._tag)))).toMatchObject({ content: { callId: "shell-1", title: "Run command", status: "completed", input: '{"command":"printf hello"}', output: '"hello\\nworld"' } });
-    const content = (displayed[0]!.event as Extract<import("@shephrd/contracts").Event, { _tag: "ThreadItem" }>).content;
+    const content = (displayed[0]!.event as Extract<import("@sheprd/contracts").Event, { _tag: "ThreadItem" }>).content;
     if (content._tag !== "tool-call") throw new Error("missing tool call");
     expect(toolText(content.input!)).toBe("printf hello");
     expect(toolText(content.output!)).toBe("hello\nworld");

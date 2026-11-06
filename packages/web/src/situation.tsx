@@ -1,6 +1,6 @@
-import { startFailureText } from "@shephrd/contracts/startFailure"
+import { startFailureText } from "@sheprd/contracts/startFailure"
 import { useEffect, useRef, useState } from "react"
-import { displayedState, type ClientSnapshot, type RosterEntry } from "@shephrd/contracts"
+import { displayedState, type ClientSnapshot, type RosterEntry } from "@sheprd/contracts"
 import { watchSituation, type ConnectionState } from "./watchSituation.ts"
 import { threadHref } from "./thread/links.ts"
 

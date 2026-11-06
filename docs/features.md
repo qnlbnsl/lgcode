@@ -1,4 +1,4 @@
-# Shephrd: the feature list
+# Sheprd: the feature list
 
 Status: **draft, not approved.** Some features are built inside the engine,
 but none is reachable from a client yet.
@@ -10,7 +10,7 @@ Each feature has a short name, one paragraph saying what it does, and a state:
 While the engine is being built, a feature can also be **built in the
 engine** (unit numbers follow). That means its engine part is merged into
 `area/engine` and passes its tests. Since unit 7b, the client library, the
-`shephrd` command-line tool and `shephrd mcp` are merged too, so the owner
+`sheprd` command-line tool and `sheprd mcp` are merged too, so the owner
 and agents can reach the engine from a terminal, but no web or phone client
 exists yet. Since unit 8b, an acceptance suite runs the service as a
 child process and checks each of the engine's twelve capabilities, its
@@ -33,8 +33,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   to repeat the team collection and first stall without waiting for the
   cache timer. The report marks the timed flush as skipped. The run remains
   incomplete and exits with code 1, even when every remaining step passes.
-- **Shephrd tools need no harness approval** (agreed, 2026-11-05). An agent
-  can call Shephrd's own Model Context Protocol server in every permission
+- **Sheprd tools need no harness approval** (agreed, 2026-11-05). An agent
+  can call Sheprd's own Model Context Protocol server in every permission
   mode on Claude, Codex, Gemini, and Cursor. The engine authenticates every
   call and checks the caller's existing rights. Other servers and native
   file and command tools continue following the selected mode. The settings
@@ -58,14 +58,14 @@ Synapse fork. It is at `docs/message-board/features.md` in the
     agents after an engine restart: it reloads each one with a new token,
     scans the replayed history for delivery ids, then sends a carry-on or
     re-sends, returns paused agents, and supports `resume --fresh`; unit
-    7a answers every connection with 503 until recovery ends). Shephrd starts the agent as a child process
+    7a answers every connection with 503 until recovery ends). Sheprd starts the agent as a child process
     and drives it through the Agent Client Protocol (ACP): it opens a
     session, sends prompts, and receives structured events (text, plan, tool
     calls, permission requests). Adding a harness means adding its ACP
     command, so Claude Code, Codex, Gemini CLI, OpenCode and the rest come
     almost for free. Claude Code and Codex need their adapters,
     `claude-agent-acp` and `codex-acp`.
-  - **Interactive mode** (built second). Shephrd opens the harness's normal
+  - **Interactive mode** (built second). Sheprd opens the harness's normal
     terminal program in a Herdr pane, as Herdr Synapse does, and the owner
     can watch it and type into it. Use this for Claude when the 5-hour limit
     matters: Claude in ACP mode runs through the Agent SDK, which T3 Code
@@ -80,7 +80,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   runs out of usage, and returns them when the account is available again;
   unit 7a carries the accounts command over the API). The owner can
   set up more than one account for a harness, such as two ChatGPT accounts
-  for Codex or three Cursor accounts, and Shephrd spreads agents across
+  for Codex or three Cursor accounts, and Sheprd spreads agents across
   them. Each account is its own sign-in, kept apart by its own home
   directory (`CODEX_HOME` for Codex, `CLAUDE_CONFIG_DIR` for Claude Code) or
   by its own API key, plus any extra environment variables. Starting an agent
@@ -90,13 +90,13 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   two Codex accounts continue the same threads. See T3 Code's
   `docs/user/providers-codex.md`, `providers-claude.md` and `cursor.md`, and
   `packages/contracts/src/providerInstance.ts`, at commit `6fc9144`.
-- **A token for every agent** (built in the engine: units 5a and 5b). When Shephrd starts an agent, it mints a
+- **A token for every agent** (built in the engine: units 5a and 5b). When Sheprd starts an agent, it mints a
   private token for it and passes it in an environment variable. The agent
   proves who it is with that token, not with the pane's environment or the
   process tree, so Codex's sandbox and a backgrounded Claude stop breaking
   identity. Borrowed from T3 Code; see
   [research/t3-code.md](research/t3-code.md), item 1.
-- **Shephrd's tools over MCP** (idea). The board's verbs (post, read, finish
+- **Sheprd's tools over MCP** (idea). The board's verbs (post, read, finish
   work, ask the owner) are offered to agents through a Model Context Protocol
   (MCP) server on a loopback address, as well as through the command line.
   Every tool declares which roles may call it. See research item 1.
@@ -105,7 +105,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   messages never runs with a broader permission mode than the lead. See
   research item 6.
 - **Hand-offs built from records** (idea). A replacement worker starts from a
-  hand-off that Shephrd builds from the work brief, the worker's posts, the
+  hand-off that Sheprd builds from the work brief, the worker's posts, the
   files it touched and the commands it ran, with no model turn spent. See
   research item 5.
 - **Role rules enforced** (idea). The command handler refuses an action that a role's rules forbid, such as a worker starting an agent or asking the owner. It reads a role table that the team's definition supplies. Version 1 only advises and reports (roles decision row 10).
@@ -130,12 +130,12 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   Each delivery is recorded with when and how it landed, so a wake can never
   be silently lost. See research item 3.
 - **Wake Claude without typing** (idea). Each Claude agent keeps one
-  long-lived `Monitor` running a Shephrd command that prints a line only when
+  long-lived `Monitor` running a Sheprd command that prints a line only when
   a post needs it. Claude Code starts the turn by itself, and nothing is typed
   into the pane. Other agents keep a typed nudge that only fires when the
   agent is idle. See research item 2.
 - **Wait results that say why** (built in the engine: unit 5d's
-  waits end with a reason per member, and unit 7b's `shephrd wait` exits
+  waits end with a reason per member, and unit 7b's `sheprd wait` exits
   with the codes below). A wait or a collection ends early,
   with a reason, when the agent it waits on is stuck on a question or an
   approval. The command line exits with 0 for done, 1 for failed, and 2 for
@@ -190,9 +190,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   a failed run. See research item 11.
 - **Agents run in a sandbox** (agreed, 2026-11-05). Each agent runs inside
   bubblewrap, wrapped around the whole harness. Only its worktree is writable
-  and `.sheprd` is mounted read-only. The owner's home folder, Shephrd's state
+  and `.sheprd` is mounted read-only. The owner's home folder, Sheprd's state
   folder and other processes are not visible. This replaces the earlier plan
-  for Shephrd to run as its own Unix user, because bubblewrap needs no root
+  for Sheprd to run as its own Unix user, because bubblewrap needs no root
   access at install and leaves worktree files owned by the owner. Real Codex
   and Claude command-line runs worked this way on 2026-11-05, in a manual test.
   It is not built.
@@ -212,7 +212,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   a macOS reader for the leftover-process sweep. See issue 183 and issue 120
   in [issues.md](issues.md).
 - **Herding names for the command-line tool** (idea; shelved by the owner on
-  2026-11-01 ("hmmm shelf it."); not planned; do not build). The `shephrd`
+  2026-11-01 ("hmmm shelf it."); not planned; do not build). The `sheprd`
   command-line tool would offer herding names for its commands. The plain
   names would stay as aliases, and they would stay the names of the agents'
   tools. The proposed mapping:
@@ -237,7 +237,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   | `debug.compare-views` | `debug headcount` |
   | `mcp` | `dog` |
 - **Filtered live updates** (idea). A subscription for phones that is filtered by agent and by event kind, with checkpoints that keep the cursor moving.
-- **One password login** (planned). The service reads the password from the environment variable `SHEPHRD_WEB_PASSWORD`, and the dashboard asks for it. One person uses Shephrd, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
+- **One password login** (planned). The service reads the password from the environment variable `SHEPRD_WEB_PASSWORD`, and the dashboard asks for it. One person uses Sheprd, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
 - **Phone alerts through one sender** (idea). Phone alerts go through one sender interface, `AlertSender`, with ntfy as the first carrier. A later carrier, such as Expo's push service for the phone app, slots in behind it (client API row 83).
 - **Mobile login** (later). Starts by looking at what Home Assistant does.
 - **VS Code extension** (later). One of the last things, along with the mobile app, by the owner's answer of 2026-11-03.
@@ -245,8 +245,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 ## 5. The sheepdog
 
 A shepherd leads the flock, and the shepherd's dog keeps the sheep in line so
-none of them wander off. In Shephrd, the orchestrator and the owner lead. The
-sheepdog is the part of Shephrd's background service that keeps every agent
+none of them wander off. In Sheprd, the orchestrator and the owner lead. The
+sheepdog is the part of Sheprd's background service that keeps every agent
 moving without spending their turns. It never decides what the work is; it
 only notices when an agent has strayed and nudges it back, or tells its lead.
 
@@ -276,7 +276,7 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
 ## 6. Source control
 
 - **Remove agent credits when merging** (agreed). A setting, off by default,
-  that each project can override. When Shephrd merges a worker's or a team's
+  that each project can override. When Sheprd merges a worker's or a team's
   work with a merge commit or a squash commit, it removes the lines that
   credit a coding agent from that commit's message: `Co-authored-by:`
   trailers for known agents, and footers such as "🤖 Generated with Claude
@@ -287,7 +287,7 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
 
 ## Open questions
 
-- Which licence should Shephrd use?
+- Which licence should Sheprd use?
 
 ## Decided
 
@@ -330,19 +330,19 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   an append-only, numbered log in SQLite before anything acts on it, and
   threads, states, waits and the live stream are read from that log. T3 Code's
   server has the same shape, and since Effect was chosen (the next entry),
-  Shephrd can copy T3's event store with credit. The rejected options were
+  Sheprd can copy T3's event store with credit. The rejected options were
   saved tables updated in place, and one supervisor process per agent
   sharing files.
-- **Shephrd is written with the Effect library** (2026-11-01). Effect is a
+- **Sheprd is written with the Effect library** (2026-11-01). Effect is a
   TypeScript library for whole programs: failures are part of each
   function's type, every running task has an owner that cleans it up, and
   one schema both checks data and defines its type. The reason for choosing
   it is reuse: T3 Code is written with Effect 4, so its ACP client
   (`packages/effect-acp`), event store, accounts and device pairing can be
-  copied with credit instead of rebuilt. Shephrd pins the same Effect
+  copied with credit instead of rebuilt. Sheprd pins the same Effect
   version as the T3 Code commit it copies from, so the copied code compiles
   unchanged.
-- **Shephrd runs on Node.js 26** (2026-11-01). Node.js 26 is the current
+- **Sheprd runs on Node.js 26** (2026-11-01). Node.js 26 is the current
   long-term support line, and the repository's `.nvmrc` says `26`. A single
   file compiled with Bun was considered and not chosen: T3 Code's SQLite
   code uses Node.js's own `node:sqlite`, and the Claude Code ACP adapter

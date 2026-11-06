@@ -31,7 +31,7 @@ export const processWeb = (password = freshSecret()) => Effect.gen(function* () 
   let service: CheckedWebService;
   const restart = () => Effect.gen(function* () {
     if (service !== undefined) yield* service.stop;
-    service = yield* startCheckedWebService(root, { SHEPHRD_WEB_PASSWORD: password });
+    service = yield* startCheckedWebService(root, { SHEPRD_WEB_PASSWORD: password });
     yield* waitServing(root, service);
     let listening = false;
     for (let attempt = 0; attempt < 100; attempt++) {

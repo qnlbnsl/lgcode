@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, expect } from '@effect/vitest';
 import * as Effect from 'effect/Effect';
-import { connect } from '@shephrd/client';
+import { connect } from '@sheprd/client';
 import { probeCommands } from '../../scripts/live/liveProbes.ts';
 import { receivedUserText, slashReceipt, authRefused, exitCodeOf } from '../../scripts/live/probeEvidence.ts';
 import { SLASH_DOWN_PROMPT, SLASH_UP_PROMPT } from '../../scripts/live/prompts.ts';
@@ -42,9 +42,9 @@ scenario('the named removed-variable shell command uses the real CLI: owner cont
   expect(control.status, control.stderr).toBe(0);
   const helper = join(w.root.root, 'stripped.mjs');
   const report = join(w.root.root, 'stripped-result.json');
-  writeFileSync(helper, `import {spawnSync} from 'node:child_process'; import {writeFileSync} from 'node:fs';\nconst result=spawnSync('/bin/sh',['-c',process.argv[2]],{env:process.env,encoding:'utf8'});\nwriteFileSync(process.argv[3],JSON.stringify({status:result.status,output:result.stdout+result.stderr,socket:process.env.SHEPHRD_SOCKET??null,token:process.env.SHEPHRD_TOKEN??null}));`);
+  writeFileSync(helper, `import {spawnSync} from 'node:child_process'; import {writeFileSync} from 'node:fs';\nconst result=spawnSync('/bin/sh',['-c',process.argv[2]],{env:process.env,encoding:'utf8'});\nwriteFileSync(process.argv[3],JSON.stringify({status:result.status,output:result.stdout+result.stderr,socket:process.env.SHEPRD_SOCKET??null,token:process.env.SHEPRD_TOKEN??null}));`);
   const child = yield* w.start(w.owner, { permission: 'ask', prompt: 'Run the removed-variable CLI probe.', script: { turns: [[
-    { step: 'exec', argv: [helper, command, report], strip: ['SHEPHRD_SOCKET', 'SHEPHRD_TOKEN'] },
+    { step: 'exec', argv: [helper, command, report], strip: ['SHEPRD_SOCKET', 'SHEPRD_TOKEN'] },
   ]] } });
   yield* eventsUntil(w.owner, 0, 'the fake adapter shell child to finish', isTag('TurnEnded', child.agentId));
   const result = JSON.parse(readFileSync(report, 'utf8'));
@@ -61,9 +61,9 @@ scenario('the actual public socket refuses an old token after SIGKILL and reload
   yield* w.boot();
   const after = yield* w.token(child, before.pid);
   expect(after.token).not.toBe(before.token);
-  const old = yield* Effect.exit(Effect.scoped(connect({ environment: { SHEPHRD_SOCKET: w.root.socket, SHEPHRD_TOKEN: before.token }, attempts: 1 })));
+  const old = yield* Effect.exit(Effect.scoped(connect({ environment: { SHEPRD_SOCKET: w.root.socket, SHEPRD_TOKEN: before.token }, attempts: 1 })));
   expect(old._tag).toBe('Failure');
   expect(String(old)).toContain('401');
-  const fresh = yield* Effect.exit(Effect.scoped(connect({ environment: { SHEPHRD_SOCKET: w.root.socket, SHEPHRD_TOKEN: after.token }, attempts: 1 })));
+  const fresh = yield* Effect.exit(Effect.scoped(connect({ environment: { SHEPRD_SOCKET: w.root.socket, SHEPRD_TOKEN: after.token }, attempts: 1 })));
   expect(fresh._tag).toBe('Success');
 }));

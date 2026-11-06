@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { it } from "@effect/vitest";
-import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
-import { rolesActionKinds, type EventEnvelope, type RolesAction } from "@shephrd/contracts";
+import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
+import { rolesActionKinds, type EventEnvelope, type RolesAction } from "@sheprd/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
@@ -39,7 +39,7 @@ import { eventually, pause } from "../../support/routingRig.ts";
 import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const quiet: EngineLists = { ...engineLists, reactors: {} };
 const listsWith = (rules: ReadonlyArray<SheepdogRule> = []): EngineLists => ({ ...engineLists, reactors: { roles: makeSheepdogLoop(rules) } });

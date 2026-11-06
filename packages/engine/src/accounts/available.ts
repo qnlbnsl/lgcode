@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Event, EventEnvelope } from "@shephrd/contracts";
+import type { Event, EventEnvelope } from "@sheprd/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";

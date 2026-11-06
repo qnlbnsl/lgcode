@@ -16,11 +16,11 @@ let home: string;
 let state: string;
 let mask: number;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/shephrd-owner-fix-1-");
+  home = mkdtempSync("/tmp/sheprd-owner-fix-1-");
   state = join(home, "state");
   mask = process.umask();
   vi.stubEnv("HOME", home);
-  vi.stubEnv("SHEPHRD_HOME", state);
+  vi.stubEnv("SHEPRD_HOME", state);
 });
 afterEach(() => {
   process.umask(mask);

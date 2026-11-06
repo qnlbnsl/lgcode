@@ -9,8 +9,8 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { fakeEngine, LEAD, WORKER, markerIn, ONCE, ALWAYS, REJECT, runProbe, type FakeEngine } from "./probe-fake-engine.ts";
 import { scriptedApi } from "./scripted-api.ts";
 
-vi.mock("@shephrd/client", async (original) => {
-  const client = await original<typeof import("@shephrd/client")>();
+vi.mock("@sheprd/client", async (original) => {
+  const client = await original<typeof import("@sheprd/client")>();
   const { fakeConnect } = await import("./probe-fake-registry.ts");
   return { ...client, connect: (options: Parameters<typeof client.connect>[0]) => (fakeConnect(options) ?? client.connect(options)) as never };
 });
@@ -69,7 +69,7 @@ it.each([false, true])("issue 239: an exact failed MCP call is an attempt; permi
   };
   e.script = { onPrompt: (engine, p) => {
     const call = `mcp-${p.deliveryId}`;
-    engine.tool(p.agentId, call, { server: "shephrd", tool: "ask", arguments: { text: markerIn(p.text) } }, "mcp.shephrd.ask");
+    engine.tool(p.agentId, call, { server: "sheprd", tool: "ask", arguments: { text: markerIn(p.text) } }, "mcp.sheprd.ask");
     if (permission) pending.set(engine.permission(p.agentId, call, [ONCE, REJECT]), { agent: p.agentId, call });
     else fail(engine, p.agentId, call);
   }, onAnswer: (engine, answer) => { const p = pending.get(answer.id)!; fail(engine, p.agent, p.call); } };
@@ -77,7 +77,7 @@ it.each([false, true])("issue 239: an exact failed MCP call is an attempt; permi
   expect(result.passed).toBe(false);
   expect(result.rows).toHaveLength(2);
   for (const row of result.rows) {
-    expect(row.outcome).toBe(permission ? "attempted; failed" : "attempted; the adapter cancelled the call before Shephrd saw a permission request (see issue 236)");
+    expect(row.outcome).toBe(permission ? "attempted; failed" : "attempted; the adapter cancelled the call before Sheprd saw a permission request (see issue 236)");
     expect(row.detail).toContain("user cancelled MCP tool call");
     expect(row.detail).not.toContain("synthetic-private-key-123456");
     for (const token of e.tokenOf.values()) expect(row.detail).not.toContain(token);
@@ -197,7 +197,7 @@ it("issue 239: a different failed MCP error without permission evidence does not
   const e = make();
   e.script = { onPrompt: (engine, p) => {
     const call = `mcp-${p.deliveryId}`;
-    engine.tool(p.agentId, call, { server: "shephrd", tool: "ask", arguments: { text: markerIn(p.text) } }, "mcp.shephrd.ask");
+    engine.tool(p.agentId, call, { server: "sheprd", tool: "ask", arguments: { text: markerIn(p.text) } }, "mcp.sheprd.ask");
     engine.finish(p.agentId, call, "failed", "adapter connection unavailable");
     engine.turnEnded(p.agentId);
   } };

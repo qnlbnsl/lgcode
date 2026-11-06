@@ -1,7 +1,7 @@
 import {
   alertPushDefaults, defaultWebSettings, type AlertKind, type CarrierSettings,
   type AlertDelivery, type ClientEvent, type Event, type EventSequence, type WebSettings,
-} from "@shephrd/contracts";
+} from "@sheprd/contracts";
 import type { PieceView } from "../../pieces/viewTables.ts";
 
 type Raised = Extract<ClientEvent, { _tag: "client.AlertRaised" }>;

@@ -1,5 +1,5 @@
-import { startFailureText } from "@shephrd/contracts/startFailure";
-import { commandOutcome } from "@shephrd/contracts";
+import { startFailureText } from "@sheprd/contracts/startFailure";
+import { commandOutcome } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import { holderAbove, passUp } from "../routing/holders.ts";
 import { answer } from "../routing/permissions.ts";

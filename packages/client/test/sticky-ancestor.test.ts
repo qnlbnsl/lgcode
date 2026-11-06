@@ -20,7 +20,7 @@ it("X51 (T-5) catches allowing a user-owned writable sticky ancestor under the r
   expect(lstatSync(ancestor).uid).not.toBe(0);
   const socketPath = join(privateFolder, "engine.sock");
   const peer = await fakeEngine(root, { socketPath });
-  const exit = await Effect.runPromiseExit(Effect.scoped(connect({ environment: { ...agentEnvironment(root), SHEPHRD_SOCKET: socketPath } })));
+  const exit = await Effect.runPromiseExit(Effect.scoped(connect({ environment: { ...agentEnvironment(root), SHEPRD_SOCKET: socketPath } })));
   expect.soft(Exit.isFailure(exit), "a writable user-owned ancestor must be refused").toBe(true);
   if (Exit.isFailure(exit)) expect(Cause.pretty(exit.cause)).toMatch(/writable|ancestor|above the socket/i);
   expect(peer.upgrades).toHaveLength(0);

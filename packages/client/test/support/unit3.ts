@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { ClientSnapshot, EventEnvelope, type EventEnvelope as Envelope } from "@shephrd/contracts";
+import { ClientSnapshot, EventEnvelope, type EventEnvelope as Envelope } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { expect } from "vitest";

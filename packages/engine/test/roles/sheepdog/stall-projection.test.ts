@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { Event } from "@shephrd/contracts";
+import type { Event } from "@sheprd/contracts";
 import { apply, emptyViews, type State } from "../../../src/views/apply.ts";
 import type { RolesView } from "../../../src/roles/view.ts";
 import { stallInput, stallKey } from "../../../src/roles/sheepdog/stallView.ts";

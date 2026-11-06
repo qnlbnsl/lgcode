@@ -3,7 +3,7 @@ import { snapshotFor } from "./snapshot.ts";
 
 // Read once during service startup. Restarting without this setting restores
 // the reactor, whose initial pass scans the complete rebuilt board view.
-export const boardEnabledAtStartup = (environment: NodeJS.ProcessEnv): boolean => environment.SHEPHRD_BOARD_DISABLED !== "1";
+export const boardEnabledAtStartup = (environment: NodeJS.ProcessEnv): boolean => environment.SHEPRD_BOARD_DISABLED !== "1";
 
 export const withBoardEnabled = (lists: EngineLists, enabled: boolean): EngineLists => {
   if (enabled) return lists;

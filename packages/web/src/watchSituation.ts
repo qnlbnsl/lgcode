@@ -1,5 +1,5 @@
-import { connect } from "@shephrd/client/browser"
-import { displayedState, type ClientSnapshot, type EventSequence, type RequestId } from "@shephrd/contracts"
+import { connect } from "@sheprd/client/browser"
+import { displayedState, type ClientSnapshot, type EventSequence, type RequestId } from "@sheprd/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 

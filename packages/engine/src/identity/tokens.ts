@@ -1,4 +1,4 @@
-import type { AgentId } from "@shephrd/contracts";
+import type { AgentId } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import type * as Redacted from "effect/Redacted";
 import * as SqlClient from "effect/sql/SqlClient";

@@ -1,4 +1,4 @@
-import { waitForAgents } from "@shephrd/client";
+import { waitForAgents } from "@sheprd/client";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -14,7 +14,7 @@ import { acceptWake, catchUp, end, pendingWake } from "../board/reactorFixtures.
 import { agent, appendDelivery, boardState, eventsOf, postAs, provideBoard, queued, seedBoard, snapshot, wakeFor } from "../board/wakeFixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const reply = (runner: FakeRunner, deliveryId: string, outcome: "success" | "error" | "capacity", target = "worker") => Effect.gen(function* () {
   yield* runner.subscribed;

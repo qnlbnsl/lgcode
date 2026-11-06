@@ -1,4 +1,4 @@
-import type { EventEnvelope, RolesActionRecord } from "@shephrd/contracts";
+import type { EventEnvelope, RolesActionRecord } from "@sheprd/contracts";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import type { Snapshot } from "../../../commands/internal.ts";

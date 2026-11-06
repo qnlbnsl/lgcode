@@ -8,7 +8,7 @@ import { channel, post, queue, resolve, wake } from "./fixtures.ts";
 import { agent, appendDelivery, boardState, change, deliveryText, eventsOf, owner, postAs, provideBoard, queued, seedBoard, snapshot, wakeFor } from "./wakeFixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const run = <A, E, R>(body: (credentials: Record<string, Credential>) => Effect.Effect<A, E, R>) => provideBoard(rig, Effect.gen(function* () {
   yield* registerRebuildCheck();

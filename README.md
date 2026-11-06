@@ -1,46 +1,46 @@
-# Shephrd
+# Sheprd
 
-Shephrd is a plugin for [Herdr](https://github.com/herdrdev/herdr) that runs
+Sheprd is a plugin for [Herdr](https://github.com/herdrdev/herdr) that runs
 teams of coding agents as a small company: an orchestrator at the top, team
 leads under it, and workers under each lead. They coordinate through a strict
 message board that is built for efficiency, so no agent is woken, and no turn
 is spent, without a reason.
 
-Shephrd also exposes its state through a network application programming
+Sheprd also exposes its state through a network application programming
 interface (API). The goal is that a person can start a Herdr server, install
-Shephrd, and then set up and steer their teams from a web page, a desktop
+Sheprd, and then set up and steer their teams from a web page, a desktop
 app, or a phone, with every agent conversation available as a thread.
 
 > [!WARNING]
-> Shephrd is under development. The engine, authenticated client API, message
+> Sheprd is under development. The engine, authenticated client API, message
 > board and foundry supervision code are implemented. The foundation review
 > and its repairs are still in progress. Standing permission rules remain
 > unbuilt, pending the owner's harness recordings. Real-account and physical
 > phone checks remain separate owner-run work. This is not a released or
 > cleared build, and the capabilities below still include planned work.
 
-## Where Shephrd came from
+## Where Sheprd came from
 
-Shephrd is inspired by [Herdr Synapse](https://github.com/vitalysim/herdr-synapse),
+Sheprd is inspired by [Herdr Synapse](https://github.com/vitalysim/herdr-synapse),
 created by [Vitaly Simonovich](https://github.com/vitalysim). Synapse showed
 that agents inside one Herdr session can work as a team: a shared board, a
 human-owned charter, and a notifier that only speaks to an agent when it can
-listen. Shephrd started as a fork of that idea and then took a different
+listen. Sheprd started as a fork of that idea and then took a different
 direction, so it is a separate project with its own codebase.
 
 Thank you, Vitaly, for building Synapse and for releasing it under the
 Apache License 2.0.
 
-Shephrd also depends on Herdr itself, which hosts the agents and provides the
-terminal and session APIs that Shephrd uses.
+Sheprd also depends on Herdr itself, which hosts the agents and provides the
+terminal and session APIs that Sheprd uses.
 
-Shephrd borrows ideas, and some code, from
+Sheprd borrows ideas, and some code, from
 [T3 Code](https://github.com/pingdotgg/t3code) by T3 Tools Inc., released
-under the MIT License. The code Shephrd uses from it is in
+under the MIT License. The code Sheprd uses from it is in
 `third_party/t3code/`, and the [NOTICE](NOTICE) file lists every piece of
 code taken from another project.
 
-## What Shephrd is meant to provide
+## What Sheprd is meant to provide
 
 These are the intended pieces. Each one is tracked in more detail in
 [docs/features.md](docs/features.md).
@@ -57,7 +57,7 @@ These are the intended pieces. Each one is tracked in more detail in
   for the terminal.
 
 The team shapes and workflows themselves (which teams exist, what each role is
-told to do) are not part of Shephrd. Shephrd is the machinery; the workflows
+told to do) are not part of Sheprd. Sheprd is the machinery; the workflows
 live elsewhere and are loaded into it.
 
 ## Documents
@@ -68,13 +68,13 @@ live elsewhere and are loaded into it.
 - [docs/features.md](docs/features.md): the feature list.
 - [docs/issues.md](docs/issues.md): the running list of problems found.
 - [docs/specs/2026-11-01-engine-design.md](docs/specs/2026-11-01-engine-design.md):
-  the design of the engine, the first of Shephrd's four pieces.
+  the design of the engine, the first of Sheprd's four pieces.
 - [docs/research/acp.md](docs/research/acp.md): what the Agent Client
-  Protocol is and how it relates to Herdr and to Shephrd's client API.
+  Protocol is and how it relates to Herdr and to Sheprd's client API.
 - [docs/research/t3-code.md](docs/research/t3-code.md): how T3 Code compares
-  with Herdr and Synapse, and what Shephrd should borrow from it.
+  with Herdr and Synapse, and what Sheprd should borrow from it.
 - [docs/research/herdr-and-synapse.md](docs/research/herdr-and-synapse.md):
-  what Shephrd keeps from Herdr and Herdr Synapse, and the failures it must
+  what Sheprd keeps from Herdr and Herdr Synapse, and the failures it must
   prevent.
 
 ## Licence

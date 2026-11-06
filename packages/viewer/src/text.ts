@@ -1,4 +1,4 @@
-import { toolText, groupThreadItems } from "@shephrd/contracts/thread";
+import { toolText, groupThreadItems } from "@sheprd/contracts/thread";
 // Remove terminal programs, including their payloads, before rendering data.
 // Keep ordinary Unicode, tabs and line breaks for reading tool input and diffs.
 export const safeText = (text: string): string => text
@@ -43,8 +43,8 @@ export const linesFor = (text: string, columns: number): ReadonlyArray<string> =
   });
 };
 
-export function threadText(items: ReadonlyArray<import("@shephrd/client").ClientEnvelope>): Array<{ sequence: number; text: string }> {
-  const sources = new Map<string, import("@shephrd/contracts").Delivery>();
+export function threadText(items: ReadonlyArray<import("@sheprd/client").ClientEnvelope>): Array<{ sequence: number; text: string }> {
+  const sources = new Map<string, import("@sheprd/contracts").Delivery>();
   for (const { event } of items) {
     const delivery = event._tag === "AgentStarted" ? event.firstPromptDelivery : event._tag === "DeliveryQueued" ? event.delivery : undefined;
     if (delivery !== undefined) sources.set(delivery.id, delivery);

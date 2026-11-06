@@ -1,7 +1,7 @@
-import { groupThreadItems } from "@shephrd/contracts/thread"
+import { groupThreadItems } from "@sheprd/contracts/thread"
 import { useRef, useState, type FormEvent } from "react"
-import type { ClientEnvelope } from "@shephrd/client/browser"
-import type { ClientSnapshot, Event } from "@shephrd/contracts"
+import type { ClientEnvelope } from "@sheprd/client/browser"
+import type { ClientSnapshot, Event } from "@sheprd/contracts"
 import { Content, type ContentEvent } from "./content.tsx"
 import { requestId, withClient } from "./client.ts"
 import { actionJson, DataText, visibleText } from "./text.tsx"
@@ -87,7 +87,7 @@ export function Request({ event, open, items, signal }: {
     || event.toolInput === undefined && matching.length === 0)
 
   return <section className="request-controls" aria-label={permission ? "Permission request" : "Question"} data-request-id={id}>
-    <h3>{permission ? "Shephrd permission request" : "Shephrd question"}</h3>
+    <h3>{permission ? "Sheprd permission request" : "Sheprd question"}</h3>
     <p>Request: {visibleText(id)}</p>
     <DataText text={permission ? event.description : event.text} />
     {permission && <>

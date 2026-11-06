@@ -1,7 +1,7 @@
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { expect, it } from "vitest";
 import { translate } from "../../src/runner/translate.ts";
-import { toolText } from "@shephrd/contracts/thread";
+import { toolText } from "@sheprd/contracts/thread";
 it("preserves adapter input for readable display and leaves omitted output unchanged", () => {
   const content = translate({ sessionUpdate: "tool_call", toolCallId: "c", title: "Run shell", status: "pending", rawInput: { command: "printf hello" } }, false)[0]!.content;
   expect(content).toMatchObject({ input: '{"command":"printf hello"}' });

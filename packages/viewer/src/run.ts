@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { render } from "ink";
 import * as Effect from "effect/Effect";
-import type { Environment } from "@shephrd/client";
+import type { Environment } from "@sheprd/client";
 import { connectViewer } from "./connection.ts";
 import { ViewerApp } from "./app.ts";
 
@@ -28,6 +28,6 @@ export const runViewer = (environment: Environment): Effect.Effect<number> =>
     },
     catch: () => new Error("The viewer needs an owner terminal and a running engine."),
   }).pipe(Effect.catch(() => Effect.sync(() => {
-    process.stderr.write("shephrd: the viewer needs an owner terminal and a running engine.\n");
+    process.stderr.write("sheprd: the viewer needs an owner terminal and a running engine.\n");
     return 1;
   })));

@@ -1,4 +1,4 @@
-import { CommandsRpcGroup } from "@shephrd/contracts";
+import { CommandsRpcGroup } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import { expect, it } from "vitest";
 import { WebSocket } from "ws";

@@ -5,9 +5,9 @@ import { randomBytes } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import * as Contracts from "@shephrd/contracts";
+import * as Contracts from "@sheprd/contracts";
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
-import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Schema from "effect/Schema";
@@ -148,7 +148,7 @@ export const withFixture = async (
     .toMatch(/export\s+(?:const|function)\s+buildServices\b/);
   const { buildServices } = await import(/* @vite-ignore */ service.href) as { buildServices: BuildServices };
   const rig = options.rig ?? makeRig();
-  vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
+  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
   const bearer = randomBytes(32).toString("base64url");
   try {
     let program = Effect.gen(function* () {

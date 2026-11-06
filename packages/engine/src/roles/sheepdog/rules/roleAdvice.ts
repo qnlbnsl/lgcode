@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@shephrd/contracts";
+import type { EventEnvelope } from "@sheprd/contracts";
 import type { NoticeAction } from "../notices.ts";
 import { actionBase, isWorker, own, type AdviceKind, type RuleInput } from "./context.ts";
 

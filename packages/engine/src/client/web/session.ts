@@ -2,7 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import * as Redacted from "effect/Redacted";
 
 const digest = (text: string) => createHash("sha256").update(text).digest();
-export const cookieName = "shephrd_session";
+export const cookieName = "sheprd_session";
 export const makeSession = (password: Redacted.Redacted<string> | undefined, register: (secret: Redacted.Redacted<string>) => void) => {
   const expected = digest(password === undefined ? "" : Redacted.value(password));
   let token = "";

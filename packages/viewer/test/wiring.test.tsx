@@ -62,7 +62,7 @@ it("drives live threads, context review, a selected answer and an owner prompt t
   expect(output).toContain("Name agent-a");
   expect(output).toContain("Name agent-b");
   expect(peer.upgrades.every((headers) => headers.authorization === `Bearer ${ownerCredential}`)).toBe(true);
-  expect(peer.upgrades.every((headers) => typeof headers["shephrd-ancestors"] === "string" && typeof headers["shephrd-process-group"] === "string")).toBe(true);
+  expect(peer.upgrades.every((headers) => typeof headers["sheprd-ancestors"] === "string" && typeof headers["sheprd-process-group"] === "string")).toBe(true);
   const live = envelope(11, { _tag: "ThreadItem", agentId: "agent-a", itemId: "live", replay: false,
     content: { _tag: "text", text: "Live left\u001b]52;c;clipboard-data\u0007right" } });
   chunk(subscription!.socket, subscription!.frame, [live]);
@@ -138,7 +138,7 @@ it("runs the Node launcher and opens the declared pane without granting an agent
   const environment = { ...serviceEnvironment(root), HERDR_BIN_PATH: binary };
   const action = startCli(root, ["view", "--open-pane"], environment);
   expect((await finishCli(action)).code).toBe(0);
-  expect(readFileSync(args, "utf8").trim().split("\n")).toEqual(["plugin", "pane", "open", "--plugin", "shephrd", "--entrypoint", "view"]);
+  expect(readFileSync(args, "utf8").trim().split("\n")).toEqual(["plugin", "pane", "open", "--plugin", "sheprd", "--entrypoint", "view"]);
   const agent = startCli(root, ["view", "--open-pane"], { ...agentEnvironment(root), HERDR_BIN_PATH: binary });
   expect((await finishCli(agent)).code).toBe(1);
   // Importing the terminal app in Node must work without a JSX transform.

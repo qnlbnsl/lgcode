@@ -1,4 +1,4 @@
-import type { Event } from "@shephrd/contracts";
+import type { Event } from "@sheprd/contracts";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import type * as Effect from "effect/Effect";
@@ -36,4 +36,4 @@ export class Restart extends Context.Service<Restart, {
   // without a live process (after a restart) is reloaded first, and then its
   // queue is sent once.
   readonly returnAccount: (accountId: string, cause: Cause) => Effect.Effect<void, LogWriteFailed>;
-}>()("shephrd/engine/recovery/Restart") {}
+}>()("sheprd/engine/recovery/Restart") {}

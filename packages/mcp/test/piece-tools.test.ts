@@ -1,10 +1,10 @@
-import * as Contracts from "@shephrd/contracts";
+import * as Contracts from "@sheprd/contracts";
 import * as Schema from "effect/Schema";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcGroup from "effect/rpc/RpcGroup";
 import { afterEach, expect, it, vi } from "vitest";
 
-afterEach(() => { vi.doUnmock("@shephrd/contracts"); vi.resetModules(); });
+afterEach(() => { vi.doUnmock("@sheprd/contracts"); vi.resetModules(); });
 
 it("1a E2 tools derive new agent-callable piece commands but exclude streams and owner-only commands", async () => {
   const group = RpcGroup.make(
@@ -16,7 +16,7 @@ it("1a E2 tools derive new agent-callable piece commands but exclude streams and
     "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set"]);
   const access = { ...Contracts.commandAccess, ...Object.fromEntries([...ownerOnly].map((name) => [name, ["owner"]])) };
   vi.resetModules();
-  vi.doMock("@shephrd/contracts", () => ({ ...Contracts, CommandsRpcGroup: Contracts.CommandsRpcGroup.merge(group), commandAccess: {
+  vi.doMock("@sheprd/contracts", () => ({ ...Contracts, CommandsRpcGroup: Contracts.CommandsRpcGroup.merge(group), commandAccess: {
     ...access, "client.read": ["owner", "agent"], "client.subscribe": ["owner", "agent"], "client.set-secret": ["owner"],
   } }));
   const loading = import("../src/tools.ts");

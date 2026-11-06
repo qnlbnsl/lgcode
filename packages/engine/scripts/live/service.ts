@@ -41,7 +41,7 @@ export const serviceEnvironment = (parent: Readonly<Record<string, string | unde
   const environment: Record<string, string> = {};
   for (const name of INHERITED) if (parent[name] !== undefined) environment[name] = parent[name]!;
   // The fresh state folder must win over any state variable the owner has set.
-  return { ...environment, SHEPHRD_HOME: state, SHEPHRD_TEST_DEBUG: "1", TMPDIR: "/tmp" };
+  return { ...environment, SHEPRD_HOME: state, SHEPRD_TEST_DEBUG: "1", TMPDIR: "/tmp" };
 };
 
 // ---- Which processes belong to this run (findings F4 and F10) ------------
@@ -123,14 +123,14 @@ const until = async (done: () => boolean, milliseconds: number): Promise<boolean
 const signal = (pid: number, name: NodeJS.Signals): void => { try { process.kill(pid, name); } catch { /* gone; a process that stays is found by the liveness check */ } };
 
 export const startLiveService = (parent: Readonly<Record<string, string | undefined>>, reuse?: { readonly root: string; readonly output: string; readonly known: Map<number, string> }, webPassword?: string): LiveService => {
-  const root = reuse?.root ?? realpathSync(mkdtempSync("/tmp/shephrd-live-"));
+  const root = reuse?.root ?? realpathSync(mkdtempSync("/tmp/sheprd-live-"));
   chmodSync(root, 0o700);
   const state = join(root, "state");
   const work = join(root, "work");
   if (reuse === undefined) mkdirSync(work, { mode: 0o700 });
   const logFile = join(root, "service.log");
   const log = createWriteStream(logFile, { mode: 0o600, flags: "a" });
-  const child: ChildProcess = spawn(process.execPath, [servicePath], { env: { ...serviceEnvironment(parent, state), ...(webPassword === undefined ? {} : { SHEPHRD_WEB_PASSWORD: webPassword }) }, stdio: ["ignore", "pipe", "pipe"] });
+  const child: ChildProcess = spawn(process.execPath, [servicePath], { env: { ...serviceEnvironment(parent, state), ...(webPassword === undefined ? {} : { SHEPRD_WEB_PASSWORD: webPassword }) }, stdio: ["ignore", "pipe", "pipe"] });
   const both: Array<string> = reuse === undefined ? [] : [reuse.output];
   const known = reuse?.known ?? new Map<number, string>();
   const remember = (): void => {

@@ -1,5 +1,5 @@
 import { join, resolve } from "node:path";
-import type { AgentId, EventEnvelope, EventSequence, TurnUsage } from "@shephrd/contracts";
+import type { AgentId, EventEnvelope, EventSequence, TurnUsage } from "@sheprd/contracts";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import type { Snapshot } from "../../commands/internal.ts";

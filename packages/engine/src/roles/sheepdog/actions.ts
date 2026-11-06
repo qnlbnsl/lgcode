@@ -1,4 +1,4 @@
-import type { RolesAction } from "@shephrd/contracts";
+import type { RolesAction } from "@sheprd/contracts";
 import { executeService } from "../../commands/services.ts";
 import type { EngineLists } from "../../pieces/lists.ts";
 import { sheepdogCaller } from "./notices.ts";

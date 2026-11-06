@@ -4,7 +4,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, expect } from "@effect/vitest";
-import { eventEffect, type EventEnvelope } from "@shephrd/contracts";
+import { eventEffect, type EventEnvelope } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 

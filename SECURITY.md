@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Shephrd has no release yet. Until the first tagged release, only the current
+Sheprd has no release yet. Until the first tagged release, only the current
 `main` branch receives security fixes. After that, the latest tagged release
 and `main` will receive them.
 
@@ -12,39 +12,39 @@ Do not report a vulnerability in a public issue.
 
 Use GitHub's private vulnerability reporting for this repository, at
 `https://github.com/qnlbnsl/sheprd/security/advisories/new`. If that page is
-not available, email the maintainer at qnlbnsl@gmail.com with "Shephrd
+not available, email the maintainer at qnlbnsl@gmail.com with "Sheprd
 security" in the subject line.
 
 Include these details:
 
-- The Shephrd version or commit, the Herdr version, and the platform.
+- The Sheprd version or commit, the Herdr version, and the platform.
 - The impact: what an attacker can read, change, or run.
 - A minimal reproduction.
 
 Redact message boards, local paths, credentials, API tokens, the web password,
 session cookies, and raw provider responses before you send anything.
 
-## What Shephrd protects, and what it does not
+## What Sheprd protects, and what it does not
 
-Shephrd runs with the same local-user permissions as Herdr. It is not a
+Sheprd runs with the same local-user permissions as Herdr. It is not a
 sandbox. The coding agents it manages can run commands and change files as
-that user, and Shephrd does not stop them. Run untrusted repositories inside
+that user, and Sheprd does not stop them. Run untrusted repositories inside
 an external sandbox.
 
-Agents can read Shephrd's own files. The agents run as the owner's user, so
-any agent can read Shephrd's state folder, including the owner's credential,
+Agents can read Sheprd's own files. The agents run as the owner's user, so
+any agent can read Sheprd's state folder, including the owner's credential,
 the stored account keys and the event log. File permissions cannot stop a
-program that runs as the same user. Shephrd's permission rules (the
+program that runs as the same user. Sheprd's permission rules (the
 permission ceiling, the folder rule and the approval routing) therefore stop
 an agent's mistakes, not a deliberately hostile agent. Where a harness
-supports it, Shephrd adds a rule that forbids its agents to read the state
+supports it, Sheprd adds a rule that forbids its agents to read the state
 folder, but that rule is a guard against accidents, not a wall. The owner
 accepted this limit on 2026-11-01. The real fix is to run each agent in a
-sandbox, so Shephrd's private files are out of its reach. The owner chose
-this on 2026-11-05, in place of the earlier plan to run Shephrd as its own
+sandbox, so Sheprd's private files are out of its reach. The owner chose
+this on 2026-11-05, in place of the earlier plan to run Sheprd as its own
 user. It is still planned. On 2026-11-03 the owner approved building remote
-access before it, so that Shephrd is in use sooner. Until it is built, any
-agent can read Shephrd's state folder, including the stored account keys.
+access before it, so that Sheprd is in use sooner. Until it is built, any
+agent can read Sheprd's state folder, including the stored account keys.
 
 Agents can also read the web password. Agents run as the owner's user, so an
 agent can read the engine's first environment through `/proc`, even though the
@@ -52,7 +52,7 @@ engine deletes the variable and agents do not inherit it. The password protects
 against the network. It is not a boundary against an agent on the same user
 until the sandbox exists. The owner accepted this limit on 2026-11-03.
 
-The part of Shephrd that needs the most care is its client API, because it
+The part of Sheprd that needs the most care is its client API, because it
 lets a web page, a desktop app, or a phone control agents that can run
 commands on the host. Anyone who can reach that API with a valid credential
 can, in effect, run code on the machine. On the web server, that credential is
@@ -62,12 +62,12 @@ one password.
 
 The rule above, which forbids an agent to read the state folder, needs the
 harness to accept it. The same is true of the rule that forbids an agent to
-change its own harness settings. In Shephrd's default settings, no harness
+change its own harness settings. In Sheprd's default settings, no harness
 gets either rule today. The owner can set a launch rule for a harness in its
 settings once one is verified.
 
 - **`claude`.** Its adapter accepts permission rules only inside the
-  session's metadata, and Shephrd's settings contract cannot express rules
+  session's metadata, and Sheprd's settings contract cannot express rules
   there yet. See issue 91 in `docs/issues.md`.
 - **`codex`.** No launch-argument rule for it has been verified and recorded,
   so its default is no rule. See issue 104 in `docs/issues.md`.
@@ -89,7 +89,7 @@ These rules apply to every change. A change that breaks one is a security bug.
 2. **Every API request is authenticated, including on loopback.** There is no
    unauthenticated mode. The engine's Unix socket uses the owner credential and
    agent tokens. The web server uses one password, which the service reads from
-   the local environment variable `SHEPHRD_WEB_PASSWORD`, and the session that a
+   the local environment variable `SHEPRD_WEB_PASSWORD`, and the session that a
    correct password earns. A logged-in session is the owner. If the variable is
    not set, the web server does not start. Only the login route and the page's
    static files, which hold no data, are served with no session.
@@ -104,20 +104,20 @@ These rules apply to every change. A change that breaks one is a security bug.
    `Host` and `Origin` checks stop web pages and not local programs.
 3. **The password is checked in constant time and is not kept by the browser.**
    A login carries it in the request body, never in a URL. One person uses
-   Shephrd, and the owner chose no rate limits and no lockouts on 2026-11-03.
+   Sheprd, and the owner chose no rate limits and no lockouts on 2026-11-03.
 4. **A session is one random token per engine start, held in memory only.**
    Logging out replaces the token, which signs out every client. Changing the
    password means restarting the engine, which also ends the session. A browser
    holds the token in an `HttpOnly`, `SameSite=Strict` cookie, which is `Secure`
    on a public request when the public address is `https`.
 5. **An encrypted channel for remote access is the owner's setup**, such as TLS, a
-   Tailscale tailnet, or an SSH tunnel. Shephrd serves plain HTTP on loopback and
+   Tailscale tailnet, or an SSH tunnel. Sheprd serves plain HTTP on loopback and
    does not offer it to a non-loopback address. A configured public address must use
    HTTPS, even inside a private network, by the owner’s decision on 2026-11-04.
    The owner supplies the external proxy's certificate. The owner's later
    clarification on 2026-11-04 accepts a self-signed certificate and continuation
    past the expected browser certificate warning. Certificate trust installation
-   is not required. Shephrd holds no certificate and performs no trust setup.
+   is not required. Sheprd holds no certificate and performs no trust setup.
    An SSH local forward provides interim access at `http://127.0.0.1:<port>`, with identical ports on
    the device and server. `localhost` remains refused. The owner’s earlier words,
    on 2026-11-03:

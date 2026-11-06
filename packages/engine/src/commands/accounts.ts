@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Account } from "@shephrd/contracts";
+import type { Account } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import type { LogWriteFailed } from "../log/EventLog.ts";

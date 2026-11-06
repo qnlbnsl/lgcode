@@ -20,8 +20,8 @@ import {
   type FakeEngine, type Option, type Prompted, type Script,
 } from "./probe-fake-engine.ts";
 
-vi.mock("@shephrd/client", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@shephrd/client")>();
+vi.mock("@sheprd/client", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@sheprd/client")>();
   const { fakeConnect } = await import("./probe-fake-registry.ts");
   return { ...original, connect: (options: Parameters<typeof original.connect>[0]) => (fakeConnect(options) ?? original.connect(options)) as never };
 });
@@ -76,7 +76,7 @@ const said = (engine: FakeEngine, agentId: string, text: string) =>
 describe("sandbox-mcp (PB-A3) never passes without the agent's own authenticated MCP call", () => {
   const mcpCall = (engine: FakeEngine, prompted: Prompted) => {
     const marker = markerIn(prompted.text);
-    engine.tool(prompted.agentId, `mcp-${prompted.agentId}`, { server: "shephrd", tool: "ask", arguments: { text: marker } }, "mcp__shephrd__ask");
+    engine.tool(prompted.agentId, `mcp-${prompted.agentId}`, { server: "sheprd", tool: "ask", arguments: { text: marker } }, "mcp__sheprd__ask");
     engine.emit(prompted.agentId, { _tag: "QuestionAsked", questionId: `q-${prompted.agentId}`, holder: { _tag: "owner" }, deliveryId: `qd-${prompted.agentId}`, text: marker }, { caller: { _tag: "agent", agentId: prompted.agentId } });
     engine.finish(prompted.agentId, `mcp-${prompted.agentId}`, "completed", "{\"questionId\":\"q\"}");
     engine.turnEnded(prompted.agentId);
@@ -92,7 +92,7 @@ describe("sandbox-mcp (PB-A3) never passes without the agent's own authenticated
 
   it("fails when each model only claims, in prose, that the call succeeded", async () => {
     const engine = make();
-    engine.script = { onPrompt: (e, p) => { said(e, p.agentId, `I called the Shephrd ask tool with ${markerIn(p.text)} and it succeeded.`); e.turnEnded(p.agentId); } };
+    engine.script = { onPrompt: (e, p) => { said(e, p.agentId, `I called the Sheprd ask tool with ${markerIn(p.text)} and it succeeded.`); e.turnEnded(p.agentId); } };
     const run = await runProbe(engine, "sandbox-mcp");
     expect(run.passed).toBe(false);
     expect(run.reason).toContain("not attempted");
@@ -115,7 +115,7 @@ describe("sandbox-mcp (PB-A3) never passes without the agent's own authenticated
     const engine = make();
     engine.script = { onPrompt: (e, p) => {
       const marker = markerIn(p.text);
-      e.tool(p.agentId, `sh-${p.agentId}`, { command: `shephrd ask --input '{"text":"${marker}"}'` });
+      e.tool(p.agentId, `sh-${p.agentId}`, { command: `sheprd ask --input '{"text":"${marker}"}'` });
       e.emit(p.agentId, { _tag: "QuestionAsked", questionId: `q-${p.agentId}`, holder: { _tag: "owner" }, deliveryId: `qd-${p.agentId}`, text: marker }, { caller: { _tag: "agent", agentId: p.agentId } });
       e.finish(p.agentId, `sh-${p.agentId}`, "completed", "ok");
       e.turnEnded(p.agentId);
@@ -127,10 +127,10 @@ describe("sandbox-mcp (PB-A3) never passes without the agent's own authenticated
 
 describe("removed-variables (SEC-PB-5, SEC-PB-8) passes only on the exact command's own 403 refusal", () => {
   const refused = (engine: FakeEngine, input: (command: string) => unknown, options: ReadonlyArray<Option> = [ALWAYS, ONCE, REJECT]) => shell((_e, p) => {
-    if (!p.text.includes("env -u SHEPHRD_SOCKET")) return undefined;
+    if (!p.text.includes("env -u SHEPRD_SOCKET")) return undefined;
     return { input: input(probeCommands(engine.state).removedVariables), options,
       result: (optionId) => optionId === ONCE.id
-        ? { status: "failed", output: "shephrd: the engine refused this identity (HTTP 403)\n\nLCP_EXIT=1\n" }
+        ? { status: "failed", output: "sheprd: the engine refused this identity (HTTP 403)\n\nLCP_EXIT=1\n" }
         : { status: "failed", output: "The user rejected this tool call." } };
   });
 
@@ -159,13 +159,13 @@ describe("removed-variables (SEC-PB-5, SEC-PB-8) passes only on the exact comman
 
   it("fails when the agent only reports the refusal in prose", async () => {
     const engine = make();
-    engine.script = { onPrompt: (e, p) => { said(e, p.agentId, "shephrd: the engine refused this identity (HTTP 403)\nLCP_EXIT=1"); e.turnEnded(p.agentId); } };
+    engine.script = { onPrompt: (e, p) => { said(e, p.agentId, "sheprd: the engine refused this identity (HTTP 403)\nLCP_EXIT=1"); e.turnEnded(p.agentId); } };
     const run = await runProbe(engine, "removed-variables");
     expect(run.passed).toBe(false);
     expect(run.reason).toContain("not attempted");
   });
 
-  it("fails when shephrd acts as the owner (exit 0)", async () => {
+  it("fails when sheprd acts as the owner (exit 0)", async () => {
     const engine = make();
     engine.script = shell((e, p) => ({ input: { command: probeCommands(e.state).removedVariables }, options: [ONCE, REJECT],
       result: () => ({ status: "completed", output: "{\"accounts\":[]}\n\nLCP_EXIT=0\n" }) }));
@@ -407,7 +407,7 @@ describe("token-scan (PB-A4, SEC-PB-1) needs real evidence for each harness and 
   it("fails on a planted agent token in a session file, and neither the step nor its log line prints the token", async () => {
     const engine = make();
     const token = engine.tokenOf.get(WORKER)!;
-    engine.session("codex", { type: "response_item", payload: { role: "assistant", content: [{ type: "output_text", text: `env: SHEPHRD_TOKEN=${token}` }] } });
+    engine.session("codex", { type: "response_item", payload: { role: "assistant", content: [{ type: "output_text", text: `env: SHEPRD_TOKEN=${token}` }] } });
     const run = await runProbe(engine, "token-scan");
     expect(run.passed).toBe(false);
     expect(run.reason).toContain(engine.sessionFile("codex"));
@@ -431,7 +431,7 @@ describe("token-scan (PB-A4, SEC-PB-1) needs real evidence for each harness and 
     // The worker's process is gone, so its token was never read. Its session
     // file holds that token, yet only the lead's token is searched for.
     const engine = make({ agents: [LEAD] });
-    engine.session("codex", { type: "response_item", payload: { role: "assistant", content: [{ type: "output_text", text: "SHEPHRD_TOKEN=shp_a_workertokenneverseenbytheprobe0" }] } });
+    engine.session("codex", { type: "response_item", payload: { role: "assistant", content: [{ type: "output_text", text: "SHEPRD_TOKEN=shp_a_workertokenneverseenbytheprobe0" }] } });
     const run = await runProbe(engine, "token-scan");
     expect(run.passed).toBe(false);
   });

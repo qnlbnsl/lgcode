@@ -1,26 +1,26 @@
-id = "shephrd"
-name = "Shephrd"
+id = "sheprd"
+name = "Sheprd"
 version = "0.0.1"
 min_herdr_version = "0.8.2"
 platforms = ["linux"]
 
 [[startup]]
-command = ["./bin/shephrd", "serve", "--detach"]
+command = ["./bin/sheprd", "serve", "--detach"]
 
 [[actions]]
 id = "serve"
-title = "Start Shephrd"
+title = "Start Sheprd"
 contexts = ["global"]
-command = ["./bin/shephrd", "serve", "--detach"]
+command = ["./bin/sheprd", "serve", "--detach"]
 
 [[actions]]
 id = "view"
-title = "View Shephrd threads"
+title = "View Sheprd threads"
 contexts = ["global"]
-command = ["./bin/shephrd", "view", "--open-pane"]
+command = ["./bin/sheprd", "view", "--open-pane"]
 
 [[panes]]
 id = "view"
-title = "Shephrd threads"
+title = "Sheprd threads"
 placement = "split"
-command = ["./bin/shephrd", "view"]
+command = ["./bin/sheprd", "view"]

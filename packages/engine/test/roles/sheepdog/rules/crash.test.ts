@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { RolesActionRecord } from "@shephrd/contracts";
+import { RolesActionRecord } from "@sheprd/contracts";
 import * as Schema from "effect/Schema";
 import { evaluateCrash } from "../../../../src/roles/sheepdog/rules/crash.ts";
 import { registerRebuildCheck } from "../../../support/rebuildCheck.ts";

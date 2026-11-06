@@ -1,5 +1,5 @@
 import type { CacheTarget } from "./cache.ts";
-import type { Caller } from "@shephrd/contracts";
+import type { Caller } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import * as Option from "effect/Option";
@@ -31,7 +31,7 @@ export const subscribeService = (service: string, after: number, lists: EngineLi
   const recovery = yield* Effect.serviceOption(Restart);
   if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
   const input = yield* (yield* CommandHandler).input({ _tag: "service", service });
-  return lists.reads.subscribe!({ ...input, runtime: { ...input.runtime, lists } }, { after }) as Stream.Stream<import("@shephrd/contracts").EventEnvelope, unknown, any>;
+  return lists.reads.subscribe!({ ...input, runtime: { ...input.runtime, lists } }, { after }) as Stream.Stream<import("@sheprd/contracts").EventEnvelope, unknown, any>;
 }));
 
 // This is an internal composite of the existing compact and board.flush

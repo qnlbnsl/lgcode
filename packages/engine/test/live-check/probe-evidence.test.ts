@@ -75,8 +75,8 @@ it('never repeats malformed session content in a parser error', () => {
 
 it('matches the recorded adapter MCP argument shape and rejects the same payload aimed at another server', async () => {
   const { mcpAskInput } = await import('../../scripts/live/probeEvidence.ts');
-  expect(mcpAskInput(JSON.stringify({ server: 'shephrd', tool: 'ask', arguments: { text: 'marker' } }), 'mcp.shephrd.ask', 'marker')).toBe(true);
-  expect(mcpAskInput(JSON.stringify({ text: 'marker' }), 'mcp__shephrd__ask', 'marker')).toBe(true);
+  expect(mcpAskInput(JSON.stringify({ server: 'sheprd', tool: 'ask', arguments: { text: 'marker' } }), 'mcp.sheprd.ask', 'marker')).toBe(true);
+  expect(mcpAskInput(JSON.stringify({ text: 'marker' }), 'mcp__sheprd__ask', 'marker')).toBe(true);
   expect(mcpAskInput(JSON.stringify({ server: 'other', tool: 'ask', arguments: { text: 'marker' } }), 'mcp.other.ask', 'marker')).toBe(false);
   expect(mcpAskInput(JSON.stringify({ text: 'marker' }), 'Write file', 'marker')).toBe(false);
 });

@@ -1,5 +1,5 @@
-import { toolText } from "@shephrd/contracts/thread"
-import type { Event } from "@shephrd/contracts"
+import { toolText } from "@sheprd/contracts/thread"
+import type { Event } from "@sheprd/contracts"
 import { DataText } from "./text.tsx"
 
 export type ContentEvent = Extract<Event, { _tag: "ThreadItem" }>

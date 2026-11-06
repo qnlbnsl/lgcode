@@ -1,5 +1,5 @@
-import type { RolesAction, RolesActionRecord, EventEnvelope } from "@shephrd/contracts";
-import type { BoardView } from "@shephrd/contracts/board/view";
+import type { RolesAction, RolesActionRecord, EventEnvelope } from "@sheprd/contracts";
+import type { BoardView } from "@sheprd/contracts/board/view";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import type { Snapshot } from "../../commands/internal.ts";

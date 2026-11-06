@@ -1,5 +1,5 @@
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
-import { Event as EventSchema } from "@shephrd/contracts";
+import { Event as EventSchema } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { expect, it, vi } from "vitest";

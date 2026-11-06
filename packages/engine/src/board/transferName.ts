@@ -1,5 +1,5 @@
-import type { BoardAddressee } from "@shephrd/contracts/board/ids";
-import type { BoardChannelView } from "@shephrd/contracts/board/view";
+import type { BoardAddressee } from "@sheprd/contracts/board/ids";
+import type { BoardChannelView } from "@sheprd/contracts/board/view";
 import type { Snapshot } from "../commands/internal.ts";
 import { boardView, sameAuthor } from "./wake.ts";
 

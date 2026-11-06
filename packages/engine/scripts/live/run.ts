@@ -1,8 +1,8 @@
 import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { connect, type Client } from "@shephrd/client";
-import type { HarnessSettings } from "@shephrd/contracts";
+import { connect, type Client } from "@sheprd/client";
+import type { HarnessSettings } from "@sheprd/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -152,7 +152,7 @@ export const realDeps = (environment: Readonly<Record<string, string | undefined
   write, environment,
   hook: realStartupHookDeps(environment),
   startService: () => startLiveService(environment),
-  connectOwner: (state) => connect({ environment: { SHEPHRD_HOME: state }, attempts: 1 }),
+  connectOwner: (state) => connect({ environment: { SHEPRD_HOME: state }, attempts: 1 }),
   harnessSettings: async () => (await Effect.runPromise(resolveHarnessDefaults({
     binDirectory: fileURLToPath(new URL("../../node_modules/.bin", import.meta.url)), path: environment.PATH ?? "",
   }).pipe(Effect.provide(NodeServices.layer)))).harnesses,

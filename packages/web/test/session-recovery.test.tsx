@@ -6,7 +6,7 @@ import { afterEach, expect, it, vi } from "vitest"
 import { App } from "../src/index.ts"
 
 const browser = vi.hoisted(() => ({ client: undefined as unknown, connect: vi.fn() }))
-vi.mock("@shephrd/client/browser", async () => {
+vi.mock("@sheprd/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: (...args: unknown[]) => { browser.connect(...args); return Effect.succeed(browser.client) } }
 })

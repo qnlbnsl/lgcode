@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@shephrd/contracts";
+import type { EventEnvelope } from "@sheprd/contracts";
 import { expect, it } from "vitest";
 import { apply, emptyViews } from "../../src/views/apply.ts";
 import { holderAbove, mayActForHolder } from "../../src/routing/holders.ts";

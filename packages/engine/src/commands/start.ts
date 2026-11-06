@@ -1,6 +1,6 @@
-import { safeStartFailure, type StartFailure } from "@shephrd/contracts/startFailure";
+import { safeStartFailure, type StartFailure } from "@sheprd/contracts/startFailure";
 import { randomUUID } from "node:crypto";
-import { AgentId, DeliveryId, PermissionLevel, type Event } from "@shephrd/contracts";
+import { AgentId, DeliveryId, PermissionLevel, type Event } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";

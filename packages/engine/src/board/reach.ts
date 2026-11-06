@@ -1,4 +1,4 @@
-import type { BoardView } from "@shephrd/contracts/board/view";
+import type { BoardView } from "@sheprd/contracts/board/view";
 import type { ReachInput } from "../routing/reach.ts";
 import { canCarryCompletion, canCarryPost, own } from "./access.ts";
 

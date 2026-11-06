@@ -15,7 +15,7 @@ import { deliveryRow, eventually, snapshot } from "../support/routingRig.ts";
 let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
-  vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
+  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
   vi.stubEnv("HOME", rig.home);
   vi.stubEnv("CODEX_HOME", join(rig.home, ".codex"));
 });
