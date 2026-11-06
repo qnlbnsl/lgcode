@@ -8251,3 +8251,148 @@ complete core run into a failure.
 The owner's service is outside the probe's startup and cleanup paths.
 Plugin integration tests cover both the absent case and a real private hook
 launch, and the scripted journey covers an absent plugin through recording.
+
+## 494. The first app mock obscured project and team navigation
+
+Found: 2026-11-05, during the owner's app review.
+State: changed in the mock; awaiting owner review.
+
+What happened: The owner could not tell what Team Board, Threads, Work, and
+Files meant, or how to switch teams. The project dropdown also used much
+smaller type than the project identity.
+What changed: The first revision added a project overview and dropdown,
+which the owner also found confusing. The current revision replaces those
+with one stable project tree containing the project lead, teams, and agents.
+Projects remains a separate list page. Team views are Conversation, Tasks,
+and Changes. Each message names its sender, role, and coding tool.
+Why it matters: The owner can evaluate the hierarchy with distinct sample
+teams. This remains an isolated browser mock.
+
+## 495. The app mock feels generic despite its custom palette
+
+Found: 2026-11-05, during the same review.
+State: redesigned in the mock; awaiting owner review.
+
+What happened: The owner said the interface resembles other interfaces made
+with AI and asked whether the UI skill caused it. The design-forge skill
+permits one style with different palettes and directs token-only iteration.
+The agent also chose conventional sidebar, conversation, context-panel,
+system-type, and rounded-border patterns.
+What changed: After the owner explicitly requested T3 Code and Cursor as
+references, the mock was rebuilt with compact tree navigation, a primary
+conversation column, and tasks and changes that open separately. Repeated
+summary cards, the context column, and the overview detour were removed.
+Field and Dusk remain the approved palette pair. No skill was edited.
+Why it matters: Mechanical checks and palette selection do not establish
+a distinctive visual identity or a clear workflow.
+
+## 496. The draft new-folder form relied on an invalid browser pattern
+
+Found: 2026-11-05, while checking the Projects mock.
+State: fixed in the mock.
+
+What happened: The draft folder-name pattern was invalid under the browser's
+regular-expression rules. A sample folder name containing `../` could
+therefore reach the mock's in-memory project list. No disk operation occurs
+in this prototype.
+What changed: The submit handler checks the folder name explicitly before
+adding an example repository. The browser probe exercises duplicate names
+and path traversal.
+Why it matters: The mock should demonstrate a project folder inside its
+workspace. Production will also require server-side path validation.
+
+## 497. The redesigned mock lost context and hid pending decisions
+
+Found: 2026-11-05, during the requested design critique.
+State: fixed in the mock; visual refinement awaiting owner review.
+
+What happened: Wide layouts separated the heading from the reading column.
+The pending decision began below the conversation viewport. Switching
+conversations discarded drafts and reading position. Similar chevrons had
+different behavior, and collapsing the current project removed its location
+indicator. Agent activity did not connect clearly to assignments or reviews.
+The mobile menu and Send controls were too small.
+What changed: One frame aligns the main surfaces. A persistent attention
+entry jumps to the actual decision. Each conversation keeps its draft and
+reading position, and teams remember their last tab. Disclosure and
+navigation use separate controls. Task details connect assignment, handoff,
+review, changed files, and the owning agent. Mobile navigation manages focus,
+and its controls have larger targets. Field and Dusk remain unchanged.
+Why it matters: The owner can follow work and move between conversations
+without losing their place. The durable browser probe passed 58 assertions
+with no JavaScript errors. It covers both modes at 390, 768, 1440, and 2560
+pixels. This remains an isolated prototype with fictional work.
+
+## 498. The refined mock did not express the requested project workflow
+
+Found: 2026-11-05, during the next owner review and independent critique.
+State: changed in the mock; awaiting owner review.
+
+What happened: The branch-looking control could rebind a project to another
+repository. Project entry opened a team or the last arbitrary view. There
+was no project board or sprint model. Sage did not surface Rowan's request,
+and attention opened the team thread instead of Rowan's question. The
+chat received only 465 of 900 desktop pixels and 408 of 844 phone pixels.
+What changed: The owner clarified repository → projects → one lead per
+project → teams. The mock now follows that structure. Repository pages
+list projects. Projects open their lead conversation and have a sprint
+board. Task and sprint views connect owners, dependencies, requests, and
+completion evidence. Branch selection only changes inspected code context.
+Requests open the requesting agent's exact question and resolve everywhere.
+The compact chat has 687 of 900 pixels on desktop and 626 of 844 on phone.
+Why it matters: The owner can follow a project's plan and steer its lead
+without reconstructing progress across every conversation. The final
+browser suite passed 72 assertions with no JavaScript errors.
+
+## 499. The active project's metadata missed the text contrast target
+
+Found: 2026-11-05, during the same browser critique.
+State: fixed in the revised mock.
+
+What happened: Muted small text over the selected background measured 4.4:1
+in Field, below the 4.5:1 design contract.
+What changed: The previous blended project-count treatment was removed.
+Selected project, board, team, and workspace metadata use the existing
+primary text token. Browser measurements are 9.17:1 in Field and 8.68:1 in
+Dusk for those selected labels. The approved palette blocks are unchanged.
+Why it matters: Selected navigation metadata stays readable. Computed
+contrast was checked in the browser, because the command-line detector's
+regex fallback cannot evaluate it.
+
+## 500. Resolved requests still looked urgent inside their task
+
+Found: 2026-11-05, during cold verification of the repository/project mock.
+State: fixed in the mock.
+
+What happened: Answering Rowan cleared Sage and the board, but opening
+SH-17 still showed the amber request link while the task said Done.
+What changed: Task details render a recorded-direction message for a
+resolved request. A durable browser regression first failed on the stale
+urgent link and then passed after the fix.
+Why it matters: One answered request must have the same meaning everywhere.
+
+## 501. A completed sprint could accept unfinished scope while remaining Done
+
+Found: 2026-11-05, during the same cold verification.
+State: fixed in the mock.
+
+What happened: Adding a queued task to SP-01 left it in Done with 3/4 tasks
+and a verified-and-merged label.
+What changed: Completed sprint details have no Add task action. The task
+form disables completed sprints, and submission rejects them. The browser
+regression covers both controls.
+Why it matters: Completion evidence applies to the work that was verified.
+New scope must belong to an unfinished sprint.
+
+## 502. Team replies and task-change links could use the wrong agent context
+
+Found: 2026-11-05, while verifying multiple teams in the mock.
+State: fixed in the mock.
+
+What happened: A team sample reply used a synthetic recipient with no
+initials. A task's View changes action could fall back to the first team.
+What changed: Team replies identify the responding lead. Task links carry
+the actual owning team. Workspace app now has App shell and Review teams,
+and the browser probe follows SH-16 into Review's Changes view.
+Why it matters: The named sender and team must match the assignment when
+several teams share one project.

@@ -300,6 +300,86 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   phone. The code is T3 Code's own, copied with its MIT licence into
   [third_party/t3code/](../third_party/t3code/README.md).
 
+## 7. Repository, project, and team navigation
+
+- **A workspace folder chosen at installation** (agreed, 2026-11-05).
+  Installation asks which folder contains the owner's repositories.
+  Repository setup stays on the host. The mock uses known sample paths.
+- **Repositories contain projects** (agreed, 2026-11-05; mocked in
+  `design/workbench.html`). Repositories are the top level of navigation.
+  Each repository has a page listing its projects and an Add Project
+  action. Multiple projects can work within the same repository.
+- **Exactly one lead per project** (agreed, 2026-11-05; mocked). Selecting
+  a project always opens its lead conversation. Each project has its own
+  goal, sprint board, teams, and messages. The owner's clarification
+  replaces the earlier ambiguous request for multiple leads within a
+  project. Multiple projects have separate leads.
+- **Start a project through its lead** (agreed, 2026-11-05; mocked).
+  Add Project creates a named project under a known repository and opens
+  its lead conversation. A new project has no sprints or teams until its
+  plan is shaped. Existing projects never reopen repository setup.
+- **A project board of sprints** (agreed, 2026-11-05; mocked). The Kanban
+  board shows Planned, In progress, Review, and Done. A sprint contains
+  the plan's tasks and shows ownership, current phase, dependencies,
+  blockers, and completion evidence. Team task lists and sprint details
+  read the same assignments. The owner referenced Ananke's Cursor
+  build-order roadmap. No implementation code was copied.
+- **Completion reflects evidence** (mock behavior, 2026-11-05). A completed
+  sprint records verification and merge evidence. Release status is
+  separate. Completed sprints do not accept new tasks. Moving a card is
+  not offered as a substitute for verification or merging.
+- **Teams and individual conversations** (agreed, 2026-11-05; mocked).
+  Teams appear under their project. Each team has Chat, Tasks, and Changes.
+  Each agent also has a direct conversation. Disclosure controls expand
+  the tree independently of navigation. Senders identify their coding tool.
+- **Conversation continuity** (agreed, 2026-11-05; mocked). Each conversation
+  keeps its draft and reading position while navigating. A team remembers
+  its last view. Messages and these preferences remain in memory until
+  refresh. Sample replies can be stopped and are explicitly labelled.
+- **Branches and workspaces in the context menu** (agreed, 2026-11-05;
+  mocked). The menu lists the selected repository's branches, workspace
+  paths, ownership, and activity. The mock treats selection as inspection:
+  it changes the viewed code context and Changes view. It never changes
+  the repository or redirects an agent's assigned workspace.
+- **Project leads surface team requests** (agreed, 2026-11-05; mocked).
+  Sage can point to Rowan's design question. The project and requesting
+  agent are highlighted, and the affected sprint shows its dependency.
+  Selecting the request opens Rowan's conversation at the exact question.
+  Answering clears every indicator. Viewing alone does not resolve it.
+- **Compact chat composition** (agreed, 2026-11-05; mocked). The header
+  combines identity and navigation. User messages have a restrained
+  treatment. Agent replies use readable text with grouped tool details.
+  The composer grows when needed and retains its recipient label.
+
+## 8. The build loop
+
+The full design is in
+[specs/2026-11-05-build-loop-design.md](specs/2026-11-05-build-loop-design.md).
+
+- **A default workflow as a parsable list** (agreed, 2026-11-05). The eight
+  phases become a list of steps that Sheprd reads. Sheprd looks in the
+  repository's `.sheprd` first, then `~/.sheprd`, then its built-in copy. The
+  default install places a copy in `~/.sheprd`.
+- **`.sheprd` is read-only to agents** (agreed, 2026-11-05). Agents can read
+  it and cannot edit it.
+- **Skill files for any agent** (agreed, 2026-11-05). Sheprd ships skill files
+  that let any agent work with it.
+- **A project setup agent** (agreed, 2026-11-05). It tells the owner what the
+  project is made of, asks for the general direction, talks through testing,
+  and produces a local `.sheprd` folder with a config file. How that reaches a
+  folder agents cannot edit is open.
+- **Optional testing** (agreed, 2026-11-05). The owner can turn tests off, and
+  can also turn agent review off. They can turn tests on later through their
+  main agent.
+- **Scored stops on stuck statements** (agreed, 2026-11-05). A script scores
+  review findings by the statement they come from. A stuck statement pings the
+  owner, who keeps, changes or drops it.
+- **A limit on review rounds** (agreed, 2026-11-05). Past round 3, another
+  review runs only for blockers and majors. Rounds 5 and 6 need the owner's
+  approval, and 6 is the limit.
+- **Autonomous fix sprints** (agreed, 2026-11-05). A fix that users would not
+  notice merges and moves on without the owner.
+
 ## Open questions
 
 - Which licence should Sheprd use?

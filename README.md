@@ -56,8 +56,12 @@ These are the intended pieces. Each one is tracked in more detail in
   app, and a future mobile app all use. Nothing a client can do is reserved
   for the terminal.
 
-Sheprd ships a default workflow, and people can override it with their own
-team definitions and instructions.
+Sheprd comes with one default workflow, the
+[build loop](docs/specs/2026-11-05-build-loop-design.md). Anyone who wants a
+different workflow overrides it in `~/.sheprd`, or for one repository in that
+repository's `.sheprd`. Particular team shapes (which teams exist, what each
+role is told to do) are not part of Sheprd. They live elsewhere and are loaded
+into it.
 
 ## Start Sheprd without Herdr
 

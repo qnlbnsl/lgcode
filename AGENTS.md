@@ -86,12 +86,19 @@ ACP agent and an interactive agent can sit on the same team.
 5. **The client API is the product's surface.** Anything the owner can do
    from the terminal must also be possible through the API, so a web or
    mobile client is never a second-class citizen.
-6. **Ship a default workflow that people can override.** Sheprd provides
-   roles, the board, the API, and a default workflow. People can supply
-   their own team definitions and workflow instructions.
+6. **Only the default workflow belongs here.** Sheprd provides roles, the
+   board, the API, and one default workflow, the
+   [build loop](docs/specs/2026-11-05-build-loop-design.md). Anyone who wants a
+   different workflow overrides it in `~/.sheprd`, or for one repository in
+   that repository's `.sheprd`. The definitions of particular teams live
+   outside this repository.
 7. **Agents have full authority inside a team.** They commit, push and merge
-   on their team's branches and worktrees without asking. Moving finished work
-   into the base branch is done by a pull request, and the owner approves it.
+   on their team's branches and worktrees without asking, using the git
+   commands Sheprd allows them. Moving finished work into the base branch is
+   done by a pull request, and the owner approves it. There is one exception,
+   decided by the owner on 2026-11-05: a build loop fix sprint that users would
+   not notice merges on its own after a full test run passes. Anything users
+   would notice keeps the owner's approval.
 
 ## Writing style for documents
 
