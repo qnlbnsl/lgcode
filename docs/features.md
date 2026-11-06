@@ -28,6 +28,11 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 
 ## 1. The foundry: roles and their lifecycle
 
+- **Repeat the roles stall check without the cache wait** (agreed,
+  2026-11-05). The owner can run `pnpm live-check:roles --skip-timed-flush`
+  to repeat the team collection and first stall without waiting for the
+  cache timer. The report marks the timed flush as skipped. The run remains
+  incomplete and exits with code 1, even when every remaining step passes.
 - **Shephrd tools need no harness approval** (agreed, 2026-11-05). An agent
   can call Shephrd's own Model Context Protocol server in every permission
   mode on Claude, Codex, Gemini, and Cursor. The engine authenticates every

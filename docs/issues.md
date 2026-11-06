@@ -8169,7 +8169,7 @@ stops, and loads the runner, then inspects both the ACP server identity and
 the replacement process's native allow rule. The first brief's single extra
 live prompt was already used, so that follow-up left live verification open.
 
-The owner then authorized one more real reload proof. On commit `6bea2c4`,
+The manager then sent one more real reload proof assignment. On commit `6bea2c4`,
 a Cursor Auto agent in ask mode completed `roles.orient` and `ask`, ended
 its turn, stopped, and resumed the same session. The second prompt completed
 both calls and ended its turn. Neither turn requested permission.
@@ -8180,3 +8180,32 @@ The second orientation, question, and turn end are at sequences 89, 93,
 and 98. The session and provider identity stayed the same.
 The detailed evidence and remaining limits are recorded in `cursor-proof.md`
 beside the assigned brief. No application fix was needed for this run.
+
+## 491. The roles live check rejected the board's expected no-answer disposition
+
+Found: 2026-11-05, after the owner's roles check at `5dd41b7`.
+State: fixed on `area/shephrd-tools`; the owner must repeat the real stall check.
+
+The wave and timed flush passed in `run-TnMigw`. The first-stall check
+rejected every `board.AddresseeResolved` event, including `no-answer`.
+The worker ended its initial turn at sequence 280. The board sent its
+reminder at 281. The worker ended the reminder turn at 305, and the board
+recorded `no-answer` at 306. The check stopped before awaiting a stall.
+
+The product correctly leaves that addressee eligible in `stall.ts`.
+The board keeps the all-mode post open after `no-answer`. The stall view
+restarts its timer at each eligible worker turn end, so sequence 305 is
+the origin in this case. Sequence 280 would start the timer too early.
+
+The check now requires the matching reminder, its accepted delivery, the
+reminder turn end and the no-answer disposition. It still rejects an early
+reply or closure. The first nudge must use the latest worker turn end
+before the planned notice and wait the unchanged production interval.
+Regression tests cover that sequence, later idle turns, missing reminder
+evidence, early replies, early or stale timers and duplicate stall actions.
+
+The owner can use `--skip-timed-flush` to avoid repeating the cache wait.
+That step is reported as skipped. A run whose other steps pass reports
+`INCOMPLETE` and exits with code 1. A scripted client regression exercises
+the remaining journey, exports and cleanup without starting real agents.
+No real roles run was performed for this fix.

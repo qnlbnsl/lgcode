@@ -416,3 +416,16 @@ interval in addition to the cache wait. The owner or manager then
 rewrites the external skill from this recipe. Keep the old workflow intact
 until that switch, and avoid running both delivery systems on the same
 agents.
+
+The stall check first observes the board's reminder and the worker's
+unanswered reminder turn. The resulting `no-answer` disposition leaves the
+obligation open. The stall interval starts at the worker's latest turn end,
+including that reminder turn. The report records those sequences and the
+elapsed time before the first nudge.
+
+To repeat the stall check after a successful timed flush, run
+`pnpm live-check:roles --skip-timed-flush`. The collection, first stall,
+exports and shutdown still run. The report marks `timed-flush` as `SKIP`
+and reports `INCOMPLETE` when the remaining steps pass. The process exits
+with code 1. A run with the timed flush skipped does not satisfy the full
+real-account check.
