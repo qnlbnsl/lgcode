@@ -115,8 +115,8 @@ The mock makes this part of the website, so it no longer waits until after it.
 - [ ] Add a worker mode: the computer chooses Master or Worker, and a worker joins a
       master by its HTTPS address and a pairing code.
 - [ ] Pair with an expiring code, and confirm on both computers. The owner approved
-      a pairing code for machines on 2026-11-06. Web login stays one password. Which
-      side generates the code is the owner's next decision.
+      a pairing code for machines on 2026-11-06, and chose that the website generates
+      it. Web login stays one password.
 - [ ] Add `sheprd connect <address>`, which starts the pairing from the other computer.
 - [ ] Secure the link with a secure WebSocket and self-signed certificates that each
       side trusts after pairing, as the owner described on 2026-11-06.
