@@ -8209,3 +8209,24 @@ That step is reported as skipped. A run whose other steps pass reports
 `INCOMPLETE` and exits with code 1. A scripted client regression exercises
 the remaining journey, exports and cleanup without starting real agents.
 No real roles run was performed for this fix.
+
+## 492. The roles worker prompt did not cover the board's stall reminder
+
+Found: 2026-11-05, during the owner's roles check at `bac865a`.
+State: fixed on `area/shephrd-tools`; the owner must repeat the real stall check.
+
+The Luna worker left the initial obligation unanswered and ended its turn
+at sequence 272. The board sent its reminder at 273. That reminder asks
+for a reply even when the recipient has nothing to add. The worker replied
+at 281, and the post closed as answered at 283 in `run-AMeu00`.
+The product behaved correctly, and the check correctly rejected the early
+reply. The worker's prompt had not explicitly covered the reminder turn.
+
+The prompt now identifies the reminder about `roles-live-first-stall` as
+expected. It distinguishes that reminder from the sheepdog's notice.
+The worker must leave the obligation unanswered, must not call `board.post`,
+and must end the reminder turn with the word waiting. It may reply only
+after a notice authored by `roles.sheepdog`. A prompt regression checks
+these instructions and their inclusion in both worker start inputs.
+The check's assertions and the product code are unchanged.
+No real roles run was performed for this prompt fix.
