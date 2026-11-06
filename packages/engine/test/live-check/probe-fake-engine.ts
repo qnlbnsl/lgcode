@@ -12,8 +12,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { appendFileSync, mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import type { Client } from "@shephrd/client";
-import type { EventEnvelope } from "@shephrd/contracts";
+import type { Client } from "@sheprd/client";
+import type { EventEnvelope } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 
@@ -113,7 +113,7 @@ export const fakeEngine = (setup: { codexCore?: boolean; shellListing?: boolean;
 
   const folderOf = (agentId: string) => agentId === LEAD ? work : join(work, "project");
   const spawnAgent = (agentId: string, token: string) => {
-    const env: Record<string, string> = { SHEPHRD_SOCKET: join(state, "engine.sock"), SHEPHRD_TOKEN: token, PATH: process.env.PATH ?? "" };
+    const env: Record<string, string> = { SHEPRD_SOCKET: join(state, "engine.sock"), SHEPRD_TOKEN: token, PATH: process.env.PATH ?? "" };
     if (agentId === WORKER && setup.codexCore !== false) env.CODEX_CONFIG = JSON.stringify({ shell_environment_policy: { inherit: "core" } });
     const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { cwd: folderOf(agentId), env, stdio: "ignore" });
     children.set(agentId, child);
@@ -146,7 +146,7 @@ export const fakeEngine = (setup: { codexCore?: boolean; shellListing?: boolean;
       // requested by the exact command, before its explicit env -u. Preserve
       // caller-supplied listings so adversarial names/empty evidence survive.
       if (setup.shellListing !== false && input.includes("LCP_ENV_BEGIN") && !output.includes("LCP_ENV_BEGIN")) {
-        output = `LCP_ENV_BEGIN\n${agentId === WORKER && setup.codexCore !== false ? "PATH" : "PATH\nSHEPHRD_SOCKET\nSHEPHRD_TOKEN"}\nLCP_ENV_END\n${output}`;
+        output = `LCP_ENV_BEGIN\n${agentId === WORKER && setup.codexCore !== false ? "PATH" : "PATH\nSHEPRD_SOCKET\nSHEPRD_TOKEN"}\nLCP_ENV_END\n${output}`;
       }
       emit(agentId, { _tag: "ThreadItem", content: { _tag: "tool-call", callId, title: "", status, output } });
     },

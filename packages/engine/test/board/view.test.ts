@@ -1,4 +1,4 @@
-import type { Event, EventEnvelope } from "@shephrd/contracts";
+import type { Event, EventEnvelope } from "@sheprd/contracts";
 import { expect, it } from "vitest";
 
 import { apply, emptyViews } from "../../src/views/apply.ts";

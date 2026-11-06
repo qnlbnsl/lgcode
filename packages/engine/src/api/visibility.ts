@@ -1,4 +1,4 @@
-import type { Caller, EventEnvelope } from "@shephrd/contracts";
+import type { Caller, EventEnvelope } from "@sheprd/contracts";
 import type { Snapshot } from "../commands/internal.ts";
 import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { guardPiece } from "../pieces/guardPiece.ts";

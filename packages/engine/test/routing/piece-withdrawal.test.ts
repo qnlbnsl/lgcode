@@ -1,6 +1,6 @@
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import * as Effect from "effect/Effect";
-import { Event as EventSchema } from "@shephrd/contracts";
+import { Event as EventSchema } from "@sheprd/contracts";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
 import { expect, it } from "vitest";

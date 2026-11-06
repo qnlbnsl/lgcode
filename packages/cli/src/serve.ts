@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { request } from "node:http";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { stateFolder } from "@shephrd/engine/api/stateFolder";
+import { stateFolder } from "@sheprd/engine/api/stateFolder";
 import * as Effect from "effect/Effect";
 
 const answers = (socketPath: string): Promise<boolean> => new Promise((resolve) => {
@@ -29,7 +29,7 @@ export const serveDetach = (options: { readonly environment: Record<string, stri
   let failed = false;
   let ownsLock = false;
   child.on("message", (message: unknown) => {
-    if (typeof message === "object" && message !== null && "_tag" in message && message._tag === "ShephrdLockAcquired") ownsLock = true;
+    if (typeof message === "object" && message !== null && "_tag" in message && message._tag === "SheprdLockAcquired") ownsLock = true;
   });
   child.once("error", () => { failed = true; });
   child.once("exit", (code) => { exited = true; exitCode = code; });

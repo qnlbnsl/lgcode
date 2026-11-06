@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import type { EventEnvelope, HarnessSettings } from "@shephrd/contracts";
+import type { EventEnvelope, HarnessSettings } from "@sheprd/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -27,7 +27,7 @@ export const fakeAgentPath = fileURLToPath(new URL("../../../testing/src/fakeAge
 export interface ServiceRoot {
   readonly root: string;
   readonly home: string;
-  // SHEPHRD_HOME. Not created here: the service creates it (criterion 7.1).
+  // SHEPRD_HOME. Not created here: the service creates it (criterion 7.1).
   readonly state: string;
   readonly socket: string;
   readonly work: string;
@@ -65,7 +65,7 @@ const services: Array<ServiceProcess> = [];
 export const serviceEnvironment = (root: ServiceRoot): Record<string, string> => ({
   PATH: process.env.PATH ?? "/usr/bin:/bin",
   HOME: root.home,
-  SHEPHRD_HOME: root.state,
+  SHEPRD_HOME: root.state,
   XDG_STATE_HOME: join(root.root, "xdg"),
   CODEX_HOME: join(root.root, "codex"),
   TMPDIR: "/tmp",
@@ -260,8 +260,8 @@ export const startFakeAgent = (root: ServiceRoot, owner: Client, caller: Client,
 export const agentToken = (agent: StartedAgent, notPid?: number) =>
   waitFor("the fake agent's environment", () => {
     const echo = peekEcho(agent.echo);
-    if (echo === undefined || echo.pid === notPid || echo.env.SHEPHRD_TOKEN === undefined) return undefined;
-    return { token: echo.env.SHEPHRD_TOKEN, pid: echo.pid, echo };
+    if (echo === undefined || echo.pid === notPid || echo.env.SHEPRD_TOKEN === undefined) return undefined;
+    return { token: echo.env.SHEPRD_TOKEN, pid: echo.pid, echo };
   });
 
 // Waits for the agent's first turn to end, through the owner's subscription.

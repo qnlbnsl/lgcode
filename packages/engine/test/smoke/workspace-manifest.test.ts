@@ -268,7 +268,7 @@ describe("packages/engine/package.json adapter pins (criterion 1.7, decisions ro
 });
 
 describe("herdr-plugin.toml (task 1f, criterion 1.4's input)", () => {
-  const text = readText("herdr-plugin.toml");
+  const text = readText("plugins/herdr/herdr-plugin.toml");
 
   // Split into the top-level table and each `[[name]]` array-of-tables entry.
   const sections = (() => {
@@ -287,17 +287,17 @@ describe("herdr-plugin.toml (task 1f, criterion 1.4's input)", () => {
   })();
 
   const topLevel = sections[0]?.body ?? "";
-  const command = /^command\s*=\s*\[\s*"\.\/bin\/shephrd"\s*,\s*"serve"\s*,\s*"--detach"\s*\]\s*$/m;
+  const command = /^command\s*=\s*\[\s*"sheprd"\s*,\s*"serve"\s*,\s*"--detach"\s*\]\s*$/m;
 
-  it("identifies the plugin as shephrd 0.0.1 for Herdr 0.8.2 or newer on Linux only (breaks if a top-level field is missing or differs)", () => {
-    expect(topLevel).toMatch(/^id\s*=\s*"shephrd"\s*$/m);
-    expect(topLevel).toMatch(/^name\s*=\s*"Shephrd"\s*$/m);
+  it("identifies the plugin as sheprd 0.0.1 for Herdr 0.8.2 or newer on Linux only (breaks if a top-level field is missing or differs)", () => {
+    expect(topLevel).toMatch(/^id\s*=\s*"sheprd"\s*$/m);
+    expect(topLevel).toMatch(/^name\s*=\s*"Sheprd"\s*$/m);
     expect(topLevel).toMatch(/^version\s*=\s*"0\.0\.1"\s*$/m);
     expect(topLevel).toMatch(/^min_herdr_version\s*=\s*"0\.8\.2"\s*$/m);
     expect(topLevel).toMatch(/^platforms\s*=\s*\[\s*"linux"\s*\]\s*$/m);
   });
 
-  it("starts the engine with `./bin/shephrd serve --detach` when Herdr starts (breaks if the [[startup]] entry is missing or runs another command)", () => {
+  it("starts the engine with `sheprd serve --detach` when Herdr starts (breaks if the [[startup]] entry is missing or runs another command)", () => {
     const startup = sections.filter((section) => section.header === "startup");
     expect(startup).toHaveLength(1);
     expect(startup[0]?.body).toMatch(command);

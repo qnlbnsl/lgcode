@@ -1,4 +1,4 @@
-import { displayedState, type Caller, type RosterEntry } from "@shephrd/contracts";
+import { displayedState, type Caller, type RosterEntry } from "@sheprd/contracts";
 import type { Snapshot } from "../../commands/internal.ts";
 import { mayReadAgent } from "../../api/visibility.ts";
 

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { DeliveryId } from "@shephrd/contracts";
+import { DeliveryId } from "@sheprd/contracts";
 import * as Schema from "effect/Schema";
 import { agentText, senderOf } from "../routing/envelope.ts";
 import type { Input, Payload, Plan } from "./internal.ts";

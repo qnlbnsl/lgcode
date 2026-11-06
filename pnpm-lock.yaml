@@ -264,16 +264,16 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.5
         version: 4.0.5(effect@4.0.5)(redis@6.3.1(@opentelemetry/api@1.10.0))
-      '@shephrd/client':
+      '@sheprd/client':
         specifier: workspace:*
         version: link:../client
-      '@shephrd/contracts':
+      '@sheprd/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@shephrd/engine':
+      '@sheprd/engine':
         specifier: workspace:*
         version: link:../engine
-      '@shephrd/mcp':
+      '@sheprd/mcp':
         specifier: workspace:*
         version: link:../mcp
       effect:
@@ -301,7 +301,7 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.5
         version: 4.0.5(effect@4.0.5)(redis@6.3.1(@opentelemetry/api@1.10.0))
-      '@shephrd/contracts':
+      '@sheprd/contracts':
         specifier: workspace:*
         version: link:../contracts
       effect:
@@ -363,16 +363,16 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.5
         version: 4.0.5(effect@4.0.5)(redis@6.3.1(@opentelemetry/api@1.10.0))
-      '@shephrd/contracts':
+      '@sheprd/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@shephrd/t3-effect-acp':
+      '@sheprd/t3-effect-acp':
         specifier: workspace:*
         version: link:../../third_party/t3code/effect-acp
-      '@shephrd/t3-node-sqlite':
+      '@sheprd/t3-node-sqlite':
         specifier: workspace:*
         version: link:../../third_party/t3code/node-sqlite
-      '@shephrd/t3-provider-instance':
+      '@sheprd/t3-provider-instance':
         specifier: workspace:*
         version: link:../../third_party/t3code/provider-instance
       effect:
@@ -385,10 +385,10 @@ importers:
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.0.5(effect@4.0.5)(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(jsdom@30.1.3)(vite@8.3.4(@types/node@26.6.6)))
-      '@shephrd/client':
+      '@sheprd/client':
         specifier: workspace:*
         version: link:../client
-      '@shephrd/testing':
+      '@sheprd/testing':
         specifier: workspace:*
         version: link:../testing
       '@types/node':
@@ -412,10 +412,10 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.5
         version: 4.0.5(effect@4.0.5)(redis@6.3.1(@opentelemetry/api@1.10.0))
-      '@shephrd/client':
+      '@sheprd/client':
         specifier: workspace:*
         version: link:../client
-      '@shephrd/contracts':
+      '@sheprd/contracts':
         specifier: workspace:*
         version: link:../contracts
       effect:
@@ -443,16 +443,16 @@ importers:
       '@effect/platform-node':
         specifier: 4.0.5
         version: 4.0.5(effect@4.0.5)(redis@6.3.1(@opentelemetry/api@1.10.0))
-      '@shephrd/client':
+      '@sheprd/client':
         specifier: workspace:*
         version: link:../client
-      '@shephrd/contracts':
+      '@sheprd/contracts':
         specifier: workspace:*
         version: link:../contracts
-      '@shephrd/t3-effect-acp':
+      '@sheprd/t3-effect-acp':
         specifier: workspace:*
         version: link:../../third_party/t3code/effect-acp
-      '@shephrd/t3-provider-testing':
+      '@sheprd/t3-provider-testing':
         specifier: workspace:*
         version: link:../../third_party/t3code/provider-testing
       effect:
@@ -483,10 +483,10 @@ importers:
 
   packages/viewer:
     dependencies:
-      '@shephrd/client':
+      '@sheprd/client':
         specifier: workspace:*
         version: link:../client
-      '@shephrd/contracts':
+      '@sheprd/contracts':
         specifier: workspace:*
         version: link:../contracts
       effect:
@@ -514,10 +514,10 @@ importers:
 
   packages/web:
     dependencies:
-      '@shephrd/client':
+      '@sheprd/client':
         specifier: workspace:*
         version: link:../client
-      '@shephrd/contracts':
+      '@sheprd/contracts':
         specifier: workspace:*
         version: link:../contracts
       effect:
@@ -548,6 +548,25 @@ importers:
       vite:
         specifier: 'catalog:'
         version: 8.3.4(@types/node@26.6.6)
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(jsdom@30.1.3)(vite@8.3.4(@types/node@26.6.6))
+
+  plugins/herdr:
+    dependencies:
+      '@sheprd/client':
+        specifier: workspace:*
+        version: link:../../packages/client
+      '@sheprd/viewer':
+        specifier: workspace:*
+        version: link:../../packages/viewer
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 26.6.6
+      typescript:
+        specifier: 'catalog:'
+        version: '@tsc-rs/typescript@0.8.0'
       vitest:
         specifier: 'catalog:'
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(jsdom@30.1.3)(vite@8.3.4(@types/node@26.6.6))

@@ -1,8 +1,8 @@
 import type { State } from "../views/apply.ts";
 import { observeStalls } from "../roles/sheepdog/stallView.ts";
 import { clientPieceView } from "../client/alerts/view.ts";
-import type { Event, EventSequence, PieceNamespace } from "@shephrd/contracts";
-import type { BoardView } from "@shephrd/contracts/board/view";
+import type { Event, EventSequence, PieceNamespace } from "@sheprd/contracts";
+import type { BoardView } from "@sheprd/contracts/board/view";
 import { boardAfter, emptyBoard } from "../board/view.ts";
 import { emptyRoles, apply as applyRoles, type RolesView } from "../roles/view.ts";
 

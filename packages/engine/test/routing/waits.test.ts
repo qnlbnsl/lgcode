@@ -17,7 +17,7 @@ import {
 } from "../support/deliveryRig.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const run = <A, E, R>(body: Parameters<typeof deliveryRig<A, E, R>>[1]) =>
   deliveryRig(rig, (runner) => Effect.gen(function* () { yield* registerRebuildCheck(); return yield* body(runner); })).pipe(Effect.orDie);

@@ -1,12 +1,12 @@
-Shephrd
+Sheprd
 
-This file lists the code in Shephrd that comes from other open-source
+This file lists the code in Sheprd that comes from other open-source
 projects. Each entry names the project, its copyright holder, its licence,
-where the code lives in Shephrd, and where the licence text is.
+where the code lives in Sheprd, and where the licence text is.
 
 - T3 Code (https://github.com/pingdotgg/t3code)
   Copyright (c) 2026 T3 Tools Inc. MIT License.
-  In Shephrd, one folder for each copied package, all under third_party/t3code/:
+  In Sheprd, one folder for each copied package, all under third_party/t3code/:
     third_party/t3code/effect-acp (the Agent Client Protocol client and server)
     third_party/t3code/node-sqlite (the SQLite client for Node.js)
     third_party/t3code/provider-instance (provider instance settings and home layouts)
@@ -16,7 +16,7 @@ where the code lives in Shephrd, and where the licence text is.
   third_party/t3code/README.md.
   Licence text: third_party/t3code/LICENSE.
 
-Shephrd is also inspired by Herdr Synapse
+Sheprd is also inspired by Herdr Synapse
 (https://github.com/vitalysim/herdr-synapse), Copyright 2026 Vitaly
-Simonovich, Apache License 2.0. No Synapse code has been copied into Shephrd.
+Simonovich, Apache License 2.0. No Synapse code has been copied into Sheprd.
 If any is, it will be listed here with its licence.

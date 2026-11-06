@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@shephrd/contracts";
+import type { EventEnvelope } from "@sheprd/contracts";
 import { expect, it } from "vitest";
 import { clientTags } from "../../../contracts/test/client/support.ts";
 import { visibleTo } from "../../src/api/visibility.ts";

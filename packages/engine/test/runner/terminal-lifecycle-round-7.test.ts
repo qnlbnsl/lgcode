@@ -14,7 +14,7 @@ import { eventually, tagged } from "../support/routingRig.ts";
 
 registerRebuildCheck({ noLog: true });
 let rig: RunnerRig;
-beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); removeRunnerRig(rig); });
 const frame = (update: unknown) => ({ step: "raw_frame", frame: JSON.stringify({ jsonrpc: "2.0", method: "session/update", params: { sessionId: "${session}", update } }) });
 const reference = frame({ sessionUpdate: "tool_call_update", toolCallId: "call", title: "Run", status: "in_progress", content: [{ type: "terminal", terminalId: "terminal" }] });

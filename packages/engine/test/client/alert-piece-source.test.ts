@@ -1,4 +1,4 @@
-import type { AlertSourceRequest } from "@shephrd/contracts";
+import type { AlertSourceRequest } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import { expect, it } from "vitest";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";

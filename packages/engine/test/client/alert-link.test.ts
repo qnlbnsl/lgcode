@@ -5,9 +5,9 @@ import { configure, delivered, ntfyServer, posts, raiseQuestion, withCarrier } f
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 it.each([
-  { proxyMode: false, publicAddress: "https://shephrd.example", linked: false },
+  { proxyMode: false, publicAddress: "https://sheprd.example", linked: false },
   { proxyMode: true, linked: false },
-  { proxyMode: true, publicAddress: "https://shephrd.example", linked: true },
+  { proxyMode: true, publicAddress: "https://sheprd.example", linked: true },
 ])("6.10 link requires proxy mode and a public address: $proxyMode / $publicAddress", async (scenario) => {
   const server = await ntfyServer();
   try {
@@ -25,7 +25,7 @@ it.each([
       if (!scenario.linked) { expect(link).toBeUndefined(); return; }
       expect(link).toBeTypeOf("string");
       const url = new URL(link);
-      expect(url.origin).toBe("https://shephrd.example");
+      expect(url.origin).toBe("https://sheprd.example");
       expect(decodeURIComponent(url.pathname + url.hash)).toContain("worker");
       expect(url.username).toBe(""); expect(url.password).toBe("");
       expect(url.search).toBe("");

@@ -32,7 +32,7 @@ let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
+  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -48,7 +48,7 @@ const live = (name: string, test: () => Effect.Effect<unknown, unknown, any>) =>
 
 const settingsPaths = (folder: string) => [
   ".claude/settings.json", ".claude/settings.local.json", ".claude/commands", ".claude/agents", ".mcp.json",
-  ".codex", ".gemini", ".cursor",
+  ".codex", ".gemini", ".cursor", ".sheprd",
 ].map((path) => join(folder, path));
 
 // One argument shape per harness, so the expansion is checked inside longer

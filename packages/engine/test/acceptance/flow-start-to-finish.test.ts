@@ -7,7 +7,7 @@
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, expect } from "@effect/vitest";
-import type { EventEnvelope } from "@shephrd/contracts";
+import type { EventEnvelope } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 
 import {
@@ -71,18 +71,18 @@ scenario("flow (spec steps 1 to 8): the lead starts a worker with its own token,
 
   // Step 3: the runner starts the worker with its own token and the tools, and opens a session.
   const workerEcho = (yield* w.token(worker)).echo;
-  const workerToken = workerEcho.env.SHEPHRD_TOKEN!;
+  const workerToken = workerEcho.env.SHEPRD_TOKEN!;
   expect(workerToken, "the worker was given the lead's token").not.toBe(leadToken);
-  expect(workerEcho.env.SHEPHRD_SOCKET, "the worker's tools do not reach this service").toBe(w.root.socket);
+  expect(workerEcho.env.SHEPRD_SOCKET, "the worker's tools do not reach this service").toBe(w.root.socket);
   expect(workerEcho.env.FAKE_AGENT_ECHO, "the account's own variables did not reach the adapter").toBe(worker.echo);
   const opened = tagged(yield* eventsUntil(w.owner, mark, "the worker's session", isTag("SessionOpened", worker.agentId)), "SessionOpened", worker.agentId);
   expect(opened, "no session was recorded for the worker").toHaveLength(1);
   const sessionNew = (peekEcho(worker.echo)!.inbound.find((frame) => frame.method === "session/new")?.params ?? {}) as { cwd?: string; mcpServers?: Array<{ name: string; env: Array<{ name: string; value: string }> }> };
   expect(sessionNew.cwd, "the session was opened in another folder").toBe(folder);
-  expect(sessionNew.mcpServers?.map((server) => server.name), "the worker was not given Shephrd's tools").toEqual(["shephrd"]);
+  expect(sessionNew.mcpServers?.map((server) => server.name), "the worker was not given Sheprd's tools").toEqual(["sheprd"]);
   const grant = Object.fromEntries(sessionNew.mcpServers![0]!.env.map((entry) => [entry.name, entry.value]));
-  expect(Object.keys(grant).sort()).toEqual(["SHEPHRD_SOCKET", "SHEPHRD_TOKEN"]);
-  expect(grant.SHEPHRD_TOKEN, "the tools carry another token than the worker's").toBe(workerToken);
+  expect(Object.keys(grant).sort()).toEqual(["SHEPRD_SOCKET", "SHEPRD_TOKEN"]);
+  expect(grant.SHEPRD_TOKEN, "the tools carry another token than the worker's").toBe(workerToken);
   // The worker's token works as the worker's own: it can see only what it holds.
   const workerClient = yield* w.asAgent(workerToken);
   expect(yield* refusal(workerClient.wait({ requestId: requestId(), members: [lead.agentId], mode: "all", block: false } as never)),

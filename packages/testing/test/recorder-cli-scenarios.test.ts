@@ -16,7 +16,7 @@ vi.mock("../../engine/scripts/recorder.ts", () => ({
   hasRecordingFailures: () => false
 }))
 
-const outputPath = join(tmpdir(), "shephrd-cli-test-shell-permission.ndjson")
+const outputPath = join(tmpdir(), "sheprd-cli-test-shell-permission.ndjson")
 let originalArgv: string[]
 let originalExitCode: typeof process.exitCode
 beforeEach(() => {

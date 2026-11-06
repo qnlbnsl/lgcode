@@ -1,8 +1,8 @@
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { expect, it } from "vitest";
 import * as Schema from "effect/Schema";
-import { Event, type AgentId } from "@shephrd/contracts";
-import { BoardChannelName } from "@shephrd/contracts/board/schemas";
+import { Event, type AgentId } from "@sheprd/contracts";
+import { BoardChannelName } from "@sheprd/contracts/board/schemas";
 import { lifecycleBatch } from "../../src/board/reactor.ts";
 import { isUnread } from "../../src/board/wake.ts";
 import { agent, board, channel, event, owner, post, snapshot, stop, tree } from "./accessFixtures.ts";

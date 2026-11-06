@@ -27,8 +27,8 @@ test.use({ ignoreHTTPSErrors: true })
 test("11.1 phone flow: catches a missing alert link, login, permission answer, agent release, or thread readback", async ({ page }) => {
   const rig = makeRig()
   const ntfy = await ntfyServer()
-  const previousHome = process.env.SHEPHRD_HOME
-  process.env.SHEPHRD_HOME = rig.stateFolder
+  const previousHome = process.env.SHEPRD_HOME
+  process.env.SHEPRD_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url")
   const staticRoot = join(rig.root, "page")
   let proxy: Awaited<ReturnType<typeof httpsProxy>> | undefined
@@ -138,8 +138,8 @@ test("11.1 phone flow: catches a missing alert link, login, permission answer, a
   } finally {
     await proxy?.close()
     await ntfy.close()
-    if (previousHome === undefined) delete process.env.SHEPHRD_HOME
-    else process.env.SHEPHRD_HOME = previousHome
+    if (previousHome === undefined) delete process.env.SHEPRD_HOME
+    else process.env.SHEPRD_HOME = previousHome
     removeRig(rig)
   }
 })

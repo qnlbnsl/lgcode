@@ -16,7 +16,7 @@ it("Vitest collects the live-check tests and none of the live scripts, and check
   roots.push(home);
   const listed = spawnSync(process.execPath, [join(root, "node_modules/vitest/vitest.mjs"), "list", "packages/engine/test/live-check", "packages/engine/scripts", "--filesOnly", "--json"], {
     cwd: root, encoding: "utf8", timeout: 30_000,
-    env: { PATH: process.env.PATH ?? "", HOME: home, SHEPHRD_HOME: join(home, "state"), XDG_STATE_HOME: join(home, "xdg"), CODEX_HOME: join(home, "codex") },
+    env: { PATH: process.env.PATH ?? "", HOME: home, SHEPRD_HOME: join(home, "state"), XDG_STATE_HOME: join(home, "xdg"), CODEX_HOME: join(home, "codex") },
   });
   expect(listed.status, listed.stderr).toBe(0);
   expect(listed.stdout, `collector output at ${root} using ${process.execPath}; stderr: ${listed.stderr}`).not.toBe("");

@@ -1,5 +1,5 @@
-import type { Caller } from "@shephrd/contracts";
-import { holdsIncoming, holdsUnsettled, ownerHeld } from "@shephrd/contracts/board/conditions";
+import type { Caller } from "@sheprd/contracts";
+import { holdsIncoming, holdsUnsettled, ownerHeld } from "@sheprd/contracts/board/conditions";
 import type { Snapshot } from "../commands/internal.ts";
 import { channelMembers, own } from "./access.ts";
 import { boardView, encodedBytes, isUnread, postDispositions } from "./wake.ts";

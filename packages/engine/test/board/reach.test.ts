@@ -1,4 +1,4 @@
-import type { Caller } from "@shephrd/contracts";
+import type { Caller } from "@sheprd/contracts";
 import { expect, it } from "vitest";
 
 import type { Snapshot } from "../../src/commands/internal.ts";

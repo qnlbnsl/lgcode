@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { RequestId, AgentId, EventEnvelope } from "@shephrd/contracts";
+import { RequestId, AgentId, EventEnvelope } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";

@@ -8,7 +8,7 @@ import { App } from "../src/index.ts"
 import { controlledStream } from "./controlled-stream.ts"
 
 const browserClient = vi.hoisted(() => ({ client: undefined as unknown, connect: vi.fn() }))
-vi.mock("@shephrd/client/browser", async () => {
+vi.mock("@sheprd/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: (...args: unknown[]) => { browserClient.connect(...args); return Effect.succeed(browserClient.client) } }
 })

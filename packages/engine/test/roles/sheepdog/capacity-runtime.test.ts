@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { it } from "@effect/vitest";
-import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
@@ -30,7 +30,7 @@ import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
 import { unwrap } from "../../client/support/readRig.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const run = <A, E, R>(body: (runner: FakeRunner) => Effect.Effect<A, E, R>, boardEnabled = true, initialize = true, override?: EngineLists) => {
   const lists = override ?? { ...engineLists, boardEnabled };

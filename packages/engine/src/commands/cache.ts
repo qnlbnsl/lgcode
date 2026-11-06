@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { AgentId, Delivery, EpochMilliseconds, Event, EventSequence, RequestId } from "@shephrd/contracts";
+import type { AgentId, Delivery, EpochMilliseconds, Event, EventSequence, RequestId } from "@sheprd/contracts";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import { canRead } from "../board/access.ts";

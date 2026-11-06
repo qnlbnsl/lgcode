@@ -30,7 +30,7 @@ describe("copied packages' import boundary", () => {
     ['  import { client } from "@t3tools/x";', "@t3tools/x"],
     ["export * from '@t3tools/y';", "@t3tools/y"],
   ])("detects %s (breaks if criterion 2.6's pattern misses %s)", (statement, module) => {
-    const root = mkdtempSync(join(tmpdir(), "shephrd-t3-imports-"));
+    const root = mkdtempSync(join(tmpdir(), "sheprd-t3-imports-"));
     scratch.push(root);
     const path = join(root, "probe.ts");
     writeFileSync(path, `// import from '@t3tools/comment'\n${statement}\nconst text = '@t3tools/string';\n`);

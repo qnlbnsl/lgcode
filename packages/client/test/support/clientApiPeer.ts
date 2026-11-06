@@ -62,7 +62,7 @@ export const clientApiPeer = async (
   if (transport === "node") chmodSync(root.socket, 0o600);
   const connect = async (): Promise<Effect.Effect<TestClient, unknown, Scope.Scope>> => {
     if (transport === "node") {
-      const module = await import("@shephrd/client");
+      const module = await import("@sheprd/client");
       return module.connect({ environment: agentEnvironment(root), attempts: 3 }) as unknown as Effect.Effect<TestClient, unknown, Scope.Scope>;
     }
     const url = new URL("../../src/browser.ts", import.meta.url);

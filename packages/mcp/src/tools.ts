@@ -1,6 +1,6 @@
 import * as RpcSchema from "effect/rpc/RpcSchema"
 import * as Schema from "effect/Schema"
-import { CommandsRpcGroup, commandAccess } from "@shephrd/contracts"
+import { CommandsRpcGroup, commandAccess } from "@sheprd/contracts"
 
 // The contract test pins the exact derived list, including future piece tools.
 export const toolNames = [...CommandsRpcGroup.requests].filter(([name, rpc]) =>

@@ -21,8 +21,8 @@ import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 
 test("the production admin pages use real RPCs and fit a 360-pixel browser", async ({ page }) => {
   const rig = makeRig()
-  const previousHome = process.env.SHEPHRD_HOME
-  process.env.SHEPHRD_HOME = rig.stateFolder
+  const previousHome = process.env.SHEPRD_HOME
+  process.env.SHEPRD_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url")
   const staticRoot = join(rig.root, "page")
   try {
@@ -100,8 +100,8 @@ test("the production admin pages use real RPCs and fit a 360-pixel browser", asy
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped)
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
   } finally {
-    if (previousHome === undefined) delete process.env.SHEPHRD_HOME
-    else process.env.SHEPHRD_HOME = previousHome
+    if (previousHome === undefined) delete process.env.SHEPRD_HOME
+    else process.env.SHEPRD_HOME = previousHome
     removeRig(rig)
   }
 })

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { Alert, EventSequence } from "@shephrd/contracts"
+import type { Alert, EventSequence } from "@sheprd/contracts"
 import { requestId, useAdminApi } from "./api.ts"
 import { threadHref } from "../thread/links.ts"
 

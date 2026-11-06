@@ -17,7 +17,7 @@ import { agent, boardState, change, encodedBytes, eventsOf, owner, postAs, provi
 import { post } from "./fixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const unwrap = (reply: { data: string }) => {
   const lines = reply.data.split("\n");

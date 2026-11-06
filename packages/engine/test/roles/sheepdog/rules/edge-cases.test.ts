@@ -1,4 +1,4 @@
-import { RolesActionRecord } from "@shephrd/contracts";
+import { RolesActionRecord } from "@sheprd/contracts";
 import * as Schema from "effect/Schema";
 import { expect, it } from "vitest";
 import { evaluateCrash } from "../../../../src/roles/sheepdog/rules/crash.ts";

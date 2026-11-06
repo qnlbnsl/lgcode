@@ -1,4 +1,4 @@
-import type { Caller, Event, EventEnvelope } from "@shephrd/contracts";
+import type { Caller, Event, EventEnvelope } from "@sheprd/contracts";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import * as Effect from "effect/Effect";

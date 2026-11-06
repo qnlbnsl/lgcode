@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { PublicWebAddress, publicAddressError, type AlertKind, type AlertSettings, type WebSettings, type WebServerState } from "@shephrd/contracts"
+import { PublicWebAddress, publicAddressError, type AlertKind, type AlertSettings, type WebSettings, type WebServerState } from "@sheprd/contracts"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
@@ -163,7 +163,7 @@ export function Settings({ onSessionExpired }: { readonly onSessionExpired: () =
           <label>Port<input name="port" type="number" min={1} max={65535} defaultValue={web.port} required /></label>
           <label>Heartbeat seconds<input name="heartbeatSeconds" type="number" min={1} defaultValue={web.heartbeatSeconds} required /></label>
           <label><input name="proxyMode" type="checkbox" defaultChecked={web.proxyMode} /> Use proxy mode</label>
-          <label>Public address (HTTPS)<input name="publicAddress" type="url" placeholder="https://shephrd.example" aria-describedby="public-address-help" defaultValue={web.publicAddress ?? ""} /></label>
+          <label>Public address (HTTPS)<input name="publicAddress" type="url" placeholder="https://sheprd.example" aria-describedby="public-address-help" defaultValue={web.publicAddress ?? ""} /></label>
           <p id="public-address-help">Use HTTPS through your proxy. For an SSH tunnel, open http://127.0.0.1 at the server’s port and leave the public address empty.</p>
           <button type="submit">Save web settings</button>
         </fieldset>

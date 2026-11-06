@@ -25,7 +25,7 @@ import { fileURLToPath } from "node:url"
 
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { assert, it } from "@effect/vitest"
-import type { HarnessSettings } from "@shephrd/contracts"
+import type { HarnessSettings } from "@sheprd/contracts"
 import * as Effect from "effect/Effect"
 import * as Exit from "effect/Exit"
 import { afterEach, beforeEach } from "vitest"
@@ -128,7 +128,7 @@ let root: string
 let outputDirectory: string
 let temporaryRoot: string
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), "shephrd-recorder-"))
+  root = await mkdtemp(join(tmpdir(), "sheprd-recorder-"))
   outputDirectory = join(root, "fixtures")
   temporaryRoot = join(root, "work")
 })

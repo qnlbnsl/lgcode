@@ -36,6 +36,15 @@ describe("the real runner and flow against a controlled API", () => {
     expect(fixture.lines.at(-1)).toBe("live-check: all 23 steps passed");
   });
 
+  it("skips an absent optional Herdr hook and completes all core checks", async () => {
+    const fixture = setup();
+    expect(await main([], { ...fixture.deps, pluginHook: async () => undefined })).toBe(0);
+    expect(printed(fixture.lines)).toEqual(ids.flatMap((id) => [id === "startup-hook" ? "SKIP" : "PASS", id]));
+    expect(fixture.lines.at(-1)).toBe("live-check: all 22 applicable steps passed (1 optional step skipped)");
+    expect(fixture.calls).toContain("record");
+    expect(fixture.stopCount).toBe(1);
+  });
+
   it.each(ids)("a defect at %s exits nonzero; hard stops name missing prerequisites and other failures retain independent evidence (catches ignored failures or lost evidence)", async (id) => {
     const fixture = setup({ step: id });
     expect(await main([], fixture.deps)).toBe(1);

@@ -23,10 +23,10 @@ export function cursorModelId(requested: string, options: ReadonlyArray<ConfigOp
 export function cursorServerName(sessions: string): string {
   mkdirSync(sessions, { recursive: true, mode: 0o700 });
   chmodSync(sessions, 0o700);
-  const file = join(sessions, "shephrd-server-name");
-  if (!existsSync(file)) writeFileSync(file, `shephrd-${randomUUID()}`, { flag: "wx", mode: 0o600 });
+  const file = join(sessions, "sheprd-server-name");
+  if (!existsSync(file)) writeFileSync(file, `sheprd-${randomUUID()}`, { flag: "wx", mode: 0o600 });
   const name = readFileSync(file, "utf8");
-  if (!/^shephrd-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(name)) throw new Error("Invalid Cursor server identity");
+  if (!/^sheprd-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(name)) throw new Error("Invalid Cursor server identity");
   return name;
 }
 
@@ -53,7 +53,7 @@ export function cursorMcpConfig(environment: Readonly<Record<string, string | un
   if (permissions?.allow !== undefined && (!Array.isArray(permissions.allow) || !permissions.allow.every((value) => typeof value === "string"))) {
     throw new Error("Invalid Cursor permissions");
   }
-  const directory = mkdtempSync(join(tmpdir(), "shephrd-cursor-"));
+  const directory = mkdtempSync(join(tmpdir(), "sheprd-cursor-"));
   const remove = () => rmSync(directory, { recursive: true, force: true });
   try {
     chmodSync(directory, 0o700);

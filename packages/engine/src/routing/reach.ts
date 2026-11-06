@@ -1,4 +1,4 @@
-import type { Caller, Delivery, PieceNamespace } from "@shephrd/contracts";
+import type { Caller, Delivery, PieceNamespace } from "@sheprd/contracts";
 import type { Snapshot } from "../commands/internal.ts";
 import type { EngineLists } from "../pieces/lists.ts";
 import { guardPiece } from "../pieces/guardPiece.ts";

@@ -36,6 +36,12 @@ export default defineConfig({
       })),
       {
         test: {
+          name: "herdr-plugin",
+          include: ["plugins/herdr/test/**/*.test.ts"],
+        },
+      },
+      {
+        test: {
           name: "third-party",
           include: ["third_party/t3code/**/*.{test,spec}.{ts,tsx}"],
         },

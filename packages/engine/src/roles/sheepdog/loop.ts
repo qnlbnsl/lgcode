@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@shephrd/contracts";
+import type { EventEnvelope } from "@sheprd/contracts";
 import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";

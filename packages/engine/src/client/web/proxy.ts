@@ -1,4 +1,4 @@
-import type { WebSettings } from "@shephrd/contracts";
+import type { WebSettings } from "@sheprd/contracts";
 
 const forwardedHeaders = ["x-forwarded-for", "x-forwarded-proto", "x-forwarded-host", "forwarded"];
 export const requestPolicy = (headers: Readonly<Record<string, string | undefined>>, settings: WebSettings, port: number, staticNavigation: boolean) => {

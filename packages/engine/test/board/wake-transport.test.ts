@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { ClientStreamItem, EventEnvelope } from "@shephrd/contracts";
+import type { ClientStreamItem, EventEnvelope } from "@sheprd/contracts";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
@@ -14,7 +14,7 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { encodedBytes, provideBoard, queued, seedBoard } from "./wakeFixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const unwrap = (reply: any) => {
   const lines = reply.data.split("\n");

@@ -23,7 +23,7 @@ import { withViews } from "../support/withViews.ts";
 let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
-  vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
+  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
   vi.stubEnv("HOME", rig.home);
   vi.stubEnv("CODEX_HOME", `${rig.home}/.codex`);
 });
@@ -63,7 +63,7 @@ live("6.7 E01 row 51/PB-A7: catches a real session/load replay losing a chunked 
     expect((yield* eventually(deliveryRow(delivery), (row) => row?.status === "sent"))?.status).toBe("sent");
     yield* readEcho(echo, (value) => value.inbound.some((frame) => frame.method === "session/prompt"));
     expect((yield* deliveryRow(delivery))?.status).toBe("sent");
-    return { agentId, delivery, token: child.env.SHEPHRD_TOKEN!, session: (yield* agentRow(agentId))!.session };
+    return { agentId, delivery, token: child.env.SHEPRD_TOKEN!, session: (yield* agentRow(agentId))!.session };
   }), { recovering: false });
   // New process, same session. Each history item below is one ACP chunk;
   // the id deliberately spans two chunks, as real adapters can emit it.
@@ -98,9 +98,9 @@ live("6.7 E01 row 51/PB-A7: catches a real session/load replay losing a chunked 
     expect(tagged(written, "DeliveryAccepted").map((event) => event.deliveryId)).toEqual([old.delivery]);
     expect(tagged(written, "ThreadItem")).toEqual([]);
     expect(failureOf(yield* call(agentCredential(old.token), "harnesses", { operation: "list" }))).toEqual({ _tag: "CommandRefused", reason: "invalid credential" });
-    expect(replayed.env.SHEPHRD_TOKEN).not.toBe(old.token);
-    expect(yield* verifyAgentToken(replayed.env.SHEPHRD_TOKEN!)).toBe(old.agentId);
-    for (const secret of [old.token, replayed.env.SHEPHRD_TOKEN!]) expect(JSON.stringify([yield* readLog, yield* snapshot])).not.toContain(secret);
+    expect(replayed.env.SHEPRD_TOKEN).not.toBe(old.token);
+    expect(yield* verifyAgentToken(replayed.env.SHEPRD_TOKEN!)).toBe(old.agentId);
+    for (const secret of [old.token, replayed.env.SHEPRD_TOKEN!]) expect(JSON.stringify([yield* readLog, yield* snapshot])).not.toContain(secret);
     // The fake script itself carries the replayed answer in its AccountChanged, so the answer is checked only over what recovery wrote and the threads.
     expect(JSON.stringify([written, (yield* snapshot).threads])).not.toContain("private-replayed-answer-E01");
     yield* pause(50);
@@ -119,7 +119,7 @@ live("6.7 E02: catches reloading a real peer that advertised no reload, silently
     const agentId = success(yield* call(ownerCredential, "start", startPayloadFor(harness, account, rig.work))).agentId as string;
     expect((yield* agentRow(agentId))?.reloadable).toBe(false);
     const child = yield* readEcho(echo);
-    return { agentId, token: child.env.SHEPHRD_TOKEN!, pid: child.pid, inbound: child.inbound.length };
+    return { agentId, token: child.env.SHEPRD_TOKEN!, pid: child.pid, inbound: child.inbound.length };
   }), { recovering: false });
   yield* provideRestart(rig, runnerFor(calls), Effect.gen(function* () {
     yield* registerRebuildCheck();

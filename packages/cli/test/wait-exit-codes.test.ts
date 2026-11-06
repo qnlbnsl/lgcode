@@ -1,9 +1,9 @@
-// 7.6, row 62: all journeys use a real service and real shephrd child.
+// 7.6, row 62: all journeys use a real service and real sheprd child.
 // State is reached through RPC/ACP, never by inserting view/log fixtures.
 import { join } from "node:path";
 import { writeFileSync } from "node:fs";
 import { afterEach, expect, it } from "vitest";
-import type { EventEnvelope } from "@shephrd/contracts";
+import type { EventEnvelope } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 
@@ -29,7 +29,7 @@ const eventAfter = (owner: Client, after: number, predicate: (event: EventEnvelo
 const openedBeforeExit = (owner: Client, after: number, child: ReturnType<typeof startCli>) =>
   Effect.raceFirst(
     eventAfter(owner, after, (envelope) => envelope.event._tag === "WaitOpened"),
-    Effect.promise(() => child.exit).pipe(Effect.flatMap(() => Effect.die(new Error("shephrd exited before committing WaitOpened")))),
+    Effect.promise(() => child.exit).pipe(Effect.flatMap(() => Effect.die(new Error("sheprd exited before committing WaitOpened")))),
   );
 const head = (owner: Client) => owner["debug.compare-views"]({ requestId: requestId() } as never).pipe(Effect.map((reply) => reply.sequence));
 
@@ -55,7 +55,7 @@ const workingScript = { turns: [[{ step: "plan", entries: [] }, { step: "slow", 
 
 const setup = (busy = false) => Effect.gen(function* () {
   const root = makeServiceRoot("/tmp/s7w-");
-  const service = startService(root, { env: { SHEPHRD_TEST_DEBUG: "1" } });
+  const service = startService(root, { env: { SHEPRD_TEST_DEBUG: "1" } });
   yield* waitServing(root, service);
   const owner = yield* ownerClient(root);
   // These cases observe stable crash states, independently of automatic recovery.
@@ -70,7 +70,7 @@ const setup = (busy = false) => Effect.gen(function* () {
   if (busy) yield* eventAfter(owner, before, (envelope) => envelope.agentId === parent.agentId && envelope.event._tag === "DeliveryAccepted");
   const identity = yield* agentToken(parent);
   const caller = yield* connect(root.socket, identity.token);
-  const environment = { ...serviceEnvironment(root), SHEPHRD_SOCKET: root.socket, SHEPHRD_TOKEN: identity.token };
+  const environment = { ...serviceEnvironment(root), SHEPRD_SOCKET: root.socket, SHEPRD_TOKEN: identity.token };
   return { root, service, owner, parent, caller, environment, callerToken: identity.token };
 });
 
@@ -211,7 +211,7 @@ it("W04 enforces agents-only blocking wait under decision row 26 by refusing an 
 
 it("W05 catches mapping interrupted to success or letting it override a crash/stop after service recovery", async () => {
   const root = makeServiceRoot("/tmp/s7i-");
-  const first = startService(root, { env: { SHEPHRD_TEST_DEBUG: "1" } });
+  const first = startService(root, { env: { SHEPRD_TEST_DEBUG: "1" } });
   let parent!: StartedAgent;
   let member!: StartedAgent;
   let settled!: StartedAgent;
@@ -237,7 +237,7 @@ it("W05 catches mapping interrupted to success or letting it override a crash/st
   }));
   first.child.kill("SIGKILL");
   await first.exit;
-  const second = startService(root, { env: { SHEPHRD_TEST_DEBUG: "1" } });
+  const second = startService(root, { env: { SHEPRD_TEST_DEBUG: "1" } });
   await run(Effect.gen(function* () {
     yield* waitServing(root, second);
     const owner = yield* ownerClient(root);
@@ -248,7 +248,7 @@ it("W05 catches mapping interrupted to success or letting it override a crash/st
     ] as const) {
       const before = yield* head(owner);
       const child = startCli(root, ["wait", "--block", "--mode", "all", ...members.map((entry) => entry.agentId)], {
-        ...serviceEnvironment(root), SHEPHRD_SOCKET: root.socket, SHEPHRD_TOKEN: identity.token,
+        ...serviceEnvironment(root), SHEPRD_SOCKET: root.socket, SHEPRD_TOKEN: identity.token,
       });
       expect(yield* Effect.promise(() => finishCli(child))).toEqual({ code, signal: null });
       const events = yield* finishWindow(owner, before, parent);

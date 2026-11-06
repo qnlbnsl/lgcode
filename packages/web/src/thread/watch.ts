@@ -1,5 +1,5 @@
-import type { ClientEnvelope } from "@shephrd/client/browser"
-import { contentOnlyEventTags, type AgentId, type ClientSnapshot, type EventSequence, type Oversized } from "@shephrd/contracts"
+import type { ClientEnvelope } from "@sheprd/client/browser"
+import { contentOnlyEventTags, type AgentId, type ClientSnapshot, type EventSequence, type Oversized } from "@sheprd/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import { connectBrowser, requestId } from "./client.ts"

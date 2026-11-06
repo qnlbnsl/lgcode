@@ -1,4 +1,4 @@
-import { Event, EventEnvelope, type Actor } from "@shephrd/contracts";
+import { Event, EventEnvelope, type Actor } from "@sheprd/contracts";
 import * as Schema from "effect/Schema";
 
 // Decode fixtures at their boundary so a malformed event cannot masquerade as

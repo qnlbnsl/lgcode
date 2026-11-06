@@ -1,7 +1,7 @@
 // Unit 1b's test interfaces. These describe missing seams, not substitute
 // implementations. Keep production authorization, planning and writes real.
 import { existsSync } from "node:fs";
-import type { EventEnvelope } from "@shephrd/contracts";
+import type { EventEnvelope } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import type * as Stream from "effect/Stream";
 import { expect } from "vitest";

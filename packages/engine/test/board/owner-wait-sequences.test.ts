@@ -1,4 +1,4 @@
-import { waitForAgents, type Client } from "@shephrd/client";
+import { waitForAgents, type Client } from "@sheprd/client";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";

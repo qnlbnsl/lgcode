@@ -1,5 +1,5 @@
-import type { EventSequence } from "@shephrd/contracts";
-import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
+import type { EventSequence } from "@sheprd/contracts";
+import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as SqlClient from "effect/sql/SqlClient";

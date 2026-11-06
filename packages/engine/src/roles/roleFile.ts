@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { RoleFile, RolesEvent, rolesMaxima } from "@shephrd/contracts";
+import { RoleFile, RolesEvent, rolesMaxima } from "@sheprd/contracts";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";

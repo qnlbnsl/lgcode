@@ -1,5 +1,5 @@
 import type { ComponentType } from "react"
-import type { AgentId, AlertKind } from "@shephrd/contracts"
+import type { AgentId, AlertKind } from "@sheprd/contracts"
 import { visibleText } from "../text.tsx"
 import { Board } from "./board.tsx"
 

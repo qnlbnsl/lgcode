@@ -14,7 +14,7 @@ export class SecretStore extends Context.Service<SecretStore, {
   // Issue 119: removes every stored value whose reference is not in `keep`.
   // Restart recovery calls it, before any command can store a new value.
   readonly retainOnly?: (keep: ReadonlySet<string>) => Effect.Effect<void, LogWriteFailed>;
-}>()("shephrd/engine/commands/SecretStore") {
+}>()("sheprd/engine/commands/SecretStore") {
   static readonly layer: Layer.Layer<SecretStore> = Layer.effect(SecretStore, Effect.sync(() => {
     const values = new Map<string, Redacted.Redacted<string>>();
     return SecretStore.of({

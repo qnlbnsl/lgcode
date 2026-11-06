@@ -16,7 +16,7 @@ const usageRow = JSON.stringify({ type: "assistant", timestamp: "2026-11-04T12:0
 } });
 
 it("U01 returns only the latest request's numeric usage and timestamp", () => {
-  const folder = mkdtempSync(join(tmpdir(), "shephrd-usage-"));
+  const folder = mkdtempSync(join(tmpdir(), "sheprd-usage-"));
   try {
     const transcript = join(folder, `${sessionId}.jsonl`);
     writeFileSync(transcript, `${JSON.stringify({ type: "user", message: "OLD" })}\n${usageRow}\n`);
@@ -29,7 +29,7 @@ it("U01 returns only the latest request's numeric usage and timestamp", () => {
 });
 
 it("U02 refuses a malformed session id and a path whose filename is not that session", () => {
-  const folder = mkdtempSync(join(tmpdir(), "shephrd-usage-"));
+  const folder = mkdtempSync(join(tmpdir(), "sheprd-usage-"));
   try {
     const transcript = join(folder, `${sessionId}.jsonl`);
     writeFileSync(transcript, `${usageRow}\n`);
@@ -39,7 +39,7 @@ it("U02 refuses a malformed session id and a path whose filename is not that ses
 });
 
 it("U03 refuses a symbolic link instead of following it to another file", () => {
-  const folder = mkdtempSync(join(tmpdir(), "shephrd-usage-"));
+  const folder = mkdtempSync(join(tmpdir(), "sheprd-usage-"));
   try {
     const outside = join(folder, "outside.jsonl");
     const transcript = join(folder, `${sessionId}.jsonl`);
@@ -50,7 +50,7 @@ it("U03 refuses a symbolic link instead of following it to another file", () => 
 });
 
 it("U04 reads a bounded tail and returns no usage when the transcript is missing", () => {
-  const folder = mkdtempSync(join(tmpdir(), "shephrd-usage-"));
+  const folder = mkdtempSync(join(tmpdir(), "sheprd-usage-"));
   try {
     const transcript = join(folder, `${sessionId}.jsonl`);
     mkdirSync(join(folder, "nested"));
@@ -63,7 +63,7 @@ it("U04 reads a bounded tail and returns no usage when the transcript is missing
 
 it.each(["missing", "malformed", "partial", "future", "pending-request", "incomplete-json", "missing-usage"])(
   "U05 rejects stale high usage when the current request is %s", (current) => {
-    const folder = mkdtempSync(join(tmpdir(), "shephrd-current-usage-"));
+    const folder = mkdtempSync(join(tmpdir(), "sheprd-current-usage-"));
     try {
       const transcript = join(folder, `${sessionId}.jsonl`);
       const startedAt = Date.parse("2026-11-04T12:01:00.000Z");
@@ -83,7 +83,7 @@ it.each(["missing", "malformed", "partial", "future", "pending-request", "incomp
 );
 
 it("U06 a proven current read-only request inherits the earlier write lifetime", () => {
-  const folder = mkdtempSync(join(tmpdir(), "shephrd-current-read-"));
+  const folder = mkdtempSync(join(tmpdir(), "sheprd-current-read-"));
   try {
     const transcript = join(folder, `${sessionId}.jsonl`);
     const startedAt = Date.parse("2026-11-04T12:01:00.000Z");

@@ -1,6 +1,6 @@
 // Task 8a.3, decision rows 33 and 57, issue 14: the base environment of a child process.
 //
-//   `buildBaseEnvironment({ parent, accountVariables?, shephrdSocket?, shephrdToken? })`
+//   `buildBaseEnvironment({ parent, accountVariables?, sheprdSocket?, sheprdToken? })`
 //   (module `packages/engine/src/runner/baseEnvironment.ts`) returns a new
 //   `Record<string, string>` that is the whole environment of the child. It takes `parent` as an
 //   argument and never reads `process.env`. Names are matched exactly and case-sensitively.
@@ -8,8 +8,8 @@
 //   Allow-list (row 33): PATH, HOME, USER, LOGNAME, SHELL, LANG, LC_* (the prefix `LC_`), TERM,
 //   TMPDIR and TZ, copied from `parent` when set. Then the account's variables, which win over the
 //   parent's values. Never HERDR_* (parent or account). Never a provider key the account did not
-//   set. The only SHEPHRD_* names are SHEPHRD_SOCKET and SHEPHRD_TOKEN (row 57), and they come
-//   only from the `shephrdSocket` and `shephrdToken` arguments, never from `parent` or from the
+//   set. The only SHEPRD_* names are SHEPRD_SOCKET and SHEPRD_TOKEN (row 57), and they come
+//   only from the `sheprdSocket` and `sheprdToken` arguments, never from `parent` or from the
 //   account's variables.
 import { spawnSync } from "node:child_process"
 import { randomBytes } from "node:crypto"
@@ -25,12 +25,12 @@ registerRebuildCheck({ noLog: true })
 it("5.17/E34 drops the web password from the parent and from account variables before a child is started", () => {
   const password = randomBytes(32).toString("base64url")
   const environment = buildBaseEnvironment({
-    parent: { PATH: process.env.PATH ?? "/usr/bin", SHEPHRD_WEB_PASSWORD: password },
-    accountVariables: { SHEPHRD_WEB_PASSWORD: password },
+    parent: { PATH: process.env.PATH ?? "/usr/bin", SHEPRD_WEB_PASSWORD: password },
+    accountVariables: { SHEPRD_WEB_PASSWORD: password },
   })
-  assert.isFalse(Object.hasOwn(environment, "SHEPHRD_WEB_PASSWORD"), "the web password variable reached the child environment")
+  assert.isFalse(Object.hasOwn(environment, "SHEPRD_WEB_PASSWORD"), "the web password variable reached the child environment")
   assert.isFalse(Object.values(environment).some((value) => value.includes(password)), "the web password value reached the child environment")
-  const child = spawnSync(process.execPath, ["-e", "process.stdout.write(String(Object.hasOwn(process.env, 'SHEPHRD_WEB_PASSWORD')))"], { env: environment, encoding: "utf8" })
+  const child = spawnSync(process.execPath, ["-e", "process.stdout.write(String(Object.hasOwn(process.env, 'SHEPRD_WEB_PASSWORD')))"], { env: environment, encoding: "utf8" })
   assert.equal(child.status, 0)
   assert.equal(child.stdout, "false")
 })
@@ -62,9 +62,9 @@ const secrets = {
   SSH_AUTH_SOCK: "/tmp/ssh-planted/agent.1",
   HERDR_SOCKET_PATH: "/tmp/herdr-planted.sock",
   HERDR_PANE_ID: "p_1",
-  SHEPHRD_SOCKET: "/tmp/parent-planted.sock",
-  SHEPHRD_TOKEN: "shp_a_PLANTEDPARENTTOKEN0123456789",
-  SHEPHRD_HOME: "/tmp/parent-planted-home",
+  SHEPRD_SOCKET: "/tmp/parent-planted.sock",
+  SHEPRD_TOKEN: "shp_a_PLANTEDPARENTTOKEN0123456789",
+  SHEPRD_HOME: "/tmp/parent-planted-home",
   LCX_FOO: "looks-like-lc-but-is-not",
   XLC_ALL: "also-not",
   NODE_OPTIONS: "--require=/tmp/planted.js"
@@ -106,35 +106,35 @@ it("adds the account's variables, including a provider key the account set, and 
   })
 })
 
-it("drops account variables named HERDR_*, SHEPHRD_SOCKET or SHEPHRD_TOKEN (breaks if an account can set the agent's socket or token, or reach the Herdr socket; rows 33 and 57)", () => {
+it("drops account variables named HERDR_*, SHEPRD_SOCKET or SHEPRD_TOKEN (breaks if an account can set the agent's socket or token, or reach the Herdr socket; rows 33 and 57)", () => {
   const environment = buildBaseEnvironment({
     parent: { PATH: "/usr/bin" },
     accountVariables: {
       HERDR_SOCKET_PATH: "/tmp/herdr-planted.sock",
       HERDR_ENV: "1",
-      SHEPHRD_SOCKET: "/tmp/account-planted.sock",
-      SHEPHRD_TOKEN: "shp_a_PLANTEDACCOUNTTOKEN0123456789",
+      SHEPRD_SOCKET: "/tmp/account-planted.sock",
+      SHEPRD_TOKEN: "shp_a_PLANTEDACCOUNTTOKEN0123456789",
       KEEP_ME: "yes"
     }
   })
   assert.deepEqual(environment, { PATH: "/usr/bin", KEEP_ME: "yes" })
 })
 
-it("sets SHEPHRD_SOCKET and SHEPHRD_TOKEN from the arguments, and no other SHEPHRD_* name (breaks if the wildcard comes back, or the values are taken from the parent; row 57)", () => {
+it("sets SHEPRD_SOCKET and SHEPRD_TOKEN from the arguments, and no other SHEPRD_* name (breaks if the wildcard comes back, or the values are taken from the parent; row 57)", () => {
   const environment = buildBaseEnvironment({
-    parent: { PATH: "/usr/bin", SHEPHRD_SOCKET: "/tmp/parent.sock", SHEPHRD_HOME: "/tmp/home" },
-    shephrdSocket: "/tmp/run/engine.sock",
-    shephrdToken: "shp_a_GIVENTOKEN0123456789"
+    parent: { PATH: "/usr/bin", SHEPRD_SOCKET: "/tmp/parent.sock", SHEPRD_HOME: "/tmp/home" },
+    sheprdSocket: "/tmp/run/engine.sock",
+    sheprdToken: "shp_a_GIVENTOKEN0123456789"
   })
   assert.deepEqual(environment, {
     PATH: "/usr/bin",
-    SHEPHRD_SOCKET: "/tmp/run/engine.sock",
-    SHEPHRD_TOKEN: "shp_a_GIVENTOKEN0123456789"
+    SHEPRD_SOCKET: "/tmp/run/engine.sock",
+    SHEPRD_TOKEN: "shp_a_GIVENTOKEN0123456789"
   })
 })
 
-it("adds no SHEPHRD_* name when no socket and token are given (breaks if the parent's values are used as a fallback)", () => {
-  const environment = buildBaseEnvironment({ parent: { PATH: "/usr/bin", SHEPHRD_SOCKET: "/tmp/p.sock", SHEPHRD_TOKEN: "shp_a_PARENTPLANTED0123456789" } })
+it("adds no SHEPRD_* name when no socket and token are given (breaks if the parent's values are used as a fallback)", () => {
+  const environment = buildBaseEnvironment({ parent: { PATH: "/usr/bin", SHEPRD_SOCKET: "/tmp/p.sock", SHEPRD_TOKEN: "shp_a_PARENTPLANTED0123456789" } })
   assert.deepEqual(environment, { PATH: "/usr/bin" })
 })
 
@@ -162,8 +162,8 @@ it("a real child started with the built environment sees exactly those names and
   const environment = buildBaseEnvironment({
     parent: { ...allowListed, ...secrets, PATH: `${process.env.PATH ?? "/usr/bin"}` },
     accountVariables: { ACCOUNT_VAR: "from-account" },
-    shephrdSocket: "/tmp/run/engine.sock",
-    shephrdToken: "shp_a_GIVENTOKEN0123456789"
+    sheprdSocket: "/tmp/run/engine.sock",
+    sheprdToken: "shp_a_GIVENTOKEN0123456789"
   })
   const child = spawnSync(process.execPath, ["-e", "console.log(JSON.stringify(Object.keys(process.env).sort()))"], {
     env: environment,
@@ -171,7 +171,7 @@ it("a real child started with the built environment sees exactly those names and
   })
   assert.equal(child.status, 0)
   const seen = JSON.parse(child.stdout) as string[]
-  assert.deepEqual(seen, [...Object.keys(allowListed), "ACCOUNT_VAR", "SHEPHRD_SOCKET", "SHEPHRD_TOKEN"].sort())
+  assert.deepEqual(seen, [...Object.keys(allowListed), "ACCOUNT_VAR", "SHEPRD_SOCKET", "SHEPRD_TOKEN"].sort())
   assert.notInclude(child.stdout, "planted")
 })
 

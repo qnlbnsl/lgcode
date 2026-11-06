@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@shephrd/contracts";
+import type { EventEnvelope } from "@sheprd/contracts";
 
 export const encodedBytes = (value: unknown): number => Buffer.byteLength(JSON.stringify(value));
 export const cutUtf8 = (value: string, budget: number): string => {

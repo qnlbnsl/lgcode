@@ -4,7 +4,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, expect } from "@effect/vitest";
-import type { EventEnvelope } from "@shephrd/contracts";
+import type { EventEnvelope } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 
 import { eventsUntil, isTag, next, refusal, requestId, scenario, since, stopAllServices, tagged, threadText, type World } from "../support/acceptance.ts";

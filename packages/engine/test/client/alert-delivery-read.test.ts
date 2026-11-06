@@ -1,4 +1,4 @@
-import { Alert } from "@shephrd/contracts";
+import { Alert } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as TestClock from "effect/testing/TestClock";

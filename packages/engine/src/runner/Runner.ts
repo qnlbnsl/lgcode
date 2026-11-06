@@ -1,7 +1,7 @@
 import {
   AgentId, DeliveryId, EpochMilliseconds, ThreadContent, PermissionActionFields, PermissionOption, PermissionRequestId, TurnUsage,
   type Account, type Delivery, type HarnessSettings, type PermissionLevel, type SessionReference,
-} from "@shephrd/contracts";
+} from "@sheprd/contracts";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import type * as Effect from "effect/Effect";
@@ -11,7 +11,7 @@ import type * as Stream from "effect/Stream";
 
 import type { folderForSpawn } from "../identity/ceiling.ts";
 
-import type { StartFailure } from "@shephrd/contracts/startFailure";
+import type { StartFailure } from "@sheprd/contracts/startFailure";
 
 export class RunnerRejected extends Data.TaggedError("RunnerRejected")<{
   readonly reason: string;
@@ -138,4 +138,4 @@ export class Runner extends Context.Service<Runner, {
   readonly stop: (input: { readonly agentId: AgentId }) => Effect.Effect<void, RunnerRejected>;
   readonly capabilities: RunnerCapabilities;
   readonly events: Stream.Stream<RunnerEvent>;
-}>()("shephrd/engine/runner/Runner") {}
+}>()("sheprd/engine/runner/Runner") {}

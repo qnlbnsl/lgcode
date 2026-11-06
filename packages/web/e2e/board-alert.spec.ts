@@ -37,8 +37,8 @@ test("7.4 a phone owner follows the board alert, reads and replies, and wakes th
   const rig = makeRig()
   // The real child client enforces the production state-folder permissions.
   chmodSync(rig.stateFolder, 0o700)
-  const previousHome = process.env.SHEPHRD_HOME
-  process.env.SHEPHRD_HOME = rig.stateFolder
+  const previousHome = process.env.SHEPRD_HOME
+  process.env.SHEPRD_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url")
   const staticRoot = join(rig.root, "page")
   let proxy: Awaited<ReturnType<typeof httpsProxy>> | undefined
@@ -90,7 +90,7 @@ test("7.4 a phone owner follows the board alert, reads and replies, and wakes th
         const channelId = success(yield* call(ownerCredential, "board.open", { name: "Owner-questions" })).channelId
         const account = accountFor("first", { turns: [[
           { step: "wait_for_file", path: gatePath },
-          { step: "shephrd_command", command: "board.post", input: {
+          { step: "sheprd_command", command: "board.post", input: {
             channelId, text: '<img src=x onerror="window.__boardXss=1"> **question text**', to: [owner], reply: "all",
           } },
         ], [{ step: "text", text: "Completion received." }]] }, echoFile)
@@ -190,8 +190,8 @@ test("7.4 a phone owner follows the board alert, reads and replies, and wakes th
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.provide(NodeServices.layer), Effect.scoped)
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
   } finally {
-    if (previousHome === undefined) delete process.env.SHEPHRD_HOME
-    else process.env.SHEPHRD_HOME = previousHome
+    if (previousHome === undefined) delete process.env.SHEPRD_HOME
+    else process.env.SHEPRD_HOME = previousHome
     await proxy?.close()
     carrier.closeAllConnections()
     await new Promise<void>((resolve) => carrier.close(() => resolve()))

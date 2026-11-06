@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 
 import { it } from "@effect/vitest";
-import { readOnly } from "@shephrd/t3-node-sqlite/nodeSqliteClient";
+import { readOnly } from "@sheprd/t3-node-sqlite/nodeSqliteClient";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -17,8 +17,8 @@ import { append, sequence, withViews } from "../support/withViews.ts";
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/shephrd-compare-");
-  vi.stubEnv("SHEPHRD_HOME", home);
+  home = mkdtempSync("/tmp/sheprd-compare-");
+  vi.stubEnv("SHEPRD_HOME", home);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

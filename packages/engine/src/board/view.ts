@@ -1,6 +1,6 @@
-import { EventSequence as Sequence, type Actor, type AgentId, type EventEnvelope, type EventSequence } from "@shephrd/contracts";
-import type { BoardAddressee, BoardAuthor, PostId } from "@shephrd/contracts/board/ids";
-import type { BoardChannelView, BoardPostView, BoardReadState, BoardView, BoardWakeView } from "@shephrd/contracts/board/view";
+import { EventSequence as Sequence, type Actor, type AgentId, type EventEnvelope, type EventSequence } from "@sheprd/contracts";
+import type { BoardAddressee, BoardAuthor, PostId } from "@sheprd/contracts/board/ids";
+import type { BoardChannelView, BoardPostView, BoardReadState, BoardView, BoardWakeView } from "@sheprd/contracts/board/view";
 import * as Schema from "effect/Schema";
 
 type Keyed<T> = Readonly<Record<string, T>>;

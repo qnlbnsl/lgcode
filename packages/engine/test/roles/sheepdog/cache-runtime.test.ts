@@ -2,8 +2,8 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { it } from "@effect/vitest";
-import { HarnessSettings, type TurnUsage } from "@shephrd/contracts";
-import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
+import { HarnessSettings, type TurnUsage } from "@sheprd/contracts";
+import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -32,7 +32,7 @@ import { eventually, pause, snapshot } from "../../support/routingRig.ts";
 import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 type Client = Effect.Success<ReturnType<typeof fixtureClient>>;
 const run = <A, E, R>(body: (runner: FakeRunner, client: Client) => Effect.Effect<A, E, R>, lists: EngineLists = engineLists) => Effect.gen(function* () {

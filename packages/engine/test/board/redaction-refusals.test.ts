@@ -6,7 +6,7 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { provideBoard, seedBoard } from "./wakeFixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 
 // This is the frozen tests' public synthetic collision marker.

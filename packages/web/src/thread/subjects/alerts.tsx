@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import type { AgentId, Alert, AlertKind, EventSequence } from "@shephrd/contracts"
+import type { AgentId, Alert, AlertKind, EventSequence } from "@sheprd/contracts"
 import * as Effect from "effect/Effect"
 import { requestId, withClient } from "../client.ts"
 import { SubjectPanel } from "./index.tsx"

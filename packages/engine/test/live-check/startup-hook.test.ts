@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
   checkStartupHook, listServicesFromProc, type ServiceProcess, type StartupHookDeps,
-} from "../../scripts/live/startupHook.ts";
+} from "../../../../plugins/herdr/src/startupHook.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 registerRebuildCheck({ noLog: true });
@@ -24,13 +24,13 @@ beforeEach(() => {
 });
 afterEach(() => { rmSync(root, { recursive: true, force: true }); });
 
-const service = (pid: number, home = state): ServiceProcess => ({ pid, environment: { SHEPHRD_HOME: home } });
+const service = (pid: number, home = state): ServiceProcess => ({ pid, environment: { SHEPRD_HOME: home } });
 
 const deps = (services: ReadonlyArray<ServiceProcess>, extra: Partial<StartupHookDeps> = {}): StartupHookDeps & { readonly calls: { answers: number; sleeps: number } } => {
   const calls = { answers: 0, sleeps: 0 };
   return {
     calls,
-    environment: { SHEPHRD_HOME: state, HOME: join(root, "home") },
+    environment: { SHEPRD_HOME: state, HOME: join(root, "home") },
     listServices: () => services,
     lockExists: () => false,
     answers: async () => { calls.answers += 1; return true; },
@@ -79,9 +79,9 @@ describe("the startup-hook check", () => {
     expect(result.passed && result.pid).toBe(1);
   });
 
-  it("finds the home from XDG_STATE_HOME or HOME, as the service does (breaks if only SHEPHRD_HOME is read)", async () => {
+  it("finds the home from XDG_STATE_HOME or HOME, as the service does (breaks if only SHEPRD_HOME is read)", async () => {
     const xdg = join(root, "xdg");
-    mkdirSync(join(xdg, "shephrd"), { recursive: true });
+    mkdirSync(join(xdg, "sheprd"), { recursive: true });
     const result = await checkStartupHook(deps([{ pid: 7, environment: { XDG_STATE_HOME: xdg } }], { environment: { XDG_STATE_HOME: xdg, HOME: root } }));
     expect(result.passed).toBe(true);
   });
@@ -103,8 +103,8 @@ describe("the startup-hook check", () => {
 
   it("never prints a secret: the reasons and the state hold only paths and pids (breaks if an environment value is copied into a message)", async () => {
     const secret = "sk-live-0123456789abcdef-NEVER-PRINT";
-    const processes: Array<ServiceProcess> = [{ pid: 3, environment: { SHEPHRD_HOME: state, ANTHROPIC_API_KEY: secret } }, service(4)];
-    const result = await checkStartupHook(deps(processes, { environment: { SHEPHRD_HOME: state, ANTHROPIC_API_KEY: secret } }));
+    const processes: Array<ServiceProcess> = [{ pid: 3, environment: { SHEPRD_HOME: state, ANTHROPIC_API_KEY: secret } }, service(4)];
+    const result = await checkStartupHook(deps(processes, { environment: { SHEPRD_HOME: state, ANTHROPIC_API_KEY: secret } }));
     expect(JSON.stringify(result)).not.toContain(secret);
   });
 });
@@ -118,13 +118,13 @@ describe("the process listing", () => {
 
   it("lists the processes that run the engine's service.ts, keeps only the three state variables, and ignores the rest (breaks if another node process counts, or a secret is kept)", () => {
     const proc = join(root, "proc");
-    plant(proc, "100", ["node", "/work/packages/engine/src/service.ts"], { SHEPHRD_HOME: state, ANTHROPIC_API_KEY: "never-kept-0123456789", HOME: "/home/x" });
-    plant(proc, "101", ["node", "/work/packages/engine/src/other.ts"], { SHEPHRD_HOME: state });
-    plant(proc, "102", ["vim", "service.ts"], { SHEPHRD_HOME: state });
+    plant(proc, "100", ["node", "/work/packages/engine/src/service.ts"], { SHEPRD_HOME: state, ANTHROPIC_API_KEY: "never-kept-0123456789", HOME: "/home/x" });
+    plant(proc, "101", ["node", "/work/packages/engine/src/other.ts"], { SHEPRD_HOME: state });
+    plant(proc, "102", ["vim", "service.ts"], { SHEPRD_HOME: state });
     mkdirSync(join(proc, "self"));
     mkdirSync(join(proc, "103"));
     const listed = listServicesFromProc(proc);
-    expect(listed).toEqual([{ pid: 100, environment: { SHEPHRD_HOME: state, HOME: "/home/x" } }]);
+    expect(listed).toEqual([{ pid: 100, environment: { SHEPRD_HOME: state, HOME: "/home/x" } }]);
     expect(JSON.stringify(listed)).not.toContain("never-kept");
   });
 

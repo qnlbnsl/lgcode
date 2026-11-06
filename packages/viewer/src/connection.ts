@@ -1,5 +1,5 @@
-import { connect, resolveIdentity, type ClientEnvelope, type Environment } from "@shephrd/client";
-import type { AgentId, EventSequence, PermissionRequestId, QuestionId, RequestId } from "@shephrd/contracts";
+import { connect, resolveIdentity, type ClientEnvelope, type Environment } from "@sheprd/client";
+import type { AgentId, EventSequence, PermissionRequestId, QuestionId, RequestId } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Scope from "effect/Scope";

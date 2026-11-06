@@ -7,7 +7,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { it } from "@effect/vitest";
-import { AgentId, type Actor, type PermissionLevel } from "@shephrd/contracts";
+import { AgentId, type Actor, type PermissionLevel } from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
@@ -26,14 +26,14 @@ let ownerHome: string;
 let stateFolder: string;
 let pluginRoot: string;
 beforeEach(() => {
-  root = mkdtempSync("/tmp/shephrd-ceiling-");
+  root = mkdtempSync("/tmp/sheprd-ceiling-");
   parent = join(root, "workspace");
   ownerHome = join(root, "protected", "home");
   stateFolder = join(root, "protected", "state");
   pluginRoot = join(root, "protected", "plugin");
   for (const path of [parent, ownerHome, stateFolder, pluginRoot]) mkdirSync(path, { recursive: true, mode: 0o700 });
   vi.stubEnv("HOME", ownerHome);
-  vi.stubEnv("SHEPHRD_HOME", stateFolder);
+  vi.stubEnv("SHEPRD_HOME", stateFolder);
 });
 afterEach(() => { vi.unstubAllEnvs(); rmSync(root, { recursive: true, force: true }); });
 
@@ -202,9 +202,9 @@ it.effect.each(["home", "state", "plugin"] as const)(
 // A real bind mount requires a private user/mount namespace. Never mount in
 // the worker's namespace or request host mount privileges. Report a skip if
 // this kernel disallows unprivileged namespaces; do not replace stat with a mock.
-const bindProbeHome = mkdtempSync("/tmp/shephrd-bind-probe-");
+const bindProbeHome = mkdtempSync("/tmp/sheprd-bind-probe-");
 const bindProbe = spawnSync("/usr/bin/unshare", ["--user", "--map-root-user", "--mount", "/usr/bin/true"], {
-  env: { PATH: "/usr/bin:/bin", HOME: bindProbeHome, SHEPHRD_HOME: bindProbeHome }, encoding: "utf8",
+  env: { PATH: "/usr/bin:/bin", HOME: bindProbeHome, SHEPRD_HOME: bindProbeHome }, encoding: "utf8",
 });
 const bindSupported = bindProbe.error === undefined && bindProbe.status === 0;
 rmSync(bindProbeHome, { recursive: true, force: true });
@@ -225,7 +225,7 @@ it.skipIf(!bindSupported)("5.12 bind inode: catches allowing a protected folder 
     console.log('protected bind refused');
   `;
   const child = spawnSync("/usr/bin/unshare", ["--user", "--map-root-user", "--mount", process.execPath, "--input-type=module", "-e", script], {
-    cwd: root, env: { HOME: ownerHome, SHEPHRD_HOME: stateFolder, PATH: "/usr/bin:/bin" }, encoding: "utf8", timeout: 10_000,
+    cwd: root, env: { HOME: ownerHome, SHEPRD_HOME: stateFolder, PATH: "/usr/bin:/bin" }, encoding: "utf8", timeout: 10_000,
   });
   expect(child.error).toBeUndefined();
   expect(child.stderr).toBe("");
@@ -269,7 +269,7 @@ it.effect.each([
 it.effect.each([
   ".claude/settings.json", ".claude/settings.local.json", ".claude/settings.custom.json",
   ".claude/commands/run.md", ".claude/agents/worker.md", ".mcp.json",
-  ".codex/config.toml", ".codex/other.toml", ".gemini/settings.json", ".cursor/permissions.json",
+  ".codex/config.toml", ".codex/other.toml", ".gemini/settings.json", ".cursor/permissions.json", ".sheprd/config.json", ".SHEPRD/settings.json", ".sheprd",
 ] as const)(
   "5a.2 settings/%s: catches allowing persistent harness changes merely because the answerer has full mode",
   (settingsPath) => Effect.sync(() => {

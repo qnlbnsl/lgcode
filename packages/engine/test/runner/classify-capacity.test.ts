@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import { expect, it } from "vitest";
-import { settled } from "@shephrd/contracts";
+import { settled } from "@sheprd/contracts";
 import { snapshot as clientSnapshot } from "../../src/api/snapshot.ts";
 import { reloadedEvents } from "../../src/recovery/reload.ts";
 import { dispatchQueued } from "../../src/routing/deliveries.ts";

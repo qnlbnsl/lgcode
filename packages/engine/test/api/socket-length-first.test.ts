@@ -39,7 +39,7 @@ live("fix1 T-4 ruling 5: a missing home whose socket path is over 100 bytes is r
     const home = homeFor(parent, 120);
     expect(Buffer.byteLength(join(home, "engine.sock"))).toBe(120);
     expect(existsSync(parent)).toBe(false);
-    const service = startService(root, { env: { SHEPHRD_HOME: home } });
+    const service = startService(root, { env: { SHEPRD_HOME: home } });
     const exit = yield* failedToStart(service);
     expect(exit.signal).toBeNull();
     expect(exit.code).not.toBe(0);
@@ -54,7 +54,7 @@ live("fix1 T-4 ruling 5: an existing 0700 home whose socket path is over 100 byt
     const home = homeFor(root.root, 120);
     mkdirSync(home, { mode: 0o700 });
     writeFileSync(join(home, "keep.txt"), "unchanged", { mode: 0o600 });
-    const service = startService(root, { env: { SHEPHRD_HOME: home } });
+    const service = startService(root, { env: { SHEPRD_HOME: home } });
     const exit = yield* failedToStart(service);
     expect(exit.code).not.toBe(0);
     expect(service.output()).toContain("socket path exceeds 100 bytes");

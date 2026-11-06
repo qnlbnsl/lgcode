@@ -32,13 +32,13 @@ describe("the live-check prompts", () => {
 
   it("fills the four placeholders of the lead prompt into two valid start inputs for a Codex worker (breaks if a placeholder is renamed, or a folder or prompt breaks the JSON)", () => {
     expect([...placeholdersOf(LEAD_PROMPT)].sort()).toEqual(["WORKER_EFFORT", "WORKER_FOLDER", "WORKER_MODEL", "WORKER_PROMPT_JSON"]);
-    const filled = leadPromptFor(liveConfig({}), "/tmp/shephrd-live-x/work/project");
+    const filled = leadPromptFor(liveConfig({}), "/tmp/sheprd-live-x/work/project");
     expect(filled).not.toContain("{{");
     const [wide, real] = inputsOf(filled);
-    expect(wide).toMatchObject({ harness: "codex", permission: "full", account: { _tag: "any" }, groups: ["auth"], runMode: "acp", folder: "/tmp/shephrd-live-x/work/project" });
+    expect(wide).toMatchObject({ harness: "codex", permission: "full", account: { _tag: "any" }, groups: ["auth"], runMode: "acp", folder: "/tmp/sheprd-live-x/work/project" });
     expect(real).toMatchObject({
       harness: "codex", permission: "ask", account: { _tag: "any" }, groups: ["auth"], runMode: "acp",
-      folder: "/tmp/shephrd-live-x/work/project", model: "gpt-6-luna", effort: "low", prompt: WORKER_PROMPT,
+      folder: "/tmp/sheprd-live-x/work/project", model: "gpt-6-luna", effort: "low", prompt: WORKER_PROMPT,
     });
   });
 
@@ -63,7 +63,7 @@ describe("the live-check prompts", () => {
   });
 
   it("takes the model and effort from the variables when they are set (breaks if the owner cannot change the cheapest pick)", () => {
-    const config = liveConfig({ SHEPHRD_LIVE_WORKER_MODEL: "other", SHEPHRD_LIVE_AGENT_TIMEOUT_SECONDS: "12", SHEPHRD_LIVE_TOTAL_TIMEOUT_SECONDS: "nonsense" });
+    const config = liveConfig({ SHEPRD_LIVE_WORKER_MODEL: "other", SHEPRD_LIVE_AGENT_TIMEOUT_SECONDS: "12", SHEPRD_LIVE_TOTAL_TIMEOUT_SECONDS: "nonsense" });
     expect(config).toMatchObject({ workerModel: "other", leadModel: "haiku", leadEffort: "low", workerEffort: "low", agentTimeout: 12_000, totalTimeout: 1_800_000 });
   });
 });

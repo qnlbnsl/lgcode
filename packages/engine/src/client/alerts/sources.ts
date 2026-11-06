@@ -1,4 +1,4 @@
-import type { AlertSourceRequest, Event, EventEnvelope, PermissionRequestId, QuestionId } from "@shephrd/contracts";
+import type { AlertSourceRequest, Event, EventEnvelope, PermissionRequestId, QuestionId } from "@sheprd/contracts";
 import type { Snapshot } from "../../commands/internal.ts";
 import { alertKeyPart } from "./keys.ts";
 import { clientView } from "./view.ts";

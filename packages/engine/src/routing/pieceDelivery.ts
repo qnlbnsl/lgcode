@@ -1,4 +1,4 @@
-import type { AgentId, Caller, Event, PieceNamespace } from "@shephrd/contracts";
+import type { AgentId, Caller, Event, PieceNamespace } from "@sheprd/contracts";
 import { agentText } from "./envelope.ts";
 import { freshDelivery } from "./holders.ts";
 export interface DeliveryRequest { readonly target: AgentId; readonly body: string; readonly sourceId: string }

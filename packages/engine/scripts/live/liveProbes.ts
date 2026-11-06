@@ -3,9 +3,9 @@ import { randomBytes } from "node:crypto";
 import { readFileSync, readlinkSync, realpathSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { connect, type Client } from "@shephrd/client";
-import { permissionForOptionKind, type EventEnvelope } from "@shephrd/contracts";
-import { toolText } from "@shephrd/contracts/thread";
+import { connect, type Client } from "@sheprd/client";
+import { permissionForOptionKind, type EventEnvelope } from "@sheprd/contracts";
+import { toolText } from "@sheprd/contracts/thread";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
@@ -72,7 +72,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
     const cli = fileURLToPath(new URL("../../../cli/src/bin.ts", import.meta.url));
     const args = [cli, "accounts", "--input", '{"operation":"list"}'];
     const result = yield* Effect.tryPromise((signal) => new Promise<{ code: number | null; output: string }>((resolve, reject) => {
-      const child = spawn(process.execPath, args, { signal, env: { SHEPHRD_HOME: options.service().state, TMPDIR: "/tmp" }, stdio: ["ignore", "pipe", "pipe"] });
+      const child = spawn(process.execPath, args, { signal, env: { SHEPRD_HOME: options.service().state, TMPDIR: "/tmp" }, stdio: ["ignore", "pipe", "pipe"] });
       arguments_.set(`cli:${child.pid}`, { label: `arguments of run CLI process ${child.pid}`, text: [process.execPath, ...args].join("\0") });
       let output = "";
       for (const stream of [child.stdout!, child.stderr!]) stream.setEncoding("utf8").on("data", (chunk: string) => { output += chunk; });
@@ -116,11 +116,11 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
         const environment = Object.fromEntries(rawEnvironment.split("\0").filter(Boolean).map((entry) => {
           const at = entry.indexOf("="); return [entry.slice(0, at), entry.slice(at + 1)];
         }));
-        if (environment.SHEPHRD_SOCKET !== join(service.state, "engine.sock") || !environment.SHEPHRD_TOKEN) continue;
+        if (environment.SHEPRD_SOCKET !== join(service.state, "engine.sock") || !environment.SHEPRD_TOKEN) continue;
         if (readlinkSync(`/proc/${pid}/cwd`) === join(service.work, "project")) {
           try { if (JSON.parse(environment.CODEX_CONFIG ?? "null")?.shell_environment_policy?.inherit === "core") coreConfigured = true; } catch { /* Missing or malformed configuration is not evidence. */ }
         }
-        const token = environment.SHEPHRD_TOKEN;
+        const token = environment.SHEPRD_TOKEN;
         allTokens.add(token); options.secrets.add(token);
         const folder = readlinkSync(`/proc/${pid}/cwd`);
         for (const member of members()) if (folder === member.folder) {
@@ -149,7 +149,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
     snapshot();
     const token = tokens.get(agent.agentId);
     yield* check(token !== undefined, `not attempted: no live process token for agent ${agent.agentId}`);
-    return yield* connect({ environment: { SHEPHRD_SOCKET: join(options.service().state, "engine.sock"), SHEPHRD_TOKEN: token! }, attempts: 1 });
+    return yield* connect({ environment: { SHEPRD_SOCKET: join(options.service().state, "engine.sock"), SHEPRD_TOKEN: token! }, attempts: 1 });
   });
   const filesFor = (harness: string, agent: AgentRef, rows: ReadonlyArray<EventEnvelope>): ReadonlyArray<string> => {
     const ids = new Set(tagged(rows, "SessionOpened", agent.agentId).map((row) => event<{ session: { sessionId: string } }>(row).session.sessionId));
@@ -363,7 +363,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
             // Owner success remains a failure even if environment evidence is
             // missing; never obscure the security break behind not attempted.
             outcome = exitCode === 0 ? "acts as owner"
-              : harness === "codex" && output.includes("shephrd: the folder /tmp above the socket is owned by another user") ? "not observable (issue 243)" : !authRefused(output, exitCode) ? "no ancestry refusal observed"
+              : harness === "codex" && output.includes("sheprd: the folder /tmp above the socket is owned by another user") ? "not observable (issue 243)" : !authRefused(output, exitCode) ? "no ancestry refusal observed"
               : harness === "codex" && (!coreConfigured || !shellIdentityAbsent(output)) ? "attempted; failed" : "refused by ancestry check";
           }
         } else if (executed.length > 0) {
@@ -371,7 +371,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
             : executed.some((tool) => tool.status === "failed" && canaryDenied(toolOutputText(tool), join(options.service().state, "live-canary"))) ? "refused" : "attempted; failed";
         }
         const detail = id === "state-read" ? `exact canary command; completed tool calls=${executed.length}; SECURITY.md:51 lists no default deny-read rule`
-          : `exact command; completed tool calls=${executed.length}; ${harness === "codex" ? `core inheritance configured=${String(coreConfigured)}; shell identity variable names=${shellIdentityStatus(output)} (SEC-PB-8)` : "both Shephrd variables removed (SEC-PB-5)"}`;
+          : `exact command; completed tool calls=${executed.length}; ${harness === "codex" ? `core inheritance configured=${String(coreConfigured)}; shell identity variable names=${shellIdentityStatus(output)} (SEC-PB-8)` : "both Sheprd variables removed (SEC-PB-5)"}`;
         results.push({ harness, outcome, detail: `${detail}${outcome === "attempted; failed" ? `; errors=${toolErrors(attempted)}` : ""}` });
       }
       return results;
@@ -489,7 +489,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       for (const { agent } of members()) {
         const token = oldTokens.get(agent.agentId);
         yield* check(token !== undefined, "not attempted: old token was not captured");
-        const old = yield* Effect.exit(Effect.scoped(connect({ environment: { SHEPHRD_SOCKET: join(options.service().state, "engine.sock"), SHEPHRD_TOKEN: token! }, attempts: 1 })));
+        const old = yield* Effect.exit(Effect.scoped(connect({ environment: { SHEPRD_SOCKET: join(options.service().state, "engine.sock"), SHEPRD_TOKEN: token! }, attempts: 1 })));
         const refused = Exit.isFailure(old) && String(old.cause).includes("401");
         yield* check(refused, "old token accepted or authentication refusal not observed after restart");
         const history = yield* eventsUntil(carriedOwner, activeMark, "a real MCP ask call during the carry-on", (row) =>
@@ -561,7 +561,7 @@ export const liveProbeDriver = (options: LiveProbeOptions): ProbeDriver => {
       for (const { harness, agent } of members()) {
         const token = secondTokens.get(agent.agentId);
         yield* check(token !== undefined, "not attempted: old token was not captured");
-        const old = yield* Effect.exit(Effect.scoped(connect({ environment: { SHEPHRD_SOCKET: join(options.service().state, "engine.sock"), SHEPHRD_TOKEN: token! }, attempts: 1 })));
+        const old = yield* Effect.exit(Effect.scoped(connect({ environment: { SHEPRD_SOCKET: join(options.service().state, "engine.sock"), SHEPRD_TOKEN: token! }, attempts: 1 })));
         const refused = Exit.isFailure(old) && String(old.cause).includes("401");
         const sentAgain = yield* eventsUntil(fresh, mark, "reloaded replay or carry-on delivery to be sent", (row) =>
           row.agentId === agent.agentId && row.event._tag === "DeliverySent", options.agentTimeout);

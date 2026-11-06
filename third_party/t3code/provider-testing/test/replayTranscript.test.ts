@@ -1,4 +1,4 @@
-// Written for Shephrd. T3 Code has no unit test for these helpers, so this file checks
+// Written for Sheprd. T3 Code has no unit test for these helpers, so this file checks
 // that replay transcripts decode (plan criterion 2.4) and that bad input is refused.
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { describe, expect, it } from "@effect/vitest";

@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 
-import { EventSequence, RequestId, type Actor, type Event } from "@shephrd/contracts";
-import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
+import { EventSequence, RequestId, type Actor, type Event } from "@sheprd/contracts";
+import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";

@@ -8230,3 +8230,24 @@ after a notice authored by `roles.sheepdog`. A prompt regression checks
 these instructions and their inclusion in both worker start inputs.
 The check's assertions and the product code are unchanged.
 No real roles run was performed for this prompt fix.
+
+## 493. The live startup preflight depended on the owner's Herdr service
+
+Found: 2026-11-05, during the standalone Sheprd split.
+State: fixed on `area/sheprd-split`.
+
+The live check required a Herdr startup hook to have started a service in the
+owner's real state folder.
+That preflight prevented a standalone installation from checking the core.
+The rename also changes the default state folder, so an older running
+service cannot prove that the renamed plugin hook works.
+
+The plugin now owns the hook probe.
+The live check runs the plugin manifest's command twice in private temporary
+state and checks that both calls use one service.
+It reports SKIP when Herdr is absent.
+An optional skip permits the core checks to continue and does not turn a
+complete core run into a failure.
+The owner's service is outside the probe's startup and cleanup paths.
+Plugin integration tests cover both the absent case and a real private hook
+launch, and the scripted journey covers an absent plugin through recording.

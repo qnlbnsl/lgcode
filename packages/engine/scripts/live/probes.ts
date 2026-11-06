@@ -32,7 +32,7 @@ const accepted: Record<ProbeId, ReadonlyArray<string>> = {
   "token-scan": ["not found"],
 };
 
-export const ADAPTER_CANCELLED = "attempted; the adapter cancelled the call before Shephrd saw a permission request (see issue 236)";
+export const ADAPTER_CANCELLED = "attempted; the adapter cancelled the call before Sheprd saw a permission request (see issue 236)";
 // These are known failing outcomes, never aliases for a passing observation.
 export const failingOutcomes: Partial<Record<ProbeId, ReadonlyArray<string>>> = {
   "sandbox-mcp": ["attempted; failed", ADAPTER_CANCELLED],

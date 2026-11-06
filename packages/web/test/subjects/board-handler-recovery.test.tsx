@@ -25,7 +25,7 @@ const withBoard = async (test: (context: {
 }) => Promise<void>) => {
   const rig = makeRig()
   vi.stubEnv("HOME", rig.home)
-  vi.stubEnv("SHEPHRD_HOME", rig.stateFolder)
+  vi.stubEnv("SHEPRD_HOME", rig.stateFolder)
   try {
     await Effect.runPromise(provideBoard(rig, Effect.gen(function* () {
       const credentials = yield* seedBoard()

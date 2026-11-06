@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
-import { pieceNamespaces } from "@shephrd/contracts";
+import { pieceNamespaces } from "@sheprd/contracts";
 import { expect, it } from "vitest";
 import { requiredModule } from "../support/callerRules.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";

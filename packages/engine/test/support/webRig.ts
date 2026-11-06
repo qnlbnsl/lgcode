@@ -6,7 +6,7 @@ import { request } from "node:http";
 import { createServer } from "node:net";
 import { join } from "node:path";
 
-import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -180,12 +180,12 @@ export const withWeb = async (
   const module = await import(/* @vite-ignore */ moduleUrl.href) as WebModule;
   expect(typeof module.serve, "the real web listener must export serve").toBe("function");
   const rig = makeRig();
-  vi.stubEnv("SHEPHRD_HOME", rig.stateFolder);
+  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
   const password = Object.hasOwn(options, "password") ? options.password : freshSecret();
   const settings: WebSettings = { enabled: true, port: await freePort(), heartbeatSeconds: 25, proxyMode: false, ...options.settings };
   const staticRoot = join(rig.root, "page");
   mkdirSync(staticRoot);
-  writeFileSync(join(staticRoot, "index.html"), '<!doctype html><title>Shephrd test page</title><script src="/app.js" defer></script><main>Shephrd test page</main>');
+  writeFileSync(join(staticRoot, "index.html"), '<!doctype html><title>Sheprd test page</title><script src="/app.js" defer></script><main>Sheprd test page</main>');
   writeFileSync(join(staticRoot, "app.js"), 'document.querySelector("main").dataset.ready = "yes";');
   const lists = options.lists ?? await loadLists();
   try {

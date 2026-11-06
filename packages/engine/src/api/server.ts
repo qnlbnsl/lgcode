@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import type { Socket } from "node:net";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import { CommandsRpcGroup, type Actor, type AgentId, type EventEnvelope } from "@shephrd/contracts";
+import { CommandsRpcGroup, type Actor, type AgentId, type EventEnvelope } from "@sheprd/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -120,7 +120,7 @@ export const application = (options: ApplicationOptions) => Effect.gen(function*
     const identity = yield* currentIdentity();
     if (Option.isNone(identity)) return refused(401, "invalid credential");
     const { credential, agentId } = identity.value as { credential: Credential; agentId?: AgentId };
-    if (options.webIdentity === undefined && credential._tag === "owner" && !(yield* outsideAdapters(request.headers["shephrd-ancestors"], request.headers["shephrd-process-group"]))) return refused(403, "owner credential refused");
+    if (options.webIdentity === undefined && credential._tag === "owner" && !(yield* outsideAdapters(request.headers["sheprd-ancestors"], request.headers["sheprd-process-group"]))) return refused(403, "owner credential refused");
     // Ordinary HTTP is used by serve --detach to detect this service. It
     // performs the same authentication but never starts an RPC session.
     if (request.headers.upgrade?.toLowerCase() !== "websocket") return refused(400, "websocket required");

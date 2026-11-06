@@ -1,7 +1,4 @@
 import { PassThrough } from "node:stream";
-import { chmodSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { createServer } from "node:http";
 import { render } from "ink";
 import { afterEach, expect, it } from "vitest";
 import { connectViewer, readRequestContext } from "../src/index.ts";
@@ -62,7 +59,7 @@ it("drives live threads, context review, a selected answer and an owner prompt t
   expect(output).toContain("Name agent-a");
   expect(output).toContain("Name agent-b");
   expect(peer.upgrades.every((headers) => headers.authorization === `Bearer ${ownerCredential}`)).toBe(true);
-  expect(peer.upgrades.every((headers) => typeof headers["shephrd-ancestors"] === "string" && typeof headers["shephrd-process-group"] === "string")).toBe(true);
+  expect(peer.upgrades.every((headers) => typeof headers["sheprd-ancestors"] === "string" && typeof headers["sheprd-process-group"] === "string")).toBe(true);
   const live = envelope(11, { _tag: "ThreadItem", agentId: "agent-a", itemId: "live", replay: false,
     content: { _tag: "text", text: "Live left\u001b]52;c;clipboard-data\u0007right" } });
   chunk(subscription!.socket, subscription!.frame, [live]);
@@ -128,45 +125,13 @@ it("strips every terminal string family including C1 payloads while preserving o
   expect(safeText("left\u009d52;c;payload\u0007right")).toBe("leftright");
 });
 
-it("runs the Node launcher and opens the declared pane without granting an agent an owner action", async () => {
+it("runs the terminal viewer through the standalone command", async () => {
   const root = prepareRoot();
   await fakeEngine(root);
-  const binary = join(root.root, "fake-herdr");
-  const args = join(root.root, "pane-arguments");
-  writeFileSync(binary, `#!/bin/sh\nprintf '%s\\n' "$@" > '${args}'\n`);
-  chmodSync(binary, 0o700);
-  const environment = { ...serviceEnvironment(root), HERDR_BIN_PATH: binary };
-  const action = startCli(root, ["view", "--open-pane"], environment);
-  expect((await finishCli(action)).code).toBe(0);
-  expect(readFileSync(args, "utf8").trim().split("\n")).toEqual(["plugin", "pane", "open", "--plugin", "shephrd", "--entrypoint", "view"]);
-  const agent = startCli(root, ["view", "--open-pane"], { ...agentEnvironment(root), HERDR_BIN_PATH: binary });
-  expect((await finishCli(agent)).code).toBe(1);
-  // Importing the terminal app in Node must work without a JSX transform.
-  const nonTerminal = startCli(root, ["view"], environment);
+  const nonTerminal = startCli(root, ["view"], serviceEnvironment(root));
   expect((await finishCli(nonTerminal)).code).toBe(1);
   expect(nonTerminal.stderr()).toContain("the viewer needs an owner terminal");
   expect(nonTerminal.stderr()).not.toContain("unexpectedly");
-});
-
-it("refuses a pane action when the engine rejects its process identity, before invoking Herdr", async () => {
-  const root = prepareRoot();
-  const server = createServer();
-  let refused = false;
-  server.on("upgrade", (_request, socket) => {
-    refused = true;
-    socket.end("HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
-  });
-  await new Promise<void>((resolve) => server.listen(root.socket, resolve));
-  chmodSync(root.socket, 0o600);
-  dispose.push(() => new Promise<void>((resolve) => server.close(() => resolve())));
-  const binary = join(root.root, "must-not-run");
-  const marker = join(root.root, "invoked");
-  writeFileSync(marker, "no");
-  writeFileSync(binary, `#!/bin/sh\nprintf yes > '${marker}'\n`);
-  chmodSync(binary, 0o700);
-  const action = startCli(root, ["view", "--open-pane"], { ...serviceEnvironment(root), HERDR_BIN_PATH: binary });
-  expect((await finishCli(action)).code).toBe(1);
-  expect(refused).toBe(true);
-  expect(readFileSync(marker, "utf8")).toBe("no");
-  expect(action.stderr()).toContain("owner viewer pane could not be opened");
+  const removed = startCli(root, ["view", "--open-pane"], serviceEnvironment(root));
+  expect((await finishCli(removed)).code).toBe(2);
 });

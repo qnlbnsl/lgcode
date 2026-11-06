@@ -6,13 +6,17 @@ one set of rules.
 
 ## What this project is
 
-Shephrd is a plugin for [Herdr](https://github.com/herdrdev/herdr). It runs
+Sheprd is a standalone program with a web page and an optional
+[Herdr plugin](plugins/herdr/README.md). It runs
 teams of coding agents (an orchestrator, team leads, and workers), connects
 them through a strict message board, and exposes everything through an
 authenticated client API for web, desktop, and mobile apps. Read
 [README.md](README.md) before starting any task.
+Start it without Herdr through `./bin/sheprd serve --detach`.
+Set `SHEPRD_WEB_PASSWORD` on the service to enable the web page.
+The core must not import the optional plugin.
 
-Shephrd is a separate project from
+Sheprd is a separate project from
 [Herdr Synapse](https://github.com/vitalysim/herdr-synapse), which inspired
 it. It is not a fork in the git sense and does not track Synapse's history.
 
@@ -25,19 +29,19 @@ current task.
 
 ## Language
 
-Shephrd is written in TypeScript, decided by the owner on 2026-10-30. The
+Sheprd is written in TypeScript, decided by the owner on 2026-10-30. The
 backend, the web page, and the future desktop and mobile apps share one
 language, so the client API's types are defined once and used by every
 client. Code borrowed from TypeScript projects such as T3 Code is copied, not
 ported.
 
-Shephrd is written with the [Effect](https://effect.website) library,
+Sheprd is written with the [Effect](https://effect.website) library,
 version 4, decided by the owner on 2026-11-01, so that T3 Code's Effect code
 can be copied. Effect 4 is newer than most agents' training, so look up its
 current documentation before writing Effect code; do not write it from
 memory.
 
-Shephrd runs as a Node.js program on Node.js 26, the current long-term
+Sheprd runs as a Node.js program on Node.js 26, the current long-term
 support line, decided by the owner on 2026-11-01. The `.nvmrc` file says
 `26`; run `nvm use` before working in this repository.
 
@@ -46,10 +50,10 @@ support line, decided by the owner on 2026-11-01. The `.nvmrc` file says
 Every harness has two run modes, chosen per harness in its settings,
 decided by the owner on 2026-10-30:
 
-- **ACP mode** is built first. Shephrd runs the agent as a child process and
+- **ACP mode** is built first. Sheprd runs the agent as a child process and
   drives it through the Agent Client Protocol.
-- **Interactive mode** is built second. Shephrd opens the harness's normal
-  terminal program in a Herdr pane.
+- **Interactive mode** is built second. Sheprd opens the harness's normal
+  terminal program in a Herdr pane through the optional plugin.
 
 The board, the roster, and the thread view must not depend on which mode an
 agent uses. Keep the mode-specific code behind one delivery interface, so an
@@ -70,7 +74,7 @@ ACP agent and an interactive agent can sit on the same team.
    - Add an entry to the root [NOTICE](NOTICE) file.
    - Name the source project and file in the commit message.
    - Keep the original copyright lines. If the code is later moved into
-     Shephrd's own source tree, the moved file starts with a comment naming
+     Sheprd's own source tree, the moved file starts with a comment naming
      where it came from and its licence.
 3. **Keep the lists current.** A new feature idea goes into
    [docs/features.md](docs/features.md). A problem found while working goes
@@ -82,9 +86,9 @@ ACP agent and an interactive agent can sit on the same team.
 5. **The client API is the product's surface.** Anything the owner can do
    from the terminal must also be possible through the API, so a web or
    mobile client is never a second-class citizen.
-6. **Team shapes and workflows do not belong here.** Shephrd provides roles,
-   the board, and the API. The definitions of particular teams live outside
-   this repository.
+6. **Ship a default workflow that people can override.** Sheprd provides
+   roles, the board, the API, and a default workflow. People can supply
+   their own team definitions and workflow instructions.
 7. **Agents have full authority inside a team.** They commit, push and merge
    on their team's branches and worktrees without asking. Moving finished work
    into the base branch is done by a pull request, and the owner approves it.

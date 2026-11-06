@@ -1,6 +1,6 @@
 import { mkdtempSync, rmSync } from "node:fs";
 
-import { canTransition, eventEffect, type Event, type LifecycleState } from "@shephrd/contracts";
+import { canTransition, eventEffect, type Event, type LifecycleState } from "@sheprd/contracts";
 import * as fc from "fast-check";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
@@ -11,8 +11,8 @@ import { accepted, account, delivery, envelopes, event, opened, owner, permissio
 registerRebuildCheck({ noLog: true });
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/shephrd-apply-");
-  vi.stubEnv("SHEPHRD_HOME", home);
+  home = mkdtempSync("/tmp/sheprd-apply-");
+  vi.stubEnv("SHEPRD_HOME", home);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

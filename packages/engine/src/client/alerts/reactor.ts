@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   AlertSourceRequest, alertTitles, pieceNamespaces, type AlertId, type Event,
   type EventEnvelope, type EventSequence, type PieceNamespace,
-} from "@shephrd/contracts";
+} from "@sheprd/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";

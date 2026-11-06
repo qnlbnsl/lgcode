@@ -1,7 +1,7 @@
 // A disposable service used only by the parent's SIGKILL tests. No adapter or
 // credential crosses its IPC boundary. The HTTP peer belongs to the parent.
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as SqliteClient from "@shephrd/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
 import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";

@@ -1,4 +1,4 @@
-import { boardAlertSources } from "@shephrd/contracts/board/alerts";
+import { boardAlertSources } from "@sheprd/contracts/board/alerts";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import { afterEach, beforeEach, expect, vi } from "vitest";
@@ -11,7 +11,7 @@ import { agent, change, owner, provideBoard, seedBoard, snapshot } from "./wakeF
 import { post as postEvent } from "./fixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 
 it.live("5.15 board openMatters scans the full rebuilt view and matches post alert identities", () => provideBoard(rig, Effect.gen(function* () {

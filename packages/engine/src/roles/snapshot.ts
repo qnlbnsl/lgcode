@@ -1,4 +1,4 @@
-import { rolesMaxima, type Caller, type RolesActionRecord, type RolesSettings } from "@shephrd/contracts";
+import { rolesMaxima, type Caller, type RolesActionRecord, type RolesSettings } from "@sheprd/contracts";
 import type { Snapshot } from "../commands/internal.ts";
 import { encodedBytes } from "../client/reads/display.ts";
 import type { Matter, RolesView } from "./view.ts";

@@ -10,7 +10,7 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { agent, boardState, change, eventsOf, provideBoard } from "./wakeFixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 
 for (const state of ["paused", "starting", "interrupted", "crashed", "stopped", "idle", "working"] as const) {

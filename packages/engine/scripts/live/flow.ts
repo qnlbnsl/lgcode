@@ -1,5 +1,5 @@
-import type { Client } from "@shephrd/client";
-import type { EventEnvelope } from "@shephrd/contracts";
+import type { Client } from "@sheprd/client";
+import type { EventEnvelope } from "@sheprd/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -111,7 +111,7 @@ export const allowOnce = (options: ReadonlyArray<{ readonly id: string; readonly
   (options.find((option) => option.kind === "allow_once")
     ?? options.find((option) => option.kind.startsWith("allow") && option.persistent !== true))?.id;
 
-// The lead's own tool calls (the tools of Shephrd) ask the owner, who is its
+// The lead's own tool calls (the tools of Sheprd) ask the owner, who is its
 // parent. The script answers them with "allow once", and only them: the
 // worker's request is the lead's to pass up, and the owner answers that one
 // in the step that tests it.

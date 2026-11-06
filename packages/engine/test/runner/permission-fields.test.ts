@@ -6,7 +6,7 @@ import { accountFor, deliveryFor, echoFile, harnessFor, makeRunnerRig, removeRun
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 let rig: RunnerRig;
-beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPHRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig); });
 registerRebuildCheck({ noLog: true });
 
