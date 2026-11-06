@@ -182,11 +182,12 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   and `.sheprd` is mounted read-only. The owner's home folder, Shephrd's state
   folder and other processes are not visible. This replaces the earlier plan
   for Shephrd to run as its own Unix user, because bubblewrap needs no root
-  access at install and leaves worktree files owned by the owner. The owner
-  checked real Codex and Claude runs this way on 2026-11-05. It is not built.
+  access at install and leaves worktree files owned by the owner. Real Codex
+  and Claude command-line runs worked this way on 2026-11-05, in a manual test.
+  It is not built.
   A harness's login stays visible inside its sandbox, and how to hide it from
   the commands an agent runs is still open.
-- **Agents use API keys without holding them** (agreed, 2026-11-05). The
+- **Agents use API keys without holding them** (idea, 2026-11-05). The
   engine runs a tool server such as Firecrawl's outside the sandbox with the
   key, and agents call the tool. A proxy that swaps a placeholder for the real
   key may follow for scripts. Trusted steps such as test commands run outside
