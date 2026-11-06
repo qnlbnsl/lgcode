@@ -114,8 +114,12 @@ The mock makes this part of the website, so it no longer waits until after it.
 
 - [ ] Add a worker mode: the computer chooses Master or Worker, and a worker joins a
       master by its HTTPS address and a pairing code.
-- [ ] Pair with an expiring code, and confirm on both computers. The owner's
-      no-pairing rule was about web login, so this needs the owner's word.
+- [ ] Pair with an expiring code, and confirm on both computers. The owner approved
+      a pairing code for machines on 2026-11-06. Web login stays one password. Which
+      side generates the code is the owner's next decision.
+- [ ] Add `sheprd connect <address>`, which starts the pairing from the other computer.
+- [ ] Secure the link with a secure WebSocket and self-signed certificates that each
+      side trusts after pairing, as the owner described on 2026-11-06.
 - [ ] Have the worker connect out to the master, and report its capacity in agent
       slots, its repositories, its health and its identity.
 - [ ] Place a project on a machine. Offline or unconfirmed workers get no new projects,
