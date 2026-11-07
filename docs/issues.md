@@ -8693,11 +8693,18 @@ Nobody yet knows how many of these findings the Codex repairs already fixed. A r
 ## 520. The stall rule nudges a lead while its own worker is busy, and the plan contradicts itself
 
 Found: 2026-11-07, recorded from review finding K-368.
-State: open, awaiting the owner's ruling. No code changes during the freeze.
+State: open. The owner ruled on 2026-11-07, and the code change waits until the freeze lifts.
 
 When an orchestrator posts a question that needs a reply to a lead, the lead goes idle while its workers run. After 20 minutes the lead receives `StallSeen`, and on the third episode the orchestrator receives `ReplaceAdvised`. The code is `packages/engine/src/roles/sheepdog/rules/stall.ts:145-150`. The plan's criterion 4.3, at `.plans/plans/shepherd-foundry-roles/plan.md:939`, says both "nor is the lead" and "still nudged". The plan's line 69 says that a worker waiting on a busy agent is not stalled. No test covers an orchestrator's post to a lead with a busy descendant.
 
-The manager's recommendation is to keep the nudge, because the question is still owed, and to stop advising replacement while the lead's team is working.
+The owner ruled on 2026-11-07 that the lead keeps both the nudges and the replacement advice in this case. The advice changes form, as follows:
+
+- The sheepdog stops nudging after the third time, as it does today.
+- The replacement advice becomes a notice to the orchestrator and a mark on the lead. The lead's row in the roles view gains a field that says replacement is advised. Today the view counts nudges in `stallCount` but records nothing for `ReplaceAdvised`.
+- When every worker under a marked lead has finished, the sheepdog tells the orchestrator that the lead's workers are done and that the lead is ready for replacement.
+- The orchestrator then saves the old lead's transcript and starts a new lead. The new lead receives the original order, the old transcript to summarise, and what to look through, so it continues where the old lead stopped. Because it is a lead, it reaches the team's workers directly.
+
+The plan's criterion 4.3 should be corrected to say that the lead is nudged. The owner expects three unanswered nudges in a row to be rare. The owner's words: "keep the nudge and also keep 'replacement advised.' The replacement advisory could just be a notice to the orchestrator and a mark on the lead."
 
 ## 521. Finished review seats filled the temporary folder's file limit
 
