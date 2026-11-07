@@ -277,6 +277,13 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   after, because a wake after the cache expires costs about 20 times more for
   the cached part. Posts that need an answer and can wait are delivered
   before the cache expires. See research item 4.
+- **Replacement waits for the lead's team** (agreed, 2026-11-07). When a
+  lead has not answered three nudges, the sheepdog marks the lead as advised
+  for replacement and tells the orchestrator. When the lead's workers have all
+  finished, the sheepdog tells the orchestrator that the lead is ready to
+  replace. The new lead starts from the original order and the old lead's
+  transcript, and it reaches the team's workers directly. Issue 520 holds the
+  details.
 - **Runaway work** (built). Work that runs far past its expected length is
   reported to the lead, and can continue in a fresh agent with a built
   hand-off.
