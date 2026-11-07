@@ -9,12 +9,23 @@ const params=new URLSearchParams(location.search);
 const S={
  repositories:[],workspaces:[],projects:[],requests:[],permissionItems:[],deliveryItems:[],machineItems:[],subscriptionItems:[],
  projectMachines:new Map(),futureProjectMachines:new Map(),repositoryLocations:new Map(),runtimeStates:new Map(),workspacePreferences:new Map(),
- threads:new Map(),channels:new Map(),alerts:[],taskStories:{},agents:new Map(),agentProjects:new Map(),openTurns:new Map()
+ threads:new Map(),channels:new Map(),alerts:[],taskStories:{},agents:new Map(),agentProjects:new Map(),openTurns:new Map(),
+ setup:{step:'welcome',finished:false}
 };
 let reads=null,meta=null,source='sample',sequence=0,bootedAt=0;
 const events=[],subscribers=new Set(),gitStates=new Map(),replyTimers=new Map(),signInTimers=new Map();
 const counters={project:1,task:30,machine:1,account:1,git:1,delivery:1,item:1,post:1};
 
+// First run. Where the owner has got to is stored; what the scan finds is read each time.
+const setupSteps=['welcome','found','project'];
+const setupScenario=()=>params.get('setup')||'ready';
+const setupStore={
+ key:()=>'sheprd-setup-'+setupScenario(),
+ read(){try{return JSON.parse(localStorage.getItem(setupStore.key()))||{}}catch{return {}}},
+ write(patch){try{localStorage.setItem(setupStore.key(),JSON.stringify({...setupStore.read(),...patch}))}catch{}},
+ clear(){try{localStorage.removeItem(setupStore.key());sessionStorage.removeItem('sheprd-session')}catch{}}
+};
+let setupScans=0;
 const fetchJson=async path=>{try{const response=await fetch(path,{cache:'no-cache'});return response.ok?await response.json():null}catch{return null}};
 const fill=(text,values)=>text.replace(/\{(\w+)\}/g,(m,key)=>values[key]??m);
 const owner={_tag:'owner'},asAgent=agentId=>({_tag:'agent',agentId});
@@ -91,7 +102,10 @@ function addAlert(row,e){
 
 const handlers={
  'project.MachineAdded':(row,e)=>S.machineItems.push({id:e.machineId,name:e.name,role:e.role,status:e.status,slots:e.slots,workspaceFolder:e.workspaceFolder||'~/projects'}),
- 'project.MachineChanged':(row,e)=>Object.assign(machine(e.machineId),e.status?{status:e.status}:{},e.role?{role:e.role}:{}),
+ 'project.MachineChanged':(row,e)=>Object.assign(machine(e.machineId),e.status?{status:e.status}:{},e.role?{role:e.role}:{},e.workspaceFolder?{workspaceFolder:e.workspaceFolder}:{}),
+ 'project.SetupProgressed':(row,e)=>{S.setup.step=e.step},
+ 'project.SetupFinished':()=>{S.setup.finished=true},
+ 'project.RepositoryForgotten':(row,e)=>{S.repositories.splice(S.repositories.findIndex(r=>r.id===e.repoId),1);for(const key of [...S.repositoryLocations.keys()])if(key.startsWith(e.repoId+'/'))S.repositoryLocations.delete(key);for(let i=S.workspaces.length-1;i>=0;i--)if(S.workspaces[i].repoId===e.repoId)S.workspaces.splice(i,1)},
  'project.RepositoryAdded':(row,e)=>S.repositories.push({id:e.repoId,name:e.name,path:e.path}),
  'project.RepositoryLocated':(row,e)=>S.repositoryLocations.set(e.repoId+'/'+e.machineId,e.path),
  'project.WorktreeCreated':(row,e)=>worktreeFor(e.worktreeId,e.repoId,e),
@@ -200,15 +214,23 @@ const api={
   const load=async dir=>{const [rows,overlay,info]=await Promise.all(['events','reads','meta'].map(name=>fetchJson(`data/${dir}/${name}.json`)));return rows&&info?{rows,overlay,info}:null};
   const sample=await load(asked==='heavy'?'heavy':'sample');
   const prod=asked?null:await load('prod');
-  const chosen=prod?.rows.some(row=>row.event_type==='AgentStarted')?prod:sample;
+  const first=asked==='first'?await load('first'):null;
+  const chosen=first||(prod?.rows.some(row=>row.event_type==='AgentStarted')?prod:sample);
   if(!chosen)throw Error('The data files did not load.');
-  source=chosen===prod?'prod':asked==='heavy'?'heavy':'sample';
-  reads={...sample.overlay,...chosen.overlay,git:{...sample.overlay.git,worktrees:chosen===prod?{}:sample.overlay.git.worktrees,evidence:chosen===prod?{}:sample.overlay.git.evidence,...(chosen===prod?chosen.overlay?.git:{})}};
-  if(chosen===prod)Object.assign(reads,{large:chosen.overlay?.large||{},reactions:chosen.overlay?.reactions||{},deliveryLabels:chosen.overlay?.deliveryLabels||{}});
+  source=chosen===first?'first':chosen===prod?'prod':asked==='heavy'?'heavy':'sample';
+  const bare=chosen===prod||chosen===first;
+  reads={...sample.overlay,...chosen.overlay,git:{...sample.overlay.git,worktrees:bare?{}:sample.overlay.git.worktrees,evidence:bare?{}:sample.overlay.git.evidence,...(bare?chosen.overlay?.git:{})}};
+  if(bare)Object.assign(reads,{large:chosen.overlay?.large||{},reactions:chosen.overlay?.reactions||{},deliveryLabels:chosen.overlay?.deliveryLabels||{}});
   meta=chosen.info;bootedAt=Date.now();
   S.settings=structuredClone(reads.settings);
   for(const row of chosen.rows){events.push(row);sequence=Math.max(sequence,row.sequence);fold(row)}
   localMachine();
+  if(first){
+   if(params.has('reset')){setupStore.clear();params.delete('reset');history.replaceState(null,'','?'+params)}
+   const saved=setupStore.read();
+   if(saved.step)S.setup.step=saved.step;
+   if(saved.folder)localMachine().workspaceFolder=saved.folder;
+  }
   return api.client.snapshot();
  },
  client:{
@@ -285,7 +307,7 @@ const api={
  project:{
   // The engine has no project piece yet. These write the proposed project.* events.
   async list(){return S.projects},
-  async create({name,repoId,plan,useWorktree}){
+  async create({name,repoId,plan,useWorktree,account:chosenAccount}){
    const n=counters.project++,id='project-'+n,leadName=reads.service.leadNames[(n-1)%reads.service.leadNames.length],machineId=plan.machineId;
    let baseId=plan.base?.id;
    if(plan.fresh){
@@ -297,9 +319,9 @@ const api={
    let worktreeId=baseId;
    if(useWorktree){worktreeId='worktree-'+id;emit('project.WorktreeCreated',{worktreeId,repoId,machineId,projectId:id,branch:plan.branch,path:plan.path,owner:name+' · '+leadName,activity:'No pending changes'})}
    emit('project.Created',{projectId:id,repoId,name,goal:'Define the outcome with your project lead.',leadAgentId:'lead-'+n,worktreeId,machineId});
-   const worktree=S.workspaces.find(w=>w.id===worktreeId),leadId='lead-'+n,accountId=S.subscriptionItems.find(a=>a.harness==='claude'&&a.machineId===machineId&&a.status==='Available')?.id||'claude-'+machineId;
+   const worktree=S.workspaces.find(w=>w.id===worktreeId),leadId='lead-'+n,accountId=chosenAccount||S.subscriptionItems.find(a=>a.harness==='claude'&&a.machineId===machineId&&a.status==='Available')?.id||'claude-'+machineId,harness=account(accountId)?.harness||'claude';
    worktree.projectId||=id;
-   emit('AgentStarted',{agentId:leadId,name:leadName,role:'Project lead',groups:[id],parent:owner,harness:'claude',account:accountId,permission:'edit',folder:'/'+worktree.path.replace(/^[~/]+/,''),runMode:'acp'});
+   emit('AgentStarted',{agentId:leadId,name:leadName,role:'Project lead',groups:[id],parent:owner,harness,account:accountId,permission:'edit',folder:'/'+worktree.path.replace(/^[~/]+/,''),runMode:'acp'});
    emit('SessionOpened',{agentId:leadId,session:{_tag:'acp',sessionId:'session-'+leadId},protocolVersion:1,reloadable:true},{caller:'service:runner'});
    saySomething(leadId,reads.replies.greeting.map(text=>fill(text,{project:name})));
    return {id,repoId};
@@ -324,6 +346,49 @@ const api={
   async join(address){emit('project.MasterJoined',{address})},
   async place(projectId,machineId){emit('project.Placed',{projectId,machineId})}
  },
+ // First run. These stand for a proposed read of the computer and proposed progress records.
+ setup:{
+  needed(){return !S.setup.finished&&!S.projects.length},
+  // Reads the harnesses and the repositories in a folder. It changes nothing on the computer.
+  async scan(folder){
+   const host=localMachine(),chosen=folder||host.workspaceFolder,moved=chosen!==host.workspaceFolder;
+   if(moved){
+    for(const repo of [...S.repositories])if(!S.projects.some(project=>project.repoId===repo.id))emit('project.RepositoryForgotten',{repoId:repo.id});
+    emit('project.MachineChanged',{machineId:host.id,workspaceFolder:chosen});
+    setupStore.write({folder:chosen});
+   }
+   await new Promise(resolve=>setTimeout(resolve,reads.setup.delay));
+   const scenario=setupScenario(),found=reads.setup.scenarios[setupScans++&&reads.setup.rescan[scenario]||scenario];
+   if(found.failure)return {folder:chosen,failure:found.failure};
+   const signedIn=setupStore.read().signedIn||[];
+   const harnesses=found.harnesses.map(h=>{
+    if(!h.installed)return {...h,install:reads.setup.install[h.harness]};
+    const accountId=h.harness+'-'+host.id;
+    if(!account(accountId)){
+     emit('AccountChanged',{accountId,account:{id:accountId,harness:h.harness,displayName:toolName(h.harness),enabled:true}});
+     emit('project.AccountPlaced',{accountId,machineId:host.id});
+     if(!h.signedIn&&!signedIn.includes(accountId))emit('AccountNeedsSignIn',{accountId,reason:'not-signed-in'});
+    }
+    if(h.signedIn||signedIn.includes(accountId))emit('AccountAvailable',{accountId,cause:'signed-in'});
+    return {...h,accountId};
+   });
+   const repositories=found.repositories.length||!moved?found.repositories:reads.setup.scenarios.ready.repositories;
+   return {folder:chosen,harnesses,repositories:repositories.map(r=>({...r,id:r.name,path:chosen+'/'+r.name}))};
+  },
+  // The repositories the scan found become the service's own when the owner moves on.
+  adopt(repositories){
+   const host=localMachine();
+   for(const repo of repositories){
+    if(S.repositories.some(r=>r.id===repo.id))continue;
+    emit('project.RepositoryAdded',{repoId:repo.id,name:repo.name,path:repo.path});
+    emit('project.RepositoryLocated',{repoId:repo.id,machineId:host.id,path:repo.path});
+    emit('project.WorktreeCreated',{worktreeId:host.id+'-'+repo.id+'-main',repoId:repo.id,machineId:host.id,branch:repo.branch,path:repo.path,owner:'Main checkout',activity:'No uncommitted changes'});
+   }
+  },
+  // A lower step never lowers how far the owner has got, so Back does not lose the place.
+  advance(step){if(setupSteps.indexOf(step)>setupSteps.indexOf(S.setup.step)){emit('project.SetupProgressed',{step});setupStore.write({step})}},
+  finish(){emit('project.SetupFinished',{});setupStore.clear()}
+ },
  accounts:{
   async list(){return S.subscriptionItems},
   async add({id,harness,name,machineId}){
@@ -337,7 +402,7 @@ const api={
   // Runs the harness's own login in a terminal on that machine.
   async signIn(id){
    clearTimeout(signInTimers.get(id));
-   signInTimers.set(id,setTimeout(()=>{signInTimers.delete(id);emit('AccountAvailable',{accountId:id,cause:'signed-in'});clearAlertsFor(id,'signed-in')},1200));
+   signInTimers.set(id,setTimeout(()=>{signInTimers.delete(id);emit('AccountAvailable',{accountId:id,cause:'signed-in'});clearAlertsFor(id,'signed-in');if(source==='first')setupStore.write({signedIn:[...new Set([...(setupStore.read().signedIn||[]),id])]})},1200));
    return reads.harness.logins[account(id).harness]||reads.harness.logins.codex;
   },
   async cancelSignIn(id){clearTimeout(signInTimers.get(id));signInTimers.delete(id)}

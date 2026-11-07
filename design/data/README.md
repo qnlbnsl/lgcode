@@ -12,6 +12,7 @@ Ananke's `apps/mocks`, which loads a production export without standing up the s
 | `stubs.js` | The global `api` object that stands in for the client API. |
 | `sample/` | The small sample, and the page's default. It is committed to git. |
 | `heavy/` | 10 projects, 31 agents, and a long lead thread, at `?sample=heavy`. It is committed to git. |
+| `first/` | A service with no events, at `?sample=first`, plus what a first run can find. It is committed to git. |
 | `prod/` | A real export. Git ignores this folder, because threads hold whatever agents wrote. |
 | `export.mjs` | Copies a real database into `prod/`. |
 | `validate.mjs` | Checks an events file against the engine's contracts. |
@@ -61,6 +62,8 @@ todo names a new `project` piece for them. The sample uses these proposed types,
 | `project.AccountPlaced` | The machine an account signs in on. |
 | `project.PromptContext` | Files and tasks attached to a prompt, and the chosen account. |
 | `project.ReplyStopped` | The owner stopped a reply, and why. |
+| `project.SetupProgressed`, `project.SetupFinished` | How far the first run has got, and that it is done. |
+| `project.RepositoryForgotten` | A repository found by a scan was dropped when the owner chose another folder. |
 
 ## How the page gets its data
 
@@ -94,6 +97,7 @@ means the engine has no such command yet.
 | `api.accounts.*` | The account commands, and a terminal on that machine for sign-in |
 | `api.project.*`, `api.machines.*` | Proposed |
 | `api.git.*`, `api.terminal.run` | Proposed |
+| `api.setup.*` | Proposed: the first run's scan of the computer and its progress |
 
 Reads return promises, as the real API will. The page awaits one snapshot at boot and keeps
 its live objects, which stands in for a snapshot plus a subscription. Commands take effect
@@ -110,6 +114,8 @@ These parts behave, but they are not real:
 - A prompt gets one scripted reply after 900 milliseconds, from `replies.default`.
 - An answered question gets the reactions in `reactions`, or one line from the lead.
 - Sign-in and pairing each finish by themselves after 1,200 milliseconds.
+- The first run's scan takes 500 milliseconds and returns `setup.scenarios` from `first/reads.json`, chosen by `?setup=`.
+- First-run progress and sign-ins are kept in the browser's storage, so a reload can resume. The engine would store them.
 - The terminal answers a fixed list of commands, and `help` prints the list.
 - Everything resets when the page reloads, because nothing is saved.
 

@@ -1,0 +1,9 @@
+{
+ "source": "first",
+ "exported_at": "2026-11-07T17:00:00.000Z",
+ "clock": 1794070800000,
+ "display_time_zone": "UTC",
+ "schema": {"table": "events", "migrations": [1, 2, 3]},
+ "row_counts": {"events": 0, "by_type": {}},
+ "notes": "A service that has just started: no events yet. What the first run finds on the computer is in reads.json under setup, because the engine would read it at request time."
+}

@@ -27,6 +27,10 @@ Synapse and T3 Code.
 
 ## What to try
 
+Open the first run with `?sample=first`, or from the First run links in Design notes. The links
+cover one or two signed-in harnesses, only Codex, signed out, nothing installed, no repositories,
+and a computer that could not be read. Add `&reset=1` to start again from the login page.
+
 - Start on Home. Needs attention gathers requests across projects.
   Questions and Approvals support answers in place and retain answered history.
   Each request is one line; use its chevron or click the row to expand its
@@ -132,6 +136,7 @@ Also run `node design/operations-checks.mjs`,
 `node design/workspace-redesign-checks.mjs` for operational and workspace flows.
 Run `node design/revision-checks.mjs` for the terminal, Git height, naming, density,
 new repositories, and the heavy sample.
+Run `node design/onboarding-checks.mjs` for the first run, from login to the lead's first message.
 Run `node design/home-checks.mjs` for global queues, filters, inline answers,
 merge approvals, machine-aware creation, density, and keyboard navigation.
 Each script accepts `MOCK_URL` for another preview address,
