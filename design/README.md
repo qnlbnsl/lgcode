@@ -1,7 +1,9 @@
-# Shephrd app mockups
+# Sheprd app mockups
 
 Open `workbench.html` directly in a browser, or serve this directory with
-`python3 -m http.server 4178 --bind 127.0.0.1`.
+`python3 -m http.server 4178 --bind 127.0.0.1`. Add `?sample=heavy` to the address
+to load 10 projects, 31 agents, a long lead conversation, and a full request queue.
+The Design notes button in the sidebar links to the same sample.
 
 This is an exploratory browser prototype with fictional example projects,
 agents, conversations, tasks, terminals, machines, and subscriptions. It does not connect to the engine. Sending
@@ -11,7 +13,7 @@ is available. The first visit follows the device setting. Refreshing resets
 the example work.
 
 The owner requested the working app on 2026-11-05. A public marketing site
-is outside this pass. Shephrd is a separate product inspired by Herdr
+is outside this pass. Sheprd is a separate product inspired by Herdr
 Synapse and T3 Code.
 
 ## What to try
@@ -64,8 +66,11 @@ permission requests alongside design questions. Stopping an agent cancels
 its permissions while leaving its questions answerable.
 
 The project workspace offers Board, Chat, Terminal, Git, and Settings tabs.
-Terminal replaces the main reading view. It shows its selected machine,
-branch, and path, and has named sessions with separate command history and drafts. It is a preview: no command runs.
+Terminal fills the main area below the tabs. The prompt sits in the terminal's own
+grid, directly after the last output, with no input box or Enter button. The bar
+above it holds named sessions, the branch, the machine, and the size in columns and
+rows. `vim <file>` shows how a full-screen program takes over the grid; `:q` returns.
+Sessions keep separate history and drafts. It is a preview: no command runs.
 Git combines a repository worktree tree, staging, commit messages,
 fetch/pull/push, conflicts, unified or split diffs, and commit history.
 Team branches integrate into their project branch. Project integration into
@@ -73,7 +78,7 @@ main opens a review. Dirty source or destination worktrees block integration. Cl
 the assigned repository, branch, folder, and machine, with a saved shell
 preference for this project. The global Settings page retains service controls.
 
-Add Project defaults to Start work tree. The project name determines its
+New project defaults to Start work tree. Its repository list also offers New repository, which creates a folder in the workspace folder and starts on main. The project name determines its
 branch and folder, with a numeric suffix when needed. Unchecking uses the
 selected machine's main checkout. Run on chooses the machine before the
 project name. The dialog previews that host's branch and folder. Offline
@@ -116,6 +121,8 @@ the repository root with Playwright and its Chromium browser available.
 Also run `node design/operations-checks.mjs`,
 `node design/workspace-tools-checks.mjs`, and
 `node design/workspace-redesign-checks.mjs` for operational and workspace flows.
+Run `node design/revision-checks.mjs` for the terminal, Git height, naming, density,
+new repositories, and the heavy sample.
 Run `node design/home-checks.mjs` for global queues, filters, inline answers,
 merge approvals, machine-aware creation, density, and keyboard navigation.
 Each script accepts `MOCK_URL` for another preview address,

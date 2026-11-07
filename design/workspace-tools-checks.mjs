@@ -20,14 +20,14 @@ try{
  await click('#tab-project-chat');check(await page.locator('#message-input').inputValue()==='Keep this chat draft','Chat draft survives terminal navigation');
  check(await page.locator('#workspace-tabs [data-main-view="source-control"]').count()===1&&await page.locator('#workspace-tabs [data-main-view="diff"],#workspace-tabs [data-main-view="tree"]').count()===0,'Git and Diff are combined into one workspace tab');
  await click('[data-main-view="source-control"]');
- check(await text('#view-title').then(t=>t==='Source Control')&&await text('#diff-path').then(t=>t.includes('app/workspace.tsx')),'Git opens changed files and their diff in one view');
+ check(await text('#view-title').then(t=>t==='Git')&&await text('#diff-path').then(t=>t.includes('app/workspace.tsx')),'Git opens changed files and their diff in one view');
  await click('[data-source-file="app/sidebar.tsx"]');
  check(await text('#diff-path').then(t=>t.includes('app/sidebar.tsx'))&&await page.locator('.unified-diff').isVisible(),'Clicking a Git file immediately opens its diff');
  check(await page.locator('[data-file-diff],#file-path').count()===0,'There is no intermediate file preview or View diff step');
- await click('[data-diff-mode="split"]');check(await page.locator('.split-diff').count()===1,'Source Control retains side-by-side comparison');
+ await click('[data-diff-mode="split"]');check(await page.locator('.split-diff').count()===1,'Git retains side-by-side comparison');
  await click('[data-source-folder="app"]');check(!await page.locator('[data-source-file="app/sidebar.tsx"]').isVisible(),'Changed-file folders collapse independently of the diff');
  await click('[data-source-folder="app"]');
- await click('[data-source-history]');check(await text('#source-history').then(t=>t.includes('Navigation foundation')&&t.includes('main')),'Commit history stays inside Source Control');
+ await click('[data-source-history]');check(await text('#source-history').then(t=>t.includes('Navigation foundation')&&t.includes('main')),'Commit history stays inside Git');
  await click('[data-source-commit="a62f019"]');
  check(await text('#diff-context').then(t=>t.includes('a62f019')),'Selecting a commit opens its changes in the same diff pane');
  await click('[data-source-working]');await click('[data-source-file="app/sidebar.tsx"]');
@@ -37,7 +37,7 @@ try{
  await click('.project-select[data-project="workspace"]');await click('[data-main-view="source-control"]');
  check(await text('#diff-path').then(t=>t.includes('app/sidebar.tsx')),'Returning to Git restores the selected file');
  await click('[data-main-view="workspace-settings"]');
- check(await text('#view-title').then(t=>t==='Workspace settings')&&await text('#workspace-location').then(t=>t.includes('feat/workspace')),'Workspace has a separate Settings tab with its assigned worktree');
+ check(await text('#view-title').then(t=>t==='Project settings')&&await text('#workspace-location').then(t=>t.includes('feat/workspace')),'Workspace has a separate Settings tab with its assigned worktree');
  await page.locator('#workspace-shell').selectOption('zsh');await click('#save-workspace-settings');
  await click('[data-main-view="source-control"]');await click('[data-main-view="workspace-settings"]');
  check(await page.locator('#workspace-shell').inputValue()==='zsh','Workspace-specific preferences survive tab navigation');
@@ -56,7 +56,7 @@ try{
  check(await text('#view-body').then(t=>t.includes('Office worker')&&t.includes('Awaiting confirmation')),'Pairing requires confirmation before a worker becomes available');
  await click('[data-confirm-machine]');const newWorker=page.locator('[data-project-machine="workspace"] option').last();check(await newWorker.textContent().then(t=>t.includes('Office worker'))&&await newWorker.isDisabled(),'Confirmed worker remains unavailable for placement until its repository is connected');
  await page.locator('[data-project-machine="workspace"]').selectOption('buildbox');
- check(await text('#placement-message').then(t=>t.includes('Workspace app')&&t.includes('Buildbox')&&t.includes('future')),'Master can assign a future run to a paired worker with the repository');
+ check(await text('#placement-message').then(t=>t.includes('Agent console')&&t.includes('Buildbox')&&t.includes('future')),'Master can assign a future run to a paired worker with the repository');
  await page.locator('#machine-mode').selectOption('worker');check(await page.locator('[data-project-machine]').count()===0&&await page.locator('#join-master-form').isVisible(),'Worker mode joins a master and cannot assign projects');
  await page.locator('#master-address').fill('https://studio.example');await page.locator('#master-code').fill('SAMPLE-PAIR');await click('#join-master');check(await text('#machine-mode-state').then(t=>t.includes('Paired')),'Worker preview can pair to a master');
  check(await page.locator('#connect-machine').count()===0,'Worker mode hides the master-only Connect worker flow');

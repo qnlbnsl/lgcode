@@ -7,9 +7,9 @@
   --color-success:#2e6848; --color-warn:#805a1b; --color-error:#a73d48;
   --color-focus:#285e43; --color-line:#ccd8cb; --color-selected:#d5e5d5;
   --shadow-1:0 4px 14px rgb(22 48 28 / .07); --shadow-2:0 18px 60px rgb(22 48 28 / .18);
-  --font-display:'Segoe UI','Helvetica Neue','Nimbus Sans',Arial,sans-serif;
-  --font-body:'Segoe UI','Helvetica Neue','Nimbus Sans',Arial,sans-serif;
-  --font-mono:'SFMono-Regular',Consolas,'DejaVu Sans Mono',monospace;
+  --font-display:system-ui,-apple-system,'Segoe UI','Helvetica Neue',Arial,sans-serif;
+  --font-body:system-ui,-apple-system,'Segoe UI','Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,'SF Mono','SFMono-Regular',Consolas,'DejaVu Sans Mono',monospace;
   --scale-xs:.75rem; --scale-sm:.8125rem; --scale-md:.9375rem;
   --scale-lg:1.125rem; --scale-xl:1.65rem; --scale-2xl:2rem;
   --weight-body:400; --weight-medium:550; --weight-display:650;

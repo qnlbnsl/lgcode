@@ -1,4 +1,4 @@
-# Shephrd’s approved palette pair
+# Sheprd’s approved palette pair
 
 The owner selected Field for light mode and Dusk for dark mode on
 2026-11-05. The two palettes give the same app a brighter daytime surface
@@ -6,7 +6,7 @@ and a muted dark surface. Harbor is no longer an active option.
 
 ## What is approved
 
-`tokens.css` is the color contract for future Shephrd app mockups.
+`tokens.css` is the color contract for future Sheprd app mockups.
 The workbench embeds the same token blocks so it can be opened as one file.
 Keep those blocks identical when the tokens change.
 
@@ -241,3 +241,54 @@ Actual repository registration and project transport remain service work.
 
 The latest critique and remaining design judgments are recorded in
 `UI-CRITIQUE-2026-11-06-HOME.md`.
+
+## Rules added by the review of 2026-11-06
+
+Claude took over this mock from Codex on 2026-11-06. The first pass applied these rules.
+
+### The tab row and page edges stay still
+
+The tab row keeps the same left edge on every project view. The page title shares
+that edge. Only the conversation body is centered, so its text keeps a readable
+measure. Home is the exception, because it has no tabs and stays in a centered frame.
+
+### Terminal and Git get the whole window
+
+Terminal and Git hide the page title, because the top bar already names the project
+and the tab names the tool. Both reach the bottom of the window at any height. A
+terminal is a character grid, not a form. It has no input box, no Enter button, and
+no placeholder, so the page can host programs such as vim and agent command lines.
+
+Git puts the commit message above the file list, as VS Code does. Each of its three
+columns scrolls on its own. Team worktrees show the end of their branch name, because
+that is the part that differs. All files stacks every changed file with a sticky name.
+
+### Names
+
+| Name | Means |
+|---|---|
+| New project | The only name for starting a project, everywhere. Create project confirms it. |
+| Git | The tab and the page. |
+| Project settings | The per-project tab. Service settings is the global page. |
+| Worktree | A checkout on disk. Workspace folder is the one folder that holds repositories. |
+| Needs attention | Work waiting for an answer. The bell, Home, and the sidebar dots all count this. |
+| Alerts | Notifications sent to the owner's phone. Its badge counts failed notifications only. |
+
+### One density rule for records
+
+Comparable records are tables with rows of 46 pixels or less: Machines, Project
+placement, Subscriptions, Alerts, and All projects. Requests are single-line rows
+that say how long they have waited and what they block. Expanded rows do not repeat
+their own title. No text is smaller than 11 pixels, and metadata is 12 pixels.
+
+### Threads open at the latest message
+
+A thread with no saved position opens at its end. A pending permission is the last
+thing in the thread, so its buttons are visible when the thread opens.
+
+### Fonts
+
+The interface now uses the operating system's own font through `system-ui`, and
+`ui-monospace` for code. This replaces a stack that fell through to Nimbus Sans on
+Linux. It costs no download. The final font choice is still open.
+

@@ -30,10 +30,11 @@ The owner also requested these views on 2026-11-06.
 | View | Interactive preview | Live integration still required |
 |---|---|---|
 | Home | Default cross-project page with Needs attention, All projects, Questions, and Approvals. Search combines with repository, project, agent, machine, and status filters. Questions and permissions are answered in place. Merge approvals reuse explicit review. Answered history remains searchable. Source links preserve conversation drafts. | A durable global request index, authoritative answer results, concurrent-owner handling, access checks, pagination, and recovery across reconnects. Existing operational request states must be preserved. |
-| Terminal | Replaces the main chat, with machine, branch, workspace path, named sessions, independent input/history, clear, and input cancellation. `pwd`, `ls`, and `git status` return in-memory fixture output. Unsupported input returns Command unavailable. | A real terminal process on the selected host, authenticated attachment, streamed input/output, terminal resize, interruption, reconnection, and session ownership. The browser must not infer permission from agent messages. |
+| Terminal | Fills the main area as a character grid with the prompt in the grid. A slim bar has named sessions, branch, machine, and size in columns and rows. `pwd`, `ls`, `git status`, `git branch`, and `git log --oneline` return in-memory fixture output. `vim <file>` shows a full-screen program. Unsupported input returns Command unavailable. | A real pseudo-terminal on the selected host, a terminal emulator in the page such as xterm.js, authenticated attachment, streamed input/output, resize in columns and rows, the alternate screen for full-screen programs, interruption, reconnection, and session ownership. The browser must not infer permission from agent messages. |
 | Git / Source Control | Repository/project/team worktree hierarchy, staging and unstaging, commit message and commit, fetch/pull/push, conflict resolution, and team-to-project integration. Project-to-main integration opens an explicit review. Dirty destination worktrees block integration. Clicking a file directly opens its unified or split diff. Commit history uses the same diff pane. State stays scoped to each worktree. | Read real changes and Git history on the selected machine. Execute Git mutations with permissions, recoverable failures, branch ancestry and merge checks. Bound large-file rendering. Branch inspection remains distinct from a project’s assigned workspace. |
 | Workspace Settings | A workspace tab shows the assigned repository, branch, checkout type, folder, and machine. A shell preference is saved per project within the preview. | Persist workspace preferences and apply the shell when starting a real terminal session. |
-| Project worktree | Add Project defaults to Start work tree. A safe project-name slug sets the branch and folder. Collisions get numeric suffixes. Opting out uses that repository’s main checkout. | Create the real worktree on the assigned machine with checked paths, collision handling, and recoverable Git errors. |
+| New repository | New project offers New repository beside the repositories in the workspace folder. It asks for a name and previews the folder. | Create the folder and run `git init` on the selected machine, inside the workspace folder, with recoverable errors. |
+| Project worktree | New project defaults to Start work tree. A safe project-name slug sets the branch and folder. Collisions get numeric suffixes. Opting out uses that repository’s main checkout. | Create the real worktree on the assigned machine with checked paths, collision handling, and recoverable Git errors. |
 | Machines | Master and Worker modes, a pairing preview with confirmation, worker availability, and per-project placement. Offline or unconfirmed workers cannot receive new placement. Worker mode cannot assign projects. | One master coordinates paired workers. Pairing needs an authenticated, expiring exchange and confirmation of machine identity. Workers report capabilities, repository locations, and health. Dispatch needs durable identities, capacity checks, and recovery without duplicate execution. Moving a running project is separate from choosing a machine for a future run. |
 | Subscriptions | Multiple named entries for the same harness, a machine for each entry, independent sign-in state, active-agent counts, and an enable toggle. Adding an entry starts signed out. Sample sign-in updates only that entry. | Wire account configuration and provider authorization to existing engine account support. `packages/contracts/src/accounts.ts` already gives accounts separate identities. `packages/engine/src/accounts/shadowHome.ts` already isolates additional Codex authentication profiles. Do not replace those with one shared login per harness. |
 
@@ -47,7 +48,8 @@ connection, provider authorization, or billing action is performed by them.
 ## Verification evidence
 
 Serve `design/` on port 4178. From the repository root, run the browser
-checks with Playwright and Chromium available:
+checks with Playwright and Chromium available. `revision-checks.mjs` passed 4 of 45
+checks that could run on the mock before the 2026-11-06 review, and passes 71 of 71 now.
 
 ```sh
 node design/checks.mjs
@@ -55,9 +57,10 @@ node design/operations-checks.mjs
 node design/workspace-tools-checks.mjs
 node design/workspace-redesign-checks.mjs
 node design/home-checks.mjs
+node design/revision-checks.mjs
 ```
 
-All five scripts accept `MOCK_URL`, `PLAYWRIGHT_MODULE`, and
+All six scripts accept `MOCK_URL`, `PLAYWRIGHT_MODULE`, and
 `CHROMIUM_PATH`. They use independent browser pages and do not call a real
 service. Results and screenshots are under `design/previews/`.
 Independent verification and the reproduced issues are recorded in

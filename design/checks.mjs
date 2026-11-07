@@ -22,7 +22,7 @@ try{
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('#lead-panel #message-input').inputValue()==='Keep this plan focused','Returning to the board retains the lead draft');
  await page.locator('#message-input').press('Control+Enter');await page.locator('#lead-panel .sample-response').last().waitFor();
- check(await page.locator('#view-title').textContent()==='Workspace app'&&await page.locator('.kanban-column').count()===4,'Sending to Sage keeps the project board in place');
+ check(await page.locator('#view-title').textContent()==='Agent console'&&await page.locator('.kanban-column').count()===4,'Sending to Sage keeps the project board in place');
  check(await page.locator('#lead-panel .sample-response .turn-head').last().textContent().then(t=>t.includes('Sage')),'Board chat receives a named sample reply');
  await click('#close-lead-panel');check(!await page.locator('#lead-panel').isVisible(),'Lead panel can be collapsed to widen the board');
  await click('#lead-toggle');check(await page.locator('#lead-panel').isVisible(),'Board header reopens the lead panel');
@@ -43,7 +43,7 @@ try{
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('[data-repo="sheprd"]').count()===1,'Repositories are the root of navigation');
  check(await page.locator('[data-repo="sheprd"] [data-project]').count()===3,'A repository contains several independent projects');
- check(await page.locator('#view-title').textContent()==='Workspace app'&&await page.locator('.kanban-column').count()===4,'Initial project opens its sprint board');
+ check(await page.locator('#view-title').textContent()==='Agent console'&&await page.locator('.kanban-column').count()===4,'Initial project opens its sprint board');
  check(await page.locator('.project-select[data-project="workspace"] .project-assigned-branch').textContent().then(t=>t.includes('feat/workspace')),'Sidebar states the assigned project branch');
  check(await page.locator('#project-branch').textContent().then(t=>t.includes('feat/workspace')),'Board header places the branch beside the project name');
  check(await page.locator('#sidebar [data-open-repo="sheprd"]').count()===1,'Repository has its own projects page');
@@ -52,7 +52,7 @@ try{
  await click('#view-body [data-project="workspace"]');
  check(await page.locator('.kanban-column').count()===4,'Repository project link opens its board');
  await click('[data-team="app-shell"]');await click('.project-select[data-project="workspace"]');
- check(await page.locator('#view-title').textContent()==='Workspace app'&&await page.locator('.kanban-column').count()===4,'Selecting a project consistently opens its board');
+ check(await page.locator('#view-title').textContent()==='Agent console'&&await page.locator('.kanban-column').count()===4,'Selecting a project consistently opens its board');
  await leadChat();check(await page.locator('#view-title').textContent()==='Sage','Full conversation action opens the sole project lead');
  await click('.project-select[data-project="recovery"]');await leadChat();check(await page.locator('#view-title').textContent()==='Vale','Sibling project has its own lead');
  await click('.project-select[data-project="workspace"]');await leadChat();
@@ -63,7 +63,7 @@ try{
  check(await page.locator('#context-toggle').textContent().then(t=>t.includes('main')),'Branch picker changes the viewed code context');
  check(await page.locator('#project-branch').textContent().then(t=>t.includes('feat/workspace'))&&await page.locator('.project-select[data-project="workspace"] .project-assigned-branch').textContent().then(t=>t.includes('feat/workspace')),'Inspecting main leaves the assigned project branch visible and unchanged');
  check(await page.locator('#context-toggle').textContent().then(t=>t.includes('Viewing')),'Inspection control identifies the branch being viewed');
- check(await page.locator('#breadcrumb').textContent().then(t=>t.includes('sheprd')&&t.includes('Workspace app')),'Changing workspace preserves repository and project');
+ check(await page.locator('#breadcrumb').textContent().then(t=>t.includes('sheprd')&&t.includes('Agent console')),'Changing workspace preserves repository and project');
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('.kanban-column').count()===4,'Project board shows sprint status columns');
  check(await page.locator('[data-sprint]').count()===4,'Project board contains sprints rather than individual tasks');

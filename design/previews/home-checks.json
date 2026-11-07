@@ -33,7 +33,7 @@
     "Project setup previews the selected machine and its checkout",
     "Offline machines cannot start projects",
     "The new project lead starts on its selected machine",
-    "Workspace settings retains the selected host and path",
+    "Project settings retains the selected host and path",
     "A remote project integrates into the main checkout on its host",
     "A new remote project appears in All projects",
     "Hosts without the repository are unavailable for that project",
