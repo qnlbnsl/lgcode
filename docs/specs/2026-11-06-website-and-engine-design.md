@@ -288,6 +288,21 @@ These changes affect only the page:
 - The page also gains a quick switcher, an attention filter in the sidebar, and panel
   resizing.
 
+## What the mock's data layer shows the engine must provide
+
+Since 2026-11-07 the mock reads JSON files shaped like the `events` table, through stub
+functions named after the client commands. `design/data/README.md` on the branch
+`area/web-mock` maps each stub to its command. Every row with an event type the engine has
+already decodes against the contracts. These are the rest, and they are proposals:
+
+- The `project` piece needs machine, repository, worktree, project, team, sprint, task, question
+  link, account placement, prompt context, and stopped-reply events. The list is in that README.
+- Failure text should name the machine, such as "Not signed in to Codex on Buildbox". Today
+  `startFailure.ts` does not know the machine.
+- The attention words are Question, Approval, and Failed start. `alertTitles.approval` still says
+  "Permission needs your approval".
+- Merge evidence is read per branch head, as tests and a review verdict.
+
 ## Changes the mock still needs
 
-- The Connect a worker dialog asks for a code, and it should show one, because the website generates it.
+The owner picks from the critique's remaining Should fix and Polish findings.

@@ -163,6 +163,19 @@ The mock makes this part of the website, so it no longer waits until after it.
       obvious route.
 - [ ] Handle a worker going away while its agents are working.
 
+### Added by the designer's critique and the mock's data layer
+
+The critique of 2026-11-06 changed these parts of the mock, and the data layer of 2026-11-07
+shows which events they need. `design/data/README.md` on `area/web-mock` lists them.
+
+- [ ] Add the proposed `project.*` events to the new `project` piece.
+- [ ] Read merge evidence per branch head: the test result and the review verdict.
+- [ ] Let a retry after a failed start change the model and the effort.
+- [ ] Add a command to change a machine's role, with its effect stated first.
+- [ ] Name the machine in failure text, in `startFailure.ts`.
+- [ ] Use the attention words Question, Approval, and Failed start, including in
+      `alertTitles.approval`.
+
 ## Website: rebuild `packages/web` to match the mock
 
 - [ ] Move the Field and Dusk tokens and the mock's styles into files, because the
@@ -236,8 +249,8 @@ The mock now shows all of these. `design/FEATURE-PARITY.md` maps each to its sou
 - [ ] Rewrite the 11 browser test files for the new page.
 - [ ] Update `live-check-web.ts`, which finds elements by their current names.
 - [ ] Port `design/checks.mjs`, `operations-checks.mjs`, `workspace-tools-checks.mjs`,
-      `workspace-redesign-checks.mjs`, `home-checks.mjs` and `revision-checks.mjs` to the
-      browser suite at 390, 768, 1440 and 2560 pixels in both color modes.
+      `workspace-redesign-checks.mjs`, `home-checks.mjs`, `revision-checks.mjs` and
+      `data-checks.mjs` to the browser suite at 390, 768, 1440 and 2560 pixels in both color modes.
 - [ ] Add a real-agent proof: New project with a worktree, talk to the lead, the lead
       writes a sprint and a task, and a decision is answered from the board.
 - [ ] Add real proofs for a terminal session running vim, a commit and merge from Git, a
