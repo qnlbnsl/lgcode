@@ -1,0 +1,149 @@
+{
+  "checks": 24,
+  "layout": [
+    {
+      "theme": "light",
+      "view": "terminal",
+      "width": 1440,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "view": "terminal",
+      "width": 390,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "view": "source-control",
+      "width": 1440,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "view": "source-control",
+      "width": 390,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "view": "workspace-settings",
+      "width": 1440,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "view": "workspace-settings",
+      "width": 390,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "view": "alerts",
+      "width": 1440,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "view": "alerts",
+      "width": 390,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "view": "machines",
+      "width": 1440,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "view": "machines",
+      "width": 390,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "view": "subscriptions",
+      "width": 1440,
+      "noOverflow": true
+    },
+    {
+      "theme": "light",
+      "view": "subscriptions",
+      "width": 390,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "view": "terminal",
+      "width": 1440,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "view": "terminal",
+      "width": 390,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "view": "source-control",
+      "width": 1440,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "view": "source-control",
+      "width": 390,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "view": "workspace-settings",
+      "width": 1440,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "view": "workspace-settings",
+      "width": 390,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "view": "alerts",
+      "width": 1440,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "view": "alerts",
+      "width": 390,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "view": "machines",
+      "width": 1440,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "view": "machines",
+      "width": 390,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "view": "subscriptions",
+      "width": 1440,
+      "noOverflow": true
+    },
+    {
+      "theme": "dark",
+      "view": "subscriptions",
+      "width": 390,
+      "noOverflow": true
+    }
+  ]
+}

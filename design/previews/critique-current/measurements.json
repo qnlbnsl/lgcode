@@ -1,0 +1,61 @@
+{
+  "board": {
+    "clientWidth": 718,
+    "scrollWidth": 936,
+    "left": 304,
+    "right": 1022,
+    "cards": [
+      {
+        "label": "Planned",
+        "left": 304,
+        "right": 524
+      },
+      {
+        "label": "In progress",
+        "left": 542,
+        "right": 762
+      },
+      {
+        "label": "Review",
+        "left": 780,
+        "right": 1000
+      },
+      {
+        "label": "Done",
+        "left": 1018,
+        "right": 1238
+      }
+    ],
+    "sageEntryPoints": [
+      "Sage",
+      "Talk to Sage"
+    ],
+    "resizeHandles": 0
+  },
+  "chat": {
+    "left": 340,
+    "right": 1140,
+    "width": 800,
+    "unusedRight": 1420,
+    "composerLeft": 340,
+    "composerRight": 1140,
+    "composerWidth": 800
+  },
+  "git": {
+    "inputs": [],
+    "buttons": [
+      "Changes\n2",
+      "app",
+      "workspace.tsx\nM",
+      "sidebar.tsx\nM",
+      "History",
+      "Unified",
+      "Split"
+    ],
+    "labels": [
+      "Source Control",
+      "Changed files",
+      "Diff layout"
+    ]
+  }
+}
