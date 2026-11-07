@@ -1,5 +1,5 @@
 {
-  "passed": 49,
+  "passed": 50,
   "checks": [
     "Project workspace offers a Terminal view",
     "Terminal replaces the main conversation with command input",
@@ -25,9 +25,10 @@
     "New projects start in their own worktree by default",
     "Project name previews its worktree branch and folder",
     "Creating a project assigns the named worktree",
-    "Unchecking Start work tree previews the main checkout",
+    "Unchecking Start worktree previews the main checkout",
     "Opting out uses the repository’s main checkout",
     "Machines is a global page",
+    "The master shows the pairing code and the command",
     "Pairing requires confirmation before a worker becomes available",
     "Confirmed worker remains unavailable for placement until its repository is connected",
     "Master can assign a future run to a paired worker with the repository",

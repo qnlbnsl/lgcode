@@ -18,7 +18,7 @@
     "Conflict resolution returns the file to changes for review and staging",
     "Project integration opens an explicit review before main",
     "Approving the project review merges into main",
-    "Attention separates decisions, permissions, and failures",
+    "Attention separates questions, approvals, and failures",
     "Attention opens the exact blocking question",
     "Current progress and lifecycle controls sit beside the composer",
     "Composer attaches task context",

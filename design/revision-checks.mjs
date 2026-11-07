@@ -71,7 +71,7 @@ await run('thread',async()=>{
  const allow=await box('[data-permission-answer="allow"]'),composer=await box('#composer-wrap');
  check(allow.bottom<=composer.top,'Approval buttons are fully visible when the thread opens');
  const body=await text('#view-body');
- check(!body.includes('feat/workspace ')&&body.includes('feat/workspace/app-shell'),'Iris is always on her team branch');
+ check(!body.includes('feat/workspace ')&&(await page.locator('[data-tool-call="call-iris"] .op-data').first().textContent()).includes('workspace-app-shell'),'Iris is always on her team branch');
  check(body.includes('.worktrees/workspace-app-shell'),'The approval runs in the team worktree');
  await click('[data-team="app-shell"]');
  check(!await page.locator('#composer-account').isVisible(),'A shared team chat has no subscription picker');
@@ -157,6 +157,103 @@ await run('heavy sample',async()=>{
  check(await heavy.locator('#view-body .work-activity').count()>=5,'Tool activity is grouped in the long conversation');
  check(await heavy.locator('#view-body').evaluate(e=>e.scrollTop>0),'A long conversation opens at its latest message');
  await heavy.close();
+});
+
+await run('designer findings',async()=>{
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);return p};
+ const q=await fresh();const at=s=>q.locator(s).first();
+ // SIDE-1 and STATUS-1
+ check((await at('.project-select[data-project="recovery"]').textContent()).trim().endsWith('1'),'A project with a failed agent shows a count');
+ await at('[data-project-toggle="recovery"]').click();
+ const ash=at('[data-agent="ash"]');
+ check(await ash.locator('.dot').evaluate(e=>e.classList.contains('error'))&&(await ash.textContent()).includes('Failed to start'),'A failed agent has the error dot and says so');
+ const green=await at('[data-agent="mira"], [data-agent="vale"]').locator('.dot').evaluate(e=>getComputedStyle(e).backgroundColor).catch(()=>'');
+ check(await ash.locator('.dot').evaluate(e=>getComputedStyle(e).backgroundColor)!==green,'A failed agent does not share the running color');
+ const reviewTeam=at('.team-select[data-team="review"]');
+ check((await reviewTeam.locator('.attention-number').textContent())==='1'&&await reviewTeam.getAttribute('aria-current')===null,'A collapsed team shows its waiting request, not its member count');
+ check((await at('.repo-heading:has([data-open-repo="sheprd"]) .attention-number').textContent()).match(/^\d+$/),'A repository rolls up attention');
+ const bell=Number(await at('#attention-count').textContent()),rolled=await q.locator('.project-select .attention-number').allTextContents();
+ check(rolled.map(Number).reduce((a,b)=>a+b,0)===bell,'The sidebar counts add up to the bell');
+ // THREAD-2
+ await at('.project-select[data-project="workspace"]').click();await q.waitForTimeout(40);
+ const gap=s=>q.locator(s).evaluate(e=>e.scrollHeight-e.scrollTop-e.clientHeight);
+ check(await gap('#lead-chat-body')<=2,'The lead panel opens at its true end');
+ await at('#close-lead-panel').click();await at('#lead-toggle').click();await q.waitForTimeout(40);
+ check(await gap('#lead-chat-body')<=2,'Reopening the lead panel keeps the end in view');
+ await at('[data-main-view="chat"]').click();await q.waitForTimeout(40);
+ check(await gap('#view-body')<=2,'The Chat tab opens at the end after the panel');
+ await q.locator('#view-body').evaluate(e=>{e.scrollTop=0});await q.waitForTimeout(40);
+ check(await at('#latest-button').isVisible(),'Scrolling up offers a way back to the latest message');
+ check((await at('#latest-button').textContent()).includes('below'),'The Latest button says when a request is below');
+ await at('#latest-button').click();check(await gap('#view-body')<=2&&!await at('#latest-button').isVisible(),'The Latest button returns to the end');
+ // COMP-2
+ await at('.project-select[data-project="workspace"]').click();await at('[data-main-view="chat"]').click();
+ const input=at('#message-input');await input.fill('first line');await input.press('Shift+Enter');check((await input.inputValue()).includes('\n'),'Shift and Enter adds a new line');
+ await input.fill('Enter sends this');await input.press('Enter');check(await input.inputValue()==='','Enter sends the message');
+ check((await at('.keyboard-hint').textContent()).startsWith('Enter to send'),'The composer says how to send');
+ // THREAD-1, PERM-1, STOP-1, PERM-2
+ await at('[data-team-toggle="review"]').click();await at('[data-agent="finch"]').click();await q.waitForTimeout(40);
+ const finch=await at('#view-body').textContent();
+ check(!finch.includes('No owner action needed')&&await q.locator('#view-body .turn-state').count()===0,'A waiting thread has no contradicting status');
+ check((await at('#permission-perm-finch [data-permission-answer="allow"]').textContent())==='Allow without seeing input'&&await at('#permission-perm-finch [data-permission-answer="allow"]').evaluate(e=>e.classList.contains('secondary')),'A blind approval looks different from an informed one');
+ await at('[data-agent="iris"]').click();await q.waitForTimeout(40);
+ await at('#agent-controls [data-agent-command="stop"]').click();
+ check(await at('#stop-dialog').isVisible()&&(await at('#stop-title').textContent()).includes('cancel 1 approval request'),'Stopping an agent with a waiting request asks first and names it');
+ await at('#stop-dialog footer [data-close]').click();check((await at('[data-agent="iris"]').textContent()).includes('Needs approval'),'Cancelling the stop changes nothing');
+ await at('#agent-controls [data-agent-command="stop"]').click();await at('#confirm-stop-agent').click();
+ const closed=await at('#permission-perm-iris').textContent();
+ check(closed.includes('No answer was sent')&&!closed.includes('Answer recorded'),'A cancelled request does not claim an answer');
+ check(await at('[data-agent="iris"] .dot').evaluate(e=>e.classList.contains('stopped')),'A stopped agent has a hollow dot');
+ await q.close();
+ // GIT-1
+ const g=await fresh();await g.locator('.project-select[data-project="workspace"]').first().click();await g.locator('[data-main-view="source-control"]').first().click();await g.locator('[data-diff-mode="split"]').first().click();await g.waitForTimeout(60);
+ const split=await g.locator('.split-diff').evaluate(e=>{const cells=[...e.querySelectorAll(':scope>.diff-line:not(.hunk)')];let aligned=true;for(let i=0;i+1<cells.length;i+=2)if(Math.abs(cells[i].getBoundingClientRect().top-cells[i+1].getBoundingClientRect().top)>1)aligned=false;return {aligned,even:cells.length%2===0,filler:e.querySelectorAll('.filler').length,columns:getComputedStyle(e).gridTemplateColumns.split(' ').length,nested:e.querySelectorAll(':scope>div').length}});
+ check(split.aligned&&split.even&&split.columns===2,'Split rows line up across the two sides');
+ check(split.filler>0&&split.nested===0,'Split fills gaps with blank rows and scrolls as one');
+ check(await g.locator('.split-diff').evaluate(e=>e.scrollWidth<=e.clientWidth+1),'Both sides of a split diff are visible without sideways scrolling');
+ check((await g.locator('#split-note').textContent()).includes('hides the worktree list')&&!await g.locator('.worktree-navigation').isVisible(),'Split at 1440 pixels makes room and says so');
+ await g.locator('[data-diff-mode="unified"]').first().click();check(await g.locator('.worktree-navigation').isVisible(),'Unified brings the worktree list back');
+ await g.setViewportSize({width:1000,height:800});await g.locator('[data-diff-mode="split"]').first().click();await g.waitForTimeout(60);
+ check(await g.locator('.split-diff').count()===0&&(await g.locator('#split-note').textContent()).includes('wider window'),'A narrow window falls back to unified and says so');
+ await g.close();
+ // MERGE-1
+ const m=await fresh();await m.locator('.project-select[data-project="workspace"]').first().click();await m.locator('[data-main-view="source-control"]').first().click();
+ await m.locator('[data-stage-file="app/workspace.tsx"]').click();await m.locator('[data-stage-file="app/sidebar.tsx"]').click();await m.locator('#git-message').fill('Keep drafts with their thread');await m.locator('#git-commit').click();await m.locator('#git-integrate').click();
+ const review=await m.locator('#merge-dialog').textContent();
+ check(review.includes('1 commit ')&&!review.includes('1 commits'),'The merge review counts one commit correctly');
+ check(review.includes('app/workspace.tsx')&&await m.locator('#merge-dialog .unified-diff').count()===2,'The merge review shows every file and its diff');
+ check(review.includes('Passed')&&review.includes('Approved by Finch')&&await m.locator('#merge-dialog [data-agent="finch"]').count()===1,'The merge review shows tests and links the review thread');
+ check(await m.locator('#merge-dialog footer [data-close]').isVisible(),'The merge review can be cancelled');
+ await m.close();
+ // HOME-1, HOME-2, SIGN-1
+ const h=await fresh();
+ await h.locator('[data-home-item="failure:ash"]').click();const detail=()=>h.locator('#home-detail').textContent();
+ check((await detail()).includes('Buildbox')&&await h.locator('#home-detail [data-sign-in-agent="ash"]').isVisible(),'A failed start offers sign-in on its machine');
+ await h.locator('#home-detail [data-resume-agent="ash"]').click();check((await h.locator('#toast, .toast').first().textContent()).includes('Resume failed'),'Resume before sign-in explains why it failed');
+ await h.locator('#home-detail [data-sign-in-agent="ash"]').click();
+ check(await h.locator('#subscription-login').isVisible()&&(await h.locator('#sign-in-output').textContent()).includes('codex login')&&await h.locator('#finish-sample-signin').count()===0,'Sign-in runs the harness login, with no fake button');
+ check((await h.locator('#sign-in-status').textContent()).includes('Waiting'),'Sign-in shows that it is waiting');
+ await h.waitForFunction(()=>document.querySelector('#sign-in-status').textContent.startsWith('Signed in'));
+ await h.locator('#sign-in-close').click();await h.locator('#home-detail [data-resume-agent="ash"]').click();
+ check(await h.locator('[data-home-item="failure:ash"]').count()===0,'Signing in and resuming clears the failed start');
+ for(const key of ['question:nav-decision','approval:perm-iris','approval:perm-finch']){await h.locator(`[data-home-item="${key}"]`).click();await h.locator('#home-detail [data-permission-answer="allow"], #home-detail [data-resolve-request]').first().click()}
+ await h.waitForTimeout(60);const empty=await h.locator('#home-results').textContent();
+ check(empty.includes('Nothing needs you')&&!empty.includes('Clear the filters'),'The empty queue is not blamed on filters');
+ await h.close();
+ // THREAD-7
+ const t=await fresh();await t.locator('#design-notes').click();await t.locator('#preview-start-reason').selectOption('model-refused');await t.locator('[data-preview="failed-start"]').click();await t.waitForTimeout(40);
+ const failed=await t.locator('.start-failure').first().textContent();
+ check(failed.includes('rejected this model on Buildbox')&&!failed.includes('Adapter')&&await t.locator('.start-failure select').count()===2,'A refused model names the machine and offers the choice in place');
+ await t.locator('.start-failure [data-resume-agent]').click();check(await t.locator('.start-failure').count()===0,'Trying again with another model clears the failure');
+ await t.close();
+ // PAIR-1 and MACH-1
+ const f=await fresh();await f.locator('[data-system-page="machines"]').click();
+ check(await f.locator('select#machine-mode').count()===0&&await f.locator('#machine-role').textContent()==='Master','The role is text, not a one-click select');
+ await f.locator('#change-role').click();check((await f.locator('#role-impact').textContent()).includes('depend on Studio'),'Changing the role states who depends on it');await f.locator('#role-dialog footer [data-close]').click();check(await f.locator('#machine-role').textContent()==='Master','Cancelling keeps the role');
+ await f.locator('#connect-machine').click();await f.locator('#machine-name').fill('Office worker');await f.locator('#pair-machine').click();
+ check((await f.locator('#pair-code-value').textContent()).length>=20&&await f.locator('#machine-code').count()===0,'The master shows a code rather than asking for one');
+ await f.waitForFunction(()=>document.querySelector('#pair-status').textContent.includes('connected'));check((await f.locator('.machine-table').textContent()).includes('Office worker'),'The worker appears after it connects');
+ await f.close();
 });
 
 const result={passed:checks.length,failed:failures.length,failures,errors,checks};

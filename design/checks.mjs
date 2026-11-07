@@ -67,7 +67,7 @@ try{
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('.kanban-column').count()===4,'Project board shows sprint status columns');
  check(await page.locator('[data-sprint]').count()===4,'Project board contains sprints rather than individual tasks');
- check(await page.locator('[data-sprint="sp-02"]').textContent().then(t=>t.includes('Needs your decision')),'Sprint surfaces an unresolved owner dependency');
+ check(await page.locator('[data-sprint="sp-02"]').textContent().then(t=>t.includes('Needs answer')),'Sprint surfaces an unresolved owner dependency');
  await click('[data-sprint="sp-02"]');
  check(await page.locator('#view-body').textContent().then(t=>t.includes('Iris')&&t.includes('Rowan')&&t.includes('SH-15')),'Sprint detail connects plan tasks and agent ownership');
  await click('[data-task="SH-15"]');
@@ -82,11 +82,11 @@ try{
  await click('.request-link[data-open-request="nav-decision"]');
  check(await page.locator('#view-title').textContent()==='Rowan','Escalation opens the requesting agent');
  check(await page.locator('#request-nav-decision').evaluate(el=>document.activeElement===el),'Escalation focuses the exact question');
- check(await page.locator('[data-agent="rowan"]').textContent().then(t=>t.includes('Needs you')),'Viewing a request leaves it unresolved');
+ check(await page.locator('[data-agent="rowan"]').textContent().then(t=>t.includes('Needs answer')),'Viewing a request leaves it unresolved');
  await click('[data-resolve-request="nav-decision"]');
- check(!await page.locator('[data-agent="rowan"]').textContent().then(t=>t.includes('Needs you')),'Answer clears the requesting agent highlight');
+ check(!await page.locator('[data-agent="rowan"]').textContent().then(t=>t.includes('Needs answer')),'Answer clears the requesting agent highlight');
  await click('.project-select[data-project="workspace"]');await leadChat();check(await page.locator('[data-open-request="nav-decision"]').count()===0,'Answer clears the project lead escalation');
- await click('.project-select[data-project="workspace"]');check(!await page.locator('[data-sprint="sp-02"]').textContent().then(t=>t.includes('Needs your decision')),'Answer clears the sprint blocker');
+ await click('.project-select[data-project="workspace"]');check(!await page.locator('[data-sprint="sp-02"]').textContent().then(t=>t.includes('Needs answer')),'Answer clears the sprint blocker');
  await click('[data-sprint="sp-02"]');await click('[data-task="SH-17"]');
  check(await page.locator('.request-link').count()===0,'Resolved task does not show an urgent request');
  await click('.project-select[data-project="workspace"]');await click('[data-sprint="sp-01"]');

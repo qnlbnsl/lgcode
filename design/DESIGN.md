@@ -271,7 +271,12 @@ that is the part that differs. All files stacks every changed file with a sticky
 | Git | The tab and the page. |
 | Project settings | The per-project tab. Service settings is the global page. |
 | Worktree | A checkout on disk. Workspace folder is the one folder that holds repositories. |
-| Needs attention | Work waiting for an answer. The bell, Home, and the sidebar dots all count this. |
+| Needs attention | Work waiting for the owner. The bell, Home, and the sidebar counts add up to the same number. |
+| Question | A kind of attention: an agent asked something. The short form is Needs answer. |
+| Approval | A kind of attention: an agent or a merge waits for permission. The short form is Needs approval. |
+| Failed start | A kind of attention: an agent could not start. It wears the error color. |
+| Uncommitted changes | Files changed in a worktree. "Working tree" is not used. |
+| Thread | One agent's conversation. Chat stays the name of the tab. |
 | Alerts | Notifications sent to the owner's phone. Its badge counts failed notifications only. |
 
 ### One density rule for records
@@ -283,8 +288,10 @@ their own title. No text is smaller than 11 pixels, and metadata is 12 pixels.
 
 ### Threads open at the latest message
 
-A thread with no saved position opens at its end. A pending permission is the last
-thing in the thread, so its buttons are visible when the thread opens.
+A thread with no saved position opens at its true end, in the lead panel as well as
+the Chat tab. Closing and reopening a panel keeps the position. A pending approval is
+the last thing in the thread, so its buttons are visible when the thread opens. Away
+from the end, a Latest button appears, and it says how many requests are below.
 
 ### Fonts
 
@@ -292,3 +299,26 @@ The interface now uses the operating system's own font through `system-ui`, and
 `ui-monospace` for code. This replaces a stack that fell through to Nimbus Sans on
 Linux. It costs no download. The final font choice is still open.
 
+## Rules added by the designer's critique of 2026-11-06
+
+The owner chose the 15 Must fix findings, the two naming findings, and Enter to send.
+
+- **Status colors:** green means running. A failed agent has the error color and a filled
+  dot. A stopped agent has a hollow gray dot. Amber means that something waits for the owner.
+- **A blind approval looks different.** It has no filled button, and its button says "Allow
+  without seeing input".
+- **Destructive changes ask first.** Stopping an agent with waiting requests or running work
+  asks, and it names what is lost. Changing a machine's role asks, and it names who depends
+  on that machine.
+- **A merge to main shows its evidence.** The review shows tests, the review result with a
+  link to its thread, commits, and every file's diff. Without evidence, the button says
+  "Approve without evidence" and is not filled.
+- **A split diff lines up.** Rows pair across the sides with blank filler rows, long lines
+  wrap, and both sides scroll as one. It needs 900 pixels, the threshold Visual Studio Code
+  uses, and below that it reads as unified and says so. At 1440 pixels it hides the worktree
+  list to make room, and it says so.
+- **A failure offers its fix in place.** Sign-in opens on the right machine, and a refused
+  model offers the choice beside the message.
+- **Provider sign-in runs the harness's own login** in a terminal session on the account's
+  machine, as the design note says. The critic recommended a device code screen, and Claude
+  kept the design note's approach, because each harness has its own flow.

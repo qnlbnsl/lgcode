@@ -47,7 +47,7 @@ try{
  await page.locator('details[data-delivery="delivery-iris"]').evaluate(el=>el.open=true);
  check(await text('details[data-delivery="delivery-iris"]').then(t=>t.includes('Queued')&&t.includes('Sent')&&t.includes('Accepted')&&t.includes('Owner')),'Delivery history keeps identity, source, and lifecycle');
  await click('[data-team-toggle="review"]');await click('#sidebar [data-agent="finch"]');
- check(await text('#permission-perm-finch').then(t=>t.includes("input is not visible")&&t.includes('redaction')),'Hidden action input has an explicit warning');
+ check(await text('#permission-perm-finch').then(t=>t.includes('wants to run the read tool')&&t.includes('cannot show its input')&&t.includes('Allow without seeing input')),'Hidden action input has an explicit warning');
  await click('[data-permission-answer="deny"][data-permission-id="perm-finch"]');
  check(await text('#permission-perm-finch').then(t=>t.includes('Denied')),'Permission requests support denial');
  await click('[data-system-page="alerts"]');check(await text('#view-title').then(t=>t==='Alerts'),'Alerts is a first-class page');
@@ -100,9 +100,9 @@ try{
  await preview('permission-failure');await click('[data-permission-answer="allow"][data-permission-id="perm-iris"]');
  check(await text('#permission-perm-iris').then(t=>t.includes('Could not confirm'))&&await page.locator('[data-permission-answer="allow"]').isDisabled(),'Unconfirmed permission answers are visible and cannot be blindly retried');
  await click('#tab-board');await click('#lead-panel [data-open-permission="perm-iris"]');
- await click('#agent-controls [data-agent-command="stop"]');
+ await click('#agent-controls [data-agent-command="stop"]');if(await page.locator('#stop-dialog[open]').count())await click('#confirm-stop-agent');
  check(await text('#permission-perm-iris').then(t=>t.includes('Cancelled'))&&await page.locator('#permission-perm-iris [data-permission-answer]').count()===0,'Stopping an agent cancels its outstanding permissions');
- await click('#sidebar [data-agent="rowan"]');await click('#agent-controls [data-agent-command="stop"]');
+ await click('#sidebar [data-agent="rowan"]');await click('#agent-controls [data-agent-command="stop"]');if(await page.locator('#stop-dialog[open]').count())await click('#confirm-stop-agent');
  check(await page.locator('[data-resolve-request="nav-decision"]').isEnabled(),'Stopping an asker leaves its question answerable');
  await click('[data-team-toggle="review"]');await click('#sidebar [data-agent="finch"]');await preview('held-permission');
  check(await text('#permission-perm-finch').then(t=>t.includes('held elsewhere'))&&await page.locator('#permission-perm-finch [data-permission-answer]').count()===0,'Permissions held elsewhere offer no owner answer controls');
