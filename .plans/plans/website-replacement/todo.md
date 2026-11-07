@@ -176,6 +176,23 @@ shows which events they need. `design/data/README.md` on `area/web-mock` lists t
 - [ ] Use the attention words Question, Approval, and Failed start, including in
       `alertTitles.approval`.
 
+### Added by the mock's first run
+
+The mock gained a first run on 2026-11-07, at `?sample=first`. `design/DESIGN.md` has its rules.
+
+- [ ] Read a computer for the first run: which harnesses are installed, their versions, whether
+      each is signed in, and the Git repositories in a folder with branch and last activity. The
+      read changes nothing on the computer, and a failure returns a reason the page can show.
+- [ ] Store how far the first run has got and that it finished, as the proposed events
+      `project.SetupProgressed` and `project.SetupFinished`. A lower step never lowers the furthest
+      step, and the gate reads the finished record, not an absent flag.
+- [ ] Let the owner change the workspace folder of a machine, as `project.MachineChanged` with
+      `workspaceFolder`.
+- [ ] Take the lead's harness and account when a project is created.
+- [ ] Decide how a worker computer skips the first run. The mock does not cover this.
+- [ ] Decide how Look around first keeps sample data apart from real data. The mock reloads into
+      a separate sample, and Ananke's demo had to be sealed at the app's exits.
+
 ## Website: rebuild `packages/web` to match the mock
 
 - [ ] Move the Field and Dusk tokens and the mock's styles into files, because the
