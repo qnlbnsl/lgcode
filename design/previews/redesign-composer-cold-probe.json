@@ -1,0 +1,73 @@
+{
+  "timestamp": "2026-11-06T17:02:05.947Z",
+  "passed": 15,
+  "failed": 0,
+  "results": [
+    {
+      "pass": true,
+      "label": "Agent draft/context/account do not leak into another conversation",
+      "evidence": [
+        "Claude Code · Host profile",
+        "Build team"
+      ]
+    },
+    {
+      "pass": true,
+      "label": "Agent draft/context/account restore together"
+    },
+    {
+      "pass": true,
+      "label": "Sent context stays with message and clears composer"
+    },
+    {
+      "pass": true,
+      "label": "Attention permission route focuses its exact request"
+    },
+    {
+      "pass": true,
+      "label": "Empty quick search Enter keeps dialog open safely"
+    },
+    {
+      "pass": true,
+      "label": "Keyboard quick switch reaches agent after empty-search escape"
+    },
+    {
+      "pass": true,
+      "label": "light team chat has no document overflow at 390px"
+    },
+    {
+      "pass": true,
+      "label": "light team source-control has no document overflow at 390px"
+    },
+    {
+      "pass": true,
+      "label": "light team terminal has no document overflow at 390px"
+    },
+    {
+      "pass": true,
+      "label": "light team workspace-settings has no document overflow at 390px"
+    },
+    {
+      "pass": true,
+      "label": "dark team chat has no document overflow at 390px"
+    },
+    {
+      "pass": true,
+      "label": "dark team source-control has no document overflow at 390px"
+    },
+    {
+      "pass": true,
+      "label": "dark team terminal has no document overflow at 390px"
+    },
+    {
+      "pass": true,
+      "label": "dark team workspace-settings has no document overflow at 390px"
+    },
+    {
+      "pass": true,
+      "label": "No browser JavaScript errors",
+      "evidence": []
+    }
+  ],
+  "errors": []
+}

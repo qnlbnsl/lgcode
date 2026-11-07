@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-11-06T17:59:39.096Z",
+  "observations": [
+    {
+      "label": "Open conversation preserves Rowan draft",
+      "pass": true
+    },
+    {
+      "label": "Unconfirmed answer remains pending and disables immediate retry",
+      "pass": true
+    },
+    {
+      "label": "Open filter includes unconfirmed request",
+      "pass": true
+    },
+    {
+      "label": "Search discovers unconfirmed request",
+      "pass": true
+    },
+    {
+      "label": "Held request remains in Home with no answer controls",
+      "pass": true
+    },
+    {
+      "label": "Search discovers held request",
+      "pass": true
+    }
+  ],
+  "errors": []
+}

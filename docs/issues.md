@@ -8396,3 +8396,314 @@ the actual owning team. Workspace app now has App shell and Review teams,
 and the browser probe follows SH-16 into Review's Changes view.
 Why it matters: The named sender and team must match the assignment when
 several teams share one project.
+
+## 503. Project selection hid the board and its branch assignment
+
+Found: 2026-11-06, during the owner's mock review.
+State: changed in the mock; awaiting visual review.
+
+What happened: Selecting a project opened its lead conversation. The
+project did not state its assigned branch in navigation or on its board.
+The inspection picker was the only visible branch label.
+What changed: Project selection now opens the sprint board. Chat and Talk
+to the lead remain explicit actions. The assigned branch appears beneath
+the project name and beside the board title. The inspection picker says
+Viewing and leaves that assignment unchanged.
+Why it matters: The project opens with its overall status. The owner can
+see where its work belongs while inspecting a different branch.
+
+## 504. The board had a redundant navigation row and a separate lead chat
+
+Found: 2026-11-06, during the owner's mock review.
+State: changed in the mock; awaiting visual review.
+
+What happened: Clicking a project already opened its board, but the tree
+also contained a Board row. Talking to Sage meant leaving the board.
+What changed: The Board row was removed. The board now has its project
+lead's conversation on the right, with the same messages and drafts as
+the full conversation. The panel collapses and opens as a drawer on
+smaller screens. Each project shows its own lead.
+Why it matters: The owner can discuss the plan while seeing its sprints.
+
+## 505. The redesign omitted existing operational page capabilities
+
+Found: 2026-11-06, during the owner's comparison with the current page.
+State: represented in the mock; engine integration remains separate.
+
+What happened: The visual mock lacked login, logout, expiry, connection
+states, permission controls, agent lifecycle, failed-start reasons, large
+items, tool details, delivery history, Alerts, and Settings.
+What changed: The mock now has interactive examples of those flows.
+Source mappings and integration boundaries are in design/FEATURE-PARITY.md.
+Why it matters: Improving the layout must preserve the controls needed to
+operate agents and recover from failures.
+
+## 506. Operational and workspace examples initially lost context at boundaries
+
+Found: 2026-11-06, in independent browser verification of the expanded mock.
+State: fixed in the mock and independently rechecked.
+
+What happened: Recovery's Git examples showed Workspace app content.
+Subscription toggles remained editable while reconnecting. Stopping an
+agent left permissions actionable. Logout retained an unsaved token in a
+hidden input. Worker mode retained a Master label in Terminal and exposed
+a master-only pairing action.
+What changed: Workspace examples use the selected branch and file.
+Mutations disable during reconnection. Stop cancels permissions while
+retaining questions. Session teardown wipes secrets and pairing inputs.
+The current machine role propagates, and worker-only restrictions apply.
+Why it matters: Context, authority, and recovery behavior must stay
+consistent across navigation. Durable browser regressions cover these
+cases, and cold browser probes rechecked all six fixes.
+
+
+## 507. Responsive resizing erased unsaved settings in the mock
+
+Found: 2026-11-06, while running the operational regressions.
+State: fixed in the mock.
+
+What happened: Crossing the lead-panel breakpoint redrew every view, even
+when the board was closed. An unsaved carrier URL disappeared during resize.
+What changed: The lead-panel breakpoint redraws only the board. Other views
+use their responsive styles without rebuilding their inputs.
+Why it matters: Changing window size must preserve unsaved workspace and
+service settings. A browser regression reproduces the original failure.
+
+
+## 508. Repeated prototype disclaimers cluttered the working interface
+
+Found: 2026-11-06, in the owner’s feedback on the browser mock.
+State: removed from interface copy.
+
+What happened: Chat, connection status, Terminal, Git, settings, login,
+pairing, and subscriptions repeatedly announced sample or preview data.
+What changed: Those surfaces now use normal product language. Placeholders,
+accessible labels, save confirmations, and generated replies were cleaned up.
+Prototype boundaries remain in the design documentation.
+Why it matters: The owner is evaluating the app’s interaction and layout.
+Repeated reminders distract from the work being represented.
+
+
+## 509. The workspace layout and navigation need a consistent scope model
+
+Found: 2026-11-06, during the requested comparison with T3 Code and VS Code.
+State: addressed in the approved workspace refinement pass, 2026-11-06.
+
+Confirmed live: Team Changes and project Git expose the same viewer through
+different navigation levels. At 1440px, the board needs 936px inside a 718px
+viewport beside Sage, leaving Done mostly off-screen. At 2560px, the 800px
+chat column leaves 1420px unused to its right. Git lacks staging, a commit
+message, and the newly discussed team-to-project worktree integration view.
+
+Why it matters: Users must understand which agent, team, worktree, and branch
+an action affects while following project progress. The evidence and ranked
+recommendations are in design/UI-CRITIQUE-2026-11-06.md. Captures and geometry
+measurements are under design/previews/critique-current/.
+
+
+What changed for issue 509: One workspace tab row follows project/team scope.
+The navigation and Sage panel resize. Four board columns fit at 1440px.
+Focused chat is centered. Git exposes worktree hierarchy, staging, commits,
+synchronization, conflicts, and explicit team/project/main integration targets.
+The composer adds progress, account choice, and file/task context. Attention,
+quick switch, and named terminal sessions support navigation. Evidence is in
+`design/previews/workspace-redesign-checks.json` and the cold verification report.
+
+## 510. Worktree transitions could overwrite terminal drafts and retain stale scope
+
+Found: 2026-11-06, during independent browser verification of the refinement.
+State: fixed and independently rechecked.
+
+What happened: Selecting a team or project changed the workspace before the
+old terminal input was saved. That copied a draft into the destination and
+could overwrite the original on return. The older Viewing picker also left
+Git and Terminal in the previous project and machine. A partial commit could
+leave no selected file. Team integration ignored uncommitted destination files.
+
+What changed: Navigation saves the old context before selecting its destination.
+The Viewing picker follows the owning project, team, and machine in Git and
+Terminal. Project leads restore their assigned worktree. Partial commits select
+the remaining file. Dirty or conflicted destination worktrees block integration.
+
+Confirmed live: The independent verifier repeated these four journeys and
+reported 32 passing assertions with zero browser errors. Permanent checks in
+`design/workspace-redesign-checks.mjs` cover the reproduced boundaries.
+
+## 511. Attention was scattered and comparable machine records wasted space
+
+Found: 2026-11-06, during the owner's Cursor-first critique and density feedback.
+State: addressed in the browser prototype; awaiting owner visual judgment.
+
+Confirmed live before the change: The page opened inside one project. Four
+unresolved items were available through the bell, but there was no global
+Home or cross-project question/approval list. Add Project did not offer a
+machine choice. Machines used large rows for comparable host records.
+
+What changed: Home is now the default, with Needs attention, All projects,
+Questions, and Approvals. Filters combine across the workspace. Questions
+and permissions can be answered in place; merge reviews retain an explicit
+approval step. Answered history remains discoverable. Add Project resolves
+the selected machine's repository, branch, and folder. Machines now uses
+43-pixel table rows at desktop width. The critique and evidence are in
+`design/UI-CRITIQUE-2026-11-06-HOME.md` and `design/previews/home-checks.json`.
+
+## 512. Global request and machine actions lost context at navigation boundaries
+
+Found: 2026-11-06, in independent cold verification of Home and remote creation.
+State: fixed and independently rechecked in the prototype.
+
+What happened: Discuss could overwrite a saved draft. A machine action could
+fall back to Studio when its repository was unavailable. Placement could
+select hosts without the repository and disagree with the current Git host.
+Global permission and failure details could show a project branch instead
+of the requesting team's branch. Tab arrows were missing, filters lost focus,
+and an unchecked remote main checkout had the wrong type label.
+
+What changed: Discussion preserves nonempty drafts. Explicit machine choices
+stay selected and block creation until a repository is available there.
+Placement validates repository availability and applies only to future runs.
+Details derive branch context from the requesting agent's team. Home tabs
+support arrows, Home, and End. Filters retain focus. Remote checkout labels
+agree with the chosen host and path.
+
+Confirmed live: Independent cold verification completed 42 successful checks
+with zero browser errors and no outstanding admitted finding. Reproduction
+and recheck evidence are in `design/previews/home-cold-verification.md`.
+
+## 513. Split request views and disconnected sidebar controls impeded scanning
+
+Found: 2026-11-06, in the owner's review of Needs attention and Approvals.
+State: revised in the browser prototype; awaiting owner visual judgment.
+
+What happened: A selected request opened a separate detail column. Requests
+used multiple summary lines. The sidebar placed Repositories, Add Project,
+search, and a project filter together without clear boundaries or scope.
+The owner described it as disjointed and unintuitive.
+
+What changed: Requests now start as collapsed single-line rows. Clicking a
+row toggles the details directly beneath it, with one expansion at a time.
+Home/search, Projects/new project/project filtering, and service pages have
+visible separators. The project filter says Only projects needing you.
+Repository names still open their lists, so the duplicate Repositories
+destination was removed. Existing operational controls remain inside the
+expanded request. Evidence is in `design/previews/home-checks.json` and
+the `inline-requests-` captures.
+
+Cold verification also found that answering an expanded request could remove
+its row and drop keyboard focus onto the page body. The render path now hands
+focus to the next visible row, or to the empty result when a filtered queue
+is complete. Permanent checks reproduce question, permission, and empty-queue
+focus handoff. The initial question check failed before the fix.
+
+## 514. The mock's terminal was a command form, and a first review found layout and naming bugs
+
+Found: 2026-11-06, when Claude took over the mock from Codex and reviewed it at 1440
+pixels against Cursor and the owner's earlier requests.
+State: fixed in the mock on the branch `area/web-mock`, commit `e2d5166`; awaiting the
+owner's judgment and a designer's critique.
+
+What happened: Terminal was a form with an input box and an Enter button, so it could
+not host vim or an agent's command line. Because the mock is golden, that would have
+been built as drawn. Git stopped short of the window height, and its columns scrolled
+together. The tab row moved sideways between views. A thread opened at its top, so a
+pending permission's buttons were below the fold. Iris's branch and worktree disagreed
+across the page. The brand and storage keys said "shephrd", and "Add Project", "Source
+Control" and "Workspace settings" competed with other names for the same things. Text
+went down to 9 pixels. The Alerts badge counted requests, which duplicated the bell.
+
+What changed: Terminal is a full-height character grid with slim session tabs and a
+full-screen program example. Git uses the full window, and each column scrolls on its
+own. The tab row keeps one left edge. Threads open at the latest message, with a
+pending permission last. Names are unified as recorded in `design/DESIGN.md`, and no
+text is under 11 pixels. Alerts now means notification delivery, and its badge counts
+failures. The new `design/revision-checks.mjs` passed 4 of 45 checks on the old mock
+and passes 71 of 71 now.
+
+## 515. A designer critique found 15 problems in the mock that mislead or block the owner
+
+Found: 2026-11-06, in a critique by a subagent acting as a senior Apple designer.
+State: the 15 Must fix findings are fixed in the mock, in commit `6133a31` on the branch
+`area/web-mock`. The owner picks from the other findings. The full list of 114 findings is
+`design/UI-CRITIQUE-2026-11-06-DESIGNER.md` on that branch.
+
+What happened: The sidebar hides attention that exists, and failed agents wear the
+success color. The merge to main is approved from a dialog with no evidence. A cancelled
+permission says that an answer was recorded. A status line says "No owner action needed"
+above a waiting request. Neither side of machine pairing shows the code, although the
+owner decided that the website generates it.
+
+Two of the problems contradict claims made by the review in entry 514. `design/DESIGN.md`
+says that threads open at the latest message, and the lead panel opens 34 pixels short of
+its end and returns to its top when reopened. The split diff added in that review filters
+each side separately, so the lines of the two sides do not correspond. The 71 checks in
+`design/revision-checks.mjs` did not catch either problem.
+
+## 516. Sheprd cannot run Grok without Fast through Cursor's Agent Client Protocol
+
+Found: 2026-11-06, while setting up the advisory board on a private engine.
+State: open. Not fixed.
+
+Cursor's Agent Client Protocol (ACP) mode offers Grok 4.7 only as
+`grok-4.7[context=256k,reasoning_effort=high,fast=true]`. It refused the same
+value with `fast=false`, and it refused `grok-4.7-high`. Launch arguments and a
+private `CURSOR_CONFIG_DIR` did not change the offered value. The interactive
+`cursor-agent --model grok-4.7-high` runs without Fast. The owner's rule is no
+fast modes, so a Grok agent cannot run under Sheprd's engine today. The board
+used Herdr Synapse's team board and interactive panes instead.
+
+## 517. Moving the mock onto data files exposed four faults in it
+
+Found: 2026-11-07, while moving the mock's fixtures into JSON files and stub functions.
+State: three are fixed on the branch `area/web-mock`. The sidebar fault is open in the mock.
+
+- A thread opened from Home started 39 pixels short of its end. The fix for this fault in
+  `6133a31` restored the position before the page finished changing its layout. It is fixed.
+- A question in the heavy sample did not appear in its agent's thread, so its links opened a
+  thread without it. Questions now come from the events. It is fixed.
+- Leads in the heavy sample showed the first-run greeting although they had sprints, and their
+  team agents showed the recovery team's text.
+  It is fixed.
+- When the page opens an agent in a long project list, the sidebar does not scroll to that
+  agent, so the selection can be out of sight. It is open.
+
+A real export cannot show boards yet, because the engine stores no projects, sprints, or tasks.
+The website todo records those events as proposed.
+
+## 518. The mock's Copy button said "Copied" over plain web addresses when nothing was copied
+
+Found: 2026-11-07, while serving the mock on the build server's network address.
+State: fixed on the branch `area/web-mock`.
+
+A browser offers the clipboard only over HTTPS and loopback addresses. Over a plain network
+address, the pairing command's Copy button copied nothing and still showed "Copied". The button
+now selects the text and says that the address cannot use the clipboard. It also reports a
+refused copy, where it stayed silent before.
+
+The product page supports only HTTPS and loopback, so the product should not meet the first case.
+
+## 519. The Claude and Grok review findings are not checked against `master`
+
+Found: 2026-11-07, while reconciling `master` before the freeze.
+State: open, awaiting the owner's word to run the check.
+
+Three foundation reviews ran on the snapshot at the tag `foundation-pre-review`, and only the Codex review's fixes have reached `master`. The Claude review confirmed 51 findings, of which 25 concern the product and 26 concern tests. It left 526 findings unadjudicated and deferred 203 security findings. The Grok review confirmed 23 findings, of which 18 are distinct. It left 139 findings unadjudicated and deferred 10 security findings.
+
+Nobody yet knows how many of these findings the Codex repairs already fixed. A reading on 2026-11-07 found that the Codex register's `R-009`, `R-012`, `L-038` and `FR-001` are still present on `master`, and that `R-002` still needs a manual build. The evidence is outside git, in `.scratch/foundry-runs/foundation-plans-1/`, under `review-claude/`, `review-cursor/` and `review-codex/`.
+
+## 520. The stall rule nudges a lead while its own worker is busy, and the plan contradicts itself
+
+Found: 2026-11-07, recorded from review finding K-368.
+State: open, awaiting the owner's ruling. No code changes during the freeze.
+
+When an orchestrator posts a question that needs a reply to a lead, the lead goes idle while its workers run. After 20 minutes the lead receives `StallSeen`, and on the third episode the orchestrator receives `ReplaceAdvised`. The code is `packages/engine/src/roles/sheepdog/rules/stall.ts:145-150`. The plan's criterion 4.3, at `.plans/plans/shepherd-foundry-roles/plan.md:939`, says both "nor is the lead" and "still nudged". The plan's line 69 says that a worker waiting on a busy agent is not stalled. No test covers an orchestrator's post to a lead with a busy descendant.
+
+The manager's recommendation is to keep the nudge, because the question is still owed, and to stop advising replacement while the lead's team is working.
+
+## 521. Finished review seats filled the temporary folder's file limit
+
+Found: 2026-11-07, when every shell command in the manager's session failed with "no space left on device".
+State: worked around for now. The cause remains.
+
+`/tmp` allows 1,048,576 files, and it reached that limit while only 21 percent of its bytes were in use. Each review seat kept a full copy of the repository, including `node_modules`, in its temporary folder under `/tmp/claude-1000`, and each adjudicator seat held about 28,000 files. Nothing removes those folders when a seat finishes. The failure affects every session on the machine, because each one needs a new file for each command's output.
+
+The manager removed the `node_modules` folders from the 31 finished adjudicator seats, which brought the folder down to 56 percent of its file limit. The folders of the other finished seats remain. The Foundry should give seats a shared read-only copy, or remove a seat's temporary folder when the seat retires. The main disk is also at 96 percent.

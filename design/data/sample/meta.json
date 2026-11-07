@@ -1,0 +1,52 @@
+{
+ "source": "sample",
+ "exported_at": "2026-11-06T10:56:00.000Z",
+ "clock": 1793962560000,
+ "display_time_zone": "UTC",
+ "schema": {
+  "table": "events",
+  "migrations": [
+   1,
+   2,
+   3
+  ]
+ },
+ "row_counts": {
+  "events": 145,
+  "by_type": {
+   "project.MachineAdded": 3,
+   "project.RepositoryAdded": 2,
+   "project.RepositoryLocated": 4,
+   "AccountChanged": 4,
+   "project.AccountPlaced": 4,
+   "AccountNeedsSignIn": 1,
+   "project.WorktreeCreated": 8,
+   "project.Created": 4,
+   "AgentStarted": 9,
+   "SessionOpened": 8,
+   "project.TeamAdded": 3,
+   "board.ChannelOpened": 3,
+   "project.SprintAdded": 5,
+   "project.TaskAdded": 9,
+   "TurnStarted": 10,
+   "ThreadItem": 28,
+   "TurnEnded": 10,
+   "DeliveryQueued": 2,
+   "DeliverySent": 3,
+   "DeliveryAccepted": 2,
+   "DeliveryHeld": 1,
+   "DeliveryReleased": 1,
+   "AgentStartFailed": 1,
+   "DeliveryRequeued": 1,
+   "client.AlertRaised": 3,
+   "client.AlertDeliveryFailed": 2,
+   "PromptSent": 2,
+   "board.PostWritten": 7,
+   "QuestionAsked": 1,
+   "project.QuestionLinked": 1,
+   "client.AlertDelivered": 1,
+   "PermissionRequested": 2
+  }
+ },
+ "notes": "Hand-made sample in the shape of the engine's events table. Event types starting project. are proposed for the new project piece and do not exist in the engine yet; see design/data/README.md."
+}

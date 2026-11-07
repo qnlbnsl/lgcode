@@ -1,0 +1,91 @@
+{
+  "timestamp": "2026-11-06T18:02:25.056Z",
+  "passed": 20,
+  "failed": 0,
+  "checks": [
+    {
+      "pass": true,
+      "label": "Home ArrowRight selects and focuses next tab"
+    },
+    {
+      "pass": true,
+      "label": "Home End reaches Approvals"
+    },
+    {
+      "pass": true,
+      "label": "Home Home returns to Needs attention"
+    },
+    {
+      "pass": true,
+      "label": "Home ArrowLeft wraps to Approvals"
+    },
+    {
+      "pass": true,
+      "label": "Repository filter restores keyboard focus"
+    },
+    {
+      "pass": true,
+      "label": "Machine filter restores keyboard focus"
+    },
+    {
+      "pass": true,
+      "label": "Discuss another approach preserves existing draft"
+    },
+    {
+      "pass": true,
+      "label": "Discuss seeds helpful prompt only into empty draft"
+    },
+    {
+      "pass": true,
+      "label": "Approval detail shows agent team branch"
+    },
+    {
+      "pass": true,
+      "label": "Failed-start detail shows agent team branch and remote host"
+    },
+    {
+      "pass": true,
+      "label": "Unavailable repository is disabled for future placement"
+    },
+    {
+      "pass": true,
+      "label": "Placement change is explicitly future-run only"
+    },
+    {
+      "pass": true,
+      "label": "Future placement preserves current assigned machine"
+    },
+    {
+      "pass": true,
+      "label": "Future placement preserves current Git host"
+    },
+    {
+      "pass": true,
+      "label": "Machine Start project selects a repository on requested host"
+    },
+    {
+      "pass": true,
+      "label": "Offline host remains unavailable"
+    },
+    {
+      "pass": true,
+      "label": "Explicit host stays selected and Start disables when repository unavailable",
+      "evidence": "No available machine has this repository."
+    },
+    {
+      "pass": true,
+      "label": "Remote unchecked project correctly labels main checkout",
+      "evidence": "RepositorysheprdBranchmainCheckoutMain checkoutFolder~/work/sheprdMachineBuildbox"
+    },
+    {
+      "pass": true,
+      "label": "Repository-free worker retains requested host and explains disabled Start"
+    },
+    {
+      "pass": true,
+      "label": "No browser JavaScript errors",
+      "evidence": []
+    }
+  ],
+  "errors": []
+}

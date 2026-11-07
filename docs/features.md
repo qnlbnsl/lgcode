@@ -1,26 +1,19 @@
 # Sheprd: the feature list
 
-Status: **draft, not approved.** Some features are built inside the engine,
-but none is reachable from a client yet.
+Status: **draft, not approved.** The foundation is merged into `master`, so
+clients reach the built features through the web page, the command-line tool
+and the client API. Development is frozen from 2026-11-07 until the website
+mocks are ready.
 
 Each feature has a short name, one paragraph saying what it does, and a state:
 **idea** (written down, not agreed), **agreed** (the owner wants it), or
 **built** (merged and working).
 
-While the engine is being built, a feature can also be **built in the
-engine** (unit numbers follow). That means its engine part is merged into
-`area/engine` and passes its tests. Since unit 7b, the client library, the
-`sheprd` command-line tool and `sheprd mcp` are merged too, so the owner
-and agents can reach the engine from a terminal, but no web or phone client
-exists yet. Since unit 8b, an acceptance suite runs the service as a
-child process and checks each of the engine's twelve capabilities, its
-eight failure rules and one request from start to finish through the
-public socket only, with fake agents. Since unit 8c, `pnpm live-check`
-runs that request once on a real Claude Code lead and a real Codex worker
-in a fresh `/tmp` service, for the owner to run by hand; it has not been
-run on the owner's accounts yet. A feature
-is **partly built in the engine** when only some of what its paragraph
-describes is merged; the note after it says which part.
+The state **built in the engine** dates from when the engine had its own
+branch, and that code is now on `master`. A feature is **partly built** when
+only some of what its paragraph describes is merged; the note after it says
+which part. The states were last compared with the code on 2026-11-07 by
+searching for the matching source, not by running each feature.
 
 An earlier, much longer list of message-board features was written for the
 Synapse fork. It is at `docs/message-board/features.md` in the
@@ -54,9 +47,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   call and checks the caller's existing rights. Other servers and native
   file and command tools continue following the selected mode. The settings
   belong to the managed session or process, not the owner's harness settings.
-- **Orchestrator** (idea). The top-level agent. It receives the owner's goal,
+- **Orchestrator** (built). The top-level agent. It receives the owner's goal,
   decides which teams to staff, and talks to team leads, not to workers.
-- **Team leads** (idea). One per team. A lead plans its team's work, hands it
+- **Team leads** (built). One per team. A lead plans its team's work, hands it
   to workers, and reports to the orchestrator.
 - **Worker kinds** (idea). Workers have a kind, such as implementer,
   reviewer, or researcher, and a harness, such as Claude Code or Codex. The
@@ -111,7 +104,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   process tree, so Codex's sandbox and a backgrounded Claude stop breaking
   identity. Borrowed from T3 Code; see
   [research/t3-code.md](research/t3-code.md), item 1.
-- **Sheprd's tools over MCP** (idea). The board's verbs (post, read, finish
+- **Sheprd's tools over MCP** (built). The board's verbs (post, read, finish
   work, ask the owner) are offered to agents through a Model Context Protocol
   (MCP) server on a loopback address, as well as through the command line.
   Every tool declares which roles may call it. See research item 1.
@@ -119,7 +112,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   6a sets back a mode change made inside the agent). An agent that a lead starts, swaps or
   messages never runs with a broader permission mode than the lead. See
   research item 6.
-- **Hand-offs built from records** (idea). A replacement worker starts from a
+- **Hand-offs built from records** (built). A replacement worker starts from a
   hand-off that Sheprd builds from the work brief, the worker's posts, the
   files it touched and the commands it ran, with no model turn spent. See
   research item 5.
@@ -128,9 +121,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 
 ## 2. The message board
 
-- **Channels and direct messages** (idea). Each team has a channel. Leads can
+- **Channels and direct messages** (built). Each team has a channel. Leads can
   message the orchestrator directly. Workers can message each other.
-- **Wake rules** (idea). Each post says whether it needs an answer. Only a
+- **Wake rules** (built). Each post says whether it needs an answer. Only a
   post that needs an answer wakes its recipient, because every wake costs a
   full agent turn.
 - **System events in a log** (idea). Joins, exits, and status changes go to
@@ -184,7 +177,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   the owner-only state folder, for the owner, paired devices and agents; unit
   7b adds the client library). The web page, a future
   desktop app, and a future mobile app all use the same API.
-- **Device pairing** (idea). A new device is added with a one-time pairing
+- **Device pairing** (dropped for phones and browsers by the owner on
+  2026-11-03, in favour of one password; a pairing code remains allowed for
+  worker machines). A new device is added with a one-time pairing
   code, as described in [SECURITY.md](../SECURITY.md).
 - **Live updates** (idea; partly built in the engine: unit 7a's `subscribe`
   streams events, and an agent sees only its own and its children's). Clients receive board posts, thread events, and
@@ -252,8 +247,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   | `debug.compare-views` | `debug headcount` |
   | `mcp` | `dog` |
 - **Filtered live updates** (idea). A subscription for phones that is filtered by agent and by event kind, with checkpoints that keep the cursor moving.
-- **One password login** (planned). The service reads the password from the environment variable `SHEPRD_WEB_PASSWORD`, and the dashboard asks for it. One person uses Sheprd, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
-- **Phone alerts through one sender** (idea). Phone alerts go through one sender interface, `AlertSender`, with ntfy as the first carrier. A later carrier, such as Expo's push service for the phone app, slots in behind it (client API row 83).
+- **One password login** (built). The service reads the password from the environment variable `SHEPRD_WEB_PASSWORD`, and the dashboard asks for it. One person uses Sheprd, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
+- **Phone alerts through one sender** (built). Phone alerts go through one sender interface, `AlertSender`, with ntfy as the first carrier. A later carrier, such as Expo's push service for the phone app, slots in behind it (client API row 83).
 - **Mobile login** (later). Starts by looking at what Home Assistant does.
 - **VS Code extension** (later). One of the last things, along with the mobile app, by the owner's answer of 2026-11-03.
 
@@ -265,27 +260,27 @@ sheepdog is the part of Sheprd's background service that keeps every agent
 moving without spending their turns. It never decides what the work is; it
 only notices when an agent has strayed and nudges it back, or tells its lead.
 
-- **Stall watch** (idea). The sheepdog knows each agent's work state (off,
+- **Stall watch** (built). The sheepdog knows each agent's work state (off,
   assigned, working, waiting, done) and notices an agent that has stopped
   without finishing. It wakes the agent once, then tells its lead. A worker
   that stalls three times in a row on the same work is replaced. The rules
   come from Synapse-list items 23 and 24 (see
   [research/herdr-and-synapse.md](research/herdr-and-synapse.md)).
-- **Usage-limit pauses are not stalls** (idea). An agent stopped by a usage
+- **Usage-limit pauses are not stalls** (built). An agent stopped by a usage
   limit is resumed when the limit resets, and the pause never counts toward
   replacing it. See research item 8.
 - **Stuck input boxes and approval dialogs** (idea). An agent whose input box
   has held the same text for a long time, or that is waiting on an approval
   dialog, is reported to its lead.
-- **Compaction timed to the prompt cache** (idea). An idle Claude agent with a
+- **Compaction timed to the prompt cache** (built). An idle Claude agent with a
   large context is compacted two minutes before its prompt cache expires, not
   after, because a wake after the cache expires costs about 20 times more for
   the cached part. Posts that need an answer and can wait are delivered
   before the cache expires. See research item 4.
-- **Runaway work** (idea). Work that runs far past its expected length is
+- **Runaway work** (built). Work that runs far past its expected length is
   reported to the lead, and can continue in a fresh agent with a built
   hand-off.
-- **Cache lifetime setting** (idea). A per-harness `cacheLifetime` setting, five minutes or one hour, for timing compaction when the adapter does not report which cache lifetime it wrote (roles round 1).
+- **Cache lifetime setting** (built). A per-harness `cacheLifetime` setting, five minutes or one hour, for timing compaction when the adapter does not report which cache lifetime it wrote (roles round 1).
 - **"Compact me when I am next idle"** (idea). An agent asks the sheepdog to compact it after its current turn. This replaces the Foundry's `want-<name>` file for the context-keeper.
 
 ## 6. Source control
@@ -310,7 +305,8 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   Each repository has a page listing its projects and an Add Project
   action. Multiple projects can work within the same repository.
 - **Exactly one lead per project** (agreed, 2026-11-05; mocked). Selecting
-  a project always opens its lead conversation. Each project has its own
+  a project opens its sprint board, updated on 2026-11-06. A right chat
+  panel opens the project lead alongside that board. Each project has its own
   goal, sprint board, teams, and messages. The owner's clarification
   replaces the earlier ambiguous request for multiple leads within a
   project. Multiple projects have separate leads.
@@ -318,12 +314,31 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   Add Project creates a named project under a known repository and opens
   its lead conversation. A new project has no sprints or teams until its
   plan is shaped. Existing projects never reopen repository setup.
+- **Project worktrees by default** (agreed, 2026-11-06; mocked).
+  Add Project has Start work tree checked beneath the project name. A safe
+  version of the name determines its branch and worktree folder. Numeric
+  suffixes resolve existing names. Unchecking uses that repository’s main
+  checkout. The dialog previews the branch and location before submission.
+- **Workspace settings** (agreed, 2026-11-06; mocked). A Settings tab beside
+  Board, Chat, Terminal, and Git shows the assigned repository, branch,
+  checkout type, folder, and machine. It stores a project-specific terminal
+  shell preference in the preview. Service settings remain a global page.
 - **A project board of sprints** (agreed, 2026-11-05; mocked). The Kanban
   board shows Planned, In progress, Review, and Done. A sprint contains
   the plan's tasks and shows ownership, current phase, dependencies,
   blockers, and completion evidence. Team task lists and sprint details
   read the same assignments. The owner referenced Ananke's Cursor
   build-order roadmap. No implementation code was copied.
+- **Talk to the lead beside the board** (agreed, 2026-11-06; mocked).
+  The navigation tree has no separate Board row. The board has a right
+  chat panel with its single lead and a working sample composer. It
+  shares messages, drafts, and reading position with the full conversation.
+  The panel can be collapsed. On smaller screens it opens as a drawer
+  with contained keyboard focus and Escape to close.
+- **The project states its assigned branch** (agreed, 2026-11-06; mocked).
+  The sidebar shows it under the project name beside the lead. The board
+  repeats it beside the title. The top-right picker says Viewing and only
+  changes inspected code context. It leaves the project assignment intact.
 - **Completion reflects evidence** (mock behavior, 2026-11-05). A completed
   sprint records verification and merge evidence. Release status is
   separate. Completed sprints do not accept new tasks. Moving a card is
@@ -350,6 +365,113 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   combines identity and navigation. User messages have a restrained
   treatment. Agent replies use readable text with grouped tool details.
   The composer grows when needed and retains its recipient label.
+
+### Existing page capabilities the redesign must retain
+
+Agreed on 2026-11-06 and represented in the browser mock. These are existing
+product capabilities, not permission to remove them during implementation.
+The source-to-mock mapping is in `design/FEATURE-PARITY.md`.
+
+- Login, logout, and session expiry stay available. Rejected login and an
+  unavailable session have explicit recovery states. Entered secrets clear
+  when the session ends.
+- Connection status stays visible. Reconnection retains the last received
+  state and drafts. Stale views do not offer functioning mutation controls.
+- Permission requests show their identity and action input before approval.
+  Hidden inputs, held requests, denial, cancellation, and unconfirmed
+  answers remain distinct from an agent's ordinary text.
+- Agent stop and resume stay available. Stopping cancels permissions but
+  preserves questions. A fresh resume explains its loss of prior context.
+- Failed starts keep the current safe reason categories and prevent sends.
+- Large thread items keep an explicit full loader with failure and retry.
+- Tool calls keep identity, status, input, and output. Deliveries retain
+  their sender, source, identity, and history.
+- Alerts and Settings remain full pages. Alerts retain pagination, subject
+  links, and notification delivery failures. Settings retain all current
+  notification and web-server controls.
+
+### Workspace scope and navigation refinement
+
+Approved on 2026-11-06 after comparison with T3 Code and Visual Studio Code.
+These interactions are represented in the browser mock.
+
+- One workspace tab row follows the selected project, team, or agent.
+  Git in team scope selects that team's worktree. The header names the
+  worktree's branch, team or project, and machine.
+- Team worktrees integrate into their project worktree. Project branches
+  reach main through explicit owner review. Dirty source or destination
+  worktrees and unresolved conflicts prevent integration.
+- Each worktree has its own staging selection, commit message, history,
+  incoming/outgoing state, and file diff. Git includes Commit, Fetch, Pull,
+  Push, and conflict resolution controls.
+- The navigation and project lead panel resize with pointer or keyboard.
+  Focused chat stays centered and readable on wide monitors. The board fits
+  four columns beside its lead at desktop width. Phone users have a status
+  strip for jumping between columns.
+- Composer controls show current agent progress, stop/resume, subscription
+  choice, and attached file/task context. Activity details link to Git.
+- An attention summary distinguishes decisions, permissions, and failed
+  starts. A navigation filter hides projects with no unresolved attention.
+  A keyboard quick switcher searches projects, teams, and agents.
+- Named terminal sessions preserve independent input and command history
+  within each machine and worktree. Context changes save the old session
+  before selecting the destination.
+
+### Terminal, Git, machines, and subscriptions
+
+Requested on 2026-11-06. Interactive views are mocked. Live terminal and
+machine coordination are not implemented by this design pass.
+
+- The main conversation can switch to a terminal. The intended product
+  provides actual direct commands on the selected machine and workspace.
+  It needs an authenticated terminal session with streamed output,
+  interruption, resizing, and reconnection. The current mock never runs a
+  command. The owner requested normal product copy without repeated mock
+  disclaimers on 2026-11-06. Prototype boundaries remain in design documentation.
+- Git combines a changed-file tree with unified and split diffs. Clicking a
+  file directly opens its diff. Branch-aware commit history uses the same
+  pane. There is no separate Diff tab or intermediate file preview.
+  Live repository reads, Git mutations, and merge validation remain integration work.
+- One computer runs the master process. Other computers pair through a
+  connect mode and act as workers. The master assigns projects across
+  machines. Pairing, availability, host identity, and project placement
+  need authenticated coordination and recovery without duplicate work.
+  The machine page is a preview and does not move running work.
+- A Subscriptions page supports several named accounts for the same
+  harness. Each entry has its own machine, enabled state, and sign-in.
+  Additional subscriptions do not reuse the default Codex authentication.
+  The engine's existing account/profile separation must be preserved.
+
+### Global Home, machine choice, and screen density
+
+Requested on 2026-11-06 and represented in the browser mock.
+
+- Home is the initial global page. Needs attention combines unresolved
+  questions, permissions, failed starts, and project merge reviews across
+  all projects. All projects opens each project's board.
+- Questions and Approvals have their own global lists with answered history.
+  Search combines with repository, project, agent, machine, and status filters.
+  Requests are single-line disclosures, collapsed initially. Their details
+  expand directly underneath rather than in a split pane. The same toggle
+  closes them and retains keyboard focus.
+  Questions and permissions can be answered without leaving Home. Merge
+  requests retain the explicit review step. Links open the source conversation
+  or board, preserving drafts and the requesting team's branch context.
+- Add Project chooses a machine through Run on before the project name.
+  The preview shows that host's branch and folder. Offline hosts and hosts
+  without the repository cannot start work. Unchecking Start work tree uses
+  the main checkout on that machine. No host is silently substituted.
+- Machines uses compact tables for machine status, role, agent slots,
+  project counts, start actions, and future project placement. Future
+  placement does not relabel running work or imply that a project moved.
+- Cursor is the primary design reference. T3 Code remains secondary, with
+  explicit discoverability and space usage requirements from the owner.
+  These flows remain an isolated prototype; durable queues and machine
+  execution require service integration.
+- Sidebar boundaries separate Home/search, Projects, and service pages.
+  New project belongs to Projects. Only projects needing you names the tree
+  filter's effect. Repository names open their project lists; a second
+  Repositories destination is unnecessary and has been removed.
 
 ## 8. The build loop
 
@@ -379,6 +501,23 @@ The full design is in
   approval, and 6 is the limit.
 - **Autonomous fix sprints** (agreed, 2026-11-05). A fix that users would not
   notice merges and moves on without the owner.
+- **A hotfix lane** (requested by the owner, 2026-11-06; not designed). The
+  owner asks the project lead for a hotfix, and it starts a very limited team
+  focused on fixing and pushing.
+- **A way to bisect** (requested by the owner, 2026-11-06; not designed). A
+  command finds the commit that broke something by halving the range of commits
+  at each test.
+- **A way to freeze interfaces** (requested by the owner, 2026-11-06; not
+  designed). A frozen interface cannot change while teams build against it.
+
+## 9. Client mode
+
+- **Sheprd in client mode** (requested by the owner, 2026-11-06; not designed).
+  One main Sheprd holds the event log, the board and the website. Other machines
+  run Sheprd in client mode and take their commands from the main one, so a
+  project's load spreads across machines. How a client machine proves who it is
+  needs the owner's word, because the login rule is one user, one password and no
+  pairing.
 
 ## Open questions
 

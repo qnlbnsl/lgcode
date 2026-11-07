@@ -22,10 +22,14 @@ it. It is not a fork in the git sense and does not track Synapse's history.
 
 ## Status
 
-The engine is being built. The owner approved its design and its plan,
-`.plans/plans/shepherd-engine/plan.md`, on 2026-11-01. Add application code
-only as one of that plan's units, or when the owner asks for it in the
-current task.
+The foundation is merged into `master`: the engine, the client API with the
+current web page, the message board, and the foundry roles. The standing
+permission rules remain unbuilt, pending the owner's harness recordings.
+
+Development is frozen. The owner froze it on 2026-11-07, until the website
+mocks are ready, and only the owner lifts the freeze. While it holds, do not
+add application code unless the owner asks for it in the current task. Work on
+the mocks under `design/` continues, as do the documents that record them.
 
 ## Language
 

@@ -1,9 +1,9 @@
 ---
 topic: shepherd-message-board
-status: accepted
+status: done
 tier: M
 created: 2026-11-03
-updated: 2026-11-03
+updated: 2026-11-07
 epic: shepherd-foundation
 ---
 
