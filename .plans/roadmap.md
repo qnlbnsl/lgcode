@@ -22,7 +22,7 @@ owner lifts the freeze.
 | Kind | Name | Overview |
 |---|---|---|
 | other | Website replacement | Five build steps that add what the mock needs to the engine and replace the web page. The list is `.plans/plans/website-replacement/todo.md`. |
-| other | Review findings | Check the Claude and Grok foundation findings against `master`, as issue 519 records: 20 remain on `master`. |
+| other | Review findings | Fix the 20 Claude and Grok foundation findings still on `master`, which issue 519 lists. |
 | other | Default workflow | The build loop in `docs/specs/2026-11-05-build-loop-design.md`, with the hotfix, bisect and freeze additions still to be designed. |
 | other | Sandbox and hostile review | Agents run in a sandbox, and the owner runs the hostile review. |
 
