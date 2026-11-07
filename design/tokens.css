@@ -1,0 +1,30 @@
+/* Shephrd: Field light mode and Dusk dark mode. Approved 2026-11-05. */
+:root {
+  color-scheme:light;
+  --color-bg:#f6f8f5; --color-surface:#ffffff; --color-raised:#edf2ec;
+  --color-sidebar:#e7eee5; --color-text:#253b2e; --color-muted:#596d5f;
+  --color-primary:#285e43; --color-primary-contrast:#ffffff; --color-accent:#466e57;
+  --color-success:#2e6848; --color-warn:#805a1b; --color-error:#a73d48;
+  --color-focus:#285e43; --color-line:#ccd8cb; --color-selected:#d5e5d5;
+  --shadow-1:0 4px 14px rgb(22 48 28 / .07); --shadow-2:0 18px 60px rgb(22 48 28 / .18);
+  --font-display:'Segoe UI','Helvetica Neue','Nimbus Sans',Arial,sans-serif;
+  --font-body:'Segoe UI','Helvetica Neue','Nimbus Sans',Arial,sans-serif;
+  --font-mono:'SFMono-Regular',Consolas,'DejaVu Sans Mono',monospace;
+  --scale-xs:.75rem; --scale-sm:.8125rem; --scale-md:.9375rem;
+  --scale-lg:1.125rem; --scale-xl:1.65rem; --scale-2xl:2rem;
+  --weight-body:400; --weight-medium:550; --weight-display:650;
+  --measure:68ch; --leading-body:1.65; --leading-tight:1.2;
+  --space-1:.25rem; --space-2:.5rem; --space-3:1rem;
+  --space-4:1.5rem; --space-5:2rem; --space-6:3rem;
+  --radius-sm:5px; --radius-md:10px; --radius-pill:999px;
+  --motion-fast:150ms; --motion-slow:250ms; --ease:cubic-bezier(.22,.7,.35,1);
+}
+:root[data-theme="dark"] {
+  color-scheme:dark;
+  --color-bg:#29232e; --color-surface:#332c39; --color-raised:#403644;
+  --color-sidebar:#231e28; --color-text:#f3eaf0; --color-muted:#c3aebb;
+  --color-primary:#edbda8; --color-primary-contrast:#38232a; --color-accent:#d3b7d5;
+  --color-success:#b3d1b3; --color-warn:#edd09e; --color-error:#f0a7b2;
+  --color-focus:#edbda8; --color-line:#584959; --color-selected:#4c3c4b;
+  --shadow-1:0 4px 14px rgb(19 10 21 / .18); --shadow-2:0 18px 60px rgb(19 10 21 / .3);
+}

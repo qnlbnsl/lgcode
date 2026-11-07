@@ -1,0 +1,87 @@
+{
+  "timestamp": "2026-11-06T22:49:03.993Z",
+  "passed": 10,
+  "failed": 0,
+  "checks": [
+    {
+      "pass": true,
+      "label": "Answering attention question focuses next queue row",
+      "evidence": {
+        "tag": "BUTTON",
+        "id": "",
+        "item": "approval:perm-iris",
+        "text": "ApprovalRun the web testsWorkspace appIrisStudioOpen"
+      }
+    },
+    {
+      "pass": true,
+      "label": "Answering attention permission focuses next queue row",
+      "evidence": {
+        "tag": "BUTTON",
+        "id": "",
+        "item": "approval:perm-finch",
+        "text": "ApprovalRead the review traceWorkspace appFinchStudioOpen"
+      }
+    },
+    {
+      "pass": true,
+      "label": "Answering last filtered question focuses empty results",
+      "evidence": {
+        "tag": "SECTION",
+        "id": "home-results",
+        "text": "0 questionsOpen and answered requestsNo matching requestsClear the filters to see requests across al"
+      }
+    },
+    {
+      "pass": true,
+      "label": "Answering last filtered permission focuses empty results",
+      "evidence": {
+        "tag": "SECTION",
+        "id": "home-results",
+        "text": "0 approvalsOpen and answered requestsNo matching requestsClear the filters to see requests across al"
+      }
+    },
+    {
+      "pass": true,
+      "label": "Answered permission retained in history keeps focus in its inline result",
+      "evidence": {
+        "tag": "DIV",
+        "id": "home-detail",
+        "text": "ApprovalIris · Workspace appsheprd / Workspace appStudio · feat/workspace/app-shell×Sheprd permissio"
+      }
+    },
+    {
+      "pass": true,
+      "label": "Cancelling merge review returns focus to inline action",
+      "evidence": {
+        "tag": "BUTTON",
+        "id": "",
+        "text": "Review and approve"
+      }
+    },
+    {
+      "pass": true,
+      "label": "Approving attention merge focuses next remaining row after modal closes",
+      "evidence": {
+        "tag": "BUTTON",
+        "id": "",
+        "item": "question:nav-decision",
+        "text": "QuestionWhere should agent conversations open?Workspace appRowanStudioOpen"
+      }
+    },
+    {
+      "pass": true,
+      "label": "Merge source action accurately labels its Git destination"
+    },
+    {
+      "pass": true,
+      "label": "Review in Git opens the correct project worktree"
+    },
+    {
+      "pass": true,
+      "label": "No browser JavaScript errors",
+      "evidence": []
+    }
+  ],
+  "errors": []
+}

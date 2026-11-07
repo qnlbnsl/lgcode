@@ -1,0 +1,85 @@
+import {writeFileSync} from 'node:fs';
+const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'playwright');
+const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:{}),args:['--no-sandbox']});
+const page=await browser.newPage({viewport:{width:1440,height:900}}),checks=[],errors=[];
+page.on('pageerror',e=>errors.push(e.message));
+const check=(v,label)=>{if(!v)throw Error(label);checks.push(label)};
+const click=s=>page.locator(s).click(),text=s=>page.locator(s).textContent();
+const command=async value=>{await page.locator('#terminal-command').fill(value);await page.locator('#terminal-command').press('Enter')};
+try{
+ await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');
+ await click('.project-select[data-project="workspace"]');
+ check(await page.locator('#workspace-tabs [data-main-view="terminal"]').count()===1,'Project workspace offers a Terminal view');
+ await click('[data-main-view="terminal"]');check(await page.locator('#terminal-form').isVisible()&&!await page.locator('#composer-wrap').isVisible(),'Terminal replaces the main conversation with command input');
+ check(await page.locator('#terminal-status').count()===0,'Terminal has no repeated prototype disclaimer');
+ await command('pwd');check(await text('#terminal-output').then(t=>t.includes('.worktrees/workspace')),'Preview terminal displays its exact workspace');
+ await command('git status');check(await text('#terminal-output').then(t=>t.includes('feat/workspace')),'Preview status uses the current branch');
+ await command('echo should-not-execute');check(await text('#terminal-output').then(t=>t.includes('Command unavailable.')),'Unsupported commands never pretend to execute');
+ await page.locator('#terminal-command').press('ArrowUp');check(await page.locator('#terminal-command').inputValue()==='echo should-not-execute','Terminal supports command history');
+ await click('#tab-project-chat');await page.locator('#message-input').fill('Keep this chat draft');await click('[data-main-view="terminal"]');await command('ls');
+ await click('#tab-project-chat');check(await page.locator('#message-input').inputValue()==='Keep this chat draft','Chat draft survives terminal navigation');
+ check(await page.locator('#workspace-tabs [data-main-view="source-control"]').count()===1&&await page.locator('#workspace-tabs [data-main-view="diff"],#workspace-tabs [data-main-view="tree"]').count()===0,'Git and Diff are combined into one workspace tab');
+ await click('[data-main-view="source-control"]');
+ check(await text('#view-title').then(t=>t==='Source Control')&&await text('#diff-path').then(t=>t.includes('app/workspace.tsx')),'Git opens changed files and their diff in one view');
+ await click('[data-source-file="app/sidebar.tsx"]');
+ check(await text('#diff-path').then(t=>t.includes('app/sidebar.tsx'))&&await page.locator('.unified-diff').isVisible(),'Clicking a Git file immediately opens its diff');
+ check(await page.locator('[data-file-diff],#file-path').count()===0,'There is no intermediate file preview or View diff step');
+ await click('[data-diff-mode="split"]');check(await page.locator('.split-diff').count()===1,'Source Control retains side-by-side comparison');
+ await click('[data-source-folder="app"]');check(!await page.locator('[data-source-file="app/sidebar.tsx"]').isVisible(),'Changed-file folders collapse independently of the diff');
+ await click('[data-source-folder="app"]');
+ await click('[data-source-history]');check(await text('#source-history').then(t=>t.includes('Navigation foundation')&&t.includes('main')),'Commit history stays inside Source Control');
+ await click('[data-source-commit="a62f019"]');
+ check(await text('#diff-context').then(t=>t.includes('a62f019')),'Selecting a commit opens its changes in the same diff pane');
+ await click('[data-source-working]');await click('[data-source-file="app/sidebar.tsx"]');
+ await click('.project-select[data-project="recovery"]');await click('[data-main-view="source-control"]');
+ check(await text('#diff-path').then(t=>t.includes('engine/recovery.ts'))&&await text('#diff-context').then(t=>t.includes('fix/reconnect')),'Git selection and branch stay scoped to each workspace');
+ check(await text('#view-body').then(t=>t.includes('delivery.resume(receipt)')&&!t.includes('Conversation recipient')),'Recovery diff uses the recovery file’s own sample');
+ await click('.project-select[data-project="workspace"]');await click('[data-main-view="source-control"]');
+ check(await text('#diff-path').then(t=>t.includes('app/sidebar.tsx')),'Returning to Git restores the selected file');
+ await click('[data-main-view="workspace-settings"]');
+ check(await text('#view-title').then(t=>t==='Workspace settings')&&await text('#workspace-location').then(t=>t.includes('feat/workspace')),'Workspace has a separate Settings tab with its assigned worktree');
+ await page.locator('#workspace-shell').selectOption('zsh');await click('#save-workspace-settings');
+ await click('[data-main-view="source-control"]');await click('[data-main-view="workspace-settings"]');
+ check(await page.locator('#workspace-shell').inputValue()==='zsh','Workspace-specific preferences survive tab navigation');
+ await click('#new-project');
+ check(await page.locator('#project-worktree').isChecked(),'New projects start in their own worktree by default');
+ await page.locator('#project-name').fill('Garden tools');
+ check(await text('#project-location-preview').then(t=>t.includes('garden-tools')&&t.includes('.worktrees')),'Project name previews its worktree branch and folder');
+ await click('#project-submit');await click('[data-main-view="workspace-settings"]');
+ check(await text('#workspace-location').then(t=>t.includes('garden-tools')&&t.includes('.worktrees/garden-tools')),'Creating a project assigns the named worktree');
+ await click('#new-project');await page.locator('#project-name').fill('Shared checkout');await page.locator('#project-worktree').uncheck();
+ check(await text('#project-location-preview').then(t=>t.includes('main')&&!t.includes('.worktrees')),'Unchecking Start work tree previews the main checkout');
+ await click('#project-submit');await click('[data-main-view="workspace-settings"]');
+ check(await text('#workspace-location').then(t=>t.includes('Main checkout')&&!t.includes('.worktrees')),'Opting out uses the repository’s main checkout');
+ await click('[data-system-page="machines"]');check(await text('#view-title').then(t=>t==='Machines'),'Machines is a global page');
+ await click('#connect-machine');await page.locator('#machine-name').fill('Office worker');await page.locator('#machine-code').fill('SAMPLE-PAIR');await click('#pair-machine');
+ check(await text('#view-body').then(t=>t.includes('Office worker')&&t.includes('Awaiting confirmation')),'Pairing requires confirmation before a worker becomes available');
+ await click('[data-confirm-machine]');const newWorker=page.locator('[data-project-machine="workspace"] option').last();check(await newWorker.textContent().then(t=>t.includes('Office worker'))&&await newWorker.isDisabled(),'Confirmed worker remains unavailable for placement until its repository is connected');
+ await page.locator('[data-project-machine="workspace"]').selectOption('buildbox');
+ check(await text('#placement-message').then(t=>t.includes('Workspace app')&&t.includes('Buildbox')&&t.includes('future')),'Master can assign a future run to a paired worker with the repository');
+ await page.locator('#machine-mode').selectOption('worker');check(await page.locator('[data-project-machine]').count()===0&&await page.locator('#join-master-form').isVisible(),'Worker mode joins a master and cannot assign projects');
+ await page.locator('#master-address').fill('https://studio.example');await page.locator('#master-code').fill('SAMPLE-PAIR');await click('#join-master');check(await text('#machine-mode-state').then(t=>t.includes('Paired')),'Worker preview can pair to a master');
+ check(await page.locator('#connect-machine').count()===0,'Worker mode hides the master-only Connect worker flow');
+ await click('.project-select[data-project="desktop"]');await click('[data-main-view="terminal"]');
+ check(await text('.terminal-top').then(t=>t.includes('Studio')&&t.includes('Worker')),'Terminal reflects this computer’s current worker role');
+ await click('[data-system-page="machines"]');await page.locator('#machine-mode').selectOption('master');
+ await click('[data-system-page="subscriptions"]');check(await text('#view-title').then(t=>t==='Subscriptions'),'Subscriptions has a dedicated page');
+ check(await page.locator('[data-account-harness="codex"]').count()===2,'One harness can have multiple named subscriptions');
+ await click('#add-subscription');await page.locator('#subscription-name').fill('Codex extra');await page.locator('#subscription-harness').selectOption('codex');await click('#save-subscription');
+ check(await page.locator('[data-account-harness="codex"]').count()===3&&await text('#view-body').then(t=>t.includes('Codex extra')&&t.includes('Needs sign-in')),'Adding another Codex subscription preserves separate identity and sign-in');
+ await page.locator('[data-connect-subscription]').last().click();check(await page.locator('#subscription-login').isVisible()&&await text('#subscription-login').then(t=>t.includes('private profile')),'Each subscription has its own sign-in context');
+ await click('#finish-sample-signin');check(await page.locator('[data-account-name="Codex extra"]').textContent().then(t=>t.includes('Available')),'Completing sample sign-in updates only that subscription');
+ await click('#design-notes');await click('[data-preview="reconnect"]');
+ check(await page.locator('[data-account-enabled]').first().isDisabled(),'Offline subscription controls cannot appear to save changes');
+ await click('#retry-connection');
+ for(const theme of ['light','dark']){
+  await click(`[data-theme-choice="${theme}"]`);
+  for(const view of ['subscriptions','machines']){
+   await click(`[data-system-page="${view}"]`);
+   for(const width of [390,1440]){await page.setViewportSize({width,height:width===390?844:900});check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${theme}: ${view} has no page overflow at ${width}px`)}
+   await page.screenshot({path:new URL(`./previews/tools-${view}-${theme}-1440.png`,import.meta.url).pathname});
+  }
+ }
+ check(errors.length===0,'No JavaScript errors in workspace and machine/account flows');
+ writeFileSync(new URL('./previews/workspace-tools-checks.json',import.meta.url),JSON.stringify({passed:checks.length,checks,errors},null,2));console.log(JSON.stringify({passed:checks.length,errors}));
+}finally{await browser.close()}

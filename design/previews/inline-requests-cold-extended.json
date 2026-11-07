@@ -1,0 +1,109 @@
+{
+  "timestamp": "2026-11-06T22:47:37.308Z",
+  "passed": 25,
+  "failed": 0,
+  "checks": [
+    {
+      "pass": true,
+      "label": "Inline source navigation preserves draft and focuses blocking request"
+    },
+    {
+      "pass": true,
+      "label": "Inline Discuss preserves existing draft"
+    },
+    {
+      "pass": true,
+      "label": "Unconfirmed inline permission retains disabled answer state"
+    },
+    {
+      "pass": true,
+      "label": "Search finds unconfirmed inline request"
+    },
+    {
+      "pass": true,
+      "label": "Held inline request has no answer controls"
+    },
+    {
+      "pass": true,
+      "label": "Opening new inline permission while reconnecting disables answers"
+    },
+    {
+      "pass": true,
+      "label": "Reconnect restores available inline permission action"
+    },
+    {
+      "pass": true,
+      "label": "Changing filter collapses previous disclosure"
+    },
+    {
+      "pass": true,
+      "label": "Pending merge starts as collapsed inline row"
+    },
+    {
+      "pass": true,
+      "label": "Inline merge requires explicit review dialog"
+    },
+    {
+      "pass": true,
+      "label": "Cancelling merge review preserves inline detail"
+    },
+    {
+      "pass": true,
+      "label": "Approving merge records result within Home inline history"
+    },
+    {
+      "pass": true,
+      "label": "Answered filter retains approved merge history"
+    },
+    {
+      "pass": true,
+      "label": "light expanded inline question fits 390px"
+    },
+    {
+      "pass": true,
+      "label": "light request summary stays one compact row at 390px"
+    },
+    {
+      "pass": true,
+      "label": "light expanded inline question fits 1440px"
+    },
+    {
+      "pass": true,
+      "label": "light request summary stays one compact row at 1440px"
+    },
+    {
+      "pass": true,
+      "label": "dark expanded inline question fits 390px"
+    },
+    {
+      "pass": true,
+      "label": "dark request summary stays one compact row at 390px"
+    },
+    {
+      "pass": true,
+      "label": "dark expanded inline question fits 1440px"
+    },
+    {
+      "pass": true,
+      "label": "dark request summary stays one compact row at 1440px"
+    },
+    {
+      "pass": true,
+      "label": "Mobile sidebar search opens active quick switch"
+    },
+    {
+      "pass": true,
+      "label": "Mobile search reaches project lead"
+    },
+    {
+      "pass": true,
+      "label": "Mobile grouped New project opens usable modal"
+    },
+    {
+      "pass": true,
+      "label": "No browser JavaScript errors",
+      "evidence": []
+    }
+  ],
+  "errors": []
+}
