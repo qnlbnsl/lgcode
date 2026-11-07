@@ -310,7 +310,8 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   Each repository has a page listing its projects and an Add Project
   action. Multiple projects can work within the same repository.
 - **Exactly one lead per project** (agreed, 2026-11-05; mocked). Selecting
-  a project always opens its lead conversation. Each project has its own
+  a project opens its sprint board, updated on 2026-11-06. A right chat
+  panel opens the project lead alongside that board. Each project has its own
   goal, sprint board, teams, and messages. The owner's clarification
   replaces the earlier ambiguous request for multiple leads within a
   project. Multiple projects have separate leads.
@@ -318,12 +319,31 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   Add Project creates a named project under a known repository and opens
   its lead conversation. A new project has no sprints or teams until its
   plan is shaped. Existing projects never reopen repository setup.
+- **Project worktrees by default** (agreed, 2026-11-06; mocked).
+  Add Project has Start work tree checked beneath the project name. A safe
+  version of the name determines its branch and worktree folder. Numeric
+  suffixes resolve existing names. Unchecking uses that repository’s main
+  checkout. The dialog previews the branch and location before submission.
+- **Workspace settings** (agreed, 2026-11-06; mocked). A Settings tab beside
+  Board, Chat, Terminal, and Git shows the assigned repository, branch,
+  checkout type, folder, and machine. It stores a project-specific terminal
+  shell preference in the preview. Service settings remain a global page.
 - **A project board of sprints** (agreed, 2026-11-05; mocked). The Kanban
   board shows Planned, In progress, Review, and Done. A sprint contains
   the plan's tasks and shows ownership, current phase, dependencies,
   blockers, and completion evidence. Team task lists and sprint details
   read the same assignments. The owner referenced Ananke's Cursor
   build-order roadmap. No implementation code was copied.
+- **Talk to the lead beside the board** (agreed, 2026-11-06; mocked).
+  The navigation tree has no separate Board row. The board has a right
+  chat panel with its single lead and a working sample composer. It
+  shares messages, drafts, and reading position with the full conversation.
+  The panel can be collapsed. On smaller screens it opens as a drawer
+  with contained keyboard focus and Escape to close.
+- **The project states its assigned branch** (agreed, 2026-11-06; mocked).
+  The sidebar shows it under the project name beside the lead. The board
+  repeats it beside the title. The top-right picker says Viewing and only
+  changes inspected code context. It leaves the project assignment intact.
 - **Completion reflects evidence** (mock behavior, 2026-11-05). A completed
   sprint records verification and merge evidence. Release status is
   separate. Completed sprints do not accept new tasks. Moving a card is
@@ -350,6 +370,113 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   combines identity and navigation. User messages have a restrained
   treatment. Agent replies use readable text with grouped tool details.
   The composer grows when needed and retains its recipient label.
+
+### Existing page capabilities the redesign must retain
+
+Agreed on 2026-11-06 and represented in the browser mock. These are existing
+product capabilities, not permission to remove them during implementation.
+The source-to-mock mapping is in `design/FEATURE-PARITY.md`.
+
+- Login, logout, and session expiry stay available. Rejected login and an
+  unavailable session have explicit recovery states. Entered secrets clear
+  when the session ends.
+- Connection status stays visible. Reconnection retains the last received
+  state and drafts. Stale views do not offer functioning mutation controls.
+- Permission requests show their identity and action input before approval.
+  Hidden inputs, held requests, denial, cancellation, and unconfirmed
+  answers remain distinct from an agent's ordinary text.
+- Agent stop and resume stay available. Stopping cancels permissions but
+  preserves questions. A fresh resume explains its loss of prior context.
+- Failed starts keep the current safe reason categories and prevent sends.
+- Large thread items keep an explicit full loader with failure and retry.
+- Tool calls keep identity, status, input, and output. Deliveries retain
+  their sender, source, identity, and history.
+- Alerts and Settings remain full pages. Alerts retain pagination, subject
+  links, and notification delivery failures. Settings retain all current
+  notification and web-server controls.
+
+### Workspace scope and navigation refinement
+
+Approved on 2026-11-06 after comparison with T3 Code and Visual Studio Code.
+These interactions are represented in the browser mock.
+
+- One workspace tab row follows the selected project, team, or agent.
+  Git in team scope selects that team's worktree. The header names the
+  worktree's branch, team or project, and machine.
+- Team worktrees integrate into their project worktree. Project branches
+  reach main through explicit owner review. Dirty source or destination
+  worktrees and unresolved conflicts prevent integration.
+- Each worktree has its own staging selection, commit message, history,
+  incoming/outgoing state, and file diff. Git includes Commit, Fetch, Pull,
+  Push, and conflict resolution controls.
+- The navigation and project lead panel resize with pointer or keyboard.
+  Focused chat stays centered and readable on wide monitors. The board fits
+  four columns beside its lead at desktop width. Phone users have a status
+  strip for jumping between columns.
+- Composer controls show current agent progress, stop/resume, subscription
+  choice, and attached file/task context. Activity details link to Git.
+- An attention summary distinguishes decisions, permissions, and failed
+  starts. A navigation filter hides projects with no unresolved attention.
+  A keyboard quick switcher searches projects, teams, and agents.
+- Named terminal sessions preserve independent input and command history
+  within each machine and worktree. Context changes save the old session
+  before selecting the destination.
+
+### Terminal, Git, machines, and subscriptions
+
+Requested on 2026-11-06. Interactive views are mocked. Live terminal and
+machine coordination are not implemented by this design pass.
+
+- The main conversation can switch to a terminal. The intended product
+  provides actual direct commands on the selected machine and workspace.
+  It needs an authenticated terminal session with streamed output,
+  interruption, resizing, and reconnection. The current mock never runs a
+  command. The owner requested normal product copy without repeated mock
+  disclaimers on 2026-11-06. Prototype boundaries remain in design documentation.
+- Git combines a changed-file tree with unified and split diffs. Clicking a
+  file directly opens its diff. Branch-aware commit history uses the same
+  pane. There is no separate Diff tab or intermediate file preview.
+  Live repository reads, Git mutations, and merge validation remain integration work.
+- One computer runs the master process. Other computers pair through a
+  connect mode and act as workers. The master assigns projects across
+  machines. Pairing, availability, host identity, and project placement
+  need authenticated coordination and recovery without duplicate work.
+  The machine page is a preview and does not move running work.
+- A Subscriptions page supports several named accounts for the same
+  harness. Each entry has its own machine, enabled state, and sign-in.
+  Additional subscriptions do not reuse the default Codex authentication.
+  The engine's existing account/profile separation must be preserved.
+
+### Global Home, machine choice, and screen density
+
+Requested on 2026-11-06 and represented in the browser mock.
+
+- Home is the initial global page. Needs attention combines unresolved
+  questions, permissions, failed starts, and project merge reviews across
+  all projects. All projects opens each project's board.
+- Questions and Approvals have their own global lists with answered history.
+  Search combines with repository, project, agent, machine, and status filters.
+  Requests are single-line disclosures, collapsed initially. Their details
+  expand directly underneath rather than in a split pane. The same toggle
+  closes them and retains keyboard focus.
+  Questions and permissions can be answered without leaving Home. Merge
+  requests retain the explicit review step. Links open the source conversation
+  or board, preserving drafts and the requesting team's branch context.
+- Add Project chooses a machine through Run on before the project name.
+  The preview shows that host's branch and folder. Offline hosts and hosts
+  without the repository cannot start work. Unchecking Start work tree uses
+  the main checkout on that machine. No host is silently substituted.
+- Machines uses compact tables for machine status, role, agent slots,
+  project counts, start actions, and future project placement. Future
+  placement does not relabel running work or imply that a project moved.
+- Cursor is the primary design reference. T3 Code remains secondary, with
+  explicit discoverability and space usage requirements from the owner.
+  These flows remain an isolated prototype; durable queues and machine
+  execution require service integration.
+- Sidebar boundaries separate Home/search, Projects, and service pages.
+  New project belongs to Projects. Only projects needing you names the tree
+  filter's effect. Repository names open their project lists; a second
+  Repositories destination is unnecessary and has been removed.
 
 ## 8. The build loop
 
@@ -379,6 +506,23 @@ The full design is in
   approval, and 6 is the limit.
 - **Autonomous fix sprints** (agreed, 2026-11-05). A fix that users would not
   notice merges and moves on without the owner.
+- **A hotfix lane** (requested by the owner, 2026-11-06; not designed). The
+  owner asks the project lead for a hotfix, and it starts a very limited team
+  focused on fixing and pushing.
+- **A way to bisect** (requested by the owner, 2026-11-06; not designed). A
+  command finds the commit that broke something by halving the range of commits
+  at each test.
+- **A way to freeze interfaces** (requested by the owner, 2026-11-06; not
+  designed). A frozen interface cannot change while teams build against it.
+
+## 9. Client mode
+
+- **Sheprd in client mode** (requested by the owner, 2026-11-06; not designed).
+  One main Sheprd holds the event log, the board and the website. Other machines
+  run Sheprd in client mode and take their commands from the main one, so a
+  project's load spreads across machines. How a client machine proves who it is
+  needs the owner's word, because the login rule is one user, one password and no
+  pairing.
 
 ## Open questions
 
