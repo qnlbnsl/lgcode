@@ -8,7 +8,7 @@ const check=(value,name)=>{if(value)checks.push(name);else failures.push(name)};
 const page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(4000);page.on('pageerror',e=>errors.push(e.message));
 const click=s=>page.locator(s).first().click(),text=s=>page.locator(s).first().textContent(),box=s=>page.locator(s).first().evaluate(e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,height:r.height,width:r.width}});
 const run=async(name,steps)=>{try{await steps()}catch(e){failures.push(name+': '+e.message.split('\n')[0])}};
-await page.goto(url);
+await page.goto(url);await page.waitForFunction(()=>window.sheprdReady);
 
 await run('names',async()=>{
  check(await text('.brand')==='Sheprd'&&(await page.title()).startsWith('Sheprd'),'The product is named Sheprd');
@@ -147,7 +147,7 @@ await run('new repository',async()=>{
 await page.close();
 await run('heavy sample',async()=>{
  const heavy=await browser.newPage({viewport:{width:1440,height:900}});heavy.setDefaultTimeout(4000);heavy.on('pageerror',e=>errors.push(e.message));
- await heavy.goto(url+'?sample=heavy');
+ await heavy.goto(url+'?sample=heavy');await heavy.waitForFunction(()=>window.sheprdReady);
  const counts=await heavy.evaluate(()=>({projects:projects.length,agents:projects.flatMap(agents).length,open:homeItems().filter(i=>i.status==='open').length}));
  check(counts.projects===10,'The heavy sample has 10 projects');check(counts.agents>=30,'The heavy sample has at least 30 agents: '+counts.agents);check(counts.open>=10,'The heavy sample has a real queue: '+counts.open);
  check(await heavy.locator('#repo-tree').evaluate(e=>e.classList.contains('more-below')),'A long sidebar shows there is more below');
@@ -160,7 +160,9 @@ await run('heavy sample',async()=>{
 });
 
 await run('designer findings',async()=>{
- const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);return p};
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.sheprdReady);return p};
+ const fromHome=await fresh();await fromHome.evaluate(()=>openAgent('sage','workspace'));
+ check(await fromHome.locator('#view-body').evaluate(e=>e.scrollHeight-e.scrollTop-e.clientHeight<=4)&&await fromHome.locator('#latest-button').isHidden(),'A thread opened from Home starts at its end');
  const q=await fresh();const at=s=>q.locator(s).first();
  // SIDE-1 and STATUS-1
  check((await at('.project-select[data-project="recovery"]').textContent()).trim().endsWith('1'),'A project with a failed agent shows a count');
@@ -219,6 +221,8 @@ await run('designer findings',async()=>{
  // MERGE-1
  const m=await fresh();await m.locator('.project-select[data-project="workspace"]').first().click();await m.locator('[data-main-view="source-control"]').first().click();
  await m.locator('[data-stage-file="app/workspace.tsx"]').click();await m.locator('[data-stage-file="app/sidebar.tsx"]').click();await m.locator('#git-message').fill('Keep drafts with their thread');await m.locator('#git-commit').click();await m.locator('#git-integrate').click();
+ check(await m.locator('#approve-main-merge').isDisabled()&&(await m.locator('#merge-evidence').textContent()).includes('Loading'),'The merge review cannot be approved while its results are loading');
+ await m.locator('#approve-main-merge:not([disabled])').waitFor();
  const review=await m.locator('#merge-dialog').textContent();
  check(review.includes('1 commit ')&&!review.includes('1 commits'),'The merge review counts one commit correctly');
  check(review.includes('app/workspace.tsx')&&await m.locator('#merge-dialog .unified-diff').count()===2,'The merge review shows every file and its diff');

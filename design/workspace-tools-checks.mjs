@@ -7,15 +7,15 @@ const check=(v,label)=>{if(!v)throw Error(label);checks.push(label)};
 const click=s=>page.locator(s).click(),text=s=>page.locator(s).textContent();
 const command=async value=>{await page.locator('#terminal-command').fill(value);await page.locator('#terminal-command').press('Enter')};
 try{
- await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');
+ await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.sheprdReady);
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('#workspace-tabs [data-main-view="terminal"]').count()===1,'Project workspace offers a Terminal view');
  await click('[data-main-view="terminal"]');check(await page.locator('#terminal-form').isVisible()&&!await page.locator('#composer-wrap').isVisible(),'Terminal replaces the main conversation with command input');
  check(await page.locator('#terminal-status').count()===0,'Terminal has no repeated prototype disclaimer');
  await command('pwd');check(await text('#terminal-output').then(t=>t.includes('.worktrees/workspace')),'Preview terminal displays its exact workspace');
  await command('git status');check(await text('#terminal-output').then(t=>t.includes('feat/workspace')),'Preview status uses the current branch');
- await command('echo should-not-execute');check(await text('#terminal-output').then(t=>t.includes('Command unavailable.')),'Unsupported commands never pretend to execute');
- await page.locator('#terminal-command').press('ArrowUp');check(await page.locator('#terminal-command').inputValue()==='echo should-not-execute','Terminal supports command history');
+ await command('echo hello there');check(await text('#terminal-output').then(t=>t.includes('hello there')),'The terminal answers a known command');await command('frobnicate --now');check(await text('#terminal-output').then(t=>t.includes('Command unavailable.')),'Unsupported commands never pretend to execute');
+ await page.locator('#terminal-command').press('ArrowUp');check(await page.locator('#terminal-command').inputValue()==='frobnicate --now','Terminal supports command history');
  await click('#tab-project-chat');await page.locator('#message-input').fill('Keep this chat draft');await click('[data-main-view="terminal"]');await command('ls');
  await click('#tab-project-chat');check(await page.locator('#message-input').inputValue()==='Keep this chat draft','Chat draft survives terminal navigation');
  check(await page.locator('#workspace-tabs [data-main-view="source-control"]').count()===1&&await page.locator('#workspace-tabs [data-main-view="diff"],#workspace-tabs [data-main-view="tree"]').count()===0,'Git and Diff are combined into one workspace tab');

@@ -11,3 +11,5 @@ test-results/
 **/test/**/*.sqlite*
 **/tests/**/*.sqlite*
 .foundry/
+# Real events exported for the web mock. Threads hold whatever agents wrote.
+design/data/prod/

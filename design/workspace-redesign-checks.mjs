@@ -5,7 +5,7 @@ const browser=await chromium.launch({headless:true,...(process.env.CHROMIUM_PATH
 const page=await browser.newPage({viewport:{width:1440,height:1000}}),checks=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
 const check=(v,label)=>{if(!v)throw Error(label);checks.push(label)},click=s=>page.locator(s).click(),text=s=>page.locator(s).textContent();
 try{
- await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');
+ await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.sheprdReady);
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('#sidebar-resize').count()===1&&await page.locator('#lead-resize').count()===1,'Sidebar and lead panel expose resize controls');
  const initial=await page.locator('#sidebar').evaluate(e=>e.getBoundingClientRect().width);await page.locator('#sidebar-resize').focus();await page.keyboard.press('ArrowRight');check(await page.locator('#sidebar').evaluate(e=>e.getBoundingClientRect().width)>initial,'Keyboard resizing changes the sidebar width');await page.locator('#sidebar-resize').press('Home');

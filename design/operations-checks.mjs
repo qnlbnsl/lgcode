@@ -9,7 +9,7 @@ const click=s=>page.locator(s).click();
 const preview=async action=>{await click('#design-notes');await click(`[data-preview="${action}"]`)};
 const text=s=>page.locator(s).textContent();
 try{
- await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');
+ await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.sheprdReady);
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('#logout').count()===1,'Owner view has a Log out action');
  check(await text('#connection-status').then(t=>t.trim()==='Live'),'Connection state is visible without a sample badge');

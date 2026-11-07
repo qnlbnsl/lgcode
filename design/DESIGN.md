@@ -322,3 +322,14 @@ The owner chose the 15 Must fix findings, the two naming findings, and Enter to 
 - **Provider sign-in runs the harness's own login** in a terminal session on the account's
   machine, as the design note says. The critic recommended a device code screen, and Claude
   kept the design note's approach, because each harness has its own flow.
+
+## The data behind the mock
+
+The mock draws what stub functions return, and those functions read JSON files shaped like the
+engine's events table. [data/README.md](data/README.md) lists the files, the functions, and the
+event types the engine does not have yet. Text in a thread comes from stored items, so the page
+works out its links: a task identifier links to its task, and a Markdown-style link can name a
+task or the sprint board. Open requests appear in the lead's latest turn, and a lead's reaction
+to an answer is a new turn, so the earlier text stays as it was written. Team chat is board posts,
+which hold only text, so it no longer shows the tool activity it showed when it was hardcoded.
+

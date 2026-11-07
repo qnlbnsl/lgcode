@@ -1,11 +1,12 @@
 {
-  "passed": 50,
+  "passed": 51,
   "checks": [
     "Project workspace offers a Terminal view",
     "Terminal replaces the main conversation with command input",
     "Terminal has no repeated prototype disclaimer",
     "Preview terminal displays its exact workspace",
     "Preview status uses the current branch",
+    "The terminal answers a known command",
     "Unsupported commands never pretend to execute",
     "Terminal supports command history",
     "Chat draft survives terminal navigation",

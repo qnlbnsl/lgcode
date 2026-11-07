@@ -11,7 +11,7 @@ const click=selector=>page.locator(selector).click();
 const leadChat=async()=>{if(await page.locator('#tab-project-chat').isVisible())await click('#tab-project-chat');else{if(!await page.locator('#lead-panel').isVisible())await click('#lead-toggle');await click('#expand-lead-chat')}};
 const shot=async name=>page.screenshot({path:fileURLToPath(new URL(`./previews/projects-${name}.png`,import.meta.url))});
 try{
- await page.goto(process.env.MOCK_URL || 'http://127.0.0.1:4178/workbench.html');
+ await page.goto(process.env.MOCK_URL || 'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.sheprdReady);
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('#sidebar [data-board]').count()===0,'Project tree contains no redundant Board row');
  check(await page.locator('#lead-panel').isVisible(),'Desktop board shows its project lead chat panel');

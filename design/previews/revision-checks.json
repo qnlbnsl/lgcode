@@ -1,5 +1,5 @@
 {
-  "passed": 115,
+  "passed": 117,
   "failed": 0,
   "failures": [],
   "errors": [],
@@ -75,6 +75,7 @@
     "The lead has a long working conversation",
     "Tool activity is grouped in the long conversation",
     "A long conversation opens at its latest message",
+    "A thread opened from Home starts at its end",
     "A project with a failed agent shows a count",
     "A failed agent has the error dot and says so",
     "A failed agent does not share the running color",
@@ -102,6 +103,7 @@
     "Split at 1440 pixels makes room and says so",
     "Unified brings the worktree list back",
     "A narrow window falls back to unified and says so",
+    "The merge review cannot be approved while its results are loading",
     "The merge review counts one commit correctly",
     "The merge review shows every file and its diff",
     "The merge review shows tests and links the review thread",

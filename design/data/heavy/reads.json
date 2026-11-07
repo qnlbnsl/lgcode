@@ -1,0 +1,846 @@
+{
+ "git": {
+  "worktrees": {
+   "main": {
+    "owner": "Main checkout",
+    "activity": "Verified baseline",
+    "files": [],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "main · HEAD",
+      "files": [
+       "docs/README.md"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "workspace": {
+    "owner": "Agent console · Rowan",
+    "activity": "2 changed files · Review in progress",
+    "files": [
+     "app/workspace.tsx",
+     "app/sidebar.tsx"
+    ],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Keep conversations with their projects",
+      "ref": "feat/workspace · HEAD",
+      "files": [
+       "app/workspace.tsx",
+       "app/sidebar.tsx"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Navigation foundation",
+      "ref": "main",
+      "files": [
+       "app/sidebar.tsx"
+      ]
+     }
+    ]
+   },
+   "recovery": {
+    "owner": "Agent recovery · Mira",
+    "activity": "1 changed file · Ash is building",
+    "files": [
+     "engine/recovery.ts"
+    ],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Resume delivery from the last receipt",
+      "ref": "fix/reconnect · HEAD",
+      "files": [
+       "engine/recovery.ts"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "atlas-main": {
+    "owner": "Main checkout",
+    "activity": "No pending changes",
+    "files": [],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "main · HEAD",
+      "files": [
+       "docs/README.md"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "heavy-invoices": {
+    "owner": "Invoice exports · Tamsin",
+    "activity": "2 changed files",
+    "files": [
+     "src/index.ts",
+     "src/rules.ts"
+    ],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "feat/invoice-exports · HEAD",
+      "files": [
+       "src/index.ts",
+       "src/rules.ts"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "heavy-tax": {
+    "owner": "Tax rules · Odell",
+    "activity": "2 changed files",
+    "files": [
+     "src/index.ts",
+     "src/rules.ts"
+    ],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "feat/tax-rules · HEAD",
+      "files": [
+       "src/index.ts",
+       "src/rules.ts"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "heavy-runners": {
+    "owner": "Runner images · Bram",
+    "activity": "2 changed files",
+    "files": [
+     "src/index.ts",
+     "src/rules.ts"
+    ],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "chore/runner-images · HEAD",
+      "files": [
+       "src/index.ts",
+       "src/rules.ts"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "heavy-restore": {
+    "owner": "Backup restore drill · Sol",
+    "activity": "2 changed files",
+    "files": [
+     "src/index.ts",
+     "src/rules.ts"
+    ],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "ops/restore-drill · HEAD",
+      "files": [
+       "src/index.ts",
+       "src/rules.ts"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "heavy-push": {
+    "owner": "Push reliability · Anya",
+    "activity": "2 changed files",
+    "files": [
+     "src/index.ts",
+     "src/rules.ts"
+    ],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "fix/push-retries · HEAD",
+      "files": [
+       "src/index.ts",
+       "src/rules.ts"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "heavy-reference": {
+    "owner": "API reference · Cato",
+    "activity": "2 changed files",
+    "files": [
+     "src/index.ts",
+     "src/rules.ts"
+    ],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "docs/api-reference · HEAD",
+      "files": [
+       "src/index.ts",
+       "src/rules.ts"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "workspace-app-shell": {
+    "owner": "App shell · Rowan",
+    "activity": "2 changed files",
+    "files": [
+     "app/workspace.tsx",
+     "app/sidebar.tsx"
+    ],
+    "incoming": 1,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "feat/workspace/app-shell · HEAD",
+      "files": [
+       "app/workspace.tsx",
+       "app/sidebar.tsx"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "workspace-review": {
+    "owner": "Review · Finch",
+    "activity": "1 changed files",
+    "files": [
+     "app/workspace.tsx"
+    ],
+    "incoming": 0,
+    "conflicts": [
+     "app/workspace.tsx"
+    ],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "feat/workspace/review · HEAD",
+      "files": [
+       "app/workspace.tsx"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "recovery-engine": {
+    "owner": "Engine · Mira",
+    "activity": "1 changed files",
+    "files": [
+     "engine/recovery.ts"
+    ],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "fix/reconnect/engine · HEAD",
+      "files": [
+       "engine/recovery.ts"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "buildbox-billing-api-main": {
+    "owner": "Main checkout",
+    "activity": "No uncommitted changes",
+    "files": [],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "main · HEAD",
+      "files": [
+       "docs/README.md"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "studio-billing-api-main": {
+    "owner": "Main checkout",
+    "activity": "No uncommitted changes",
+    "files": [],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "main · HEAD",
+      "files": [
+       "docs/README.md"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "buildbox-infra-main": {
+    "owner": "Main checkout",
+    "activity": "No uncommitted changes",
+    "files": [],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "main · HEAD",
+      "files": [
+       "docs/README.md"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "studio-infra-main": {
+    "owner": "Main checkout",
+    "activity": "No uncommitted changes",
+    "files": [],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "main · HEAD",
+      "files": [
+       "docs/README.md"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "buildbox-mobile-app-main": {
+    "owner": "Main checkout",
+    "activity": "No uncommitted changes",
+    "files": [],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "main · HEAD",
+      "files": [
+       "docs/README.md"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   },
+   "buildbox-sheprd-main": {
+    "owner": "Main checkout",
+    "activity": "No uncommitted changes",
+    "files": [],
+    "incoming": 0,
+    "conflicts": [],
+    "history": [
+     {
+      "id": "c84b031",
+      "title": "Project baseline",
+      "ref": "main · HEAD",
+      "files": [
+       "docs/README.md"
+      ]
+     },
+     {
+      "id": "a62f019",
+      "title": "Verified repository baseline",
+      "ref": "main",
+      "files": [
+       "docs/README.md"
+      ]
+     }
+    ]
+   }
+  },
+  "evidence": {
+   "main": {
+    "tests": {
+     "ok": false,
+     "text": "No test run is recorded for this branch."
+    },
+    "review": {
+     "ok": false,
+     "text": "No review is recorded for this branch."
+    }
+   },
+   "workspace": {
+    "tests": {
+     "ok": true,
+     "text": "Passed · pnpm check · 412 of 412 tests"
+    },
+    "review": {
+     "ok": true,
+     "text": "Approved by Finch",
+     "agent": "finch",
+     "project": "workspace"
+    }
+   },
+   "recovery": {
+    "tests": {
+     "ok": true,
+     "text": "Passed · pnpm check · 412 of 412 tests"
+    },
+    "review": {
+     "ok": true,
+     "text": "Approved by Vale",
+     "agent": "vale",
+     "project": "recovery"
+    }
+   },
+   "atlas-main": {
+    "tests": {
+     "ok": false,
+     "text": "No test run is recorded for this branch."
+    },
+    "review": {
+     "ok": false,
+     "text": "No review is recorded for this branch."
+    }
+   },
+   "heavy-invoices": {
+    "tests": {
+     "ok": true,
+     "text": "Passed · pnpm check · 412 of 412 tests"
+    },
+    "review": {
+     "ok": true,
+     "text": "Approved by Tamsin",
+     "agent": "invoices-lead",
+     "project": "invoices"
+    }
+   },
+   "heavy-tax": {
+    "tests": {
+     "ok": true,
+     "text": "Passed · pnpm check · 412 of 412 tests"
+    },
+    "review": {
+     "ok": true,
+     "text": "Approved by Odell",
+     "agent": "tax-lead",
+     "project": "tax"
+    }
+   },
+   "heavy-runners": {
+    "tests": {
+     "ok": true,
+     "text": "Passed · pnpm check · 412 of 412 tests"
+    },
+    "review": {
+     "ok": true,
+     "text": "Approved by Bram",
+     "agent": "runners-lead",
+     "project": "runners"
+    }
+   },
+   "heavy-restore": {
+    "tests": {
+     "ok": true,
+     "text": "Passed · pnpm check · 412 of 412 tests"
+    },
+    "review": {
+     "ok": true,
+     "text": "Approved by Sol",
+     "agent": "restore-lead",
+     "project": "restore"
+    }
+   },
+   "heavy-push": {
+    "tests": {
+     "ok": true,
+     "text": "Passed · pnpm check · 412 of 412 tests"
+    },
+    "review": {
+     "ok": true,
+     "text": "Approved by Anya",
+     "agent": "push-lead",
+     "project": "push"
+    }
+   },
+   "heavy-reference": {
+    "tests": {
+     "ok": true,
+     "text": "Passed · pnpm check · 412 of 412 tests"
+    },
+    "review": {
+     "ok": true,
+     "text": "Approved by Cato",
+     "agent": "reference-lead",
+     "project": "reference"
+    }
+   },
+   "workspace-app-shell": {
+    "tests": {
+     "ok": true,
+     "text": "Passed · pnpm check · 412 of 412 tests"
+    },
+    "review": {
+     "ok": true,
+     "text": "Approved by Finch",
+     "agent": "finch",
+     "project": "workspace"
+    }
+   },
+   "workspace-review": {
+    "tests": {
+     "ok": true,
+     "text": "Passed · pnpm check · 412 of 412 tests"
+    },
+    "review": {
+     "ok": true,
+     "text": "Approved by Finch",
+     "agent": "finch",
+     "project": "workspace"
+    }
+   },
+   "recovery-engine": {
+    "tests": {
+     "ok": true,
+     "text": "Passed · pnpm check · 412 of 412 tests"
+    },
+    "review": {
+     "ok": true,
+     "text": "Approved by Vale",
+     "agent": "vale",
+     "project": "recovery"
+    }
+   }
+  },
+  "defaultHistory": [
+   {
+    "id": "c84b031",
+    "title": "Project baseline",
+    "ref": "{branch} · HEAD",
+    "files": [
+     "docs/README.md"
+    ]
+   },
+   {
+    "id": "a62f019",
+    "title": "Verified repository baseline",
+    "ref": "main",
+    "files": [
+     "docs/README.md"
+    ]
+   }
+  ],
+  "diffs": {
+   "app/sidebar.tsx": "@@ -1,4 +1,4 @@\n export function ProjectTree() {\n-  return <ProjectMenu />;\n+  return <RepositoryTree preserveDrafts />;\n }\n@@ -41,18 +41,24 @@\n function RepositoryTree({preserveDrafts}) {\n   const {repositories, selection} = useNavigation();\n-  const [open, setOpen] = useState(new Set());\n+  const [open, setOpen] = useState(() => restoreExpanded(selection));\n+  const needsYou = useAttention();\n \n   return (\n     <nav aria-label=\"Projects\">\n       {repositories.map(repository => (\n-        <RepositoryGroup key={repository.id} repository={repository} />\n+        <RepositoryGroup\n+          key={repository.id}\n+          repository={repository}\n+          open={open.has(repository.id)}\n+          needsYou={needsYou.for(repository.id)}\n+          onToggle={() => setOpen(toggle(open, repository.id))}\n+        />\n       ))}\n     </nav>\n   );\n }",
+   "app/workspace.tsx": "@@ -1,4 +1,4 @@\n export function Workspace() {\n-  return <Chat thread={active} />;\n+  return <Conversation recipient={agent} preserveDraft />;\n }\n@@ -58,22 +58,27 @@\n function Conversation({recipient, preserveDraft}) {\n-  const [draft, setDraft] = useState(\"\");\n+  const [draft, setDraft] = useDraft(recipient.id, {enabled: preserveDraft});\n+  const position = useReadingPosition(recipient.id);\n   const thread = useThread(recipient.id);\n \n-  useEffect(() => scrollToEnd(), [thread.length]);\n+  useEffect(() => {\n+    if (position.isAtLatest) scrollToEnd();\n+  }, [thread.length, position.isAtLatest]);\n \n   return (\n     <section aria-label={recipient.name}>\n       <Thread items={thread} />\n+      <Progress agent={recipient} />\n       <Composer value={draft} onChange={setDraft} recipient={recipient} />\n     </section>\n   );\n }",
+   "engine/recovery.ts": " export async function reconnect(receipt) {\n-  return delivery.send(prompt);\n+  return delivery.resume(receipt);\n }",
+   "docs/README.md": " # {repository}\n-Project setup in progress.\n+Project baseline verified.",
+   "default": "@@ -1,4 +1,4 @@\n export function Workspace() {\n-  return <Chat thread={active} />;\n+  return <Conversation recipient={agent} preserveDraft />;\n }\n@@ -58,22 +58,27 @@\n function Conversation({recipient, preserveDraft}) {\n-  const [draft, setDraft] = useState(\"\");\n+  const [draft, setDraft] = useDraft(recipient.id, {enabled: preserveDraft});\n+  const position = useReadingPosition(recipient.id);\n   const thread = useThread(recipient.id);\n \n-  useEffect(() => scrollToEnd(), [thread.length]);\n+  useEffect(() => {\n+    if (position.isAtLatest) scrollToEnd();\n+  }, [thread.length, position.isAtLatest]);\n \n   return (\n     <section aria-label={recipient.name}>\n       <Thread items={thread} />\n+      <Progress agent={recipient} />\n       <Composer value={draft} onChange={setDraft} recipient={recipient} />\n     </section>\n   );\n }"
+  }
+ },
+ "harness": {
+  "labels": {
+   "codex": "Codex",
+   "claude": "Claude Code",
+   "cursor": "Cursor",
+   "gemini": "Gemini"
+  },
+  "models": {
+   "codex": [
+    "gpt-6",
+    "gpt-6-luna",
+    "gpt-5.5"
+   ],
+   "claude": [
+    "claude-opus-5-5",
+    "claude-sonnet-5-5",
+    "claude-haiku-5-5"
+   ],
+   "cursor": [
+    "auto"
+   ],
+   "gemini": [
+    "gemini-3-pro"
+   ]
+  },
+  "efforts": [
+   "low",
+   "medium",
+   "high"
+  ],
+  "logins": {
+   "codex": {
+    "command": "codex login",
+    "url": "https://auth.openai.com/device",
+    "code": "QWRT-8841"
+   },
+   "claude": {
+    "command": "claude auth login",
+    "url": "https://claude.ai/oauth/device",
+    "code": "MPLX-2207"
+   },
+   "cursor": {
+    "command": "cursor-agent login",
+    "url": "https://cursor.com/loginDeepControl",
+    "code": "TZKB-5530"
+   },
+   "gemini": {
+    "command": "gemini auth login",
+    "url": "https://accounts.google.com/device",
+    "code": "HNVD-1962"
+   }
+  }
+ },
+ "terminal": {
+  "ls": "app/  engine/  docs/  .sheprd/",
+  "replies": {
+   "whoami": "owner",
+   "date": "Fri Nov  6 10:56:00 UTC 2026",
+   "node --version": "v26.13.0",
+   "pnpm test": "Test Files  41 passed (41)\n     Tests  412 passed (412)",
+   "help": "Commands here: pwd, ls, cat <file>, echo <text>, whoami, date, node --version, pnpm test, git status, git branch, git log --oneline, vim <file>."
+  },
+  "unavailable": "Command unavailable."
+ },
+ "large": {
+  "iris": {
+   "bytes": 192000,
+   "label": "Review trace",
+   "item": 184,
+   "lines": 180,
+   "line": "Check {n}: Reading view, keyboard focus, and draft continuity - review trace.",
+   "fill": "Detailed review trace continuation.\n"
+  }
+ },
+ "files": {
+  "app/workspace.tsx": "export function Workspace() {\n  return <Conversation recipient={agent} preserveDraft />;\n}",
+  "app/sidebar.tsx": "export function ProjectTree() {\n  return <RepositoryTree preserveDrafts />;\n}",
+  "engine/recovery.ts": "export async function reconnect(receipt) {\n  return delivery.resume(receipt);\n}",
+  "docs/README.md": "# Project baseline verified."
+ },
+ "deliveryLabels": {
+  "delivery-iris": "Sprint SP-02 · SH-15",
+  "delivery-rowan": "Sprint SP-02 · SH-17"
+ },
+ "settings": {
+  "push": {
+   "approval": true,
+   "question": true,
+   "failure": true,
+   "account": true,
+   "other": true,
+   "client.web-down": true,
+   "board.post": true,
+   "board.no-answer": true,
+   "roles.stall": true,
+   "roles.replace": true,
+   "roles.runaway": false,
+   "roles.rule-first-use": true
+  },
+  "carrier": null,
+  "tokenSet": false,
+  "web": {
+   "enabled": true,
+   "port": 8787,
+   "heartbeat": 25,
+   "proxy": false,
+   "publicAddress": ""
+  }
+ },
+ "service": {
+  "masterAddress": "https://studio.example",
+  "workspaceFolder": "~/projects",
+  "pairingCodeParts": [
+   "H4KT",
+   "Q9WM",
+   "7RZP",
+   "L2XF",
+   "8VNC"
+  ],
+  "leadNames": [
+   "Reed",
+   "Wren",
+   "Quinn"
+  ]
+ },
+ "replies": {
+  "default": "I’ve captured that direction for {project}. We can keep working from here.",
+  "answered": "Your direction is recorded, and {agent} is back to work.",
+  "greeting": [
+   "What would you like to build for {project}?",
+   "Tell me the outcome you have in mind. I’ll help shape the plan, split it into sprints, and bring in the right teams."
+  ]
+ },
+ "reactions": {
+  "nav-decision": [
+   {
+    "agentId": "sage",
+    "text": "Your direction is recorded, and Rowan is finishing the sprint."
+   },
+   {
+    "channelId": "ch-workspace-app-shell",
+    "author": "rowan",
+    "text": "Your direction is recorded: agent conversations open in the main view. We can finish the handoff."
+   }
+  ]
+ }
+}

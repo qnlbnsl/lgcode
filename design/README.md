@@ -1,16 +1,20 @@
 # Sheprd app mockups
 
-Open `workbench.html` directly in a browser, or serve this directory with
-`python3 -m http.server 4178 --bind 127.0.0.1`. Add `?sample=heavy` to the address
-to load 10 projects, 31 agents, a long lead conversation, and a full request queue.
-The Design notes button in the sidebar links to the same sample.
+Serve this directory with `python3 -m http.server 4178 --bind 127.0.0.1`, then open
+`http://127.0.0.1:4178/workbench.html`. Opening the file directly no longer works, because
+the page reads its data with `fetch`. Add `?sample=heavy` to the address to load 10 projects,
+31 agents, a long lead conversation, and a full request queue. The Design notes button in the
+sidebar links to the same sample.
 
-This is an exploratory browser prototype with fictional example projects,
-agents, conversations, tasks, terminals, machines, and subscriptions. It does not connect to the engine. Sending
-a message or making a decision changes only this page's in-memory sample.
-The selected color mode is remembered in this browser when storage
-is available. The first visit follows the device setting. Refreshing resets
-the example work.
+This is an exploratory browser prototype. It does not connect to the engine. Its data has the
+shape of the engine's database, and functions named after the engine's commands hand it to
+the page. [data/README.md](data/README.md) explains the files, the functions, and how to load
+a real export. Sending a message or making a decision changes only this page's memory, and
+refreshing resets the work. The selected color mode is remembered in this browser when storage
+is available. The first visit follows the device setting.
+
+The page has three parts: `workbench.html` holds the markup and styles, `workbench.js` holds
+the app, and `data/stubs.js` holds the data functions.
 
 The owner requested the working app on 2026-11-05. A public marketing site
 is outside this pass. Sheprd is a separate product inspired by Herdr
@@ -70,9 +74,9 @@ Terminal fills the main area below the tabs. The prompt sits in the terminal's o
 grid, directly after the last output, with no input box or Enter button. The bar
 above it holds named sessions, the branch, the machine, and the size in columns and
 rows. `vim <file>` shows how a full-screen program takes over the grid; `:q` returns.
-Sessions keep separate history and drafts. It is a preview: no command runs.
+Sessions keep separate history and drafts. No real command runs: `help` lists the commands with canned answers.
 Git combines a repository worktree tree, staging, commit messages,
-fetch/pull/push, conflicts, unified or split diffs, and commit history.
+fetch/pull/push, conflicts, unified or split diffs, and commit history. A split diff needs 900 pixels, as Visual Studio Code does; a narrower window shows it unified.
 Team branches integrate into their project branch. Project integration into
 main opens a review. Dirty source or destination worktrees block integration. Clicking a file opens its diff directly. Workspace Settings shows
 the assigned repository, branch, folder, and machine, with a saved shell

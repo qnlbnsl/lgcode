@@ -2,7 +2,9 @@
 
 The owner required these capabilities to stay on 2026-11-06. This document
 maps the current page’s source to the interactive browser mock. It records
-interface coverage. It does not claim that the mock connects to the engine.
+interface coverage. It does not claim that the mock connects to the engine. The stub functions
+that stand in for the client API are mapped to their real commands in
+[data/README.md](data/README.md).
 
 ## Existing behavior represented in the mock
 
@@ -49,7 +51,8 @@ connection, provider authorization, or billing action is performed by them.
 
 Serve `design/` on port 4178. From the repository root, run the browser
 checks with Playwright and Chromium available. `revision-checks.mjs` passed 4 of 45
-checks that could run on the mock before the 2026-11-06 review, and passes 71 of 71 now.
+checks that could run on the mock before the 2026-11-06 review. The later findings of that
+day's designer critique added more checks to it.
 
 ```sh
 node design/checks.mjs
@@ -58,9 +61,15 @@ node design/workspace-tools-checks.mjs
 node design/workspace-redesign-checks.mjs
 node design/home-checks.mjs
 node design/revision-checks.mjs
+node design/data-checks.mjs
+node design/data/validate.mjs design/data/sample/events.json design/data/heavy/events.json
 ```
 
-All six scripts accept `MOCK_URL`, `PLAYWRIGHT_MODULE`, and
+`data-checks.mjs` covers which data files load, what is derived from events, what each command
+writes, and a real database built from the engine's migrations, exported, and loaded. It checks
+every row the commands wrote against the engine's contracts.
+
+The script checks accept `MOCK_URL`, `PLAYWRIGHT_MODULE`, and
 `CHROMIUM_PATH`. They use independent browser pages and do not call a real
 service. Results and screenshots are under `design/previews/`.
 Independent verification and the reproduced issues are recorded in
