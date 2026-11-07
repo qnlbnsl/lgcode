@@ -14,11 +14,13 @@ Sheprd ships a default workflow that people can override.
 
 > [!WARNING]
 > Sheprd is under development. The engine, authenticated client API, message
-> board and foundry supervision code are implemented. The foundation review
-> and its repairs are still in progress. Standing permission rules remain
-> unbuilt, pending the owner's harness recordings. Real-account and physical
-> phone checks remain separate owner-run work. This is not a released or
-> cleared build, and the capabilities below still include planned work.
+> board and foundry supervision code are merged. Development is frozen from
+> 2026-11-07 until the website mocks are ready. The findings of two of the
+> three foundation reviews are not yet checked against this code. Standing
+> permission rules remain unbuilt, pending the owner's harness recordings.
+> Real-account and physical phone checks remain separate owner-run work. This
+> is not a released or cleared build, and the capabilities below still include
+> planned work.
 
 ## Where Sheprd came from
 

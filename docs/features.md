@@ -1,26 +1,19 @@
 # Sheprd: the feature list
 
-Status: **draft, not approved.** Some features are built inside the engine,
-but none is reachable from a client yet.
+Status: **draft, not approved.** The foundation is merged into `master`, so
+clients reach the built features through the web page, the command-line tool
+and the client API. Development is frozen from 2026-11-07 until the website
+mocks are ready.
 
 Each feature has a short name, one paragraph saying what it does, and a state:
 **idea** (written down, not agreed), **agreed** (the owner wants it), or
 **built** (merged and working).
 
-While the engine is being built, a feature can also be **built in the
-engine** (unit numbers follow). That means its engine part is merged into
-`area/engine` and passes its tests. Since unit 7b, the client library, the
-`sheprd` command-line tool and `sheprd mcp` are merged too, so the owner
-and agents can reach the engine from a terminal, but no web or phone client
-exists yet. Since unit 8b, an acceptance suite runs the service as a
-child process and checks each of the engine's twelve capabilities, its
-eight failure rules and one request from start to finish through the
-public socket only, with fake agents. Since unit 8c, `pnpm live-check`
-runs that request once on a real Claude Code lead and a real Codex worker
-in a fresh `/tmp` service, for the owner to run by hand; it has not been
-run on the owner's accounts yet. A feature
-is **partly built in the engine** when only some of what its paragraph
-describes is merged; the note after it says which part.
+The state **built in the engine** dates from when the engine had its own
+branch, and that code is now on `master`. A feature is **partly built** when
+only some of what its paragraph describes is merged; the note after it says
+which part. The states were last compared with the code on 2026-11-07 by
+searching for the matching source, not by running each feature.
 
 An earlier, much longer list of message-board features was written for the
 Synapse fork. It is at `docs/message-board/features.md` in the
@@ -54,9 +47,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   call and checks the caller's existing rights. Other servers and native
   file and command tools continue following the selected mode. The settings
   belong to the managed session or process, not the owner's harness settings.
-- **Orchestrator** (idea). The top-level agent. It receives the owner's goal,
+- **Orchestrator** (built). The top-level agent. It receives the owner's goal,
   decides which teams to staff, and talks to team leads, not to workers.
-- **Team leads** (idea). One per team. A lead plans its team's work, hands it
+- **Team leads** (built). One per team. A lead plans its team's work, hands it
   to workers, and reports to the orchestrator.
 - **Worker kinds** (idea). Workers have a kind, such as implementer,
   reviewer, or researcher, and a harness, such as Claude Code or Codex. The
@@ -111,7 +104,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   process tree, so Codex's sandbox and a backgrounded Claude stop breaking
   identity. Borrowed from T3 Code; see
   [research/t3-code.md](research/t3-code.md), item 1.
-- **Sheprd's tools over MCP** (idea). The board's verbs (post, read, finish
+- **Sheprd's tools over MCP** (built). The board's verbs (post, read, finish
   work, ask the owner) are offered to agents through a Model Context Protocol
   (MCP) server on a loopback address, as well as through the command line.
   Every tool declares which roles may call it. See research item 1.
@@ -119,7 +112,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   6a sets back a mode change made inside the agent). An agent that a lead starts, swaps or
   messages never runs with a broader permission mode than the lead. See
   research item 6.
-- **Hand-offs built from records** (idea). A replacement worker starts from a
+- **Hand-offs built from records** (built). A replacement worker starts from a
   hand-off that Sheprd builds from the work brief, the worker's posts, the
   files it touched and the commands it ran, with no model turn spent. See
   research item 5.
@@ -128,9 +121,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 
 ## 2. The message board
 
-- **Channels and direct messages** (idea). Each team has a channel. Leads can
+- **Channels and direct messages** (built). Each team has a channel. Leads can
   message the orchestrator directly. Workers can message each other.
-- **Wake rules** (idea). Each post says whether it needs an answer. Only a
+- **Wake rules** (built). Each post says whether it needs an answer. Only a
   post that needs an answer wakes its recipient, because every wake costs a
   full agent turn.
 - **System events in a log** (idea). Joins, exits, and status changes go to
@@ -184,7 +177,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   the owner-only state folder, for the owner, paired devices and agents; unit
   7b adds the client library). The web page, a future
   desktop app, and a future mobile app all use the same API.
-- **Device pairing** (idea). A new device is added with a one-time pairing
+- **Device pairing** (dropped for phones and browsers by the owner on
+  2026-11-03, in favour of one password; a pairing code remains allowed for
+  worker machines). A new device is added with a one-time pairing
   code, as described in [SECURITY.md](../SECURITY.md).
 - **Live updates** (idea; partly built in the engine: unit 7a's `subscribe`
   streams events, and an agent sees only its own and its children's). Clients receive board posts, thread events, and
@@ -252,8 +247,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   | `debug.compare-views` | `debug headcount` |
   | `mcp` | `dog` |
 - **Filtered live updates** (idea). A subscription for phones that is filtered by agent and by event kind, with checkpoints that keep the cursor moving.
-- **One password login** (planned). The service reads the password from the environment variable `SHEPRD_WEB_PASSWORD`, and the dashboard asks for it. One person uses Sheprd, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
-- **Phone alerts through one sender** (idea). Phone alerts go through one sender interface, `AlertSender`, with ntfy as the first carrier. A later carrier, such as Expo's push service for the phone app, slots in behind it (client API row 83).
+- **One password login** (built). The service reads the password from the environment variable `SHEPRD_WEB_PASSWORD`, and the dashboard asks for it. One person uses Sheprd, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
+- **Phone alerts through one sender** (built). Phone alerts go through one sender interface, `AlertSender`, with ntfy as the first carrier. A later carrier, such as Expo's push service for the phone app, slots in behind it (client API row 83).
 - **Mobile login** (later). Starts by looking at what Home Assistant does.
 - **VS Code extension** (later). One of the last things, along with the mobile app, by the owner's answer of 2026-11-03.
 
@@ -265,27 +260,27 @@ sheepdog is the part of Sheprd's background service that keeps every agent
 moving without spending their turns. It never decides what the work is; it
 only notices when an agent has strayed and nudges it back, or tells its lead.
 
-- **Stall watch** (idea). The sheepdog knows each agent's work state (off,
+- **Stall watch** (built). The sheepdog knows each agent's work state (off,
   assigned, working, waiting, done) and notices an agent that has stopped
   without finishing. It wakes the agent once, then tells its lead. A worker
   that stalls three times in a row on the same work is replaced. The rules
   come from Synapse-list items 23 and 24 (see
   [research/herdr-and-synapse.md](research/herdr-and-synapse.md)).
-- **Usage-limit pauses are not stalls** (idea). An agent stopped by a usage
+- **Usage-limit pauses are not stalls** (built). An agent stopped by a usage
   limit is resumed when the limit resets, and the pause never counts toward
   replacing it. See research item 8.
 - **Stuck input boxes and approval dialogs** (idea). An agent whose input box
   has held the same text for a long time, or that is waiting on an approval
   dialog, is reported to its lead.
-- **Compaction timed to the prompt cache** (idea). An idle Claude agent with a
+- **Compaction timed to the prompt cache** (built). An idle Claude agent with a
   large context is compacted two minutes before its prompt cache expires, not
   after, because a wake after the cache expires costs about 20 times more for
   the cached part. Posts that need an answer and can wait are delivered
   before the cache expires. See research item 4.
-- **Runaway work** (idea). Work that runs far past its expected length is
+- **Runaway work** (built). Work that runs far past its expected length is
   reported to the lead, and can continue in a fresh agent with a built
   hand-off.
-- **Cache lifetime setting** (idea). A per-harness `cacheLifetime` setting, five minutes or one hour, for timing compaction when the adapter does not report which cache lifetime it wrote (roles round 1).
+- **Cache lifetime setting** (built). A per-harness `cacheLifetime` setting, five minutes or one hour, for timing compaction when the adapter does not report which cache lifetime it wrote (roles round 1).
 - **"Compact me when I am next idle"** (idea). An agent asks the sheepdog to compact it after its current turn. This replaces the Foundry's `want-<name>` file for the context-keeper.
 
 ## 6. Source control

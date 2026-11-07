@@ -3,11 +3,15 @@ topic: shepherd-foundry-roles
 status: accepted
 tier: L
 created: 2026-11-03
-updated: 2026-11-03
+updated: 2026-11-07
 epic: shepherd-foundation
 ---
 
 # Build the foundry roles and the sheepdog
+
+This plan is merged into `master`, except for units 3, 4 and 11a. Those units
+are the standing permission rules, which are unbuilt or switched off until the
+owner runs the harness recordings.
 
 ## Overview
 

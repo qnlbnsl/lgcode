@@ -2,15 +2,15 @@
 topic: shepherd-foundation
 kind: epic
 status: active
-parked: false
-updated: 2026-11-03
+parked: true
+updated: 2026-11-07
 ---
 
-# Shephrd runs the Foundry's teams on its own
+# Sheprd runs the Foundry's teams on its own
 
 ## Outcome
 
-Shephrd, a Herdr plugin, runs teams of coding agents over the Agent Client
+Sheprd runs teams of coding agents over the Agent Client
 Protocol: an orchestrator, team leads and workers, coordinated through a
 strict message board, and visible and answerable from a web page, a phone,
 or a pane in Herdr. The Foundry skill no longer needs Herdr commands or shell
@@ -18,7 +18,7 @@ scripts to start, watch, approve or wake its agents.
 
 ## Done when
 
-- The Foundry skill's Steps 3 to 5 and 8 run through Shephrd alone, with no
+- The Foundry skill's Steps 3 to 5 and 8 run through Sheprd alone, with no
   `herdr agent` command and no `collect.sh` or `board-waker.sh`.
 - The owner answers a permission request and reads a thread from a phone,
   after logging in with the password, through the owner's own reverse proxy
@@ -29,18 +29,17 @@ scripts to start, watch, approve or wake its agents.
 
 | Order | Plan slug | What it delivers | State |
 |---|---|---|---|
-| 1 | shepherd-engine | The engine: agents over ACP, the event log, commands, permissions, waits, accounts, and one authenticated API. | linked |
-| 2 | shepherd-client-api | Phone alerts, remote access through the owner's proxy, the web page behind one password, and a thread viewer in a Herdr pane. | linked |
-| 3 | shepherd-message-board | Channels, direct messages and wake rules, behind one delivery interface. | linked |
-| 4 | shepherd-foundry-roles | The orchestrator, team leads, workers, standing permission rules and the sheepdog. | linked |
-| 5 | shepherd-worktrees | Git worktrees for agents under `<repo>/.worktrees/`, through an option on the agent `start` command, with safe clean-up. | planned |
+| 1 | shepherd-engine | The engine: agents over ACP, the event log, commands, permissions, waits, accounts, and one authenticated API. | done |
+| 2 | shepherd-client-api | Phone alerts, remote access through the owner's proxy, the web page behind one password, and a thread viewer in a Herdr pane. | done |
+| 3 | shepherd-message-board | Channels, direct messages and wake rules, behind one delivery interface. | done |
+| 4 | shepherd-foundry-roles | The orchestrator, team leads, workers, standing permission rules and the sheepdog. | built, apart from standing rules |
+| 5 | shepherd-worktrees | Git worktrees for agents under `<repo>/.worktrees/`, through an option on the agent `start` command, with safe clean-up. | absorbed by `website-replacement`, step 1 |
 
-`planned` — named slice, no `.plans/plans/<slug>/plan.md` yet.
-`linked` — that plan exists and its `epic:` is this slug.
+`done` — the plan is built and merged into `master`.
 
 ## Out of scope
 
-- Team shapes and workflows. They live outside Shephrd (`AGENTS.md`, rule 6).
+- Team shapes and workflows. They live outside Sheprd (`AGENTS.md`, rule 6).
 - Interactive mode, where an agent runs in a Herdr pane. It follows this epic.
 - The desktop and phone apps themselves. Piece 2 gives them their API and a
   web page.
@@ -63,7 +62,7 @@ scripts to start, watch, approve or wake its agents.
   `dev` branch, so the rule says "base branch". `engine` counts as a team
   branch, so the manager merges into it, and moving `engine` into `master`
   goes to the owner.
-- 2026-10-30: the owner split Shephrd into four pieces and chose to build the
+- 2026-10-30: the owner split Sheprd into four pieces and chose to build the
   engine first, then the client API, the message board and the foundry roles.
   The engine comes first because the other three are built on its
   capabilities.
@@ -93,3 +92,8 @@ scripts to start, watch, approve or wake its agents.
   at what Home Assistant does. The owner's words: "just a single password would
   be fine", and "we don't need multi-user capabilities". This supersedes the
   entry above where they differ.
+- 2026-11-07: the owner froze development until the website mocks are ready,
+  so this epic is parked. Its done-when lines have not been checked end to end.
+  The owner's words: "start reconciling everything so that master gets updated
+  with the current version, and then we'll be freezing development for a while
+  until the mocks are ready."

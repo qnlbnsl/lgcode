@@ -8668,3 +8668,42 @@ State: three are fixed on the branch `area/web-mock`. The sidebar fault is open 
 
 A real export cannot show boards yet, because the engine stores no projects, sprints, or tasks.
 The website todo records those events as proposed.
+
+## 518. The mock's Copy button said "Copied" over plain web addresses when nothing was copied
+
+Found: 2026-11-07, while serving the mock on the build server's network address.
+State: fixed on the branch `area/web-mock`.
+
+A browser offers the clipboard only over HTTPS and loopback addresses. Over a plain network
+address, the pairing command's Copy button copied nothing and still showed "Copied". The button
+now selects the text and says that the address cannot use the clipboard. It also reports a
+refused copy, where it stayed silent before.
+
+The product page supports only HTTPS and loopback, so the product should not meet the first case.
+
+## 519. The Claude and Grok review findings are not checked against `master`
+
+Found: 2026-11-07, while reconciling `master` before the freeze.
+State: open, awaiting the owner's word to run the check.
+
+Three foundation reviews ran on the snapshot at the tag `foundation-pre-review`, and only the Codex review's fixes have reached `master`. The Claude review confirmed 51 findings, of which 25 concern the product and 26 concern tests. It left 526 findings unadjudicated and deferred 203 security findings. The Grok review confirmed 23 findings, of which 18 are distinct. It left 139 findings unadjudicated and deferred 10 security findings.
+
+Nobody yet knows how many of these findings the Codex repairs already fixed. A reading on 2026-11-07 found that the Codex register's `R-009`, `R-012`, `L-038` and `FR-001` are still present on `master`, and that `R-002` still needs a manual build. The evidence is outside git, in `.scratch/foundry-runs/foundation-plans-1/`, under `review-claude/`, `review-cursor/` and `review-codex/`.
+
+## 520. The stall rule nudges a lead while its own worker is busy, and the plan contradicts itself
+
+Found: 2026-11-07, recorded from review finding K-368.
+State: open, awaiting the owner's ruling. No code changes during the freeze.
+
+When an orchestrator posts a question that needs a reply to a lead, the lead goes idle while its workers run. After 20 minutes the lead receives `StallSeen`, and on the third episode the orchestrator receives `ReplaceAdvised`. The code is `packages/engine/src/roles/sheepdog/rules/stall.ts:145-150`. The plan's criterion 4.3, at `.plans/plans/shepherd-foundry-roles/plan.md:939`, says both "nor is the lead" and "still nudged". The plan's line 69 says that a worker waiting on a busy agent is not stalled. No test covers an orchestrator's post to a lead with a busy descendant.
+
+The manager's recommendation is to keep the nudge, because the question is still owed, and to stop advising replacement while the lead's team is working.
+
+## 521. Finished review seats filled the temporary folder's file limit
+
+Found: 2026-11-07, when every shell command in the manager's session failed with "no space left on device".
+State: worked around for now. The cause remains.
+
+`/tmp` allows 1,048,576 files, and it reached that limit while only 21 percent of its bytes were in use. Each review seat kept a full copy of the repository, including `node_modules`, in its temporary folder under `/tmp/claude-1000`, and each adjudicator seat held about 28,000 files. Nothing removes those folders when a seat finishes. The failure affects every session on the machine, because each one needs a new file for each command's output.
+
+The manager removed the `node_modules` folders from the 31 finished adjudicator seats, which brought the folder down to 56 percent of its file limit. The folders of the other finished seats remain. The Foundry should give seats a shared read-only copy, or remove a seat's temporary folder when the seat retires. The main disk is also at 96 percent.
