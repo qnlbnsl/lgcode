@@ -6,16 +6,16 @@ This note is the design for replacing the current page with the mock in
 `design/workbench.html`, and for adding what the engine lacks. The checklist is
 `.plans/plans/website-replacement/todo.md`. None of this is built.
 
-The design was written against the mock as it stood at 09:18 on 2026-11-06. The
-mock session was still critiquing its work. That can change how screens look, and
-it should rarely change the data this note describes.
+The design was written against the mock as it stood at 09:18 on 2026-11-06. The section
+"What changed in the mock after 09:18" records the later additions, against commit
+`e2d5166` on the branch `area/web-mock`.
 
 ## What the owner decided
 
 All of these were decided on 2026-11-06.
 
 - The mock is golden, and the engine gets whatever it needs: "just add the missing
-  support to the engine". The mock's spelling "shephrd" is the one exception.
+  support to the engine".
 - Nothing is built until the owner says so: "just a discussion and todo. not making
   the changes."
 - One master runs the work, and other computers join it as workers, "basically
@@ -249,7 +249,7 @@ are built.
 The agent made these choices, and any of them can be overruled:
 
 - A new project's lead uses stored defaults for harness, account, model, effort and permission,
-  because Add Project asks only for a repository and a name.
+  because New project asks only for a repository and a name.
 - A lead's name comes from a fixed list.
 - Task label prefixes come from the project's name.
 - Answering a linked question marks its task done.
@@ -258,7 +258,36 @@ The agent made these choices, and any of them can be overruled:
 - Provider sign-in runs in a terminal session.
 - The master relies on a paired worker's report for that worker's local checks.
 
+## What changed in the mock after 09:18
+
+These additions change what the engine has to do.
+
+- **Home needs a durable request index.** Home, the bell and the sidebar dots count one
+  list of the owner's open requests across all projects. It needs filters, answered
+  history, the time each request has waited, and the task each one blocks.
+- **Git writes the repository.** The note above describes git reads only. The mock now
+  stages, commits, fetches, pulls and pushes, merges a team's branch into its project's
+  branch, lists conflicts, and opens a review to the main branch. A merge is refused when
+  the destination has uncommitted changes, and the page never merges into the main branch.
+- **New project can create a repository.** It makes a folder inside the workspace folder
+  on the selected machine, and runs `git init`. Cloning from an address is not offered.
+- **The terminal is a real grid.** It has no input box, so the page needs a terminal
+  emulator such as xterm.js, and the engine needs a pseudo-terminal. Full-screen programs
+  such as vim and agent command lines must run, and resize reports columns and rows. This
+  makes `node-pty`, or an equivalent, a requirement rather than a likely choice.
+- **Conversations choose a subscription.** The composer offers only the subscriptions that
+  are ready for the harness, and it has an Add context control.
+- **Alerts means notifications.** Its badge counts failed notifications to the owner's
+  phone. It no longer counts requests, so it needs no new data.
+
+These changes affect only the page:
+
+- There is one tab row, with the same position on every view: Board, Chat, Tasks in team
+  scope, Terminal, Git and Project settings. There is no Changes tab, and no separate
+  Repositories destination.
+- The page also gains a quick switcher, an attention filter in the sidebar, and panel
+  resizing.
+
 ## Changes the mock still needs
 
 - The Connect a worker dialog asks for a code, and it should show one, because the website generates it.
-- The brand and login heading say "shephrd", and they should say "sheprd".

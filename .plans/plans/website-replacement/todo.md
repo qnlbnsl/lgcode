@@ -3,11 +3,10 @@
 The owner decided this on 2026-11-06. The mock, `design/workbench.html`, is
 golden, and the engine gets whatever the mock needs. There are no stages.
 
-This list was checked against the mock on 2026-11-06 at 09:18, after it gained
-the operational pages, Terminal, Git, Machines and Subscriptions. The mock session
-is still critiquing its work, so later changes add to this list. The source-to-mock
-map is `design/FEATURE-PARITY.md`. The mock's spelling "shephrd" is the one exception
-to golden, because the product is Sheprd.
+This list was checked again on 2026-11-06 against the mock at commit `e2d5166` on the
+branch `area/web-mock`, after Claude rebuilt Terminal and Git and added Home. The mock
+now lives on that branch, and later changes add to this list. The source-to-mock map
+is `design/FEATURE-PARITY.md`.
 
 Each line below is one piece of work. "Agent's call" marks a choice the owner has
 not ruled on.
@@ -22,7 +21,7 @@ stored events, commands, a client API section and agent tools.
 - [ ] Store the workspace folder, which holds the owner's repositories. It is an
       owner-only setting. The installer will write it later.
 - [ ] Store the defaults for a new project lead: harness, account, model, effort
-      and permission. Add Project asks only for a repository and a name, so these
+      and permission. New project asks only for a repository and a name, so these
       must already exist. Agent's call.
 - [ ] Store the owner's display name for the sidebar. It starts from git's
       `user.name`. Agent's call.
@@ -31,6 +30,9 @@ stored events, commands, a client API section and agent tools.
 
 - [ ] List the repositories in the workspace folder, with name, path and project
       count.
+- [ ] Create a brand new repository from New project: make the folder inside the
+      workspace folder on the selected machine, run `git init`, and start on `main`.
+      Report a name collision or a failure in a form the page can show.
 - [ ] List a repository's branches and workspaces, with path, owner and activity,
       for the branch picker.
 - [ ] Read a workspace's changes as a file tree, with added and removed line counts
@@ -43,12 +45,24 @@ stored events, commands, a client API section and agent tools.
       errors in a form the page can show.
 - [ ] Record which machine each repository and workspace is on.
 
+### Git writes
+
+The mock's Git page changes the repository, so these are not reads. Each one reports
+git's failure in a form the page can show.
+
+- [ ] Stage and unstage a file, and commit with a message, on the workspace's branch.
+- [ ] Fetch, pull and push the branch, with counts of commits ahead and behind.
+- [ ] Merge a team's branch into its project's branch, and list the conflicts when it
+      stops. Refuse the merge when the destination has uncommitted changes.
+- [ ] Open a review from the project's branch to the main branch. The page must not
+      merge into the main branch directly.
+
 ### Projects and teams
 
 - [ ] Add a project record: repository, name, goal, lead, assigned branch, checkout
       type, folder and machine.
 - [ ] Refuse a second project with the same name in a repository, ignoring case.
-- [ ] Add Project starts the lead with the stored defaults, in the project's
+- [ ] New project starts the lead with the stored defaults, in the project's
       worktree or main checkout, and opens its conversation.
 - [ ] Store each project's preferred shell for its terminal sessions.
 - [ ] Choose each lead's name from a list. Agent's call.
@@ -90,6 +104,18 @@ stored events, commands, a client API section and agent tools.
       already cancel a turn, but no command reaches it.
 - [ ] Let the owner read a team channel without leaving read marks. Today a board
       read marks posts, so the page waits for a tap.
+- [ ] Add context to a message from the composer's Add context control.
+
+### Requests across projects
+
+Home, the bell and the sidebar dots all read this.
+
+- [ ] Add a durable index of the owner's open requests across all projects: questions
+      and permissions, with project, agent, task and the time each was raised.
+- [ ] Filter that index by kind and by project, for Needs attention, Questions and
+      Approvals.
+- [ ] Keep answered requests, so the page can show them after the answer.
+- [ ] Work out how long each request has waited and which task it blocks.
 
 ### Terminal
 
@@ -97,6 +123,8 @@ stored events, commands, a client API section and agent tools.
       preferred shell. It runs commands directly, as the owner.
 - [ ] Stream input and output, and support resize, interrupt and reconnect, with an
       owner for each session. Only the logged-in owner can attach.
+- [ ] Use a real pseudo-terminal, so full-screen programs such as vim and agent command
+      lines run, and resize reports columns and rows to the program.
 - [ ] Choose how Node.js runs a terminal. This may be the first native dependency.
 
 ### Subscriptions
@@ -105,6 +133,8 @@ stored events, commands, a client API section and agent tools.
       active agent count. `accounts` and `shadowHome.ts` already separate accounts,
       and the page keeps that.
 - [ ] Add a machine to each account.
+- [ ] Let each conversation choose its subscription, and offer only the subscriptions
+      that are ready for that harness.
 - [ ] Sign in to a provider from the page, in that account's private login. The agent
       suggests running the harness's own login in a terminal session. Agent's call.
 
@@ -139,9 +169,16 @@ The mock makes this part of the website, so it no longer waits until after it.
       site's security policy blocks inline styles and scripts.
 - [ ] Rewrite the mock's string-built views in React. Agent data stays plain text.
 - [ ] Build the sidebar tree: repositories, projects with lead and branch, teams
-      and agents, with chevrons separate from selection.
-- [ ] Build the Repositories page and each repository's page.
-- [ ] Build the Add Project dialog.
+      and agents, with chevrons separate from selection. Include the filter for only
+      projects needing the owner.
+- [ ] Build Home: Needs attention, All projects, Questions and Approvals, with one-line
+      rows that expand in place and hand focus to the next row after an answer.
+- [ ] Build the bell's popover, which counts the same requests as Home.
+- [ ] Build the quick switcher.
+- [ ] Build each repository's page. A repository name in the sidebar opens it, so there
+      is no separate Repositories destination.
+- [ ] Build the New project dialog, including its New repository option.
+- [ ] Build panel resizing and remember each panel's width.
 - [ ] Build the sprint board with its four columns and the empty board.
 - [ ] Build the lead chat panel on the board: open, close, expand, and a drawer on
       smaller screens with Escape and contained focus.
@@ -150,13 +187,19 @@ The mock makes this part of the website, so it no longer waits until after it.
 - [ ] Build the Add Task dialog.
 - [ ] Build the conversation view: compact header, quiet owner turns, collapsed
       tool details and a growing composer that names its recipient.
-- [ ] Build the project tabs: Board, Chat, Terminal, Git and Settings.
-- [ ] Build team tabs for Chat, Tasks and Changes, remembering the last tab.
-- [ ] Build the Git view: file tree, unified and split diffs, and commit history in
-      the same pane.
+- [ ] Build one tab row that keeps its position on every view: Board, Chat, Tasks in
+      team scope, Terminal, Git and Project settings. There is no Changes tab, because Git
+      covers it. Remember the last tab.
+- [ ] Build the Git view at full window height, with three columns that each scroll:
+      worktrees, then the commit message above the file tree, then the diff. It has unified
+      and split diffs, This file and All files, and commit history in the same pane.
+- [ ] Build the Git actions: commit, fetch, pull, push, the conflict list, the team merge,
+      the review to the main branch, and the block on a dirty destination.
 - [ ] Build the branch picker. Picking a branch changes only what is viewed.
-- [ ] Build the Terminal view, which replaces the main chat.
-- [ ] Build the project's Settings tab: location and preferred shell.
+- [ ] Build the Terminal view with a terminal emulator such as xterm.js. It fills the
+      main area below the tabs, with the prompt in the character grid and no input box. A
+      slim bar holds the sessions, branch, machine and size in columns and rows.
+- [ ] Build the Project settings tab: location and preferred shell.
 - [ ] Build the Machines page in both modes, with its pairing dialog and project
       placement.
 - [ ] Build the Subscriptions page, with its add and sign-in dialogs.
@@ -165,7 +208,8 @@ The mock makes this part of the website, so it no longer waits until after it.
 - [ ] Build the color mode switch, following the device until the owner chooses.
 - [ ] Build mobile navigation with contained focus.
 - [ ] Keep routes in the URL hash, including the alert links `/#/thread/<agentId>`.
-- [ ] Leave out the mock's Design notes preview controls and all its sample data.
+- [ ] Leave out the mock's Design notes preview controls, its heavy sample and all its
+      other sample data.
 
 ## Keep what the current page does
 
@@ -181,7 +225,9 @@ The mock now shows all of these. `design/FEATURE-PARITY.md` maps each to its sou
 - [ ] Failed-start reasons, which also prevent sending.
 - [ ] Large thread items, with a loader, failure and retry.
 - [ ] Tool calls and delivery history.
-- [ ] The Alerts page, with paging, subject links and delivery failures.
+- [ ] The Alerts page as a table of notifications sent to the owner's phone, with paging,
+      subject links and delivery failures. Its badge counts failed notifications only, and
+      Home and the bell count the requests.
 - [ ] The Settings page, with all twelve push kinds, the carrier and its write-only
       token, and the web server controls.
 
@@ -189,12 +235,13 @@ The mock now shows all of these. `design/FEATURE-PARITY.md` maps each to its sou
 
 - [ ] Rewrite the 11 browser test files for the new page.
 - [ ] Update `live-check-web.ts`, which finds elements by their current names.
-- [ ] Port `design/checks.mjs`, `operations-checks.mjs` and `workspace-tools-checks.mjs`
-      to the browser suite at 390, 768, 1440 and 2560 pixels in both color modes.
-- [ ] Add a real-agent proof: Add Project with a worktree, talk to the lead, the lead
+- [ ] Port `design/checks.mjs`, `operations-checks.mjs`, `workspace-tools-checks.mjs`,
+      `workspace-redesign-checks.mjs`, `home-checks.mjs` and `revision-checks.mjs` to the
+      browser suite at 390, 768, 1440 and 2560 pixels in both color modes.
+- [ ] Add a real-agent proof: New project with a worktree, talk to the lead, the lead
       writes a sprint and a task, and a decision is answered from the board.
-- [ ] Add real proofs for a terminal session, a provider sign-in and a worker on a
-      second machine.
+- [ ] Add real proofs for a terminal session running vim, a commit and merge from Git, a
+      new repository, a provider sign-in and a worker on a second machine.
 - [ ] Run `pnpm check`, `pnpm live-check:web` and `pnpm live-check` before merging,
       because stored events change.
 
@@ -203,6 +250,7 @@ The mock now shows all of these. `design/FEATURE-PARITY.md` maps each to its sou
 These are on `.scratch/security/attack-todo.md` as what must hold.
 
 - [ ] Git reads and the changes view.
+- [ ] Git writes from the page, and creating a new repository.
 - [ ] Who may write projects, sprints and tasks.
 - [ ] Agent-written fields on the page.
 - [ ] The terminal, worktree creation and provider sign-in.
