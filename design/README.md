@@ -6,6 +6,11 @@ the page reads its data with `fetch`. Add `?sample=heavy` to the address to load
 31 agents, a long lead conversation, and a full request queue. The Design notes button in the
 sidebar links to the same sample.
 
+To open the mock from another computer or a phone, use `--bind 0.0.0.0` and the server's
+address. That address has no password, so anyone on the network can open it. The server shares
+this whole folder, which includes `data/prod/` if a real export exists, so do not bind to the
+network while an export is there.
+
 This is an exploratory browser prototype. It does not connect to the engine. Its data has the
 shape of the engine's database, and functions named after the engine's commands hand it to
 the page. [data/README.md](data/README.md) explains the files, the functions, and how to load
