@@ -8,7 +8,7 @@ const checks=[],errors=[];
 page.on('pageerror',error=>errors.push(error.message));
 const check=(value,label)=>{if(!value)throw new Error(label);checks.push(label)};
 const click=selector=>page.locator(selector).click();
-const leadChat=async()=>{if(await page.locator('#tab-project-chat').isVisible())await click('#tab-project-chat');else{if(!await page.locator('#lead-panel').isVisible())await click('#lead-toggle');await click('#expand-lead-chat')}};
+const leadChat=async()=>{if(page.viewportSize().width<=1100&&await page.locator('#lead-panel').isVisible())await page.keyboard.press('Escape');await click('#tab-project-chat')};
 const shot=async name=>page.screenshot({path:fileURLToPath(new URL(`./previews/projects-${name}.png`,import.meta.url))});
 try{
  await page.goto(process.env.MOCK_URL || 'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.lgcodeReady);
@@ -24,7 +24,8 @@ try{
  await page.locator('#message-input').press('Control+Enter');await page.locator('#lead-panel .sample-response').last().waitFor();
  check(await page.locator('#view-title').textContent()==='Agent console'&&await page.locator('.kanban-column').count()===4,'Sending to Sage keeps the project board in place');
  check(await page.locator('#lead-panel .sample-response .turn-head').last().textContent().then(t=>t.includes('Sage')),'Board chat receives a named sample reply');
- await click('#close-lead-panel');check(!await page.locator('#lead-panel').isVisible(),'Lead panel can be collapsed to widen the board');
+ check(!await page.locator('#close-lead-panel').isVisible()&&await page.locator('#expand-lead-chat').count()===0,'The lead toggle is the panel’s one open and close control on a desktop');
+ await click('#lead-toggle');check(!await page.locator('#lead-panel').isVisible(),'Lead panel can be collapsed to widen the board');
  await click('#lead-toggle');check(await page.locator('#lead-panel').isVisible(),'Board header reopens the lead panel');
  await page.locator('#message-input').fill('A board draft for Sage');await click('.project-select[data-project="recovery"]');
  check(await page.locator('#lead-chat-title').textContent()==='Vale'&&await page.locator('#message-input').inputValue()==='','Sibling board uses its own project lead and draft');
@@ -48,8 +49,8 @@ try{
  check(await page.locator('#context-toggle').textContent().then(t=>t.includes('feat/workspace'))&&await page.locator('#conversation-header code, #composer-wrap code').count()===0&&await page.locator('#composer-worktree, #recipient-label').count()===0,'The top bar names the branch once, and the board header and composer do not repeat it');
  check(await page.locator('#sidebar [data-open-repo="lgcode"]').count()===1,'Repository has its own projects page');
  await click('#sidebar [data-open-repo="lgcode"]');
- check(await page.locator('#view-body [data-project]').count()===3,'Repository page lists all its projects');
- await click('#view-body [data-project="workspace"]');
+ check(await page.locator('#view-body [data-home-project]').count()===3,'Repository page lists all its projects');
+ await click('#view-body [data-home-project="workspace"]');
  check(await page.locator('.kanban-column').count()===4,'Repository project link opens its board');
  await click('[data-team="app-shell"]');await click('.project-select[data-project="workspace"]');
  check(await page.locator('#view-title').textContent()==='Agent console'&&await page.locator('.kanban-column').count()===4,'Selecting a project consistently opens its board');
@@ -67,12 +68,13 @@ try{
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('.kanban-column').count()===4,'Project board shows sprint status columns');
  check(await page.locator('[data-sprint]').count()===4,'Project board contains sprints rather than individual tasks');
- check(await page.locator('[data-sprint="sp-02"]').textContent().then(t=>t.includes('Needs answer')),'Sprint surfaces an unresolved owner dependency');
+ check(await page.locator('.sprint-card[data-sprint="sp-02"]').evaluate(e=>e.classList.contains('needs-attention')&&e.firstElementChild.classList.contains('sprint-note')&&e.firstElementChild.textContent==='2 requests need you'),'Sprint surfaces its unresolved question and approval first, with an amber rule');
  await click('[data-sprint="sp-02"]');
  check(await page.locator('#view-body').textContent().then(t=>t.includes('Iris')&&t.includes('Rowan')&&t.includes('SH-15')),'Sprint detail connects plan tasks and agent ownership');
  await click('[data-task="SH-15"]');
  check(await page.locator('#view-body').textContent().then(t=>t.includes('feat/workspace')),'Viewing another branch does not retarget the task workspace');
- await click('[data-talk-agent="iris"]');
+ check(await page.locator('.page-top .page-actions [data-talk-agent="iris"]').isVisible()&&await page.locator('.detail-sidebar [data-talk-agent="iris"]').isVisible(),'A task offers its owner at the top right and links the owner');
+ await click('.page-actions [data-talk-agent="iris"]');
  check(await page.locator('#view-title').textContent()==='Iris','Task opens its owning agent conversation');
  await page.locator('#message-input').fill('A draft for Iris');await click('.project-select[data-project="workspace"]');await leadChat();
  await page.locator('#message-input').fill('A draft for Sage');await click('[data-agent="iris"]');
@@ -86,7 +88,7 @@ try{
  await click('[data-resolve-request="nav-decision"]');
  check(!await page.locator('[data-agent="rowan"]').textContent().then(t=>t.includes('Needs answer')),'Answer clears the requesting agent highlight');
  await click('.project-select[data-project="workspace"]');await leadChat();check(await page.locator('[data-open-request="nav-decision"]').count()===0,'Answer clears the project lead escalation');
- await click('.project-select[data-project="workspace"]');check(!await page.locator('[data-sprint="sp-02"]').textContent().then(t=>t.includes('Needs answer')),'Answer clears the sprint blocker');
+ await click('.project-select[data-project="workspace"]');check(await page.locator('.sprint-card[data-sprint="sp-02"] .sprint-note').textContent()==='Needs approval','Answer clears the sprint’s question and leaves its approval');
  await click('[data-sprint="sp-02"]');await click('[data-task="SH-17"]');
  check(await page.locator('.request-link').count()===0,'Resolved task does not show an urgent request');
  await click('.project-select[data-project="workspace"]');await click('[data-sprint="sp-01"]');
@@ -122,7 +124,8 @@ try{
  check(await page.locator('#view-body').textContent().then(t=>t.includes('A new sprint assignment')),'New task also appears in its sprint');
  await click('#new-project');await page.locator('#project-name').fill('Garden');await page.locator('#project-repo').selectOption('lgcode');await click('#project-submit');
  check(await page.locator('#breadcrumb').textContent().then(t=>t.includes('lgcode')&&t.includes('Garden')),'New project belongs to its selected known repository');
- await click('#tab-board');check(await page.locator('#view-body .empty h2').textContent()==='No sprints yet.'&&await page.locator('#view-body .empty button').count()===1&&await page.locator('#view-body .empty p').count()===0,'An empty board is one sentence and one action');
+ await click('#tab-board');check(await page.locator('#view-body .empty h2').textContent()==='No sprints yet. Ask Lark for a plan.'.replace('Lark',await page.locator('#lead-chat-title').textContent())&&await page.locator('#view-body .empty button').count()===0,'An empty board beside its open lead panel is one sentence with no action');
+ await click('#lead-toggle');check(await page.locator('#view-body .empty h2').textContent()==='No sprints yet.'&&await page.locator('#view-body .empty button').count()===1&&await page.locator('#view-body .empty p').count()===0,'An empty board with the panel closed is one sentence and one action');
  await click('#view-body [data-focus-lead]');check(await page.locator('#message-input').evaluate(el=>el===document.activeElement),'Empty board action focuses its project lead');
  check(await page.locator('.project-group[data-project-id]').count()===5,'New project joins the repository tree');
  await page.reload();await click('.project-select[data-project="workspace"]');await leadChat();

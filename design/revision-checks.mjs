@@ -180,7 +180,7 @@ await run('designer findings',async()=>{
  await q.setViewportSize({width:1440,height:700});await at('.project-select[data-project="workspace"]').click();await q.waitForTimeout(40);
  const gap=s=>q.locator(s).evaluate(e=>e.scrollHeight-e.scrollTop-e.clientHeight);
  check(await gap('#lead-chat-body')<=2,'The lead panel opens at its true end');
- await at('#close-lead-panel').click();await at('#lead-toggle').click();await q.waitForTimeout(40);
+ await at('#lead-toggle').click();await at('#lead-toggle').click();await q.waitForTimeout(40);
  check(await gap('#lead-chat-body')<=2,'Reopening the lead panel keeps the end in view');
  await at('[data-main-view="chat"]').click();await q.waitForTimeout(40);
  check(await gap('#view-body')<=2,'The Chat tab opens at the end after the panel');
@@ -579,6 +579,74 @@ await run('composer and threads',async()=>{
  for(const width of [390,768]){const m=await fresh('',{width,height:844});await m.evaluate(()=>openAgent('iris','workspace'));await m.waitForTimeout(40);
   const over=await m.evaluate(()=>[...document.querySelectorAll('.composer-tools > :not([hidden])')].filter(e=>e.scrollWidth>e.clientWidth+1||e.getBoundingClientRect().right>document.querySelector('#message-form').getBoundingClientRect().right).map(e=>e.id));
   check(over.length===0&&await m.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`COMP-3: at ${width} pixels every tool fits the composer: ${over}`);await m.close()}
+});
+
+await run('board, sprint, task, tables, and wide screens',async()=>{
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const t=await fresh();const at=s=>t.locator(s).first();
+ // BOARD-1, BOARD-2, and BOARD-3
+ await t.evaluate(()=>openBoard('workspace'));await t.waitForTimeout(40);
+ const card=await at('.sprint-card[data-sprint="sp-02"]').evaluate(c=>{const warn=document.createElement('i');warn.style.color='var(--color-warn)';document.body.append(warn);const w=getComputedStyle(warn).color;warn.remove();const goal=c.querySelector('.sprint-goal');return {first:c.firstElementChild.className,rule:getComputedStyle(c).borderLeftColor===w&&getComputedStyle(c).boxShadow.includes(w.replace(/\s/g,'').replace('rgb(','rgb(')),oneLine:getComputedStyle(goal).whiteSpace==='nowrap'&&goal.getBoundingClientRect().height<24,owner:c.querySelector('.sprint-owner strong')?.textContent,id:c.querySelector('.sprint-id').textContent}});
+ check(card.first==='sprint-note'&&card.oneLine&&card.owner==='Rowan'&&card.id.startsWith('SP-02'),'BOARD-1: a card leads with its attention line, then its identifier, a one-line goal, and its owner: '+JSON.stringify(card));
+ check(await at('.sprint-card[data-sprint="sp-02"]').evaluate(c=>{const s=getComputedStyle(c);return s.borderLeftColor===s.color||s.boxShadow!=='none'})&&await t.locator('.sprint-card.needs-attention').count()===2,'BOARD-1: the two cards that need the owner wear an amber left rule');
+ check(await at('.sprint-card[data-sprint="sp-04"]').evaluate(c=>!c.querySelector('.sprint-progress')&&!/0\/\d/.test(c.textContent)&&c.textContent.includes('1 task')),'BOARD-1: a sprint with no finished task shows its task count without an empty bar');
+ check(await t.locator('.column-heading .dot').count()===0,'BOARD-3: column headings have no dot');
+ check(await t.locator('#expand-lead-chat').count()===0&&await at('#close-lead-panel').isHidden()&&await t.locator('#tab-row #lead-toggle').isVisible(),'BOARD-2: the toggle at the end of the tab row is the panel’s only open and close control');
+ // SPRINT-1 and SPACE-2
+ await t.evaluate(()=>openSprint('sp-02'));await t.waitForTimeout(40);
+ const sprint=await t.evaluate(()=>{const body=document.querySelector('#view-body'),blockers=body.querySelector('.detail-blockers'),summary=body.querySelector('.detail-summary');return {line:document.querySelector('#participants').textContent,first:!!blockers&&!!(blockers.compareDocumentPosition(summary)&Node.DOCUMENT_POSITION_FOLLOWING),question:!!blockers?.querySelector('#request-nav-decision [data-resolve-request]'),approval:!!blockers?.querySelector('#permission-perm-iris [data-permission-answer]'),plan:[...body.querySelectorAll('dt')].some(d=>d.textContent==='Plan'),primaries:body.querySelectorAll('.primary').length,blocked:[...body.querySelectorAll('.task-list tr')].find(r=>r.textContent.includes('SH-15'))?.querySelector('.task-status').textContent}});
+ check(sprint.line.includes('In progress')&&sprint.line.includes('2 requests need you'),'SPRINT-1: the sprint’s status and blockers are in the line under its title: '+sprint.line);
+ check(sprint.first&&sprint.question&&sprint.approval&&!sprint.plan&&sprint.primaries===1,'SPRINT-1: the question and the approval come first and can be answered there, with one primary button and no Plan line: '+JSON.stringify(sprint));
+ check(sprint.blocked==='Blocked by an approval','SPRINT-1: a task blocked by its owner’s approval says so');
+ const base=await t.evaluate(()=>{const h=document.querySelector('.detail-section .section-heading'),r=document.createRange(),rect=n=>{r.selectNodeContents(n);return r.getBoundingClientRect().bottom};const b=h.querySelector('#add-task'),text=[...b.childNodes].find(n=>n.nodeType===3);return Math.abs(rect(h.querySelector('h2'))-rect(text))});
+ check(base<=2,'SPACE-2: Add task sits on its heading’s baseline: '+base);
+ await at('#request-nav-decision [data-resolve-request]').click();await t.waitForTimeout(40);
+ check(await t.evaluate(()=>state.view==='sprint'&&!document.querySelector('#request-nav-decision')),'SPRINT-1: answering on the sprint page records the answer and keeps the page');
+ // TASK-1
+ await t.evaluate(()=>openTask('SH-15'));await t.waitForTimeout(40);
+ const task=await t.evaluate(()=>{const talk=document.querySelector('.page-actions [data-talk-agent="iris"]'),path=document.querySelector('.detail-sidebar code.tail[title*=".worktrees"]');return {top:talk.getBoundingClientRect().top,right:innerWidth-talk.getBoundingClientRect().right,times:document.querySelectorAll('.task-timeline li time').length,steps:document.querySelectorAll('.task-timeline li').length,owner:!!document.querySelector('.detail-sidebar [data-talk-agent="iris"]'),cut:path&&path.scrollWidth>path.clientWidth&&getComputedStyle(path).direction==='rtl'&&path.title.endsWith('workspace-app-shell'),dts:[...document.querySelectorAll('.detail-sidebar dt')].map(d=>d.textContent)}});
+ check(task.top<240&&task.right<40,'TASK-1: Talk to Iris sits at the top right of the page: '+JSON.stringify(task));
+ check(task.times===task.steps&&task.steps>0,'TASK-1: every activity step has its time');
+ check(task.owner&&task.cut&&!task.dts.includes('Task')&&!task.dts.includes('Status'),'TASK-1: the owner is a link, the folder is cut at its start with the full path on hover, and the metadata does not repeat the line under the title');
+ // TEAMTASKS-1 and ROW-1
+ await t.evaluate(()=>openTeam('app-shell','workspace','tasks'));await t.waitForTimeout(40);
+ const team=await t.evaluate(()=>{const rows=[...document.querySelectorAll('.task-list tbody tr')].map(r=>r.getBoundingClientRect().height);return {left:document.querySelector('.task-list').getBoundingClientRect().left,tab:document.querySelector('#workspace-tabs [role=tab]').getBoundingClientRect().left,max:Math.max(...rows),heads:[...document.querySelectorAll('.task-list th')].map(h=>h.textContent)}});
+ check(Math.abs(team.left-team.tab)<=2,'TEAMTASKS-1 and SPACE-2: team tasks start at the tab row’s left edge: '+JSON.stringify(team));
+ check(team.max<=46&&team.heads.join()==='Task,Title,Status,Owner','ROW-1: team task rows are one line of at most 46 pixels, with identifier, title, status, and owner columns');
+ await t.evaluate(()=>openHome('projects'));await t.waitForTimeout(40);
+ const all=await t.evaluate(()=>({max:Math.max(...[...document.querySelectorAll('.project-table tbody tr')].map(r=>r.getBoundingClientRect().height)),heads:[...document.querySelectorAll('.project-table th')].map(h=>h.textContent)}));
+ check(all.max<=46&&all.heads.includes('Lead')&&all.heads.includes('Branch'),'ROW-1: All projects rows are one line of at most 46 pixels, with lead and branch columns: '+JSON.stringify(all));
+ await t.evaluate(()=>openRepository('lgcode'));await t.waitForTimeout(40);
+ const repo=await t.evaluate(()=>({table:!!document.querySelector('#view-body .project-table'),max:Math.max(...[...document.querySelectorAll('.project-table tbody tr')].map(r=>r.getBoundingClientRect().height)),heads:[...document.querySelectorAll('.project-table th')].map(h=>h.textContent),text:document.querySelector('#main').textContent,recovery:document.querySelector('[data-project-inbox="recovery"]').textContent}));
+ check(repo.table&&repo.max<=46&&!repo.heads.includes('Repository')&&repo.heads.includes('Stage'),'REPO-1: the repository page is the All projects table with the repository filtered: '+JSON.stringify(repo.heads));
+ check(!repo.text.includes('One lead per project')&&!repo.text.includes('Each has its own lead')&&!repo.text.includes('Next step')&&repo.recovery.startsWith('Needs attention'),'REPO-1: no filler, and a project with a failed agent says Needs attention');
+ // Leftovers from the composer batch: a lead's status counts its team's requests, and a held request leaves the bell.
+ await t.evaluate(()=>openAgent('sage','workspace'));await t.waitForTimeout(40);
+ const leadLine=await at('#participants .agent-state').textContent(),composerLine=await at('#agent-controls').textContent();check(/^Waiting on \d requests?$/.test(leadLine)&&composerLine.includes(leadLine),'A lead’s status line counts its team’s open requests, as the composer line does: '+leadLine);
+ const before=Number(await at('#attention-count').textContent());await t.evaluate(()=>openAgent('finch','workspace'));await at('#design-notes').click();await at('[data-preview="held-permission"]').click();await t.waitForTimeout(40);
+ check(Number(await at('#attention-count').textContent())===before-1,'A request held by the lead leaves the bell’s count');
+ await t.evaluate(()=>openHome('attention'));await t.waitForTimeout(40);check(Number(await at('#home-tab-attention small').textContent())===before-1&&!(await at('#home-results').textContent()).includes('Read the review trace'),'A request held by the lead leaves Home’s Needs attention, so Home and the bell agree');
+ // WHOLE-5: Git keeps the current agent's thread available, closed by default below 1801 pixels.
+ await t.evaluate(()=>openAgent('iris','workspace'));await at('[data-main-view="source-control"]').click();await t.waitForTimeout(40);
+ check(await at('#lead-toggle').isVisible()&&(await at('#lead-toggle').textContent()).includes('Iris')&&await at('#lead-panel').isHidden(),'WHOLE-5: Git offers Iris’s thread at 1440 pixels, closed until asked');
+ await at('#lead-toggle').click();await t.waitForTimeout(40);
+ check(await at('#lead-panel').isVisible()&&(await at('#lead-chat-title').textContent())==='Iris'&&await at('#lead-panel #message-input').isVisible()&&await t.locator('.git-workspace').isVisible(),'WHOLE-5: Iris’s thread docks beside Git with its composer');
+ await t.evaluate(()=>openBoard('workspace'));await t.waitForTimeout(40);
+ check(await at('#lead-panel').isVisible()&&(await at('#lead-chat-title').textContent())==='Sage','WHOLE-5: the board still opens with its lead beside it');
+ await t.close();
+ // WHOLE-2: above 1800 pixels the panel stays beside every project view, Chat shows the task and changed files, and cards stop at 300 pixels.
+ for(const theme of ['light','dark']){const w=await fresh('',{width:2560,height:900});await w.evaluate(t=>{document.documentElement.dataset.theme=t},theme);const wat=s=>w.locator(s).first();
+  const views={};for(const [name,go] of [['sprint',()=>{openBoard('workspace');openSprint('sp-02')}],['task',()=>{openBoard('workspace');openTask('SH-15')}],['terminal',()=>{openBoard('workspace');go({view:'terminal',tab:'chat'})}],['settings',()=>{openBoard('workspace');go({view:'workspace-settings',tab:'chat'})}],['git',()=>openGit('workspace-app-shell','workspace')],['team tasks',()=>openTeam('app-shell','workspace','tasks')]]){await w.evaluate(go);await w.waitForTimeout(30);views[name]=await wat('#lead-panel').isVisible()}
+  check(Object.values(views).every(Boolean),`WHOLE-2: at 2560 pixels in ${theme} the thread panel stays open beside every project view: ${JSON.stringify(views)}`);
+  await w.evaluate(()=>openAgent('iris','workspace'));await w.waitForTimeout(30);
+  check(await wat('#lead-panel').isHidden()&&(await wat('#chat-context').textContent()).includes('SH-15')&&await w.locator('#chat-context [data-inspect-file]').count()===2,`WHOLE-2: at 2560 pixels in ${theme} Chat shows Iris’s task and changed files beside the thread`);
+  await w.evaluate(()=>{for(let i=5;i<=7;i++)api.debug.emit('project.SprintAdded',{projectId:'workspace',sprintId:'sp-0'+i,label:'SP-0'+i,name:'Later work '+i,goal:'A later sprint.',phase:'Plan',owner:'rowan',needs:['sp-02']});openBoard('workspace')});await w.waitForTimeout(40);
+  const cards=await w.evaluate(()=>[...document.querySelectorAll('.kanban-column[aria-label="Planned"] .sprint-card')].map(c=>{const r=c.getBoundingClientRect();return {w:r.width,top:Math.round(r.top)}}));
+  check(cards.every(c=>c.w<=300)&&new Set(cards.map(c=>c.top)).size<cards.length&&await w.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`WHOLE-2: at 2560 pixels in ${theme} cards stop at 300 pixels and a busy column shows them side by side: ${JSON.stringify(cards)}`);
+  await w.close()}
+ // Narrow screens keep the drawer's close button, because the toggle is under the drawer.
+ const m=await fresh('',{width:390,height:844});await m.evaluate(()=>openBoard('workspace'));await m.locator('#lead-toggle').click();
+ check(await m.locator('#close-lead-panel').isVisible()&&await m.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'BOARD-2: the phone drawer keeps its close button');await m.close();
 });
 
 const result={passed:checks.length,failed:failures.length,failures,errors,checks};

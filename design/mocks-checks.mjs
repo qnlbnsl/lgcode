@@ -25,7 +25,7 @@ const wide=page=>page.evaluate(()=>document.documentElement.scrollWidth-innerWid
  check(await page.locator('.stage-strip li').count()===4,'A project without screens has no Design step');
  check(await page.locator('#workspace-tab-mocks').count()===0,'A project without mocks has no Mocks tab');
  await page.click('[data-open-repo="lgcode"]');
- const stages=await page.locator('.repos-table .stage-cell').allTextContents();
+ const stages=await page.locator('.project-table .stage-cell').allTextContents();
  check(stages.includes('Build')&&stages.includes('Design'),'The repository page lists each project’s stage');
  await page.click('[data-project="desktop"]');
  check(await page.locator('.stage-strip li.current').textContent()==='Design'&&await page.locator('.stage-strip li').count()===5,'A project with mocks starts at Design');
@@ -93,7 +93,7 @@ const wide=page=>page.evaluate(()=>document.documentElement.scrollWidth-innerWid
  check((await teams(page)).includes('Planning team'),'Approval starts a Planning team');
  check((await page.locator('.mock-component-table .component-state').allTextContents()).filter(k=>k==='Moved in').length===2,'Drafts move into the real components');
  await page.click('#tab-board');
- check((await page.locator('.sprint-card').textContent()).includes('0/13 tasks'),'The board gets a sprint with a task for each change and screen');
+ check((await page.locator('.sprint-card').textContent()).includes('13 tasks'),'The board gets a sprint with a task for each change and screen');
  await page.click('[data-open-repo="lgcode"]');await page.click('[data-repo-tab="design"]');
  check(await page.locator('.design-table td',{hasText:'From Desktop companion'}).count()===2,'Approved components join the repository’s design');
  await page.context().close();
@@ -103,7 +103,7 @@ const wide=page=>page.evaluate(()=>document.documentElement.scrollWidth-innerWid
 {
  const page=await fresh({scheme:'dark'});
  await page.click('[data-open-repo="lgcode"]');
- check(await page.locator('.repos-table').isVisible(),'A repository opens on its projects');
+ check(await page.locator('.project-table').isVisible(),'A repository opens on its projects');
  await page.click('[data-repo-tab="design"]');
  check(await page.locator('.token-list li').count()===12,'Design shows the color tokens');
  const swatch=await page.locator('.swatch').first().evaluate(e=>getComputedStyle(e).backgroundColor);
