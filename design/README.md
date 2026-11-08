@@ -146,6 +146,18 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
   and the prompt wraps only at the last column. Tap Ctrl, then type c, to stop a command.
 - Open Phone notifications, the phone icon at the foot of the sidebar, and choose Refresh.
   The notice appears at the top right, below the bell.
+- On Phone notifications, choose Retry on a failed row. It fails again, because no token is
+  set. Choose Fix in Service settings, type a token, and leave the field. Retry now delivers,
+  and the badge drops by one.
+- Open Service settings. The section list on the left follows scrolling. Change a field and
+  leave it: "Saved" appears beside its label. Send test notification sits beside the token.
+- Open Machines in `?sample=heavy`. Studio says "Over limit" in amber, and Laptop says
+  "Last seen 2 hours ago". Open a row's menu, the three dots, to rename or remove a machine.
+- Open Subscriptions. Usage shows per subscription, and the row menu offers Rename and Remove.
+- Open Project settings in Agent console and choose Archive. The project leaves the sidebar
+  and Home. Open All projects on Home to find it marked Archived, then choose Restore.
+- Choose New project. Type a name: the preview shows Branch and Folder on two lines. Choose a
+  repository that no online machine has, and one message links to Machines.
 - Expand a request on Home and answer it. The row eases open, and the answered row folds away.
 - Open Design notes and choose Reconnecting. The Live indicator turns amber, says when it last
   heard from the service, and offers Reconnect now. Nothing on the page moves. Hover a disabled
@@ -174,11 +186,11 @@ Sessions keep separate history and drafts. No real command runs: `help` lists th
 Git combines a repository worktree tree, staging, commit messages,
 fetch/pull/push, conflicts, unified or split diffs, and commit history. A split diff needs 900 pixels, as Visual Studio Code does; a narrower window shows it unified.
 Team branches integrate into their project branch. Project integration into
-main opens a review. Dirty source or destination worktrees block integration. Clicking a file opens its diff directly. Workspace Settings shows
-the assigned repository, branch, folder, and machine, with a saved shell
-preference for this project. The global Settings page retains service controls.
+main opens a review. Dirty source or destination worktrees block integration. Clicking a file opens its diff directly. Project settings shows
+the assigned repository, branch, folder, and machine as a list, with a shell
+preference that saves on change, and offers Rename and Archive. The global Settings page retains service controls.
 
-New project defaults to Start work tree. Its repository list also offers New repository, which creates a folder in the workspace folder and starts on main. The project name determines its
+New project defaults to Create a worktree. Its repository list also offers New repository, which creates a folder in the workspace folder and starts on main. The project name determines its
 branch and folder, with a numeric suffix when needed. Unchecking uses the
 selected machine's main checkout. Run on chooses the machine before the
 project name. The dialog previews that host's branch and folder. Offline

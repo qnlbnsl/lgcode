@@ -81,10 +81,11 @@ branches, stays visible. Hover text gives the full name. Inspecting another
 worktree does not move the work: the list marks the assigned worktree as
 Assigned, and the control's hover text names it.
 A new project still starts with its lead to shape the first plan.
-Start work tree is checked beneath its name by default. A safe version of
+Create a worktree is checked beneath its name by default. A safe version of
 the project name becomes the branch and worktree folder. Existing names get
 a numeric suffix. Unchecking uses the repository’s main checkout. The dialog
-previews the exact branch and folder before creating the sample project.
+previews the exact branch and folder on two labelled lines, Branch and Folder,
+before it creates the project.
 
 ## How the modes behave
 
@@ -237,7 +238,7 @@ Control + K.
 
 Use tables for comparable fleet records and compact lists for requests.
 Machine rows show identity, status, role, agent slots, project count, and a
-Start project action. At 1440 pixels the observed rows are 43 pixels tall.
+New project here action. At 1440 pixels the observed rows are 43 pixels tall.
 Project placement is a second compact table. Keep comfortable paragraph
 measure in conversations; compact the framing instead of shrinking body text.
 The Kanban board retains cards because their grouping communicates sprint state.
@@ -296,6 +297,13 @@ that is the part that differs. All files stacks every changed file with a sticky
 | Ours | The worktree's own version of a conflicting change. |
 | Theirs | The version being merged in: the project branch for a team, or main. |
 | Base | The version both sides changed. |
+| Create a worktree | The New project check box that gives the project its own branch and folder. It was named Start work tree. |
+| Goal | What the owner wants from a new project. The lead turns it into sprints and teams. |
+| Lead subscription | The subscription the new project's lead runs on. It was named Lead runs on. |
+| Notification service | The ntfy server and topic that carry phone notifications. It was named Notification carrier. |
+| Notification service token | The secret that lets LGcode post to the notification service. It was named Carrier token. |
+| Check-in interval, in seconds | How often a connected page checks in with the web server. It was named Heartbeat seconds. |
+| Archive | Hides a finished project from the sidebar and Home. All projects still lists it, and Restore brings it back. |
 
 ### One density rule for records
 
@@ -887,3 +895,76 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
   arrows. Control stays pressed for the next letter, so Control and C stops a command. The keys
   keep the focus, and with it the keyboard, in the terminal. Tab completes a word on every
   screen size.
+
+## The service pages and Project settings, set on 2026-11-08
+
+These rules come from the designer's critique of 2026-11-06. They cover Phone
+notifications, Machines, Subscriptions, Service settings, Project settings, and
+New project.
+
+### Shared controls on these pages
+
+- **Actions sit at the top right.** Each page starts with a short status line and its
+  actions, such as Connect machine or Add subscription. The pages have no filler subtitles.
+- **Rare actions live in a row menu.** The menu is a button with three dots at the end of
+  a row. It holds Rename and Remove. A disabled item says why beneath it.
+- **Every destructive action asks first.** One shared dialog names what will be lost, with
+  Cancel on the left and the action on the right.
+- **Rename uses one shared dialog.** It refuses an empty name and a name already in use.
+- **Rows stack below 720 pixels of table width.** The name and the actions share the first
+  line. The other facts go on the second line in muted text. The rule follows the table's
+  own width, so a 768 pixel window with the sidebar open stacks too.
+
+### Phone notifications
+
+- **The columns are Notification, Time, About, and Delivery.** About names the agent and
+  the project, and the agent's name opens its thread. The State column is gone.
+- **Every failed delivery uses the error colour.** The badge counts the same failed rows.
+- **A failed notification offers Retry.** Retry without a token fails again, honestly, as
+  another attempt.
+- **A missing token shows Fix in Service settings once, at the top.** It opens the token
+  field. Repeating it on every row would add noise.
+
+### Machines and subscriptions
+
+- **Agent slots count running agents only.** A machine over its limit shows its count in
+  amber with "Over limit" and a warning icon.
+- **An offline machine says when it was last seen,** such as "Last seen 2 hours ago".
+- **Remove is refused for this computer and for a machine that runs projects.** The menu
+  says to move the projects first.
+- **A worker shows its master's address and how long it has been connected,** with
+  Disconnect. Disconnect asks first.
+- **Subscriptions show usage.** Usage of 90 percent or more is amber, with the time it
+  resets. A subscription that reports nothing says "Not reported".
+- **Use for new work saves on change** and shows a small Saved mark.
+
+### Service settings
+
+- **A section list on the left follows scrolling.** Below 1100 pixels it becomes a row of
+  links above the sections.
+- **Fields save on change.** There are no Save buttons. Each field shows "Saved" beside
+  its label for four seconds, and an invalid value shows its error under the field.
+- **Turning the web server off asks first,** because it ends every open web session.
+- **Numeric fields are 96 pixels wide.**
+- **Send test notification sits beside the token.** It is disabled until a token is set,
+  and the line under it says why.
+- **First use of a permission rule** carries one sentence that explains it.
+
+### Project settings
+
+- **The facts are a list of labels and values,** not read-only fields. Machine links to
+  the project's placement on Machines.
+- **Rename and Archive sit at the top right.** Archive asks first and stops the project's
+  running agents.
+- **An archived project leaves the sidebar, Home, and the bell.** All projects lists it
+  last, marked Archived. Its Project settings page offers Restore.
+- **The preferred shell saves on change.**
+
+### New project
+
+- **The fields are Run on, Repository, Project name, Goal, and Lead subscription.** The
+  first run hides Goal, because the first project's goal comes from the onboarding
+  conversation.
+- **Lead subscription shows when a subscription is ready.**
+- **When no machine has the repository, the dialog shows one message** with a link to
+  Machines. There is no separate error under the field.
