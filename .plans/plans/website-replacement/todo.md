@@ -193,6 +193,29 @@ The mock gained a first run on 2026-11-07, at `?sample=first`. `design/DESIGN.md
 - [ ] Decide how Look around first keeps sample data apart from real data. The mock reloads into
       a separate sample, and Ananke's demo had to be sealed at the app's exits.
 
+### Added by the mock's stages and mocks
+
+The mock gained project stages, stage-named teams, the Mocks tab and the repository Design tab on
+2026-11-07. `design/DESIGN.md` has its rules, and `design/data/README.md` lists the proposed events.
+
+- [ ] Store a project's stage, as `project.StageChanged`, and a team's stage and area on
+      `project.TeamAdded`. Name teams from the stage, and add the area when two teams share one.
+- [ ] Store mocks as the proposed events `project.MocksStarted`, `project.MockScreenAdded`,
+      `project.MockScreenRevised`, `project.MockDataDrafted`, `project.MockComponentUsed` and
+      `project.MocksApproved`.
+- [ ] Let the lead start a Design team when a project needs screens, as a step of the default
+      workflow.
+- [ ] Serve a project's screens to the page: either the project's own pages from its worktree,
+      or a command the project names, such as Ananke's mock server, with a check that it runs.
+- [ ] Show a change to a screen without reloading it, so the owner sees the AI's edits arrive.
+- [ ] Compare the fields the screens use with the repository's schema.
+- [ ] On approval, promote the draft components, move the project to Plan, and give a Planning
+      team the tasks to move components, change the schema and wire each screen.
+- [ ] Read a repository's design for the Design tab: its color tokens and its components, with
+      a preview of each.
+- [ ] Decide how OpenPencil runs for Edit design. The mock shows a white placeholder. OpenPencil's
+      bridge to agents only connects in its development build today.
+
 ## Website: rebuild `packages/web` to match the mock
 
 - [ ] Move the Field and Dusk tokens and the mock's styles into files, because the
