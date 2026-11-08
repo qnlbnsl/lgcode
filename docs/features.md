@@ -1,4 +1,4 @@
-# Sheprd: the feature list
+# LGcode: the feature list
 
 Status: **draft, not approved.** The foundation is merged into `master`, so
 clients reach the built features through the web page, the command-line tool
@@ -22,16 +22,16 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 ## The next piece: installation and configuration
 
 - **Standalone installer and startup at login** (agreed, 2026-11-05).
-  Install the `sheprd` command and let the owner start the service at login.
+  Install the `lgcode` command and let the owner start the service at login.
   The engine, board, and website run without Herdr.
   The optional plugin lives in `plugins/herdr` and calls the installed command.
   The installer and login integration are not built by the rename and split.
-- **Project configuration in `.sheprd`** (agreed, 2026-11-05).
+- **Project configuration in `.lgcode`** (agreed, 2026-11-05).
   Define the folder's contents and loading rules in the next piece.
   Agents can read the folder, and changes require the owner through the
   existing settings protection.
 - **An overridable default workflow** (agreed, 2026-11-05).
-  Sheprd ships a default workflow.
+  LGcode ships a default workflow.
   People can override its team definitions and instructions.
 
 ## 1. The foundry: roles and their lifecycle
@@ -41,8 +41,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   to repeat the team collection and first stall without waiting for the
   cache timer. The report marks the timed flush as skipped. The run remains
   incomplete and exits with code 1, even when every remaining step passes.
-- **Sheprd tools need no harness approval** (agreed, 2026-11-05). An agent
-  can call Sheprd's own Model Context Protocol server in every permission
+- **LGcode tools need no harness approval** (agreed, 2026-11-05). An agent
+  can call LGcode's own Model Context Protocol server in every permission
   mode on Claude, Codex, Gemini, and Cursor. The engine authenticates every
   call and checks the caller's existing rights. Other servers and native
   file and command tools continue following the selected mode. The settings
@@ -66,14 +66,14 @@ Synapse fork. It is at `docs/message-board/features.md` in the
     agents after an engine restart: it reloads each one with a new token,
     scans the replayed history for delivery ids, then sends a carry-on or
     re-sends, returns paused agents, and supports `resume --fresh`; unit
-    7a answers every connection with 503 until recovery ends). Sheprd starts the agent as a child process
+    7a answers every connection with 503 until recovery ends). LGcode starts the agent as a child process
     and drives it through the Agent Client Protocol (ACP): it opens a
     session, sends prompts, and receives structured events (text, plan, tool
     calls, permission requests). Adding a harness means adding its ACP
     command, so Claude Code, Codex, Gemini CLI, OpenCode and the rest come
     almost for free. Claude Code and Codex need their adapters,
     `claude-agent-acp` and `codex-acp`.
-  - **Interactive mode** (built second). Sheprd opens the harness's normal
+  - **Interactive mode** (built second). LGcode opens the harness's normal
     terminal program in a Herdr pane through the optional plugin, and the owner
     can watch it and type into it. Use this for Claude when the 5-hour limit
     matters: Claude in ACP mode runs through the Agent SDK, which T3 Code
@@ -88,7 +88,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   runs out of usage, and returns them when the account is available again;
   unit 7a carries the accounts command over the API). The owner can
   set up more than one account for a harness, such as two ChatGPT accounts
-  for Codex or three Cursor accounts, and Sheprd spreads agents across
+  for Codex or three Cursor accounts, and LGcode spreads agents across
   them. Each account is its own sign-in, kept apart by its own home
   directory (`CODEX_HOME` for Codex, `CLAUDE_CONFIG_DIR` for Claude Code) or
   by its own API key, plus any extra environment variables. Starting an agent
@@ -98,13 +98,13 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   two Codex accounts continue the same threads. See T3 Code's
   `docs/user/providers-codex.md`, `providers-claude.md` and `cursor.md`, and
   `packages/contracts/src/providerInstance.ts`, at commit `6fc9144`.
-- **A token for every agent** (built in the engine: units 5a and 5b). When Sheprd starts an agent, it mints a
+- **A token for every agent** (built in the engine: units 5a and 5b). When LGcode starts an agent, it mints a
   private token for it and passes it in an environment variable. The agent
   proves who it is with that token, not with the pane's environment or the
   process tree, so Codex's sandbox and a backgrounded Claude stop breaking
   identity. Borrowed from T3 Code; see
   [research/t3-code.md](research/t3-code.md), item 1.
-- **Sheprd's tools over MCP** (built). The board's verbs (post, read, finish
+- **LGcode's tools over MCP** (built). The board's verbs (post, read, finish
   work, ask the owner) are offered to agents through a Model Context Protocol
   (MCP) server on a loopback address, as well as through the command line.
   Every tool declares which roles may call it. See research item 1.
@@ -113,7 +113,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   messages never runs with a broader permission mode than the lead. See
   research item 6.
 - **Hand-offs built from records** (built). A replacement worker starts from a
-  hand-off that Sheprd builds from the work brief, the worker's posts, the
+  hand-off that LGcode builds from the work brief, the worker's posts, the
   files it touched and the commands it ran, with no model turn spent. See
   research item 5.
 - **Role rules enforced** (idea). The command handler refuses an action that a role's rules forbid, such as a worker starting an agent or asking the owner. It reads a role table that the team's definition supplies. Version 1 only advises and reports (roles decision row 10).
@@ -138,12 +138,12 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   Each delivery is recorded with when and how it landed, so a wake can never
   be silently lost. See research item 3.
 - **Wake Claude without typing** (idea). Each Claude agent keeps one
-  long-lived `Monitor` running a Sheprd command that prints a line only when
+  long-lived `Monitor` running a LGcode command that prints a line only when
   a post needs it. Claude Code starts the turn by itself, and nothing is typed
   into the pane. Other agents keep a typed nudge that only fires when the
   agent is idle. See research item 2.
 - **Wait results that say why** (built in the engine: unit 5d's
-  waits end with a reason per member, and unit 7b's `sheprd wait` exits
+  waits end with a reason per member, and unit 7b's `lgcode wait` exits
   with the codes below). A wait or a collection ends early,
   with a reason, when the agent it waits on is stuck on a question or an
   approval. The command line exits with 0 for done, 1 for failed, and 2 for
@@ -200,9 +200,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   a failed run. See research item 11.
 - **Agents run in a sandbox** (agreed, 2026-11-05). Each agent runs inside
   bubblewrap, wrapped around the whole harness. Only its worktree is writable
-  and `.sheprd` is mounted read-only. The owner's home folder, Sheprd's state
+  and `.lgcode` is mounted read-only. The owner's home folder, LGcode's state
   folder and other processes are not visible. This replaces the earlier plan
-  for Sheprd to run as its own Unix user, because bubblewrap needs no root
+  for LGcode to run as its own Unix user, because bubblewrap needs no root
   access at install and leaves worktree files owned by the owner. Real Codex
   and Claude command-line runs worked this way on 2026-11-05, in a manual test.
   It is not built.
@@ -222,7 +222,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   a macOS reader for the leftover-process sweep. See issue 183 and issue 120
   in [issues.md](issues.md).
 - **Herding names for the command-line tool** (idea; shelved by the owner on
-  2026-11-01 ("hmmm shelf it."); not planned; do not build). The `sheprd`
+  2026-11-01 ("hmmm shelf it."); not planned; do not build). The `lgcode`
   command-line tool would offer herding names for its commands. The plain
   names would stay as aliases, and they would stay the names of the agents'
   tools. The proposed mapping:
@@ -247,7 +247,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   | `debug.compare-views` | `debug headcount` |
   | `mcp` | `dog` |
 - **Filtered live updates** (idea). A subscription for phones that is filtered by agent and by event kind, with checkpoints that keep the cursor moving.
-- **One password login** (built). The service reads the password from the environment variable `SHEPRD_WEB_PASSWORD`, and the dashboard asks for it. One person uses Sheprd, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
+- **One password login** (built). The service reads the password from the environment variable `LGCODE_WEB_PASSWORD`, and the dashboard asks for it. One person uses LGcode, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
 - **Phone alerts through one sender** (built). Phone alerts go through one sender interface, `AlertSender`, with ntfy as the first carrier. A later carrier, such as Expo's push service for the phone app, slots in behind it (client API row 83).
 - **Mobile login** (later). Starts by looking at what Home Assistant does.
 - **VS Code extension** (later). One of the last things, along with the mobile app, by the owner's answer of 2026-11-03.
@@ -255,8 +255,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 ## 5. The sheepdog
 
 A shepherd leads the flock, and the shepherd's dog keeps the sheep in line so
-none of them wander off. In Sheprd, the orchestrator and the owner lead. The
-sheepdog is the part of Sheprd's background service that keeps every agent
+none of them wander off. In LGcode, the orchestrator and the owner lead. The
+sheepdog is the part of LGcode's background service that keeps every agent
 moving without spending their turns. It never decides what the work is; it
 only notices when an agent has strayed and nudges it back, or tells its lead.
 
@@ -293,7 +293,7 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
 ## 6. Source control
 
 - **Remove agent credits when merging** (agreed). A setting, off by default,
-  that each project can override. When Sheprd merges a worker's or a team's
+  that each project can override. When LGcode merges a worker's or a team's
   work with a merge commit or a squash commit, it removes the lines that
   credit a coding agent from that commit's message: `Co-authored-by:`
   trailers for known agents, and footers such as "🤖 Generated with Claude
@@ -486,16 +486,16 @@ The full design is in
 [specs/2026-11-05-build-loop-design.md](specs/2026-11-05-build-loop-design.md).
 
 - **A default workflow as a parsable list** (agreed, 2026-11-05). The eight
-  phases become a list of steps that Sheprd reads. Sheprd looks in the
-  repository's `.sheprd` first, then `~/.sheprd`, then its built-in copy. The
-  default install places a copy in `~/.sheprd`.
-- **`.sheprd` is read-only to agents** (agreed, 2026-11-05). Agents can read
+  phases become a list of steps that LGcode reads. LGcode looks in the
+  repository's `.lgcode` first, then `~/.lgcode`, then its built-in copy. The
+  default install places a copy in `~/.lgcode`.
+- **`.lgcode` is read-only to agents** (agreed, 2026-11-05). Agents can read
   it and cannot edit it.
-- **Skill files for any agent** (agreed, 2026-11-05). Sheprd ships skill files
+- **Skill files for any agent** (agreed, 2026-11-05). LGcode ships skill files
   that let any agent work with it.
 - **A project setup agent** (agreed, 2026-11-05). It tells the owner what the
   project is made of, asks for the general direction, talks through testing,
-  and produces a local `.sheprd` folder with a config file. How that reaches a
+  and produces a local `.lgcode` folder with a config file. How that reaches a
   folder agents cannot edit is open.
 - **Optional testing** (agreed, 2026-11-05). The owner can turn tests off, and
   can also turn agent review off. They can turn tests on later through their
@@ -519,9 +519,9 @@ The full design is in
 
 ## 9. Client mode
 
-- **Sheprd in client mode** (requested by the owner, 2026-11-06; not designed).
-  One main Sheprd holds the event log, the board and the website. Other machines
-  run Sheprd in client mode and take their commands from the main one, so a
+- **LGcode in client mode** (requested by the owner, 2026-11-06; not designed).
+  One main LGcode holds the event log, the board and the website. Other machines
+  run LGcode in client mode and take their commands from the main one, so a
   project's load spreads across machines. How a client machine proves who it is
   needs the owner's word, because the login rule is one user, one password and no
   pairing.
@@ -537,7 +537,7 @@ The full design is in
 
 ## Open questions
 
-- Which licence should Sheprd use?
+- Which licence should LGcode use?
 
 ## Decided
 
@@ -580,19 +580,19 @@ The full design is in
   an append-only, numbered log in SQLite before anything acts on it, and
   threads, states, waits and the live stream are read from that log. T3 Code's
   server has the same shape, and since Effect was chosen (the next entry),
-  Sheprd can copy T3's event store with credit. The rejected options were
+  LGcode can copy T3's event store with credit. The rejected options were
   saved tables updated in place, and one supervisor process per agent
   sharing files.
-- **Sheprd is written with the Effect library** (2026-11-01). Effect is a
+- **LGcode is written with the Effect library** (2026-11-01). Effect is a
   TypeScript library for whole programs: failures are part of each
   function's type, every running task has an owner that cleans it up, and
   one schema both checks data and defines its type. The reason for choosing
   it is reuse: T3 Code is written with Effect 4, so its ACP client
   (`packages/effect-acp`), event store, accounts and device pairing can be
-  copied with credit instead of rebuilt. Sheprd pins the same Effect
+  copied with credit instead of rebuilt. LGcode pins the same Effect
   version as the T3 Code commit it copies from, so the copied code compiles
   unchanged.
-- **Sheprd runs on Node.js 26** (2026-11-01). Node.js 26 is the current
+- **LGcode runs on Node.js 26** (2026-11-01). Node.js 26 is the current
   long-term support line, and the repository's `.nvmrc` says `26`. A single
   file compiled with Bun was considered and not chosen: T3 Code's SQLite
   code uses Node.js's own `node:sqlite`, and the Claude Code ACP adapter

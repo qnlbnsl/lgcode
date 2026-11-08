@@ -119,7 +119,7 @@ it("5.15 durable outage: catches recording another WebServerDown when a port sta
         finally { database.close(); }
       };
       for (let restart = 0; restart < 2; restart++) {
-        const service = yield* startCheckedWebService(process.root, { SHEPRD_WEB_PASSWORD: process.ctx.password });
+        const service = yield* startCheckedWebService(process.root, { LGCODE_WEB_PASSWORD: process.ctx.password });
         yield* waitServing(process.root, service);
         const upgrade = yield* Effect.promise(() => hostUpgrade(process.root.socket, { ...authorization(ownerBearer(process.root.state)), ...ancestryHeaders() }));
         expect(upgrade.status).toBe(101);

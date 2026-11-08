@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eventEffect, pieceNamespaces, type Caller, type Event, type EventSequence, type PieceNamespace } from "@sheprd/contracts";
+import { eventEffect, pieceNamespaces, type Caller, type Event, type EventSequence, type PieceNamespace } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import { engineLists, type EngineLists } from "../pieces/lists.ts";

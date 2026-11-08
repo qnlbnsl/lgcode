@@ -59,6 +59,6 @@ it("5.4 static navigation: catches requiring an Origin or a cookie for a static 
     const reply = yield* Effect.promise(() => http(ctx, "/", { method, headers: { Origin: undefined } }));
     expect(reply.status).toBe(200);
     if (method === "HEAD") expect(reply.body).toBe("");
-    else expect(reply.body).toContain("Sheprd test page");
+    else expect(reply.body).toContain("LGcode test page");
   }
 })));

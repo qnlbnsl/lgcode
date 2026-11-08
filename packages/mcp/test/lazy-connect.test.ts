@@ -46,7 +46,7 @@ it("L02 (7.8) catches treating HTTP 503 recovering as permanent failure or consu
 // One small clock seam keeps the exact production deadline test under a
 // second. L02 independently proves the real stdio child uses recovery retries.
 const loadRetry = async () => {
-  const module = await import("@sheprd/mcp") as unknown as {
+  const module = await import("@lgcode/mcp") as unknown as {
     retryRecovering: <A>(attempt: () => Promise<A>, clock: {
       now: () => number; sleep: (milliseconds: number) => Promise<void>;
     }) => Promise<A>;

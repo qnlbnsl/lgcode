@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   EventEnvelope, type Caller, type AgentId, type BootId, type Event, type RequestId,
-} from "@sheprd/contracts";
+} from "@lgcode/contracts";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
@@ -87,7 +87,7 @@ export class EventLog extends Context.Service<
       use: (append: Append) => Effect.Effect<A, E, R>,
     ) => Effect.Effect<A, E | LogWriteFailed, R>;
   }
->()("sheprd/engine/log/EventLog") {}
+>()("lgcode/engine/log/EventLog") {}
 
 
 

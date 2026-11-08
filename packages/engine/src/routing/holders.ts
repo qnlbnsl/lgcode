@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   DeliveryId, PermissionRequestId, QuestionId,
   type Actor, type Caller, type AgentId, type Event, type PermissionAction,
-} from "@sheprd/contracts";
+} from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 

@@ -1,5 +1,5 @@
-import type { ClientEnvelope } from "@sheprd/client/browser"
-import type { Event } from "@sheprd/contracts"
+import type { ClientEnvelope } from "@lgcode/client/browser"
+import type { Event } from "@lgcode/contracts"
 import { DataText, visibleText } from "./text.tsx"
 
 type DeliveryEvent = Extract<Event, { _tag: "DeliveryQueued" | "DeliverySent" | "DeliveryAccepted" | "DeliveryRequeued" | "DeliveryHeld" | "DeliveryReleased" | "DeliveryReturned" | "DeliveryWithdrawn" }>

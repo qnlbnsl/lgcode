@@ -1,5 +1,5 @@
-import type { ClientFilter, ClientStreamItem } from "@sheprd/contracts";
-import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
+import type { ClientFilter, ClientStreamItem } from "@lgcode/contracts";
+import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import type { ReadHandler } from "../../api/reads.ts";

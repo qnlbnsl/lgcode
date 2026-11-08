@@ -5,7 +5,7 @@ import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { join } from "node:path";
-import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -30,11 +30,11 @@ export const withBrowserWeb = async (body: (ctx: { origin: string; password: str
   const { serve } = await import(/* @vite-ignore */ moduleUrl.href) as {
     serve: (options: unknown) => Effect.Effect<unknown, unknown, any>;
   };
-  const rig = makeRig(); const previousHome = process.env.SHEPRD_HOME;
-  process.env.SHEPRD_HOME = rig.stateFolder;
+  const rig = makeRig(); const previousHome = process.env.LGCODE_HOME;
+  process.env.LGCODE_HOME = rig.stateFolder;
   const password = randomBytes(32).toString("base64url"); const port = await unusedPort();
   const staticRoot = join(rig.root, "page"); mkdirSync(staticRoot);
-  writeFileSync(join(staticRoot, "index.html"), '<!doctype html><title>Sheprd browser fixture</title><main>Sheprd</main><script src="/app.js" defer></script>');
+  writeFileSync(join(staticRoot, "index.html"), '<!doctype html><title>LGcode browser fixture</title><main>LGcode</main><script src="/app.js" defer></script>');
   writeFileSync(join(staticRoot, "app.js"), 'document.querySelector("main").dataset.ready = "yes";');
   try {
     const program = Effect.gen(function* () {
@@ -52,7 +52,7 @@ export const withBrowserWeb = async (body: (ctx: { origin: string; password: str
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped);
     await Effect.runPromise(program as Effect.Effect<void, unknown, never>);
   } finally {
-    if (previousHome === undefined) delete process.env.SHEPRD_HOME; else process.env.SHEPRD_HOME = previousHome;
+    if (previousHome === undefined) delete process.env.LGCODE_HOME; else process.env.LGCODE_HOME = previousHome;
     removeRig(rig);
   }
 };

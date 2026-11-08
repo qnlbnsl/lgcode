@@ -32,7 +32,7 @@ const helpers = new Set<number>();
 beforeEach(() => {
   rig = makeRunnerRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
+  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
 });
 afterEach(() => {
   // The helper is in a session of its own, so removing the rig does not reach it.

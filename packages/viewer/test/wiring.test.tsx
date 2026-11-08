@@ -59,7 +59,7 @@ it("drives live threads, context review, a selected answer and an owner prompt t
   expect(output).toContain("Name agent-a");
   expect(output).toContain("Name agent-b");
   expect(peer.upgrades.every((headers) => headers.authorization === `Bearer ${ownerCredential}`)).toBe(true);
-  expect(peer.upgrades.every((headers) => typeof headers["sheprd-ancestors"] === "string" && typeof headers["sheprd-process-group"] === "string")).toBe(true);
+  expect(peer.upgrades.every((headers) => typeof headers["lgcode-ancestors"] === "string" && typeof headers["lgcode-process-group"] === "string")).toBe(true);
   const live = envelope(11, { _tag: "ThreadItem", agentId: "agent-a", itemId: "live", replay: false,
     content: { _tag: "text", text: "Live left\u001b]52;c;clipboard-data\u0007right" } });
   chunk(subscription!.socket, subscription!.frame, [live]);

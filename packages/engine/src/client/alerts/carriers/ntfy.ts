@@ -1,6 +1,6 @@
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
-import { carrierTokenReference } from "@sheprd/contracts";
+import { carrierTokenReference } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import type { SecretStore } from "../../../commands/SecretStore.ts";

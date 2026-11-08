@@ -5,7 +5,7 @@ import { agentEnvironment, bounded, type Process, type ServiceRoot } from "../..
 const hosts: Array<Process> = [];
 export const startServerHost = (root: ServiceRoot, fastClock = false): Process => {
   const child = spawn(process.execPath, [fileURLToPath(new URL("./serverHost.ts", import.meta.url))], {
-    env: { ...agentEnvironment(root), ...(fastClock ? { SHEPRD_TEST_FAST_RECOVERY_CLOCK: "1" } : {}) },
+    env: { ...agentEnvironment(root), ...(fastClock ? { LGCODE_TEST_FAST_RECOVERY_CLOCK: "1" } : {}) },
     stdio: ["pipe", "pipe", "pipe"],
   });
   let stdout = "";

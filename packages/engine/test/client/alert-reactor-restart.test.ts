@@ -11,7 +11,7 @@ import { append, awaitRaised, barrier, clientView, eventsOf, permission, questio
 interface CrashPoint { readonly phase: string; readonly questionId: string; readonly sourceSequence: number; readonly staged: number }
 const killAt = async (rig: Rig, mode: "source" | "baseline") => {
   const child = spawn(process.execPath, [fileURLToPath(new URL("../support/alertCrashChild.ts", import.meta.url)), JSON.stringify(rig), mode], {
-    env: { PATH: process.env.PATH, HOME: rig.home, SHEPRD_HOME: rig.stateFolder }, stdio: ["ignore", "ignore", "pipe", "ipc"],
+    env: { PATH: process.env.PATH, HOME: rig.home, LGCODE_HOME: rig.stateFolder }, stdio: ["ignore", "ignore", "pipe", "ipc"],
   });
   const exited = once(child, "exit");
   let errors = "";

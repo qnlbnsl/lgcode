@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { it } from "@effect/vitest";
-import type { EventEnvelope, RolesAction } from "@sheprd/contracts";
+import type { EventEnvelope, RolesAction } from "@lgcode/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -28,7 +28,7 @@ import { eventually, pause, snapshot } from "../../support/routingRig.ts";
 import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); removeRig(rig); });
 const quiet: EngineLists = { ...engineLists, reactors: {} };
 const run = <A, E, R>(lists: EngineLists, restarting: boolean, body: (runner: FakeRunner) => Effect.Effect<A, E, R>) => Effect.gen(function* () {

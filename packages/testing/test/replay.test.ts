@@ -43,7 +43,7 @@ const initialized = { jsonrpc: "2.0", id: 1, result: { protocolVersion: 2, info:
 
 let folder: string
 beforeEach(async () => {
-  folder = await mkdtemp(join(tmpdir(), "sheprd-replay-"))
+  folder = await mkdtemp(join(tmpdir(), "lgcode-replay-"))
 })
 afterEach(async () => {
   await rm(folder, { recursive: true, force: true })

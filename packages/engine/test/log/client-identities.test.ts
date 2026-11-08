@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
-import type { Event } from "@sheprd/contracts";
+import type { Event } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
-import { EventEnvelope } from "@sheprd/contracts";
+import { EventEnvelope } from "@lgcode/contracts";
 import { expect, it } from "vitest";
 import { makeRedactor } from "../../src/identity/redactor.ts";
 import { Redactor } from "../../src/log/Redactor.ts";

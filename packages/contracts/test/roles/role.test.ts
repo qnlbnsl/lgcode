@@ -8,7 +8,7 @@ interface ParsedRole {
 }
 const parse = (text: string): ParsedRole => {
   const { parseRole } = Contracts as unknown as { parseRole: (text: string) => ParsedRole };
-  expect(parseRole, "1a must export parseRole through @sheprd/contracts").toBeTypeOf("function");
+  expect(parseRole, "1a must export parseRole through @lgcode/contracts").toBeTypeOf("function");
   return parseRole(text);
 };
 

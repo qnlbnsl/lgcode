@@ -1,6 +1,6 @@
-import { comparePermission, type Actor, type AgentId, type Caller } from "@sheprd/contracts";
-import type { BoardAddressee, BoardAuthor, ReplyMode } from "@sheprd/contracts/board/ids";
-import type { BoardPostView, BoardView } from "@sheprd/contracts/board/view";
+import { comparePermission, type Actor, type AgentId, type Caller } from "@lgcode/contracts";
+import type { BoardAddressee, BoardAuthor, ReplyMode } from "@lgcode/contracts/board/ids";
+import type { BoardPostView, BoardView } from "@lgcode/contracts/board/view";
 import type { Snapshot } from "../commands/internal.ts";
 import { holderAbove } from "../routing/holders.ts";
 

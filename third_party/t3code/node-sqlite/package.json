@@ -1,5 +1,5 @@
 {
-  "name": "@sheprd/t3-node-sqlite",
+  "name": "@lgcode/t3-node-sqlite",
   "version": "0.0.1",
   "private": true,
   "type": "module",

@@ -1,7 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import * as AcpAgent from "@sheprd/t3-effect-acp/agent"
-import { AcpRequestError } from "@sheprd/t3-effect-acp/errors"
-import type * as AcpSchema from "@sheprd/t3-effect-acp/schema"
+import * as AcpAgent from "@lgcode/t3-effect-acp/agent"
+import { AcpRequestError } from "@lgcode/t3-effect-acp/errors"
+import type * as AcpSchema from "@lgcode/t3-effect-acp/schema"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -13,7 +13,7 @@ import * as Stream from "effect/Stream"
 import { spawn, type ChildProcess } from "node:child_process"
 import { existsSync, writeFileSync } from "node:fs"
 import { randomUUID } from "node:crypto"
-import { connect } from "@sheprd/client"
+import { connect } from "@lgcode/client"
 
 type DiagnosticStep =
   | { type: "ext_notification"; method: string; params: Schema.Json }
@@ -32,7 +32,7 @@ type Step = DiagnosticStep | StepDiagnostic
   | { step: "question"; message: string; requestedSchema: Record<string, unknown> }
   | { step: "mode_change"; configId: string; value: string }
   | { step: "config_options"; configOptions: AcpSchema.SessionConfigOption[] }
-  | { step: "sheprd_command"; command: string; input: unknown }
+  | { step: "lgcode_command"; command: string; input: unknown }
   // Unit 7b tests release a turn only after a real blocking wait is open.
   | { step: "wait_for_file"; path: string }
   | { step: "end_turn"; stopReason: string }
@@ -213,15 +213,15 @@ const awaitGate = (gate: string) => Effect.callback<void>((resume) => {
   return Effect.sync(() => clearInterval(timer))
 })
 
-// Issue 160: the step speaks the same RPC as the sheprd tool, through the
+// Issue 160: the step speaks the same RPC as the lgcode tool, through the
 // shared client. A refusal reports "failed", as does any transport error.
-const sheprdCommand = (command: string, input: unknown) => Effect.scoped(Effect.gen(function*() {
+const lgcodeCommand = (command: string, input: unknown) => Effect.scoped(Effect.gen(function*() {
   const client = yield* connect({ environment, attempts: 1 })
   const call = (client as unknown as Record<string, ((payload: unknown) => Effect.Effect<unknown, unknown>) | undefined>)[command]
-  if (call === undefined) return "sheprd_command:failed"
+  if (call === undefined) return "lgcode_command:failed"
   yield* call({ requestId: randomUUID(), ...(input as Record<string, unknown>) })
-  return "sheprd_command:ok"
-})).pipe(Effect.timeout(5000), Effect.catchCause(() => Effect.succeed("sheprd_command:failed")))
+  return "lgcode_command:ok"
+})).pipe(Effect.timeout(5000), Effect.catchCause(() => Effect.succeed("lgcode_command:failed")))
 
 const program = Effect.gen(function*() {
   const agent = yield* AcpAgent.AcpAgent
@@ -307,7 +307,7 @@ const program = Effect.gen(function*() {
             session.options = session.options.map((option) => option.configId === step.configId ? { ...option, currentValue: step.value } as AcpSchema.SessionConfigOption : option)
             yield* update({ sessionUpdate: "config_option_update", configOptions: session.options }); break
           case "config_options": session.options = step.configOptions; yield* update({ sessionUpdate: "config_option_update", configOptions: session.options }); break
-          case "sheprd_command": yield* text(yield* sheprdCommand(step.command, step.input)); break
+          case "lgcode_command": yield* text(yield* lgcodeCommand(step.command, step.input)); break
           case "wait_for_file": yield* awaitGate(step.path); break
           case "exec": yield* text(`exec:${yield* execChild(step.argv, step.strip ?? [])}`); break
           case "print_env": yield* text(Object.entries(environment).map(([name, value]) => `${name}=${value}`).join("\n")); break

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { connect } from "@sheprd/client"
+import { connect } from "@lgcode/client"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
 import { err, out } from "./output.ts"

@@ -1,4 +1,4 @@
-import type { ClientEnvelope } from "@sheprd/client"
+import type { ClientEnvelope } from "@lgcode/client"
 import { expect, it, vi } from "vitest"
 import type { ViewerClient } from "../src/connection.ts"
 import { ViewerSession } from "../src/session.ts"

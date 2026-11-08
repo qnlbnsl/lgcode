@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { PermissionRequestId, type Event } from "@sheprd/contracts";
+import { PermissionRequestId, type Event } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type { EngineLists } from "../pieces/lists.ts";

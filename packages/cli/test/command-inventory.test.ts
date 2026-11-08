@@ -1,4 +1,4 @@
-import { CommandsRpcGroup } from "@sheprd/contracts";
+import { CommandsRpcGroup } from "@lgcode/contracts";
 import { afterEach, expect, it } from "vitest";
 import { matchCommand } from "../src/commands/registry.ts";
 import { cleanupUnit7b, finishCli, prepareRoot, startCli } from "../../testing/test/support/unit7b.ts";

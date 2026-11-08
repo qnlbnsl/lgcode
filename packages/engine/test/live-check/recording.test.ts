@@ -3,7 +3,7 @@
 import { mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { HarnessSettings } from "@sheprd/contracts";
+import type { HarnessSettings } from "@lgcode/contracts";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { RECORDER_PROMPT } from "../../scripts/live/prompts.ts";
@@ -48,7 +48,7 @@ describe("the recording step", () => {
     writeFileSync(join(output, "errors", "claude-signed-out.json"), JSON.stringify({ harness: "claude", kind: "signed-out", text: "x", source: "s" }));
     writeFileSync(join(output, "errors", "README.md"), "not a sample");
     const settings = (id: string) => ({ id, runMode: "acp" }) as unknown as HarnessSettings;
-    const before = readdirSync(tmpdir()).filter((name) => name.startsWith("sheprd-live-record-"));
+    const before = readdirSync(tmpdir()).filter((name) => name.startsWith("lgcode-live-record-"));
     let seen: Record<string, unknown> | undefined;
     const outcome = await recordLive({
       environment: { HOME: "/home/owner", PATH: "/usr/bin", CODEX_HOME: "/home/owner/.codex", CLAUDE_CONFIG_DIR: undefined },
@@ -60,7 +60,7 @@ describe("the recording step", () => {
     expect((seen!.harnesses as Array<{ accountVariables: Record<string, string> }>)[1]!.accountVariables).toEqual({ CODEX_HOME: "/home/owner/.codex" });
     expect(seen).toMatchObject({ prompt: RECORDER_PROMPT, homeDirectory: "/home/owner", outputDirectory: output, captureSignedOut: true });
     expect(seen!.errorSamples).toHaveLength(1);
-    expect(readdirSync(tmpdir()).filter((name) => name.startsWith("sheprd-live-record-"))).toEqual(before);
+    expect(readdirSync(tmpdir()).filter((name) => name.startsWith("lgcode-live-record-"))).toEqual(before);
   });
 
   it("fails without a home instead of recording into the wrong one (breaks if a missing HOME is guessed)", async () => {

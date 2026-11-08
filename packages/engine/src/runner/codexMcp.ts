@@ -16,14 +16,14 @@ const object = (value: unknown): value is Record<string, unknown> =>
 // token values in the configuration that codex-acp logs at startup:
 // https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/rmcp-client/src/utils.rs#L14-L56
 // These are configuration facts, not copied implementation code.
-export const withSheprdMcp = (accountConfig: string | undefined): string => {
+export const withLGcodeMcp = (accountConfig: string | undefined): string => {
   const config: unknown = accountConfig === undefined ? {} : JSON.parse(accountConfig);
   if (!object(config)) throw new Error("invalid account configuration");
   const servers = config.mcp_servers;
   if (servers !== undefined && !object(servers)) throw new Error("invalid server configuration");
-  if (object(servers) && Object.hasOwn(servers, "sheprd")) throw new Error("reserved server configuration");
-  return JSON.stringify({ ...config, mcp_servers: { ...(servers ?? {}), sheprd: {
+  if (object(servers) && Object.hasOwn(servers, "lgcode")) throw new Error("reserved server configuration");
+  return JSON.stringify({ ...config, mcp_servers: { ...(servers ?? {}), lgcode: {
     command: process.execPath, args: [mcpScriptPath, "mcp"],
-    env_vars: ["SHEPRD_SOCKET", "SHEPRD_TOKEN"], default_tools_approval_mode: "approve",
+    env_vars: ["LGCODE_SOCKET", "LGCODE_TOKEN"], default_tools_approval_mode: "approve",
   } } });
 };

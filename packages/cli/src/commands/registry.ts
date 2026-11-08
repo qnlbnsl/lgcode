@@ -1,10 +1,10 @@
-import { CommandsRpcGroup, commandAccess, type CallerKind } from "@sheprd/contracts"
+import { CommandsRpcGroup, commandAccess, type CallerKind } from "@lgcode/contracts"
 import type * as Rpc from "effect/rpc/Rpc"
 import type * as RpcGroup from "effect/rpc/RpcGroup"
 
 export type CommandName = Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>> | "client.wait" | "thread.export"
 
-// The commands the sheprd command recognises are the requests of the RPC
+// The commands the lgcode command recognises are the requests of the RPC
 // group, the same list the client builds its methods from; only the
 // descriptions below are written here.
 export const commandNames: ReadonlyArray<CommandName> = [...CommandsRpcGroup.requests.keys()] as Array<CommandName>
@@ -87,7 +87,7 @@ export const helpText = (command: CommandName): string => {
     ? "This command is for the owner's terminal; an agent's identity is refused.\n" : "")
   if (command === "accounts set-secret") {
     return [
-      "Usage: sheprd accounts set-secret <account-id> <env-name>", "",
+      "Usage: lgcode accounts set-secret <account-id> <env-name>", "",
       summaries[command], callers,
       "Arguments:",
       "  <account-id>  The account the secret belongs to.",
@@ -97,7 +97,7 @@ export const helpText = (command: CommandName): string => {
     ].join("\n") + "\n"
   }
   if (command === "client.alerts.carrier.set-token") return [
-    "Usage: sheprd client alerts carrier set-token", "       sheprd client.alerts.carrier.set-token", "", summaries[command], callers,
+    "Usage: lgcode client alerts carrier set-token", "       lgcode client.alerts.carrier.set-token", "", summaries[command], callers,
     "Takes no arguments. Type yes to confirm the displayed server, then supply the token on standard input.",
     "The token is never echoed or accepted in --input."
   ].join("\n") + "\n"
@@ -106,7 +106,7 @@ export const helpText = (command: CommandName): string => {
     "  --input <json>  The command's payload as one JSON object. A requestId is added when absent.",
     "  --help          Show this help."
   ]
-  if (command === "thread.export") return `Usage: sheprd thread export <agent> --out <file>\n\nExport all thread pages to a file on this computer with mode 0600.\n${callers}\nUse the positional agent and --out; --input is not supported.\n`
+  if (command === "thread.export") return `Usage: lgcode thread export <agent> --out <file>\n\nExport all thread pages to a file on this computer with mode 0600.\n${callers}\nUse the positional agent and --out; --input is not supported.\n`
   if (command === "wait" || command === "client.wait") {
     options.splice(1, 0,
       "  --block         Hold this process until the agents settle. Exit 1 if any crashed or stopped,",
@@ -116,7 +116,7 @@ export const helpText = (command: CommandName): string => {
   }
   if (command === "subscribe") options.splice(1, 0, "  --after <n>     Print events after this sequence (default 0).")
   const invocation = command === "debug.compare-views" ? command : command.replaceAll(".", " ")
-  const usage = [`Usage: sheprd ${invocation} [options]`]
-  if (invocation !== command) usage.push(`       sheprd ${command} [options]`)
+  const usage = [`Usage: lgcode ${invocation} [options]`]
+  if (invocation !== command) usage.push(`       lgcode ${command} [options]`)
   return [...usage, "", summaries[command], callers, ...options].join("\n").replace(/\n\n\n/g, "\n\n") + "\n"
 }

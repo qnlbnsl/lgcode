@@ -1,4 +1,4 @@
-import type { AgentId } from "@sheprd/contracts";
+import type { AgentId } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Logger from "effect/Logger";
 import { expect, vi } from "vitest";
@@ -38,7 +38,7 @@ export const runCapacity = async <A>(
 ): Promise<A> => {
   const rig = makeRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
+  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
   try {
     const program = Effect.gen(function* () {
       const runner = yield* makeFakeRunner();

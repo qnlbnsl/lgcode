@@ -1,6 +1,6 @@
 import { afterEach, expect, it } from 'vitest';
 import * as Effect from 'effect/Effect';
-import { connect } from '@sheprd/client';
+import { connect } from '@lgcode/client';
 import { startLiveService, type LiveService } from '../../scripts/live/service.ts';
 import { registerRebuildCheck } from '../support/rebuildCheck.ts';
 registerRebuildCheck({ noLog: true });
@@ -9,7 +9,7 @@ afterEach(async () => { for (const service of services.splice(0)) { await servic
 const serving = async (service: LiveService) => {
   const until = Date.now() + 30_000;
   for (;;) {
-    const result = await Effect.runPromiseExit(Effect.scoped(connect({ environment: { SHEPRD_HOME: service.state }, attempts: 1 })));
+    const result = await Effect.runPromiseExit(Effect.scoped(connect({ environment: { LGCODE_HOME: service.state }, attempts: 1 })));
     if (result._tag === 'Success') return;
     if (service.exited() || Date.now() > until) throw new Error('service did not serve: ' + service.output());
     await new Promise(resolve => setTimeout(resolve, 50));

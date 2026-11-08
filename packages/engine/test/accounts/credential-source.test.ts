@@ -30,7 +30,7 @@ beforeEach(() => {
   home = join(root, "home");
   mkdirSync(home);
   for (const [name, value] of Object.entries({
-    HOME: home, SHEPRD_HOME: join(root, "state"), XDG_STATE_HOME: join(root, "xdg"),
+    HOME: home, LGCODE_HOME: join(root, "state"), XDG_STATE_HOME: join(root, "xdg"),
     CODEX_HOME: join(home, ".codex"), CLAUDE_CONFIG_DIR: join(home, ".claude"),
   })) vi.stubEnv(name, value);
 });

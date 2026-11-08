@@ -35,11 +35,11 @@ describe("which processes belong to a run", () => {
     mkdirSync(sibling);
     mkdirSync(join(root, "work"));
     cleanup.push(() => { rmSync(root, { recursive: true, force: true }); rmSync(sibling, { recursive: true, force: true }); });
-    const byEnvironment = decoy({ env: { SHEPRD_SOCKET: join(root, "state", "engine.sock") } });
+    const byEnvironment = decoy({ env: { LGCODE_SOCKET: join(root, "state", "engine.sock") } });
     const byFolder = decoy({ cwd: join(root, "work") });
     const byArgument = decoy({ args: [`--dir=${root}/x`] });
     const byRoot = decoy({ env: { WORK: root } });
-    const siblingEnvironment = decoy({ env: { SHEPRD_SOCKET: join(sibling, "state", "engine.sock") } });
+    const siblingEnvironment = decoy({ env: { LGCODE_SOCKET: join(sibling, "state", "engine.sock") } });
     const siblingFolder = decoy({ cwd: sibling });
     const siblingArgument = decoy({ args: [`--dir=${sibling}/x`, `${root}x`] });
     await settle(400);
@@ -92,10 +92,10 @@ describe("the stop of a real service", () => {
     const deadline = Date.now() + 40_000;
     while (!existsSync(join(service.state, "engine.sock")) && !service.exited() && Date.now() < deadline) await settle(50);
     const stubborn = spawn(process.execPath, ["-e", 'process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'], {
-      env: { PATH: process.env.PATH ?? "", SHEPRD_SOCKET: join(service.state, "engine.sock") }, stdio: "ignore",
+      env: { PATH: process.env.PATH ?? "", LGCODE_SOCKET: join(service.state, "engine.sock") }, stdio: "ignore",
     });
     cleanup.push(() => { stubborn.kill("SIGKILL"); });
-    const stranger = decoy({ env: { SHEPRD_SOCKET: "/tmp/someone-elses/engine.sock" } });
+    const stranger = decoy({ env: { LGCODE_SOCKET: "/tmp/someone-elses/engine.sock" } });
     await settle(400);
     const killed = await service.stop();
     expect(alive(stubborn.pid!)).toBe(false);

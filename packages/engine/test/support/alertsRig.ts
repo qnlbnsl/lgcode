@@ -1,6 +1,6 @@
-import { EventEnvelope as EventEnvelopeSchema, type AlertSourceRequest, type Event, type EventEnvelope, type PieceNamespace } from "@sheprd/contracts";
+import { EventEnvelope as EventEnvelopeSchema, type AlertSourceRequest, type Event, type EventEnvelope, type PieceNamespace } from "@lgcode/contracts";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
@@ -75,7 +75,7 @@ export async function withAlerts(
   options: AlertRigOptions = {},
 ): Promise<void> {
   const rig = options.rig ?? makeRig();
-  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
+  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
   const program = Effect.gen(function* () {
     const runner = yield* makeFakeRunner();
     const dependencies = Layer.mergeAll(runner.layer, makeFakeSecrets().layer, Layer.succeed(Redactor, {

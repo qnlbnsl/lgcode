@@ -1,4 +1,4 @@
-# Shephrd: problems found
+# LGcode: problems found
 
 A running list of problems found while building or using Shephrd. Add a
 problem here in the same change that finds it, even if it is not fixed yet.
@@ -8737,3 +8737,25 @@ State: worked around for now. The cause remains.
 `/tmp` allows 1,048,576 files, and it reached that limit while only 21 percent of its bytes were in use. Each review seat kept a full copy of the repository, including `node_modules`, in its temporary folder under `/tmp/claude-1000`, and each adjudicator seat held about 28,000 files. Nothing removes those folders when a seat finishes. The failure affects every session on the machine, because each one needs a new file for each command's output.
 
 The manager removed the `node_modules` folders from the 31 finished adjudicator seats, which brought the folder down to 56 percent of its file limit. The folders of the other finished seats remain. The Foundry should give seats a shared read-only copy, or remove a seat's temporary folder when the seat retires. The main disk is also at 96 percent.
+
+## 523. The LGcode rename does not migrate existing state or environment variables
+
+Found: 2026-11-08, while renaming Sheprd to LGcode.
+State: accepted for this rename, with no automatic migration.
+
+What happens: LGcode reads `~/.local/state/lgcode` by default and uses the
+`LGCODE_` environment variables. Existing state under `~/.local/state/sheprd`
+and the old `SHEPRD_` variables are not migrated or read. Configuration folders
+are now `.lgcode` and `~/.lgcode`, with no aliases for the old names.
+What should happen: an owner who ran Sheprd starts fresh, or stops the old
+service and moves the state folder by hand before starting LGcode. The owner
+also updates environment variables, configuration folder names, and commands.
+Why it matters: an existing owner otherwise sees an empty installation, and
+old service settings, including the web password, do not configure LGcode.
+
+## 524. The live check's Codex tool step can fail because the agent never calls the tool
+
+Found: 2026-11-08, while checking the LGcode rename.
+State: open.
+
+In the first `pnpm live-check` run on the rename branch, the `sandbox-mcp` step failed with "codex: not attempted; exact ask tool calls=0". The Codex agent, GPT-6 Luna at low effort, made no call to the `lgcode` ask tool, so the probe had nothing to judge. The Claude agent's call succeeded in the same run. A second run passed the step for both agents, with the same code, so the failure depends on whether the model chooses to call the tool. The step should give the agent a second prompt, or run on a model that follows the instruction reliably, before it reports a failure.

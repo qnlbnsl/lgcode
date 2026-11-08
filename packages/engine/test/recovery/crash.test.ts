@@ -114,7 +114,7 @@ describe("6.6 the stderr tail keeps the last lines and removes secrets across ch
 // ---------------------------------------------------------------------------
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 
 // The redactor holds the planted secrets and, once the test names them, the

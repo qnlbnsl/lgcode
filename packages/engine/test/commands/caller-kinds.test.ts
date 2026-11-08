@@ -1,4 +1,4 @@
-import { commandAccess } from "@sheprd/contracts";
+import { commandAccess } from "@lgcode/contracts";
 import { expect, it } from "vitest";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 

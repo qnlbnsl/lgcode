@@ -1,6 +1,6 @@
 import { join } from "node:path";
-import type { Client } from "@sheprd/client";
-import type { HarnessSettings } from "@sheprd/contracts";
+import type { Client } from "@lgcode/client";
+import type { HarnessSettings } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 
 import type { AgentRef, FlowDriver } from "./flow.ts";
@@ -32,12 +32,12 @@ export interface LiveConfig {
 // 2026-11-01 list haiku for Claude Code and gpt-6-luna for Codex). The owner
 // can change any of them with the variables named in the second column.
 export const LIVE_VARIABLES = {
-  leadModel: "SHEPRD_LIVE_LEAD_MODEL",
-  leadEffort: "SHEPRD_LIVE_LEAD_EFFORT",
-  workerModel: "SHEPRD_LIVE_WORKER_MODEL",
-  workerEffort: "SHEPRD_LIVE_WORKER_EFFORT",
-  agentTimeoutSeconds: "SHEPRD_LIVE_AGENT_TIMEOUT_SECONDS",
-  totalTimeoutSeconds: "SHEPRD_LIVE_TOTAL_TIMEOUT_SECONDS",
+  leadModel: "LGCODE_LIVE_LEAD_MODEL",
+  leadEffort: "LGCODE_LIVE_LEAD_EFFORT",
+  workerModel: "LGCODE_LIVE_WORKER_MODEL",
+  workerEffort: "LGCODE_LIVE_WORKER_EFFORT",
+  agentTimeoutSeconds: "LGCODE_LIVE_AGENT_TIMEOUT_SECONDS",
+  totalTimeoutSeconds: "LGCODE_LIVE_TOTAL_TIMEOUT_SECONDS",
 } as const;
 
 const seconds = (value: string | undefined, fallback: number): number => {
@@ -87,7 +87,7 @@ export const liveFolders = (work: string): { readonly lead: string; readonly wor
 
 // The folder the dry run shows in place of the run's own, which does not exist
 // until the run starts.
-export const REPRESENTATIVE_ROOT = "/tmp/sheprd-live-EXAMPLE";
+export const REPRESENTATIVE_ROOT = "/tmp/lgcode-live-EXAMPLE";
 
 export const leadPromptFor = (config: LiveConfig, workerFolder: string): string => fill(LEAD_PROMPT, {
   WORKER_FOLDER: JSON.stringify(workerFolder).slice(1, -1),

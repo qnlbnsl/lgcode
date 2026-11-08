@@ -1,4 +1,4 @@
-import { Event, EventEnvelope } from "@sheprd/contracts";
+import { Event, EventEnvelope } from "@lgcode/contracts";
 import * as Schema from "effect/Schema";
 import { expect, it } from "vitest";
 import * as Apply from "../../src/views/apply.ts";

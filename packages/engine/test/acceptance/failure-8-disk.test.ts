@@ -10,7 +10,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, expect } from "@effect/vitest";
-import type { EventEnvelope } from "@sheprd/contracts";
+import type { EventEnvelope } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 
 import {

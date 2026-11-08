@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import type { Socket } from "node:net";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { NodeWS } from "@effect/platform-node/NodeSocket";
-import { defaultWebSettings, type WebSettings } from "@sheprd/contracts";
+import { defaultWebSettings, type WebSettings } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import * as Semaphore from "effect/Semaphore";
