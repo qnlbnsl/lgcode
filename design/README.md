@@ -31,12 +31,21 @@ Open the first run with `?sample=first`, or from the First run links in Design n
 cover one or two signed-in harnesses, only Codex, signed out, nothing installed, no repositories,
 and a computer that could not be read. Add `&reset=1` to start again from the login page.
 
-- Start on Home. Needs attention gathers requests across projects.
-  Questions and Approvals support answers in place and retain answered history.
+- Start on Home. Needs attention gathers requests across projects, failed starts first and
+  then the longest wait. Sort switches to Newest first. A wait of an hour or more is amber.
+  Questions and Approvals support answers in place. Their tab counts show open requests, and
+  answered ones fold under Answered with Allowed, Denied, or Answered and the time.
   Each request is one line; use its chevron or click the row to expand its
   details underneath. Click again to collapse. There is no split detail pane.
-  Use search and the repository, project, agent, machine, and status filters.
+  An approval's row shows its command. Expanded, it shows Command and Folder, with the
+  identifiers under Details. Choose Filter for the repository, project, agent, and machine
+  filters. Each set filter shows as a chip that removes it. Narrow the window below 900
+  pixels to see the kind start each row's second line.
   All projects opens each project's board. The bell links to the full queue.
+- In `?sample=heavy`, the Merge row has waited 1 hour and 25 minutes for the owner.
+- Open Rowan's question, Iris's approval, and Ash's failed start in their threads. All three
+  are the same block with a left rule and a label, amber for the first two and red for the
+  failed start.
 - Select a repository name to see its projects. Use its chevron to expand
   the tree. Add Project starts a named project within a known repository.
 - Select Workspace app to open its sprint board with Sage in the right

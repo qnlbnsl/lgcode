@@ -194,9 +194,11 @@ Terminal sessions preserve separate input and history in each worktree.
 Home is the initial page and a permanent navigation destination. It offers
 Needs attention, All projects, Questions, and Approvals. Needs attention
 gathers unresolved questions, permissions, failed starts, and project merge
-reviews. Questions and Approvals retain answered history. Search combines
-with repository, project, agent, machine, and status filters. Open entries
-sort first. Filters stay selected on return, with a visible Clear filters action.
+reviews. Questions and Approvals keep answered history under a collapsed
+Answered section. Search combines with repository, project, agent, and machine
+filters behind one Filter button, and All projects adds a status filter. Open
+entries sort first, in the bell's order. Filters stay selected on return, and
+Clear filters appears while one is set.
 
 A single-line request row expands its details directly underneath. All rows
 start collapsed. Selecting the same row closes it. Only one request expands
@@ -208,8 +210,9 @@ Request context names the requesting team's worktree where applicable.
 Keyboard arrows, Home, and End operate the tabs. Filter changes retain focus.
 
 The row retains keyboard focus when toggled. Its chevron and expanded state
-expose the disclosure. Full source context lives in the expanded content;
-narrow screens retain the title and status on the summary line. On wide
+expose the disclosure. The footer of the expanded content names the machine and
+the worktree. Narrow screens keep the title and status on the first line and
+the kind on the second. On wide
 monitors Home stays in a centered frame capped at 1380 pixels.
 If an answer removes its request from the queue, focus moves to the next
 remaining row. Finishing a filtered queue focuses the empty result. Answered
@@ -279,7 +282,8 @@ that is the part that differs. All files stacks every changed file with a sticky
 | Worktree | A checkout on disk. Workspace folder is the one folder that holds repositories. |
 | Needs attention | Work waiting for the owner. The bell, Home, and the sidebar counts add up to the same number. |
 | Question | A kind of attention: an agent asked something. The short form is Needs answer. |
-| Approval | A kind of attention: an agent or a merge waits for permission. The short form is Needs approval. |
+| Approval | A kind of attention: an agent waits for permission to run a tool. The short form is Needs approval. |
+| Merge | A kind of attention: a project branch waits for the owner's merge into main. It was called Approval until 2026-11-08. |
 | Failed start | A kind of attention: an agent could not start. It wears the error color. |
 | Uncommitted changes | Files changed in a worktree. "Working tree" is not used. |
 | Thread | One agent's conversation. Chat stays the name of the tab. |
@@ -290,7 +294,8 @@ that is the part that differs. All files stacks every changed file with a sticky
 
 Comparable records are tables with rows of 46 pixels or less: Machines, Project
 placement, Subscriptions, Phone notifications, and All projects. Requests are single-line rows
-that say how long they have waited and what they block. Expanded rows do not repeat
+that say how long they have waited and what they block. At 900 pixels and narrower, a request
+row has a second line that starts with its kind. Expanded rows do not repeat
 their own title. No text is smaller than 11 pixels, and metadata is 12 pixels.
 
 ### Threads open at the latest message
@@ -597,7 +602,7 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
 
 ### The bell is a short copy of Home
 
-- **The bell uses Home's kinds.** They are Question, Approval, and Failed start.
+- **The bell uses Home's kinds.** They are Question, Approval, Merge, and Failed start.
 - **The bell's order is shared.** Failed starts come first, then the request that has waited
   longest. The comparator is `byAttention` in `workbench.js`, and `attentionQueue()` returns
   the open queue in that order, so Home can use the same order.
@@ -616,3 +621,64 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
   needs you." when no project does.
 - **Home's empty queue keeps its line about running work.** "Nothing needs you" is followed
   by how many agents are working, linked to All projects, as the Home finding asked.
+
+## Home and its requests, set on 2026-11-08
+
+These rules come from the designer's critique of 2026-11-06. Claude applied them on
+2026-11-08. They cover Home's list and the request block that Home shares with threads.
+
+### Order and age
+
+- **Home uses the bell's order.** Failed starts come first, then the request that has waited
+  longest. The comparator is `byAttention` in `workbench.js`.
+- **Sort offers Oldest first and Newest first.** Newest first flips only the age, so failed
+  starts still lead.
+- **A long wait is amber.** A request that has waited an hour or more shows its age in the
+  attention color, on Home and in the bell.
+
+### Filters
+
+- **One search field, one Filter button, and Sort.** The Filter button opens a menu with the
+  repository, project, agent, and machine filters. All projects adds Status. Escape or a
+  click outside closes the menu. The band is one row on a desktop and two short rows on a
+  phone, where it used to take about 200 pixels.
+- **A set filter is a chip.** Each chip names its filter and value, such as "Machine:
+  Studio", and removes that filter when selected. Clear filters sits after the chips and
+  appears only while a filter or a search is set.
+- **The count line is for filtered lists.** Without a filter, the tab counts say the same
+  thing, so the line is read only by screen readers.
+
+### Rows
+
+- **The kinds are Question, Approval, Merge, and Failed start.** Failed start is red, and
+  the others are amber while open. On narrow screens the second line starts with the kind as
+  one word, and Failed start becomes Failed.
+- **An approval's row shows its command.** The first 60 characters follow the title in
+  JetBrains Mono, so the row shows what will run, not only what the agent called it.
+- **A merge row waits like any other.** It says how long the merge has waited, and it says
+  Merge rather than Approval.
+
+### Answered requests
+
+- **Tab counts are open requests only.** They match the bell.
+- **Answered requests fold away.** Questions and Approvals end with a collapsed Answered
+  section, most recent first. An answered row says Allowed, Denied, Answered, Merged, or
+  Cancelled, with the time.
+
+### The expanded row and the request block
+
+- **The expanded row starts with the request.** It has no header and no close button,
+  because the row above names the agent, the project, and the title, and its chevron closes
+  it. The footer has the links, the machine, and the worktree.
+- **One request block.** Questions, approvals, merges, and failed starts use
+  `requestBlock(kind, …)` in `workbench.js`. It has a 2 pixel left rule and a label that
+  names the kind. Both are amber while a question, approval, or merge is open, red for a
+  failed start, and the line color once closed. It has no top rule.
+- **The block spans the thread.** A question sits inside its agent's turn, so it reaches
+  back over the avatar column to the thread's full width, the same as an approval. On Home
+  the label and title are hidden, because the row shows them.
+- **An approval names its command and folder.** Command and Folder are labelled lines in
+  JetBrains Mono, above the answer buttons. The request, tool, and call identifiers and the
+  raw input wait under a closed Details disclosure.
+- **One filled button.** An expanded row holds at most one primary button, so Home never shows
+  two.
