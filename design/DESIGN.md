@@ -108,10 +108,10 @@ setting.
 
 ## Type and reading
 
-The current workbench uses available system sans-serif fonts for interface
-text and a system monospace stack for file references. Final font selection
-is open. Keep long replies within roughly 68 characters per line, with
-enough line spacing to follow paragraphs.
+The workbench uses Inter for interface text and JetBrains Mono for code,
+paths, and branch names. Both are served from the repository, as the
+"Fonts" section below says. Keep long replies within roughly 68 characters
+per line, with enough line spacing to follow paragraphs.
 
 The current proposal uses a shared frame for the compact conversation
 header, chat, and composer. That frame stays centered within the available workspace on wide
@@ -295,9 +295,19 @@ from the end, a Latest button appears, and it says how many requests are below.
 
 ### Fonts
 
-The interface now uses the operating system's own font through `system-ui`, and
-`ui-monospace` for code. This replaces a stack that fell through to Nimbus Sans on
-Linux. It costs no download. The final font choice is still open.
+The interface uses Inter, and code uses JetBrains Mono, decided by the designer's
+critique of 2026-11-06 and applied on 2026-11-08. They replace `system-ui`, which drew
+a wide face on Linux and a different face on every operating system.
+
+- **Both fonts are self-hosted.** Each is a variable font, cut to Google Fonts' Latin
+  subset, in `third_party/inter/` and `third_party/jetbrains-mono/`. The mock reaches
+  them through symbolic links in `design/fonts/`. There is no request to a font service.
+- **The measured cost is 79,688 bytes.** Inter 4.001 is 48,256 bytes, and JetBrains Mono
+  2.211 is 31,432 bytes. The critic estimated about 150 kilobytes.
+- **Numbers are tabular.** The body turns on Inter's tabular figures, so counts and times
+  line up in rows.
+- **Code has no ligatures.** Code, diffs, and the terminal turn JetBrains Mono's
+  ligatures off, so `=>` stays two characters.
 
 ## Rules added by the designer's critique of 2026-11-06
 
@@ -403,3 +413,86 @@ task or the sprint board. Open requests appear in the lead's latest turn, and a 
 to an answer is a new turn, so the earlier text stays as it was written. Team chat is board posts,
 which hold only text, so it no longer shows the tool activity it showed when it was hardcoded.
 
+## Visual foundations, set on 2026-11-08
+
+These rules come from the designer's critique of 2026-11-06. Claude applied them on
+2026-11-08, after the rename to LGcode. They are the base that later screen work builds on.
+
+### One type scale
+
+- **Five sizes.** Text is 11, 12, 13, 15, or 20 pixels, named `--text-xs` to `--text-xl`.
+  The body is 13 pixels. Agent replies are 15 pixels. The login heading is 20 pixels.
+- **One exception.** Text fields on phones are 16 pixels, named `--text-input`, because a
+  smaller field makes iOS zoom the page.
+- **Three weights.** Text is 400, 500, or 600, named `--weight-body`, `--weight-medium`, and
+  `--weight-strong`.
+- **Page titles are quiet.** A page title is 15 pixels at weight 600. Removing repeated
+  titles belongs to the later work on the chrome.
+- **A check enforces the scale.** `revision-checks.mjs` fails when the stylesheet or the
+  script holds a raw font size, and when a rendered page shows a size outside the scale.
+
+### Spacing and shape
+
+- **Spacing sits on a 4 pixel grid.** Padding, margins, and gaps use `--space-1` (4 pixels)
+  to `--space-12` (48 pixels), where the number times 4 is the size. One and two pixel
+  nudges are allowed for hairlines. Values above 48 pixels are written as multiples of 4.
+- **Three radii.** Controls use 4 pixels, panels and dialogs use 8 pixels, and dots and
+  pills are fully round.
+
+### Controls
+
+- **Two heights.** Buttons, inputs, and selects are 32 pixels, named `--control`. Dense
+  places use 28 pixels, named `--control-dense`: the top bar picker, the Git sync row, table
+  rows, agent stop and resume, and the composer's tools. A form uses one height for its
+  inputs, selects, and buttons.
+- **Phones keep larger targets where they had them.** Icon buttons stay 40 to 44 pixels on
+  phones, and the first run's buttons stay 44 pixels.
+- **A disabled button is an outline.** It has no fill, and its text uses the muted color,
+  which keeps at least 3 to 1 contrast. A disabled action that needs something says what,
+  beside the button. Commit says "Add a message and stage a file."
+- **Links go somewhere, and buttons change something.** Clear filters, Load full item, Try
+  reconnecting, Confirm pairing, New project here, Connect subscription, Add task, Check
+  again, and Change folder are buttons now. A small action in a row uses the `secondary
+  dense` classes.
+
+### Color
+
+- **The primary color has two jobs.** It marks the one primary action in a view, and links
+  in body text. The tab underline, the avatar initials, the logo, and save messages no
+  longer use it.
+- **Amber is for attention only.** The Modified letter in Git is muted. The failed alerts
+  count uses the error color, as a failed start does. Stop agent is a neutral outline.
+- **The toast is a notice, not a button.** It is a raised neutral surface at the top right,
+  below the bell, so it never covers the composer.
+
+### Icons
+
+- **One icon set.** Every icon uses Lucide's paths, credited in `third_party/lucide/`. No text
+  character stands in for an icon, so there is no ×, ←, →, ↗, ⌘, ✓, or ＋ in a button.
+- **The shortcut matches the system.** The switcher shows the Command icon and K on Apple
+  systems, and Ctrl K elsewhere.
+- **Alerts use a phone icon,** because Alerts are notifications sent to the owner's phone.
+
+### Motion, focus, tabs, and dialogs
+
+- **Rows move in 120 milliseconds.** An expanded Home row eases in, and an answered request
+  folds away instead of vanishing. Reduced motion turns both off. Nothing else animates.
+- **Focus rings are not clipped.** The tree's scrolling area has 8 pixels of padding, so a
+  disclosure's whole ring shows.
+- **Tabs do not move.** Every tab has weight 500, selected or not, so selecting one changes
+  no widths. The selected tab has the text color and an underline. Hover changes the color
+  without a fill.
+- **Every dialog closes the same way.** A Cancel button sits left of the action, and the
+  corner close stays. A dialog with nothing to confirm, such as Design notes, has Close.
+  The quick switcher is a search box rather than a form, so Escape closes it.
+- **Resize handles show a grip on hover.** The target is 8 pixels wide. Hovering or
+  focusing it shows a line, a grip, and the resize cursor.
+
+### Login
+
+- **The page names the product.** The logo mark sits above the heading "Sign in to
+  LGcode", which suits a first visit and a return alike. The button says Sign in.
+- **A password manager can fill the field.** The field has `autocomplete="current-password"`.
+- **Messages show their severity under the field.** A rejected password uses the error
+  color. An expired session uses the muted color. On the unavailable page, Try again is the
+  primary button, because it is the only thing to do.

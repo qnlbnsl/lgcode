@@ -87,6 +87,13 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
   with `?with=<id>`; Design notes lists the ones present. `?with=ananke` adds Ananke's
   onboarding mocks, which need Ananke's mock server on port 8091.
 - Switch between Field and Dusk at the bottom of the sidebar.
+- Open Design notes and choose Logged out, Login rejected, Session expired, or Session
+  unavailable. The page says "Sign in to LGcode" under the logo mark. A rejected password
+  shows in the error color under the field, and an expired session shows in the muted
+  color. The unavailable page offers Try again as its main button.
+- Open Git in Agent console. Commit says what it needs before it can be used.
+- Open Alerts and choose Refresh. The notice appears at the top right, below the bell.
+- Expand a request on Home and answer it. The row eases open, and the answered row folds away.
 
 ## Existing page capabilities and new workspace views
 
@@ -186,8 +193,9 @@ Those patterns and the second type pairing were discarded.
 All three palettes are custom explorations, filtered through the UI skill's
 craft rules. Harbor uses layered blue surfaces. Field uses green-tinted light
 surfaces. Dusk uses layered plum surfaces with a peach action color. Each
-uses the operating system's available sans-serif and monospace fonts, so the
-prototype has no remote font dependency. Final type remains undecided.
+used the operating system's available sans-serif and monospace fonts. Since
+2026-11-08 the workbench uses Inter and JetBrains Mono, served from the repository, as
+DESIGN.md records.
 
 The owner selected Field as light mode and Dusk as dark mode on 2026-11-05.
 Harbor remains in the initial screenshots as a historical candidate.
@@ -215,7 +223,7 @@ Phone users can use the status strip to jump between columns. Focused chat
 is centered on larger monitors.
 
 Find project or agent opens the quick switcher. Command or Control + K
-also opens it. Arrow keys and Enter choose a result. Only projects needing you filters
+also opens it, and the hint shows the key for the system in use. Arrow keys and Enter choose a result. Only projects needing you filters
 the navigation tree, and the top-bar bell opens decisions, permissions, and
 failed starts with direct links to the relevant thread item.
 
