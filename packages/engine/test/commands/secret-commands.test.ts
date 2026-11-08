@@ -1,6 +1,6 @@
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { randomBytes } from "node:crypto";
-import { RequestId } from "@sheprd/contracts";
+import { RequestId } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";

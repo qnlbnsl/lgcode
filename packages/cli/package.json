@@ -1,5 +1,5 @@
 {
-  "name": "@sheprd/cli",
+  "name": "@lgcode/cli",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -15,10 +15,10 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
-    "@sheprd/client": "workspace:*",
-    "@sheprd/contracts": "workspace:*",
-    "@sheprd/engine": "workspace:*",
-    "@sheprd/mcp": "workspace:*",
+    "@lgcode/client": "workspace:*",
+    "@lgcode/contracts": "workspace:*",
+    "@lgcode/engine": "workspace:*",
+    "@lgcode/mcp": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

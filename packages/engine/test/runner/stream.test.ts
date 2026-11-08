@@ -37,7 +37,7 @@ let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
+  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
 });
 afterEach(() => {
   vi.restoreAllMocks();
@@ -262,13 +262,13 @@ live("6.2 secrets (rows 36, 57): an account secret and the agent token written t
     const harness = harnessFor("first", writeFakeAdapter(rig));
     const account = accountFor("first", { turns: [
       [
-        { step: "stderr", text: "stderr leak ${env:PLANTED_API_KEY} and ${env:SHEPRD_TOKEN}" },
+        { step: "stderr", text: "stderr leak ${env:PLANTED_API_KEY} and ${env:LGCODE_TOKEN}" },
         { step: "raw_frame", frame: escapedLeak("PLANTED_API_KEY") },
-        { step: "raw_frame", frame: escapedLeak("SHEPRD_TOKEN") },
+        { step: "raw_frame", frame: escapedLeak("LGCODE_TOKEN") },
         { step: "raw_frame", frame: escapedToolLeak("PLANTED_API_KEY") },
-        { step: "raw_frame", frame: escapedToolLeak("SHEPRD_TOKEN") },
+        { step: "raw_frame", frame: escapedToolLeak("LGCODE_TOKEN") },
       ],
-      [{ step: "rpc_error", message: "reply leak ${env:PLANTED_API_KEY} and ${env:SHEPRD_TOKEN}" }],
+      [{ step: "rpc_error", message: "reply leak ${env:PLANTED_API_KEY} and ${env:LGCODE_TOKEN}" }],
     ] }, echo, { PLANTED_API_KEY: "secret:planted-stream" });
     const written: Array<string> = [];
     const original = { out: process.stdout.write.bind(process.stdout), err: process.stderr.write.bind(process.stderr) };
@@ -285,7 +285,7 @@ live("6.2 secrets (rows 36, 57): an account secret and the agent token written t
       success(yield* call(ownerCredential, "prompt", { agentId: reply.agentId, text: "second turn" }));
       yield* eventually(readLog, (rows) => tagged(rows, "DeliveryReturned").length + tagged(rows, "TurnEnded").length >= 2);
       yield* pause(300);
-      const token = (yield* readEcho(echo)).env.SHEPRD_TOKEN!;
+      const token = (yield* readEcho(echo)).env.LGCODE_TOKEN!;
       expect(token.startsWith("shp_a_")).toBe(true);
       // The leaks did reach the runner, so their absence below is redaction.
       expect(context.events.some((event) => event._tag === "deliveryUpdate" && event.kind === "message")).toBe(true);

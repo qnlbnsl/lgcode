@@ -1,4 +1,4 @@
-import { CommandsRpcGroup, Event, EventEnvelope, WireCommandsRpcGroup, WireEnvelope, contentOnlyEventTags } from "@sheprd/contracts"
+import { CommandsRpcGroup, Event, EventEnvelope, WireCommandsRpcGroup, WireEnvelope, contentOnlyEventTags } from "@lgcode/contracts"
 import type * as Duration from "effect/Duration"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"

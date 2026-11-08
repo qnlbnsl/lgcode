@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { EventEnvelope, type Event } from "@sheprd/contracts";
-import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
+import { EventEnvelope, type Event } from "@lgcode/contracts";
+import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as PubSub from "effect/PubSub";
@@ -25,8 +25,8 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 const callers: Caller[] = [{ _tag: "owner" }, { _tag: "agent", agentId: "agent-a" }, { _tag: "service", service: "roles.sheepdog" }, { _tag: "service", service: "roles.standing-rules", rule: "rule-4" }, { _tag: "piece", namespace: "board" }];
 const keys = ["owner", "agent:agent-a", "service:roles.sheepdog", "service:roles.standing-rules", "piece:board"];
 it("1.30 caller identity survives live publication, catch-up, rebuild, paging and a reopened database; receipts ignore the rule", async () => {
-  const home = mkdtempSync("/tmp/sheprd-caller-durable-");
-  vi.stubEnv("SHEPRD_HOME", home);
+  const home = mkdtempSync("/tmp/lgcode-caller-durable-");
+  vi.stubEnv("LGCODE_HOME", home);
   // Build fresh services for each opening; the file, not a retained layer,
   // must carry the rule. No decoder is reproduced in the test.
   const { layer } = await import("../../src/log/EventLog.ts");

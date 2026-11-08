@@ -17,15 +17,15 @@ for (const scenario of [
   { id: "F01", command: "ask", input: { text: "What should I do next?" }, outcome: "ok", event: "QuestionAsked" },
   { id: "F02", command: "accounts", input: { operation: "list" }, outcome: "failed", event: "CommandRefused" },
 ] as const) {
-  it(`${scenario.id} catches sheprd_command sending a non-RPC frame or reporting an error reply as success (${scenario.command})`, async () => run(Effect.gen(function* () {
+  it(`${scenario.id} catches lgcode_command sending a non-RPC frame or reporting an error reply as success (${scenario.command})`, async () => run(Effect.gen(function* () {
     const root = makeServiceRoot("/tmp/s7f-");
-    const service = startService(root, { env: { SHEPRD_TEST_DEBUG: "1" } });
+    const service = startService(root, { env: { LGCODE_TEST_DEBUG: "1" } });
     yield* waitServing(root, service);
     const owner = yield* ownerClient(root);
     const before = (yield* owner["debug.compare-views"]({ requestId: requestId() } as never)).sequence;
     const agent = yield* startFakeAgent(root, owner, owner, {
       script: { turns: [[
-        { step: "sheprd_command", command: scenario.command, input: { requestId: requestId(), ...scenario.input } },
+        { step: "lgcode_command", command: scenario.command, input: { requestId: requestId(), ...scenario.input } },
         { step: "end_turn", stopReason: "end_turn" },
       ]] }, prompt: "Call the engine through the shared client.",
     });
@@ -38,7 +38,7 @@ for (const scenario of [
       Stream.runCollect, Effect.timeout(20_000),
     );
     const text = events.flatMap((envelope) => envelope.event._tag === "ThreadItem" && envelope.event.content._tag === "text" ? [envelope.event.content.text] : []).join("");
-    expect(text).toContain(`sheprd_command:${scenario.outcome}`);
+    expect(text).toContain(`lgcode_command:${scenario.outcome}`);
     expect(events.some((envelope) => envelope.event._tag === scenario.event)).toBe(true);
     if (scenario.command === "ask") {
       expect(events.filter((envelope) => envelope.event._tag === "QuestionAsked")).toHaveLength(1);
@@ -59,7 +59,7 @@ for (const scenario of [
 it("F03 catches wait_for_file running its next step before the gate exists or never releasing after it appears", async () => run(Effect.gen(function* () {
   const root = makeServiceRoot("/tmp/s7g-");
   const gate = join(root.root, "gate");
-  const service = startService(root, { env: { SHEPRD_TEST_DEBUG: "1" } });
+  const service = startService(root, { env: { LGCODE_TEST_DEBUG: "1" } });
   yield* waitServing(root, service);
   const owner = yield* ownerClient(root);
   const before = (yield* owner["debug.compare-views"]({ requestId: requestId() } as never)).sequence;

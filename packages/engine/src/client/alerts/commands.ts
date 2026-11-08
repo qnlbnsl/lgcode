@@ -1,4 +1,4 @@
-import { alertKindNames, type AlertKind } from "@sheprd/contracts";
+import { alertKindNames, type AlertKind } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import { refused, type Input, type PiecePlan } from "../../commands/internal.ts";
 import type { ReadHandler } from "../../api/reads.ts";

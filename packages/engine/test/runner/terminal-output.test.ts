@@ -14,7 +14,7 @@ import { eventually, tagged } from "../support/routingRig.ts";
 
 registerRebuildCheck({ noLog: true });
 let rig: RunnerRig;
-beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); removeRunnerRig(rig); });
 const frame = (update: unknown) => ({ step: "raw_frame", frame: JSON.stringify({ jsonrpc: "2.0", method: "session/update", params: { sessionId: "${session}", update } }) });
 const base64 = (text: string) => Buffer.from(text).toString("base64");
@@ -107,7 +107,7 @@ for (const scenario of shapes) {
     writeFileSync(adapter, `#!${process.execPath}
 const script = JSON.parse(process.env.FAKE_AGENT_SCRIPT);
 const replacements = {};
-for (const [label, value] of [["PLANTED", process.env.PLANTED_KEY], ["TOKEN", process.env.SHEPRD_TOKEN]]) {
+for (const [label, value] of [["PLANTED", process.env.PLANTED_KEY], ["TOKEN", process.env.LGCODE_TOKEN]]) {
   replacements[label + "_FULL"] = value;
   replacements[label + "_FIRST"] = value.slice(0, Math.floor(value.length / 2));
   replacements[label + "_LAST"] = value.slice(Math.floor(value.length / 2));
@@ -133,7 +133,7 @@ await import(${JSON.stringify(pathToFileURL(fakeAgentPath).href)});
       const rows = yield* eventually(readLog, (events) => tagged(events, "TurnEnded").length > 0);
       expect(payloads(tagged(rows, "ThreadItem")).at(-1)).toMatchObject({ output: "visible\n[REDACTED]\nsplit:[REDACTED]\ntoken:[REDACTED]\ntoken split:[REDACTED]\nfinished\n", exitCode: 0 });
       expect(context.logLines.some((line) => line.includes("terminal output withheld")) || scenario.shape.startsWith("terminal metadata")).toBe(true);
-      const token = (yield* readEcho(echo)).env.SHEPRD_TOKEN!;
+      const token = (yield* readEcho(echo)).env.LGCODE_TOKEN!;
       const state = yield* (yield* Views.Views).snapshot;
       const replay = yield* rebuild(state.sequence);
       const sql = yield* SqlClient.SqlClient;

@@ -1,6 +1,6 @@
 import { act } from "react"
 import * as Effect from "effect/Effect"
-import { CommandsRpcGroup } from "@sheprd/contracts"
+import { CommandsRpcGroup } from "@lgcode/contracts"
 import { expect, it, vi } from "vitest"
 import { mountThread } from "./thread-fixtures.tsx"
 

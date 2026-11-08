@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { it } from "@effect/vitest";
-import { connect, type Client } from "@sheprd/client";
-import type { AgentId, EventEnvelope } from "@sheprd/contracts";
+import { connect, type Client } from "@lgcode/client";
+import type { AgentId, EventEnvelope } from "@lgcode/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -15,7 +15,7 @@ import { FLUSH_MARKER, ROLES_GROUP, STALL_MARKER, WAVE_MARKER } from "../../scri
 import { startLiveService, type LiveService } from "../../scripts/live/service.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
-vi.mock("@sheprd/client", async (original) => ({ ...await original<typeof import("@sheprd/client")>(), connect: vi.fn() }));
+vi.mock("@lgcode/client", async (original) => ({ ...await original<typeof import("@lgcode/client")>(), connect: vi.fn() }));
 vi.mock("../../scripts/live/service.ts", () => ({ startLiveService: vi.fn() }));
 registerRebuildCheck({ noLog: true });
 const roots: string[] = [];
@@ -126,7 +126,7 @@ for (const fault of ["", "later turn", "missing reminder", "other reminder", "un
 }
 
 it("--skip-timed-flush skips only that step, completes first-stall and exports, and exits incomplete", async () => {
-  const root = mkdtempSync("/tmp/sheprd-roles-run-test-"); roots.push(root);
+  const root = mkdtempSync("/tmp/lgcode-roles-run-test-"); roots.push(root);
   const work = join(root, "work"); const state = join(root, "state");
   mkdirSync(work); mkdirSync(state);
   writeFileSync(join(state, "owner-credential"), "synthetic-roles-owner-credential");

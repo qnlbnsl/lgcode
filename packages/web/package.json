@@ -1,5 +1,5 @@
 {
-  "name": "@sheprd/web",
+  "name": "@lgcode/web",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -15,8 +15,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@sheprd/client": "workspace:*",
-    "@sheprd/contracts": "workspace:*",
+    "@lgcode/client": "workspace:*",
+    "@lgcode/contracts": "workspace:*",
     "effect": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"

@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { EventEnvelope } from "@sheprd/contracts";
+import type { EventEnvelope } from "@lgcode/contracts";
 import { afterEach, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";

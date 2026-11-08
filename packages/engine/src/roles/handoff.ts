@@ -1,4 +1,4 @@
-import type { Delivery, Event, EventEnvelope } from "@sheprd/contracts";
+import type { Delivery, Event, EventEnvelope } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import { encodedBytes } from "../client/reads/display.ts";
 import { refused, type Input } from "../commands/internal.ts";

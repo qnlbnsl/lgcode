@@ -29,8 +29,8 @@ export const prepareRoot = (): ServiceRoot => {
 };
 
 export const agentEnvironment = (root: ServiceRoot): Record<string, string> => ({
-  ...serviceEnvironment(root), SHEPRD_NODE: process.execPath,
-  SHEPRD_SOCKET: root.socket, SHEPRD_TOKEN: token,
+  ...serviceEnvironment(root), LGCODE_NODE: process.execPath,
+  LGCODE_SOCKET: root.socket, LGCODE_TOKEN: token,
 });
 
 // A timeout guards a named observable condition; a delay alone is never proof.
@@ -63,10 +63,10 @@ export interface Process {
 
 const children: Array<Process> = [];
 const listeners: Array<() => Promise<void>> = [];
-const sheprd = fileURLToPath(new URL("../../../../bin/sheprd", import.meta.url));
+const lgcode = fileURLToPath(new URL("../../../../bin/lgcode", import.meta.url));
 
 export const startCli = (root: ServiceRoot, args: ReadonlyArray<string>, env: Record<string, string> = agentEnvironment(root)): Process => {
-  const child = spawn(sheprd, [...args], { env: { ...env, SHEPRD_NODE: process.execPath }, stdio: ["pipe", "pipe", "pipe"] });
+  const child = spawn(lgcode, [...args], { env: { ...env, LGCODE_NODE: process.execPath }, stdio: ["pipe", "pipe", "pipe"] });
   let stdout = "";
   let stderr = "";
   let done = false;
@@ -81,7 +81,7 @@ export const startCli = (root: ServiceRoot, args: ReadonlyArray<string>, env: Re
   return result;
 };
 
-export const finishCli = async (process: Process) => bounded("the sheprd command to exit", process.exit);
+export const finishCli = async (process: Process) => bounded("the lgcode command to exit", process.exit);
 
 export const assertNoSecrets = (process: Process, secrets: ReadonlyArray<string>): void => {
   let commandLine = "";
@@ -192,13 +192,13 @@ export const mcpPeer = (process: Process) => {
   });
   const request = async (method: string, params: unknown = {}, limit = 10_000): Promise<McpReply> => {
     const requestId = ++id;
-    if (process.exited()) throw new Error("sheprd mcp exited before answering JSON-RPC");
+    if (process.exited()) throw new Error("lgcode mcp exited before answering JSON-RPC");
     process.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id: requestId, method, params })}\n`);
     return until(`MCP ${method} reply`, () => {
-      if (malformed.length > 0) throw new Error("sheprd mcp printed non-JSON protocol output");
+      if (malformed.length > 0) throw new Error("lgcode mcp printed non-JSON protocol output");
       const reply = replies.get(requestId);
       if (reply !== undefined) return reply;
-      if (process.exited()) throw new Error(`sheprd mcp exited before ${method} replied`);
+      if (process.exited()) throw new Error(`lgcode mcp exited before ${method} replied`);
       return undefined;
     }, limit);
   };
@@ -212,7 +212,7 @@ export const mcpPeer = (process: Process) => {
 };
 
 export const loadClient = async () => {
-  const module = await import("@sheprd/client") as unknown as {
+  const module = await import("@lgcode/client") as unknown as {
     connect: (options: {
       environment: Readonly<Record<string, string | undefined>>;
       socketSecurity?: {
@@ -225,7 +225,7 @@ export const loadClient = async () => {
       };
     }) => Effect.Effect<Client, unknown, Scope.Scope>;
   };
-  expect(typeof module.connect, "unit 7b must export connect({ environment }) from @sheprd/client").toBe("function");
+  expect(typeof module.connect, "unit 7b must export connect({ environment }) from @lgcode/client").toBe("function");
   return module.connect;
 };
 

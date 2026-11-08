@@ -24,8 +24,8 @@ import { eventText } from "../../viewer/src/text.ts"
 test("both owner clients retain first/later prompts, question answers, board deliveries and oversized sources across reopen and reconnect", async ({ page }) => {
   test.setTimeout(90_000)
   const rig = makeRig()
-  const previousHome = process.env.SHEPRD_HOME
-  process.env.SHEPRD_HOME = rig.stateFolder
+  const previousHome = process.env.LGCODE_HOME
+  process.env.LGCODE_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url")
   const credential = randomBytes(32)
   chmodSync(rig.stateFolder, 0o700)
@@ -64,7 +64,7 @@ test("both owner clients retain first/later prompts, question answers, board del
         const viewerText = () => viewer!.items.map((item) => eventText(item.event)).join("\n")
         yield* promptCount(1)
         yield* Effect.promise(async () => {
-          viewer = new ViewerSession(await connectViewer({ SHEPRD_HOME: rig.stateFolder }), () => {})
+          viewer = new ViewerSession(await connectViewer({ LGCODE_HOME: rig.stateFolder }), () => {})
           await viewer.start()
           await page.setViewportSize({ width: 360, height: 800 })
           await page.goto(`http://127.0.0.1:${port}/`)
@@ -133,8 +133,8 @@ test("both owner clients retain first/later prompts, question answers, board del
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
   } finally {
     await viewer?.close()
-    if (previousHome === undefined) delete process.env.SHEPRD_HOME
-    else process.env.SHEPRD_HOME = previousHome
+    if (previousHome === undefined) delete process.env.LGCODE_HOME
+    else process.env.LGCODE_HOME = previousHome
     removeRig(rig)
   }
 })

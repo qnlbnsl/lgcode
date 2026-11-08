@@ -4,7 +4,7 @@ import * as Deferred from "effect/Deferred";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
 import { TestClock } from "effect/testing";
-import { boardAlertSources } from "@sheprd/contracts/board/alerts";
+import { boardAlertSources } from "@lgcode/contracts/board/alerts";
 import * as SqlClient from "effect/sql/SqlClient";
 import { expect, vi } from "vitest";
 
@@ -705,7 +705,7 @@ it.live("4.3 returned wake: a fake agent's send error runs the real dispatcher r
   expect(state.deliveries[first.id]?.status).toBe("returned");
   expect(state.agents.worker?.state._tag).toBe("idle");
   expect(eventsOf(yield* readLog, "DeliveryReturned").find((row) => row.deliveryId === first.id)?.sender).toEqual({ _tag: "piece", namespace: "board" });
-  expect((state.board as import("@sheprd/contracts/board/view").BoardView).posts[id]?.returns?.worker).toBe(1);
+  expect((state.board as import("@lgcode/contracts/board/view").BoardView).posts[id]?.returns?.worker).toBe(1);
   yield* catchUp;
   const retry = yield* pendingWake();
   expect(retry.id).not.toBe(first.id);

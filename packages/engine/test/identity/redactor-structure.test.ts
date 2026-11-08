@@ -2,8 +2,8 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 import { it } from "@effect/vitest";
-import { AgentId, Event, RequestId } from "@sheprd/contracts";
-import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
+import { AgentId, Event, RequestId } from "@lgcode/contracts";
+import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -50,7 +50,7 @@ it.effect.each(["x", "1", "text", "ThreadItem", agentId])(
 
 it.effect("A4 event and receipt identities survive collisions while record values are still redacted", () =>
   Effect.acquireUseRelease(
-    Effect.sync(() => mkdtempSync("/tmp/sheprd-a4-")),
+    Effect.sync(() => mkdtempSync("/tmp/lgcode-a4-")),
     (folder) => Effect.gen(function* () {
       yield* migrate;
       return yield* Effect.gen(function* () {

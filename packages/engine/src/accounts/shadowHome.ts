@@ -2,10 +2,10 @@
 // (third_party/t3code/provider-instance/, T3 Code, MIT) keeps the instance
 // "codex" on the shared home and gives every other account a private
 // `auth.json` over symlinks into the shared home (rows 19, 33).
-import { resolveManagedCodexHomeLayout } from "@sheprd/t3-provider-instance/CodexManagedHome";
-import { materializeCodexShadowHome } from "@sheprd/t3-provider-instance/CodexHomeLayout";
-import { HomeDirectory } from "@sheprd/t3-provider-instance/HostProcess";
-import { ProviderInstanceId } from "@sheprd/t3-provider-instance/providerInstance";
+import { resolveManagedCodexHomeLayout } from "@lgcode/t3-provider-instance/CodexManagedHome";
+import { materializeCodexShadowHome } from "@lgcode/t3-provider-instance/CodexHomeLayout";
+import { HomeDirectory } from "@lgcode/t3-provider-instance/HostProcess";
+import { ProviderInstanceId } from "@lgcode/t3-provider-instance/providerInstance";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";

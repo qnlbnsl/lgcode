@@ -11,8 +11,8 @@ it("I81 catches a viewer that accepts agent credentials instead of the owner ide
   expect(typeof identity.connectViewer, "viewer must establish its owner identity through the client library").toBe("function");
 
   await expect(identity.connectViewer({
-    SHEPRD_HOME: "/tmp/sheprd-viewer-identity",
-    SHEPRD_SOCKET: "/tmp/sheprd-viewer-identity/engine.sock",
-    SHEPRD_TOKEN: "agent-token-fixture",
+    LGCODE_HOME: "/tmp/lgcode-viewer-identity",
+    LGCODE_SOCKET: "/tmp/lgcode-viewer-identity/engine.sock",
+    LGCODE_TOKEN: "agent-token-fixture",
   })).rejects.toThrow(/owner|agent|identity/i);
 });

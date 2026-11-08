@@ -1,4 +1,4 @@
-import { foldSettled, pieceNamespaces, reasonOf, waitSatisfied, type ClientSnapshot, type EventEnvelope, type PieceNamespace, type SettledInput, type WaitMember, type RequestId } from "@sheprd/contracts"
+import { foldSettled, pieceNamespaces, reasonOf, waitSatisfied, type ClientSnapshot, type EventEnvelope, type PieceNamespace, type SettledInput, type WaitMember, type RequestId } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import type { Client, ClientEnvelope } from "./core.ts"

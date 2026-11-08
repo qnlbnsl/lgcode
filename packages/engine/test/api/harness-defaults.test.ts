@@ -3,7 +3,7 @@
 // `harnesses set`; a restart leaves the owner's edit alone; `harnesses reset`
 // through the client restores the default.
 import { afterEach, expect, it } from "@effect/vitest";
-import type { HarnessSettings } from "@sheprd/contracts";
+import type { HarnessSettings } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";

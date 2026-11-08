@@ -1,4 +1,4 @@
-import { defaultWebSettings, PublicWebAddress, publicAddressError, type WebSettings } from "@sheprd/contracts";
+import { defaultWebSettings, PublicWebAddress, publicAddressError, type WebSettings } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { refused, type Input } from "../commands/internal.ts";

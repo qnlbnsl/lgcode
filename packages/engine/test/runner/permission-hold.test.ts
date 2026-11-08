@@ -15,14 +15,14 @@ import { eventually, pause, tagged } from "../support/routingRig.ts";
 // Criterion 6.3 (task 6a.3; rows 35b, 56, 65; issues 68, 72, 73): a
 // permission request holds the agent until it is answered, then releases it
 // with the chosen option. The runner mints the request identifier itself,
-// unique across agents, maps every option onto Sheprd's scale, and marks a
+// unique across agents, maps every option onto LGcode's scale, and marks a
 // request that would write a harness settings path.
 
 let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
+  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -176,7 +176,7 @@ it("6.3 option table, first harness (rows 35b, 56, issue 73): each recorded opti
   }
 });
 
-it("6.3 option table, any harness (rows 35b, 56): the four protocol kinds map onto Sheprd's scale, and an unknown kind is full and persistent, so only the owner can choose it (breaks if an unknown kind fails open)", () => {
+it("6.3 option table, any harness (rows 35b, 56): the four protocol kinds map onto LGcode's scale, and an unknown kind is full and persistent, so only the owner can choose it (breaks if an unknown kind fails open)", () => {
   const kinds: ReadonlyArray<readonly [string, { level: string; persistent: boolean }]> = [
     ["allow_once", { level: "ask", persistent: false }],
     ["allow_always", { level: "edit", persistent: true }],

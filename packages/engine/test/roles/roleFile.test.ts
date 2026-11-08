@@ -4,7 +4,7 @@ import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as SqlClient from "effect/sql/SqlClient";
-import { RolesEvent, rolesMaxima } from "@sheprd/contracts";
+import { RolesEvent, rolesMaxima } from "@lgcode/contracts";
 import { makeRedactor } from "../../src/identity/redactor.ts";
 import { Redactor } from "../../src/log/Redactor.ts";
 import { expect, it } from "vitest";

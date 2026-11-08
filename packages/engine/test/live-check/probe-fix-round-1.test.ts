@@ -12,8 +12,8 @@ import { createReporter } from "../../scripts/live/reporter.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { ALWAYS, ONCE, REJECT, fakeEngine, harnessOf, LEAD, WORKER, runProbe, type FakeEngine, type Option } from "./probe-fake-engine.ts";
 
-vi.mock("@sheprd/client", async (original) => {
-  const client = await original<typeof import("@sheprd/client")>();
+vi.mock("@lgcode/client", async (original) => {
+  const client = await original<typeof import("@lgcode/client")>();
   const { fakeConnect } = await import("./probe-fake-registry.ts");
   return { ...client, connect: (options: Parameters<typeof client.connect>[0]) => (fakeConnect(options) ?? client.connect(options)) as never };
 });
@@ -76,7 +76,7 @@ it("m-1: the rendered pending replay prompt holds its turn with the named exact 
 it("m-2: core inheritance cannot pass when the shell's name-only listing still contains identity variables", async () => {
   const e = make();
   command(e, probeCommands(e.state).removedVariables,
-    "LCP_ENV_BEGIN\nPATH\nSHEPRD_SOCKET\nSHEPRD_TOKEN\nLCP_ENV_END\nthe engine refused this identity (HTTP 403)\nLCP_EXIT=1\n");
+    "LCP_ENV_BEGIN\nPATH\nLGCODE_SOCKET\nLGCODE_TOKEN\nLCP_ENV_END\nthe engine refused this identity (HTTP 403)\nLCP_EXIT=1\n");
   expect((await runProbe(e, "removed-variables")).passed).toBe(false);
 });
 

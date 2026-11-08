@@ -4,7 +4,7 @@ import {
 import { join, relative } from "node:path";
 
 import { it } from "@effect/vitest";
-import { AgentId, type Actor } from "@sheprd/contracts";
+import { AgentId, type Actor } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Result from "effect/Result";
 import * as Schema from "effect/Schema";
@@ -22,13 +22,13 @@ let stateFolder: string;
 let pluginRoot: string;
 const directory = (path: string) => { mkdirSync(path, { recursive: true, mode: 0o700 }); return path; };
 beforeEach(() => {
-  root = mkdtempSync("/tmp/sheprd-ceiling-fix-1-");
+  root = mkdtempSync("/tmp/lgcode-ceiling-fix-1-");
   parent = directory(join(root, "repo"));
   home = directory(join(root, "protected", "home"));
   stateFolder = directory(join(root, "protected", "state"));
   pluginRoot = directory(join(root, "protected", "plugin"));
   vi.stubEnv("HOME", home);
-  vi.stubEnv("SHEPRD_HOME", stateFolder);
+  vi.stubEnv("LGCODE_HOME", stateFolder);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

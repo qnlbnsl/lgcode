@@ -13,6 +13,6 @@ export const auditCredentialReads = (credential: string, marker: string): (() =>
   return () => { fs.readFileSync = read; syncBuiltinESMExports(); };
 };
 
-if (process.env.SHEPRD_TEST_CREDENTIAL_PATH && process.env.SHEPRD_TEST_CREDENTIAL_READS) {
-  auditCredentialReads(process.env.SHEPRD_TEST_CREDENTIAL_PATH, process.env.SHEPRD_TEST_CREDENTIAL_READS);
+if (process.env.LGCODE_TEST_CREDENTIAL_PATH && process.env.LGCODE_TEST_CREDENTIAL_READS) {
+  auditCredentialReads(process.env.LGCODE_TEST_CREDENTIAL_PATH, process.env.LGCODE_TEST_CREDENTIAL_READS);
 }

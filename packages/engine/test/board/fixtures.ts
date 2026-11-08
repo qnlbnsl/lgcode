@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 
-import type { Event, EventEnvelope } from "@sheprd/contracts";
-import type { BoardView } from "@sheprd/contracts/board/view";
+import type { Event, EventEnvelope } from "@lgcode/contracts";
+import type { BoardView } from "@lgcode/contracts/board/view";
 import { expect } from "vitest";
 
 import { envelopes, event, owner, started } from "../support/viewFixtures.ts";

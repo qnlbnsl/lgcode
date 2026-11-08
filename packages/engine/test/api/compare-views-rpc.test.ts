@@ -1,5 +1,5 @@
 // Criterion 7.12 (unit 7a; rows 23, 62, 74): `debug.compare-views` exists
-// only when the service runs with `SHEPRD_TEST_DEBUG=1`, is owner-only,
+// only when the service runs with `LGCODE_TEST_DEBUG=1`, is owner-only,
 // and returns no difference after a flow. "Exists" is read as served: without
 // the flag the request tag is unknown to the server (a defect from Effect
 // RPC, "Unknown request tag"), which differs from a refusal (`CommandError`).
@@ -34,10 +34,10 @@ const flow = (root: ServiceRoot) => Effect.scoped(Effect.gen(function* () {
   return agent;
 }));
 
-live("7.12 with SHEPRD_TEST_DEBUG=1 the owner's debug.compare-views reports no difference at the current head after a flow, and an agent is refused (breaks if the RPC compares stale views, is not served under the flag, or is callable by an agent)", () =>
+live("7.12 with LGCODE_TEST_DEBUG=1 the owner's debug.compare-views reports no difference at the current head after a flow, and an agent is refused (breaks if the RPC compares stale views, is not served under the flag, or is callable by an agent)", () =>
   Effect.gen(function* () {
     const root = makeServiceRoot();
-    const service = startService(root, { env: { SHEPRD_TEST_DEBUG: "1" } });
+    const service = startService(root, { env: { LGCODE_TEST_DEBUG: "1" } });
     yield* waitServing(root, service);
     const agent = yield* flow(root);
     const token = (yield* agentToken(agent)).token;
@@ -54,11 +54,11 @@ live("7.12 with SHEPRD_TEST_DEBUG=1 the owner's debug.compare-views reports no d
     }));
   }), 120_000);
 
-live("7.12 without SHEPRD_TEST_DEBUG=1, including with any other value, debug.compare-views is not served at all, to the owner either (breaks if the debug group is always served and only refused, or any truthy value turns it on)", () =>
+live("7.12 without LGCODE_TEST_DEBUG=1, including with any other value, debug.compare-views is not served at all, to the owner either (breaks if the debug group is always served and only refused, or any truthy value turns it on)", () =>
   Effect.gen(function* () {
     for (const value of [undefined, "0", "true", "yes", " 1"]) {
       const root = makeServiceRoot();
-      const service = startService(root, { env: { SHEPRD_TEST_DEBUG: value } });
+      const service = startService(root, { env: { LGCODE_TEST_DEBUG: value } });
       yield* waitServing(root, service);
       yield* Effect.scoped(Effect.gen(function* () {
         const owner = yield* ownerClient(root);

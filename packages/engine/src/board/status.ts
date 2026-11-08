@@ -1,5 +1,5 @@
-import { holdsIncoming, holdsUnsettled, ownerHeld } from "@sheprd/contracts/board/conditions";
-import type { BoardView } from "@sheprd/contracts/board/view";
+import { holdsIncoming, holdsUnsettled, ownerHeld } from "@lgcode/contracts/board/conditions";
+import type { BoardView } from "@lgcode/contracts/board/view";
 import type { Snapshot } from "../commands/internal.ts";
 
 // In-process services use one snapshot for both the board and engine answers.

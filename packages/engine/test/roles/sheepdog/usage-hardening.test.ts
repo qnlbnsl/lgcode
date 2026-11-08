@@ -10,7 +10,7 @@ const session = "123e4567-e89b-42d3-a456-426614174000";
 const row = (usage: unknown, timestamp = "2026-11-04T12:00:00Z") => JSON.stringify({ type: "assistant", timestamp,
   message: { usage, content: "PRIVATE FILE TEXT" } });
 const withTranscript = (body: (folder: string, path: string) => void) => {
-  const folder = mkdtempSync(join(tmpdir(), "sheprd-usage-hardening-"));
+  const folder = mkdtempSync(join(tmpdir(), "lgcode-usage-hardening-"));
   try { body(folder, join(folder, `${session}.jsonl`)); }
   finally { rmSync(folder, { recursive: true, force: true }); }
 };

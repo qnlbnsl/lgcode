@@ -20,7 +20,7 @@ import { withViews } from "../support/withViews.ts";
 let rig: Rig;
 beforeEach(() => {
   rig = makeRig();
-  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
+  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
   vi.stubEnv("HOME", rig.home);
   vi.stubEnv("CODEX_HOME", `${rig.home}/.codex`);
 });

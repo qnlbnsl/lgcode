@@ -1,5 +1,5 @@
 import { it } from "@effect/vitest";
-import type { Event } from "@sheprd/contracts";
+import type { Event } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 
@@ -15,7 +15,7 @@ import { snapshot, tagged } from "../support/routingRig.ts";
 let rig: Rig;
 beforeEach(() => {
   rig = makeRig();
-  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
+  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
   vi.stubEnv("HOME", rig.home);
   vi.stubEnv("CODEX_HOME", `${rig.home}/.codex`);
 });

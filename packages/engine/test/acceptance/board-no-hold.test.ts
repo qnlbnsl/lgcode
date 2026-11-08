@@ -3,8 +3,8 @@ import { join } from "node:path";
 
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
 import { it } from "@effect/vitest";
-import { settled } from "@sheprd/contracts";
-import { waitForAgents } from "@sheprd/client";
+import { settled } from "@lgcode/contracts";
+import { waitForAgents } from "@lgcode/client";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Redacted from "effect/Redacted";
@@ -21,7 +21,7 @@ import { ancestryHeaders, authorization, socketUrl } from "../support/socketClie
 import { boardState, change, postAs, provideBoard, queued, seedBoard, snapshot } from "../board/wakeFixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 
 const ownerWait = () => Effect.gen(function* () {

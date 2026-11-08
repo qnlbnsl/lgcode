@@ -1,5 +1,5 @@
 {
-  "name": "@sheprd/client",
+  "name": "@lgcode/client",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
-    "@sheprd/contracts": "workspace:*",
+    "@lgcode/contracts": "workspace:*",
     "effect": "catalog:",
     "ws": "catalog:"
   },

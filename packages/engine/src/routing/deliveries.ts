@@ -5,7 +5,7 @@ import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { guardPiece } from "../pieces/guardPiece.ts";
 import { canReach } from "./reach.ts";
 import { randomUUID } from "node:crypto";
-import { AccountId, RunMode, type AgentId, type Delivery, type Event, type EventEnvelope } from "@sheprd/contracts";
+import { AccountId, RunMode, type AgentId, type Delivery, type Event, type EventEnvelope } from "@lgcode/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";

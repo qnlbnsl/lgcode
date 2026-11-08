@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@sheprd/contracts";
+import type { EventEnvelope } from "@lgcode/contracts";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -29,7 +29,7 @@ let rig: Rig;
 beforeEach(() => {
   rig = makeRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
+  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

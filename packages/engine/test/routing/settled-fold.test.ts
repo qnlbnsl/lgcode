@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { EventEnvelope } from "@sheprd/contracts";
+import { EventEnvelope } from "@lgcode/contracts";
 import * as Schema from "effect/Schema";
 import * as fc from "fast-check";
 import { expect, it } from "vitest";

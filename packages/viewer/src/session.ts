@@ -1,4 +1,4 @@
-import type { ClientEnvelope } from "@sheprd/client";
+import type { ClientEnvelope } from "@lgcode/client";
 import type { ViewerClient } from "./connection.ts";
 
 export type Snapshot = Awaited<ReturnType<ViewerClient["snapshot"]>>;

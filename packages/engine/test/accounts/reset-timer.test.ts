@@ -1,5 +1,5 @@
 import { it } from "@effect/vitest";
-import { AccountId, HarnessId, type Event, type EventEnvelope } from "@sheprd/contracts";
+import { AccountId, HarnessId, type Event, type EventEnvelope } from "@lgcode/contracts";
 import * as Clock from "effect/Clock";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
