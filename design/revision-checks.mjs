@@ -244,6 +244,9 @@ await run('designer findings',async()=>{
  for(const key of ['question:nav-decision','approval:perm-iris','approval:perm-finch']){await h.locator(`[data-home-item="${key}"]`).click();await h.locator('#home-detail [data-permission-answer="allow"], #home-detail [data-resolve-request]').first().click()}
  await h.waitForTimeout(60);const empty=await h.locator('#home-results').textContent();
  check(empty.includes('Nothing needs you')&&!empty.includes('Clear the filters'),'The empty queue is not blamed on filters');
+ // EMPTY-1 and BELL-1: an empty bell says so, with no link to an empty list.
+ await h.locator('#attention-toggle').click();check(await h.locator('.attention-row').count()===0&&(await h.locator('#attention-list').textContent()).trim()==='Nothing needs your attention.'&&!await h.locator('#attention-home').isVisible(),'An empty bell says so and offers no list to view');await h.keyboard.press('Escape');
+ await h.locator('#attention-filter').click();check((await h.locator('#tree-empty').textContent())==='Nothing needs you.'&&await h.locator('.project-group:not([hidden])').count()===0,'Only projects needing you says so when nothing does');await h.locator('#attention-filter').click();check(await h.locator('#tree-empty').count()===0,'Turning the filter off removes that line');
  await h.close();
  // THREAD-7
  const t=await fresh();await t.locator('#design-notes').click();await t.locator('#preview-start-reason').selectOption('model-refused');await t.locator('[data-preview="failed-start"]').click();await t.waitForTimeout(40);
@@ -457,6 +460,35 @@ await run('application shell',async()=>{
  await phone.locator('#menu').click();check(await phone.locator('#sidebar').isVisible()&&!await phone.locator('#collapse-sidebar').isVisible(),'The phone drawer opens, without the rail button');
  await phone.keyboard.press('Escape');check(!await phone.locator('#sidebar').isVisible(),'Escape closes the phone drawer');
  await phone.close();
+});
+
+// Connection, the bell, and empty states, from the designer's critique of 2026-11-06. The connection itself is in operations-checks.
+await run('bell, terminal notice, and empty states',async()=>{
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ // TERM-3: the reconnect notice sits in the terminal's own bar, so the grid keeps its rows.
+ const f=await fresh();await f.evaluate(()=>{openBoard('workspace');document.querySelector('[data-main-view="terminal"]').click()});await f.evaluate(async()=>{const s=getComputedStyle(document.querySelector('#terminal-screen'));await document.fonts.load(s.fontSize+' '+s.fontFamily)});await f.waitForTimeout(150);
+ const size=await f.locator('#terminal-size').textContent();
+ await f.evaluate(()=>document.querySelector('[data-preview="reconnect"]').click());await f.waitForTimeout(100);
+ check((await f.locator('#terminal-size').textContent())===size&&await f.locator('.terminal-top .terminal-paused').isVisible()&&await f.locator('#terminal-screen .terminal-paused').count()===0,'The reconnect notice sits in the terminal bar, and the grid keeps its size: '+size);
+ check(Math.round(await f.locator('.terminal-top').evaluate(e=>e.getBoundingClientRect().height))===36,'The terminal bar keeps its height with the notice');
+ await f.evaluate(()=>document.querySelector('[data-preview="live"]').click());
+ // EMPTY-1: a filtered Home is one sentence and one action, and a sprint shows no empty evidence section.
+ await f.evaluate(()=>openHome());await f.locator('#home-search').fill('nothing matches this');
+ check((await f.locator('.home-empty h2').textContent())==='No matching requests.'&&await f.locator('.home-empty p').count()===0&&await f.locator('.home-empty button').count()===1,'A filtered empty Home is one sentence and one action');
+ await f.locator('.home-empty [data-home-clear]').click();check(await f.locator('[data-home-item]').count()>0&&(await f.locator('#home-search').inputValue())==='','Its action clears the filters');
+ await f.evaluate(()=>openSprint('sp-02'));check(!(await f.locator('#view-body').textContent()).includes('Completion evidence'),'An unfinished sprint shows no empty evidence section');
+ await f.evaluate(()=>openSprint('sp-01'));check((await f.locator('#view-body').textContent()).includes('Completion evidence'),'A merged sprint shows its evidence');
+ await f.close();
+ // BELL-1: Home's kinds and order, 44 pixel rows with the age, at most six rows, and View all with the count.
+ const h=await fresh('?sample=heavy');await h.locator('#attention-toggle').click();
+ const rows=await h.locator('.attention-row').evaluateAll(rs=>rs.map(r=>({h:Math.round(r.getBoundingClientRect().height),kind:r.querySelector('.attention-kind').textContent,age:r.querySelector('time').textContent}))),count=Number(await h.locator('#attention-count').textContent());
+ check(count>6&&rows.length===6&&rows.every(r=>r.h===44&&r.age),'The bell shows six rows of 44 pixels, each with its age');
+ check((await h.locator('#attention-home').textContent()).trim()==='View all '+count,'The bell ends with View all and the count');
+ check(rows.every(r=>['Question','Approval','Failed start'].includes(r.kind)),"The bell uses Home's kind names");
+ const minutes=t=>(+(t.match(/(\d+) day/)?.[1]||0))*1440+(+(t.match(/(\d+) hr/)?.[1]||0))*60+(+(t.match(/(\d+) min/)?.[1]||0)),rest=rows.filter(r=>r.kind!=='Failed start');
+ check(rows[0].kind==='Failed start'&&rows.findIndex(r=>r.kind!=='Failed start')===rows.length-rest.length&&rest.every((r,i)=>!i||minutes(rest[i-1].age)>=minutes(r.age)),'The bell lists failed starts first, then the longest wait: '+rows.map(r=>r.age).join(', '));
+ check(await h.evaluate(()=>typeof byAttention==='function'&&attentionQueue().length===Number(document.querySelector('#attention-count').textContent)),'Home and the bell can share one order, byAttention');
+ await h.close();
 });
 
 const result={passed:checks.length,failed:failures.length,failures,errors,checks};

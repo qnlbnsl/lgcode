@@ -29,7 +29,7 @@ const wide=page=>page.evaluate(()=>document.documentElement.scrollWidth-innerWid
  check(stages.includes('Build')&&stages.includes('Design'),'The repository page lists each project’s stage');
  await page.click('[data-project="desktop"]');
  check(await page.locator('.stage-strip li.current').textContent()==='Design'&&await page.locator('.stage-strip li').count()===5,'A project with mocks starts at Design');
- check(await page.locator('.empty h2').textContent()==='No sprints yet','The board stays empty while the mocks are drawn');
+ check(await page.locator('.empty h2').textContent()==='No sprints until you approve the mocks.','The board stays empty while the mocks are drawn');
  check(await page.locator('#workspace-tab-mocks').isVisible(),'A project with mocks has a Mocks tab');
  check(await page.locator('#lead-chat-body').getByRole('button',{name:'Open the mocks'}).isVisible(),'The lead’s message links to the mocks');
  await page.context().close();
@@ -114,7 +114,7 @@ const wide=page=>page.evaluate(()=>document.documentElement.scrollWidth-innerWid
  await page.waitForFunction(()=>!document.querySelector('.pencil[role="status"].design-canvas'));
  check(await page.locator('.pencil').isVisible()&&(await page.locator('.pencil').textContent()).includes('design/lgcode.fig')||await page.locator('#pencil-slot[data-src*="lgcode.fig"]').count()===1,'Edit opens OpenPencil on the repository design file');
  await page.click('[data-open-repo="atlas-docs"]');await page.click('[data-repo-tab="design"]');
- check(await page.locator('.empty h2').textContent()==='No design yet','A repository without a design says so');
+ check(await page.locator('.empty h2').textContent()==='No design until a project’s mocks are approved.'&&await page.locator('.empty p').count()===0,'A repository without a design says so in one sentence');
  await page.context().close();
 }
 

@@ -94,8 +94,8 @@ try{
  await click('.project-select[data-project="workspace"]');await click('[data-sprint="sp-03"]');await click('[data-task="SH-16"]');await click('[data-show-changes="workspace-review"]');
  check(await page.locator('#participants').textContent().then(t=>t.includes('Review')),'Task changes open in the task owner’s team');
  await click('.project-select[data-project="desktop"]');
- check(await page.locator('#view-body').textContent().then(t=>t.includes('No sprints yet')&&t.includes('Design team')),'A project in design points its empty board at the mocks');check(await page.locator('#view-body [data-open-mocks]').count()===1,'The empty board opens the mocks');
- await click('#view-body [data-focus-lead]');check(await page.locator('#lead-chat-title').textContent()==='Nico'&&await page.locator('#message-input').evaluate(el=>el===document.activeElement),'Empty board action focuses its project lead panel');await leadChat();
+ check(await page.locator('#view-body .empty h2').textContent()==='No sprints until you approve the mocks.','A project in design points its empty board at the mocks');check(await page.locator('#view-body [data-open-mocks]').count()===1&&await page.locator('#view-body .empty button').count()===1,'The empty board opens the mocks, its only action');
+ await leadChat();
  await click('.project-select[data-project="workspace"]');await leadChat();
  const longDraft=Array.from({length:18},(_,i)=>`Paragraph ${i+1}: Please keep this conversation scoped to the project.`).join('\n');
  await page.locator('#message-input').fill(longDraft);await page.locator('#message-input').press('Control+Enter');
@@ -122,6 +122,8 @@ try{
  check(await page.locator('#view-body').textContent().then(t=>t.includes('A new sprint assignment')),'New task also appears in its sprint');
  await click('#new-project');await page.locator('#project-name').fill('Garden');await page.locator('#project-repo').selectOption('lgcode');await click('#project-submit');
  check(await page.locator('#breadcrumb').textContent().then(t=>t.includes('lgcode')&&t.includes('Garden')),'New project belongs to its selected known repository');
+ await click('#tab-board');check(await page.locator('#view-body .empty h2').textContent()==='No sprints yet.'&&await page.locator('#view-body .empty button').count()===1&&await page.locator('#view-body .empty p').count()===0,'An empty board is one sentence and one action');
+ await click('#view-body [data-focus-lead]');check(await page.locator('#message-input').evaluate(el=>el===document.activeElement),'Empty board action focuses its project lead');
  check(await page.locator('.project-group[data-project-id]').count()===5,'New project joins the repository tree');
  await page.reload();await click('.project-select[data-project="workspace"]');await leadChat();
  for(const theme of ['light','dark']){

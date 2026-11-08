@@ -29,9 +29,21 @@ try{
  await preview('session-unavailable');check(await page.locator('#session-retry').isVisible()&&!await page.locator('#login-form').isVisible(),'Unavailable session checks offer retry without exposing the workspace');
  check(await page.locator('#session-retry').evaluate(b=>b.classList.contains('primary')),'Try again is the primary button on the unavailable page');
  await click('#session-retry');await page.locator('#login-password').fill('sample-only-password');await click('#login-submit');
- await preview('reconnect');check(await text('#connection-banner').then(t=>t.includes('last received state')),'Reconnect retains the last received state and explains it');
- await page.locator('#message-input').fill('Keep my offline draft');check(await page.locator('#send-message').isDisabled(),'Prompt sending is unavailable while reconnecting');
+ // CONN-1 to CONN-4: the connection lives in the top bar's Live indicator, and nothing moves.
+ const layoutTop=()=>page.locator('#workspace-layout').evaluate(e=>Math.round(e.getBoundingClientRect().top)),liveTop=await layoutTop();
+ await preview('reconnect');check(await text('#connection-state')==='Reconnecting'&&await text('#connection-updated').then(t=>t.startsWith('Last updated')),'Reconnecting shows in the Live indicator with the last update time');
+ check(await page.locator('#connection-banner').count()===0&&await layoutTop()===liveTop,'Reconnecting inserts no banner and moves nothing');
+ check(await page.locator('#retry-connection').isVisible()&&(await text('#retry-connection')).trim()==='Reconnect now'&&await page.locator('#retry-connection').evaluate(b=>b.classList.contains('secondary')&&b.classList.contains('dense')&&!/[→↗]/.test(b.textContent)),'Reconnect now is a small button with no arrow');
+ check(await page.locator('#attention-toggle').evaluate(b=>{const d=document.createElement('i');d.style.color='var(--color-muted)';document.body.append(d);const m=getComputedStyle(d).color;d.remove();return b.classList.contains('stale')&&getComputedStyle(b).color===m&&b.title.startsWith('Count from the last update')}),'A stale bell count is muted and says so');
+ await page.locator('#message-input').fill('Keep my offline draft');check(await page.locator('#send-message').isDisabled()&&(await page.locator('#send-message').getAttribute('title')).startsWith('Reconnecting'),'Prompt sending is unavailable while reconnecting, and says why');
+ check(await page.locator('#new-project').isDisabled()&&await page.evaluate(()=>[...document.querySelectorAll('.app button:disabled,.app input:disabled,.app select:disabled,.app textarea:disabled')].filter(e=>e.offsetParent&&!e.matches('#home-clear-filters')).every(e=>e.title)),'Every disabled action says why while reconnecting');
  await click('#retry-connection');check(await text('#connection-status').then(t=>t.includes('Live'))&&await page.locator('#message-input').inputValue()==='Keep my offline draft','Reconnect restores connection without losing the draft');
+ check(await page.locator('#retry-connection').isHidden()&&!await page.locator('#new-project').isDisabled()&&!(await page.locator('#new-project').getAttribute('title'))&&!await page.locator('#attention-toggle').evaluate(b=>b.classList.contains('stale')),'Going live re-enables actions and clears their reasons');
+ await click('#lead-panel [data-open-permission="perm-iris"]');await preview('offline');
+ check(await text('#connection-state')==='Offline'&&await text('#connection-updated')==='Last updated 2 minutes ago','The Offline preview shows the indicator with the last update time');
+ check(await page.locator('#permission-perm-iris [data-permission-answer="allow"]').isDisabled()&&(await page.locator('#permission-perm-iris [data-permission-answer="allow"]').getAttribute('title')).startsWith('LGcode is offline')&&await text('#permission-perm-iris').then(t=>t.includes('pnpm')),'Offline keeps the request readable and disables Allow with the reason');
+ check(await page.locator('#permission-perm-iris [data-permission-answer="allow"]').evaluate(b=>{const c=document.querySelector('#composer-wrap').getBoundingClientRect(),r=b.getBoundingClientRect();return r.bottom<=c.top}),'Allow stays above the composer while offline');
+ await click('#retry-connection');await click('#tab-board');
  await click('#lead-agent-controls [data-agent-command="stop"]');check(await text('#lead-agent-controls').then(t=>t.includes('Stopped'))&&await page.locator('#send-message').isDisabled(),'Stop agent changes lifecycle and prevents sends');
  await click('#lead-agent-controls [data-agent-command="resume"]');check(await text('#lead-agent-controls').then(t=>t.includes('Waiting on'))&&!await page.locator('#send-message').isDisabled(),'Resume agent restores lifecycle and sending');
  await click('#lead-panel [data-open-permission="perm-iris"]');
@@ -112,6 +124,16 @@ try{
  check(await page.locator('[data-resolve-request="nav-decision"]').isEnabled(),'Stopping an asker leaves its question answerable');
  await click('[data-team-toggle="review"]');await click('#sidebar [data-agent="finch"]');await preview('held-permission');
  check(await text('#permission-perm-finch').then(t=>t.includes('held elsewhere'))&&await page.locator('#permission-perm-finch [data-permission-answer]').count()===0,'Permissions held elsewhere offer no owner answer controls');
+ // CONN-4: after 30 seconds of failed reconnects the indicator says Offline, and the last update time keeps counting.
+ {const ctx=await browser.newContext({viewport:{width:1440,height:900}}),o=await ctx.newPage();o.on('pageerror',e=>errors.push(e.message));await o.clock.install();
+  await o.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await o.waitForFunction(()=>window.lgcodeReady);
+  await o.click('.project-select[data-project="workspace"]');await o.click('#design-notes');await o.click('[data-preview="reconnect"]');
+  await o.clock.runFor(29000);check(await o.locator('#connection-state').textContent()==='Reconnecting','Reconnecting holds for the first 30 seconds');
+  await o.clock.runFor(2000);check(await o.locator('#connection-state').textContent()==='Offline'&&await o.locator('#connection-updated').textContent()==='Last updated 30 seconds ago','After 30 seconds of failed reconnects the indicator says Offline');
+  await o.clock.runFor(90000);check(await o.locator('#connection-updated').textContent()==='Last updated 2 minutes ago','The last update time keeps counting while offline');
+  check(await o.locator('#lead-panel [data-open-permission="perm-iris"]').isEnabled()&&await o.locator('#lead-chat-body').textContent().then(t=>t.length>200),'Offline keeps the data readable and navigable');
+  await o.click('#retry-connection');check(await o.locator('#connection-state').textContent()==='Live','Reconnect now returns to Live');
+  await ctx.close()}
  check(errors.length===0,'No JavaScript errors in operational flows');
  writeFileSync(new URL('./previews/operations-checks.json',import.meta.url),JSON.stringify({passed:checks.length,checks,errors},null,2));
  console.log(JSON.stringify({passed:checks.length,errors}));

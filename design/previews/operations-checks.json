@@ -1,5 +1,5 @@
 {
-  "passed": 62,
+  "passed": 75,
   "checks": [
     "Owner view has a Log out action",
     "Connection state is visible without a sample badge",
@@ -14,9 +14,17 @@
     "A rejected password is shown in the error color directly under the field",
     "Unavailable session checks offer retry without exposing the workspace",
     "Try again is the primary button on the unavailable page",
-    "Reconnect retains the last received state and explains it",
-    "Prompt sending is unavailable while reconnecting",
+    "Reconnecting shows in the Live indicator with the last update time",
+    "Reconnecting inserts no banner and moves nothing",
+    "Reconnect now is a small button with no arrow",
+    "A stale bell count is muted and says so",
+    "Prompt sending is unavailable while reconnecting, and says why",
+    "Every disabled action says why while reconnecting",
     "Reconnect restores connection without losing the draft",
+    "Going live re-enables actions and clears their reasons",
+    "The Offline preview shows the indicator with the last update time",
+    "Offline keeps the request readable and disables Allow with the reason",
+    "Allow stays above the composer while offline",
     "Stop agent changes lifecycle and prevents sends",
     "Resume agent restores lifecycle and sending",
     "Lead surfaces permission requests from its team",
@@ -62,6 +70,11 @@
     "Stopping an agent cancels its outstanding permissions",
     "Stopping an asker leaves its question answerable",
     "Permissions held elsewhere offer no owner answer controls",
+    "Reconnecting holds for the first 30 seconds",
+    "After 30 seconds of failed reconnects the indicator says Offline",
+    "The last update time keeps counting while offline",
+    "Offline keeps the data readable and navigable",
+    "Reconnect now returns to Live",
     "No JavaScript errors in operational flows"
   ],
   "errors": []

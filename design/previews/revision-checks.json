@@ -1,5 +1,5 @@
 {
-  "passed": 230,
+  "passed": 244,
   "failed": 0,
   "failures": [],
   "errors": [],
@@ -114,6 +114,9 @@
     "Sign-in shows that it is waiting",
     "Signing in and resuming clears the failed start",
     "The empty queue is not blamed on filters",
+    "An empty bell says so and offers no list to view",
+    "Only projects needing you says so when nothing does",
+    "Turning the filter off removes that line",
     "A refused model names the machine and offers the choice in place",
     "Trying again with another model clears the failure",
     "The role is text, not a one-click select",
@@ -233,6 +236,17 @@
     "Design notes groups its previews as Session, Connection, and Requests",
     "The current row sits 8 pixels above the tree fade: 44",
     "The phone drawer opens, without the rail button",
-    "Escape closes the phone drawer"
+    "Escape closes the phone drawer",
+    "The reconnect notice sits in the terminal bar, and the grid keeps its size: 145×38",
+    "The terminal bar keeps its height with the notice",
+    "A filtered empty Home is one sentence and one action",
+    "Its action clears the filters",
+    "An unfinished sprint shows no empty evidence section",
+    "A merged sprint shows its evidence",
+    "The bell shows six rows of 44 pixels, each with its age",
+    "The bell ends with View all and the count",
+    "The bell uses Home's kind names",
+    "The bell lists failed starts first, then the longest wait: 41 min, 2 days, 3 hr 40 min, 1 hr 12 min, 51 min, 27 min",
+    "Home and the bell can share one order, byAttention"
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "passed": 125,
+  "passed": 126,
   "checks": [
     "Project tree contains no redundant Board row",
     "Desktop board shows its project lead chat panel",
@@ -52,8 +52,7 @@
     "Completed sprint cannot accept unverified new scope",
     "Task changes open in the task owner’s team",
     "A project in design points its empty board at the mocks",
-    "The empty board opens the mocks",
-    "Empty board action focuses its project lead panel",
+    "The empty board opens the mocks, its only action",
     "Running sample reply can be stopped",
     "Long conversation provides a real scroll position to preserve",
     "Project switching preserves reading position",
@@ -65,6 +64,8 @@
     "Adding a task updates its team task list",
     "New task also appears in its sprint",
     "New project belongs to its selected known repository",
+    "An empty board is one sentence and one action",
+    "Empty board action focuses its project lead",
     "New project joins the repository tree",
     "light: board has no page overflow at 390px",
     "light: the branch fits the top bar at 390px",
