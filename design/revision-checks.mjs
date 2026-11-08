@@ -260,6 +260,96 @@ await run('designer findings',async()=>{
  await f.close();
 });
 
+// The designer's visual foundations: type, spacing, shape, controls, colour, icons, motion, focus, tabs, and dialogs.
+await run('visual foundations',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const html=readFileSync(new URL('./workbench.html',import.meta.url),'utf8'),js=readFileSync(new URL('./workbench.js',import.meta.url),'utf8');
+ const css=html.slice(html.indexOf('<style>')+7,html.indexOf('</style>'));
+ const decls=[...css.matchAll(/([a-z-]+):([^;{}]+)/g)].map(m=>[m[1],m[2].trim()]);
+ // TYPE-2: five sizes, three weights, and no raw size in the stylesheet or the script.
+ check(/--text-xs:11px; --text-sm:12px; --text-md:13px; --text-lg:15px; --text-xl:20px; --text-input:16px;/.test(css)&&readFileSync(new URL('./tokens.css',import.meta.url),'utf8').includes('--text-md:13px'),'The type scale is 11, 12, 13, 15, and 20 pixels, with 16 for phone fields');
+ const rawSizes=decls.filter(([p,v])=>p==='font-size'&&!/^var\(--text-(xs|sm|md|lg|xl|input)\)$/.test(v)&&v!=='inherit'||p==='font'&&v!=='inherit'&&!/(^|\s)var\(--text-(xs|sm|md|lg|xl|input)\)/.test(v));
+ check(!rawSizes.length,'No raw font size appears in the stylesheet: '+rawSizes.map(d=>d.join(':')).slice(0,3).join(' | '));
+ check(!/font-size:\s*\d|font:\s*\d/.test(js),'The script writes no raw font size');
+ check(decls.filter(([p,v])=>p==='font-weight'&&!/^\d+ \d+$/.test(v)).every(([,v])=>/^var\(--weight-(body|medium|strong)\)$/.test(v)),'Every weight in the stylesheet is a token');
+ // SPACE-1: three radii and a 4 pixel grid.
+ check(decls.filter(([p])=>p==='border-radius').every(([,v])=>v.split(/\s+/).every(x=>x==='0'||/^var\(--radius-(sm|md|pill)\)$/.test(x))),'Every radius is 4 pixels, 8 pixels, or full');
+ const offGrid=decls.filter(([p,v])=>/^(padding|margin|gap|row-gap|column-gap)(-[a-z-]+)?$/.test(p)&&v.replace(/var\([^)]*\)|calc\([^)]*\)|clamp\([^)]*\)/g,'').split(/\s+/).some(x=>/px/.test(x)&&!/^(1|2)px/.test(x)&&parseFloat(x)%4!==0));
+ check(!offGrid.length,'Spacing sits on the 4 pixel grid: '+offGrid.map(d=>d.join(':')).slice(0,3).join(' | '));
+ const audit=p=>p.evaluate(()=>{const sizes=new Set(),weights=new Set(),radii=new Set(),phoneSizes=[];for(const e of document.querySelectorAll('body *')){const r=e.getBoundingClientRect();if(!r.width||!r.height||e.closest('svg,.sr-only'))continue;const c=getComputedStyle(e),text=[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim())||/INPUT|TEXTAREA|SELECT/.test(e.tagName);if(text){sizes.add(c.fontSize+(/INPUT|TEXTAREA|SELECT/.test(e.tagName)?' field':''));weights.add(c.fontWeight)}radii.add(c.borderTopLeftRadius)}return {sizes:[...sizes],weights:[...weights],radii:[...radii]}});
+ const views=[[''],['workspace'],['git'],['machines'],['settings']];
+ for(const width of [1440,390]){const p=await fresh('',{width,height:900});for(const [v] of views){if(v==='workspace'||v==='git')await p.evaluate(()=>openBoard('workspace'));if(v==='git')await p.locator('[data-main-view="source-control"]').first().click();if(v==='machines'||v==='settings')await p.evaluate(s=>document.querySelector(`[data-system-page="${s}"]`).click(),v);
+  const a=await audit(p),bad=a.sizes.filter(s=>!['11px','12px','13px','15px','20px','12px field','13px field','15px field'].includes(s)&&!(width<=700&&s==='16px field'));
+  check(!bad.length,`${width}: ${v||'home'} renders only scale sizes: ${bad.join(',')}`);
+  check(a.weights.every(w=>['400','500','600'].includes(w)),`${width}: ${v||'home'} uses three weights: ${a.weights.join(',')}`);
+  check(a.radii.every(r=>['0px','4px','8px','999px'].includes(r)),`${width}: ${v||'home'} uses three radii: ${a.radii.join(',')}`)}await p.close()}
+ // TYPE-1: Inter and JetBrains Mono are self-hosted, with tabular numbers.
+ const f=await fresh();
+ check(await f.evaluate(async()=>{await document.fonts.ready;return ['Inter','JetBrains Mono'].every(n=>[...document.fonts].some(x=>x.family.replace(/"/g,'')===n&&x.status==='loaded'))}),'Inter and JetBrains Mono load from the repository');
+ check(await f.evaluate(()=>getComputedStyle(document.body).fontFamily.startsWith('Inter')&&getComputedStyle(document.body).fontVariantNumeric==='tabular-nums'&&getComputedStyle(document.querySelector('.repo-label')).fontFamily.startsWith('"JetBrains Mono"')),'Interface text is Inter with tabular numbers, and paths are JetBrains Mono');
+ // TYPE-3: a page title is 15 pixels at weight 600.
+ check(await f.locator('#view-title').evaluate(e=>getComputedStyle(e).fontSize==='15px'&&getComputedStyle(e).fontWeight==='600'),'A page title is 15 pixels at weight 600');
+ // ICON-1: no text characters stand in for icons, and the shortcut matches the system.
+ check(!/[×←→↗⌘✓＋]/.test(await f.evaluate(()=>[...document.querySelectorAll('button,kbd')].map(b=>b.textContent).join(''))),'Buttons use drawn icons instead of text characters');
+ check((await f.locator('#quick-open-key').textContent())==='Ctrl K','The switcher shortcut reads Ctrl K off Apple systems');
+ const mac=await browser.newPage({viewport:{width:1440,height:900}});await mac.addInitScript(()=>{Object.defineProperty(Navigator.prototype,'platform',{get:()=>'MacIntel'});Object.defineProperty(Navigator.prototype,'userAgentData',{get:()=>({platform:'macOS'})})});await mac.goto(url);await mac.waitForFunction(()=>window.lgcodeReady);
+ check(await mac.locator('#quick-open-key svg').count()===1&&(await mac.locator('#quick-open-key').textContent()).endsWith('K'),'The switcher shortcut shows the Command icon on Apple systems');await mac.close();
+ check(await f.locator('[data-system-page="alerts"] svg rect').count()===1,'Alerts, which go to a phone, use a phone icon');
+ // COLOR-1: amber is for attention, and the modified letter is quiet.
+ const colors=await f.evaluate(()=>{const token=v=>{const d=document.createElement('i');d.style.color=`var(${v})`;document.body.append(d);const c=getComputedStyle(d).color;d.remove();return c};openBoard('workspace');document.querySelector('[data-main-view="source-control"]').click();const m=document.querySelector('.source-file small');return {m:m?getComputedStyle(m).color:null,muted:token('--color-muted'),warn:token('--color-warn'),alerts:getComputedStyle(document.querySelector('#alerts-count')).color,primary:token('--color-primary')}});
+ check(colors.m===colors.muted,'The Modified letter in Git uses the muted colour');
+ check(colors.alerts!==colors.warn,'The failed alerts count is not amber');
+ await f.evaluate(()=>openBoard('workspace'));
+ check(await f.locator('#lead-agent-controls [data-agent-command="stop"]').evaluate(b=>b.classList.contains('secondary')&&getComputedStyle(b).backgroundColor==='rgba(0, 0, 0, 0)'),'Stop agent is a neutral outline button');
+ // BTN-1: a disabled button is an outline with readable muted text, and Commit says why.
+ const disabled=await f.locator('#send-message').evaluate(b=>{const lum=c=>{const [r,g,bl]=c.match(/\d+/g).slice(0,3).map(x=>{x/=255;return x<=.03928?x/12.92:((x+.055)/1.055)**2.4});return .2126*r+.7152*g+.0722*bl};const bg=getComputedStyle(document.querySelector('#message-form')).backgroundColor,fg=getComputedStyle(b).color,[a,c]=[lum(fg),lum(bg)].sort((x,y)=>y-x);return {disabled:b.disabled,fill:getComputedStyle(b).backgroundColor,ratio:(a+.05)/(c+.05)}});
+ check(disabled.disabled&&disabled.fill==='rgba(0, 0, 0, 0)'&&disabled.ratio>=3,'A disabled Send is an outline with text at 3 to 1 or more: '+disabled.ratio.toFixed(2));
+ await f.locator('[data-main-view="source-control"]').first().click();
+ check(await f.locator('#git-commit').isDisabled()&&(await f.locator('#git-commit-reason').textContent())==='Add a message and stage a file.','Disabled Commit says what it needs');
+ await f.locator('#git-message').fill('Tighten the thread');check((await f.locator('#git-commit-reason').textContent())==='Stage a file to commit.','The reason updates as the message is typed');
+ // BTN-2: two control heights.
+ check(await f.locator('#context-toggle').evaluate(e=>Math.round(e.getBoundingClientRect().height))===28&&await f.locator('.git-sync button').first().evaluate(e=>Math.round(e.getBoundingClientRect().height))===28,'The top bar picker and Git sync buttons are 28 pixels');
+ await f.evaluate(()=>showNewProject());
+ check(new Set(await f.locator('#project-dialog input:not([type=checkbox]):visible,#project-dialog select:visible,#project-dialog footer button').evaluateAll(es=>es.map(e=>Math.round(e.getBoundingClientRect().height)))).size===1,'Inputs, selects, and buttons in one form share one height');
+ await f.locator('#project-dialog footer [data-close]').click();
+ // BTN-3: anything that changes state is a button.
+ await f.evaluate(()=>openHome('attention'));
+ check(await f.locator('#home-clear-filters').evaluate(b=>b.classList.contains('secondary')&&!b.classList.contains('inline-link')),'Clear filters is a button, not a link');
+ // DLG-1 and ADDSUB-1: every dialog has Cancel or Close left of its action.
+ const dialogs=await f.evaluate(()=>[...document.querySelectorAll('dialog:not(#quick-dialog)')].map(d=>{const footers=[...d.querySelectorAll('footer')];return [d.id,footers.some(ft=>{const bs=[...ft.querySelectorAll('button')];const c=bs.findIndex(b=>/^(Cancel|Close)$/.test(b.textContent.trim())&&b.classList.contains('secondary'));const a=bs.findIndex(b=>b.classList.contains('primary'));return c>=0&&(a<0||c<a)})||d.id==='machine-dialog'&&!!d.querySelector('#pair-start footer [data-close]')]}));
+ check(dialogs.every(([,ok])=>ok),'Every dialog closes with Cancel or Close left of its action: '+dialogs.filter(([,ok])=>!ok).map(([id])=>id).join(','));
+ await f.evaluate(()=>{document.querySelector('[data-system-page="subscriptions"]').click()});await f.locator('#add-subscription').click();
+ check(await f.evaluate(()=>{const s=document.querySelector('#subscription-machine'),p=s.nextElementSibling;return p.getBoundingClientRect().top-s.getBoundingClientRect().bottom>=16}),'Add subscription leaves 16 pixels between the select and its note');
+ await f.locator('#subscription-dialog footer [data-close]').click();
+ // COLOR-2: the toast is a neutral surface at the top right, below the bell.
+ await f.evaluate(()=>toast('Saved.'));
+ const t=await f.evaluate(()=>{const r=document.querySelector('#toast').getBoundingClientRect(),bell=document.querySelector('#attention-toggle').getBoundingClientRect(),d=document.createElement('i');d.style.color='var(--color-surface)';document.body.append(d);const surface=getComputedStyle(d).color;d.remove();return {right:innerWidth-r.right,top:r.top,bell:bell.bottom,bg:getComputedStyle(document.querySelector('#toast')).backgroundColor,surface}});
+ check(t.right<=24&&t.top>=t.bell&&t.top<80&&t.bg===t.surface,'The toast is a raised neutral surface at the top right, below the bell');
+ // MOTION-1: rows open and leave in 120 milliseconds, unless motion is reduced.
+ await f.evaluate(()=>openHome('attention'));await f.locator('[data-home-item]').first().click();
+ check(await f.locator('#home-detail').evaluate(e=>getComputedStyle(e).animationName==='row-open'&&getComputedStyle(e).animationDuration==='0.12s'),'An expanded row eases open in 120 milliseconds');
+ await f.locator('#home-detail [data-resolve-request]').first().click();
+ check(await f.locator('.row-leaving').count()===1&&await f.locator('.row-leaving [data-home-item]').count()===0,'An answered request leaves its place instead of vanishing');
+ await f.waitForTimeout(450);check(await f.locator('.row-leaving').count()===0,'The leaving row is gone after its animation');
+ await f.emulateMedia({reducedMotion:'reduce'});await f.locator('[data-home-item]').first().click();
+ check(await f.locator('#home-detail').evaluate(e=>getComputedStyle(e).animationName==='none'),'Reduced motion turns the row animation off');
+ // FOCUS-1: the tree has room for the focus ring.
+ check(await f.evaluate(()=>{const t=document.querySelector('#repo-tree'),d=t.querySelector('.disclosure');return d.getBoundingClientRect().left-t.getBoundingClientRect().left>=5}),'A tree disclosure has room for its whole focus ring');
+ // TAB-2 and TAB-3: tabs stay still, and hover changes colour without a fill.
+ await f.evaluate(()=>openBoard('workspace'));const rows=[];
+ for(const view of ['board','chat','terminal','source-control','workspace-settings']){await f.locator(`[data-main-view="${view}"]`).first().click();rows.push(await f.locator('#workspace-tabs [role=tab]').evaluateAll(ts=>ts.map(t=>Math.round(t.getBoundingClientRect().left)).join(',')))}
+ check(new Set(rows).size===1,'Selecting a tab moves no other tab: '+rows[0]);
+ await f.locator('[data-main-view="chat"]').first().hover();
+ check(await f.locator('[data-main-view="chat"]').first().evaluate(e=>getComputedStyle(e).backgroundColor==='rgba(0, 0, 0, 0)'),'A hovered tab changes colour without a fill');
+ // DISC-2: the resize handles show a grip on hover.
+ const handle=f.locator('#sidebar-resize'),hb=await handle.boundingBox();
+ check(await handle.evaluate(e=>getComputedStyle(e,'::after').opacity==='0'),'The resize grip is hidden at rest');
+ await f.mouse.move(hb.x+hb.width/2,hb.y+300);await f.waitForTimeout(200);
+ check(hb.width===8&&await handle.evaluate(e=>getComputedStyle(e).cursor==='col-resize'&&getComputedStyle(e,'::after').opacity==='1'),'Hovering the 8 pixel resize target shows a grip and the resize cursor');
+ await f.close();
+});
+
 const result={passed:checks.length,failed:failures.length,failures,errors,checks};
 writeFileSync('design/previews/revision-checks.json',JSON.stringify(result,null,2));
 console.log(JSON.stringify({passed:checks.length,failed:failures.length,failures,errors},null,1));

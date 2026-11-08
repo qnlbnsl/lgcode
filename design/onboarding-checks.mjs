@@ -20,7 +20,7 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  const page=await fresh();
  check(await page.locator('#auth-gate').isVisible(),'A first run starts at the login page');
  check(!await page.locator('#setup').isVisible()&&!await page.locator('.app').isVisible(),'Nothing else shows before login');
- check(await page.locator('#auth-title').textContent()==='Log in','A first run does not say "Back to your projects"');
+ check(await page.locator('#auth-title').textContent()==='Sign in to LGcode','A first visit is asked to sign in, not welcomed back');
  await logIn(page);
  check(await title(page)==='LGcode'&&await page.locator('#setup').isVisible(),'Login opens the first page');
  check(!await page.locator('.app').isVisible(),'The empty app stays hidden during setup');

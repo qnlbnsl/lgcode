@@ -8,20 +8,26 @@ const check=(v,label)=>{if(!v)throw Error(label);checks.push(label)};
 const click=s=>page.locator(s).click();
 const preview=async action=>{await click('#design-notes');await click(`[data-preview="${action}"]`)};
 const text=s=>page.locator(s).textContent();
+const authLook=()=>page.evaluate(()=>{const m=document.querySelector('#auth-message'),f=document.querySelector('#login-password'),s=document.querySelector('#login-submit'),token=v=>{const d=document.createElement('i');d.style.color=`var(${v})`;document.body.append(d);const c=getComputedStyle(d).color;d.remove();return c};return {color:getComputedStyle(m).color,error:token('--color-error'),muted:token('--color-muted'),gap:m.getBoundingClientRect().top-f.getBoundingClientRect().bottom,beforeSubmit:m.getBoundingClientRect().bottom<=s.getBoundingClientRect().top}});
 try{
  await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.lgcodeReady);
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('#logout').count()===1,'Owner view has a Log out action');
  check(await text('#connection-status').then(t=>t.trim()==='Live'),'Connection state is visible without a sample badge');
  await click('#logout');check(await page.locator('#login-form').isVisible()&&!await page.locator('.app').isVisible(),'Logout hides the owner workspace and shows login');
+ check(await page.locator('#login-password').getAttribute('autocomplete')==='current-password','The password field lets a password manager fill it');
+ check(await text('#auth-title')==='Sign in to LGcode'&&await page.locator('.auth-mark').isVisible()&&(await page.locator('.auth-mark').boundingBox()).y<(await page.locator('#auth-title').boundingBox()).y,'Login says Sign in to LGcode under the logo mark');
  await page.locator('#login-password').fill('sample-only-password');await click('#login-submit');
  check(await page.locator('#login-password').inputValue()==='','Password input clears on submission');
  check(await page.locator('.app').isVisible(),'Sample login returns to the workspace');
  await preview('expire');check(await text('#auth-message').then(t=>t.includes('session ended'))&&!await page.locator('.app').isVisible(),'Session expiry returns to login with a reason');
+ {const a=await authLook();check(a.color===a.muted&&a.gap>=0&&a.gap<16&&a.beforeSubmit,'The expiry notice is muted and sits directly under the password field')}
  await page.locator('#login-password').fill('sample-only-password');await click('#login-submit');
  await preview('login-rejected');check(await text('#auth-message').then(t=>t.includes('not accepted')),'Rejected-login state keeps a readable error');
+ {const a=await authLook();check(a.color===a.error&&a.gap>=0&&a.gap<16&&a.beforeSubmit,'A rejected password is shown in the error color directly under the field')}
  await page.locator('#login-password').fill('sample-only-password');await click('#login-submit');
  await preview('session-unavailable');check(await page.locator('#session-retry').isVisible()&&!await page.locator('#login-form').isVisible(),'Unavailable session checks offer retry without exposing the workspace');
+ check(await page.locator('#session-retry').evaluate(b=>b.classList.contains('primary')),'Try again is the primary button on the unavailable page');
  await click('#session-retry');await page.locator('#login-password').fill('sample-only-password');await click('#login-submit');
  await preview('reconnect');check(await text('#connection-banner').then(t=>t.includes('last received state')),'Reconnect retains the last received state and explains it');
  await page.locator('#message-input').fill('Keep my offline draft');check(await page.locator('#send-message').isDisabled(),'Prompt sending is unavailable while reconnecting');
