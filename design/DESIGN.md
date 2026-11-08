@@ -122,8 +122,9 @@ The current proposal uses a shared frame for the compact conversation
 header, chat, and composer. That frame stays centered within the available workspace on wide
 screens. Message text has a separate 70-character reading measure. Boards
 and plan details use a wider frame. Titles,
-authors, replies, and metadata have distinct sizes. The composer always
-names its recipient, including after a draft replaces the placeholder.
+authors, replies, and metadata have distinct sizes. The composer's label and
+placeholder name its recipient. While a draft is typed, the line under the tabs
+or the lead panel's header still names the agent.
 
 ## Interaction rules
 
@@ -181,8 +182,8 @@ project branch. A clean project branch requires an explicit review before
 main. Uncommitted destination changes block integration. All of these are
 in-memory interactions, with no repository mutation.
 
-Agent progress and stop/resume sit next to the composer. Subscription choices
-are filtered by harness and machine. Files and tasks can be attached as
+Agent progress and Stop sit above the composer, and Resume replaces its input.
+Subscription choices are filtered by harness and machine. Files and tasks can be attached as
 context, and sent turns retain those references. Grouped activity links to
 its changed files. The bell lists questions, approvals, and
 failed starts in one order. Only projects needing you filters projects. Quick switch searches
@@ -682,3 +683,76 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
   raw input wait under a closed Details disclosure.
 - **One filled button.** An expanded row holds at most one primary button, so Home never shows
   two.
+
+## The composer and agent threads, set on 2026-11-08
+
+These rules come from the designer's critique of 2026-11-06. Claude applied them on
+2026-11-08. They cover the composer, Add context, and what a thread shows besides messages.
+
+### One input over one tool row
+
+- **The composer is 74 pixels tall.** It is one input with one tool row beneath it, inside one
+  border, in Chat and in the lead panel alike. The recipient line, the worktree line, and the
+  keyboard hint are gone. The input's label still names the agent, and the hint is read only by
+  screen readers.
+- **Both places have a top rule.** A line separates the thread from the composer in Chat, as it
+  already did in the lead panel, so thread text never runs into it.
+- **The tool row holds, in order:** Add context, the subscription, the model, the effort, the share
+  of the context window in use, and Send at the right end. Stop response takes Send's place while
+  a reply is running.
+- **The subscription shows its own name,** such as "Claude Code · Team". It no longer says Host
+  profile. The agent's own subscription is chosen until the owner picks another.
+- **Each menu fits its label.** Subscription, model, and effort are buttons that open one shared
+  menu above them, so no fixed width leaves a gap before the chevron. Arrow keys move through the
+  menu, and Escape returns to its button.
+- **The model and effort belong to the agent.** The data layer stores them, and the next turn
+  uses them. The context share is the harness's latest usage report, such as "34% context".
+- **Narrow composers drop words, not controls.** Below 600 pixels the subscription drops its
+  harness name. Below 420 pixels, as in the lead panel and on phones, Add context shows only its
+  icon and "context" leaves the percentage.
+
+### The line above the composer
+
+- **It shows only while the agent is busy or something waits.** Examples are "Waiting for
+  approval · Run the web tests" and "Working on your message". An idle agent has no line.
+- **Stop shows only while the agent works or waits on a tool.** Waiting for an approval or an
+  answer counts, because the agent is mid-turn. A lead with no sprints in flight,
+  such as Nico before the mocks are approved, offers no Stop.
+
+### A stopped or failed agent cannot take a message
+
+- **The state and its remedy replace the input.** A failed start says "Ash failed to start." and
+  its reason, with Sign in on Buildbox and Resume. A refused model or effort offers the model and
+  effort menus and Try again. A stopped agent says so and offers Resume as the primary button.
+- **The draft is kept.** The panel says "Your draft is kept." when there is one, and the input
+  returns with it after Resume.
+- **The thread keeps the failed start as a record.** Its block says what went wrong and how to fix
+  it, and the controls live in the composer, so a thread never shows two Resume buttons. Home's
+  failed-start rows keep their own controls.
+- **A row with two states says both.** A stopped agent with an open question says "Stopped · Needs
+  answer" and wears a hollow amber dot. A sidebar narrower than 210 pixels per row drops
+  "Stopped · ", and the hollow dot and the hover text still say it.
+
+### What a thread shows besides messages
+
+- **An approval holds its tool call.** The call, its state, its input, and its output sit under
+  the approval's Details, so the command shows once.
+- **A request held by the lead names the lead.** It says "Held by Sage, the project lead", with a
+  link to Sage's thread. The sidebar says "Waiting on Sage", as the line above the composer does.
+- **An unconfirmed answer can be refreshed.** "Refresh this request" re-reads it before the owner
+  answers again.
+- **Delivery history is quiet unless something failed.** It is a muted Delivery details
+  disclosure at 12 pixels. A message that was returned or withdrawn opens as "Message not
+  delivered" in the error color.
+- **A large item is named by its content and size,** such as "Review trace (192 kilobytes)".
+  Loaded, it shows its first 12 lines with Open in full and Copy. A failed load offers Retry.
+- **Open in full fills the main area.** The whole text is one plain block, so the browser's find
+  reaches all of it. The link back and Escape return to the thread, at the item.
+
+### Add context
+
+- **Search, then groups.** The list has a search field and two groups, Tasks and Files, with rows
+  of 32 pixels. Enter in the search field adds what is checked.
+- **Typing @ opens the same list.** An @ typed at the start of the draft or after a space opens it.
+  Adding context removes that @, and Cancel leaves it in the draft.
+

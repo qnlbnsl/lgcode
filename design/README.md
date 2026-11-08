@@ -80,6 +80,18 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
   shows what needs attention. Escape closes it.
 - Send a message to see a reply. Stop cancels
   a pending reply. Both messages and drafts are scoped to their conversation.
+- Look at the composer. It is one input over one tool row: Add context, the subscription by its
+  own name, the model, the effort, and how much of the context window is in use. Choose another
+  model or effort from its menu; the agent keeps it. Type @ after a space to open Add context,
+  search it, and pick a task or a file.
+- Open Nico on Desktop companion's board. He is idle, so there is no status line and no Stop.
+  Open Iris: she waits on a tool, so the line says so and offers Stop agent.
+- Stop Rowan. The input gives way to "Rowan is stopped." and a Resume button, and his sidebar row
+  keeps "Needs answer" with a hollow amber dot. Open Ash: the composer says he failed to start and
+  offers Sign in on Buildbox and Resume.
+- In Iris's thread, load the review trace. It shows its first 12 lines with Open in full and Copy.
+  Open in full fills the main area, and Escape returns to the thread. Delivery details is a quiet
+  disclosure, and the tool call sits under the approval's Details.
 - Add a task to an active sprint. Completed sprints do not accept new tasks.
 - Every project board starts with a stage strip: Design, Plan, Build, Review, and Hand over.
   The repository page lists each project's stage.
@@ -126,7 +138,7 @@ contains preview controls for session expiry, login errors, connection loss and 
 failed starts, permissions, and large-item failure.
 
 Agent threads retain stop/resume, failed-start reasons, permission controls,
-full large-item loading, tool calls, and delivery history. Sage surfaces team
+full large-item loading, tool calls inside their approvals, and delivery history under Delivery details. Sage surfaces team
 permission requests alongside design questions. Stopping an agent cancels
 its permissions while leaving its questions answerable.
 
@@ -256,8 +268,9 @@ tree. Repository names still open their project lists; there is no separate
 Repositories destination. Borders separate the project tree, repository
 groups, and service pages. This replaces the earlier disconnected controls.
 
-The composer shows current progress and stop/resume, a subscription picker,
-and Add context for task and file references. Activity details link to Git.
+The composer shows current progress and Stop while the agent is busy, Resume in place of the
+input when it is stopped, and a tool row with Add context, the subscription, the model, the
+effort, and the context in use. Activity details link to Git.
 Terminal's plus button starts another session within that worktree. Switching
 projects, teams, or terminal sessions preserves each session's input.
 
