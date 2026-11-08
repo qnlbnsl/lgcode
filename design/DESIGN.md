@@ -1,4 +1,4 @@
-# Sheprd’s approved palette pair
+# LGcode’s approved palette pair
 
 The owner selected Field for light mode and Dusk for dark mode on
 2026-11-05. The two palettes give the same app a brighter daytime surface
@@ -6,7 +6,7 @@ and a muted dark surface. Harbor is no longer an active option.
 
 ## What is approved
 
-`tokens.css` is the color contract for future Sheprd app mockups.
+`tokens.css` is the color contract for future LGcode app mockups.
 The workbench embeds the same token blocks so it can be opened as one file.
 Keep those blocks identical when the tokens change.
 
@@ -328,12 +328,12 @@ The owner chose the 15 Must fix findings, the two naming findings, and Enter to 
 A service with no projects opens a first run after login. It has three pages, and each does one
 job. The rules come from Ananke's onboarding specs and session reports, read on 2026-11-07.
 
-- **Value comes before any ask.** The first page says what Sheprd does and asks for nothing. Its
+- **Value comes before any ask.** The first page says what LGcode does and asks for nothing. Its
   three paired promises state only what the product does. The third says "You approve what users
   would notice", not "you approve every merge", because a fix sprint users would not notice merges
   by itself after a full test run.
 - **The second page shows what was found and asks nothing.** It lists harnesses, sign-in state,
-  and repositories in the workspace folder. It says that Sheprd only looked. A harness that is
+  and repositories in the workspace folder. It says that LGcode only looked. A harness that is
   installed but signed out offers its sign-in in place, through the usual sign-in dialog.
 - **The third page is the first real ask, with its answers filled in.** It starts on the most
   recent repository, a name from that repository, and a new worktree. It hides the machine when
@@ -382,6 +382,10 @@ The owner set this direction on 2026-11-07, after looking at how Ananke makes it
   and the repository Design tab's Edit mode show OpenPencil's web editor in a frame, open on the
   repository's design file. It runs from `openpencil/` on port 8443 and cannot save into the
   repository yet. When it is not running, the page says so and gives the command that starts it.
+- **The Build team turns the design back into code.** Decided by the owner on 2026-11-08. Reverse
+  Fig goes one way only, from existing code to the design file. When the design changes, the Build
+  team changes the code to match it, and the mocks, built from that code, show the result. No tool
+  generates code from the design file.
 - **The repository has a Design tab.** It shows the colors and the components that every project
   in the repository draws from, with live previews. A component that a project's approval promoted
   says which project it came from.

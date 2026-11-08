@@ -192,7 +192,7 @@
      }
     ]
    },
-   "buildbox-sheprd-main": {
+   "buildbox-lgcode-main": {
     "owner": "Main checkout",
     "activity": "No uncommitted changes",
     "files": [],
@@ -380,7 +380,7 @@
   }
  },
  "terminal": {
-  "ls": "app/  engine/  docs/  .sheprd/",
+  "ls": "app/  engine/  docs/  .lgcode/",
   "replies": {
    "whoami": "owner",
    "date": "Fri Nov  6 10:56:00 UTC 2026",
@@ -630,7 +630,7 @@
   "screenDelay": 700
  },
  "schema": {
-  "sheprd": {
+  "lgcode": {
    "Project": {
     "id": "text",
     "repoId": "text",
@@ -671,8 +671,8 @@
   }
  },
  "design": {
-  "sheprd": {
-   "file": "design/sheprd.fig",
+  "lgcode": {
+   "file": "design/lgcode.fig",
    "tokens": [
     "--color-bg",
     "--color-surface",

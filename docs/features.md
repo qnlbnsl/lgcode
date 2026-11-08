@@ -524,7 +524,7 @@ The full design is in
   looked at are built from the project's real code, so what the owner sees is
   what users get, and any gap between the mock and the design gets fixed.
   Since 2026-11-08 the web mock shows OpenPencil's web editor in a frame, built
-  from source in `design/openpencil/` on the branch `area/web-mock`. It opens a
+  from source in `design/openpencil/`. It opens a
   repository's design file but cannot save into the repository yet. Saving back
   needs an endpoint that writes the file, or OpenPencil's automation bridge.
 - **Teams named for their stage** (requested by the owner, 2026-11-07; not
@@ -541,13 +541,13 @@ The full design is in
 - **A Reverse Fig skill** (requested by the owner, 2026-11-07; not designed).
   When someone connects a project that already has an interface, the skill
   turns its existing components and screens into a `.fig` file, so the design
-  becomes the source of truth and can later be turned back into code. A test
+  becomes the source of truth. The owner decided on 2026-11-08 that the Build
+  team turns later design changes back into code, rather than a tool. A test
   on 2026-11-07 did this for three of the mock's components with OpenPencil's
   command-line tool. The result had real component sets, variants and color
   variables, and it exported back to React components. Some styling was lost
   on the way.
-  A first version exists on the branch `area/reverse-fig`, in
-  `skills/reverse-fig/`, since 2026-11-08. It covers color tokens and
+  A first version is in `skills/reverse-fig/` since 2026-11-08. It covers color tokens and
   components, not screens. Everything specific to a project lives in a profile
   file, so each project tunes its own profile.
 

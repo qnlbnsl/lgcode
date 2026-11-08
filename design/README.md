@@ -1,4 +1,4 @@
-# Sheprd app mockups
+# LGcode app mockups
 
 Serve this directory with `python3 -m http.server 4178 --bind 127.0.0.1`, then open
 `http://127.0.0.1:4178/workbench.html`. Opening the file directly no longer works, because
@@ -22,7 +22,7 @@ The page has three parts: `workbench.html` holds the markup and styles, `workben
 the app, and `data/stubs.js` holds the data functions.
 
 The owner requested the working app on 2026-11-05. A public marketing site
-is outside this pass. Sheprd is a separate product inspired by Herdr
+is outside this pass. LGcode is a separate product inspired by Herdr
 Synapse and T3 Code.
 
 ## What to try

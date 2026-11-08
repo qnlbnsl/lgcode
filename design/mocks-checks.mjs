@@ -6,12 +6,12 @@ const check=(ok,label)=>{(ok?passed:failures).push(label)};
 const fresh=async({query='',width=1440,height=900,scheme='light'}={})=>{
  const context=await browser.newContext({viewport:{width,height},colorScheme:scheme}),page=await context.newPage();
  page.setDefaultTimeout(6000);page.on('pageerror',e=>errors.push((query||'default')+': '+e.message));
- await page.goto(base+query);await page.waitForFunction(()=>window.sheprdReady);
+ await page.goto(base+query);await page.waitForFunction(()=>window.lgcodeReady);
  return page;
 };
 const teams=page=>page.locator('.team-select').allTextContents().then(all=>all.map(t=>t.replace(/\d+$/,'')));
 const frame=page=>page.frameLocator('#mock-slot iframe');
-const frameReady=async page=>{const handle=await page.waitForSelector('#mock-slot iframe');const f=await handle.contentFrame();await f.waitForFunction(()=>window.sheprdReady);return f};
+const frameReady=async page=>{const handle=await page.waitForSelector('#mock-slot iframe');const f=await handle.contentFrame();await f.waitForFunction(()=>window.lgcodeReady);return f};
 const wide=page=>page.evaluate(()=>document.documentElement.scrollWidth-innerWidth);
 
 // Teams are named for their stage, and a project's stage shows above its work.
@@ -24,7 +24,7 @@ const wide=page=>page.evaluate(()=>document.documentElement.scrollWidth-innerWid
  check(await page.locator('.stage-strip li.current').textContent()==='Build','A building project shows Build as its stage');
  check(await page.locator('.stage-strip li').count()===4,'A project without screens has no Design step');
  check(await page.locator('#workspace-tab-mocks').count()===0,'A project without mocks has no Mocks tab');
- await page.click('[data-open-repo="sheprd"]');
+ await page.click('[data-open-repo="lgcode"]');
  const stages=await page.locator('.repos-table .stage-cell').allTextContents();
  check(stages.includes('Build')&&stages.includes('Design'),'The repository page lists each project’s stage');
  await page.click('[data-project="desktop"]');
@@ -94,7 +94,7 @@ const wide=page=>page.evaluate(()=>document.documentElement.scrollWidth-innerWid
  check((await page.locator('.mock-component-table .component-state').allTextContents()).filter(k=>k==='Moved in').length===2,'Drafts move into the real components');
  await page.click('#tab-board');
  check((await page.locator('.sprint-card').textContent()).includes('0/13 tasks'),'The board gets a sprint with a task for each change and screen');
- await page.click('[data-open-repo="sheprd"]');await page.click('[data-repo-tab="design"]');
+ await page.click('[data-open-repo="lgcode"]');await page.click('[data-repo-tab="design"]');
  check(await page.locator('.design-table td',{hasText:'From Desktop companion'}).count()===2,'Approved components join the repository’s design');
  await page.context().close();
 }
@@ -102,7 +102,7 @@ const wide=page=>page.evaluate(()=>document.documentElement.scrollWidth-innerWid
 // The repository's Design tab shows the components from the page's own code.
 {
  const page=await fresh({scheme:'dark'});
- await page.click('[data-open-repo="sheprd"]');
+ await page.click('[data-open-repo="lgcode"]');
  check(await page.locator('.repos-table').isVisible(),'A repository opens on its projects');
  await page.click('[data-repo-tab="design"]');
  check(await page.locator('.token-list li').count()===12,'Design shows the color tokens');
@@ -112,7 +112,7 @@ const wide=page=>page.evaluate(()=>document.documentElement.scrollWidth-innerWid
  check(await page.locator('.component-preview button').first().evaluate(e=>e.closest('[inert]')!==null),'Previews cannot be clicked');
  await page.click('[data-design-mode="edit"]');
  await page.waitForFunction(()=>!document.querySelector('.pencil[role="status"].design-canvas'));
- check(await page.locator('.pencil').isVisible()&&(await page.locator('.pencil').textContent()).includes('design/sheprd.fig')||await page.locator('#pencil-slot[data-src*="sheprd.fig"]').count()===1,'Edit opens OpenPencil on the repository design file');
+ check(await page.locator('.pencil').isVisible()&&(await page.locator('.pencil').textContent()).includes('design/lgcode.fig')||await page.locator('#pencil-slot[data-src*="lgcode.fig"]').count()===1,'Edit opens OpenPencil on the repository design file');
  await page.click('[data-open-repo="atlas-docs"]');await page.click('[data-repo-tab="design"]');
  check(await page.locator('.empty h2').textContent()==='No design yet','A repository without a design says so');
  await page.context().close();

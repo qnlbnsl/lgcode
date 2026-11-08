@@ -491,7 +491,7 @@
      }
     ]
    },
-   "buildbox-sheprd-main": {
+   "buildbox-lgcode-main": {
     "owner": "Main checkout",
     "activity": "No uncommitted changes",
     "files": [],
@@ -751,7 +751,7 @@
   }
  },
  "terminal": {
-  "ls": "app/  engine/  docs/  .sheprd/",
+  "ls": "app/  engine/  docs/  .lgcode/",
   "replies": {
    "whoami": "owner",
    "date": "Fri Nov  6 10:56:00 UTC 2026",

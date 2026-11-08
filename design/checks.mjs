@@ -11,7 +11,7 @@ const click=selector=>page.locator(selector).click();
 const leadChat=async()=>{if(await page.locator('#tab-project-chat').isVisible())await click('#tab-project-chat');else{if(!await page.locator('#lead-panel').isVisible())await click('#lead-toggle');await click('#expand-lead-chat')}};
 const shot=async name=>page.screenshot({path:fileURLToPath(new URL(`./previews/projects-${name}.png`,import.meta.url))});
 try{
- await page.goto(process.env.MOCK_URL || 'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.sheprdReady);
+ await page.goto(process.env.MOCK_URL || 'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.lgcodeReady);
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('#sidebar [data-board]').count()===0,'Project tree contains no redundant Board row');
  check(await page.locator('#lead-panel').isVisible(),'Desktop board shows its project lead chat panel');
@@ -41,13 +41,13 @@ try{
  await click('.project-select[data-project="recovery"]');
  check(await page.locator('#message-input').inputValue()==='Keep this draft with Vale'&&!await page.locator('#lead-chat-body').textContent().then(t=>t.includes('Direction sent from the board')),'Pending Sage reply leaves Vale’s conversation and draft intact');
  await click('.project-select[data-project="workspace"]');
- check(await page.locator('[data-repo="sheprd"]').count()===1,'Repositories are the root of navigation');
- check(await page.locator('[data-repo="sheprd"] [data-project]').count()===3,'A repository contains several independent projects');
+ check(await page.locator('[data-repo="lgcode"]').count()===1,'Repositories are the root of navigation');
+ check(await page.locator('[data-repo="lgcode"] [data-project]').count()===3,'A repository contains several independent projects');
  check(await page.locator('#view-title').textContent()==='Agent console'&&await page.locator('.kanban-column').count()===4,'Initial project opens its sprint board');
  check(await page.locator('.project-select[data-project="workspace"] .project-assigned-branch').textContent().then(t=>t.includes('feat/workspace')),'Sidebar states the assigned project branch');
  check(await page.locator('#project-branch').textContent().then(t=>t.includes('feat/workspace')),'Board header places the branch beside the project name');
- check(await page.locator('#sidebar [data-open-repo="sheprd"]').count()===1,'Repository has its own projects page');
- await click('#sidebar [data-open-repo="sheprd"]');
+ check(await page.locator('#sidebar [data-open-repo="lgcode"]').count()===1,'Repository has its own projects page');
+ await click('#sidebar [data-open-repo="lgcode"]');
  check(await page.locator('#view-body [data-project]').count()===3,'Repository page lists all its projects');
  await click('#view-body [data-project="workspace"]');
  check(await page.locator('.kanban-column').count()===4,'Repository project link opens its board');
@@ -63,7 +63,7 @@ try{
  check(await page.locator('#context-toggle').textContent().then(t=>t.includes('main')),'Branch picker changes the viewed code context');
  check(await page.locator('#project-branch').textContent().then(t=>t.includes('feat/workspace'))&&await page.locator('.project-select[data-project="workspace"] .project-assigned-branch').textContent().then(t=>t.includes('feat/workspace')),'Inspecting main leaves the assigned project branch visible and unchanged');
  check(await page.locator('#context-toggle').textContent().then(t=>t.includes('Viewing')),'Inspection control identifies the branch being viewed');
- check(await page.locator('#breadcrumb').textContent().then(t=>t.includes('sheprd')&&t.includes('Agent console')),'Changing workspace preserves repository and project');
+ check(await page.locator('#breadcrumb').textContent().then(t=>t.includes('lgcode')&&t.includes('Agent console')),'Changing workspace preserves repository and project');
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('.kanban-column').count()===4,'Project board shows sprint status columns');
  check(await page.locator('[data-sprint]').count()===4,'Project board contains sprints rather than individual tasks');
@@ -120,8 +120,8 @@ try{
  check(await page.locator('#view-body').textContent().then(t=>t.includes('A new sprint assignment')),'Adding a task updates its team task list');
  await click('.project-select[data-project="workspace"]');await click('[data-sprint="sp-02"]');
  check(await page.locator('#view-body').textContent().then(t=>t.includes('A new sprint assignment')),'New task also appears in its sprint');
- await click('#new-project');await page.locator('#project-name').fill('Garden');await page.locator('#project-repo').selectOption('sheprd');await click('#project-submit');
- check(await page.locator('#breadcrumb').textContent().then(t=>t.includes('sheprd')&&t.includes('Garden')),'New project belongs to its selected known repository');
+ await click('#new-project');await page.locator('#project-name').fill('Garden');await page.locator('#project-repo').selectOption('lgcode');await click('#project-submit');
+ check(await page.locator('#breadcrumb').textContent().then(t=>t.includes('lgcode')&&t.includes('Garden')),'New project belongs to its selected known repository');
  check(await page.locator('.project-group[data-project-id]').count()===5,'New project joins the repository tree');
  await page.reload();await click('.project-select[data-project="workspace"]');await leadChat();
  for(const theme of ['light','dark']){

@@ -11,7 +11,7 @@ import {fileURLToPath} from 'node:url';
 
 const here=dirname(fileURLToPath(import.meta.url));
 // The same order as stateDirectory in packages/engine/src/service.ts.
-const stateFolder=process.env.SHEPRD_HOME||join(process.env.XDG_STATE_HOME||join(homedir(),'.local/state'),'sheprd');
+const stateFolder=process.env.LGCODE_HOME||join(process.env.XDG_STATE_HOME||join(homedir(),'.local/state'),'lgcode');
 const input=process.argv[2]||join(stateFolder,'events.sqlite'),output=resolve(process.argv[3]||join(here,'prod'));
 
 const database=new DatabaseSync(input,{readOnly:true});

@@ -9,7 +9,7 @@ const click=s=>page.locator(s).click();
 const preview=async action=>{await click('#design-notes');await click(`[data-preview="${action}"]`)};
 const text=s=>page.locator(s).textContent();
 try{
- await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.sheprdReady);
+ await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.lgcodeReady);
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('#logout').count()===1,'Owner view has a Log out action');
  check(await text('#connection-status').then(t=>t.trim()==='Live'),'Connection state is visible without a sample badge');
@@ -32,7 +32,7 @@ try{
  check(await text('#view-title').then(t=>t==='Iris'),'Lead surfaces permission requests from its team');
  const permission=page.locator('#permission-perm-iris');
  check(await permission.evaluate(el=>el===document.activeElement),'Permission link focuses the exact request');
- check(await permission.textContent().then(t=>t.includes('pnpm --filter @sheprd/web test')&&t.includes('perm-iris')),'Permission request shows identity and actual tool input');
+ check(await permission.textContent().then(t=>t.includes('pnpm --filter @lgcode/web test')&&t.includes('perm-iris')),'Permission request shows identity and actual tool input');
  check(await permission.evaluate(el=>el.querySelector('pre').compareDocumentPosition(el.querySelector('[data-permission-answer]'))&Node.DOCUMENT_POSITION_FOLLOWING),'Action input is visible before permission answer buttons');
  await click('[data-permission-answer="allow"][data-permission-id="perm-iris"]');
  check(await permission.textContent().then(t=>t.includes('Allow once'))&&await permission.locator('[data-permission-answer]').count()===0,'Permission answer is recorded and cannot be sent twice');
@@ -64,16 +64,16 @@ try{
  await click('[data-system-page="settings"]');check(await text('#view-title').then(t=>t==='Service settings'),'Settings is a first-class page');
  check(await page.locator('[data-push-kind]').count()===12,'Settings retains all twelve alert push categories');
  await page.locator('[data-push-kind="approval"]').uncheck();
- await page.locator('#carrier-server').fill('https://push.example');await page.locator('#carrier-topic').fill('sheprd');await click('#save-carrier');
+ await page.locator('#carrier-server').fill('https://push.example');await page.locator('#carrier-topic').fill('lgcode');await click('#save-carrier');
  await page.locator('#carrier-token').fill('sample-only-token');await click('#save-token');
  check(await page.locator('#carrier-token').inputValue()===''&&await text('#token-state').then(t=>t.includes('Token set')),'Token control clears the input and exposes only whether a token is set');
  check(!await text('body').then(t=>t.includes('sample-only-token')),'Token contents are absent from rendered text');
  await page.locator('#carrier-server').fill('https://other.example');await click('#save-carrier');
  check(await text('#token-state').then(t=>t.includes('No token')),'Changing token destination clears the old token state');
  await click('#clear-carrier');check(await page.locator('#carrier-token').isDisabled(),'Clearing carrier disables token entry');
- await page.locator('#web-proxy').check();await page.locator('#web-public').fill('https://sheprd.example/path');await click('#save-web');
+ await page.locator('#web-proxy').check();await page.locator('#web-public').fill('https://lgcode.example/path');await click('#save-web');
  check(await text('#settings-message').then(t=>t.includes('canonical HTTPS origin')),'Settings rejects a public address with a path');
- await page.locator('#web-public').fill('https://sheprd.example');await page.locator('#web-port').fill('8899');await click('#save-web');
+ await page.locator('#web-public').fill('https://lgcode.example');await page.locator('#web-port').fill('8899');await click('#save-web');
  check(await text('#settings-message').then(t=>t.includes('next service start')),'Web settings preserve restart and connection consequences');
  await click('[data-system-page="alerts"]');await click('[data-system-page="settings"]');
  check(await page.locator('#web-port').inputValue()==='8899'&&!await page.locator('[data-push-kind="approval"]').isChecked(),'Settings persist across page navigation within the sample');
@@ -92,7 +92,7 @@ try{
  await page.screenshot({path:new URL('./previews/operations-settings-dark-1440.png',import.meta.url).pathname});
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:new URL('./previews/operations-settings-dark-390.png',import.meta.url).pathname});
  await page.setViewportSize({width:1440,height:900});
- await page.locator('#carrier-server').fill('https://push.example');await page.locator('#carrier-topic').fill('sheprd');await click('#save-carrier');
+ await page.locator('#carrier-server').fill('https://push.example');await page.locator('#carrier-topic').fill('lgcode');await click('#save-carrier');
  await page.locator('#carrier-token').fill('unsaved-secret-must-clear');await click('#logout');
  check(await page.locator('#carrier-token').inputValue()==='','Logout wipes an unsaved token from hidden controls');
  await page.locator('#login-password').fill('sample-only-password');await click('#login-submit');

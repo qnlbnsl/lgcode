@@ -1,5 +1,5 @@
 // Reverse Fig profile template. Copy it into the project, for example as
-// `.sheprd/reverse-fig.mjs`, and fill it in. Everything specific to a project belongs here, so
+// `.lgcode/reverse-fig.mjs`, and fill it in. Everything specific to a project belongs here, so
 // the scripts in `lib/` stay the same for every project. When the first runs show that a
 // project needs something the scripts cannot do, change the scripts too, and say why in a
 // comment. SKILL.md explains the loop.

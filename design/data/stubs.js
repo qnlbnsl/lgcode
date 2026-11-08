@@ -20,10 +20,10 @@ const counters={project:1,task:30,machine:1,account:1,git:1,delivery:1,item:1,po
 const setupSteps=['welcome','found','project'];
 const setupScenario=()=>params.get('setup')||'ready';
 const setupStore={
- key:()=>'sheprd-setup-'+setupScenario(),
+ key:()=>'lgcode-setup-'+setupScenario(),
  read(){try{return JSON.parse(localStorage.getItem(setupStore.key()))||{}}catch{return {}}},
  write(patch){try{localStorage.setItem(setupStore.key(),JSON.stringify({...setupStore.read(),...patch}))}catch{}},
- clear(){try{localStorage.removeItem(setupStore.key());sessionStorage.removeItem('sheprd-session')}catch{}}
+ clear(){try{localStorage.removeItem(setupStore.key());sessionStorage.removeItem('lgcode-session')}catch{}}
 };
 let setupScans=0;
 const fetchJson=async path=>{try{const response=await fetch(path,{cache:'no-cache'});return response.ok?await response.json():null}catch{return null}};
@@ -411,7 +411,7 @@ const api={
   async pair(name){
    const id='worker-'+counters.machine++,parts=reads.service.pairingCodeParts,code=parts.map((part,i)=>i===counters.machine%parts.length?[...part].reverse().join(''):part).join('-');
    setTimeout(()=>emit('project.MachineAdded',{machineId:id,name,role:'Worker',status:'Awaiting confirmation',slots:4,workspaceFolder:'~/projects'}),1200);
-   return {id,code,command:'sheprd connect '+reads.service.masterAddress};
+   return {id,code,command:'lgcode connect '+reads.service.masterAddress};
   },
   async confirm(id){emit('project.MachineChanged',{machineId:id,status:'Online'})},
   async setRole(id,role){emit('project.MachineChanged',{machineId:id,role})},

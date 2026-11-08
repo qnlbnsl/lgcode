@@ -1,4 +1,4 @@
-/* Shephrd: Field light mode and Dusk dark mode. Approved 2026-11-05. */
+/* LGcode: Field light mode and Dusk dark mode. Approved 2026-11-05. */
 :root {
   color-scheme:light;
   --color-bg:#f6f8f5; --color-surface:#ffffff; --color-raised:#edf2ec;

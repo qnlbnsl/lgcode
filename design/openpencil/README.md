@@ -43,7 +43,7 @@ The certificate is kept in a Docker volume, so it survives restarts.
 ## Where design files live
 
 Each repository keeps its design file in its own `design/` folder, for example
-`design/sheprd.fig` here and `design/ananke.fig` in Ananke. The compose files
+`design/lgcode.fig` here and `design/ananke.fig` in Ananke. The compose files
 mount each folder read-only at `/files/<repository id>/`. Caddy serves only
 `.fig` and `.pen` files from them.
 
