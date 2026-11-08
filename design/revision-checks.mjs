@@ -192,7 +192,7 @@ await run('designer findings',async()=>{
  await at('.project-select[data-project="workspace"]').click();await at('[data-main-view="chat"]').click();
  const input=at('#message-input');await input.fill('first line');await input.press('Shift+Enter');check((await input.inputValue()).includes('\n'),'Shift and Enter adds a new line');
  await input.fill('Enter sends this');await input.press('Enter');check(await input.inputValue()==='','Enter sends the message');
- check((await at('.keyboard-hint').textContent()).startsWith('Enter to send'),'The composer says how to send');
+ check((await at('#composer-hint').textContent()).startsWith('Enter sends')&&(await at('#message-input').getAttribute('aria-describedby'))==='composer-hint'&&(await at('#send-message').getAttribute('title')).includes('Enter'),'The composer says how to send, to screen readers and on Send');
  // THREAD-1, PERM-1, STOP-1, PERM-2
  await at('[data-team-toggle="review"]').click();await at('[data-agent="finch"]').click();await q.waitForTimeout(40);
  const finch=await at('#view-body').textContent();
@@ -250,8 +250,8 @@ await run('designer findings',async()=>{
  // THREAD-7
  const t=await fresh();await t.locator('#design-notes').click();await t.locator('#preview-start-reason').selectOption('model-refused');await t.locator('[data-preview="failed-start"]').click();await t.waitForTimeout(40);
  const failed=await t.locator('.request.is-failed').first().textContent();
- check(failed.includes('rejected this model on Buildbox')&&!failed.includes('Adapter')&&await t.locator('.request.is-failed select').count()===2,'A refused model names the machine and offers the choice in place');
- await t.locator('.request.is-failed [data-resume-agent]').click();check(await t.locator('.request.is-failed').count()===0,'Trying again with another model clears the failure');
+ check(failed.includes('rejected this model on Buildbox')&&!failed.includes('Adapter')&&await t.locator('#agent-controls .composer-halt .tool-menu').count()===2,'A refused model names the machine and offers the choice in the composer');
+ await t.locator('#agent-controls [data-tool-menu="model"]').click();await t.locator('#tool-menu [data-menu-choice]').nth(1).click();await t.locator('#agent-controls [data-agent-command="resume"]').click();check(await t.locator('.request.is-failed').count()===0,'Trying again with another model clears the failure');
  await t.close();
  // PAIR-1 and MACH-1
  const f=await fresh();await f.locator('[data-system-page="machines"]').click();
@@ -507,6 +507,78 @@ await run('request block',async()=>{
  await p.locator('.request-details summary').click();check((await p.innerText()).includes('call-iris')&&(await p.locator('.request-details pre').textContent()).includes('"command"'),'HOME-8: Details shows the identifiers and the raw input');
  await t.evaluate(()=>openHome('approvals'));await t.locator('[data-home-item="approval:perm-iris"]').click();check(await t.locator('#home-detail .request.is-approval').count()===1,'STATUS-3: Home expands the same request block');
  await t.close();
+});
+
+// COMP-1, COMP-3 to COMP-6, THREAD-3 to THREAD-6, BOARD-4, and CTX-1: the composer, Add context, and what a thread shows besides messages.
+await run('composer and threads',async()=>{
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const t=await fresh();const at=s=>t.locator(s).first();
+ const shape=()=>t.evaluate(()=>{const f=document.querySelector('#message-form').getBoundingClientRect(),w=getComputedStyle(document.querySelector('#composer-wrap'));return {height:Math.round(f.height),rule:w.borderTopWidth+' '+w.borderTopStyle,tools:!!document.querySelector('#message-form .composer-tools #send-message')}});
+ await t.evaluate(()=>openAgent('iris','workspace'));await t.waitForTimeout(40);const chat=await shape();
+ await t.evaluate(()=>openBoard('workspace'));await t.waitForTimeout(40);const lead=await shape();
+ check(chat.height>=70&&chat.height<=80&&lead.height===chat.height&&chat.tools&&lead.tools,`COMP-1: the composer is one input over one tool row, about 76 pixels, in Chat and the lead panel: ${chat.height}, ${lead.height}`);
+ check(await t.locator('#recipient-label, #composer-worktree, .composer-meta').count()===0,'COMP-1: the composer has no recipient line and no worktree line');
+ check(chat.rule==='1px solid'&&lead.rule==='1px solid','COMP-4: Chat and the lead panel both draw a top rule above the composer');
+ await t.evaluate(()=>openProject('desktop'));await t.waitForTimeout(40);
+ check(await t.locator('#lead-agent-controls').isHidden()&&await t.locator('[data-agent-command="stop"]').count()===0,'BOARD-4: an idle lead shows no status line and no Stop');
+ await t.evaluate(()=>openAgent('iris','workspace'));await t.waitForTimeout(40);
+ check(await at('#agent-controls').isVisible()&&(await at('#agent-controls').textContent()).includes('Waiting for approval')&&await at('#agent-controls [data-agent-command="stop"]').isVisible(),'BOARD-4: an agent waiting on a tool shows its status and Stop');
+ const account=await at('#composer-account').textContent();
+ check(account==='Codex · Personal'&&!account.includes('Host profile'),'COMP-3: the subscription shows its own name: '+account);
+ check((await at('#composer-model').textContent())==='GPT-6'&&(await at('#composer-effort').textContent())==='Medium'&&/^\d+% context$/.test(await at('#context-use').textContent()),'COMP-3: the tool row shows the model, the effort, and the context in use');
+ const fit=await t.locator('.composer-tools .tool-menu:not([hidden])').evaluateAll(bs=>bs.map(b=>{const s=b.querySelector('span').getBoundingClientRect(),c=b.querySelector('svg').getBoundingClientRect();return {gap:Math.round(c.left-s.right),fits:b.scrollWidth<=b.clientWidth}}));
+ check(fit.length===3&&fit.every(x=>x.fits&&x.gap<=8),'COMP-6: each menu button fits its label, with no gap before its chevron: '+JSON.stringify(fit));
+ const before=await t.evaluate(()=>api.debug.events().length);
+ await at('#composer-model').click();check(await at('#tool-menu').evaluate(m=>m.matches(':popover-open'))&&(await at('#composer-model').getAttribute('aria-expanded'))==='true','COMP-3: the model button opens its menu');
+ await t.keyboard.press('Escape');check(await t.evaluate(()=>document.activeElement.id)==='composer-model','COMP-3: Escape closes the menu and returns to its button');
+ await at('#composer-model').click();await t.keyboard.press('ArrowDown');await t.keyboard.press('Enter');
+ const chosen=await t.evaluate(b=>api.debug.events().slice(b).map(r=>r.event_type+' '+r.payload_json),before);
+ check((await at('#composer-model').textContent())==='GPT-6 Luna'&&chosen.some(r=>r.startsWith('project.ModelChosen')&&r.includes('gpt-6-luna')),'COMP-3: choosing a model stores it for the agent through the data layer');
+ await t.evaluate(()=>openBoard('workspace'));await t.evaluate(()=>openAgent('iris','workspace'));check((await at('#composer-model').textContent())==='GPT-6 Luna','COMP-3: the agent keeps its model when the thread is opened again');
+ // CTX-1
+ await at('#attach-context').click();const rows=await t.locator('#context-items label').evaluateAll(ls=>ls.map(l=>Math.round(l.getBoundingClientRect().height)));
+ check(await at('#context-search').evaluate(e=>e===document.activeElement)&&(await t.locator('.context-group h3').allTextContents()).join()==='Tasks,Files'&&rows.every(h=>h===32),'CTX-1: Add context opens on a search field, with Tasks and Files groups and rows of 32 pixels');
+ await at('#context-search').fill('sidebar');check(await t.locator('#context-items label:not([hidden])').count()===1&&await t.locator('.context-group:not([hidden]) h3').allTextContents().then(x=>x.join()==='Files'),'CTX-1: search narrows the list and hides an empty group');
+ await at('#context-search').fill('zzzz');check(await at('.context-none').isVisible(),'CTX-1: a search with no match says so');
+ await t.locator('#attach-dialog [data-close]').last().click();
+ await at('#message-input').fill('');await at('#message-input').pressSequentially('See @');check(await at('#attach-dialog').evaluate(d=>d.open),'CTX-1: typing @ opens Add context');
+ await t.locator('[data-context-item="task:SH-15"]').check();await at('#apply-context').click();
+ check((await at('#message-input').inputValue())==='See '&&(await at('#composer-context').textContent()).includes('SH-15'),'CTX-1: adding context removes the @ that opened it and attaches the item');
+ // THREAD-3 and THREAD-4
+ check(await t.locator('#view-body .thread-detail[data-tool-call]').count()===0&&await t.locator('#permission-perm-iris [data-tool-call="call-iris"]').count()===1,'THREAD-3: the tool call sits inside its approval, so the command shows once');
+ const delivery=await at('[data-delivery="delivery-iris"]').evaluate(d=>{const s=d.querySelector('summary'),cs=getComputedStyle(s),m=document.createElement('i');m.style.color='var(--color-muted)';document.body.append(m);const muted=getComputedStyle(m).color;m.remove();return {text:s.textContent,size:cs.fontSize,muted:cs.color===muted,open:d.open}});
+ check(delivery.text==='Delivery details'&&delivery.size==='12px'&&delivery.muted&&!delivery.open,'THREAD-3: delivery history is a muted 12 pixel Details disclosure: '+JSON.stringify(delivery));
+ await t.evaluate(()=>{api.debug.emit('DeliveryReturned',{agentId:'iris',deliveryId:'delivery-iris',sender:{_tag:'owner'},reason:'session ended'});render()});
+ check((await at('[data-delivery="delivery-iris"]').textContent()).includes('Message not delivered')&&await at('[data-delivery="delivery-iris"]').evaluate(d=>d.open&&d.classList.contains('delivery-failed')),'THREAD-3: a returned message shows its delivery history open, as a failure');
+ check((await at('#large-item-iris h3').textContent()).replace(/\s+/g,' ')==='Review trace (192 kilobytes)'&&!(await at('#large-item-iris').textContent()).includes('Large thread item'),'THREAD-3: a large item is named by its content and size');
+ await at('[data-load-large="iris"]').click();await t.waitForTimeout(80);
+ check(await at('#large-item-iris [data-open-large]').isVisible()&&await at('#large-item-iris [data-copy-large]').isVisible()&&await at('#large-item-iris pre').evaluate(e=>e.scrollHeight<=e.clientHeight+1),'THREAD-4: a loaded item offers Open in full and Copy, with no nested scroller');
+ await at('[data-open-large="iris"]').click();check(await at('#large-text-iris').evaluate(e=>getComputedStyle(e).overflowY==='visible'&&getComputedStyle(e).maxHeight==='none')&&await at('#composer-wrap').isHidden()&&await t.evaluate(()=>document.activeElement.id)==='large-full-title','THREAD-4: Open in full fills the main area with one plain block');
+ await at('[data-close-large]').click();check(await at('#large-item-iris').isVisible()&&await at('#message-input').isVisible(),'THREAD-4: the link back returns to the thread');
+ await t.close();
+ // COMP-5 and THREAD-5
+ const s=await fresh();const sat=x=>s.locator(x).first();
+ await s.evaluate(()=>openAgent('ash','recovery'));await s.waitForTimeout(40);
+ check(await sat('#message-form').isHidden()&&(await sat('#agent-controls .composer-halt').textContent()).includes('Ash failed to start')&&await sat('#agent-controls [data-sign-in-agent="ash"]').evaluate(b=>b.classList.contains('primary'))&&await sat('#agent-controls [data-agent-command="resume"]').isVisible(),'COMP-5: a failed agent shows its state, Sign in, and Resume in place of the input');
+ check(await s.locator('#view-body .request.is-failed button').count()===0,'COMP-5: the failed-start record in the thread does not repeat the controls');
+ await s.evaluate(()=>openAgent('rowan','workspace'));await s.waitForTimeout(40);await sat('#message-input').fill('Keep this draft');
+ await sat('#agent-controls [data-agent-command="stop"]').click();if(await s.locator('#stop-dialog[open]').count())await sat('#confirm-stop-agent').click();
+ const resume=sat('#agent-controls .composer-halt [data-agent-command="resume"]');
+ check(await sat('#message-form').isHidden()&&await resume.evaluate(b=>b.classList.contains('primary')&&b.getBoundingClientRect().height>=32)&&(await sat('#agent-controls').textContent()).includes('Your draft is kept'),'THREAD-5: a stopped agent offers Resume as a primary button in place of the input, and keeps the draft');
+ const row=await sat('#sidebar [data-agent="rowan"]').evaluate(b=>({title:b.title,dot:b.querySelector('.dot').className,text:b.querySelector('small').textContent}));
+ check(row.title.startsWith('Stopped · Needs answer')&&row.dot.includes('stopped')&&row.dot.includes('wait')&&row.text.endsWith('Needs answer'),'THREAD-5: a stopped row with a waiting question says both states: '+JSON.stringify(row));
+ await resume.click();check((await sat('#message-input').inputValue())==='Keep this draft'&&await sat('#message-input').isVisible(),'COMP-5: Resume brings the input back with the draft');
+ // THREAD-6
+ await s.evaluate(()=>openAgent('finch','workspace'));await sat('#design-notes').click();await sat('[data-preview="held-permission"]').click();await s.waitForTimeout(40);
+ check((await sat('#permission-perm-finch').textContent()).includes('Held by Sage, the project lead')&&await sat('#permission-perm-finch [data-project-chat="workspace"]').isVisible(),'THREAD-6: a held request names its holder with a link');
+ check((await sat('#sidebar [data-agent="finch"] small').textContent())==='Waiting on Sage'&&(await sat('#agent-controls').textContent()).includes('Waiting on Sage'),'THREAD-6: the sidebar and the composer agree that Finch waits on Sage');
+ await s.evaluate(()=>openAgent('iris','workspace'));await sat('#design-notes').click();await sat('[data-preview="large-failure"]').click();await sat('[data-load-large="iris"]').click();
+ check((await sat('#large-item-iris [data-load-large]').textContent())==='Retry','THREAD-6: a failed large item offers Retry, with no arrow');
+ await s.close();
+ // Phones and the drawer keep every control in view.
+ for(const width of [390,768]){const m=await fresh('',{width,height:844});await m.evaluate(()=>openAgent('iris','workspace'));await m.waitForTimeout(40);
+  const over=await m.evaluate(()=>[...document.querySelectorAll('.composer-tools > :not([hidden])')].filter(e=>e.scrollWidth>e.clientWidth+1||e.getBoundingClientRect().right>document.querySelector('#message-form').getBoundingClientRect().right).map(e=>e.id));
+  check(over.length===0&&await m.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`COMP-3: at ${width} pixels every tool fits the composer: ${over}`);await m.close()}
 });
 
 const result={passed:checks.length,failed:failures.length,failures,errors,checks};

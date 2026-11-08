@@ -187,7 +187,7 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  const codex=await fresh({query:'?sample=first&setup=codex-only'});
  await toProject(codex);await codex.click('#project-submit');await codex.waitForSelector('#setup',{state:'hidden'});
  check(await codex.evaluate(()=>projects[0].lead.tool)==='Codex','With only Codex signed in, the lead runs on Codex, not Claude Code');
- check((await codex.locator('#composer-account option').first().textContent()).startsWith('Codex'),'The composer names the harness that runs the lead');
+ check((await codex.locator('#composer-account').textContent()).startsWith('Codex'),'The composer names the harness that runs the lead');
  await codex.context().close();
 }
 // Each page at phone width, in both palettes.

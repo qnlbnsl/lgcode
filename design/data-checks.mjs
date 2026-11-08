@@ -77,10 +77,13 @@ const added=async(page,before)=>(await eventsOf(page)).slice(before).map(row=>ro
   await api.project.savePreferences('workspace',{shell:'zsh'});
   await api.client.prompt({channelId:'ch-workspace-app-shell'},'Team note',{context:['SH-15']});await api.client.stopReply({channelId:'ch-workspace-app-shell'});
   await api.client.prompt({agentId:sage},'Lead note');await api.client.stopReply({agentId:sage});
+  await api.agents.choose('iris',{model:'gpt-6-luna',effort:'high'});
  });
  const rows=await eventsOf(page),file=join(temp,'after-commands.json');
  writeFileSync(file,JSON.stringify(rows));
  check(!JSON.stringify(rows).includes('never-stored-token'),'A carrier token never reaches an event');
+ check(rows.some(r=>r.event_type==='AgentStarted'&&JSON.parse(r.payload_json).model)&&rows.some(r=>r.event_type==='project.ModelChosen'),'Agents start with a model and effort, and a change of either is an event');
+ check(await page.evaluate(()=>{const a=findAgent('iris',projects[0]),u=api.agents.usage('sage');return a.model==='gpt-6-luna'&&a.effort==='high'&&u.percent===34&&api.agents.usage('ash')===null}),'The reducer applies a model choice, and context use comes from the reads');
  try{execFileSync(process.execPath,[join(here,'data/validate.mjs'),file],{encoding:'utf8',env:process.env});check(true,'Every row a command wrote matches the engine contracts')}catch(e){check(false,'Every row a command wrote matches the engine contracts: '+String(e.stdout).slice(0,600))}
 }
 // A real database: built with the engine's own migrations, exported, and loaded.

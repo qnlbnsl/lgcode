@@ -44,7 +44,7 @@ try{
  check(await page.locator('#permission-perm-iris [data-permission-answer="allow"]').isDisabled()&&(await page.locator('#permission-perm-iris [data-permission-answer="allow"]').getAttribute('title')).startsWith('LGcode is offline')&&await text('#permission-perm-iris').then(t=>t.includes('pnpm')),'Offline keeps the request readable and disables Allow with the reason');
  check(await page.locator('#permission-perm-iris [data-permission-answer="allow"]').evaluate(b=>{const c=document.querySelector('#composer-wrap').getBoundingClientRect(),r=b.getBoundingClientRect();return r.bottom<=c.top}),'Allow stays above the composer while offline');
  await click('#retry-connection');await click('#tab-board');
- await click('#lead-agent-controls [data-agent-command="stop"]');check(await text('#lead-agent-controls').then(t=>t.includes('Stopped'))&&await page.locator('#send-message').isDisabled(),'Stop agent changes lifecycle and prevents sends');
+ await click('#lead-agent-controls [data-agent-command="stop"]');check(await text('#lead-agent-controls').then(t=>t.includes('Sage is stopped'))&&await page.locator('#send-message').isDisabled()&&await page.locator('#message-input').isHidden(),'Stop agent changes lifecycle, and Resume replaces the input');
  await click('#lead-agent-controls [data-agent-command="resume"]');check(await text('#lead-agent-controls').then(t=>t.includes('Waiting on'))&&!await page.locator('#send-message').isDisabled(),'Resume agent restores lifecycle and sending');
  await click('#lead-panel [data-open-permission="perm-iris"]');
  check(await text('#view-title').then(t=>t==='Iris'),'Lead surfaces permission requests from its team');
@@ -60,8 +60,10 @@ try{
  check(await page.locator('[data-load-large="iris"]').isVisible(),'Large thread items have an explicit load action');
  await preview('large-failure');await click('[data-load-large="iris"]');
  check(await text('#large-item-iris').then(t=>t.includes('Could not load')),'Large-item load failures are visible and retryable');
- await click('[data-load-large="iris"]');check(await text('#large-item-iris').then(t=>t.includes('Check 180:')),'Retry loads the complete large sample item');
- check(await page.locator('#large-item-iris pre').evaluate(el=>new TextEncoder().encode(el.textContent).length)===192000,'Loaded item matches the advertised 192000-byte size');
+ await click('[data-load-large="iris"]');check(await text('#large-item-iris').then(t=>t.includes('Check 12:')&&t.includes('of 5,127 lines')),'Retry loads the large sample item and shows its start');
+ check(await text('#large-item-iris h3').then(t=>t.includes('Review trace')&&t.includes('192 kilobytes'))&&await page.locator('#large-item-iris pre').evaluate(el=>el.textContent.split('\n').length)===12,'A loaded large item is named by its content and shows its first 12 lines');
+ await click('[data-open-large="iris"]');check(await page.locator('#large-text-iris').evaluate(el=>new TextEncoder().encode(el.textContent).length)===192000&&await page.locator('#composer-wrap').isHidden(),'Open in full shows the whole 192000-byte item in the main area');
+ await page.keyboard.press('Escape');check(await page.locator('#large-item-iris').isVisible()&&await page.locator('#message-input').isVisible(),'Escape returns from the full item to the thread');
  await page.locator('details[data-delivery="delivery-iris"]').evaluate(el=>el.open=true);
  check(await text('details[data-delivery="delivery-iris"]').then(t=>t.includes('Queued')&&t.includes('Sent')&&t.includes('Accepted')&&t.includes('Owner')),'Delivery history keeps identity, source, and lifecycle');
  await click('[data-team-toggle="review"]');await click('#sidebar [data-agent="finch"]');
@@ -78,7 +80,7 @@ try{
  check(await text('#view-body').then(t=>t.includes('Not signed in')),'Retrying an unresolved start failure keeps its reason visible');
  await preview('fresh-resume');
  check(await text('#agent-controls').then(t=>t.includes('new session')&&t.includes('context')),'Fresh-session resume warns when previous context cannot reload');
- await click('#agent-controls [data-agent-command="resume"]');check(await page.locator('#agent-controls [data-agent-command="stop"]').isVisible(),'Resume can start a fresh sample session');
+ await click('#agent-controls [data-agent-command="resume"]');check(await page.locator('#message-input').isVisible()&&await page.locator('#agent-controls .composer-halt').count()===0,'Resume can start a fresh sample session');
  await click('[data-system-page="settings"]');check(await text('#view-title').then(t=>t==='Service settings'),'Settings is a first-class page');
  check(await page.locator('[data-push-kind]').count()===12,'Settings retains all twelve alert push categories');
  await page.locator('[data-push-kind="approval"]').uncheck();
@@ -117,13 +119,14 @@ try{
  await page.reload();await click('.project-select[data-project="workspace"]');await click('#lead-panel [data-open-permission="perm-iris"]');
  await preview('permission-failure');await click('[data-permission-answer="allow"][data-permission-id="perm-iris"]');
  check(await text('#permission-perm-iris').then(t=>t.includes('Could not confirm'))&&await page.locator('[data-permission-answer="allow"]').isDisabled(),'Unconfirmed permission answers are visible and cannot be blindly retried');
+ check(await page.locator('[data-refresh-permission="perm-iris"]').isVisible(),'An unconfirmed answer offers Refresh this request');await click('[data-refresh-permission="perm-iris"]');check(!await page.locator('[data-permission-answer="allow"][data-permission-id="perm-iris"]').isDisabled()&&await page.locator('#permission-perm-iris .op-warning[role=alert]').count()===0,'Refreshing the request clears the unconfirmed state and allows a fresh answer');
  await click('#tab-board');await click('#lead-panel [data-open-permission="perm-iris"]');
  await click('#agent-controls [data-agent-command="stop"]');if(await page.locator('#stop-dialog[open]').count())await click('#confirm-stop-agent');
  check(await text('#permission-perm-iris').then(t=>t.includes('Cancelled'))&&await page.locator('#permission-perm-iris [data-permission-answer]').count()===0,'Stopping an agent cancels its outstanding permissions');
  await click('#sidebar [data-agent="rowan"]');await click('#agent-controls [data-agent-command="stop"]');if(await page.locator('#stop-dialog[open]').count())await click('#confirm-stop-agent');
  check(await page.locator('[data-resolve-request="nav-decision"]').isEnabled(),'Stopping an asker leaves its question answerable');
  await click('[data-team-toggle="review"]');await click('#sidebar [data-agent="finch"]');await preview('held-permission');
- check(await text('#permission-perm-finch').then(t=>t.includes('held elsewhere'))&&await page.locator('#permission-perm-finch [data-permission-answer]').count()===0,'Permissions held elsewhere offer no owner answer controls');
+ check(await text('#permission-perm-finch').then(t=>t.includes('Held by Sage, the project lead'))&&await page.locator('#permission-perm-finch [data-permission-answer]').count()===0,'Permissions held elsewhere offer no owner answer controls');
  // CONN-4: after 30 seconds of failed reconnects the indicator says Offline, and the last update time keeps counting.
  {const ctx=await browser.newContext({viewport:{width:1440,height:900}}),o=await ctx.newPage();o.on('pageerror',e=>errors.push(e.message));await o.clock.install();
   await o.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await o.waitForFunction(()=>window.lgcodeReady);

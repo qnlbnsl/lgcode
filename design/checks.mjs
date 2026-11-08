@@ -45,7 +45,7 @@ try{
  check(await page.locator('[data-repo="lgcode"] [data-project]').count()===3,'A repository contains several independent projects');
  check(await page.locator('#view-title').textContent()==='Agent console'&&await page.locator('.kanban-column').count()===4,'Initial project opens its sprint board');
  check(await page.locator('.project-select[data-project="workspace"] .project-lead').textContent()==='Sage leads'&&await page.locator('#sidebar .project-assigned-branch').count()===0,'The selected project names its lead, and leaves the branch to the top bar');
- check(await page.locator('#context-toggle').textContent().then(t=>t.includes('feat/workspace'))&&await page.locator('#conversation-header code, #composer-wrap code').count()===0&&!(await page.locator('#composer-worktree').textContent()).includes('feat/'),'The top bar names the branch once, and the board header and composer do not repeat it');
+ check(await page.locator('#context-toggle').textContent().then(t=>t.includes('feat/workspace'))&&await page.locator('#conversation-header code, #composer-wrap code').count()===0&&await page.locator('#composer-worktree, #recipient-label').count()===0,'The top bar names the branch once, and the board header and composer do not repeat it');
  check(await page.locator('#sidebar [data-open-repo="lgcode"]').count()===1,'Repository has its own projects page');
  await click('#sidebar [data-open-repo="lgcode"]');
  check(await page.locator('#view-body [data-project]').count()===3,'Repository page lists all its projects');
