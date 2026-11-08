@@ -49,6 +49,12 @@ LGcode's own stylesheet sets the stroke width to 1.6 instead of Lucide's 2.
 | `list-filter` | Home's Filter button, added on 2026-11-08. |
 | `copy` | Copying a large thread item, added on 2026-11-08. |
 | `maximize-2` | Opening a large thread item in full, added on 2026-11-08. Its `polyline` and `line` elements were written as equivalent `path` elements. |
+| `ellipsis` | The row menu on Machines and Subscriptions, added on 2026-11-08. |
+| `pencil` | Rename, added on 2026-11-08. |
+| `trash-2` | Remove, added on 2026-11-08. Its `line` elements were written as equivalent `path` elements. LGcode stores it under the key `trash`. |
+| `archive` and `archive-restore` | Archive and Restore in Project settings, added on 2026-11-08. |
+| `rotate-ccw` | Retry on a failed phone notification, added on 2026-11-08. |
+| `send` | Send test notification, added on 2026-11-08. LGcode stores it under the key `paper-plane`, because `send` already names the arrow-up Send icon. |
 
 ## Where the paths live
 
