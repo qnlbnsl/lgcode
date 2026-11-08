@@ -115,6 +115,7 @@ const handlers={
  'project.Created':(row,e)=>{S.projects.push({id:e.projectId,repoId:e.repoId,name:e.name,goal:e.goal,lead:null,workspace:e.worktreeId,teams:[],sprints:[],tasks:[]});S.projectMachines.set(e.projectId,e.machineId)},
  'project.Placed':(row,e)=>S.futureProjectMachines.set(e.projectId,e.machineId),
  'project.PreferencesChanged':(row,e)=>S.workspacePreferences.set(e.projectId,{shell:e.shell}),
+ 'project.ModelChosen':(row,e)=>{const a=S.agents.get(e.agentId);if(a)Object.assign(a,e.model?{model:e.model}:{},e.effort?{effort:e.effort}:{})},
  'project.TeamAdded':(row,e)=>{const project=projectById(e.projectId);project.teams.push({id:e.teamId,name:e.name,area:e.name,...(e.stage?{stage:e.stage}:{}),agents:[],...(e.worktreeId?{workspace:e.worktreeId}:{})});nameTeams(project)},
  'project.StageChanged':(row,e)=>{projectById(e.projectId).stage=e.stage},
  // Mocks. The screens are the project's own code, so these record what was drawn, not the drawing.
@@ -147,7 +148,7 @@ const handlers={
   const known=S.agents.get(e.agentId);
   if(known){Object.assign(known,e.model?{model:e.model}:{},e.effort?{effort:e.effort}:{});Object.assign(S.runtimeStates.get(e.agentId),{state:'running',failure:null})}
   else{
-   const a={id:e.agentId,name:e.name,initial:initials(e.name),role:e.role,tool:toolName(e.harness),harness:e.harness,account:e.account};
+   const a={id:e.agentId,name:e.name,initial:initials(e.name),role:e.role,tool:toolName(e.harness),harness:e.harness,account:e.account,...(e.model?{model:e.model}:{}),...(e.effort?{effort:e.effort}:{})};
    S.agents.set(a.id,a);S.agentProjects.set(a.id,placeAgent(a,e).id);S.runtimeStates.set(a.id,{state:'running',failure:null,reloadable:true});
   }
  },
@@ -184,6 +185,8 @@ const handlers={
  DeliveryRequeued:(row,e)=>delivery(e.deliveryId)?.history.push('Requeued: '+e.reason),
  DeliveryHeld:(row,e)=>delivery(e.deliveryId)?.history.push('Held: no agent capacity'),
  DeliveryReleased:(row,e)=>S.deliveryItems.filter(d=>d.agentId===e.agentId&&d.history.at(-1).startsWith('Held')).forEach(d=>d.history.push('Released')),
+ DeliveryReturned:(row,e)=>{const d=delivery(e.deliveryId);if(d){d.history.push('Returned: '+e.reason);d.failed=true}},
+ DeliveryWithdrawn:(row,e)=>{const d=delivery(e.deliveryId);if(d){d.history.push('Withdrawn: '+e.reason);d.failed=true}},
  'board.ChannelOpened':(row,e)=>S.channels.set(e.channelId,{id:e.channelId,name:e.name,group:e.group,anchorAgentId:e.anchorAgentId,posts:[]}),
  'board.PostWritten':(row,e)=>S.channels.get(e.channelId)?.posts.push(postEntry(row,e)),
  'client.AlertRaised':addAlert,
@@ -353,7 +356,11 @@ const api={
    emit('AgentStarted',{agentId:id,name:a.name,role:a.role,groups:[team?project.id+'/'+team.id:project.id],parent:owner,harness:a.harness,account:a.account,...(model?{model}:{}),...(effort?{effort}:{}),permission:'edit',folder:'/'+S.workspaces.find(w=>w.id===(team?.workspace||project.workspace)).path.replace(/^[~/]+/,''),runMode:'acp'});
    emit('SessionOpened',{agentId:id,session:{_tag:'acp',sessionId:'session-'+id+'-'+sequence},protocolVersion:1,reloadable:true},{caller:'service:runner'});
    clearAlertsFor(id,'resumed');
-  }
+  },
+  // Proposed: the model and effort an agent uses from its next turn. The engine sets both only at start.
+  async choose(id,{model,effort}={}){if(S.agents.has(id)&&(model||effort))emit('project.ModelChosen',{agentId:id,...(model?{model}:{}),...(effort?{effort}:{})})},
+  // How much of its context window an agent has used. The engine would read the harness's latest usage report.
+  usage(id){const u=reads.usage?.[id];return u?{...u,percent:Math.round(u.used/u.window*100)}:null}
  },
  project:{
   // The engine has no project piece yet. These write the proposed project.* events.

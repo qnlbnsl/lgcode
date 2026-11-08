@@ -732,6 +732,16 @@
     "gemini-3-pro"
    ]
   },
+  "modelLabels": {
+   "claude-opus-5-5": "Opus 5.5",
+   "claude-sonnet-5-5": "Sonnet 5.5",
+   "claude-haiku-5-5": "Haiku 5.5",
+   "gpt-6": "GPT-6",
+   "gpt-6-luna": "GPT-6 Luna",
+   "gpt-5.5": "GPT-5.5",
+   "auto": "Auto",
+   "gemini-3-pro": "Gemini 3 Pro"
+  },
   "efforts": [
    "low",
    "medium",
@@ -779,6 +789,136 @@
    "lines": 180,
    "line": "Check {n}: Reading view, keyboard focus, and draft continuity - review trace.",
    "fill": "Detailed review trace continuation.\n"
+  }
+ },
+ "usage": {
+  "sage": {
+   "used": 68000,
+   "window": 200000
+  },
+  "rowan": {
+   "used": 121000,
+   "window": 200000
+  },
+  "iris": {
+   "used": 88000,
+   "window": 400000
+  },
+  "finch": {
+   "used": 140000,
+   "window": 400000
+  },
+  "vale": {
+   "used": 30000,
+   "window": 200000
+  },
+  "mira": {
+   "used": 12000,
+   "window": 200000
+  },
+  "nico": {
+   "used": 9000,
+   "window": 200000
+  },
+  "lark": {
+   "used": 4000,
+   "window": 200000
+  },
+  "invoices-lead": {
+   "used": 76000,
+   "window": 200000
+  },
+  "invoices-oren": {
+   "used": 18000,
+   "window": 200000
+  },
+  "invoices-pia": {
+   "used": 216000,
+   "window": 400000
+  },
+  "invoices-dov": {
+   "used": 100000,
+   "window": 400000
+  },
+  "invoices-lena": {
+   "used": 200000,
+   "window": 400000
+  },
+  "tax-lead": {
+   "used": 70000,
+   "window": 200000
+  },
+  "tax-sana": {
+   "used": 24000,
+   "window": 200000
+  },
+  "tax-ivo": {
+   "used": 164000,
+   "window": 400000
+  },
+  "runners-lead": {
+   "used": 30000,
+   "window": 200000
+  },
+  "runners-yara": {
+   "used": 46000,
+   "window": 200000
+  },
+  "runners-kit": {
+   "used": 168000,
+   "window": 400000
+  },
+  "runners-noor": {
+   "used": 244000,
+   "window": 400000
+  },
+  "restore-lead": {
+   "used": 98000,
+   "window": 200000
+  },
+  "restore-tess": {
+   "used": 42000,
+   "window": 200000
+  },
+  "restore-ansel": {
+   "used": 116000,
+   "window": 400000
+  },
+  "push-lead": {
+   "used": 14000,
+   "window": 200000
+  },
+  "push-remy": {
+   "used": 88000,
+   "window": 200000
+  },
+  "push-juno": {
+   "used": 88000,
+   "window": 400000
+  },
+  "push-pax": {
+   "used": 224000,
+   "window": 400000
+  },
+  "reference-lead": {
+   "used": 30000,
+   "window": 200000
+  },
+  "reference-ines": {
+   "used": 86000,
+   "window": 200000
+  },
+  "reference-milo": {
+   "used": 60000,
+   "window": 400000
+  },
+  "tove": {
+   "used": 46000,
+   "window": 200000
+  },
+  "bryn": {
+   "used": 70000,
+   "window": 400000
   }
  },
  "files": {

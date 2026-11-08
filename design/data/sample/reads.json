@@ -351,6 +351,16 @@
     "gemini-3-pro"
    ]
   },
+  "modelLabels": {
+   "claude-opus-5-5": "Opus 5.5",
+   "claude-sonnet-5-5": "Sonnet 5.5",
+   "claude-haiku-5-5": "Haiku 5.5",
+   "gpt-6": "GPT-6",
+   "gpt-6-luna": "GPT-6 Luna",
+   "gpt-5.5": "GPT-5.5",
+   "auto": "Auto",
+   "gemini-3-pro": "Gemini 3 Pro"
+  },
   "efforts": [
    "low",
    "medium",
@@ -398,6 +408,48 @@
    "lines": 180,
    "line": "Check {n}: Reading view, keyboard focus, and draft continuity - review trace.",
    "fill": "Detailed review trace continuation.\n"
+  }
+ },
+ "usage": {
+  "sage": {
+   "used": 68000,
+   "window": 200000
+  },
+  "rowan": {
+   "used": 121000,
+   "window": 200000
+  },
+  "iris": {
+   "used": 88000,
+   "window": 400000
+  },
+  "finch": {
+   "used": 140000,
+   "window": 400000
+  },
+  "vale": {
+   "used": 30000,
+   "window": 200000
+  },
+  "mira": {
+   "used": 12000,
+   "window": 200000
+  },
+  "nico": {
+   "used": 9000,
+   "window": 200000
+  },
+  "lark": {
+   "used": 4000,
+   "window": 200000
+  },
+  "tove": {
+   "used": 46000,
+   "window": 200000
+  },
+  "bryn": {
+   "used": 70000,
+   "window": 400000
   }
  },
  "files": {

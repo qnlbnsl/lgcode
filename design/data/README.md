@@ -32,7 +32,7 @@ processes, and migration records, and the page needs none of them. So `events.js
 database, and `stubs.js` folds it into the shapes the page draws.
 
 `reads.json` holds Git state, merge evidence, terminal replies, harness models and logins,
-large thread items, default settings, and scripted reactions. The design note says the
+large thread items, context use, default settings, and scripted reactions. The design note says the
 engine reads Git from the worktree at request time, so none of it belongs in events.
 
 ## Which event types are real and which are proposed
@@ -71,6 +71,7 @@ todo names a new `project` piece for them. The sample uses these proposed types,
 | `project.ReplyStopped` | The owner stopped a reply, and why. |
 | `project.SetupProgressed`, `project.SetupFinished` | How far the first run has got, and that it is done. |
 | `project.RepositoryForgotten` | A repository found by a scan was dropped when the owner chose another folder. |
+| `project.ModelChosen` | The owner chose another model or effort for an agent's next turns. |
 
 ## How the page gets its data
 
@@ -102,6 +103,21 @@ Home needs three more times, added on 2026-11-08 for the designer's Home finding
   `since` and its `commits`. The heavy sample uses it for `docs/api-reference`, which has
   waited 1 hour and 25 minutes for the owner's merge.
 
+The composer needs five more facts, added on 2026-11-08 for the designer's composer findings:
+
+- **The model and effort an agent runs with.** The engine's `AgentStarted` event already has
+  optional `model` and `effort` fields, and the samples now fill them in. The roster returns them.
+- **A change of model or effort while the agent runs.** The engine sets both only at start, so
+  `api.agents.choose` writes the proposed `project.ModelChosen` event. The reducer copies its
+  fields onto the agent.
+- **How much of the context window is in use.** `reads.json` holds `usage`, with `used` and
+  `window` in tokens for each agent. `api.agents.usage` returns them with the percentage. The
+  real service would read the harness's latest usage report at request time.
+- **Model names people read.** `reads.json` holds `harness.modelLabels`, such as "Opus 5.5" for
+  `claude-opus-5-5`.
+- **A delivery that failed.** The reducer now folds the engine's `DeliveryReturned` and
+  `DeliveryWithdrawn` events, and marks the delivery `failed`, so a thread can show it.
+
 ## Which stub stands for which real command
 
 The real command names come from `packages/contracts/src/client/commands.ts`. "Proposed"
@@ -115,6 +131,7 @@ means the engine has no such command yet.
 | `api.client.largeItem` | The thread item read |
 | `api.questions.answer`, `api.permissions.answer` | The question and permission answers |
 | `api.agents.stop`, `api.agents.resume` | The stop and resume commands |
+| `api.agents.choose`, `api.agents.usage` | Proposed: change an agent's model or effort, and read its context use |
 | `api.alerts.list`, `api.settings.*` | `client.alerts.list`, `client.alerts.settings`, `client.web.settings` |
 | `api.accounts.*` | The account commands, and a terminal on that machine for sign-in |
 | `api.project.*`, `api.machines.*` | Proposed |
