@@ -44,8 +44,8 @@ try{
  check(await page.locator('[data-repo="lgcode"]').count()===1,'Repositories are the root of navigation');
  check(await page.locator('[data-repo="lgcode"] [data-project]').count()===3,'A repository contains several independent projects');
  check(await page.locator('#view-title').textContent()==='Agent console'&&await page.locator('.kanban-column').count()===4,'Initial project opens its sprint board');
- check(await page.locator('.project-select[data-project="workspace"] .project-assigned-branch').textContent().then(t=>t.includes('feat/workspace')),'Sidebar states the assigned project branch');
- check(await page.locator('#project-branch').textContent().then(t=>t.includes('feat/workspace')),'Board header places the branch beside the project name');
+ check(await page.locator('.project-select[data-project="workspace"] .project-lead').textContent()==='Sage leads'&&await page.locator('#sidebar .project-assigned-branch').count()===0,'The selected project names its lead, and leaves the branch to the top bar');
+ check(await page.locator('#context-toggle').textContent().then(t=>t.includes('feat/workspace'))&&await page.locator('#conversation-header code, #composer-wrap code').count()===0&&!(await page.locator('#composer-worktree').textContent()).includes('feat/'),'The top bar names the branch once, and the board header and composer do not repeat it');
  check(await page.locator('#sidebar [data-open-repo="lgcode"]').count()===1,'Repository has its own projects page');
  await click('#sidebar [data-open-repo="lgcode"]');
  check(await page.locator('#view-body [data-project]').count()===3,'Repository page lists all its projects');
@@ -61,8 +61,8 @@ try{
  check(!await page.locator('#project-dialog').isVisible(),'Branch control does not open repository setup');
  await click('[data-workspace="main"]');
  check(await page.locator('#context-toggle').textContent().then(t=>t.includes('main')),'Branch picker changes the viewed code context');
- check(await page.locator('#project-branch').textContent().then(t=>t.includes('feat/workspace'))&&await page.locator('.project-select[data-project="workspace"] .project-assigned-branch').textContent().then(t=>t.includes('feat/workspace')),'Inspecting main leaves the assigned project branch visible and unchanged');
- check(await page.locator('#context-toggle').textContent().then(t=>t.includes('Viewing')),'Inspection control identifies the branch being viewed');
+ check(await page.locator('[data-workspace="workspace"] .ws-tag').textContent()==='Assigned'&&(await page.locator('#context-toggle').getAttribute('title')).includes('stays on feat/workspace'),'Inspecting main leaves the assigned branch marked and unchanged');
+ check(await page.locator('#context-toggle').textContent().then(t=>t.includes('Inspecting')),'Inspection control says it is inspecting a branch');
  check(await page.locator('#breadcrumb').textContent().then(t=>t.includes('lgcode')&&t.includes('Agent console')),'Changing workspace preserves repository and project');
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('.kanban-column').count()===4,'Project board shows sprint status columns');
@@ -125,12 +125,12 @@ try{
  check(await page.locator('.project-group[data-project-id]').count()===5,'New project joins the repository tree');
  await page.reload();await click('.project-select[data-project="workspace"]');await leadChat();
  for(const theme of ['light','dark']){
-  await click(`[data-theme-choice="${theme}"]`);
+  await page.evaluate(t=>setTheme(t),theme);
   await click('#tab-board');
   for(const width of [390,768,1440,2560]){
    await page.setViewportSize({width,height:width===390?844:900});
    check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${theme}: board has no page overflow at ${width}px`);
-   check(await page.locator('#project-branch').evaluate(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth}),`${theme}: assigned branch fits the board header at ${width}px`);
+   check(await page.locator('#context-toggle').evaluate(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth}),`${theme}: the branch fits the top bar at ${width}px`);
    if(width>=1440){
     check(await page.locator('#lead-panel').evaluate(el=>{const r=el.getBoundingClientRect(),board=document.querySelector('#conversation-main').getBoundingClientRect();return r.width>=320&&r.left>=board.right-1&&r.right<=innerWidth}),`${theme}: lead panel sits beside the board at ${width}px`);
     check(await page.locator('#lead-panel #message-form').evaluate(el=>{const r=el.getBoundingClientRect();return r.width>0&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight}),`${theme}: board chat composer stays visible at ${width}px`);

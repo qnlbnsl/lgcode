@@ -73,7 +73,7 @@ try{
  check(await page.locator('[data-account-enabled]').first().isDisabled(),'Offline subscription controls cannot appear to save changes');
  await click('#retry-connection');
  for(const theme of ['light','dark']){
-  await click(`[data-theme-choice="${theme}"]`);
+  await page.evaluate(t=>setTheme(t),theme);
   for(const view of ['subscriptions','machines']){
    await click(`[data-system-page="${view}"]`);
    for(const width of [390,1440]){await page.setViewportSize({width,height:width===390?844:900});check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${theme}: ${view} has no page overflow at ${width}px`)}

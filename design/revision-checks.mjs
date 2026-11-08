@@ -13,7 +13,7 @@ await page.goto(url);await page.waitForFunction(()=>window.lgcodeReady);
 await run('names',async()=>{
  check(await text('.brand')==='LGcode'&&(await page.title()).startsWith('LGcode'),'The product is named LGcode');
  check(!/shephrd|sheprd/i.test(await page.content()),'The old names are gone from the page');
- check(await text('#page-action')==='New project'&&await text('#project-submit')==='Create project','One name for starting a project');
+ check(await text('[data-home-new-project]')==='New project'&&await text('#new-project')==='New project'&&await text('#project-submit')==='Create project','One name for starting a project');
  await click('.project-select[data-project="workspace"]');
  check(await text('#workspace-tab-source-control')==='Git','The Git tab is named Git');
  check((await text('#workspace-tab-workspace-settings')).includes('Project settings'),'Project settings are named for their scope');
@@ -24,7 +24,7 @@ await run('tabs',async()=>{
  const lefts=[];for(const view of ['board','chat','terminal','source-control','workspace-settings']){await click(`[data-main-view="${view}"]`);lefts.push((await box('#tab-board')).left)}
  check(new Set(lefts).size===1,'The tab row stays still between views: '+lefts.join(','));
  await page.setViewportSize({width:2560,height:1300});await click('[data-main-view="board"]');
- check((await box('#view-title')).left===(await box('#tab-board')).left,'Title and tabs share an edge on a wide monitor');
+ check((await box('#participants')).left===(await box('#tab-board')).left,'The header line and tabs share an edge on a wide monitor');
  await page.setViewportSize({width:1440,height:900});
 });
 
@@ -124,7 +124,7 @@ await run('service pages',async()=>{
  await click('[data-system-page="alerts"]');
  check(await page.locator('table.alert-list').count()===1,'Alerts is a table');
  check(await page.locator('table.alert-list tbody tr').first().evaluate(e=>e.getBoundingClientRect().height)<=46,'Alert rows are single lines');
- check(await text('#alerts-count')==='1 failed','The Alerts badge counts failed notifications, not requests');
+ check(await text('#alerts-count')==='1'&&(await page.locator('[data-system-page="alerts"]').getAttribute('aria-label'))==='Phone notifications, 1 failed','The phone notifications badge counts failed notifications, not requests');
  await click('[data-system-page="machines"]');
  check((await text('.machine-table tbody tr')).includes(' of 8'),'Agent slots show how many are in use');
  for(const page2 of ['alerts','machines','subscriptions','settings']){await click(`[data-system-page="${page2}"]`);check(!(await text('#participants')).includes('Across all'),`${page2} has no filler subtitle`)}
@@ -150,6 +150,7 @@ await run('heavy sample',async()=>{
  await heavy.goto(url+'?sample=heavy');await heavy.waitForFunction(()=>window.lgcodeReady);
  const counts=await heavy.evaluate(()=>({projects:projects.length,agents:projects.flatMap(agents).length,open:homeItems().filter(i=>i.status==='open').length}));
  check(counts.projects===10,'The heavy sample has 10 projects');check(counts.agents>=30,'The heavy sample has at least 30 agents: '+counts.agents);check(counts.open>=10,'The heavy sample has a real queue: '+counts.open);
+ await heavy.evaluate(()=>{repositories.forEach(r=>expandedRepos.add(r.id));renderSidebar()});
  check(await heavy.locator('#repo-tree').evaluate(e=>e.classList.contains('more-below')),'A long sidebar shows there is more below');
  await heavy.locator('[data-project-toggle="workspace"]').click();
  await heavy.locator('.project-select[data-project="workspace"]').click();await heavy.locator('[data-main-view="chat"]').click();
@@ -176,8 +177,8 @@ await run('designer findings',async()=>{
  check((await at('.repo-heading:has([data-open-repo="lgcode"]) .attention-number').textContent()).match(/^\d+$/),'A repository rolls up attention');
  const bell=Number(await at('#attention-count').textContent()),rolled=await q.locator('.project-select .attention-number').allTextContents();
  check(rolled.map(Number).reduce((a,b)=>a+b,0)===bell,'The sidebar counts add up to the bell');
- // THREAD-2
- await at('.project-select[data-project="workspace"]').click();await q.waitForTimeout(40);
+ // THREAD-2, at a window short enough that the thread scrolls
+ await q.setViewportSize({width:1440,height:700});await at('.project-select[data-project="workspace"]').click();await q.waitForTimeout(40);
  const gap=s=>q.locator(s).evaluate(e=>e.scrollHeight-e.scrollTop-e.clientHeight);
  check(await gap('#lead-chat-body')<=2,'The lead panel opens at its true end');
  await at('#close-lead-panel').click();await at('#lead-toggle').click();await q.waitForTimeout(40);
@@ -187,7 +188,7 @@ await run('designer findings',async()=>{
  await q.locator('#view-body').evaluate(e=>{e.scrollTop=0});await q.waitForTimeout(40);
  check(await at('#latest-button').isVisible(),'Scrolling up offers a way back to the latest message');
  check((await at('#latest-button').textContent()).includes('below'),'The Latest button says when a request is below');
- await at('#latest-button').click();check(await gap('#view-body')<=2&&!await at('#latest-button').isVisible(),'The Latest button returns to the end');
+ await at('#latest-button').click();check(await gap('#view-body')<=2&&!await at('#latest-button').isVisible(),'The Latest button returns to the end');await q.setViewportSize({width:1440,height:900});
  // COMP-2
  await at('.project-select[data-project="workspace"]').click();await at('[data-main-view="chat"]').click();
  const input=at('#message-input');await input.fill('first line');await input.press('Shift+Enter');check((await input.inputValue()).includes('\n'),'Shift and Enter adds a new line');
@@ -348,6 +349,114 @@ await run('visual foundations',async()=>{
  await f.mouse.move(hb.x+hb.width/2,hb.y+300);await f.waitForTimeout(200);
  check(hb.width===8&&await handle.evaluate(e=>getComputedStyle(e).cursor==='col-resize'&&getComputedStyle(e,'::after').opacity==='1'),'Hovering the 8 pixel resize target shows a grip and the resize cursor');
  await f.close();
+});
+
+// The application shell: sidebar, top bar, tab row, and switchers, from the designer's critique of 2026-11-06.
+await run('application shell',async()=>{
+ const fresh=async(path='',size={width:1440,height:900},init)=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));if(init)await p.addInitScript(init);await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const f=await fresh(),at=s=>f.locator(s).first(),rect=s=>at(s).evaluate(e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,height:r.height,width:r.width}});
+ const clipped=s=>at(s).evaluate(e=>e.getBoundingClientRect().width<=1||e.closest('.conversation-header').getBoundingClientRect().width<=1),txt=s=>at(s).textContent();
+ // WHOLE-1: Control + B folds the sidebar into a 48 pixel rail of icons, and the browser remembers it.
+ await f.evaluate(()=>openBoard('workspace'));await f.locator('body').click({position:{x:700,y:600}});await f.keyboard.press('Control+b');
+ check(Math.round((await rect('#sidebar')).width)===48,'Control and B fold the sidebar into a 48 pixel rail');
+ check(!await at('#repo-tree').isVisible()&&await at('[data-system-page="machines"]').isVisible()&&await at('#home-link').isVisible()&&(await at('#home-link').getAttribute('title'))==='Home','The rail keeps Home and the service pages as icons, with their names on hover');
+ check(await at('#collapse-sidebar').getAttribute('aria-expanded')==='false','The collapse button says the navigation is folded');
+ await f.reload();await f.waitForFunction(()=>window.lgcodeReady);
+ check(Math.round((await rect('#sidebar')).width)===48,'The rail is remembered in this browser');
+ await at('#collapse-sidebar').click();check((await rect('#sidebar')).width>200,'The collapse button opens the sidebar again');
+ await f.evaluate(()=>{openBoard('workspace');document.querySelector('[data-main-view="terminal"]').click()});await at('#terminal-command').focus();await f.keyboard.press('Control+b');
+ check((await rect('#sidebar')).width>200,'Control and B stay with a program in the terminal');
+ // WHOLE-1 and TYPE-3: Home and Chat repeat no title; a sprint keeps its 15 pixel title.
+ await f.evaluate(()=>openHome());check(await clipped('#view-title')&&(await txt('#view-title'))==='Home','Home shows no title under the top bar that already names it');
+ check(await at('[data-home-new-project]').isVisible(),'Home keeps New project, in its tab row');
+ for(const page2 of ['machines','alerts']){await f.evaluate(s=>document.querySelector(`[data-system-page="${s}"]`).click(),page2);check(await clipped('#view-title'),`${page2} shows no title under the top bar`)}
+ await f.evaluate(()=>openBoard('workspace'));check(await clipped('#view-title')&&await at('#participants').isVisible(),'The board keeps its summary line without repeating the project name');
+ await f.evaluate(()=>openSprint('sp-02'));check(await at('#view-title').evaluate(e=>e.getBoundingClientRect().width>1&&getComputedStyle(e).fontSize==='15px'),'A sprint keeps its own title at 15 pixels');
+ // WHOLE-1: the branch shows once, in the top bar.
+ await f.evaluate(()=>openBoard('workspace'));
+ const branchPlaces=await f.evaluate(()=>[...document.querySelectorAll('#sidebar,#conversation-header,#composer-wrap,#context-toggle')].filter(e=>e.textContent.includes('feat/workspace')).map(e=>e.id));
+ check(branchPlaces.join()==='context-toggle','The branch shows once, in the top bar: '+branchPlaces.join());
+ // TAB-4: Chat has one 32 pixel line under the tabs with the agent, its role, and its status.
+ await f.evaluate(()=>openAgent('rowan','workspace'));
+ const line=await rect('#conversation-header'),tabs=await rect('#workspace-tabs'),lineText=await txt('#conversation-header');
+ check(Math.round(line.height)===32&&line.top>=tabs.bottom-1,'The chat header is one 32 pixel line under the tabs: '+line.height);
+ check(lineText.includes('Rowan')&&lineText.includes('Team lead')&&lineText.includes('Needs answer'),'The chat line names the agent, its role, and its status');
+ // SIDE-2: rows are one line of 28 pixels, and only the selected project shows its lead.
+ await f.evaluate(()=>{expandedProjects.add('recovery');openBoard('workspace')});
+ check(Math.round((await rect('.project-heading:has([data-project="recovery"])')).height)===28,'A project row is one line of 28 pixels');
+ check(await f.locator('.project-lead').count()===1&&(await txt('.project-select[data-project="workspace"] .project-lead'))==='Sage leads','Only the selected project shows its lead');
+ check(await f.locator('.system-nav button').evaluateAll(bs=>bs.every(b=>Math.round(b.getBoundingClientRect().height)===40&&!b.textContent.replace(/\d/g,'').trim()))&&new Set(await f.locator('.system-nav button').evaluateAll(bs=>bs.map(b=>Math.round(b.getBoundingClientRect().top)))).size===1,'Service pages are one row of 40 pixel icons');
+ // SIDE-3: the color mode is in Service settings as Light, Dark, and Match system.
+ check(await f.locator('#sidebar [data-theme-choice]').count()===0&&await at('#design-notes').isVisible(),'The sidebar has no color mode row, and Design notes keeps its button');
+ await f.evaluate(()=>document.querySelector('[data-system-page="settings"]').click());
+ const choices=await f.locator('[data-theme-choice]').allTextContents();
+ check(choices.join()==='Light,Dark,Match system'&&(await txt('.theme-choice')).match(/Field|Dusk/)===null,'Appearance offers Light, Dark, and Match system, without the palette names');
+ await at('[data-theme-choice="dark"]').click();
+ check(await f.evaluate(()=>document.documentElement.dataset.theme==='dark'&&localStorage.getItem('lgcode-theme')==='dark')&&await at('[data-theme-choice="dark"]').getAttribute('aria-pressed')==='true','Choosing Dark applies and remembers it');
+ await f.emulateMedia({colorScheme:'light'});await at('[data-theme-choice="system"]').click();
+ check(await f.evaluate(()=>document.documentElement.dataset.theme==='light'&&localStorage.getItem('lgcode-theme')===null),'Match system follows the device and forgets the manual choice');
+ await f.emulateMedia({colorScheme:'dark'});await f.waitForTimeout(50);check(await f.evaluate(()=>document.documentElement.dataset.theme==='dark'),'Match system keeps following the device');
+ await f.evaluate(()=>setTheme('light'));
+ // SIDE-4: only the current row is filled; its ancestors are bold, and a row is one hover target.
+ await f.evaluate(()=>openTeam('app-shell','workspace'));
+ const fills=await f.evaluate(()=>{const bg=s=>getComputedStyle(document.querySelector(s)).backgroundColor,w=s=>getComputedStyle(document.querySelector(s)).fontWeight;return {team:bg('.team-heading:has([data-team="app-shell"])'),project:bg('.project-heading:has([data-project="workspace"])'),weight:w('.project-select[data-project="workspace"] .project-label')}});
+ check(fills.team!=='rgba(0, 0, 0, 0)'&&fills.project==='rgba(0, 0, 0, 0)'&&fills.weight==='600','A selected team fills its own row, and its project is bold without a fill');
+ await at('.project-heading:has([data-project="recovery"]) .project-select').hover();
+ check(await f.evaluate(()=>{const h=document.querySelector('.project-heading:has([data-project="recovery"])');return getComputedStyle(h).backgroundColor!=='rgba(0, 0, 0, 0)'&&[...h.querySelectorAll('button')].every(b=>getComputedStyle(b).backgroundColor==='rgba(0, 0, 0, 0)')}),'A hovered project row is one surface, with no seam between its parts');
+ // SIDE-5: a project with no teams has no disclosure and no tree line.
+ await f.evaluate(()=>{expandedRepos.add('atlas-docs');expandedProjects.add('docs');renderSidebar()});
+ check(await f.locator('[data-project-toggle="docs"]').count()===0&&await f.locator('#project-docs').count()===0,'A project with no teams has no disclosure and no tree line');
+ // REPO-2: the selected repository uses the same fill as a selected project.
+ await f.evaluate(()=>openRepository('lgcode'));
+ check(await f.evaluate(()=>{const h=document.querySelector('.repo-heading:has([data-open-repo="lgcode"])'),d=document.createElement('i');d.style.color='var(--color-selected)';document.body.append(d);const c=getComputedStyle(d).color;d.remove();return getComputedStyle(h).backgroundColor===c&&h.getBoundingClientRect().height>=28}),'The selected repository fills its whole row');
+ // TOP-1: every place in the top bar opens.
+ await f.evaluate(()=>openAgent('rowan','workspace'));
+ check(await f.locator('#breadcrumb button').count()===3,'The repository, project, and team in the top bar are buttons');
+ await at('#breadcrumb [data-crumb-team]').click();check(await f.evaluate(()=>state.view==='chat'&&state.teamId==='app-shell'&&!state.agentId),'The team in the top bar opens the team');
+ await at('#breadcrumb [data-crumb-project]').click();check(await f.evaluate(()=>state.view==='board'&&state.projectId==='workspace'),'The project in the top bar opens its board');
+ await at('#breadcrumb [data-crumb-repo]').click();check(await f.evaluate(()=>state.view==='repository'&&state.repoId==='lgcode'),'The repository in the top bar opens its projects');
+ // TOP-2 and PICKER-1: the picker says Inspecting, points down, and lists one line per worktree.
+ await f.evaluate(()=>openBoard('workspace'));
+ check((await txt('.context-label'))==='Inspecting'&&(await at('#context-toggle svg:last-child').innerHTML()).includes('m6 9 6 6 6-6'),'The picker says Inspecting and its chevron points down');
+ await at('#context-toggle').click();
+ const rows=await f.locator('.workspace-option').evaluateAll(es=>es.map(e=>({h:Math.round(e.getBoundingClientRect().height),text:e.textContent,depth:e.className.match(/depth-(\d)/)[1],left:e.querySelector('.ws-label').getBoundingClientRect().left})));
+ check(rows.every(r=>r.h===32),'Each worktree is one line of 32 pixels');
+ const mains=rows.filter(r=>r.text.startsWith('Main checkout'));
+ check(mains.length===2&&mains.some(r=>r.text.includes('Studio'))&&mains.some(r=>r.text.includes('Buildbox')),'Two main checkouts are told apart by their machines');
+ check(rows.some(r=>r.depth==='1'&&r.text.startsWith('Build team'))&&rows.find(r=>r.depth==='1').left>rows.find(r=>r.depth==='0').left,'Team worktrees are indented under their project');
+ check(await f.locator('#context-menu footer').count()===0&&await at('#workspace-search').evaluate(e=>e===document.activeElement),'The picker opens on a search field and has no footer');
+ await f.keyboard.type('review');check(await f.locator('.workspace-option').count()===1&&(await txt('.workspace-option')).includes('feat/workspace/review'),'Search narrows the worktrees');
+ check(await at('.workspace-option code').evaluate(e=>getComputedStyle(e).direction==='rtl'),'A long branch is cut at its start, keeping the end');
+ await f.keyboard.press('Escape');
+ // TAB-1: Tasks comes last, so no shared tab moves when a team is selected.
+ const lefts=async()=>f.locator('#workspace-tabs [role=tab]').evaluateAll(ts=>ts.map(t=>t.textContent+':'+Math.round(t.getBoundingClientRect().left)));
+ await f.evaluate(()=>openAgent('sage','workspace'));const project=await lefts();await f.evaluate(()=>openTeam('app-shell','workspace'));const team=await lefts();
+ check(team.at(-1).startsWith('Tasks')&&project.every((t,i)=>team[i]===t),'Tasks is the last tab, and no shared tab moves for it: '+team.join(' '));
+ // ALERT-1: phone notifications are named for where they go.
+ await f.evaluate(()=>document.querySelector('[data-system-page="alerts"]').click());
+ check((await txt('#breadcrumb'))==='Phone notifications'&&(await at('[data-system-page="alerts"]').getAttribute('aria-label')).startsWith('Phone notifications')&&!(await txt('#view-body')).includes('Alert'),'Alerts are named Phone notifications everywhere');
+ // QUICK-1: names only, prefix first, 36 pixel rows with attention, and no header.
+ await f.evaluate(()=>showQuickOpen());await f.locator('#quick-search').fill('ro');
+ check((await txt('#quick-results [role=option] strong'))==='Rowan','A name that starts with the query comes first');
+ check(!(await f.locator('#quick-results [role=option] strong').allTextContents()).includes('Agent console'),'The switcher matches names only, not kinds');
+ check(Math.round((await rect('#quick-results [role=option]')).height)===36&&(await txt('#quick-results [role=option] .attention-number'))==='1','Switcher rows are 36 pixels and show what needs attention');
+ check(await f.locator('#quick-dialog header,#quick-dialog [data-close]').count()===0,'The switcher has no header and no close button');
+ await f.keyboard.press('Escape');check(!await at('#quick-dialog').isVisible(),'Escape closes the switcher');
+ // NOTES-1: Design notes is titled for what it is, with its previews grouped.
+ await at('#design-notes').click();
+ check((await txt('#notes-title'))==='Design notes'&&(await f.locator('#notes h3').allTextContents()).filter(h=>['Session','Connection','Requests'].includes(h)).length===3,'Design notes groups its previews as Session, Connection, and Requests');
+ await at('#notes footer [data-close]').click();await f.close();
+ // SIDE-6: after a navigation, the current row sits clear of the bottom fade.
+ const h=await fresh('?sample=heavy',{width:1440,height:800});
+ await h.evaluate(()=>{repositories.forEach(r=>expandedRepos.add(r.id));projects.forEach(p=>expandedProjects.add(p.id));const last=projects.at(-1);openAgent((last.teams.at(-1)?.agents.at(-1)||last.lead).id,last.id)});await h.waitForTimeout(60);
+ const clear=await h.evaluate(()=>{const t=document.querySelector('#repo-tree').getBoundingClientRect(),r=document.querySelector('#repo-tree .current').getBoundingClientRect();return t.bottom-r.bottom});
+ check(clear>=43,'The current row sits 8 pixels above the tree fade: '+Math.round(clear));
+ await h.close();
+ // The phone drawer still opens and closes.
+ const phone=await fresh('',{width:390,height:844});
+ await phone.locator('#menu').click();check(await phone.locator('#sidebar').isVisible()&&!await phone.locator('#collapse-sidebar').isVisible(),'The phone drawer opens, without the rail button');
+ await phone.keyboard.press('Escape');check(!await phone.locator('#sidebar').isVisible(),'Escape closes the phone drawer');
+ await phone.close();
 });
 
 const result={passed:checks.length,failed:failures.length,failures,errors,checks};

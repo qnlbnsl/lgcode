@@ -56,9 +56,9 @@ try{
  check(await text('#permission-perm-finch').then(t=>t.includes('wants to run the read tool')&&t.includes('cannot show its input')&&t.includes('Allow without seeing input')),'Hidden action input has an explicit warning');
  await click('[data-permission-answer="deny"][data-permission-id="perm-finch"]');
  check(await text('#permission-perm-finch').then(t=>t.includes('Denied')),'Permission requests support denial');
- await click('[data-system-page="alerts"]');check(await text('#view-title').then(t=>t==='Alerts'),'Alerts is a first-class page');
- check(await text('#view-body').then(t=>t.includes('Attempt')&&t.includes('token missing')),'Alerts preserve delivery attempts and failure reasons');
- await click('#load-more-alerts');check(await text('#view-body').then(t=>t.includes('Still failing')&&t.includes('carrier delivery failed')),'Alerts pagination retains final delivery failures');
+ await click('[data-system-page="alerts"]');check(await text('#view-title').then(t=>t==='Phone notifications'),'Phone notifications is a first-class page');
+ check(await text('#view-body').then(t=>t.includes('Attempt')&&t.includes('token missing')),'Phone notifications keep delivery attempts and failure reasons');
+ await click('#load-more-alerts');check(await text('#view-body').then(t=>t.includes('Still failing')&&t.includes('carrier delivery failed')),'Loading more phone notifications keeps final delivery failures');
  await click('.alert-list [data-alert-agent="ash"]');
  check(await text('#view-body').then(t=>t.includes('Failed to start: Not signed in')),'Failed agent thread shows the safe start-failure reason');
  check(await page.locator('#send-message').isDisabled(),'Failed starts prevent prompt submission');
@@ -84,7 +84,7 @@ try{
  await click('[data-system-page="alerts"]');await click('[data-system-page="settings"]');
  check(await page.locator('#web-port').inputValue()==='8899'&&!await page.locator('[data-push-kind="approval"]').isChecked(),'Settings persist across page navigation within the sample');
  for(const theme of ['light','dark']){
-  await click(`[data-theme-choice="${theme}"]`);
+  await page.evaluate(t=>setTheme(t),theme);
   for(const width of [390,768,1440]){
    await page.setViewportSize({width,height:width===390?844:900});
    check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${theme}: Settings fits at ${width}px`);
