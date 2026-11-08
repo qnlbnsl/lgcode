@@ -382,10 +382,10 @@ The owner set this direction on 2026-11-07, after looking at how Ananke makes it
   and the repository Design tab's Edit mode show OpenPencil's web editor in a frame, open on the
   repository's design file. It runs from `openpencil/` on port 8443 and cannot save into the
   repository yet. When it is not running, the page says so and gives the command that starts it.
-- **The Build team turns the design back into code.** Decided by the owner on 2026-11-08. Reverse
-  Fig goes one way only, from existing code to the design file. When the design changes, the Build
-  team changes the code to match it, and the mocks, built from that code, show the result. No tool
-  generates code from the design file.
+- **Converting the design into code belongs to the Build team.** Decided by the owner on
+  2026-11-08. Reverse Fig goes one way only, from existing code to the design file. The conversion
+  from the design file to code is a separate tool, built later as part of the Build team. The mocks,
+  built from that code, then show the result.
 - **The repository has a Design tab.** It shows the colors and the components that every project
   in the repository draws from, with live previews. A component that a project's approval promoted
   says which project it came from.

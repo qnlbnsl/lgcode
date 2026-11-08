@@ -541,8 +541,9 @@ The full design is in
 - **A Reverse Fig skill** (requested by the owner, 2026-11-07; not designed).
   When someone connects a project that already has an interface, the skill
   turns its existing components and screens into a `.fig` file, so the design
-  becomes the source of truth. The owner decided on 2026-11-08 that the Build
-  team turns later design changes back into code, rather than a tool. A test
+  becomes the source of truth. Reverse Fig goes only from code to the design.
+  The owner decided on 2026-11-08 that the conversion from the design file to
+  code is a separate tool, built later as part of the Build team. A test
   on 2026-11-07 did this for three of the mock's components with OpenPencil's
   command-line tool. The result had real component sets, variants and color
   variables, and it exported back to React components. Some styling was lost

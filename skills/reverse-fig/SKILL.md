@@ -13,8 +13,8 @@ compares it with the browser's photograph.
 
 The owner decided on 2026-11-07 that the design file is the source of truth, and that mocks are
 built from code. Reverse Fig is how a project that already has an interface gets its first design
-file. It goes one way only. The owner decided on 2026-11-08 that the Build team turns design changes
-back into code; no tool generates code from the design file.
+file. It goes one way only. The owner decided on 2026-11-08 that the conversion from the design file
+to code is a separate tool, built later as part of the Build team.
 
 It covers color tokens and components. It does not draw screens yet. The design file has a Screens
 page with one instance of each component, ready for that work.
