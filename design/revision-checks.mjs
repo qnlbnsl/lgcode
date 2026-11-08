@@ -123,7 +123,7 @@ await run('service pages',async()=>{
  await click('[data-system-page="alerts"]');
  check(await page.locator('table.alert-list').count()===1,'Alerts is a table');
  check(await page.locator('table.alert-list tbody tr').first().evaluate(e=>e.getBoundingClientRect().height)<=46,'Alert rows are single lines');
- check(await text('#alerts-count')==='1'&&(await page.locator('[data-system-page="alerts"]').getAttribute('aria-label'))==='Phone notifications, 1 failed','The phone notifications badge counts failed notifications, not requests');
+ check(await text('#alerts-count')==='2'&&(await page.locator('[data-system-page="alerts"]').getAttribute('aria-label'))==='Phone notifications, 2 failed'&&await page.locator('.alert-list td.delivery-failed').count()===2,'The phone notifications badge counts every failed notification it shows, not requests');
  await click('[data-system-page="machines"]');
  check((await text('.machine-table tbody tr')).includes(' of 8'),'Agent slots show how many are in use');
  for(const page2 of ['alerts','machines','subscriptions','settings']){await click(`[data-system-page="${page2}"]`);check(!(await text('#participants')).includes('Across all'),`${page2} has no filler subtitle`)}
@@ -713,6 +713,52 @@ await run('git and the terminal',async()=>{
  const o=await fresh();await o.evaluate(()=>openBoard('workspace'));await o.locator('[data-main-view="source-control"]').first().click();await o.evaluate(()=>document.querySelector('[data-preview="reconnect"]').click());await o.waitForTimeout(60);
  check(await o.locator('#git-stage-all').isDisabled()&&await o.locator('#git-discard').isDisabled()&&(await o.locator('#git-discard').getAttribute('title')||'').includes('connection'),'Stage all and Discard wait for the connection');
  await o.locator('[data-main-view="terminal"]').first().click();check(await o.locator('[data-close-terminal]').first().isDisabled(),'Closing a terminal waits for the connection');await o.close();
+});
+
+// The service pages and project pages, from the designer's critique: Machines, Project settings, and New project.
+await run('machines, project settings, and new project',async()=>{
+ const f=await browser.newPage({viewport:{width:1440,height:900}});f.setDefaultTimeout(4000);f.on('pageerror',e=>errors.push(e.message));
+ await f.goto(url+'?sample=heavy');await f.waitForFunction(()=>window.lgcodeReady);
+ const sys=v=>f.evaluate(s=>document.querySelector(`[data-system-page="${s}"]`).click(),v);
+ // MACH-2: overload, last seen, and a row menu.
+ await sys('machines');
+ check(await f.locator('[data-machine-row="studio"] .over-limit').textContent().then(t=>t.includes('Over limit'))&&await f.locator('[data-machine-row="studio"] .over-limit').evaluate(e=>getComputedStyle(e).color===getComputedStyle(document.querySelector('.dot.wait')||document.body).backgroundColor||true),'MACH-2: an overloaded machine says Over limit');
+ check(await f.locator('[data-machine-row="studio"] .over-limit').evaluate(e=>{const c=getComputedStyle(e).color,t=document.createElement('span');t.style.color='var(--color-warn)';document.body.append(t);const w=getComputedStyle(t).color;t.remove();return c===w}),'MACH-2: Over limit is amber');
+ check(await f.locator('[data-machine-row="laptop"]').textContent().then(t=>t.includes('Last seen 2 hours ago')),'MACH-2: an offline machine says when it was last seen');
+ check(!await f.locator('.machine-page').textContent().then(t=>t.includes('Computers connected to')||t.includes('Choose a machine when starting')),'MACH-2: Machines has no filler subtitles');
+ await f.locator('[data-row-menu="machine"][data-row-id="studio"]').click();check(await f.locator('#row-menu [data-row-action="remove"]').isDisabled()&&await f.locator('#row-menu .menu-reason').textContent().then(t=>t.includes('cannot be removed')),'This computer cannot be removed, and the menu says why');await f.keyboard.press('Escape');
+ await f.locator('[data-row-menu="machine"][data-row-id="buildbox"]').click();check(await f.locator('#row-menu .menu-reason').textContent().then(t=>t.includes('Move its 4 projects')),'A machine with projects says to move them first');
+ await f.locator('#row-menu [data-row-action="rename"]').click();await f.locator('#rename-input').fill('Build server');await f.locator('#rename-submit').click();check(await f.locator('[data-machine-row="buildbox"] .machine-name').textContent()==='Build server','MACH-2: Rename changes the machine name');
+ await f.locator('[data-row-menu="machine"][data-row-id="laptop"]').click();await f.locator('#row-menu [data-row-action="remove"]').click();check(await f.locator('#confirm-dialog').isVisible()&&(await f.locator('#confirm-title').textContent())==='Remove Laptop?','MACH-2: Remove asks first');
+ await f.locator('#confirm-run').click();check(await f.locator('[data-machine-row="laptop"]').count()===0,'Confirming Remove removes the machine');
+ await f.setViewportSize({width:390,height:844});
+ check(await f.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)&&await f.locator('[data-machine-row="studio"] [data-new-on-machine]').evaluate(b=>b.getBoundingClientRect().right<=innerWidth)&&await f.locator('[data-project-machine]').first().evaluate(b=>b.getBoundingClientRect().right<=innerWidth),'MACH-2: at 390 pixels each machine and placement row stacks, with its actions on screen');
+ check(await f.locator('[data-machine-row="studio"]').evaluate(r=>{const tds=[...r.cells].filter(c=>c.offsetParent);const tops=tds.map(c=>c.getBoundingClientRect().top).sort((a,b)=>a-b);return tops.filter((t,i)=>i&&t-tops[i-1]>16).length===1}),'MACH-2: a stacked machine row is two lines');
+ await f.setViewportSize({width:1440,height:900});
+ // PSET-1: facts, a link to placement, Rename, and Archive.
+ await f.evaluate(()=>{openBoard('workspace');go({view:'workspace-settings'})});
+ check(await f.locator('#workspace-location dt').allTextContents().then(t=>t.join()==='Repository,Branch,Checkout,Folder,Machine')&&await f.locator('#workspace-location input').count()===0,'PSET-1: facts are a label-and-value list');
+ check(!await f.locator('#view-body').textContent().then(t=>/Viewing picker|and its agents work/.test(t)),'PSET-1: the filler sentences are gone');
+ await f.locator('[data-open-placement="workspace"]').click();check(await f.evaluate(()=>state.view==='machines'&&document.activeElement.dataset.projectMachine==='workspace'),'PSET-1: the Machine row links to its placement');
+ await f.evaluate(()=>{openBoard('workspace');go({view:'workspace-settings'})});
+ await f.locator('#rename-project').click();await f.locator('#rename-input').fill('Agent recovery');await f.locator('#rename-submit').click();check(await f.locator('#rename-error').isVisible(),'Renaming to an existing project name is refused');
+ await f.locator('#rename-input').fill('Agent desk');await f.locator('#rename-submit').click();check(await f.locator('.project-select[data-project="workspace"] .project-label').textContent()==='Agent desk','PSET-1: Rename changes the project name in the sidebar');
+ const before=await f.evaluate(()=>attentionQueue().length);
+ await f.locator('#archive-project').click();check(await f.locator('#confirm-dialog').isVisible()&&(await f.locator('#confirm-impact').textContent()).includes('All projects still lists it'),'PSET-1: Archive asks first in a dialog');
+ await f.locator('#confirm-run').click();await f.waitForSelector('#restore-project');
+ check(await f.locator('.project-select[data-project="workspace"]').count()===0,'An archived project leaves the sidebar');
+ check(await f.evaluate(b=>attentionQueue().length<b&&attentionQueue().every(i=>i.project.id!=='workspace'),before),'An archived project leaves Home and the bell');
+ check(await f.locator('.archived-note').isVisible(),'Project settings says the project is archived');
+ await f.locator('#home-link').click();await f.locator('[data-home-tab="projects"]').click();check(await f.locator('[data-home-project="workspace"]').count()===1&&await f.locator('tr:has([data-home-project="workspace"])').textContent().then(t=>t.includes('Archived')),'An archived project stays reachable from All projects');
+ await f.locator('[data-home-project="workspace"]').click();await f.evaluate(()=>go({view:'workspace-settings'}));await f.locator('#restore-project').click();check(await f.locator('.project-select[data-project="workspace"]').count()===1,'Restore brings the project back to the sidebar');
+ // NEW-1 and NEW-2: labels, Goal, worktree, preview, and the lead subscription.
+ await f.locator('#new-project').click();
+ check(await f.evaluate(()=>['project-name','project-goal','project-account'].map(id=>document.querySelector(`label[for=${id}]`).textContent).join())==='Project name,Goal,Lead subscription','NEW-1: the fields are Project name, Goal, and Lead subscription');
+ check((await f.locator('.project-worktree-label').textContent())==='Create a worktree'&&await f.locator('#project-lead-field').isVisible(),'NEW-1: the checkbox says Create a worktree, and the lead subscription is offered');
+ await f.locator('#project-name').fill('Field notes');await f.locator('#project-goal').fill('Ship offline notes');
+ check(await f.locator('#project-location-preview dt').allTextContents().then(t=>t.join()==='Branch,Folder')&&await f.locator('#project-location-preview dd').first().textContent().then(t=>t.startsWith('field-notes')),'NEW-1: the preview is two labelled lines, Branch and Folder');
+ await f.locator('#project-submit').click();check(await f.evaluate(()=>p().goal)==='Ship offline notes','The goal reaches the new project');
+ await f.close();
 });
 
 const result={passed:checks.length,failed:failures.length,failures,errors,checks};

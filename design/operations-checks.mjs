@@ -71,8 +71,19 @@ try{
  await click('[data-permission-answer="deny"][data-permission-id="perm-finch"]');
  check(await text('#permission-perm-finch').then(t=>t.includes('Denied')),'Permission requests support denial');
  await click('[data-system-page="alerts"]');check(await text('#view-title').then(t=>t==='Phone notifications'),'Phone notifications is a first-class page');
- check(await text('#view-body').then(t=>t.includes('Attempt')&&t.includes('token missing')),'Phone notifications keep delivery attempts and failure reasons');
- await click('#load-more-alerts');check(await text('#view-body').then(t=>t.includes('Still failing')&&t.includes('carrier delivery failed')),'Loading more phone notifications keeps final delivery failures');
+ check(await text('#view-body').then(t=>t.includes('Attempt')&&t.includes('Token missing')&&t.includes('Still failing')&&t.includes('Carrier delivery failed')),'Phone notifications keep delivery attempts and failure reasons');
+ // ALERT-2: time, names, one failure colour, no State column, Retry, and the fix for a missing token.
+ check(await page.locator('.alert-list thead th').allTextContents().then(t=>t.join()==='Notification,Time,About,Delivery,Actions'),'ALERT-2: the table has a Time column and no State column');
+ check(await text('.alert-list [data-alert="alert-perm-iris"]').then(t=>t.includes('Approval')&&t.includes('10:50')&&t.includes('Iris · Agent console')&&!t.includes('perm-iris')),'ALERT-2: a row names its kind, its time, its agent, and its project');
+ check(await page.locator('.alert-list td.delivery-failed').evaluateAll(c=>c.length===2&&new Set(c.map(x=>getComputedStyle(x).color)).size===1),'ALERT-2: every failed delivery wears the same colour');
+ const openFailed=await page.evaluate(()=>failedAlertCount());check(openFailed>=1&&await page.locator('[data-alert-retry]').count()===openFailed&&await page.locator('[data-fix-notifications]').count()===1,'ALERT-2: each failed row offers Retry, and the missing token offers one fix');
+ await click('[data-alert-retry="alert-ash"]');check(await text('[data-alert="alert-ash"]').then(t=>t.includes('Failed · Attempt 4 · Token missing')),'Retry without a token fails again and says why');
+ await click('[data-fix-notifications]');check(await text('#view-title')==='Service settings'&&await page.evaluate(()=>document.activeElement.id)==='carrier-token','Fix in Service settings opens the token field');
+ await page.locator('#carrier-token').fill('sample-retry-token');await page.locator('#carrier-token').blur();await click('[data-system-page="alerts"]');
+ check(await page.locator('[data-fix-notifications]').count()===0,'With a token set, the fix is gone');
+ await click('[data-alert-retry="alert-ash"]');check(await text('[data-alert="alert-ash"]').then(t=>t.includes('Delivered · Attempt 5'))&&await text('#alerts-count')===(openFailed>1?String(openFailed-1):''),'Retry with a token delivers, and the badge drops');
+ for(const width of [390,768]){await page.setViewportSize({width,height:844});check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)&&await page.locator('.alert-list td.delivery-failed').first().evaluate(c=>c.getBoundingClientRect().right<=innerWidth&&c.scrollWidth<=c.clientWidth+1),`ALERT-2: the Delivery column does not clip at ${width} pixels`)}await page.setViewportSize({width:1440,height:900});
+ await click('[data-system-page="settings"]');await click('#clear-token');await click('[data-system-page="alerts"]');
  await click('.alert-list [data-alert-agent="ash"]');
  check(await text('#view-body .request.is-failed').then(t=>t.includes('Failed start')&&t.includes('Not signed in')),'Failed agent thread shows the safe start-failure reason');
  check(await page.locator('#send-message').isDisabled(),'Failed starts prevent prompt submission');
@@ -83,20 +94,35 @@ try{
  await click('#agent-controls [data-agent-command="resume"]');check(await page.locator('#message-input').isVisible()&&await page.locator('#agent-controls .composer-halt').count()===0,'Resume can start a fresh sample session');
  await click('[data-system-page="settings"]');check(await text('#view-title').then(t=>t==='Service settings'),'Settings is a first-class page');
  check(await page.locator('[data-push-kind]').count()===12,'Settings retains all twelve alert push categories');
- await page.locator('[data-push-kind="approval"]').uncheck();
- await page.locator('#carrier-server').fill('https://push.example');await page.locator('#carrier-topic').fill('lgcode');await click('#save-carrier');
- await page.locator('#carrier-token').fill('sample-only-token');await click('#save-token');
- check(await page.locator('#carrier-token').inputValue()===''&&await text('#token-state').then(t=>t.includes('Token set')),'Token control clears the input and exposes only whether a token is set');
+ // SET-1: a section list that follows scrolling, saving on change with a Saved mark, and 96 pixel number fields.
+ check(await page.locator('[data-settings-nav]').allTextContents().then(t=>t.join()==='Appearance,Phone notifications,Notification service,Web server'),'SET-1: a section list names every section');
+ check(await page.locator('#save-carrier,#save-token,#save-web,#refresh-settings').count()===0,'SET-1: no section has its own Save button');
+ check(await page.locator('#web-port').evaluate(e=>e.getBoundingClientRect().width)===96&&await page.locator('#web-heartbeat').evaluate(e=>e.getBoundingClientRect().width)===96,'SET-1: numeric fields are 96 pixels wide');
+ await click('[data-settings-nav="web"]');await page.waitForTimeout(150);check(await page.locator('[data-settings-nav="web"]').getAttribute('aria-current')!==null&&await page.locator('.settings-nav').evaluate(n=>n.getBoundingClientRect().top>=document.querySelector('#view-body').getBoundingClientRect().top-1&&n.getBoundingClientRect().top<200),'SET-1: the section list stays in view and follows scrolling');
+ await page.locator('#view-body').evaluate(b=>b.scrollTop=0);await page.waitForTimeout(150);check(await page.locator('[data-settings-nav="appearance"]').getAttribute('aria-current')!==null,'Scrolling back up marks the first section');
+ // SET-2: the labels name what they do, and a test notification can be sent.
+ check(await text('#view-body').then(t=>t.includes('Notification service token')&&t.includes('Check-in interval, in seconds')&&!/carrier|Heartbeat|permission-rule/i.test(t)),'SET-2: the labels drop engine words');
+ check(await text('[data-push-kind="roles.rule-first-use"]~*, .push-setting:has([data-push-kind="roles.rule-first-use"]) .op-caption').then(t=>/permission rule/.test(t)),'SET-2: one sentence explains the permission rule');
+ check(await page.locator('#send-test').isDisabled()&&await text('#send-test-reason')==='Set the token first.','Send test notification says what it needs');
+ await page.locator('[data-push-kind="approval"]').uncheck();check(await text('[data-saved-for="push-approval"]').then(t=>t.includes('Saved')),'A notification choice saves at once with a Saved mark');
+ await page.locator('#carrier-server').fill('https://push.example/path');await page.locator('#carrier-topic').fill('lgcode');await page.locator('#carrier-topic').blur();
+ check(await text('[data-saved-for="carrier-topic"]').then(t=>t.includes('Saved'))&&await page.locator('#carrier-server').inputValue()==='https://push.example','The service saves on change, keeping only the server origin');
+ await page.locator('#carrier-token').fill('sample-only-token');await page.locator('#carrier-token').blur();
+ check(await page.locator('#carrier-token').inputValue()===''&&await text('#token-state').then(t=>t.includes('A token is set')),'Token control clears the input and exposes only whether a token is set');
  check(!await text('body').then(t=>t.includes('sample-only-token')),'Token contents are absent from rendered text');
- await page.locator('#carrier-server').fill('https://other.example');await click('#save-carrier');
+ check(await page.locator('#send-test').evaluate(b=>b.getBoundingClientRect().top<document.querySelector('#carrier-token').getBoundingClientRect().bottom),'SET-2: Send test notification sits beside the token');
+ await click('#send-test');await page.waitForFunction(()=>document.querySelector('#send-test-result').textContent.startsWith('Sent'));check(true,'Send test notification reports that it was sent');
+ await page.locator('#carrier-server').fill('https://other.example');await page.locator('#carrier-server').blur();
  check(await text('#token-state').then(t=>t.includes('No token')),'Changing token destination clears the old token state');
  await click('#clear-carrier');check(await page.locator('#carrier-token').isDisabled(),'Clearing carrier disables token entry');
- await page.locator('#web-proxy').check();await page.locator('#web-public').fill('https://lgcode.example/path');await click('#save-web');
- check(await text('#settings-message').then(t=>t.includes('canonical HTTPS origin')),'Settings rejects a public address with a path');
- await page.locator('#web-public').fill('https://lgcode.example');await page.locator('#web-port').fill('8899');await click('#save-web');
- check(await text('#settings-message').then(t=>t.includes('next service start')),'Web settings preserve restart and connection consequences');
+ await page.locator('#web-public').fill('https://lgcode.example/path');await page.locator('#web-public').blur();
+ check(await text('#web-public-error').then(t=>t.includes('canonical HTTPS origin')),'Settings rejects a public address with a path');
+ await page.locator('#web-public').fill('https://lgcode.example');await page.locator('#web-public').blur();await page.locator('#web-proxy').check();
+ await page.locator('#web-port').fill('8899');await page.locator('#web-port').blur();
+ check(await text('[data-saved-for="web-port"]').then(t=>t.includes('Saved'))&&await text('#view-body').then(t=>t.includes('next service start')),'Web settings save on change and keep the restart consequence');
+ await click('#web-enabled');check(await page.locator('#confirm-dialog').isVisible()&&await page.locator('#web-enabled').isChecked(),'Turning off the web server asks first');await click('#confirm-dialog footer [data-close]');
  await click('[data-system-page="alerts"]');await click('[data-system-page="settings"]');
- check(await page.locator('#web-port').inputValue()==='8899'&&!await page.locator('[data-push-kind="approval"]').isChecked(),'Settings persist across page navigation within the sample');
+ check(await page.locator('#web-port').inputValue()==='8899'&&!await page.locator('[data-push-kind="approval"]').isChecked()&&await page.locator('#web-proxy').isChecked(),'Settings persist across page navigation within the sample');
  for(const theme of ['light','dark']){
   await page.evaluate(t=>setTheme(t),theme);
   for(const width of [390,768,1440]){
@@ -105,14 +131,14 @@ try{
   }
  }
  // A viewport change must preserve unsaved settings, not redraw their inputs.
- await page.locator('#carrier-server').fill('https://draft.example');
+ await page.locator('#carrier-token').evaluate(e=>e.disabled=false);await page.locator('#carrier-token').evaluate(e=>e.value='draft-unsaved');
  await page.setViewportSize({width:390,height:844});
  await page.waitForTimeout(100);
- check(await page.locator('#carrier-server').inputValue()==='https://draft.example','Responsive resize preserves unsaved service settings');
+ check(await page.locator('#carrier-token').inputValue()==='draft-unsaved','Responsive resize preserves unsaved service settings');
  await page.screenshot({path:new URL('./previews/operations-settings-dark-1440.png',import.meta.url).pathname});
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:new URL('./previews/operations-settings-dark-390.png',import.meta.url).pathname});
  await page.setViewportSize({width:1440,height:900});
- await page.locator('#carrier-server').fill('https://push.example');await page.locator('#carrier-topic').fill('lgcode');await click('#save-carrier');
+ await page.locator('#carrier-server').fill('https://push.example');await page.locator('#carrier-topic').fill('lgcode');await page.locator('#carrier-topic').blur();
  await page.locator('#carrier-token').fill('unsaved-secret-must-clear');await click('#logout');
  check(await page.locator('#carrier-token').inputValue()==='','Logout wipes an unsaved token from hidden controls');
  await page.locator('#login-password').fill('sample-only-password');await click('#login-submit');
