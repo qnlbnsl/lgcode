@@ -103,12 +103,17 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
 - Open Phone notifications, the phone icon at the foot of the sidebar, and choose Refresh.
   The notice appears at the top right, below the bell.
 - Expand a request on Home and answer it. The row eases open, and the answered row folds away.
+- Open Design notes and choose Reconnecting. The Live indicator turns amber, says when it last
+  heard from the service, and offers Reconnect now. Nothing on the page moves. Hover a disabled
+  button to read why. After 30 seconds it says Offline. The Offline preview shows that state at once.
+- Open the bell in `?sample=heavy`. It lists six requests, failed starts first and then the longest
+  wait, each with its age, and ends with View all 10.
 
 ## Existing page capabilities and new workspace views
 
 The navigation footer is a row of icons for Phone notifications, Machines,
 Subscriptions, Service settings, and Design notes, above the account and Log out. The top bar shows the connection state. Design notes
-contains preview controls for session expiry, login errors, connection loss,
+contains preview controls for session expiry, login errors, connection loss and Offline,
 failed starts, permissions, and large-item failure.
 
 Agent threads retain stop/resume, failed-start reasons, permission controls,
@@ -233,7 +238,7 @@ is centered on larger monitors.
 
 Find project or agent opens the quick switcher. Command or Control + K
 also opens it, and the hint shows the key for the system in use. Arrow keys and Enter choose a result. Only projects needing you filters
-the navigation tree, and the top-bar bell opens decisions, permissions, and
+the navigation tree, and the top-bar bell opens questions, approvals, and
 failed starts with direct links to the relevant thread item.
 
 The sidebar now groups Home and Find project or agent above a border.

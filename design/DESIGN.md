@@ -184,8 +184,8 @@ in-memory interactions, with no repository mutation.
 Agent progress and stop/resume sit next to the composer. Subscription choices
 are filtered by harness and machine. Files and tasks can be attached as
 context, and sent turns retain those references. Grouped activity links to
-its changed files. The attention menu separates decisions, permissions, and
-failed starts. Only projects needing you filters projects. Quick switch searches
+its changed files. The bell lists questions, approvals, and
+failed starts in one order. Only projects needing you filters projects. Quick switch searches
 projects, teams, and agents by name, and opens with Command or Control + K.
 Terminal sessions preserve separate input and history in each worktree.
 
@@ -458,7 +458,7 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
   which keeps at least 3 to 1 contrast. A disabled action that needs something says what,
   beside the button. Commit says "Add a message and stage a file."
 - **Links go somewhere, and buttons change something.** Clear filters, Load full item, Try
-  reconnecting, Confirm pairing, New project here, Connect subscription, Add task, Check
+  reconnecting (now Reconnect now), Confirm pairing, New project here, Connect subscription, Add task, Check
   again, and Change folder are buttons now. A small action in a row uses the `secondary
   dense` classes.
 
@@ -570,3 +570,49 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
   Escape closes it.
 - **Design notes says what it is.** Its previews are grouped as Session, Connection, and
   Requests.
+
+## Connection, the bell, and empty states, set on 2026-11-08
+
+These rules come from the designer's critique of 2026-11-06. Claude applied them on
+2026-11-08.
+
+### The connection lives in the Live indicator
+
+- **Nothing is inserted into the layout.** The top bar's Live indicator carries the state.
+  The connection banner is gone, so a lost connection moves no content and hides no button.
+- **There are four states.** Live has a green dot. Connecting and Reconnecting have an amber
+  dot. Offline has a red dot.
+- **Reconnecting turns into Offline after 30 seconds.** Both states say when the page last
+  heard from the service, such as "Last updated 2 minutes ago". The time keeps counting.
+- **Reconnect now is a small button.** It sits beside the indicator, with a refresh icon and
+  no arrow. On a phone it shows only the icon.
+- **Data stays readable, and actions wait.** Threads, lists, and links keep working. Every
+  control that changes state is disabled, and its hover text gives the reason, such as
+  "LGcode is offline. This works again when the connection returns." Drafts can still be
+  typed. Starting a project, a new terminal, and refreshing notifications also wait.
+- **The bell's count is muted while stale.** Its hover text says that the count is from the
+  last update.
+- **The terminal keeps its grid.** Its notice, such as "Reconnecting. Input is paused.",
+  sits in the terminal's own bar, so the rows and columns do not change.
+
+### The bell is a short copy of Home
+
+- **The bell uses Home's kinds.** They are Question, Approval, and Failed start.
+- **The bell's order is shared.** Failed starts come first, then the request that has waited
+  longest. The comparator is `byAttention` in `workbench.js`, and `attentionQueue()` returns
+  the open queue in that order, so Home can use the same order.
+- **Rows are 44 pixels.** Each row has the request, its age at the right, and a second line
+  with the kind, the agent, and the project.
+- **The bell shows at most six rows.** "View all 10" follows them and opens Needs attention
+  on Home. An empty bell says "Nothing needs your attention." and has no link.
+
+### Empty states
+
+- **One short sentence and at most one action.** The helper `emptyState(line, action)` in
+  `workbench.js` draws one. Examples are "No sprints until you approve the mocks." with
+  Open the mocks, and "No matching requests." with Clear filters.
+- **An empty list is not shown.** A table with no rows becomes its sentence. A sprint shows
+  Completion evidence only once it has evidence. Only projects needing you says "Nothing
+  needs you." when no project does.
+- **Home's empty queue keeps its line about running work.** "Nothing needs you" is followed
+  by how many agents are working, linked to All projects, as the Home finding asked.
