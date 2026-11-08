@@ -36,6 +36,7 @@ LGcode's own stylesheet sets the stroke width to 1.6 instead of Lucide's 2.
 | `menu` | The phone navigation button. |
 | `panel-left` | Folding the sidebar into a rail, added on 2026-11-08. |
 | `circle-help` | Design notes. |
+| `refresh-cw` | Reconnect now, beside the Live indicator, added on 2026-11-08. |
 | `git-branch` | Branch names. |
 | `kanban` | The project board. |
 | `message-square` | Requests in a thread. |
