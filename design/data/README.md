@@ -118,6 +118,26 @@ The composer needs five more facts, added on 2026-11-08 for the designer's compo
 - **A delivery that failed.** The reducer now folds the engine's `DeliveryReturned` and
   `DeliveryWithdrawn` events, and marks the delivery `failed`, so a thread can show it.
 
+Git and the terminal need more, added on 2026-11-08 for the designer's Git and terminal findings:
+
+- **What a conflict looks like.** `reads.json` holds `git.conflicts`, keyed by file path. Each
+  file is a list of segments. A shared segment has `line`, the number of its first line, and
+  `context`, its lines. A conflict has `ours`, `base`, and `theirs`. `api.git.conflict`
+  returns the segments with the branch names and the choices made so far. The real service
+  would read the conflict markers from the file at request time.
+- **A choice for each conflict.** `api.git.choose` keeps ours, theirs, or both for one
+  conflict, and `api.git.resolve` marks the file resolved once every conflict has a choice.
+- **Staging and discarding many files.** `api.git.stageAll`, `api.git.unstageAll`, and
+  `api.git.discard` act on the worktree in the same way as `api.git.stage`. Stage all and
+  Discard leave conflicted files alone.
+- **Terminal sessions.** `api.terminal.sessions` lists a worktree's sessions, each with an
+  `id` and a `name`. An empty name means the shell's own name, such as "Shell 1".
+  `api.terminal.open`, `api.terminal.close`, and `api.terminal.rename` change the list, and
+  `api.terminal.complete` completes the last word of a command for the Tab key. Sessions
+  live on the machine, so none of this belongs in events.
+- **A long list of changed files.** In the heavy sample, Invoice exports has 26 changed files,
+  so the Git page shows the long-list case.
+
 ## Which stub stands for which real command
 
 The real command names come from `packages/contracts/src/client/commands.ts`. "Proposed"
@@ -135,15 +155,15 @@ means the engine has no such command yet.
 | `api.alerts.list`, `api.settings.*` | `client.alerts.list`, `client.alerts.settings`, `client.web.settings` |
 | `api.accounts.*` | The account commands, and a terminal on that machine for sign-in |
 | `api.project.*`, `api.machines.*` | Proposed |
-| `api.git.*`, `api.terminal.run` | Proposed |
+| `api.git.*`, `api.terminal.*` | Proposed |
 | `api.setup.*` | Proposed: the first run's scan of the computer and its progress |
 | `api.mocks.*` | Proposed: compare a mock field with the schema, read a repository's design, and approve mocks |
 
 Reads return promises, as the real API will. The page awaits one snapshot at boot and keeps
 its live objects, which stands in for a snapshot plus a subscription. Commands take effect
 before they return, so a page handler can call one and draw at once. A real client would
-wait for the result, and the website must do that. `api.git.state` and `api.terminal.run`
-answer synchronously, because the page reads them while it draws.
+wait for the result, and the website must do that. `api.git.state`, `api.git.conflict`, and the
+`api.terminal` reads answer synchronously, because the page reads them while it draws.
 
 `api.debug` exists only for Design notes and the checks.
 

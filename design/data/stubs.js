@@ -13,7 +13,7 @@ const S={
  setup:{step:'welcome',finished:false}
 };
 let reads=null,meta=null,source='sample',sequence=0,bootedAt=0,localSets=[],withSet=null;
-const events=[],subscribers=new Set(),gitStates=new Map(),replyTimers=new Map(),signInTimers=new Map();
+const events=[],subscribers=new Set(),gitStates=new Map(),terminalSessions=new Map(),replyTimers=new Map(),signInTimers=new Map();
 const counters={project:1,task:30,machine:1,account:1,git:1,delivery:1,item:1,post:1};
 
 // First run. Where the owner has got to is stored; what the scan finds is read each time.
@@ -505,11 +505,21 @@ const api={
  git:{
   state(id){
    // A worktree can start with commits that wait for the owner's merge; pendingSince says since when, and mergedAt when the last merge happened.
-   if(!gitStates.has(id)){const w=S.workspaces.find(x=>x.id===id),waiting=(w?.awaiting?.commits||[]).map(c=>({...c,ref:w.branch}));gitStates.set(id,{staged:new Set(),message:'',commits:waiting,incoming:w?.incoming||0,outgoing:waiting.length,pending:waiting.length,pendingSince:waiting.length?w.awaiting.since:null,mergedAt:null,conflicts:new Set(w?.conflicts||[]),resolutions:new Map(),notice:'',lastMerge:''})}
+   if(!gitStates.has(id)){const w=S.workspaces.find(x=>x.id===id),waiting=(w?.awaiting?.commits||[]).map(c=>({...c,ref:w.branch}));gitStates.set(id,{staged:new Set(),message:'',commits:waiting,incoming:w?.incoming||0,outgoing:waiting.length,pending:waiting.length,pendingSince:waiting.length?w.awaiting.since:null,mergedAt:null,conflicts:new Set(w?.conflicts||[]),choices:new Map(),notice:'',lastMerge:''})}
    return gitStates.get(id);
   },
   log(id){const w=S.workspaces.find(x=>x.id===id);return [...api.git.state(id).commits,...(w?.history||[])]},
   stage(id,path){const g=api.git.state(id);g.staged.has(path)?g.staged.delete(path):g.staged.add(path)},
+  // Stage all leaves conflicted files alone, because they need a resolution first.
+  stageAll(id){const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id);for(const f of w.files)if(!g.conflicts.has(f))g.staged.add(f)},
+  unstageAll(id){api.git.state(id).staged.clear()},
+  // Discard throws away uncommitted changes to these files. The page asks first.
+  discard(id,paths){const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id),gone=paths.filter(f=>w.files.includes(f)&&!g.conflicts.has(f));w.files=w.files.filter(f=>!gone.includes(f));gone.forEach(f=>g.staged.delete(f));g.notice=gone.length===1?'Discarded the changes to '+gone[0]+'.':'Discarded '+gone.length+' changes.'},
+  // A conflicted file is a list of segments: shared lines with their line number, or a conflict with ours, the base, and theirs.
+  // Theirs is the branch being merged in: the parent worktree's branch for a team, and main otherwise.
+  conflict(id,path){const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id);if(!g.choices.has(path))g.choices.set(path,[]);return {path,ours:w.branch,theirs:S.workspaces.find(x=>x.id===w.parentId)?.branch||'main',segments:reads.git.conflicts?.[path]||reads.git.conflicts?.default||[],choices:g.choices.get(path)}},
+  // Each conflict keeps ours, theirs, or both. Marking the file resolved needs a choice for every conflict.
+  choose(id,path,hunk,choice){api.git.conflict(id,path).choices[hunk]=choice},
   commit(id){
    const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id),files=w.files.filter(f=>g.staged.has(f)),commit='d'+(counters.git++).toString(16).padStart(6,'0');
    g.commits.unshift({id:commit,title:g.message.trim(),ref:w.branch,files});
@@ -518,7 +528,7 @@ const api={
   fetch(id){api.git.state(id).notice='Remote references are up to date.'},
   pull(id){const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id);g.incoming=0;g.notice='Updated '+w.branch+' from its tracked branch.'},
   push(id){const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id);g.outgoing=0;g.notice='Pushed '+w.branch+'.'},
-  resolve(id,path,choice){const g=api.git.state(id);g.conflicts.delete(path);g.resolutions.set(path,choice);g.notice='Conflict resolved. Review and stage '+path+'.'},
+  resolve(id,path){const c=api.git.conflict(id,path),hunks=c.segments.filter(s=>!s.context).length,g=api.git.state(id);if(c.choices.filter(Boolean).length<hunks)return;g.conflicts.delete(path);g.notice='Resolved '+path+'. Review and stage it.'},
   integrate(id,targetId){
    const w=S.workspaces.find(x=>x.id===id),target=S.workspaces.find(x=>x.id===targetId),g=api.git.state(id),parent=api.git.state(targetId),files=[...new Set(g.commits.slice(0,g.pending).flatMap(c=>c.files))];
    parent.commits.unshift({id:'m'+(counters.git++).toString(16).padStart(6,'0'),title:'Merge '+w.branch,ref:target.branch,files:files.length?files:['docs/README.md']});
@@ -532,6 +542,13 @@ const api={
  },
  // A real terminal is a stream, so this one answers at once.
  terminal:{
+  // Sessions belong to a worktree on its machine. Each worktree starts with one, and an empty name means the shell's own name.
+  sessions(id){if(!terminalSessions.has(id))terminalSessions.set(id,{next:2,items:[{id:1,name:''}]});return terminalSessions.get(id).items},
+  open(id){api.terminal.sessions(id);const s=terminalSessions.get(id),item={id:s.next++,name:''};s.items.push(item);return item},
+  close(id,session){api.terminal.sessions(id);const s=terminalSessions.get(id);s.items=s.items.filter(x=>x.id!==session)},
+  rename(id,session,name){const item=api.terminal.sessions(id).find(x=>x.id===session);if(item)item.name=name.trim().slice(0,40)},
+  // Tab completes the last word from the folder, the known files, and the commands this terminal answers.
+  complete(id,text){const t=reads.terminal,word=text.split(/\s+/).at(-1);if(!word)return text;const names=[...new Set([...t.ls.split(/\s+/),...Object.keys(reads.files||{}),...Object.keys(t.replies).filter(k=>!k.includes(' ')),'pwd','ls','cat','echo','git','vim','clear'])].filter(n=>n.startsWith(word)&&n!==word);if(!names.length)return text;let common=names[0];for(const n of names)while(!n.startsWith(common))common=common.slice(0,-1);return text.slice(0,text.length-word.length)+(names.length===1&&!common.endsWith('/')?common+' ':common)},
   run(id,command){
    const w=S.workspaces.find(x=>x.id===id),t=reads.terminal;
    if(command==='pwd')return w.path;

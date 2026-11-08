@@ -324,6 +324,54 @@
    "engine/recovery.ts": " export async function reconnect(receipt) {\n-  return delivery.send(prompt);\n+  return delivery.resume(receipt);\n }",
    "docs/README.md": " # {repository}\n-Project setup in progress.\n+Project baseline verified.",
    "default": "@@ -1,4 +1,4 @@\n export function Workspace() {\n-  return <Chat thread={active} />;\n+  return <Conversation recipient={agent} preserveDraft />;\n }\n@@ -58,22 +58,27 @@\n function Conversation({recipient, preserveDraft}) {\n-  const [draft, setDraft] = useState(\"\");\n+  const [draft, setDraft] = useDraft(recipient.id, {enabled: preserveDraft});\n+  const position = useReadingPosition(recipient.id);\n   const thread = useThread(recipient.id);\n \n-  useEffect(() => scrollToEnd(), [thread.length]);\n+  useEffect(() => {\n+    if (position.isAtLatest) scrollToEnd();\n+  }, [thread.length, position.isAtLatest]);\n \n   return (\n     <section aria-label={recipient.name}>\n       <Thread items={thread} />\n+      <Progress agent={recipient} />\n       <Composer value={draft} onChange={setDraft} recipient={recipient} />\n     </section>\n   );\n }"
+  },
+  "conflicts": {
+   "app/workspace.tsx": [
+    {
+     "line": 56,
+     "context": [
+      "function Conversation({recipient, preserveDraft}) {",
+      "  const [draft, setDraft] = useDraft(recipient.id, {enabled: preserveDraft});"
+     ]
+    },
+    {
+     "ours": [
+      "  const position = useReadingPosition(recipient.id);"
+     ],
+     "base": [
+      "  const position = useScrollPosition(recipient.id);"
+     ],
+     "theirs": [
+      "  const position = useReadingPosition(recipient.id, {restore: true});"
+     ]
+    },
+    {
+     "line": 59,
+     "context": [
+      "  const thread = useThread(recipient.id);",
+      "",
+      "  useEffect(() => {"
+     ]
+    },
+    {
+     "ours": [
+      "    if (position.isAtLatest) scrollToEnd();"
+     ],
+     "base": [
+      "    scrollToEnd();"
+     ],
+     "theirs": [
+      "    if (position.isAtLatest) scrollToEnd({smooth: true});",
+      "    else position.markUnread(thread.length);"
+     ]
+    },
+    {
+     "line": 63,
+     "context": [
+      "  }, [thread.length, position.isAtLatest]);"
+     ]
+    }
+   ]
   }
  },
  "harness": {
