@@ -1,4 +1,4 @@
-// Reverse Fig profile for Sheprd's web mock, `design/workbench.html` on the branch area/web-mock.
+// Reverse Fig profile for LGcode's web mock, which still says Sheprd: `design/workbench.html` on the branch area/web-mock.
 // Serve that folder on port 4178 first:  python3 -m http.server 4178 --bind 127.0.0.1
 const sidebar = '<aside class="sidebar" style="position:static;display:block;width:248px;height:auto;padding:4px 0">{slot}</aside>';
 const statusDot = (cls) => `<span class="dot ${cls}" style="display:block"></span>`;

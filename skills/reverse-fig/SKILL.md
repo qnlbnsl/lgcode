@@ -1,6 +1,6 @@
 ---
 name: reverse-fig
-description: Turn a project's existing interface into an OpenPencil design file (.fig) with component sets, variants and color variables, then check it against the browser pixel by pixel. Use when a project that already has screens joins Sheprd and its design should become the source of truth.
+description: Turn a project's existing interface into an OpenPencil design file (.fig) with component sets, variants and color variables, then check it against the browser pixel by pixel. Use when a project that already has screens joins LGcode and its design should become the source of truth.
 ---
 
 # Reverse Fig
@@ -70,7 +70,7 @@ Options:
 - `PLAYWRIGHT_MODULE` points at another Playwright copy, and `REVERSE_FIG_OPENPENCIL` at another
   `openpencil.js`.
 
-Sheprd's own profile, `profiles/sheprd-mock.mjs`, runs against the web mock on the branch
+LGcode's own profile, `profiles/sheprd-mock.mjs`, runs against the web mock, which still says Sheprd, on the branch
 `area/web-mock`, served on port 4178. Run it from that worktree's root, and it writes
 `design/sheprd.fig`. On 2026-11-08 its first tuning passes reached 18 of 26 variants within 3
 percent, after the faults below were fixed in the scripts.
