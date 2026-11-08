@@ -51,7 +51,7 @@ try{
  const permission=page.locator('#permission-perm-iris');
  check(await permission.evaluate(el=>el===document.activeElement),'Permission link focuses the exact request');
  check(await permission.textContent().then(t=>t.includes('pnpm --filter @lgcode/web test')&&t.includes('perm-iris')),'Permission request shows identity and actual tool input');
- check(await permission.evaluate(el=>el.querySelector('pre').compareDocumentPosition(el.querySelector('[data-permission-answer]'))&Node.DOCUMENT_POSITION_FOLLOWING),'Action input is visible before permission answer buttons');
+ check(await permission.evaluate(el=>el.querySelector('.request-fields').compareDocumentPosition(el.querySelector('[data-permission-answer]'))&Node.DOCUMENT_POSITION_FOLLOWING),'Action input is visible before permission answer buttons');
  await click('[data-permission-answer="allow"][data-permission-id="perm-iris"]');
  check(await permission.textContent().then(t=>t.includes('Allow once'))&&await permission.locator('[data-permission-answer]').count()===0,'Permission answer is recorded and cannot be sent twice');
  check(await page.locator('#sidebar [data-agent="iris"]').textContent().then(t=>!t.includes('Needs approval')),'Permission resolution clears the agent attention label');
@@ -72,7 +72,7 @@ try{
  check(await text('#view-body').then(t=>t.includes('Attempt')&&t.includes('token missing')),'Phone notifications keep delivery attempts and failure reasons');
  await click('#load-more-alerts');check(await text('#view-body').then(t=>t.includes('Still failing')&&t.includes('carrier delivery failed')),'Loading more phone notifications keeps final delivery failures');
  await click('.alert-list [data-alert-agent="ash"]');
- check(await text('#view-body').then(t=>t.includes('Failed to start: Not signed in')),'Failed agent thread shows the safe start-failure reason');
+ check(await text('#view-body .request.is-failed').then(t=>t.includes('Failed start')&&t.includes('Not signed in')),'Failed agent thread shows the safe start-failure reason');
  check(await page.locator('#send-message').isDisabled(),'Failed starts prevent prompt submission');
  await click('#agent-controls [data-agent-command="resume"]');
  check(await text('#view-body').then(t=>t.includes('Not signed in')),'Retrying an unresolved start failure keeps its reason visible');

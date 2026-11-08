@@ -100,9 +100,8 @@ await run('home',async()=>{
  check((await row.textContent()).includes('Blocks SH-17'),'A request shows what it blocks');
  check(await row.evaluate(e=>e.getBoundingClientRect().height)<=44,'Rows stay single lines with the extra detail');
  await row.click();
- const close=await box('#close-home-detail'),detail=await box('#home-detail');
- check(detail.right-close.right<60,'The close button sits at the right edge of the expanded row');
- check(await page.locator('#home-detail .decision h2').evaluate(e=>getComputedStyle(e).display==='none'),'The expanded row does not repeat its own title');
+ check(await page.locator('#close-home-detail').count()===0,'The expanded row closes from its own row, with no second close button');
+ check(await page.locator('#home-detail .request h2').evaluate(e=>getComputedStyle(e).display==='none'),'The expanded row does not repeat its own title');
  await row.click();
  await click('[data-home-tab="projects"]');
  const color=await page.locator('.project-attention-status').first().evaluate(e=>getComputedStyle(e).color),warn=await page.evaluate(()=>{const d=document.createElement('i');d.style.color='var(--color-warn)';document.body.append(d);const c=getComputedStyle(d).color;d.remove();return c});
@@ -250,9 +249,9 @@ await run('designer findings',async()=>{
  await h.close();
  // THREAD-7
  const t=await fresh();await t.locator('#design-notes').click();await t.locator('#preview-start-reason').selectOption('model-refused');await t.locator('[data-preview="failed-start"]').click();await t.waitForTimeout(40);
- const failed=await t.locator('.start-failure').first().textContent();
- check(failed.includes('rejected this model on Buildbox')&&!failed.includes('Adapter')&&await t.locator('.start-failure select').count()===2,'A refused model names the machine and offers the choice in place');
- await t.locator('.start-failure [data-resume-agent]').click();check(await t.locator('.start-failure').count()===0,'Trying again with another model clears the failure');
+ const failed=await t.locator('.request.is-failed').first().textContent();
+ check(failed.includes('rejected this model on Buildbox')&&!failed.includes('Adapter')&&await t.locator('.request.is-failed select').count()===2,'A refused model names the machine and offers the choice in place');
+ await t.locator('.request.is-failed [data-resume-agent]').click();check(await t.locator('.request.is-failed').count()===0,'Trying again with another model clears the failure');
  await t.close();
  // PAIR-1 and MACH-1
  const f=await fresh();await f.locator('[data-system-page="machines"]').click();
@@ -318,8 +317,8 @@ await run('visual foundations',async()=>{
  check(new Set(await f.locator('#project-dialog input:not([type=checkbox]):visible,#project-dialog select:visible,#project-dialog footer button').evaluateAll(es=>es.map(e=>Math.round(e.getBoundingClientRect().height)))).size===1,'Inputs, selects, and buttons in one form share one height');
  await f.locator('#project-dialog footer [data-close]').click();
  // BTN-3: anything that changes state is a button.
- await f.evaluate(()=>openHome('attention'));
- check(await f.locator('#home-clear-filters').evaluate(b=>b.classList.contains('secondary')&&!b.classList.contains('inline-link')),'Clear filters is a button, not a link');
+ await f.evaluate(()=>openHome('attention'));await f.locator('#home-search').fill('Rowan');
+ check(await f.locator('#home-clear-filters').evaluate(b=>b.classList.contains('secondary')&&!b.classList.contains('inline-link')),'Clear filters is a button, not a link');await f.locator('#home-clear-filters').click();
  // DLG-1 and ADDSUB-1: every dialog has Cancel or Close left of its action.
  const dialogs=await f.evaluate(()=>[...document.querySelectorAll('dialog:not(#quick-dialog)')].map(d=>{const footers=[...d.querySelectorAll('footer')];return [d.id,footers.some(ft=>{const bs=[...ft.querySelectorAll('button')];const c=bs.findIndex(b=>/^(Cancel|Close)$/.test(b.textContent.trim())&&b.classList.contains('secondary'));const a=bs.findIndex(b=>b.classList.contains('primary'));return c>=0&&(a<0||c<a)})||d.id==='machine-dialog'&&!!d.querySelector('#pair-start footer [data-close]')]}));
  check(dialogs.every(([,ok])=>ok),'Every dialog closes with Cancel or Close left of its action: '+dialogs.filter(([,ok])=>!ok).map(([id])=>id).join(','));
@@ -331,7 +330,7 @@ await run('visual foundations',async()=>{
  const t=await f.evaluate(()=>{const r=document.querySelector('#toast').getBoundingClientRect(),bell=document.querySelector('#attention-toggle').getBoundingClientRect(),d=document.createElement('i');d.style.color='var(--color-surface)';document.body.append(d);const surface=getComputedStyle(d).color;d.remove();return {right:innerWidth-r.right,top:r.top,bell:bell.bottom,bg:getComputedStyle(document.querySelector('#toast')).backgroundColor,surface}});
  check(t.right<=24&&t.top>=t.bell&&t.top<80&&t.bg===t.surface,'The toast is a raised neutral surface at the top right, below the bell');
  // MOTION-1: rows open and leave in 120 milliseconds, unless motion is reduced.
- await f.evaluate(()=>openHome('attention'));await f.locator('[data-home-item]').first().click();
+ await f.evaluate(()=>openHome('attention'));await f.locator('[data-home-item="question:nav-decision"]').click();
  check(await f.locator('#home-detail').evaluate(e=>getComputedStyle(e).animationName==='row-open'&&getComputedStyle(e).animationDuration==='0.12s'),'An expanded row eases open in 120 milliseconds');
  await f.locator('#home-detail [data-resolve-request]').first().click();
  check(await f.locator('.row-leaving').count()===1&&await f.locator('.row-leaving [data-home-item]').count()===0,'An answered request leaves its place instead of vanishing');
@@ -484,11 +483,30 @@ await run('bell, terminal notice, and empty states',async()=>{
  const rows=await h.locator('.attention-row').evaluateAll(rs=>rs.map(r=>({h:Math.round(r.getBoundingClientRect().height),kind:r.querySelector('.attention-kind').textContent,age:r.querySelector('time').textContent}))),count=Number(await h.locator('#attention-count').textContent());
  check(count>6&&rows.length===6&&rows.every(r=>r.h===44&&r.age),'The bell shows six rows of 44 pixels, each with its age');
  check((await h.locator('#attention-home').textContent()).trim()==='View all '+count,'The bell ends with View all and the count');
- check(rows.every(r=>['Question','Approval','Failed start'].includes(r.kind)),"The bell uses Home's kind names");
+ check(rows.every(r=>['Question','Approval','Merge','Failed start'].includes(r.kind)),"The bell uses Home's kind names");
  const minutes=t=>(+(t.match(/(\d+) day/)?.[1]||0))*1440+(+(t.match(/(\d+) hr/)?.[1]||0))*60+(+(t.match(/(\d+) min/)?.[1]||0)),rest=rows.filter(r=>r.kind!=='Failed start');
  check(rows[0].kind==='Failed start'&&rows.findIndex(r=>r.kind!=='Failed start')===rows.length-rest.length&&rest.every((r,i)=>!i||minutes(rest[i-1].age)>=minutes(r.age)),'The bell lists failed starts first, then the longest wait: '+rows.map(r=>r.age).join(', '));
  check(await h.evaluate(()=>typeof byAttention==='function'&&attentionQueue().length===Number(document.querySelector('#attention-count').textContent)),'Home and the bell can share one order, byAttention');
  await h.close();
+});
+
+// STATUS-3 and HOME-8: one request block for questions, approvals, and failed starts, in threads and on Home.
+await run('request block',async()=>{
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ for(const theme of ['light','dark'])for(const width of [390,1440]){const t=await fresh('',{width,height:900});await t.evaluate(x=>setTheme(x),theme);
+  const tone=v=>t.evaluate(v=>{const d=document.createElement('i');d.style.color=v;document.body.append(d);const c=getComputedStyle(d).color;d.remove();return c},v);
+  const shape=async(agent,project)=>{await t.evaluate(([a,p])=>openAgent(a,p),[agent,project]);await t.waitForTimeout(60);return t.locator('#view-body .request').first().evaluate(e=>{const r=e.getBoundingClientRect(),turn=document.querySelector('#view-body .turn:not(.user-turn)')?.getBoundingClientRect()||document.querySelector('#view-body').getBoundingClientRect(),s=getComputedStyle(e);return {left:Math.round(r.left),width:Math.round(r.width),turnLeft:Math.round(turn.left),turnWidth:Math.round(turn.width),rule:s.borderLeftStyle+' '+s.borderLeftWidth,ruleColor:s.borderLeftColor,top:s.borderTopStyle,label:e.querySelector('.request-label').textContent,labelColor:getComputedStyle(e.querySelector('.request-label')).color}})};
+  const q=await shape('rowan','workspace'),a=await shape('iris','workspace'),f=await shape('ash','recovery'),warn=await tone('var(--color-warn)'),error=await tone('var(--color-error)');
+  check([q,a,f].every(s=>s.rule==='solid 2px'&&s.top==='none'),`${theme} ${width}: questions, approvals, and failed starts have one left rule and no top rule`);
+  check([q,a].every(s=>s.left===s.turnLeft&&s.width===s.turnWidth)&&q.width===a.width,`${theme} ${width}: a question and an approval span the same thread width: ${q.left}/${q.width}, ${a.left}/${a.width}`);
+  check(q.label.startsWith('Question')&&a.label==='Approval'&&f.label==='Failed start',`${theme} ${width}: the label names the kind`);
+  check(q.ruleColor===warn&&a.ruleColor===warn&&q.labelColor===warn&&f.ruleColor===error&&f.labelColor===error,`${theme} ${width}: the rule and label are amber for a question or approval and red for a failed start`);
+  await t.close()}
+ const t=await fresh();await t.evaluate(()=>openAgent('iris','workspace'));await t.waitForTimeout(60);const p=t.locator('#permission-perm-iris');
+ check(await p.locator('.request-fields dt').allTextContents().then(x=>x.join()==='Command,Folder')&&!(await p.innerText()).includes('Request:')&&!(await p.innerText()).includes('call-iris'),'HOME-8: The thread permission shows Command and Folder and hides identifiers');
+ await p.locator('.request-details summary').click();check((await p.innerText()).includes('call-iris')&&(await p.locator('.request-details pre').textContent()).includes('"command"'),'HOME-8: Details shows the identifiers and the raw input');
+ await t.evaluate(()=>openHome('approvals'));await t.locator('[data-home-item="approval:perm-iris"]').click();check(await t.locator('#home-detail .request.is-approval').count()===1,'STATUS-3: Home expands the same request block');
+ await t.close();
 });
 
 const result={passed:checks.length,failed:failures.length,failures,errors,checks};
