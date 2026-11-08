@@ -72,6 +72,10 @@ todo names a new `project` piece for them. The sample uses these proposed types,
 | `project.SetupProgressed`, `project.SetupFinished` | How far the first run has got, and that it is done. |
 | `project.RepositoryForgotten` | A repository found by a scan was dropped when the owner chose another folder. |
 | `project.ModelChosen` | The owner chose another model or effort for an agent's next turns. |
+| `project.MachineRemoved` | The owner removed a machine that ran no project. |
+| `project.MasterLeft` | This computer left the master it had joined as a worker. |
+| `project.Renamed` | A project's new name. Its branch and folder keep their names. |
+| `project.Archived`, `project.Restored` | A project was archived, or brought back from the archive. |
 
 ## How the page gets its data
 
@@ -138,6 +142,40 @@ Git and the terminal need more, added on 2026-11-08 for the designer's Git and t
 - **A long list of changed files.** In the heavy sample, Invoice exports has 26 changed files,
   so the Git page shows the long-list case.
 
+The service pages and Project settings need more, added on 2026-11-08 for the designer's
+findings on those pages:
+
+- **When a notification was raised and tried.** The reducer copies the `occurred_at` of
+  `client.AlertRaised` into `raisedAt`, and the time of the latest delivery attempt into
+  `delivery.at`. The engine's events already carry both times, so the real API needs no new field.
+- **Sending a notification again.** `api.alerts.retry` is proposed. It writes the engine's own
+  `client.AlertDelivered` or `client.AlertDeliveryFailed` event as the next attempt. Without the
+  notification service and its token, the attempt fails and says what is missing.
+- **A test notification.** `api.settings.sendTest` is proposed. It says whether the service took
+  the notification, and it stores nothing.
+- **The notification service in the samples.** The samples' default settings now have a
+  notification service with no token, so a failed notification can point at the missing token.
+- **When an offline machine was last seen.** `project.MachineAdded` and `project.MachineChanged`
+  carry `lastSeenAt`. In both samples, Laptop was last seen 2 hours before the clock.
+- **Renaming and removing a machine.** `project.MachineChanged` can carry a new `name`, and the
+  proposed `project.MachineRemoved` removes a machine with its repository folders.
+  `api.machines.remove` refuses this computer and any machine that still runs a project.
+- **Leaving a master.** The reducer now folds `project.MasterJoined` into `master`, with the
+  address and the time it joined. The proposed `project.MasterLeft` clears it, and
+  `api.machines.leave` writes it.
+- **How much of a subscription's limit is used.** `reads.json` holds `accountUsage`, with `used`,
+  `limit`, and `resetsAt` for each account. `api.accounts.usage` returns the percentage and the
+  reset time. The real service would read the harness's latest usage report at request time.
+- **Renaming and removing a subscription.** `api.accounts.rename` and `api.accounts.remove` write
+  the engine's own `AccountChanged` event, with a new display name or with no account.
+- **The heavy sample's fifth subscription.** Eight heavy-sample agents ran on `codex-buildbox`,
+  which had no account record. Two rows at the end of `heavy/events.json` now add it, so the
+  Subscriptions page counts every running agent.
+- **A project's goal, name, and archive state.** `api.project.create` takes the goal from New
+  project. The proposed `project.Renamed`, `project.Archived`, and `project.Restored` events
+  rename a project, archive it, and bring it back. `api.project.archive` stops the project's
+  running agents first. An archived project has `archivedAt`.
+
 ## Which stub stands for which real command
 
 The real command names come from `packages/contracts/src/client/commands.ts`. "Proposed"
@@ -153,7 +191,9 @@ means the engine has no such command yet.
 | `api.agents.stop`, `api.agents.resume` | The stop and resume commands |
 | `api.agents.choose`, `api.agents.usage` | Proposed: change an agent's model or effort, and read its context use |
 | `api.alerts.list`, `api.settings.*` | `client.alerts.list`, `client.alerts.settings`, `client.web.settings` |
+| `api.alerts.retry`, `api.settings.sendTest` | Proposed: send a failed notification again, and send a test notification |
 | `api.accounts.*` | The account commands, and a terminal on that machine for sign-in |
+| `api.accounts.usage` | Proposed: read how much of a subscription's usage limit is used |
 | `api.project.*`, `api.machines.*` | Proposed |
 | `api.git.*`, `api.terminal.*` | Proposed |
 | `api.setup.*` | Proposed: the first run's scan of the computer and its progress |

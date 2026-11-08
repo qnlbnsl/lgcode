@@ -10,7 +10,9 @@ const S={
  repositories:[],workspaces:[],projects:[],requests:[],permissionItems:[],deliveryItems:[],machineItems:[],subscriptionItems:[],
  projectMachines:new Map(),futureProjectMachines:new Map(),repositoryLocations:new Map(),runtimeStates:new Map(),workspacePreferences:new Map(),
  threads:new Map(),channels:new Map(),alerts:[],taskStories:{},agents:new Map(),agentProjects:new Map(),openTurns:new Map(),
- setup:{step:'welcome',finished:false}
+ setup:{step:'welcome',finished:false},
+ // The master this computer joined as a worker. The page keeps this object, so the reducer changes it in place.
+ master:{address:'',since:null}
 };
 let reads=null,meta=null,source='sample',sequence=0,bootedAt=0,localSets=[],withSet=null;
 const events=[],subscribers=new Set(),gitStates=new Map(),terminalSessions=new Map(),replyTimers=new Map(),signInTimers=new Map();
@@ -93,7 +95,7 @@ function threadPart(content,itemId){
 }
 const postEntry=(row,e)=>e.author._tag==='owner'?{type:'prompt',text:e.text,occurred:row.occurred_at,deliveryId:e.postId}:{type:'turn',agentId:e.author.agentId,occurred:row.occurred_at,parts:[{type:'text',text:e.text}],reply:row.reply};
 function addAlert(row,e){
- const subject=e.subject||{},alert={id:e.alertId,kind:e.kind,agentId:e.agentId,subject:subject.id,subjectKind:subject._tag,title:e.title,delivery:null,cleared:false};
+ const subject=e.subject||{},alert={id:e.alertId,kind:e.kind,agentId:e.agentId,subject:subject.id,subjectKind:subject._tag,title:e.title,raisedAt:row.occurred_at,delivery:null,cleared:false};
  Object.defineProperty(alert,'status',{enumerable:true,get(){
   if(subject._tag==='permission')return permission(subject.id)?.status==='open'?'open':'cleared';
   if(subject._tag==='question')return request(subject.id)?.status==='open'?'open':'cleared';
@@ -104,8 +106,12 @@ function addAlert(row,e){
 }
 
 const handlers={
- 'project.MachineAdded':(row,e)=>S.machineItems.push({id:e.machineId,name:e.name,role:e.role,status:e.status,slots:e.slots,workspaceFolder:e.workspaceFolder||'~/projects'}),
- 'project.MachineChanged':(row,e)=>Object.assign(machine(e.machineId),e.status?{status:e.status}:{},e.role?{role:e.role}:{},e.workspaceFolder?{workspaceFolder:e.workspaceFolder}:{}),
+ 'project.MachineAdded':(row,e)=>S.machineItems.push({id:e.machineId,name:e.name,role:e.role,status:e.status,slots:e.slots,workspaceFolder:e.workspaceFolder||'~/projects',lastSeenAt:e.lastSeenAt??row.occurred_at}),
+ // A machine's last contact moves on while it is online, so lastSeenAt matters only once it goes offline.
+ 'project.MachineChanged':(row,e)=>Object.assign(machine(e.machineId),e.status?{status:e.status}:{},e.role?{role:e.role}:{},e.name?{name:e.name}:{},e.workspaceFolder?{workspaceFolder:e.workspaceFolder}:{},e.lastSeenAt?{lastSeenAt:e.lastSeenAt}:{}),
+ 'project.MachineRemoved':(row,e)=>{S.machineItems.splice(S.machineItems.findIndex(m=>m.id===e.machineId),1);for(const key of [...S.repositoryLocations.keys()])if(key.endsWith('/'+e.machineId))S.repositoryLocations.delete(key)},
+ 'project.MasterJoined':(row,e)=>{Object.assign(S.master,{address:e.address,since:row.occurred_at})},
+ 'project.MasterLeft':()=>{Object.assign(S.master,{address:'',since:null})},
  'project.SetupProgressed':(row,e)=>{S.setup.step=e.step},
  'project.SetupFinished':()=>{S.setup.finished=true},
  'project.RepositoryForgotten':(row,e)=>{S.repositories.splice(S.repositories.findIndex(r=>r.id===e.repoId),1);for(const key of [...S.repositoryLocations.keys()])if(key.startsWith(e.repoId+'/'))S.repositoryLocations.delete(key);for(let i=S.workspaces.length-1;i>=0;i--)if(S.workspaces[i].repoId===e.repoId)S.workspaces.splice(i,1)},
@@ -113,6 +119,10 @@ const handlers={
  'project.RepositoryLocated':(row,e)=>S.repositoryLocations.set(e.repoId+'/'+e.machineId,e.path),
  'project.WorktreeCreated':(row,e)=>worktreeFor(e.worktreeId,e.repoId,e),
  'project.Created':(row,e)=>{S.projects.push({id:e.projectId,repoId:e.repoId,name:e.name,goal:e.goal,lead:null,workspace:e.worktreeId,teams:[],sprints:[],tasks:[]});S.projectMachines.set(e.projectId,e.machineId)},
+ 'project.Renamed':(row,e)=>{projectById(e.projectId).name=e.name},
+ // An archived project keeps its board, threads, and worktree. Only the sidebar and the attention queues leave it out.
+ 'project.Archived':(row,e)=>{projectById(e.projectId).archivedAt=row.occurred_at},
+ 'project.Restored':(row,e)=>{delete projectById(e.projectId).archivedAt},
  'project.Placed':(row,e)=>S.futureProjectMachines.set(e.projectId,e.machineId),
  'project.PreferencesChanged':(row,e)=>S.workspacePreferences.set(e.projectId,{shell:e.shell}),
  'project.ModelChosen':(row,e)=>{const a=S.agents.get(e.agentId);if(a)Object.assign(a,e.model?{model:e.model}:{},e.effort?{effort:e.effort}:{})},
@@ -141,6 +151,7 @@ const handlers={
    S.subscriptionItems.push(a);
   }
   a.enabled=e.account.enabled!==false;
+  if(e.account.displayName)a.name=e.account.displayName;
  },
  AccountNeedsSignIn:(row,e)=>{const a=account(e.accountId);if(a)a.status='Needs sign-in'},
  AccountAvailable:(row,e)=>{const a=account(e.accountId);if(a)a.status='Available'},
@@ -190,8 +201,8 @@ const handlers={
  'board.ChannelOpened':(row,e)=>S.channels.set(e.channelId,{id:e.channelId,name:e.name,group:e.group,anchorAgentId:e.anchorAgentId,posts:[]}),
  'board.PostWritten':(row,e)=>S.channels.get(e.channelId)?.posts.push(postEntry(row,e)),
  'client.AlertRaised':addAlert,
- 'client.AlertDelivered':(row,e)=>{const a=S.alerts.find(x=>x.id===e.alertId);if(a)a.delivery={status:'Delivered',attempt:e.attempt}},
- 'client.AlertDeliveryFailed':(row,e)=>{const a=S.alerts.find(x=>x.id===e.alertId);if(a)a.delivery={status:e.final?'Failed':'Still failing',attempt:e.attempt,reason:e.reason}},
+ 'client.AlertDelivered':(row,e)=>{const a=S.alerts.find(x=>x.id===e.alertId);if(a)a.delivery={status:'Delivered',attempt:e.attempt,at:row.occurred_at}},
+ 'client.AlertDeliveryFailed':(row,e)=>{const a=S.alerts.find(x=>x.id===e.alertId);if(a)a.delivery={status:e.final?'Failed':'Still failing',attempt:e.attempt,reason:e.reason,at:row.occurred_at}},
  'client.AlertCleared':(row,e)=>{const a=S.alerts.find(x=>x.id===e.alertId);if(a)a.cleared=true},
  'client.AlertSettingsChanged':(row,e)=>{S.settings.push[e.kind]=e.push},
  'client.AlertCarrierChanged':(row,e)=>{S.settings.carrier=e.carrier._tag==='none'?null:{server:e.carrier.server,topic:e.carrier.topic}},
@@ -365,7 +376,7 @@ const api={
  project:{
   // The engine has no project piece yet. These write the proposed project.* events.
   async list(){return S.projects},
-  async create({name,repoId,plan,useWorktree,account:chosenAccount}){
+  async create({name,goal,repoId,plan,useWorktree,account:chosenAccount}){
    const n=counters.project++,id='project-'+n,leadName=reads.service.leadNames[(n-1)%reads.service.leadNames.length],machineId=plan.machineId;
    let baseId=plan.base?.id;
    if(plan.fresh){
@@ -376,7 +387,7 @@ const api={
    }
    let worktreeId=baseId;
    if(useWorktree){worktreeId='worktree-'+id;emit('project.WorktreeCreated',{worktreeId,repoId,machineId,projectId:id,branch:plan.branch,path:plan.path,owner:name+' · '+leadName,activity:'No pending changes'})}
-   emit('project.Created',{projectId:id,repoId,name,goal:'Define the outcome with your project lead.',leadAgentId:'lead-'+n,worktreeId,machineId});
+   emit('project.Created',{projectId:id,repoId,name,goal:goal||'Define the outcome with your project lead.',leadAgentId:'lead-'+n,worktreeId,machineId});
    const worktree=S.workspaces.find(w=>w.id===worktreeId),leadId='lead-'+n,accountId=chosenAccount||S.subscriptionItems.find(a=>a.harness==='claude'&&a.machineId===machineId&&a.status==='Available')?.id||'claude-'+machineId,harness=account(accountId)?.harness||'claude';
    worktree.projectId||=id;
    emit('AgentStarted',{agentId:leadId,name:leadName,role:'Project lead',groups:[id],parent:owner,harness,account:accountId,permission:'edit',folder:'/'+worktree.path.replace(/^[~/]+/,''),runMode:'acp'});
@@ -389,7 +400,12 @@ const api={
    emit('project.TaskAdded',{projectId,taskId:id,title,owner:ownerId,teamId,sprintId,state:'queue',addedByOwner:true});
    return {id};
   },
-  async savePreferences(projectId,{shell}){emit('project.PreferencesChanged',{projectId,shell})}
+  async savePreferences(projectId,{shell}){emit('project.PreferencesChanged',{projectId,shell})},
+  // A new name changes only what people read. The branch and the folder keep the name they were created with.
+  async rename(projectId,name){if(projectById(projectId)&&name.trim())emit('project.Renamed',{projectId,name:name.trim().slice(0,80)})},
+  // Archiving stops the project's running agents, which cancels their approvals. Restoring leaves them stopped.
+  async archive(projectId){const project=projectById(projectId);if(!project||project.archivedAt)return;for(const a of [project.lead,...project.teams.flatMap(t=>t.agents)])if(S.runtimeStates.get(a.id)?.state==='running'&&!S.runtimeStates.get(a.id)?.failure)await api.agents.stop(a.id);emit('project.Archived',{projectId})},
+  async restore(projectId){if(projectById(projectId)?.archivedAt)emit('project.Restored',{projectId})}
  },
  // Proposed. Mocks are drawn from the repository's own components and invented data.
  mocks:{
@@ -425,6 +441,11 @@ const api={
   async confirm(id){emit('project.MachineChanged',{machineId:id,status:'Online'})},
   async setRole(id,role){emit('project.MachineChanged',{machineId:id,role})},
   async join(address){emit('project.MasterJoined',{address})},
+  // Leaving the master stops new work arriving. Projects already here keep their worktrees.
+  async leave(){if(S.master.address)emit('project.MasterLeft',{address:S.master.address})},
+  async rename(id,name){if(machine(id)&&name.trim())emit('project.MachineChanged',{machineId:id,name:name.trim().slice(0,48)})},
+  // Only a machine with no projects can go, and never this computer. The page explains both rules.
+  async remove(id){const m=machine(id);if(!m||m.role==='Master'||S.projects.some(p=>S.projectMachines.get(p.id)===id))return false;emit('project.MachineRemoved',{machineId:id});return true},
   async place(projectId,machineId){emit('project.Placed',{projectId,machineId})}
  },
  // First run. These stand for a proposed read of the computer and proposed progress records.
@@ -480,6 +501,11 @@ const api={
    return account(accountId);
   },
   async setEnabled(id,enabled){const a=account(id);emit('AccountChanged',{accountId:id,account:{id,harness:a.harness,displayName:a.name,enabled}})},
+  async rename(id,name){const a=account(id);if(a&&name.trim())emit('AccountChanged',{accountId:id,account:{id,harness:a.harness,displayName:name.trim().slice(0,48),enabled:a.enabled}})},
+  // An account with no account record is removed, as the engine folds it. Agents already running on it keep running.
+  async remove(id){if(account(id))emit('AccountChanged',{accountId:id})},
+  // How much of the current usage limit an account has used, and when the limit resets. The harness reports it, so it is read, not stored.
+  usage(id){const u=reads.accountUsage?.[id];return u?{percent:Math.round(u.used/u.limit*100),resetsAt:u.resetsAt}:null},
   // Runs the harness's own login in a terminal on that machine.
   async signIn(id){
    clearTimeout(signInTimers.get(id));
@@ -489,7 +515,11 @@ const api={
   async cancelSignIn(id){clearTimeout(signInTimers.get(id));signInTimers.delete(id)}
  },
  alerts:{
-  async list(){return S.alerts}
+  async list(){return S.alerts},
+  // Proposed. Sends a failed notification again, as the next attempt. Without the notification service and its token it fails again and says why.
+  async retry(id){const a=S.alerts.find(x=>x.id===id);if(!a?.delivery||a.delivery.status==='Delivered')return;const s=S.settings,attempt=a.delivery.attempt+1;
+   if(s.carrier&&s.tokenSet)emit('client.AlertDelivered',{alertId:id,carrier:'ntfy',generation:1,attempt},{caller:'piece:client'});
+   else emit('client.AlertDeliveryFailed',{alertId:id,carrier:'ntfy',generation:1,attempt,reason:s.carrier?'token missing':'no notification service',final:true},{caller:'piece:client'})}
  },
  settings:{
   async read(){return S.settings},
@@ -499,6 +529,8 @@ const api={
   // The token never reaches a file or an event, as in the engine.
   async setToken(){emit('client.AlertCarrierTokenSet',{origin:S.settings.carrier.server,carrierGeneration:'generation-1'})},
   async clearToken(){emit('client.AlertCarrierTokenCleared',{})},
+  // Proposed. Sends one notification through the service now and stores nothing, so it says only whether the service took it.
+  async sendTest(){const s=S.settings;await new Promise(done=>setTimeout(done,300));return s.carrier&&s.tokenSet?{sent:true,at:nowAt()}:{sent:false,reason:s.carrier?'Set the notification service token first.':'Set the notification service first.'}},
   async saveWeb(web){emit('client.WebSettingsChanged',{settings:{enabled:web.enabled,port:web.port,heartbeatSeconds:web.heartbeat,proxyMode:web.proxy,...(web.publicAddress?{publicAddress:web.publicAddress}:{})}})}
  },
  // Git is read from the worktree at request time, so these change no events.

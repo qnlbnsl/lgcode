@@ -525,7 +525,10 @@
    "roles.runaway": false,
    "roles.rule-first-use": true
   },
-  "carrier": null,
+  "carrier": {
+   "server": "https://ntfy.sh",
+   "topic": "lgcode-owner"
+  },
   "tokenSet": false,
   "web": {
    "enabled": true,
@@ -825,6 +828,23 @@
      "preview": "<span class=\"task-state queue\"></span> <span class=\"task-state active\"></span> <span class=\"task-state review\"></span> <span class=\"task-state done\"></span> <span class=\"task-state blocked\"></span>"
     }
    ]
+  }
+ },
+ "accountUsage": {
+  "codex-personal": {
+   "used": 62,
+   "limit": 100,
+   "resetsAt": 1793973600000
+  },
+  "claude-studio": {
+   "used": 91,
+   "limit": 100,
+   "resetsAt": 1793966400000
+  },
+  "claude-buildbox": {
+   "used": 38,
+   "limit": 100,
+   "resetsAt": 1794214800000
   }
  }
 }

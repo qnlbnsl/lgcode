@@ -12,15 +12,15 @@
   ]
  },
  "row_counts": {
-  "events": 457,
+  "events": 459,
   "by_type": {
    "QuestionAsked": 4,
    "project.QuestionLinked": 4,
    "project.MachineAdded": 3,
    "project.RepositoryAdded": 5,
    "project.RepositoryLocated": 9,
-   "AccountChanged": 4,
-   "project.AccountPlaced": 4,
+   "AccountChanged": 5,
+   "project.AccountPlaced": 5,
    "AccountNeedsSignIn": 1,
    "project.WorktreeCreated": 20,
    "project.Created": 10,
