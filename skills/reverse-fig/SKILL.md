@@ -100,6 +100,24 @@ shows each component on a page of its own, such as a component gallery or a mock
   the page background.
 - **Half pixels.** Staged components sit at whole pixels, and the window grows to fit them.
 - **Percent radii** become pixels, and `inline-block` becomes `block`.
+- **Fixed sizes.** A component hugs its content only along an axis where that gives the browser's
+  size, so a button with a fixed height keeps it.
+
+## What the profile hooks are for
+
+The first project after Sheprd's mock was Ananke, a React Native Web app. Its pass on 2026-11-08
+added three hooks, and each one is for a kind of project, not for Ananke alone:
+
+- `tokens.read` supplies tokens from Node, for colors kept in a manifest or a theme file rather
+  than in CSS custom properties.
+- `font.keep` keeps the page's own fonts when OpenPencil can fetch them, which it does for Google
+  Fonts. The comparison then uses the as-shipped photograph.
+- `font.map` turns a page font name into a design family and weight, such as React Native Web's
+  `PlusJakartaSans_600SemiBold`, or an icon font into its Google Fonts name.
+
+A component library that renders only through its framework needs a page that shows every
+variant, tagged so the profile can find each one. For Ananke that is a gallery route in its mocks
+app, with a `testID` on each variant.
 
 ## Known losses
 
@@ -112,3 +130,6 @@ These are still lost on the way into the design file:
 - Layer names come from class names, not from the component's meaning.
 - Two tokens with the same color bind to the first one, so the profile's token order decides.
 - Only color tokens become variables. Spacing, radius and type scales do not yet.
+- Text drawn in the operating system's font has no design equivalent. Mapping it to Inter changes
+  its width, and Inter Medium also hits the measuring fault, so a long label can lose its last
+  word. Ananke's check row shows this.

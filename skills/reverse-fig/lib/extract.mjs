@@ -19,6 +19,9 @@ const interFiles = { 100: 'Inter-Thin.ttf', 200: 'Inter-ExtraLight.ttf', 300: 'I
 
 export function designFont(profile) {
   const font = { family: 'Inter', dir: fontsDir, files: interFiles, ...profile.font };
+  // `keep` leaves the page's own fonts in place, for fonts OpenPencil can fetch by itself, such
+  // as Google Fonts. `map` then turns a page font name into a design font family and weight.
+  if (font.keep) return { ...font, family: null, weights: [], files: {} };
   let present = [];
   try { present = readdirSync(font.dir); } catch {}
   font.files = Object.fromEntries(Object.entries(font.files).filter(([, file]) => present.includes(file)));
@@ -102,9 +105,9 @@ function serializeInPage({ index, styles, family, weights }) {
     for (const k of styles) {
       let v = cs.getPropertyValue(k);
       if (!v) continue;
-      if (k === 'font-family') v = family;
+      if (k === 'font-family') v = family || v.split(',')[0].trim().replace(/^["']|["']$/g, '');
       if (k === 'white-space' && oneLine) v = 'nowrap';
-      if (k === 'font-weight') v = String(nearestWeight(Number(v)));
+      if (k === 'font-weight' && weights.length) v = String(nearestWeight(Number(v)));
       // Containers hug their content. An element holding text keeps the browser's size, which the
       // build step gives to its text.
       if ((k === 'width' || k === 'height') && !isRoot && el.childNodes.length && !texts.length) continue;
@@ -191,13 +194,15 @@ export async function extract(profile, { chromium, work, log }) {
     const cdp = await forceStates(page);
     // The look as shipped, before the design font replaces the page's own.
     for (const j of here) if (!missing.includes(j.index)) await page.locator(`[data-rf-index="${j.index}"]`).screenshot({ path: join(work, 'browser-shown', j.file), animations: 'disabled' });
-    await page.addStyleTag({ content: `${fontFace}[data-rf-index],[data-rf-index] *{font-family:'${font.family}'!important}` });
+    if (font.family) await page.addStyleTag({ content: `${fontFace}[data-rf-index],[data-rf-index] *{font-family:'${font.family}'!important}` });
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(100);
     for (const j of here) {
       if (missing.includes(j.index)) continue;
       await page.locator(`[data-rf-index="${j.index}"]`).screenshot({ path: join(work, 'browser', j.file), animations: 'disabled' });
-      out.push({ ...j, html: await page.evaluate(serializeInPage, { index: j.index, styles, family: font.family, weights: font.weights }) });
+      const html = await page.evaluate(serializeInPage, { index: j.index, styles, family: font.family, weights: font.weights });
+      const box = await page.locator(`[data-rf-index="${j.index}"]`).boundingBox();
+      out.push({ ...j, width: box.width, height: box.height, html: font.map ? mapFonts(html, font.map) : html });
     }
     await cdp.detach();
     await page.close();
@@ -214,7 +219,21 @@ export async function extract(profile, { chromium, work, log }) {
   return result;
 }
 
+// Rewrites each element's font-family and font-weight through the profile's `font.map`.
+function mapFonts(html, map) {
+  return html.replace(/style="([^"]*)"/g, (all, style) => {
+    const family = style.match(/font-family:([^;]*)/)?.[1];
+    if (!family) return all;
+    const weight = Number(style.match(/font-weight:([^;]*)/)?.[1] || 400);
+    const to = map(family.trim(), weight) || {};
+    return `style="${style.replace(/font-family:[^;]*/, `font-family:${to.family || family}`).replace(/font-weight:[^;]*/, `font-weight:${to.weight || weight}`)}"`;
+  });
+}
+
 async function readTokens(page, profile) {
+  // A profile whose colors are not CSS custom properties supplies its own tokens: an array of
+  // { name, values: [{ css, name, rgb }] }, one entry per mode, where rgb is a CSS color.
+  if (profile.tokens?.read) return { collection: profile.tokens.collection || 'Color', modes: await profile.tokens.read(page) };
   const t = { prefix: '--color-', collection: 'Color', modes: [{ name: 'Default' }], name: (k) => k.replace(/^--/, '').replace(/-/, '/'), ...profile.tokens };
   const modes = [];
   for (const mode of t.modes) {

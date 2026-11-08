@@ -8,6 +8,12 @@ const page = figma.currentPage;
 page.name = 'Components';
 const log = [];
 const parse = (s) => {
+  const hex = s.match(/^#([0-9a-f]{3,8})$/i);
+  if (hex) {
+    let h = hex[1];
+    if (h.length <= 4) h = [...h].map((c) => c + c).join('');
+    return { r: parseInt(h.slice(0, 2), 16) / 255, g: parseInt(h.slice(2, 4), 16) / 255, b: parseInt(h.slice(4, 6), 16) / 255, a: h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1 };
+  }
   const n = s.match(/[\d.]+/g).map(Number);
   return { r: n[0] / 255, g: n[1] / 255, b: n[2] / 255, a: n.length > 3 ? n[3] : 1 };
 };
@@ -79,7 +85,18 @@ wrappers.forEach((w, i) => {
   page.appendChild(comp);
   w.remove();
   pinText(comp);
-  if (v.hug && comp.layoutMode && comp.layoutMode !== 'NONE') { comp.primaryAxisSizingMode = 'AUTO'; comp.counterAxisSizingMode = 'AUTO'; }
+  // Hug the content only along an axis where hugging gives the browser's size. A button with a
+  // fixed height or a minimum width keeps that size instead.
+  if (v.hug && comp.layoutMode && comp.layoutMode !== 'NONE') {
+    comp.primaryAxisSizingMode = 'AUTO'; comp.counterAxisSizingMode = 'AUTO';
+    if (v.width && v.height) {
+      const horizontal = comp.layoutMode === 'HORIZONTAL';
+      const wrongW = Math.abs(comp.width - v.width) > 1.5, wrongH = Math.abs(comp.height - v.height) > 1.5;
+      if (wrongW) horizontal ? (comp.primaryAxisSizingMode = 'FIXED') : (comp.counterAxisSizingMode = 'FIXED');
+      if (wrongH) horizontal ? (comp.counterAxisSizingMode = 'FIXED') : (comp.primaryAxisSizingMode = 'FIXED');
+      if (wrongW || wrongH) comp.resize(wrongW ? v.width : comp.width, wrongH ? v.height : comp.height);
+    }
+  }
   bindPaints(comp);
   (groups[v.component] ??= []).push(comp);
   made.push({ index: v.index, component: v.component, name: v.name, id: comp.id });

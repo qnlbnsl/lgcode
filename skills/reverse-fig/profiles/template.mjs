@@ -36,9 +36,19 @@ export default {
   // The design font. Inter ships with OpenPencil, so it is the default. Another family needs
   // `dir`, the folder that holds its files, and `files`, keyed by CSS weight.
   // font: { family: 'Inter' },
+  //
+  // Or keep the page's own fonts, when OpenPencil can fetch them by itself (it fetches Google
+  // Fonts), and use `map` to turn a page font name into a family and a weight. React Native Web
+  // names a family per weight, such as PlusJakartaSans_600SemiBold.
+  // font: {
+  //   keep: true,
+  //   map: (family, weight) => /^material$/i.test(family) ? { family: 'Material Icons', weight: 400 } : { family, weight },
+  // },
 
   // Color tokens become color variables, one mode per entry in `modes`. Set `tokens: false` for
-  // a project without CSS custom properties.
+  // a project without tokens. A project whose colors live elsewhere, such as a JSON manifest,
+  // gives `read` instead of `prefix` and `modes`. It runs in Node and returns one entry per mode:
+  //   read: async (page) => [{ name: 'Light', values: [{ css: '--color-bg', name: 'color/bg', rgb: '#ffffff' }] }]
   tokens: {
     prefix: '--color-',                         // which custom properties are tokens
     collection: 'Color',
@@ -69,7 +79,9 @@ export default {
   // `disabled`, `url`, and, for html variants only, `context`: markup with `{slot}` that wraps
   // the variant so it inherits the styles of its usual parent. `context` can also sit on the
   // component.
-  // Set `hug: false` on a component whose width is fixed rather than set by its content.
+  // Components hug their content along each axis where that gives the browser's size, and keep
+  // the browser's size elsewhere, such as a button with a fixed height. Set `hug: false` to keep
+  // the browser's size on both axes.
   components: [
     {
       name: 'Button',

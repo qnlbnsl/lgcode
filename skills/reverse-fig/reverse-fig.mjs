@@ -49,7 +49,7 @@ if (steps.includes('build')) {
   const extracted = JSON.parse(readFileSync(join(work, 'extract.json'), 'utf8'));
   const imported = join(work, 'imported.fig');
   openpencil(['import', join(work, 'import.html'), '-o', imported, '--pageName', 'Components']);
-  const input = { variants: extracted.variants.map(({ index, component, name, hug }) => ({ index, component, name, hug })), tokens: extracted.tokens };
+  const input = { variants: extracted.variants.map(({ index, component, name, hug, width, height }) => ({ index, component, name, hug, width, height })), tokens: extracted.tokens };
   const code = `const INPUT = ${JSON.stringify(input)};\n${readFileSync(join(skillDir, 'lib', 'build.js'), 'utf8')}`;
   const raw = openpencil(['eval', imported, '--stdin', '-o', output, '--json'], { input: code });
   built = JSON.parse(raw.slice(raw.indexOf('{')));
