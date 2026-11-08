@@ -94,7 +94,7 @@ shows each component on a page of its own, such as a component gallery or a mock
 - **Font weights.** Weights snap to the nearest weight the design font has, the way CSS picks one.
 - **Labels that only just fit.** OpenPencil 0.16.0 measures Inter Medium and SemiBold with a rough
   estimate from the command line, so labels wrapped. Each element that holds only text keeps the
-  browser's size, plus one pixel. This is issue 523 in `docs/issues.md`.
+  browser's size, plus one pixel. This is issue 524 in `docs/issues.md`.
 - **Node ids.** OpenPencil renumbers nodes when it saves, so the check finds variants by name.
 - **Transparent renders.** The design render has no background, so both pictures are compared on
   the page background.
