@@ -15,3 +15,6 @@ test-results/
 design/data/prod/
 # Private repositories shown in the web mock. They stay on this computer.
 design/data/local/
+
+# Reverse Fig photographs, reports and intermediate files.
+.reverse-fig/
