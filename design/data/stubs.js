@@ -387,6 +387,9 @@ const api={
   // Compares a field the mocks need with the repository's schema, read at request time.
   field(repoId,row){const known=reads.schema?.[repoId]?.[row.entity]?.[row.field];return {status:known===undefined?'new':known===row.type?'matches':'differs',known}},
   design(repoId){return reads.design?.[repoId]||null},
+  // OpenPencil serves each repository's design folder at /files/<repository>/ on its own HTTPS
+  // port, because it opens a file named in its address only over HTTPS.
+  editor(repoId,file){const base=`https://${location.hostname}:8443`;return {base,file:`${base}/files/${encodeURIComponent(repoId)}/${file.replace(/^design\//,'')}`}},
   // Approval freezes the screens as the design, and hands the rest to a Planning team as tasks.
   async approve(projectId){
    const project=projectById(projectId),mocks=project?.mocks;if(!mocks||mocks.approvedAt)return;

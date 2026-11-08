@@ -588,7 +588,7 @@ function mocksScreens(){
  const changing=pending.has(conversationKey()),server=m.source._tag==='server',stopped=server&&serverStates.get(project.id)==='stopped';
  const list=`<nav class="mock-screen-list" aria-label="Screens">${m.screens.map(x=>`<button data-mock-screen="${esc(x.id)}" aria-current="${x.id===screen.id}"><strong>${esc(x.title)}</strong><small>${changing&&x.id===screen.id?'Changing…':'Revision '+x.revisions.length}</small></button>`).join('')}</nav>`;
  const bar=`<div class="mock-frame-bar">${s.edit?'':`<div class="segmented" role="group" aria-label="Frame size">${[['phone','Phone'],['desktop','Desktop']].map(([id,label])=>`<button data-mock-size="${id}" aria-pressed="${s.size===id}">${label}</button>`).join('')}</div>`}${m.scenarios.length&&!s.edit?`<label class="mock-scenario">Data<select id="mock-scenario">${m.scenarios.map(x=>`<option value="${esc(x.id)}" ${x.id===s.scenario?'selected':''}>${esc(x.label)}</option>`).join('')}</select></label>`:''}<button class="secondary" id="mock-edit" aria-pressed="${s.edit}">${s.edit?'Done editing':'Edit design'}</button></div>`;
- const stage=s.edit?`<div class="design-canvas" role="img" aria-label="Design canvas for ${esc(screen.title)}"><strong>OpenPencil</strong><code>${esc(m.designFile)}</code></div>`:stopped?`<div class="mock-stopped" role="status"><h2>The mocks are not running</h2><p>Sheprd runs them from the repository with this command.</p><code>${esc(m.source.command)}</code><button class="secondary" id="mock-check-server">Check again</button></div>`:embedded?`<div class="design-canvas" role="img" aria-label="${esc(screen.title)}"><strong>${esc(screen.title)}</strong></div>`:`<div class="mock-stage" id="mock-stage"><div class="mock-device" id="mock-slot" data-size="${s.size}"></div></div>`;
+ const stage=s.edit?pencilCanvas(project.repoId,m.designFile,screen.title):stopped?`<div class="mock-stopped" role="status"><h2>The mocks are not running</h2><p>Sheprd runs them from the repository with this command.</p><code>${esc(m.source.command)}</code><button class="secondary" id="mock-check-server">Check again</button></div>`:embedded?`<div class="design-canvas" role="img" aria-label="${esc(screen.title)}"><strong>${esc(screen.title)}</strong></div>`:`<div class="mock-stage" id="mock-stage"><div class="mock-device" id="mock-slot" data-size="${s.size}"></div></div>`;
  const history=`<section class="mock-history" aria-label="Changes to ${esc(screen.title)}"><h2>Changes</h2><ol>${[...screen.revisions].reverse().slice(0,6).map(r=>`<li><span>${esc(r.summary)}</span><small>${esc(agentName(r.by))} · ${timeOf(r)}</small></li>`).join('')}</ol></section>`;
  return `<div class="mocks-screens">${list}<div class="mock-main">${bar}${stage}<p class="mock-note">${esc(screen.note)}</p>${history}</div></div>`;
 }
@@ -607,13 +607,31 @@ function designView(){
  const d=api.mocks.design(state.repoId),edit=designEdits.has(state.repoId),moved=projects.filter(x=>x.repoId===state.repoId&&x.mocks).flatMap(x=>x.mocks.components.filter(c=>c.origin==='promoted').map(c=>({...c,from:x.name})));
  if(!d&&!moved.length)return `<div class="empty"><h2>No design yet</h2><p>Components appear here when a project’s mocks are approved.</p></div>`;
  const file=d?.file||'design/'+repo().name+'.fig',head=`<div class="design-head"><p class="detail-summary">The components every project in ${esc(repo().name)} draws from, saved in <code>${esc(file)}</code>.</p><div class="segmented" role="group" aria-label="Design mode"><button data-design-mode="view" aria-pressed="${!edit}">View</button><button data-design-mode="edit" aria-pressed="${edit}">Edit</button></div></div>`;
- if(edit)return head+`<div class="design-canvas" role="img" aria-label="Design canvas for ${esc(repo().name)}"><strong>OpenPencil</strong><code>${esc(file)}</code></div>`;
+ if(edit)return head+pencilCanvas(state.repoId,file,repo().name);
  const tokens=d?.tokens?.length?`<section class="design-section"><h2>Colors</h2><ul class="token-list">${d.tokens.map(t=>{const name=t.name||t,value=t.value||`var(${t})`;return `<li><span class="swatch" style="background:${esc(value)}"></span><code>${esc(name)}</code></li>`}).join('')}</ul></section>`:'';
  const rows=[...(d?.components||[]),...moved.map(c=>({name:c.name,path:c.path,variants:'From '+c.from}))];
  return head+tokens+`<section class="design-section"><h2>Components</h2><div class="compact-table-wrap"><table class="compact-table design-table" aria-label="Components"><thead><tr><th>Component</th>${rows.some(c=>c.preview)?'<th>Preview</th>':''}<th>Variants</th><th>Lives in</th></tr></thead><tbody>${rows.map(c=>`<tr><td>${esc(c.name)}</td>${rows.some(x=>x.preview)?`<td><div class="component-preview" inert>${c.preview||''}</div></td>`:''}<td>${esc(c.variants||'')}</td><td><code>${esc(c.path)}</code></td></tr>`).join('')}</tbody></table></div></section>`;
 }
+// OpenPencil runs beside the service and opens the repository's design file. Its frame is kept
+// between renders like the mock frame, so a render never throws away unsaved drawing.
+const pencilStates=new Map();let pencilFrame=null;
+function checkPencil(url){pencilStates.set(url,'checking');const controller=new AbortController();setTimeout(()=>controller.abort(),4000);fetch(url,{method:'HEAD',cache:'no-store',signal:controller.signal}).then(r=>r.ok?'ready':'missing',()=>'unreachable').then(result=>{pencilStates.set(url,result);remember();render()})}
+function pencilCanvas(repoId,file,label){
+ if(embedded)return `<div class="design-canvas pencil" role="img" aria-label="Design canvas for ${esc(label)}"><strong>OpenPencil</strong><code>${esc(file)}</code></div>`;
+ const e=api.mocks.editor(repoId,file),st=pencilStates.get(e.file);
+ if(!st)queueMicrotask(()=>pencilStates.has(e.file)||checkPencil(e.file));
+ if(!st||st==='checking')return `<div class="design-canvas pencil" role="status"><strong>Opening OpenPencil</strong><code>${esc(file)}</code></div>`;
+ if(st==='unreachable')return `<div class="mock-stopped pencil" role="status"><h2>OpenPencil is not reachable</h2><p>Start it on this computer with this command, then open <a href="${esc(e.base)}/" target="_blank" rel="noopener">${esc(e.base)}</a> once and accept its certificate.</p><code>docker compose -f design/openpencil/compose.yml up -d</code><button class="secondary" data-pencil-check="${esc(e.file)}">Check again</button><p class="op-caption">It will open <code>${esc(file)}</code>.</p></div>`;
+ const src=st==='ready'?`${e.base}/?file=${encodeURIComponent(e.file)}`:`${e.base}/`;
+ return `<div class="pencil">${st==='missing'?`<p class="op-caption"><code>${esc(file)}</code> does not exist yet, so OpenPencil starts an empty document.</p>`:''}<div class="pencil-slot" id="pencil-slot" data-src="${esc(src)}" data-label="${esc(label)}"></div></div>`;
+}
+function mountPencilFrame(){
+ const slot=$('#pencil-slot');if(!slot){if(pencilFrame?.el.isConnected&&!pencilFrame.el.closest('#view-body'))pencilFrame.el.remove();return}
+ if(pencilFrame?.src!==slot.dataset.src){pencilFrame?.el.remove();const el=document.createElement('iframe');el.className='pencil-frame';el.title='OpenPencil: '+slot.dataset.label;el.allow='clipboard-read; clipboard-write; local-fonts';el.src=slot.dataset.src;pencilFrame={el,src:slot.dataset.src}}
+ if(document.body.moveBefore&&pencilFrame.el.isConnected)slot.moveBefore(pencilFrame.el,null);else slot.append(pencilFrame.el);
+}
 // The frame keeps its page between renders where the browser can move it without reloading.
-function parkMockFrame(){const el=mockFrame?.el;if(el?.isConnected&&document.body.moveBefore)document.body.moveBefore(el,null)}
+function parkMockFrame(){for(const el of [mockFrame?.el,pencilFrame?.el])if(el?.isConnected&&document.body.moveBefore)document.body.moveBefore(el,null)}
 function mockCss(screen){return screen.revisions.map(r=>r.css).filter(Boolean).join('\n')}
 function styleMockFrame(){const el=mockFrame?.el;if(!el)return;try{const doc=el.contentDocument;if(!doc?.head)return;let style=doc.getElementById('mock-revisions');if(!style){style=doc.createElement('style');style.id='mock-revisions';doc.head.append(style)}style.textContent=mockCss(mockFrame.screen)}catch{}}
 function fitMockFrame(){const slot=$('#mock-slot'),stage=$('#mock-stage');if(!slot||!stage||!mockFrame)return;const [w,h]=mocksReads.devices[slot.dataset.size],scale=Math.min(1,stage.clientWidth/w);slot.style.width=w*scale+'px';slot.style.height=h*scale+'px';Object.assign(mockFrame.el.style,{width:w+'px',height:h+'px',transform:`scale(${scale})`})}
@@ -634,7 +652,7 @@ const previousMocksRender=render;
 render=function(){parkMockFrame();previousMocksRender();if(sampleSession!=='owner'||api.setup.needed())return;
  if(state.view==='mocks'&&!p()?.mocks){openBoard();return}
  if(state.view==='mocks'){const m=p().mocks;$('#participants').innerHTML=`${esc(designTeam()?.name||'Design team')} · ${plural(m.screens.length,'screen')} · ${m.approvedAt?'Approved':'Not approved yet'}`}
- mountMockFrame();
+ mountMockFrame();mountPencilFrame();
 };
 let mocksRenderQueued=false;
 api.client.subscribe((row,e)=>{if(!/^project\.(Mock|Stage|TeamAdded|SprintAdded|TaskAdded)/.test(e._tag)||mocksRenderQueued)return;mocksRenderQueued=true;queueMicrotask(()=>{mocksRenderQueued=false;if(sampleSession!=='owner'||api.setup.needed())return;remember();render()})});
@@ -644,6 +662,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)r
  if(d.mockScreen){remember();mocksPane().screenId=d.mockScreen;render();$(`[data-mock-screen="${CSS.escape(d.mockScreen)}"]`)?.focus();return}
  if(d.mockSize){remember();mocksPane().size=d.mockSize;render();return}
  if(b.id==='mock-edit'){remember();mocksPane().edit=!mocksPane().edit;render();$('#mock-edit')?.focus();return}
+ if(d.pencilCheck){pencilStates.delete(d.pencilCheck);remember();render();return}
  if(b.id==='mock-check-server'){serverStates.delete(state.projectId);checkMockServer(p());return}
  if(b.id==='approve-mocks'&&canOperate()){openApproveMocks();return}
  if(b.id==='confirm-approve-mocks'){const id=approvingProject;$('#approve-mocks-dialog').close();if(!canOperate()||!id)return;remember();api.mocks.approve(id).then(()=>{render();toast('Mocks approved. The Planning team has the tasks.')});return}

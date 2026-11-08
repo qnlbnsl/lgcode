@@ -73,7 +73,8 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
     real code, at phone or desktop size, with the four-project or ten-project data.
   - Ask Nico for a change while a screen is open, such as "make it denser", "bluer",
     "rounder", or "add lines". The screen changes in place, and Changes records it.
-  - Edit design shows a white placeholder where OpenPencil will run later.
+  - Edit design opens OpenPencil on the project's design file, once OpenPencil runs.
+    [openpencil/README.md](openpencil/README.md) says how to start it.
   - Data lists the fields the screens use and compares each with the schema: new,
     matches, or differs. Components lists what the screens use, real or draft.
   - Approve mocks promotes the drafts, moves the project to Plan, and starts a Planning team
@@ -81,7 +82,7 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
 - Start a new project and tell its lead about screens, pages, or a design. The lead starts a
   Design team, the Mocks tab appears, and the screens arrive one by one.
 - Open a repository page and choose Design. View shows the colors and the components every
-  project draws from, with live previews. Edit shows the OpenPencil placeholder.
+  project draws from, with live previews. Edit opens OpenPencil on that design file.
 - Repositories that stay on this computer go in `data/local/`, which git ignores. Open one
   with `?with=<id>`; Design notes lists the ones present. `?with=ananke` adds Ananke's
   onboarding mocks, which need Ananke's mock server on port 8091.

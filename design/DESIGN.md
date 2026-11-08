@@ -378,8 +378,10 @@ The owner set this direction on 2026-11-07, after looking at how Ananke makes it
   project to Plan, and gives a Planning team the tasks: move each draft into the real components,
   change the schema, and wire each screen to real data. Building is not part of design.
 - **The design file is the source of truth, and the mocks show exactly what it says.** OpenPencil
-  runs only while someone designs or edits. Looking at the mocks needs only the code. For now, Edit
-  design and the repository Design tab's Edit mode show a white placeholder where OpenPencil goes.
+  runs only while someone designs or edits. Looking at the mocks needs only the code. Edit design
+  and the repository Design tab's Edit mode show OpenPencil's web editor in a frame, open on the
+  repository's design file. It runs from `openpencil/` on port 8443 and cannot save into the
+  repository yet. When it is not running, the page says so and gives the command that starts it.
 - **The repository has a Design tab.** It shows the colors and the components that every project
   in the repository draws from, with live previews. A component that a project's approval promoted
   says which project it came from.

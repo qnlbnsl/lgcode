@@ -1,0 +1,32 @@
+# Serves the editor and the design files from one HTTPS address. The editor opens a file named in
+# its address (?file=...) only over HTTPS, and only from an address it can fetch, so both live here.
+{
+	admin off
+	local_certs
+	skip_install_trust
+}
+
+https://:8443 {
+	tls internal {
+		on_demand
+	}
+
+	# Design files, mounted read-only under /files/<project>/. Only .fig and .pen files are served.
+	handle_path /files/* {
+		# The web mock, on another port, asks whether a file exists before it opens the editor.
+		header Access-Control-Allow-Origin *
+		@design path *.fig *.pen
+		handle @design {
+			root * /files
+			header Cache-Control no-store
+			file_server
+		}
+		respond 404
+	}
+
+	handle {
+		root * /srv/editor
+		try_files {path} /index.html
+		file_server
+	}
+}

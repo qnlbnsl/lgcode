@@ -73,7 +73,8 @@ const wide=page=>page.evaluate(()=>document.documentElement.scrollWidth-innerWid
  check(live.kept,'The screen changes in place, without reloading');
  check(live.css.includes('zoom'),'The change reaches the running screen');
  await page.click('#mock-edit');
- check(await page.locator('.design-canvas').isVisible()&&(await page.locator('.design-canvas').textContent()).includes('design/desktop-companion.fig')&&await page.locator('#mock-slot').count()===0,'Edit design swaps the screen for the design canvas');
+ await page.waitForFunction(()=>!document.querySelector('.pencil[role="status"].design-canvas'));
+ check(await page.locator('.pencil').isVisible()&&(await page.locator('.pencil').textContent()).includes('design/desktop-companion.fig')&&await page.locator('#mock-slot').count()===0,'Edit design swaps the screen for OpenPencil on the design file');
  await page.click('#mock-edit');
  check(await page.locator('#mock-slot iframe').count()===1,'Done editing brings the screen back');
  await page.click('[data-mocks-pane="data"]');
@@ -110,7 +111,8 @@ const wide=page=>page.evaluate(()=>document.documentElement.scrollWidth-innerWid
  check(await page.locator('.component-preview button.primary').count()===1,'Components preview with the page’s own styles');
  check(await page.locator('.component-preview button').first().evaluate(e=>e.closest('[inert]')!==null),'Previews cannot be clicked');
  await page.click('[data-design-mode="edit"]');
- check(await page.locator('.design-canvas strong').textContent()==='OpenPencil','Edit opens the design canvas');
+ await page.waitForFunction(()=>!document.querySelector('.pencil[role="status"].design-canvas'));
+ check(await page.locator('.pencil').isVisible()&&(await page.locator('.pencil').textContent()).includes('design/sheprd.fig')||await page.locator('#pencil-slot[data-src*="sheprd.fig"]').count()===1,'Edit opens OpenPencil on the repository design file');
  await page.click('[data-open-repo="atlas-docs"]');await page.click('[data-repo-tab="design"]');
  check(await page.locator('.empty h2').textContent()==='No design yet','A repository without a design says so');
  await page.context().close();
