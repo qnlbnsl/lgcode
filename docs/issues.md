@@ -8738,7 +8738,7 @@ State: worked around for now. The cause remains.
 
 The manager removed the `node_modules` folders from the 31 finished adjudicator seats, which brought the folder down to 56 percent of its file limit. The folders of the other finished seats remain. The Foundry should give seats a shared read-only copy, or remove a seat's temporary folder when the seat retires. The main disk is also at 96 percent.
 
-## 522. The LGcode rename does not migrate existing state or environment variables
+## 523. The LGcode rename does not migrate existing state or environment variables
 
 Found: 2026-11-08, while renaming Sheprd to LGcode.
 State: accepted for this rename, with no automatic migration.
