@@ -64,7 +64,7 @@ todo names a new `project` piece for them. The sample uses these proposed types,
 | `project.MockDataDrafted` | A field the screens use, with its type and the screens that use it. |
 | `project.MockComponentUsed` | A component the screens use, where it lives, and whether it is real or a draft. |
 | `project.MocksApproved` | The owner approved the mocks, which promotes the drafts. |
-| `project.TaskAdded`, `project.TaskChanged` | A task with its story, and a change to its state. |
+| `project.TaskAdded`, `project.TaskChanged` | A task with its story, and a change to its state. Each step of a story's activity has an `at` time, and a step without one takes the time the task was added. |
 | `project.QuestionLinked` | A question's title, recommendation, task, and sprint. |
 | `project.AccountPlaced` | The machine an account signs in on. |
 | `project.PromptContext` | Files and tasks attached to a prompt, and the chosen account. |

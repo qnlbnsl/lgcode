@@ -126,7 +126,7 @@ const handlers={
  'project.MockComponentUsed':(row,e)=>projectById(e.projectId).mocks.components.push({id:e.componentId,name:e.name,origin:e.origin,path:e.path,screens:e.screens||[]}),
  'project.MocksApproved':(row,e)=>{const mocks=projectById(e.projectId).mocks;mocks.approvedAt=row.occurred_at;for(const c of mocks.components)if(c.origin==='draft')c.origin='promoted'},
  'project.SprintAdded':(row,e)=>projectById(e.projectId).sprints.push({id:e.sprintId,label:e.label,name:e.name,goal:e.goal,phase:e.phase,owner:e.owner,needs:e.needs||[],...(e.completion?{completion:e.completion}:{}),...(e.evidence?{evidence:e.evidence}:{})}),
- 'project.TaskAdded':(row,e)=>{const project=projectById(e.projectId);project.tasks.push({id:e.taskId,title:e.title,owner:e.owner,teamId:e.teamId,sprintId:e.sprintId,state:e.state,workspace:e.worktreeId||project.workspace,...(e.addedByOwner?{addedByOwner:true}:{})});if(e.story)S.taskStories[e.taskId]=e.story},
+ 'project.TaskAdded':(row,e)=>{const project=projectById(e.projectId);project.tasks.push({id:e.taskId,title:e.title,owner:e.owner,teamId:e.teamId,sprintId:e.sprintId,state:e.state,workspace:e.worktreeId||project.workspace,addedAt:row.occurred_at,...(e.addedByOwner?{addedByOwner:true}:{})});if(e.story)S.taskStories[e.taskId]=e.story},
  'project.TaskChanged':(row,e)=>{const task=S.projects.flatMap(project=>project.tasks).find(t=>t.id===e.taskId);if(task)task.state=e.state},
  'project.QuestionLinked':(row,e)=>{const r=request(e.questionId);if(r)Object.assign(r,{projectId:e.projectId,teamId:e.teamId,taskId:e.taskId,sprintId:e.sprintId,title:e.title,summary:e.summary,recommendation:e.recommendation,answer:e.proposedAnswer})},
  'project.AccountPlaced':(row,e)=>{const a=account(e.accountId);if(a)a.machineId=e.machineId},
