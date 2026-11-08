@@ -29,11 +29,12 @@ LGcode's own stylesheet sets the stroke width to 1.6 instead of Lucide's 2.
 | `search` | Find project or agent. |
 | `command` | The Command key in the switcher shortcut on Apple systems. |
 | `bell` | Needs attention. |
-| `smartphone` | Alerts, which go to the owner's phone. |
+| `smartphone` | Phone notifications, which go to the owner's phone. |
 | `monitor` | Machines. |
 | `user` | Subscriptions. |
-| `settings` | Settings. |
+| `settings` | Service settings. |
 | `menu` | The phone navigation button. |
+| `panel-left` | Folding the sidebar into a rail, added on 2026-11-08. |
 | `circle-help` | Design notes. |
 | `git-branch` | Branch names. |
 | `kanban` | The project board. |
