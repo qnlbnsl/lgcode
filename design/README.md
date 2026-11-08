@@ -45,8 +45,8 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
 - Close the lead panel to widen the board. The lead button reopens it. On smaller screens it opens as a drawer. Escape closes the
   drawer. The expand control opens the full conversation, preserving its
   messages and draft.
-- The project branch appears under its name and beside the board title.
-  It stays assigned when you inspect a different workspace.
+- The branch appears once, in the top bar, after Inspecting. Inspect another worktree, and
+  the list still marks the assigned one.
 - On the board, select a sprint to see its tasks,
   owners, phase, dependencies, and completion evidence. Select a task to
   see the assignment and continue to its agent or changed files.
@@ -55,13 +55,20 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
   answered. Answering clears Sage's request and the sprint's blocker too.
 - Expand Build team and Review team to see their agents. Teams are named for their stage:
   Design team, Planning team, Build team, and Review team. Two teams in the same stage add
-  their area, such as Build team · Exports. A single workspace tab row offers Chat,
-  Tasks, Terminal, Git, and Workspace settings in team scope. Drafts and reading position stay with each
+  their area, such as Build team · Exports. A single tab row offers Board, Chat, Terminal,
+  Git, and Project settings, and a team adds Tasks at the end, so no other tab moves. Drafts and reading position stay with each
   conversation. Teams remember their last tab.
-- Open the branch name at the top right. The list shows branches,
-  workspaces, owners, and current activity for this repository. Selecting
-  one changes the inspected code context. It does not change repository
+- Open Inspecting at the top right. The list groups this repository's worktrees as Git does,
+  one line each, with the machine at the right. Type in its search field to narrow it.
+  Selecting one changes the inspected code context. It does not change repository
   binding or redirect an agent. Git displays the selected workspace and follows its owning project and machine.
+- Select the repository, project, or team in the top bar. Each opens its page.
+- Press Control + B, or Command + B on a Mac, to fold the sidebar into a rail of icons. The
+  browser remembers it. The button at the top of the sidebar does the same.
+- Open Rowan's chat. One line under the tabs names him, his role, and his status, and no
+  title repeats the top bar.
+- Press Control + K and type "ro". Names that start with the query come first, and each row
+  shows what needs attention. Escape closes it.
 - Send a message to see a reply. Stop cancels
   a pending reply. Both messages and drafts are scoped to their conversation.
 - Add a task to an active sprint. Completed sprints do not accept new tasks.
@@ -86,19 +93,21 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
 - Repositories that stay on this computer go in `data/local/`, which git ignores. Open one
   with `?with=<id>`; Design notes lists the ones present. `?with=ananke` adds Ananke's
   onboarding mocks, which need Ananke's mock server on port 8091.
-- Switch between Field and Dusk at the bottom of the sidebar.
+- Open Service settings, the gear at the foot of the sidebar, and choose Light, Dark, or Match
+  system under Appearance.
 - Open Design notes and choose Logged out, Login rejected, Session expired, or Session
   unavailable. The page says "Sign in to LGcode" under the logo mark. A rejected password
   shows in the error color under the field, and an expired session shows in the muted
   color. The unavailable page offers Try again as its main button.
 - Open Git in Agent console. Commit says what it needs before it can be used.
-- Open Alerts and choose Refresh. The notice appears at the top right, below the bell.
+- Open Phone notifications, the phone icon at the foot of the sidebar, and choose Refresh.
+  The notice appears at the top right, below the bell.
 - Expand a request on Home and answer it. The row eases open, and the answered row folds away.
 
 ## Existing page capabilities and new workspace views
 
-The navigation footer now contains Alerts, Machines, Subscriptions, Settings,
-and Log out. The top bar shows the connection state. Design notes
+The navigation footer is a row of icons for Phone notifications, Machines,
+Subscriptions, Service settings, and Design notes, above the account and Log out. The top bar shows the connection state. Design notes
 contains preview controls for session expiry, login errors, connection loss,
 failed starts, permissions, and large-item failure.
 

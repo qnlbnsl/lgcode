@@ -44,15 +44,16 @@ The board retains its own scroll position while the conversation scrolls.
 
 The redesign retains authentication states, connection status, permission
 requests, agent stop/resume, safe failed-start reasons, explicit large-item
-loading, tool calls, delivery history, Alerts, and Settings. Permission
+loading, tool calls, delivery history, Phone notifications, and Settings. Permission
 controls show the actual action input before answer buttons. Hidden input
 and unconfirmed answers have explicit states. Stop cancels permissions.
 Logout and expiry wipe entered secrets. Reconnecting preserves reading
 context but disables mutations. These remain sample flows in the mock.
 
-Alerts, Machines, Subscriptions, and Settings belong to the service, so they
-sit in global navigation. The project workspace has Board, Chat, Terminal,
-Git, and Settings tabs. Git combines the repository worktree hierarchy, staged and unstaged files,
+Phone notifications, Machines, Subscriptions, and Service settings belong to
+the service, so they sit in global navigation, as a row of icons at the foot of
+the sidebar. The project workspace has Board, Chat, Terminal, Git, and Project
+settings tabs, and a team adds Tasks. Git combines the repository worktree hierarchy, staged and unstaged files,
 commit messages, synchronization, direct file diffs, and integration controls.
 History uses that same diff pane. Workspace Settings shows the assigned
 repository, branch, checkout folder, and machine, plus a per-project shell
@@ -68,12 +69,14 @@ FEATURE-PARITY.md records the integration requirements and source evidence.
 
 ## Project branch placement
 
-The assigned branch sits beneath each project name beside its lead in the
-sidebar. The board repeats it beside the project title as quiet monospace
-text with a branch icon. Long names truncate in the sidebar and wrap onto
-the next title line when needed. Hover text exposes the full branch name.
-The top-right picker says Viewing, because it changes the inspected
-workspace. Inspecting another branch does not change the project label.
+The branch shows once, in the top bar, in the control that says Inspecting.
+The sidebar, the board header, and the composer do not repeat it, decided by
+the designer's critique of 2026-11-06 and applied on 2026-11-08. The control
+says Inspecting because it changes the code you look at, not where agents work.
+A long branch name is cut at its start, so the end, which differs between
+branches, stays visible. Hover text gives the full name. Inspecting another
+worktree does not move the work: the list marks the assigned worktree as
+Assigned, and the control's hover text names it.
 A new project still starts with its lead to shape the first plan.
 Start work tree is checked beneath its name by default. A safe version of
 the project name becomes the branch and worktree folder. Existing names get
@@ -85,9 +88,11 @@ previews the exact branch and folder before creating the sample project.
 Field is the default token block. Dusk overrides it under
 `:root[data-theme="dark"]`. Both modes share spacing, type roles, shape,
 and motion values. A first visit follows the device's color mode.
-A manual light or dark choice takes precedence and is remembered when
-browser storage is available. Device changes are followed until the owner
-makes a manual choice.
+The choice lives in Service settings, under Appearance, as Light, Dark, and
+Match system. The labels do not name the Field and Dusk palettes. A manual
+light or dark choice takes precedence and is remembered when browser storage
+is available. Match system forgets that choice, and the page follows the
+device again.
 
 The prototype migrates a previously selected Field or Dusk candidate to
 the matching mode. A previous Harbor selection falls back to the device
@@ -157,8 +162,9 @@ the UI skill's craft rules applied during the workshop.
 ## Scope and workspace controls
 
 One tab row serves the selected project, team, or agent. Team Tasks remains
-available in team scope. Git selects the team worktree when opened from a
-team. The header names the selected team, branch, and machine. Selecting a
+available in team scope, as the last tab. Git selects the team worktree when
+opened from a team. The top bar names the selected repository, project, team,
+and branch. Selecting a
 worktree in Git or Terminal follows its owning project and machine. Opening
 a project lead restores that project's assigned worktree.
 
@@ -180,7 +186,7 @@ are filtered by harness and machine. Files and tasks can be attached as
 context, and sent turns retain those references. Grouped activity links to
 its changed files. The attention menu separates decisions, permissions, and
 failed starts. Only projects needing you filters projects. Quick switch searches
-projects, teams, and agents, and opens with Command or Control + K.
+projects, teams, and agents by name, and opens with Command or Control + K.
 Terminal sessions preserve separate input and history in each worktree.
 
 ## Home gathers work across projects
@@ -216,9 +222,9 @@ control. A divider separates Projects, New project, and the explicitly named
 Only projects needing you filter from global navigation. Repository names
 within that tree open their project lists. The former separate Repositories
 destination is removed. Another divider separates service pages from the
-project tree, and thin rules separate repository groups. The account and
-theme controls retain their existing boundaries. Search remains available
-with Command or Control + K.
+project tree, and thin rules separate repository groups. The service pages
+are a row of icons above the account. Search remains available with Command or
+Control + K.
 
 ## Density and machine-aware creation
 
@@ -277,12 +283,13 @@ that is the part that differs. All files stacks every changed file with a sticky
 | Failed start | A kind of attention: an agent could not start. It wears the error color. |
 | Uncommitted changes | Files changed in a worktree. "Working tree" is not used. |
 | Thread | One agent's conversation. Chat stays the name of the tab. |
-| Alerts | Notifications sent to the owner's phone. Its badge counts failed notifications only. |
+| Phone notifications | Notifications sent to the owner's phone. Its badge counts failed notifications only. It was named Alerts until 2026-11-08, which a first reader confused with the bell. |
+| Inspecting | The top bar's control for the worktree whose code you look at. It was named Viewing. |
 
 ### One density rule for records
 
 Comparable records are tables with rows of 46 pixels or less: Machines, Project
-placement, Subscriptions, Alerts, and All projects. Requests are single-line rows
+placement, Subscriptions, Phone notifications, and All projects. Requests are single-line rows
 that say how long they have waited and what they block. Expanded rows do not repeat
 their own title. No text is smaller than 11 pixels, and metadata is 12 pixels.
 
@@ -426,8 +433,8 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
   smaller field makes iOS zoom the page.
 - **Three weights.** Text is 400, 500, or 600, named `--weight-body`, `--weight-medium`, and
   `--weight-strong`.
-- **Page titles are quiet.** A page title is 15 pixels at weight 600. Removing repeated
-  titles belongs to the later work on the chrome.
+- **Page titles are quiet.** A page title is 15 pixels at weight 600. The application
+  shell section below says which pages keep one.
 - **A check enforces the scale.** `revision-checks.mjs` fails when the stylesheet or the
   script holds a raw font size, and when a rendered page shows a size outside the scale.
 
@@ -471,7 +478,7 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
   character stands in for an icon, so there is no ×, ←, →, ↗, ⌘, ✓, or ＋ in a button.
 - **The shortcut matches the system.** The switcher shows the Command icon and K on Apple
   systems, and Ctrl K elsewhere.
-- **Alerts use a phone icon,** because Alerts are notifications sent to the owner's phone.
+- **Phone notifications use a phone icon,** because they are sent to the owner's phone.
 
 ### Motion, focus, tabs, and dialogs
 
@@ -496,3 +503,70 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
 - **Messages show their severity under the field.** A rejected password uses the error
   color. An expired session uses the muted color. On the unavailable page, Try again is the
   primary button, because it is the only thing to do.
+
+## The application shell, set on 2026-11-08
+
+These rules come from the designer's critique of 2026-11-06. Claude applied them on
+2026-11-08. They cover the sidebar, the top bar, the tab row, and the two switchers.
+
+### The sidebar folds into a rail
+
+- **Control + B folds the sidebar.** On Apple systems it is Command + B. The button at the
+  top of the sidebar does the same, and its hover text names the keys.
+- **The rail is 48 pixels wide.** It keeps Home, Find, New project, the service pages, Design
+  notes, and the owner's initials as icons. Each icon names itself on hover. The project tree
+  hides until the sidebar opens again.
+- **The browser remembers the choice.** A phone keeps its drawer, and the drawer has no rail.
+- **The terminal keeps Control + B.** Programs such as tmux and the shell use it, so the
+  shortcut does nothing while the terminal has focus.
+
+### Sidebar rows
+
+- **Every row is one line of 28 pixels on a desktop.** Phones keep their 40 to 46 pixel
+  targets.
+- **Only the selected project has a second line.** It names the project's lead. The branch
+  is in the top bar, so the tree does not repeat it.
+- **Only the current row is filled.** Its project and team above it are bold, without a
+  fill. A selected repository fills its whole row too.
+- **A row is one hover target.** Its disclosure and its name share one surface, so no seam
+  shows between them.
+- **A project with no teams has no disclosure.** It draws no tree line either.
+- **The current row stays clear of the fade.** After each navigation, the tree scrolls so that
+  the current row sits 8 pixels above the fade at its foot.
+- **Service pages are one row of 40 pixel icons.** Phone notifications, Machines,
+  Subscriptions, and Service settings sit in that row, with Design notes at its end. A
+  red count on the phone icon says how many notifications failed.
+
+### The top bar and the titles
+
+- **Each place in the top bar opens.** The repository opens its projects, the project opens
+  its board, and the team opens the team.
+- **A page does not repeat its place.** The top bar names the place, and the selected tab
+  names the view. Home, Chat, team Tasks, Terminal, Git, Project settings, and the service
+  pages show no title. The board, Mocks, and the repository page keep their summary line
+  without a title. Sprints and tasks keep their own titles, because nothing else names them.
+  Each page still has a heading for screen readers.
+- **Home keeps New project in its tab row.** The sidebar's New project is the same action.
+- **Chat has one line of 32 pixels under the tabs.** It names the agent, its role, and its
+  status. A team's chat says how many agents share it.
+
+### The tab row
+
+- **Tasks is the last tab.** The order is Board, Mocks when the project has them, Chat,
+  Terminal, Git, Project settings, and then Tasks for a team. A team's Tasks tab therefore
+  moves no other tab. The critic suggested Tasks after Git with Project settings pinned to the
+  right end. Claude kept Project settings in the row instead, because the lead panel narrows
+  the board, so a tab pinned to the right would move between the board and the other views.
+
+### The two switchers
+
+- **Inspecting lists worktrees as Git does.** Main checkouts come first, then each project,
+  with its teams indented beneath it. Each worktree is one line of 32 pixels with its name,
+  its branch, and its machine at the right. A search field sits at the top. The list has no
+  footer.
+- **The quick switcher matches names only.** A name that starts with the query comes first,
+  then a name with a word that starts with it, then any other name that contains it. Rows are
+  36 pixels and show the attention count. The switcher has no title and no close button.
+  Escape closes it.
+- **Design notes says what it is.** Its previews are grouped as Session, Connection, and
+  Requests.
