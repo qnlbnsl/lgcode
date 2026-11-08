@@ -13,3 +13,6 @@ test-results/
 .foundry/
 # Real events exported for the web mock. Threads hold whatever agents wrote.
 design/data/prod/
+
+# Reverse Fig photographs, reports and intermediate files.
+.reverse-fig/
