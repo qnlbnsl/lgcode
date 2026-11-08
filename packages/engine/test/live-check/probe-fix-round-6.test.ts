@@ -7,8 +7,8 @@ import { ALWAYS_ALLOW_PROMPT } from "../../scripts/live/prompts.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { ALWAYS, ONCE, REJECT, fakeEngine, runProbe, type FakeEngine, type Option } from "./probe-fake-engine.ts";
 
-vi.mock("@sheprd/client", async (original) => {
-  const client = await original<typeof import("@sheprd/client")>();
+vi.mock("@lgcode/client", async (original) => {
+  const client = await original<typeof import("@lgcode/client")>();
   const { fakeConnect } = await import("./probe-fake-registry.ts");
   return { ...client, connect: (options: Parameters<typeof client.connect>[0]) => (fakeConnect(options) ?? client.connect(options)) as never };
 });

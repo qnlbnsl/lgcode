@@ -192,6 +192,61 @@ These points were set aside on purpose: how migration numbers are handed out,
 model selection, which other steps a script should control, a test index for
 choosing narrow runs, and the template for the end-result page.
 
+## Additions still to be designed
+
+The owner asked for these three additions on 2026-11-06. None of them is in the
+chart or in the steps below yet. Only the quoted words are the owner's. The rest
+of this section is the agent's reading and suggestions, and the owner has not
+ruled on it.
+
+### A lane for hotfixes
+
+The owner said: "a lane for hotfixes. note it down, then for when user needs a
+hotfix they talk to project lead and it spawns a hotfix team. very limited.
+focused on fixing and pushing."
+
+These points are open:
+
+- **Who the project lead is.** This note has no role with that name. The closest
+  is the owner's main agent.
+- **What pushing may reach.** Rule 7 keeps the owner's approval for anything
+  users would notice, and deployments stay with the owner. A hotfix is usually
+  something users notice. Whether asking for the hotfix counts as that approval
+  needs the owner's word.
+- **What very limited means.** The agent suggests one fix, one test that shows
+  the failure first, and a run of the failed and related tests. It also suggests
+  no plan review rounds and no full 6 Review. The full run and the review could
+  follow after the fix is out.
+- **How the fix reaches running teams.** Every team in a sprint starts from the
+  same commit, so a hotfix on the base branch can leave running teams behind it.
+
+### A way to bisect
+
+The owner said: "need a way to bisect(not sure what that means)."
+
+To bisect is to find the commit that broke something by testing the middle of a
+range of commits and halving the range each time. Finding the culprit among 1,000
+commits takes about 10 tests.
+
+The agent suggests a Sheprd command, because Sheprd limits which git commands
+agents can run. The last passing full-run report gives the known-good commit, and
+the failing commit gives the other end. The test runner agent would run only the
+failing test at each step. The nightly run and the hotfix lane would both use it.
+
+### A way to freeze the interfaces
+
+The owner said: "Also a way to freeze the interfaces."
+
+The agent reads an interface here as the agreed names, inputs and outputs of what
+teams share, such as an API, a database schema or a message format. Freezing one
+stops a team from changing it while another team is building against it.
+
+The agent suggests freezing after Plans compared in 3 Plan, because that is when
+the teams' plans have been checked against each other. A script could then fail
+any change to a frozen interface, the way the frozen-test script does for tests.
+A team that needs a change would take the existing plan wrong move back to 3 Plan.
+What counts as an interface, and who can unfreeze one, are open.
+
 ## Changes this design made to the repository's rules
 
 The owner approved these changes to AGENTS.md on 2026-11-05, and they are in

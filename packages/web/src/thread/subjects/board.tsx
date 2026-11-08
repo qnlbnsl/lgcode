@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { boardAlertTitles, type BoardAuthor, type BoardPost, type PostId } from "@sheprd/contracts"
+import { boardAlertTitles, type BoardAuthor, type BoardPost, type PostId } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
 import { requestId, withClient } from "../client.ts"
 import { DataText, visibleText } from "../text.tsx"

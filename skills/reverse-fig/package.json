@@ -1,0 +1,17 @@
+{
+  "name": "reverse-fig",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Turns a project's rendered components into an OpenPencil design file.",
+  "type": "module",
+  "bin": {
+    "reverse-fig": "./reverse-fig.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@open-pencil/cli": "0.16.0",
+    "playwright": "1.64.1"
+  }
+}

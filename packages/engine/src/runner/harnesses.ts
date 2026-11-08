@@ -1,7 +1,7 @@
 import { delimiter, isAbsolute, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import { HarnessId, type Account, type HarnessSettings, type PermissionLevel } from "@sheprd/contracts"
+import { HarnessId, type Account, type HarnessSettings, type PermissionLevel } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
 import * as FileSystem from "effect/FileSystem"
 import * as Schema from "effect/Schema"

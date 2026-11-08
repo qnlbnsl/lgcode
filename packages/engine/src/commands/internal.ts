@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   CommandsRpcGroup, Event as EventSchema, RequestId,
   type Caller, type Event, type EventEnvelope, type HarnessSettings,
-} from "@sheprd/contracts";
+} from "@lgcode/contracts";
 import type * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
@@ -59,7 +59,7 @@ export type PiecePlan = Omit<Plan, "afterCommit" | "reply"> & {
 
 export type Planner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<Plan, CommandRefused | LogWriteFailed>;
 export type PiecePlanner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<PiecePlan, CommandRefused | LogWriteFailed>;
-export type PlannerTable = Readonly<Record<string, Planner> & Record<`${import("@sheprd/contracts").PieceNamespace}.${string}`, PiecePlanner>>;
+export type PlannerTable = Readonly<Record<string, Planner> & Record<`${import("@lgcode/contracts").PieceNamespace}.${string}`, PiecePlanner>>;
 
 export const freshRequest = () => Schema.decodeUnknownSync(RequestId)(randomUUID());
 export const readHarnesses = (runtime: Runtime): Effect.Effect<ReadonlyArray<HarnessSettings>, LogWriteFailed> =>

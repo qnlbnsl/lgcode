@@ -16,7 +16,7 @@ it("7.12 shows the request title and full tool input before Allow, with the acti
   expect(container.textContent!.indexOf('"command":"rm -rf /tmp/example"')).toBeLessThan(container.textContent!.indexOf("Allow"))
   const message = [...container.querySelectorAll("article")].find((article) => article.textContent?.includes("Agent message before its request."))
   const request = container.querySelector('[aria-label="Permission request"]')
-  expect(message).toBeTruthy() // catches agent text being rendered in the same control region as Sheprd actions
+  expect(message).toBeTruthy() // catches agent text being rendered in the same control region as LGcode actions
   expect(request).toBeTruthy()
   expect(request!.contains(allow)).toBe(true)
   expect(message!.contains(allow)).toBe(false) // catches an approval control that appears to be part of the agent's message

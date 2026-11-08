@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { connect, type Client } from "@sheprd/client";
-import type { AgentId, EventEnvelope, RosterEntry } from "@sheprd/contracts";
+import { connect, type Client } from "@lgcode/client";
+import type { AgentId, EventEnvelope, RosterEntry } from "@lgcode/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -39,11 +39,11 @@ provider failures or kill real agent sessions to simulate them.
 
 --dry-run prints the exact prompts and steps without starting anything or
 reading the account homes. --help prints this text. Model, effort and timeout
-variables are the same SHEPRD_LIVE_* variables as pnpm live-check.
+variables are the same LGCODE_LIVE_* variables as pnpm live-check.
 --skip-timed-flush skips the cache-timer step and continues to first-stall.
 The report marks that step SKIP and the run remains incomplete with exit 1.
-The default total limit is 30 minutes; set SHEPRD_LIVE_TOTAL_TIMEOUT_SECONDS
-above 4200 when checking a one-hour cache plus the first stall. Only Sheprd's
+The default total limit is 30 minutes; set LGCODE_LIVE_TOTAL_TIMEOUT_SECONDS
+above 4200 when checking a one-hour cache plus the first stall. Only LGcode's
 own tools are approval-free; other tools retain their normal permission path.`;
 
 const STEPS = [
@@ -270,7 +270,7 @@ export const rolesMain = async (argv: ReadonlyArray<string>, environment: Readon
   const config = liveConfig(environment);
   if (args.kind === "dry-run") {
     process.stdout.write(`${HELP}\n\nNothing is started, sent or read.\nModels: ${config.leadModel} (${config.leadEffort}), ${config.workerModel} (${config.workerEffort}).\n`
-      + `${rolesLeadPrompt(config, ["/tmp/sheprd-live-EXAMPLE/work/worker-1", "/tmp/sheprd-live-EXAMPLE/work/worker-2"])}\n`
+      + `${rolesLeadPrompt(config, ["/tmp/lgcode-live-EXAMPLE/work/worker-1", "/tmp/lgcode-live-EXAMPLE/work/worker-2"])}\n`
       + (skipTimedFlush ? "" : `Owner's later board post: ${FLUSH_MARKER}, reply:none, to:[], on the team channel.\n`)
       + STEPS.map((step) => `${skipTimedFlush && step.id === "timed-flush" ? "SKIP " : ""}${step.id}: ${step.title}`).join("\n") + "\n");
     return 0;
@@ -300,12 +300,12 @@ export const rolesMain = async (argv: ReadonlyArray<string>, environment: Readon
         service = startLiveService(environment);
         const deadline = Date.now() + 60_000;
         for (;;) {
-          const probe = yield* Effect.exit(Effect.scoped(connect({ environment: { SHEPRD_HOME: service.state }, attempts: 1 })));
+          const probe = yield* Effect.exit(Effect.scoped(connect({ environment: { LGCODE_HOME: service.state }, attempts: 1 })));
           if (Exit.isSuccess(probe)) break;
           requireCheck(!service.exited() && Date.now() < deadline, "the isolated service did not start");
           yield* Effect.sleep(100);
         }
-        return yield* connect({ environment: { SHEPRD_HOME: service.state }, attempts: 1 });
+        return yield* connect({ environment: { LGCODE_HOME: service.state }, attempts: 1 });
       }));
       const live = service!;
       const journey = yield* Effect.exit(Effect.gen(function* () {

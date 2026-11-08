@@ -1,4 +1,4 @@
-import { parseRole, type RoleFile, type RoleKind, type RoleLimits, type RolesSettings } from "@sheprd/contracts";
+import { parseRole, type RoleFile, type RoleKind, type RoleLimits, type RolesSettings } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as SchemaIssue from "effect/SchemaIssue";

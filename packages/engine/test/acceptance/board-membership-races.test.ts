@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import type { EventEnvelope } from "@sheprd/contracts";
+import type { EventEnvelope } from "@lgcode/contracts";
 import { it } from "@effect/vitest";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -20,7 +20,7 @@ import { eventually } from "../support/routingRig.ts";
 import { agent, provideBoard, queued, seedBoard, snapshot } from "../board/wakeFixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); removeRig(rig); });
 
 for (const boundary of ["queue", "send"] as const) for (const removalFirst of [true, false]) {

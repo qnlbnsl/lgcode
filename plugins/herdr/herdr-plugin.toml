@@ -1,26 +1,26 @@
-id = "sheprd"
-name = "Sheprd"
+id = "lgcode"
+name = "LGcode"
 version = "0.0.1"
 min_herdr_version = "0.8.2"
 platforms = ["linux"]
 
 [[startup]]
-command = ["sheprd", "serve", "--detach"]
+command = ["lgcode", "serve", "--detach"]
 
 [[actions]]
 id = "serve"
-title = "Start Sheprd"
+title = "Start LGcode"
 contexts = ["global"]
-command = ["sheprd", "serve", "--detach"]
+command = ["lgcode", "serve", "--detach"]
 
 [[actions]]
 id = "view"
-title = "View Sheprd threads"
+title = "View LGcode threads"
 contexts = ["global"]
 command = ["node", "./src/openPane.ts"]
 
 [[panes]]
 id = "view"
-title = "Sheprd threads"
+title = "LGcode threads"
 placement = "split"
-command = ["sheprd", "view"]
+command = ["lgcode", "view"]

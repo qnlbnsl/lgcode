@@ -28,8 +28,8 @@ for (const [name, path, ready] of [
   ["Settings", "/?page=settings", "Settings"],
 ] as const) test(`7.3 production width: ${name} fits 360 pixels`, async ({ page }) => {
   const rig = makeRig()
-  const previousHome = process.env.SHEPRD_HOME
-  process.env.SHEPRD_HOME = rig.stateFolder
+  const previousHome = process.env.LGCODE_HOME
+  process.env.LGCODE_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url")
   const staticRoot = join(rig.root, "page")
   try {
@@ -74,8 +74,8 @@ for (const [name, path, ready] of [
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped)
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
   } finally {
-    if (previousHome === undefined) delete process.env.SHEPRD_HOME
-    else process.env.SHEPRD_HOME = previousHome
+    if (previousHome === undefined) delete process.env.LGCODE_HOME
+    else process.env.LGCODE_HOME = previousHome
     removeRig(rig)
   }
 })

@@ -122,7 +122,7 @@ liveIf(foreignFolder() === undefined)("7.1 refuses a 0700 state folder owned by 
   Effect.gen(function* () {
     const root = makeServiceRoot();
     const folder = foreignFolder()!;
-    const service = startService(root, { env: { SHEPRD_HOME: folder } });
+    const service = startService(root, { env: { LGCODE_HOME: folder } });
     const exit = yield* failedToStart(service);
     expect(exit.signal).toBeNull();
     expect(exit.code).not.toBe(0);
@@ -139,14 +139,14 @@ live("7.1 starts with a socket path of exactly 100 bytes and refuses one of 101 
     const fitsHome = pathFor(fits.root, 100);
     const fitsSocket = join(fitsHome, "engine.sock");
     expect(Buffer.byteLength(fitsSocket)).toBe(100);
-    const accepted = startService(fits, { env: { SHEPRD_HOME: fitsHome } });
+    const accepted = startService(fits, { env: { LGCODE_HOME: fitsHome } });
     yield* waitServing({ ...fits, state: fitsHome, socket: fitsSocket }, accepted);
     expect(lstatSync(fitsSocket).isSocket()).toBe(true);
 
     const long = makeServiceRoot();
     const longHome = pathFor(long.root, 101);
     expect(Buffer.byteLength(join(longHome, "engine.sock"))).toBe(101);
-    const refused = startService(long, { env: { SHEPRD_HOME: longHome } });
+    const refused = startService(long, { env: { LGCODE_HOME: longHome } });
     const exit = yield* failedToStart(refused);
     expect(exit.code).not.toBe(0);
     expectReason(refused, "socket path exceeds 100 bytes");

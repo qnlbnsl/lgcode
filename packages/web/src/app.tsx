@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Situation } from "./situation.tsx"
-import type { AgentId } from "@sheprd/contracts"
+import type { AgentId } from "@lgcode/contracts"
 import { Thread } from "./thread/index.tsx"
 import { threadLocation } from "./thread/links.ts"
 import { Alerts } from "./admin/alerts.tsx"
@@ -75,7 +75,7 @@ export function App() {
       if (response.ok) setSession("owner")
       else setMessage(response.status === 401 ? "The password was not accepted." : "Log in is unavailable. Try again.")
     }).catch(() => {
-      if (!controller.signal.aborted) setMessage("Could not reach Sheprd. Try again.")
+      if (!controller.signal.aborted) setMessage("Could not reach LGcode. Try again.")
     }).finally(() => {
       if (!controller.signal.aborted) {
         action.current = undefined
@@ -108,7 +108,7 @@ export function App() {
 
   return <main>
     <header>
-      <h1>Sheprd</h1>
+      <h1>LGcode</h1>
       {session === "owner" && <button aria-label="Log out" disabled={busy} onClick={logOut}>Log out</button>}
     </header>
     {message && <p role="alert">{message}</p>}

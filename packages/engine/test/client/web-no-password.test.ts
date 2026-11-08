@@ -17,7 +17,7 @@ for (const kind of ["unset", "empty", "short"] as const) {
     const password = kind === "unset" ? undefined : kind === "empty" ? "" : freshSecret().slice(0, 7);
     const observer = "import net from 'node:net';const listen=net.Server.prototype.listen;net.Server.prototype.listen=function(...args){if(typeof args[0]==='number'||(typeof args[0]==='object'&&args[0]?.port!==undefined))process.stdout.write('web-tcp-bind-attempt\\n');return listen.apply(this,args)}";
     await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
-      const service = yield* startCheckedWebService(root, { SHEPRD_WEB_PASSWORD: password, NODE_OPTIONS: `--import=data:text/javascript;base64,${Buffer.from(observer).toString("base64")}` });
+      const service = yield* startCheckedWebService(root, { LGCODE_WEB_PASSWORD: password, NODE_OPTIONS: `--import=data:text/javascript;base64,${Buffer.from(observer).toString("base64")}` });
       yield* waitServing(root, service);
       const outcome = yield* Effect.promise(() => hostUpgrade(root.socket, { ...authorization(ownerBearer(root.state)), ...ancestryHeaders() }));
       expect(outcome.status).toBe(101);

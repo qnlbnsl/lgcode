@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 
-import { holdsIncoming, holdsUnsettled } from "@sheprd/contracts/board/conditions";
+import { holdsIncoming, holdsUnsettled } from "@lgcode/contracts/board/conditions";
 import { buildWake } from "../../src/board/wake.ts";
 import { canReach } from "../../src/routing/reach.ts";
 import { engineLists } from "../../src/pieces/lists.ts";

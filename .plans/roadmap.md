@@ -1,19 +1,36 @@
 ---
 kind: roadmap
-updated: 2026-11-03
+updated: 2026-11-07
 ---
 
 # Roadmap
 
-Shephrd is meant to make it possible for anyone to run a Herdr server,
-install Shephrd, and set up and steer teams of coding agents from a phone,
+Sheprd is meant to make it possible for anyone to install Sheprd, and set up and steer teams of coding agents from a phone,
 with every agent's conversation available as a thread.
 
 ## Now
 
+Development is frozen from 2026-11-07 until the website mocks are ready. The
+owner lifts the freeze.
+
 | Kind | Name | Overview |
 |---|---|---|
-| epic | shepherd-foundation | The pieces that let Shephrd run the Foundry's teams on its own: the engine, the client API, the message board, and the foundry roles. The engine is built, and the plans for the other three are accepted and ready to build. A fifth plan, Git worktrees for agents, is on hold by the owner until the build is running. |
+| other | Website mocks | The mock under `design/` is under construction, and it is the golden reference for the website. |
+
+## Next, after the freeze
+
+| Kind | Name | Overview |
+|---|---|---|
+| other | Website replacement | Five build steps that add what the mock needs to the engine and replace the web page. The list is `.plans/plans/website-replacement/todo.md`. |
+| other | Review findings | Fix the 20 Claude and Grok foundation findings still on `master`, which issue 519 lists. |
+| other | Default workflow | The build loop in `docs/specs/2026-11-05-build-loop-design.md`, with the hotfix, bisect and freeze additions still to be designed. |
+| other | Sandbox and hostile review | Agents run in a sandbox, and the owner runs the hostile review. |
+
+## Done
+
+| Kind | Name | Overview |
+|---|---|---|
+| epic | shepherd-foundation | The engine, the client API, the message board and the foundry roles are merged, apart from the standing permission rules. The epic is parked. |
 
 ## Later
 

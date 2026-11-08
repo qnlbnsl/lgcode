@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { it } from "@effect/vitest";
-import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";
@@ -27,7 +27,7 @@ import { eventually, pause } from "../../support/routingRig.ts";
 import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const current = Views.pipe(Effect.flatMap((views) => views.snapshot));
 const roles = current.pipe(Effect.map((snapshot) => snapshot.roles as RolesView));

@@ -71,7 +71,7 @@ it("FR-078 real ACP permissions, socket commands, stop and recovered reload surv
       expect((yield* compareViews()).differences).toEqual([]);
       beforeClose = yield* snapshot;
     }), { rig, runner: { layer: runnerLayer() } });
-    vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
+    vi.stubEnv("LGCODE_HOME", rig.stateFolder);
     await Effect.runPromise(provideRestart(rig, runnerLayer(), Effect.gen(function* () {
       yield* registerRebuildCheck();
       expect(yield* snapshot).toEqual(beforeClose);

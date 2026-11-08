@@ -25,7 +25,7 @@ describe("ids, modes, authors, outcomes", () => {
   it("1.1 brands keep channel, post, wake and agent ids distinct at compile time", () => {
     for (const name of ["ChannelId", "PostId", "WakeId"]) codec(name);
     const root = fileURLToPath(new URL("../../../../", import.meta.url));
-    const home = mkdtempSync("/tmp/sheprd-board-brands-");
+    const home = mkdtempSync("/tmp/lgcode-board-brands-");
     try {
       const file = join(home, "brands.mts");
       writeFileSync(file, `

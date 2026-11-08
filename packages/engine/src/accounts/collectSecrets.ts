@@ -1,4 +1,4 @@
-import { pieceNamespaces } from "@sheprd/contracts";
+import { pieceNamespaces } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import { SecretStore } from "../commands/SecretStore.ts";
 import type { Snapshot } from "../commands/internal.ts";

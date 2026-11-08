@@ -1,9 +1,9 @@
 ---
 topic: shepherd-client-api
-status: accepted
+status: done
 tier: L
 created: 2026-11-03
-updated: 2026-11-04
+updated: 2026-11-07
 epic: shepherd-foundation
 ---
 

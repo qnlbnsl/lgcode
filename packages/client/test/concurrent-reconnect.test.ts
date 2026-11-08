@@ -67,7 +67,7 @@ it("X12 (T-1 control) catches mistaking the caller's own interruption for a retr
 });
 
 it("X13 (T-1 budget control) catches restarting the attempt budget whenever a failed connection is replaced", async () => {
-  const { connect } = await import("@sheprd/client");
+  const { connect } = await import("@lgcode/client");
   const root = prepareRoot();
   const peer = await recoveryPeer(root, (_frame, socket) => socket.close(1012, "every attempt disconnects"));
   const exit = await Effect.runPromiseExit(Effect.scoped(Effect.gen(function* () {

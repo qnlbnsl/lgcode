@@ -1,6 +1,6 @@
 import { senderOf } from "../routing/envelope.ts";
 import { randomUUID } from "node:crypto";
-import { QuestionId } from "@sheprd/contracts";
+import { QuestionId } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 

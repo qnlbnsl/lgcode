@@ -1,5 +1,5 @@
 import { useRef, useState } from "react"
-import { commandOutcome, type AgentId, type ClientSnapshot } from "@sheprd/contracts"
+import { commandOutcome, type AgentId, type ClientSnapshot } from "@lgcode/contracts"
 import { requestId, withClient } from "./client.ts"
 
 type Agent = ClientSnapshot["agents"][number]

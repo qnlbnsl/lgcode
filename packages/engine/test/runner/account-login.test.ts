@@ -21,7 +21,7 @@ let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
+  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -103,7 +103,7 @@ live("A9 secret: an account `secret` reaches the child only as the harness's key
     for (const name of allowListed) expected[name] = service[name]!;
     Object.assign(expected, {
       FAKE_AGENT_SCRIPT: account.environment!.FAKE_AGENT_SCRIPT, FAKE_AGENT_ECHO: echo,
-      ANTHROPIC_API_KEY: plantedKey, SHEPRD_SOCKET: rig.socket, SHEPRD_TOKEN: spawn.token,
+      ANTHROPIC_API_KEY: plantedKey, LGCODE_SOCKET: rig.socket, LGCODE_TOKEN: spawn.token,
     });
     expect(seen.env).toEqual(expected);
     expect(seen.env.ANTHROPIC_API_KEY).not.toBe(service.ANTHROPIC_API_KEY);

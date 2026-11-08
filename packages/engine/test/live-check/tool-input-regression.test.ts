@@ -1,13 +1,13 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { toolText } from "@sheprd/contracts/thread";
+import { toolText } from "@lgcode/contracts/thread";
 import { translate } from "../../src/runner/translate.ts";
 import { authRefused, exactCommand, exitCodeOf, foregroundCommand, mcpAskDiscovery, mcpAskInput, shellIdentityStatus, terminalToolOutput } from "../../scripts/live/probeEvidence.ts";
 import { probeCommands } from "../../scripts/live/liveProbes.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { fakeEngine, LEAD, markerIn, runProbe, type FakeEngine } from "./probe-fake-engine.ts";
 
-vi.mock("@sheprd/client", async (original) => {
-  const client = await original<typeof import("@sheprd/client")>();
+vi.mock("@lgcode/client", async (original) => {
+  const client = await original<typeof import("@lgcode/client")>();
   const { fakeConnect } = await import("./probe-fake-registry.ts");
   return { ...client, connect: (options: Parameters<typeof client.connect>[0]) => (fakeConnect(options) ?? client.connect(options)) as never };
 });
@@ -52,10 +52,10 @@ it.each([
 });
 
 it("preserves non-shell arguments for the ask and discovery matchers", () => {
-  expect(mcpAskInput(storedInput({ server: "sheprd", tool: "ask", arguments: { text: "probe marker" } }), "mcp.sheprd.ask", "probe marker")).toBe(true);
-  expect(mcpAskInput(storedInput({ text: "probe marker" }), "mcp__sheprd__ask", "probe marker")).toBe(true);
+  expect(mcpAskInput(storedInput({ server: "lgcode", tool: "ask", arguments: { text: "probe marker" } }), "mcp.lgcode.ask", "probe marker")).toBe(true);
+  expect(mcpAskInput(storedInput({ text: "probe marker" }), "mcp__lgcode__ask", "probe marker")).toBe(true);
   expect(mcpAskInput(storedInput({ server: "other", tool: "ask", arguments: { text: "probe marker" } }), "mcp.other.ask", "probe marker")).toBe(false);
-  expect(mcpAskDiscovery({ title: "ToolSearch", status: "completed", input: storedInput({ query: "select:mcp__sheprd__ask", max_results: 1 }), output: '[{"type":"tool_reference","tool_name":"mcp__sheprd__ask"}]' })).toBe(true);
+  expect(mcpAskDiscovery({ title: "ToolSearch", status: "completed", input: storedInput({ query: "select:mcp__lgcode__ask", max_results: 1 }), output: '[{"type":"tool_reference","tool_name":"mcp__lgcode__ask"}]' })).toBe(true);
   expect(JSON.parse(storedInput({ type: "text", text: "file text", path: "example.txt" }))).toEqual({ type: "text", text: "file text", path: "example.txt" });
 });
 
@@ -75,12 +75,12 @@ const translatedTool = (update: Record<string, unknown>) => {
   if (content._tag !== "tool-call") throw new Error("missing tool call");
   return { ...content, status: content.status ?? "pending" };
 };
-const lookupInput = { query: "select:mcp__sheprd__ask", max_results: 1 };
-const reference = { type: "tool_reference", tool_name: "mcp__sheprd__ask" };
+const lookupInput = { query: "select:mcp__lgcode__ask", max_results: 1 };
+const reference = { type: "tool_reference", tool_name: "mcp__lgcode__ask" };
 
 it.each([
   { rawOutput: [reference] },
-  { content: [{ type: "content", content: { type: "text", text: '[{"type":"tool_reference","tool_name":"mcp__sheprd__ask"}]' } }] },
+  { content: [{ type: "content", content: { type: "text", text: '[{"type":"tool_reference","tool_name":"mcp__lgcode__ask"}]' } }] },
 ])("matches discovery evidence from the real translator without flattening its output: %j", (payload) => {
   const tool = translatedTool({ title: "ToolSearch", rawInput: lookupInput, ...payload });
   expect(mcpAskDiscovery(tool)).toBe(true);
@@ -88,15 +88,15 @@ it.each([
 });
 
 it.each([
-  '[{"type":"tool_reference","tool_name":"mcp__sheprd__ask"}]',
-  '{\n  "type": "tool_reference",\n  "tool_name": "mcp__sheprd__ask"\n}',
-  '[{"type":"tool_reference","tool_name":"mcp__sheprd__ask"}]\n[{"type":"tool_reference","tool_name":"mcp__sheprd__ask"}]',
+  '[{"type":"tool_reference","tool_name":"mcp__lgcode__ask"}]',
+  '{\n  "type": "tool_reference",\n  "tool_name": "mcp__lgcode__ask"\n}',
+  '[{"type":"tool_reference","tool_name":"mcp__lgcode__ask"}]\n[{"type":"tool_reference","tool_name":"mcp__lgcode__ask"}]',
 ])("reads historical discovery output without changing the required reference: %s", (output) => {
   expect(mcpAskDiscovery({ title: "ToolSearch", status: "completed", input: storedInput(lookupInput), output })).toBe(true);
 });
 
 it.each([
-  { rawOutput: [{ type: "tool_reference", tool_name: "mcp__sheprd__other" }] },
+  { rawOutput: [{ type: "tool_reference", tool_name: "mcp__lgcode__other" }] },
   { rawOutput: [{ ...reference, extra: "unexpected" }] },
   { rawOutput: [{ type: "text", text: "The ask tool was found." }] },
   { rawOutput: [] },
@@ -135,7 +135,7 @@ it("runs translated discovery snapshots through the real sandbox probe", async (
       for (const rawOutput of [[], [reference]]) e.emit(p.agentId, { _tag: "ThreadItem", content: translatedTool({ toolCallId: "lookup", title: "ToolSearch", rawInput: lookupInput, rawOutput }) });
       e.emit(p.agentId, { _tag: "ThreadItem", content: translatedTool({ toolCallId: "lookup", status: "completed" }) });
     }
-    e.emit(p.agentId, { _tag: "ThreadItem", content: translatedTool({ toolCallId: "ask", title: "mcp__sheprd__ask", rawInput: { text: markerIn(p.text) }, rawOutput: "question recorded" }) });
+    e.emit(p.agentId, { _tag: "ThreadItem", content: translatedTool({ toolCallId: "ask", title: "mcp__lgcode__ask", rawInput: { text: markerIn(p.text) }, rawOutput: "question recorded" }) });
     e.emit(p.agentId, { _tag: "QuestionAsked", text: markerIn(p.text) }, { caller: { _tag: "agent", agentId: p.agentId } });
     e.turnEnded(p.agentId);
   } };

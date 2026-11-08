@@ -1,7 +1,7 @@
 import type { Snapshot } from "../commands/internal.ts";
 import type { PieceAlertSourceRequest, AlertSourceResult } from "../client/alerts/reactor.ts";
-import { rolesAlertSources } from "@sheprd/contracts";
-import type { EventEnvelope } from "@sheprd/contracts";
+import { rolesAlertSources } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgcode/contracts";
 import type { RolesView } from "./view.ts";
 
 // The reducer keeps this index, so the first-start scan needs no log search.

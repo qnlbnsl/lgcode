@@ -51,8 +51,8 @@ afterEach(async () => {
 // prove that the production cleanup, rather than EOF, stopped the child.
 const startFake = (home: string, state: string, echo: string) => {
   const child = spawn(process.execPath, [fakeAgentPath], {
-    env: { PATH: process.env.PATH ?? "", HOME: home, SHEPRD_HOME: state, XDG_STATE_HOME: join(home, "xdg"), CODEX_HOME: join(home, "codex"),
-      SHEPRD_SOCKET: join(state, "engine.sock"), FAKE_AGENT_ECHO: echo, FAKE_AGENT_SCRIPT: JSON.stringify({ turns: [], outliveStdin: true }) },
+    env: { PATH: process.env.PATH ?? "", HOME: home, LGCODE_HOME: state, XDG_STATE_HOME: join(home, "xdg"), CODEX_HOME: join(home, "codex"),
+      LGCODE_SOCKET: join(state, "engine.sock"), FAKE_AGENT_ECHO: echo, FAKE_AGENT_SCRIPT: JSON.stringify({ turns: [], outliveStdin: true }) },
     stdio: ["pipe", "ignore", "pipe"],
   });
   child.stderr!.resume();

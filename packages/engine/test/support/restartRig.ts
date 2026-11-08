@@ -1,6 +1,6 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import type { Event } from "@sheprd/contracts";
-import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
+import type { Event } from "@lgcode/contracts";
+import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";

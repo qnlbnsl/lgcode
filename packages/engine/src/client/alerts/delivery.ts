@@ -1,4 +1,4 @@
-import { alertTitles, type Event, type EventSequence } from "@sheprd/contracts";
+import { alertTitles, type Event, type EventSequence } from "@lgcode/contracts";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import type * as Scope from "effect/Scope";

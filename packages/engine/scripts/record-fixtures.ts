@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { parseArgs } from "node:util"
-import { permissionLevels } from "@sheprd/contracts"
+import { permissionLevels } from "@lgcode/contracts"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import * as Effect from "effect/Effect"
 import { resolveHarnessDefaults } from "../src/runner/harnesses.ts"
@@ -49,7 +49,7 @@ async function main() {
   const errorSamples = values.scenario !== "read-only-greeting" ? [] : await Promise.all((await readdir(errorDirectory)).filter((name) => name.endsWith(".json")).map(async (name) =>
     JSON.parse(await readFile(join(errorDirectory, name), "utf8"))
   ))
-  const temporaryRoot = await mkdtemp(join(tmpdir(), "sheprd-record-fixtures-"))
+  const temporaryRoot = await mkdtemp(join(tmpdir(), "lgcode-record-fixtures-"))
   try {
     const results = await Effect.runPromise(recordFixtures({
       harnesses, outputDirectory: values.scenario === "read-only-greeting" ? outputDirectory : join(outputDirectory, values.scenario),

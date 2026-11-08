@@ -1,4 +1,4 @@
-import { rolesMaxima, type RolesActionRecord } from "@sheprd/contracts";
+import { rolesMaxima, type RolesActionRecord } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import { encodedBytes } from "../client/reads/display.ts";
 import { refused, type Input } from "../commands/internal.ts";

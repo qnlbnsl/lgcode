@@ -27,7 +27,7 @@ const mountViewer = (client: ViewerClient) => {
     stdin: stdin as unknown as NodeJS.ReadStream, stdout: stdout as unknown as NodeJS.WriteStream,
     stderr: stdout as unknown as NodeJS.WriteStream, debug: true, patchConsole: false, exitOnCtrlC: false,
   });
-  const screen = () => output.slice(output.lastIndexOf("Sheprd viewer"));
+  const screen = () => output.slice(output.lastIndexOf("LGcode viewer"));
   dispose.push(async () => { app.unmount(); await app.waitUntilExit(); await client.close(); stdin.destroy(); stdout.destroy(); });
   return { screen, key: (text: string) => { stdin.write(text); } };
 };
@@ -83,7 +83,7 @@ it.each(["prompt", "question", "permission"] as const)("FR-014 retires an acknow
 it("FR-014 retries a lost prompt acknowledgement with the same wire body and one real SQLite receipt and delivery", async () => {
   const rig = makeRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
+  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
   try {
     await Effect.runPromise(Effect.gen(function* () {
       const runner = yield* makeFakeRunner();

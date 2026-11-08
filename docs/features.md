@@ -1,26 +1,19 @@
-# Sheprd: the feature list
+# LGcode: the feature list
 
-Status: **draft, not approved.** Some features are built inside the engine,
-but none is reachable from a client yet.
+Status: **draft, not approved.** The foundation is merged into `master`, so
+clients reach the built features through the web page, the command-line tool
+and the client API. Development is frozen from 2026-11-07 until the website
+mocks are ready.
 
 Each feature has a short name, one paragraph saying what it does, and a state:
 **idea** (written down, not agreed), **agreed** (the owner wants it), or
 **built** (merged and working).
 
-While the engine is being built, a feature can also be **built in the
-engine** (unit numbers follow). That means its engine part is merged into
-`area/engine` and passes its tests. Since unit 7b, the client library, the
-`sheprd` command-line tool and `sheprd mcp` are merged too, so the owner
-and agents can reach the engine from a terminal, but no web or phone client
-exists yet. Since unit 8b, an acceptance suite runs the service as a
-child process and checks each of the engine's twelve capabilities, its
-eight failure rules and one request from start to finish through the
-public socket only, with fake agents. Since unit 8c, `pnpm live-check`
-runs that request once on a real Claude Code lead and a real Codex worker
-in a fresh `/tmp` service, for the owner to run by hand; it has not been
-run on the owner's accounts yet. A feature
-is **partly built in the engine** when only some of what its paragraph
-describes is merged; the note after it says which part.
+The state **built in the engine** dates from when the engine had its own
+branch, and that code is now on `master`. A feature is **partly built** when
+only some of what its paragraph describes is merged; the note after it says
+which part. The states were last compared with the code on 2026-11-07 by
+searching for the matching source, not by running each feature.
 
 An earlier, much longer list of message-board features was written for the
 Synapse fork. It is at `docs/message-board/features.md` in the
@@ -29,16 +22,16 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 ## The next piece: installation and configuration
 
 - **Standalone installer and startup at login** (agreed, 2026-11-05).
-  Install the `sheprd` command and let the owner start the service at login.
+  Install the `lgcode` command and let the owner start the service at login.
   The engine, board, and website run without Herdr.
   The optional plugin lives in `plugins/herdr` and calls the installed command.
   The installer and login integration are not built by the rename and split.
-- **Project configuration in `.sheprd`** (agreed, 2026-11-05).
+- **Project configuration in `.lgcode`** (agreed, 2026-11-05).
   Define the folder's contents and loading rules in the next piece.
   Agents can read the folder, and changes require the owner through the
   existing settings protection.
 - **An overridable default workflow** (agreed, 2026-11-05).
-  Sheprd ships a default workflow.
+  LGcode ships a default workflow.
   People can override its team definitions and instructions.
 
 ## 1. The foundry: roles and their lifecycle
@@ -48,15 +41,15 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   to repeat the team collection and first stall without waiting for the
   cache timer. The report marks the timed flush as skipped. The run remains
   incomplete and exits with code 1, even when every remaining step passes.
-- **Sheprd tools need no harness approval** (agreed, 2026-11-05). An agent
-  can call Sheprd's own Model Context Protocol server in every permission
+- **LGcode tools need no harness approval** (agreed, 2026-11-05). An agent
+  can call LGcode's own Model Context Protocol server in every permission
   mode on Claude, Codex, Gemini, and Cursor. The engine authenticates every
   call and checks the caller's existing rights. Other servers and native
   file and command tools continue following the selected mode. The settings
   belong to the managed session or process, not the owner's harness settings.
-- **Orchestrator** (idea). The top-level agent. It receives the owner's goal,
+- **Orchestrator** (built). The top-level agent. It receives the owner's goal,
   decides which teams to staff, and talks to team leads, not to workers.
-- **Team leads** (idea). One per team. A lead plans its team's work, hands it
+- **Team leads** (built). One per team. A lead plans its team's work, hands it
   to workers, and reports to the orchestrator.
 - **Worker kinds** (idea). Workers have a kind, such as implementer,
   reviewer, or researcher, and a harness, such as Claude Code or Codex. The
@@ -73,14 +66,14 @@ Synapse fork. It is at `docs/message-board/features.md` in the
     agents after an engine restart: it reloads each one with a new token,
     scans the replayed history for delivery ids, then sends a carry-on or
     re-sends, returns paused agents, and supports `resume --fresh`; unit
-    7a answers every connection with 503 until recovery ends). Sheprd starts the agent as a child process
+    7a answers every connection with 503 until recovery ends). LGcode starts the agent as a child process
     and drives it through the Agent Client Protocol (ACP): it opens a
     session, sends prompts, and receives structured events (text, plan, tool
     calls, permission requests). Adding a harness means adding its ACP
     command, so Claude Code, Codex, Gemini CLI, OpenCode and the rest come
     almost for free. Claude Code and Codex need their adapters,
     `claude-agent-acp` and `codex-acp`.
-  - **Interactive mode** (built second). Sheprd opens the harness's normal
+  - **Interactive mode** (built second). LGcode opens the harness's normal
     terminal program in a Herdr pane through the optional plugin, and the owner
     can watch it and type into it. Use this for Claude when the 5-hour limit
     matters: Claude in ACP mode runs through the Agent SDK, which T3 Code
@@ -95,7 +88,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   runs out of usage, and returns them when the account is available again;
   unit 7a carries the accounts command over the API). The owner can
   set up more than one account for a harness, such as two ChatGPT accounts
-  for Codex or three Cursor accounts, and Sheprd spreads agents across
+  for Codex or three Cursor accounts, and LGcode spreads agents across
   them. Each account is its own sign-in, kept apart by its own home
   directory (`CODEX_HOME` for Codex, `CLAUDE_CONFIG_DIR` for Claude Code) or
   by its own API key, plus any extra environment variables. Starting an agent
@@ -105,13 +98,13 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   two Codex accounts continue the same threads. See T3 Code's
   `docs/user/providers-codex.md`, `providers-claude.md` and `cursor.md`, and
   `packages/contracts/src/providerInstance.ts`, at commit `6fc9144`.
-- **A token for every agent** (built in the engine: units 5a and 5b). When Sheprd starts an agent, it mints a
+- **A token for every agent** (built in the engine: units 5a and 5b). When LGcode starts an agent, it mints a
   private token for it and passes it in an environment variable. The agent
   proves who it is with that token, not with the pane's environment or the
   process tree, so Codex's sandbox and a backgrounded Claude stop breaking
   identity. Borrowed from T3 Code; see
   [research/t3-code.md](research/t3-code.md), item 1.
-- **Sheprd's tools over MCP** (idea). The board's verbs (post, read, finish
+- **LGcode's tools over MCP** (built). The board's verbs (post, read, finish
   work, ask the owner) are offered to agents through a Model Context Protocol
   (MCP) server on a loopback address, as well as through the command line.
   Every tool declares which roles may call it. See research item 1.
@@ -119,8 +112,8 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   6a sets back a mode change made inside the agent). An agent that a lead starts, swaps or
   messages never runs with a broader permission mode than the lead. See
   research item 6.
-- **Hand-offs built from records** (idea). A replacement worker starts from a
-  hand-off that Sheprd builds from the work brief, the worker's posts, the
+- **Hand-offs built from records** (built). A replacement worker starts from a
+  hand-off that LGcode builds from the work brief, the worker's posts, the
   files it touched and the commands it ran, with no model turn spent. See
   research item 5.
 - **Role rules enforced** (idea). The command handler refuses an action that a role's rules forbid, such as a worker starting an agent or asking the owner. It reads a role table that the team's definition supplies. Version 1 only advises and reports (roles decision row 10).
@@ -128,9 +121,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 
 ## 2. The message board
 
-- **Channels and direct messages** (idea). Each team has a channel. Leads can
+- **Channels and direct messages** (built). Each team has a channel. Leads can
   message the orchestrator directly. Workers can message each other.
-- **Wake rules** (idea). Each post says whether it needs an answer. Only a
+- **Wake rules** (built). Each post says whether it needs an answer. Only a
   post that needs an answer wakes its recipient, because every wake costs a
   full agent turn.
 - **System events in a log** (idea). Joins, exits, and status changes go to
@@ -145,12 +138,12 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   Each delivery is recorded with when and how it landed, so a wake can never
   be silently lost. See research item 3.
 - **Wake Claude without typing** (idea). Each Claude agent keeps one
-  long-lived `Monitor` running a Sheprd command that prints a line only when
+  long-lived `Monitor` running a LGcode command that prints a line only when
   a post needs it. Claude Code starts the turn by itself, and nothing is typed
   into the pane. Other agents keep a typed nudge that only fires when the
   agent is idle. See research item 2.
 - **Wait results that say why** (built in the engine: unit 5d's
-  waits end with a reason per member, and unit 7b's `sheprd wait` exits
+  waits end with a reason per member, and unit 7b's `lgcode wait` exits
   with the codes below). A wait or a collection ends early,
   with a reason, when the agent it waits on is stuck on a question or an
   approval. The command line exits with 0 for done, 1 for failed, and 2 for
@@ -184,7 +177,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   the owner-only state folder, for the owner, paired devices and agents; unit
   7b adds the client library). The web page, a future
   desktop app, and a future mobile app all use the same API.
-- **Device pairing** (idea). A new device is added with a one-time pairing
+- **Device pairing** (dropped for phones and browsers by the owner on
+  2026-11-03, in favour of one password; a pairing code remains allowed for
+  worker machines). A new device is added with a one-time pairing
   code, as described in [SECURITY.md](../SECURITY.md).
 - **Live updates** (idea; partly built in the engine: unit 7a's `subscribe`
   streams events, and an agent sees only its own and its children's). Clients receive board posts, thread events, and
@@ -205,9 +200,9 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   a failed run. See research item 11.
 - **Agents run in a sandbox** (agreed, 2026-11-05). Each agent runs inside
   bubblewrap, wrapped around the whole harness. Only its worktree is writable
-  and `.sheprd` is mounted read-only. The owner's home folder, Sheprd's state
+  and `.lgcode` is mounted read-only. The owner's home folder, LGcode's state
   folder and other processes are not visible. This replaces the earlier plan
-  for Sheprd to run as its own Unix user, because bubblewrap needs no root
+  for LGcode to run as its own Unix user, because bubblewrap needs no root
   access at install and leaves worktree files owned by the owner. Real Codex
   and Claude command-line runs worked this way on 2026-11-05, in a manual test.
   It is not built.
@@ -227,7 +222,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   a macOS reader for the leftover-process sweep. See issue 183 and issue 120
   in [issues.md](issues.md).
 - **Herding names for the command-line tool** (idea; shelved by the owner on
-  2026-11-01 ("hmmm shelf it."); not planned; do not build). The `sheprd`
+  2026-11-01 ("hmmm shelf it."); not planned; do not build). The `lgcode`
   command-line tool would offer herding names for its commands. The plain
   names would stay as aliases, and they would stay the names of the agents'
   tools. The proposed mapping:
@@ -252,46 +247,53 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   | `debug.compare-views` | `debug headcount` |
   | `mcp` | `dog` |
 - **Filtered live updates** (idea). A subscription for phones that is filtered by agent and by event kind, with checkpoints that keep the cursor moving.
-- **One password login** (planned). The service reads the password from the environment variable `SHEPRD_WEB_PASSWORD`, and the dashboard asks for it. One person uses Sheprd, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
-- **Phone alerts through one sender** (idea). Phone alerts go through one sender interface, `AlertSender`, with ntfy as the first carrier. A later carrier, such as Expo's push service for the phone app, slots in behind it (client API row 83).
+- **One password login** (built). The service reads the password from the environment variable `LGCODE_WEB_PASSWORD`, and the dashboard asks for it. One person uses LGcode, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
+- **Phone alerts through one sender** (built). Phone alerts go through one sender interface, `AlertSender`, with ntfy as the first carrier. A later carrier, such as Expo's push service for the phone app, slots in behind it (client API row 83).
 - **Mobile login** (later). Starts by looking at what Home Assistant does.
 - **VS Code extension** (later). One of the last things, along with the mobile app, by the owner's answer of 2026-11-03.
 
 ## 5. The sheepdog
 
 A shepherd leads the flock, and the shepherd's dog keeps the sheep in line so
-none of them wander off. In Sheprd, the orchestrator and the owner lead. The
-sheepdog is the part of Sheprd's background service that keeps every agent
+none of them wander off. In LGcode, the orchestrator and the owner lead. The
+sheepdog is the part of LGcode's background service that keeps every agent
 moving without spending their turns. It never decides what the work is; it
 only notices when an agent has strayed and nudges it back, or tells its lead.
 
-- **Stall watch** (idea). The sheepdog knows each agent's work state (off,
+- **Stall watch** (built). The sheepdog knows each agent's work state (off,
   assigned, working, waiting, done) and notices an agent that has stopped
   without finishing. It wakes the agent once, then tells its lead. A worker
   that stalls three times in a row on the same work is replaced. The rules
   come from Synapse-list items 23 and 24 (see
   [research/herdr-and-synapse.md](research/herdr-and-synapse.md)).
-- **Usage-limit pauses are not stalls** (idea). An agent stopped by a usage
+- **Usage-limit pauses are not stalls** (built). An agent stopped by a usage
   limit is resumed when the limit resets, and the pause never counts toward
   replacing it. See research item 8.
 - **Stuck input boxes and approval dialogs** (idea). An agent whose input box
   has held the same text for a long time, or that is waiting on an approval
   dialog, is reported to its lead.
-- **Compaction timed to the prompt cache** (idea). An idle Claude agent with a
+- **Compaction timed to the prompt cache** (built). An idle Claude agent with a
   large context is compacted two minutes before its prompt cache expires, not
   after, because a wake after the cache expires costs about 20 times more for
   the cached part. Posts that need an answer and can wait are delivered
   before the cache expires. See research item 4.
-- **Runaway work** (idea). Work that runs far past its expected length is
+- **Replacement waits for the lead's team** (agreed, 2026-11-07). When a
+  lead has not answered three nudges, the sheepdog marks the lead as advised
+  for replacement and tells the orchestrator. When the lead's workers have all
+  finished, the sheepdog tells the orchestrator that the lead is ready to
+  replace. The new lead starts from the original order and the old lead's
+  transcript, and it reaches the team's workers directly. Issue 520 holds the
+  details.
+- **Runaway work** (built). Work that runs far past its expected length is
   reported to the lead, and can continue in a fresh agent with a built
   hand-off.
-- **Cache lifetime setting** (idea). A per-harness `cacheLifetime` setting, five minutes or one hour, for timing compaction when the adapter does not report which cache lifetime it wrote (roles round 1).
+- **Cache lifetime setting** (built). A per-harness `cacheLifetime` setting, five minutes or one hour, for timing compaction when the adapter does not report which cache lifetime it wrote (roles round 1).
 - **"Compact me when I am next idle"** (idea). An agent asks the sheepdog to compact it after its current turn. This replaces the Foundry's `want-<name>` file for the context-keeper.
 
 ## 6. Source control
 
 - **Remove agent credits when merging** (agreed). A setting, off by default,
-  that each project can override. When Sheprd merges a worker's or a team's
+  that each project can override. When LGcode merges a worker's or a team's
   work with a merge commit or a squash commit, it removes the lines that
   credit a coding agent from that commit's message: `Co-authored-by:`
   trailers for known agents, and footers such as "🤖 Generated with Claude
@@ -310,7 +312,8 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   Each repository has a page listing its projects and an Add Project
   action. Multiple projects can work within the same repository.
 - **Exactly one lead per project** (agreed, 2026-11-05; mocked). Selecting
-  a project always opens its lead conversation. Each project has its own
+  a project opens its sprint board, updated on 2026-11-06. A right chat
+  panel opens the project lead alongside that board. Each project has its own
   goal, sprint board, teams, and messages. The owner's clarification
   replaces the earlier ambiguous request for multiple leads within a
   project. Multiple projects have separate leads.
@@ -318,12 +321,31 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   Add Project creates a named project under a known repository and opens
   its lead conversation. A new project has no sprints or teams until its
   plan is shaped. Existing projects never reopen repository setup.
+- **Project worktrees by default** (agreed, 2026-11-06; mocked).
+  Add Project has Start work tree checked beneath the project name. A safe
+  version of the name determines its branch and worktree folder. Numeric
+  suffixes resolve existing names. Unchecking uses that repository’s main
+  checkout. The dialog previews the branch and location before submission.
+- **Workspace settings** (agreed, 2026-11-06; mocked). A Settings tab beside
+  Board, Chat, Terminal, and Git shows the assigned repository, branch,
+  checkout type, folder, and machine. It stores a project-specific terminal
+  shell preference in the preview. Service settings remain a global page.
 - **A project board of sprints** (agreed, 2026-11-05; mocked). The Kanban
   board shows Planned, In progress, Review, and Done. A sprint contains
   the plan's tasks and shows ownership, current phase, dependencies,
   blockers, and completion evidence. Team task lists and sprint details
   read the same assignments. The owner referenced Ananke's Cursor
   build-order roadmap. No implementation code was copied.
+- **Talk to the lead beside the board** (agreed, 2026-11-06; mocked).
+  The navigation tree has no separate Board row. The board has a right
+  chat panel with its single lead and a working sample composer. It
+  shares messages, drafts, and reading position with the full conversation.
+  The panel can be collapsed. On smaller screens it opens as a drawer
+  with contained keyboard focus and Escape to close.
+- **The project states its assigned branch** (agreed, 2026-11-06; mocked).
+  The sidebar shows it under the project name beside the lead. The board
+  repeats it beside the title. The top-right picker says Viewing and only
+  changes inspected code context. It leaves the project assignment intact.
 - **Completion reflects evidence** (mock behavior, 2026-11-05). A completed
   sprint records verification and merge evidence. Release status is
   separate. Completed sprints do not accept new tasks. Moving a card is
@@ -351,22 +373,129 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   treatment. Agent replies use readable text with grouped tool details.
   The composer grows when needed and retains its recipient label.
 
+### Existing page capabilities the redesign must retain
+
+Agreed on 2026-11-06 and represented in the browser mock. These are existing
+product capabilities, not permission to remove them during implementation.
+The source-to-mock mapping is in `design/FEATURE-PARITY.md`.
+
+- Login, logout, and session expiry stay available. Rejected login and an
+  unavailable session have explicit recovery states. Entered secrets clear
+  when the session ends.
+- Connection status stays visible. Reconnection retains the last received
+  state and drafts. Stale views do not offer functioning mutation controls.
+- Permission requests show their identity and action input before approval.
+  Hidden inputs, held requests, denial, cancellation, and unconfirmed
+  answers remain distinct from an agent's ordinary text.
+- Agent stop and resume stay available. Stopping cancels permissions but
+  preserves questions. A fresh resume explains its loss of prior context.
+- Failed starts keep the current safe reason categories and prevent sends.
+- Large thread items keep an explicit full loader with failure and retry.
+- Tool calls keep identity, status, input, and output. Deliveries retain
+  their sender, source, identity, and history.
+- Alerts and Settings remain full pages. Alerts retain pagination, subject
+  links, and notification delivery failures. Settings retain all current
+  notification and web-server controls.
+
+### Workspace scope and navigation refinement
+
+Approved on 2026-11-06 after comparison with T3 Code and Visual Studio Code.
+These interactions are represented in the browser mock.
+
+- One workspace tab row follows the selected project, team, or agent.
+  Git in team scope selects that team's worktree. The header names the
+  worktree's branch, team or project, and machine.
+- Team worktrees integrate into their project worktree. Project branches
+  reach main through explicit owner review. Dirty source or destination
+  worktrees and unresolved conflicts prevent integration.
+- Each worktree has its own staging selection, commit message, history,
+  incoming/outgoing state, and file diff. Git includes Commit, Fetch, Pull,
+  Push, and conflict resolution controls.
+- The navigation and project lead panel resize with pointer or keyboard.
+  Focused chat stays centered and readable on wide monitors. The board fits
+  four columns beside its lead at desktop width. Phone users have a status
+  strip for jumping between columns.
+- Composer controls show current agent progress, stop/resume, subscription
+  choice, and attached file/task context. Activity details link to Git.
+- An attention summary distinguishes decisions, permissions, and failed
+  starts. A navigation filter hides projects with no unresolved attention.
+  A keyboard quick switcher searches projects, teams, and agents.
+- Named terminal sessions preserve independent input and command history
+  within each machine and worktree. Context changes save the old session
+  before selecting the destination.
+
+### Terminal, Git, machines, and subscriptions
+
+Requested on 2026-11-06. Interactive views are mocked. Live terminal and
+machine coordination are not implemented by this design pass.
+
+- The main conversation can switch to a terminal. The intended product
+  provides actual direct commands on the selected machine and workspace.
+  It needs an authenticated terminal session with streamed output,
+  interruption, resizing, and reconnection. The current mock never runs a
+  command. The owner requested normal product copy without repeated mock
+  disclaimers on 2026-11-06. Prototype boundaries remain in design documentation.
+- Git combines a changed-file tree with unified and split diffs. Clicking a
+  file directly opens its diff. Branch-aware commit history uses the same
+  pane. There is no separate Diff tab or intermediate file preview.
+  Live repository reads, Git mutations, and merge validation remain integration work.
+- One computer runs the master process. Other computers pair through a
+  connect mode and act as workers. The master assigns projects across
+  machines. Pairing, availability, host identity, and project placement
+  need authenticated coordination and recovery without duplicate work.
+  The machine page is a preview and does not move running work.
+- A Subscriptions page supports several named accounts for the same
+  harness. Each entry has its own machine, enabled state, and sign-in.
+  Additional subscriptions do not reuse the default Codex authentication.
+  The engine's existing account/profile separation must be preserved.
+
+### Global Home, machine choice, and screen density
+
+Requested on 2026-11-06 and represented in the browser mock.
+
+- Home is the initial global page. Needs attention combines unresolved
+  questions, permissions, failed starts, and project merge reviews across
+  all projects. All projects opens each project's board.
+- Questions and Approvals have their own global lists with answered history.
+  Search combines with repository, project, agent, machine, and status filters.
+  Requests are single-line disclosures, collapsed initially. Their details
+  expand directly underneath rather than in a split pane. The same toggle
+  closes them and retains keyboard focus.
+  Questions and permissions can be answered without leaving Home. Merge
+  requests retain the explicit review step. Links open the source conversation
+  or board, preserving drafts and the requesting team's branch context.
+- Add Project chooses a machine through Run on before the project name.
+  The preview shows that host's branch and folder. Offline hosts and hosts
+  without the repository cannot start work. Unchecking Start work tree uses
+  the main checkout on that machine. No host is silently substituted.
+- Machines uses compact tables for machine status, role, agent slots,
+  project counts, start actions, and future project placement. Future
+  placement does not relabel running work or imply that a project moved.
+- Cursor is the primary design reference. T3 Code remains secondary, with
+  explicit discoverability and space usage requirements from the owner.
+  These flows remain an isolated prototype; durable queues and machine
+  execution require service integration.
+- Sidebar boundaries separate Home/search, Projects, and service pages.
+  New project belongs to Projects. Only projects needing you names the tree
+  filter's effect. Repository names open their project lists; a second
+  Repositories destination is unnecessary and has been removed.
+
 ## 8. The build loop
 
 The full design is in
 [specs/2026-11-05-build-loop-design.md](specs/2026-11-05-build-loop-design.md).
 
 - **A default workflow as a parsable list** (agreed, 2026-11-05). The eight
-  phases become a list of steps that Sheprd reads. Sheprd looks in the
-  repository's `.sheprd` first, then `~/.sheprd`, then its built-in copy. The
-  default install places a copy in `~/.sheprd`.
-- **`.sheprd` is read-only to agents** (agreed, 2026-11-05). Agents can read
+  phases become a list of steps that LGcode reads. LGcode looks in the
+  repository's `.lgcode` first, then `~/.lgcode`, then its built-in copy. The
+  default install places a copy in `~/.lgcode`.
+- **`.lgcode` is read-only to agents** (agreed, 2026-11-05). Agents can read
   it and cannot edit it.
-- **Skill files for any agent** (agreed, 2026-11-05). Sheprd ships skill files
+- **Skill files for any agent** (agreed, 2026-11-05). LGcode ships skill files
   that let any agent work with it.
 - **A project setup agent** (agreed, 2026-11-05). It tells the owner what the
   project is made of, asks for the general direction, talks through testing,
-  and produces a local `.sheprd` folder with a config file. How that reaches a
+  and produces a local `.lgcode` folder with a config file. How that reaches a
   folder agents cannot edit is open.
 - **Optional testing** (agreed, 2026-11-05). The owner can turn tests off, and
   can also turn agent review off. They can turn tests on later through their
@@ -379,10 +508,70 @@ The full design is in
   approval, and 6 is the limit.
 - **Autonomous fix sprints** (agreed, 2026-11-05). A fix that users would not
   notice merges and moves on without the owner.
+- **A hotfix lane** (requested by the owner, 2026-11-06; not designed). The
+  owner asks the project lead for a hotfix, and it starts a very limited team
+  focused on fixing and pushing.
+- **A way to bisect** (requested by the owner, 2026-11-06; not designed). A
+  command finds the commit that broke something by halving the range of commits
+  at each test.
+- **A way to freeze interfaces** (requested by the owner, 2026-11-06; not
+  designed). A frozen interface cannot change while teams build against it.
+- **The design file is the source of truth** (decided by the owner, 2026-11-07;
+  not designed). A project's design lives in a Figma-format `.fig` file. LGcode
+  runs OpenPencil, the open-source editor from openpencil.dev, on the same
+  computer and shows it inside its page. OpenPencil opens only while someone is
+  designing, looking at components, or weighing an edit. Mocks that are only
+  looked at are built from the project's real code, so what the owner sees is
+  what users get, and any gap between the mock and the design gets fixed.
+  Since 2026-11-08 the web mock shows OpenPencil's web editor in a frame, built
+  from source in `design/openpencil/` on the branch `area/web-mock`. It opens a
+  repository's design file but cannot save into the repository yet. Saving back
+  needs an endpoint that writes the file, or OpenPencil's automation bridge.
+- **Teams named for their stage** (requested by the owner, 2026-11-07; not
+  designed). A project moves through a Design team, a Planning team, a Build
+  team and a Review team, in place of hand-picked names. The project page shows
+  which stage the project is in.
+- **Mocks made by the Design team** (requested by the owner, 2026-11-07; not
+  designed). A project with user interface work gets a Mocks tab. The mocks use
+  the project's real components and realistic, invented data, as Ananke's mocks
+  did. While designing, the team keeps a draft of the data schema the screens
+  need and reconciles it with the real schema. When the mocks are approved, new
+  components move into the real component folder, and wiring them to real data
+  becomes the Build team's tasks.
+- **A Reverse Fig skill** (requested by the owner, 2026-11-07; not designed).
+  When someone connects a project that already has an interface, the skill
+  turns its existing components and screens into a `.fig` file, so the design
+  becomes the source of truth and can later be turned back into code. A test
+  on 2026-11-07 did this for three of the mock's components with OpenPencil's
+  command-line tool. The result had real component sets, variants and color
+  variables, and it exported back to React components. Some styling was lost
+  on the way.
+  A first version exists on the branch `area/reverse-fig`, in
+  `skills/reverse-fig/`, since 2026-11-08. It covers color tokens and
+  components, not screens. Everything specific to a project lives in a profile
+  file, so each project tunes its own profile.
+
+## 9. Client mode
+
+- **LGcode in client mode** (requested by the owner, 2026-11-06; not designed).
+  One main LGcode holds the event log, the board and the website. Other machines
+  run LGcode in client mode and take their commands from the main one, so a
+  project's load spreads across machines. How a client machine proves who it is
+  needs the owner's word, because the login rule is one user, one password and no
+  pairing.
+
+## 10. Design and mock modes
+
+- **Design mode and mock mode** (requested by the owner, 2026-11-07; not
+  designed). The website gains an integrated design mode and a mock mode, so
+  the owner can use it to design and update the mocks of projects and apps.
+  Each project lists all of its mocks. For example, the owner could open the
+  website, go to Ananke's mocks, and see every one of them there. The owner is
+  adding this to the website mock first.
 
 ## Open questions
 
-- Which licence should Sheprd use?
+- Which licence should LGcode use?
 
 ## Decided
 
@@ -425,19 +614,19 @@ The full design is in
   an append-only, numbered log in SQLite before anything acts on it, and
   threads, states, waits and the live stream are read from that log. T3 Code's
   server has the same shape, and since Effect was chosen (the next entry),
-  Sheprd can copy T3's event store with credit. The rejected options were
+  LGcode can copy T3's event store with credit. The rejected options were
   saved tables updated in place, and one supervisor process per agent
   sharing files.
-- **Sheprd is written with the Effect library** (2026-11-01). Effect is a
+- **LGcode is written with the Effect library** (2026-11-01). Effect is a
   TypeScript library for whole programs: failures are part of each
   function's type, every running task has an owner that cleans it up, and
   one schema both checks data and defines its type. The reason for choosing
   it is reuse: T3 Code is written with Effect 4, so its ACP client
   (`packages/effect-acp`), event store, accounts and device pairing can be
-  copied with credit instead of rebuilt. Sheprd pins the same Effect
+  copied with credit instead of rebuilt. LGcode pins the same Effect
   version as the T3 Code commit it copies from, so the copied code compiles
   unchanged.
-- **Sheprd runs on Node.js 26** (2026-11-01). Node.js 26 is the current
+- **LGcode runs on Node.js 26** (2026-11-01). Node.js 26 is the current
   long-term support line, and the repository's `.nvmrc` says `26`. A single
   file compiled with Bun was considered and not chosen: T3 Code's SQLite
   code uses Node.js's own `node:sqlite`, and the Claude Code ACP adapter

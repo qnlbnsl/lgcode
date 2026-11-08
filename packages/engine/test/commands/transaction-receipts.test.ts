@@ -16,7 +16,7 @@ let rig: Rig;
 beforeEach(() => {
   rig = makeRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("SHEPRD_HOME", rig.stateFolder);
+  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
 });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 

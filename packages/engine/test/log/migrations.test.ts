@@ -1,6 +1,6 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import * as SqliteClient from "@sheprd/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as SqlClient from "effect/sql/SqlClient";
 import { expect, it, vi } from "vitest";
@@ -10,8 +10,8 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 registerRebuildCheck({ noLog: true });
 
 it("1.34 a version-2 database loses only devices, keeps every other row, decodes old callers without a rule and migrates twice", async () => {
-  const home = mkdtempSync("/tmp/sheprd-device-migration-");
-  vi.stubEnv("SHEPRD_HOME", home);
+  const home = mkdtempSync("/tmp/lgcode-device-migration-");
+  vi.stubEnv("LGCODE_HOME", home);
   try {
     await Effect.runPromise(Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;

@@ -10,11 +10,11 @@ import { agentEnvironment, cleanupUnit7b, fakeEngine, loadClient, ownerCredentia
 afterEach(cleanupUnit7b);
 
 for (const [name, variables] of [
-  ["empty socket", { SHEPRD_SOCKET: "" }],
-  ["empty token", { SHEPRD_TOKEN: "" }],
-  ["both empty", { SHEPRD_SOCKET: "", SHEPRD_TOKEN: "" }],
-  ["empty socket with token", { SHEPRD_SOCKET: "", SHEPRD_TOKEN: token }],
-  ["empty token with socket", { SHEPRD_SOCKET: "SOCKET_FIXTURE", SHEPRD_TOKEN: "" }],
+  ["empty socket", { LGCODE_SOCKET: "" }],
+  ["empty token", { LGCODE_TOKEN: "" }],
+  ["both empty", { LGCODE_SOCKET: "", LGCODE_TOKEN: "" }],
+  ["empty socket with token", { LGCODE_SOCKET: "", LGCODE_TOKEN: token }],
+  ["empty token with socket", { LGCODE_SOCKET: "SOCKET_FIXTURE", LGCODE_TOKEN: "" }],
 ] as const) {
   it(`X31 client ${name} (T-3) catches treating an explicitly empty identity as unset and reading the owner credential`, async () => {
     const connect = await loadClient();
@@ -25,12 +25,12 @@ for (const [name, variables] of [
     const restore = auditCredentialReads(join(root.state, "owner-credential"), marker);
     try {
       const environment: Record<string, string> = { ...serviceEnvironment(root), ...variables };
-      if (environment.SHEPRD_SOCKET === "SOCKET_FIXTURE") environment.SHEPRD_SOCKET = root.socket;
+      if (environment.LGCODE_SOCKET === "SOCKET_FIXTURE") environment.LGCODE_SOCKET = root.socket;
       const exit = await Effect.runPromiseExit(Effect.scoped(connect({ environment })));
       expect.soft(readFileSync(marker, "utf8"), "owner credential was read before refusing an incomplete agent identity").toBe("");
       expect.soft(peer.upgrades, "an empty identity reached a peer").toHaveLength(0);
       expect.soft(Exit.isFailure(exit), "an explicitly empty identity must fail").toBe(true);
-      if (Exit.isFailure(exit)) expect(Cause.pretty(exit.cause)).toMatch(/SHEPRD_SOCKET|SHEPRD_TOKEN|identity|empty/i);
+      if (Exit.isFailure(exit)) expect(Cause.pretty(exit.cause)).toMatch(/LGCODE_SOCKET|LGCODE_TOKEN|identity|empty/i);
     } finally { restore(); }
   });
 }

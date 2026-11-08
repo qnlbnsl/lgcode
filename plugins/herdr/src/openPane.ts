@@ -1,9 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { resolveIdentity, type Environment } from "@sheprd/client";
-import { connectViewer } from "@sheprd/viewer/connection";
+import { resolveIdentity, type Environment } from "@lgcode/client";
+import { connectViewer } from "@lgcode/viewer/connection";
 
 // Herdr action commands run in the background. The action opens the declared
-// pane, whose terminal runs `sheprd view` with the same owner identity checks.
+// pane, whose terminal runs `lgcode view` with the same owner identity checks.
 export const openViewerPane = async (environment: Environment): Promise<number> => {
   try {
     if (resolveIdentity(environment).kind !== "owner") throw new Error("Owner required");
@@ -13,11 +13,11 @@ export const openViewerPane = async (environment: Environment): Promise<number> 
     const client = await connectViewer(environment);
     await client.close();
     const result = spawnSync(environment.HERDR_BIN_PATH || "herdr", [
-      "plugin", "pane", "open", "--plugin", "sheprd", "--entrypoint", "view",
+      "plugin", "pane", "open", "--plugin", "lgcode", "--entrypoint", "view",
     ], { env: environment, stdio: "ignore" });
     if (result.status === 0 && result.error === undefined) return 0;
   } catch { /* No environment, subprocess output or identity data in errors. */ }
-  process.stderr.write("sheprd: the owner viewer pane could not be opened.\n");
+  process.stderr.write("lgcode: the owner viewer pane could not be opened.\n");
   return 1;
 };
 

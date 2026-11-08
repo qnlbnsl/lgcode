@@ -16,10 +16,10 @@ const present = (value: string | undefined): value is string => value !== undefi
 
 // The state folder, resolved as the engine resolves it (engine/api/stateFolder.ts).
 export const stateFolder = (environment: Environment): string => {
-  if (present(environment.SHEPRD_HOME)) return resolve(environment.SHEPRD_HOME)
-  if (present(environment.XDG_STATE_HOME)) return resolve(environment.XDG_STATE_HOME, "sheprd")
-  if (!present(environment.HOME)) throw new ClientError({ message: "the home folder is unavailable; set SHEPRD_HOME" })
-  return resolve(environment.HOME, ".local/state/sheprd")
+  if (present(environment.LGCODE_HOME)) return resolve(environment.LGCODE_HOME)
+  if (present(environment.XDG_STATE_HOME)) return resolve(environment.XDG_STATE_HOME, "lgcode")
+  if (!present(environment.HOME)) throw new ClientError({ message: "the home folder is unavailable; set LGCODE_HOME" })
+  return resolve(environment.HOME, ".local/state/lgcode")
 }
 
 // Both variables name an agent. Neither names the owner's terminal. One alone
@@ -27,17 +27,17 @@ export const stateFolder = (environment: Environment): string => {
 // A variable that is set but empty counts as set (rows 54 and 64): the owner
 // fallback applies only when both are unset.
 export const resolveIdentity = (environment: Environment): Identity => {
-  const socket = environment.SHEPRD_SOCKET
-  const token = environment.SHEPRD_TOKEN
+  const socket = environment.LGCODE_SOCKET
+  const token = environment.LGCODE_TOKEN
   if (socket !== undefined && token !== undefined) {
     if (socket === "" || token === "") {
-      throw new ClientError({ message: "SHEPRD_SOCKET and SHEPRD_TOKEN must both hold a value, or both be left unset" })
+      throw new ClientError({ message: "LGCODE_SOCKET and LGCODE_TOKEN must both hold a value, or both be left unset" })
     }
-    if (!socket.startsWith("/")) throw new ClientError({ message: "SHEPRD_SOCKET must be an absolute path" })
+    if (!socket.startsWith("/")) throw new ClientError({ message: "LGCODE_SOCKET must be an absolute path" })
     return { kind: "agent", socketPath: socket, bearer: () => token }
   }
   if (socket !== undefined || token !== undefined) {
-    throw new ClientError({ message: "SHEPRD_SOCKET and SHEPRD_TOKEN must be set together, or both left unset" })
+    throw new ClientError({ message: "LGCODE_SOCKET and LGCODE_TOKEN must be set together, or both left unset" })
   }
   const folder = stateFolder(environment)
   return {

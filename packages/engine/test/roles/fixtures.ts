@@ -1,4 +1,4 @@
-import { type Event, type EventSequence } from "@sheprd/contracts";
+import { type Event, type EventSequence } from "@lgcode/contracts";
 import { createHash } from "node:crypto";
 import { expect } from "vitest";
 import { apply, emptyViews, type State } from "../../src/views/apply.ts";

@@ -1,4 +1,4 @@
-import { type Event, rolesActionKinds } from "@sheprd/contracts";
+import { type Event, rolesActionKinds } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import { expect, it } from "vitest";
 import { engineLists } from "../../src/pieces/lists.ts";

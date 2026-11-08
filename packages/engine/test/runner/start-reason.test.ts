@@ -6,7 +6,7 @@ import { accountFor, echoFile, harnessFor, makeRunnerRig, modeOption, modelOptio
 import { call, ownerCredential, readLog, success } from "../support/handlerRig.ts";
 import { eventually, tagged } from "../support/routingRig.ts";
 let rig: RunnerRig;
-beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("SHEPRD_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig); });
 for (const [reason, script, fields] of [
   ["not-signed-in", { sessionError: "Authentication required PRIVATE_ERROR_123" }, {}],

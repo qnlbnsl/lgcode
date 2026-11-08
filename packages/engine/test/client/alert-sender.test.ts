@@ -3,7 +3,7 @@ import type * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { expect, it } from "vitest";
-import { alertKindNames } from "@sheprd/contracts";
+import { alertKindNames } from "@lgcode/contracts";
 import { append, eventsOf } from "../support/alertsRig.ts";
 import { call, ownerCredential, seedAgent, success } from "../support/handlerRig.ts";
 import { configure, withCarrier } from "../support/carrierRig.ts";
@@ -33,7 +33,7 @@ it("6.6/6.7 every enabled kind reaches only AlertSender, send-time changes take 
   await withCarrier(() => Effect.gen(function* () {
     yield* registerRebuildCheck();
     yield* seedAgent({ id: "worker", state: "working", groups: ["build"] });
-    yield* append({ _tag: "client.WebSettingsChanged", settings: { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: true, publicAddress: "https://sheprd.example" } });
+    yield* append({ _tag: "client.WebSettingsChanged", settings: { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: true, publicAddress: "https://lgcode.example" } });
     for (const kind of alertKindNames) {
       yield* append({ _tag: "client.AlertRaised", alertId: `sender-${kind}`, alertKey: `fixture:${kind}`, kind,
         agentId: "worker", title: titles[kind], sourceSequence: 1 });
@@ -47,7 +47,7 @@ it("6.6/6.7 every enabled kind reaches only AlertSender, send-time changes take 
     for (const payload of pushed) {
       expect(payload).toMatchObject({ alertId: `sender-${payload.kind}`, agentName: "name-worker", team: ["build"], title: titles[payload.kind] });
       expect(Object.keys(payload).sort()).toEqual(["alertId", "kind", "agentName", "team", "title", "link"].sort());
-      expect(payload.link).toContain("https://sheprd.example");
+      expect(payload.link).toContain("https://lgcode.example");
     }
     success(yield* call(ownerCredential, "client.alerts.settings.set", { kind: "roles.runaway", push: true }));
     expect(yield* eventually(Effect.sync(() => sends.length), (n) => n === 12)).toBe(12);

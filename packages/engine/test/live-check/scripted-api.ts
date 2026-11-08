@@ -2,8 +2,8 @@
 // follow the public contract; no production flow or step assertion is mocked.
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Client } from "@sheprd/client";
-import type { EventEnvelope, HarnessSettings } from "@sheprd/contracts";
+import type { Client } from "@lgcode/client";
+import type { EventEnvelope, HarnessSettings } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 
@@ -143,10 +143,10 @@ export const scriptedApi = (fault: Faults = {}) => {
       "reload": "old token refused; tool succeeds; found", "token-scan": "not found",
     })[id], detail: "controlled adapter boundary; not real-adapter evidence" }))) },
     write: (line) => { lines.push(line); },
-    environment: { HOME: home, SHEPRD_HOME: state, XDG_STATE_HOME: join(root, "xdg"), CODEX_HOME: join(root, "codex") },
+    environment: { HOME: home, LGCODE_HOME: state, XDG_STATE_HOME: join(root, "xdg"), CODEX_HOME: join(root, "codex") },
     hook: {
-      environment: { SHEPRD_HOME: state },
-      listServices: () => fault.step === "startup-hook" ? [] : [{ pid: 42, environment: { SHEPRD_HOME: state } }],
+      environment: { LGCODE_HOME: state },
+      listServices: () => fault.step === "startup-hook" ? [] : [{ pid: 42, environment: { LGCODE_HOME: state } }],
       lockExists: () => false, answers: async () => true, sleep: async () => undefined,
     },
     startService: () => { calls.push("service"); return service; },

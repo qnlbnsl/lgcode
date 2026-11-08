@@ -6,42 +6,46 @@ one set of rules.
 
 ## What this project is
 
-Sheprd is a standalone program with a web page and an optional
+LGcode is a standalone program with a web page and an optional
 [Herdr plugin](plugins/herdr/README.md). It runs
 teams of coding agents (an orchestrator, team leads, and workers), connects
 them through a strict message board, and exposes everything through an
 authenticated client API for web, desktop, and mobile apps. Read
 [README.md](README.md) before starting any task.
-Start it without Herdr through `./bin/sheprd serve --detach`.
-Set `SHEPRD_WEB_PASSWORD` on the service to enable the web page.
+Start it without Herdr through `./bin/lgcode serve --detach`.
+Set `LGCODE_WEB_PASSWORD` on the service to enable the web page.
 The core must not import the optional plugin.
 
-Sheprd is a separate project from
+LGcode is a separate project from
 [Herdr Synapse](https://github.com/vitalysim/herdr-synapse), which inspired
 it. It is not a fork in the git sense and does not track Synapse's history.
 
 ## Status
 
-The engine is being built. The owner approved its design and its plan,
-`.plans/plans/shepherd-engine/plan.md`, on 2026-11-01. Add application code
-only as one of that plan's units, or when the owner asks for it in the
-current task.
+The foundation is merged into `master`: the engine, the client API with the
+current web page, the message board, and the foundry roles. The standing
+permission rules remain unbuilt, pending the owner's harness recordings.
+
+Development is frozen. The owner froze it on 2026-11-07, until the website
+mocks are ready, and only the owner lifts the freeze. While it holds, do not
+add application code unless the owner asks for it in the current task. Work on
+the mocks under `design/` continues, as do the documents that record them.
 
 ## Language
 
-Sheprd is written in TypeScript, decided by the owner on 2026-10-30. The
+LGcode is written in TypeScript, decided by the owner on 2026-10-30. The
 backend, the web page, and the future desktop and mobile apps share one
 language, so the client API's types are defined once and used by every
 client. Code borrowed from TypeScript projects such as T3 Code is copied, not
 ported.
 
-Sheprd is written with the [Effect](https://effect.website) library,
+LGcode is written with the [Effect](https://effect.website) library,
 version 4, decided by the owner on 2026-11-01, so that T3 Code's Effect code
 can be copied. Effect 4 is newer than most agents' training, so look up its
 current documentation before writing Effect code; do not write it from
 memory.
 
-Sheprd runs as a Node.js program on Node.js 26, the current long-term
+LGcode runs as a Node.js program on Node.js 26, the current long-term
 support line, decided by the owner on 2026-11-01. The `.nvmrc` file says
 `26`; run `nvm use` before working in this repository.
 
@@ -50,9 +54,9 @@ support line, decided by the owner on 2026-11-01. The `.nvmrc` file says
 Every harness has two run modes, chosen per harness in its settings,
 decided by the owner on 2026-10-30:
 
-- **ACP mode** is built first. Sheprd runs the agent as a child process and
+- **ACP mode** is built first. LGcode runs the agent as a child process and
   drives it through the Agent Client Protocol.
-- **Interactive mode** is built second. Sheprd opens the harness's normal
+- **Interactive mode** is built second. LGcode opens the harness's normal
   terminal program in a Herdr pane through the optional plugin.
 
 The board, the roster, and the thread view must not depend on which mode an
@@ -63,7 +67,7 @@ ACP agent and an interactive agent can sit on the same team.
 
 1. **Never push to, or open a pull request against,
    `vitalysim/herdr-synapse`.** The only remote for this repository is
-   `qnlbnsl/sheprd`.
+   `qnlbnsl/lgcode`.
 2. **Credit every piece of copied open-source code.** Ideas and designs can
    be reused freely, but copied code carries its licence's obligations. When
    code is copied or ported from another project, such as Herdr Synapse
@@ -74,7 +78,7 @@ ACP agent and an interactive agent can sit on the same team.
    - Add an entry to the root [NOTICE](NOTICE) file.
    - Name the source project and file in the commit message.
    - Keep the original copyright lines. If the code is later moved into
-     Sheprd's own source tree, the moved file starts with a comment naming
+     LGcode's own source tree, the moved file starts with a comment naming
      where it came from and its licence.
 3. **Keep the lists current.** A new feature idea goes into
    [docs/features.md](docs/features.md). A problem found while working goes
@@ -86,15 +90,15 @@ ACP agent and an interactive agent can sit on the same team.
 5. **The client API is the product's surface.** Anything the owner can do
    from the terminal must also be possible through the API, so a web or
    mobile client is never a second-class citizen.
-6. **Only the default workflow belongs here.** Sheprd provides roles, the
+6. **Only the default workflow belongs here.** LGcode provides roles, the
    board, the API, and one default workflow, the
    [build loop](docs/specs/2026-11-05-build-loop-design.md). Anyone who wants a
-   different workflow overrides it in `~/.sheprd`, or for one repository in
-   that repository's `.sheprd`. The definitions of particular teams live
+   different workflow overrides it in `~/.lgcode`, or for one repository in
+   that repository's `.lgcode`. The definitions of particular teams live
    outside this repository.
 7. **Agents have full authority inside a team.** They commit, push and merge
    on their team's branches and worktrees without asking, using the git
-   commands Sheprd allows them. Moving finished work into the base branch is
+   commands LGcode allows them. Moving finished work into the base branch is
    done by a pull request, and the owner approves it. There is one exception,
    decided by the owner on 2026-11-05: a build loop fix sprint that users would
    not notice merges on its own after a full test run passes. Anything users

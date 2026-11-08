@@ -3,11 +3,11 @@ set -eu
 
 # Herdr may start without a shell profile or a PATH containing Node.js.
 install_hint() {
-  echo 'Sheprd needs Node.js 26. Run nvm install 26, or set SHEPRD_NODE to its executable.' >&2
+  echo 'LGcode needs Node.js 26. Run nvm install 26, or set LGCODE_NODE to its executable.' >&2
   exit 1
 }
 
-node_bin=${SHEPRD_NODE:-}
+node_bin=${LGCODE_NODE:-}
 if [ -z "$node_bin" ]; then
   nvm_directory=${NVM_DIR:-${HOME:-}/.nvm}
   newest_minor=-1
@@ -44,7 +44,7 @@ fi
 self=$0
 if [ -L "$self" ]; then
   self=$("$node_bin" -e 'process.stdout.write(process.getBuiltinModule("node:fs").realpathSync(process.argv[1]))' "$0") || {
-    echo "Sheprd could not find its folder: $0 is not a usable link." >&2
+    echo "LGcode could not find its folder: $0 is not a usable link." >&2
     exit 1
   }
 fi

@@ -31,15 +31,15 @@ tests, and that the service's logger passes through the redactor.
 
 | Lines | Call | Level | What it can contain | How it is kept off or redacted |
 |---|---|---|---|---|
-| 263-272 | `logProtocol`, which ends in `Effect.logDebug("ACP protocol event")` at line 272 | Debug | The whole protocol event: raw wire text and decoded messages, so prompts and tool output | Off. The function returns at once unless the caller passed `logIncoming` (line 264) or `logOutgoing` (line 267), and both options are unset by default. Its callers are lines 285, 305, 540, 700, 724, 731, 936 and 950, and line 700 checks `logIncoming` again. Sheprd's engine must never set either option outside tests. A caller can also pass its own `logger` option, which receives the same events; Sheprd must not pass one. Decision 57 also requires a test that greps the service's output for planted secrets. |
-| 503 | `Effect.logError("ACP extension request handler failed for '<method>'", cause)` | Error | The cause of a defect in an extension request handler, which can carry anything the handler held | On, because no option gates it. It reaches the Effect logger only, and the service's logger passes through the redactor (decision 57). Until that logger exists, no Sheprd code registers an extension handler, so the call cannot fire. |
+| 263-272 | `logProtocol`, which ends in `Effect.logDebug("ACP protocol event")` at line 272 | Debug | The whole protocol event: raw wire text and decoded messages, so prompts and tool output | Off. The function returns at once unless the caller passed `logIncoming` (line 264) or `logOutgoing` (line 267), and both options are unset by default. Its callers are lines 285, 305, 540, 700, 724, 731, 936 and 950, and line 700 checks `logIncoming` again. LGcode's engine must never set either option outside tests. A caller can also pass its own `logger` option, which receives the same events; LGcode must not pass one. Decision 57 also requires a test that greps the service's output for planted secrets. |
+| 503 | `Effect.logError("ACP extension request handler failed for '<method>'", cause)` | Error | The cause of a defect in an extension request handler, which can carry anything the handler held | On, because no option gates it. It reaches the Effect logger only, and the service's logger passes through the redactor (decision 57). Until that logger exists, no LGcode code registers an extension handler, so the call cannot fire. |
 | 547 | `Effect.logWarning("Dropped an ACP notification that failed to decode")` | Warning | Only structural diagnostics: operation, method, request identifier, issue count, issue kinds, path depth, and a summary of field paths and reasons such as "missing" or "wrong type". It never contains a payload value. The code reads `decodeFailureDiagnostics` at lines 184-192. | On, and safe. It logs once for each distinct failure on a connection. Field names come from the agent, so the service logger still redacts it. |
-| 599 | `Effect.logWarning(error)` with annotations for method, request identifier and operation | Warning | An encoding error whose `cause` field holds the schema failure for the value an extension handler returned, so it can include that value | On, because no option gates it. It reaches the Effect logger only, and the service's logger passes through the redactor (decision 57). No extension handler exists in Sheprd yet. |
+| 599 | `Effect.logWarning(error)` with annotations for method, request identifier and operation | Warning | An encoding error whose `cause` field holds the schema failure for the value an extension handler returned, so it can include that value | On, because no option gates it. It reaches the Effect logger only, and the service's logger passes through the redactor (decision 57). No extension handler exists in LGcode yet. |
 
 The calls at lines 503 and 599 are not gated by the logging options, which is
 the part of decision 57's wording that is not literally true of the copy. The
 copy is unchanged. Instead, the service's logger redacts them, and the rule that
-Sheprd registers no extension handler holds until that logger is built. This
+LGcode registers no extension handler holds until that logger is built. This
 is recorded as an issue in `docs/issues.md`.
 
 ## Other logging calls found
@@ -50,23 +50,23 @@ is recorded as an issue in `docs/issues.md`.
 | `effect-acp/src/_internal/shared.ts` line 53 | `Effect.logError("ACP request handler failed for '<method>'", defect)` | Logs a defect in a request handler. Redacted by the service logger. |
 | `node-sqlite/src/nodeSqliteClient.ts` lines 451 and 626 | `Effect.logWarning(...)` with a `reason` string | The reason is an error message or a SQLite version, never a statement parameter or row. |
 | `provider-instance/src/CodexHomeLayout.ts` line 280 | `Effect.logWarning(...)` with a directory path | Logs a path inside the second harness's home. No secret. |
-| `effect-acp/scripts/generate.ts` lines 437 and 482 | `Effect.log(...)` | Counts of generated schemas. The script is not run by Sheprd. |
+| `effect-acp/scripts/generate.ts` lines 437 and 482 | `Effect.log(...)` | Counts of generated schemas. The script is not run by LGcode. |
 
 ## Findings that are not logging
 
 | Finding | Where | Fix |
 |---|---|---|
-| The whole process environment is passed on by default, because `baseEnv` defaults to `process.env`. | `provider-instance/src/instanceEnvironment.ts` line 9, `provider-instance/src/ClaudeHome.ts` line 34 | Sheprd must always pass an explicit environment that holds exactly `SHEPRD_SOCKET` and `SHEPRD_TOKEN` plus what the harness needs (decision 57). Recorded in `docs/issues.md`. The copy is unchanged. |
+| The whole process environment is passed on by default, because `baseEnv` defaults to `process.env`. | `provider-instance/src/instanceEnvironment.ts` line 9, `provider-instance/src/ClaudeHome.ts` line 34 | LGcode must always pass an explicit environment that holds exactly `LGCODE_SOCKET` and `LGCODE_TOKEN` plus what the harness needs (decision 57). Recorded in `docs/issues.md`. The copy is unchanged. |
 | The helper writes the environment values it is given to a JSON file next to the stub, with the default file mode. | `provider-testing/src/fakeCli.ts` lines 21-22 | The helper is for tests, under a temporary folder. Tests must never pass a real secret to it. Recorded in `docs/issues.md`. |
-| The generator downloads schema files over HTTPS from GitHub and then runs `pnpm exec vp fmt`. The `vp` program is not installed in Sheprd, so the last step fails. | `effect-acp/scripts/generate.ts` lines 95 and 490 | The script only runs when someone runs `pnpm --filter @sheprd/t3-effect-acp generate`. It is not part of `pnpm check`, the build, or the service. Recorded in `docs/issues.md`. |
-| The shadow-home setup removes a real directory recursively when it blocks a shared link. | `provider-instance/src/CodexHomeLayout.ts` around line 270 | The removal is limited to three fixed names (`mcp-oauth-locks`, `thread-writer-locks`, `.sqlite-maintenance.lock`) inside the shadow home that Sheprd owns. Sheprd must never set the shadow home to a folder it does not own. |
+| The generator downloads schema files over HTTPS from GitHub and then runs `pnpm exec vp fmt`. The `vp` program is not installed in LGcode, so the last step fails. | `effect-acp/scripts/generate.ts` lines 95 and 490 | The script only runs when someone runs `pnpm --filter @lgcode/t3-effect-acp generate`. It is not part of `pnpm check`, the build, or the service. Recorded in `docs/issues.md`. |
+| The shadow-home setup removes a real directory recursively when it blocks a shared link. | `provider-instance/src/CodexHomeLayout.ts` around line 270 | The removal is limited to three fixed names (`mcp-oauth-locks`, `thread-writer-locks`, `.sqlite-maintenance.lock`) inside the shadow home that LGcode owns. LGcode must never set the shadow home to a folder it does not own. |
 | The replay reader keeps the raw text of a bad line in its error value, although the error message does not show it. | `provider-testing/src/replayTranscript.ts` lines 12-23 | Replay files are test fixtures. Recorded fixtures must be redacted before they are committed. |
 | One regular expression can take quadratic time on a very long line with many spaces. | `source-control/src/mergeMessage.ts`, the `co-authored-by` pattern | The input is a commit message that the engine itself builds. Accepted, no fix. |
 
 ## Table of files
 
 The two metadata files in each package (`package.json` and `tsconfig.json`) are
-Sheprd's own and are not listed.
+LGcode's own and are not listed.
 
 The three generated files under `effect-acp/src/_generated/` (19,457 lines in
 all) were scanned and were not read line by line. The scan used these commands
@@ -85,7 +85,7 @@ Rows for these files say "scanned, not read line by line".
 
 | File | Result |
 |---|---|
-| `effect-acp/scripts/generate.ts` | Finding: downloads from GitHub and runs `pnpm exec vp fmt`; development only, not run by Sheprd. See "Findings that are not logging". |
+| `effect-acp/scripts/generate.ts` | Finding: downloads from GitHub and runs `pnpm exec vp fmt`; development only, not run by LGcode. See "Findings that are not logging". |
 | `effect-acp/src/_generated/meta.gen.ts` | scanned, not read line by line; no findings. See the method above. |
 | `effect-acp/src/_generated/schema-v1.gen.ts` | scanned, not read line by line; no findings. See the method above. |
 | `effect-acp/src/_generated/schema.gen.ts` | scanned, not read line by line; no findings. See the method above. |

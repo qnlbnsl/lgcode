@@ -1,4 +1,4 @@
-import { parseRole, roleAdvice } from "@sheprd/contracts";
+import { parseRole, roleAdvice } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import { agentReadReply } from "../client/reads/index.ts";
 import { roster } from "../client/reads/roster.ts";

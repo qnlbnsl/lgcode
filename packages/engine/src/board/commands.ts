@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { type AgentId, type Event, type EventEnvelope } from "@sheprd/contracts";
-import { ChannelId, PostId, type BoardAddressee, type BoardAuthor } from "@sheprd/contracts/board/ids";
-import { holdsIncoming, holdsUnsettled } from "@sheprd/contracts/board/conditions";
-import type { BoardPostView } from "@sheprd/contracts/board/view";
-import { BoardChannelName, BoardPostText } from "@sheprd/contracts/board/schemas";
+import { type AgentId, type Event, type EventEnvelope } from "@lgcode/contracts";
+import { ChannelId, PostId, type BoardAddressee, type BoardAuthor } from "@lgcode/contracts/board/ids";
+import { holdsIncoming, holdsUnsettled } from "@lgcode/contracts/board/conditions";
+import type { BoardPostView } from "@lgcode/contracts/board/view";
+import { BoardChannelName, BoardPostText } from "@lgcode/contracts/board/schemas";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { agentReadReply, type ReadHandler, type ReadReply } from "../api/reads.ts";
