@@ -14,7 +14,7 @@ try{
  check(await page.locator('#message-form').evaluate(e=>{const r=e.getBoundingClientRect(),m=document.querySelector('#conversation-main').getBoundingClientRect();return Math.abs((r.left+r.right)/2-(m.left+m.right)/2)<5&&r.width<1000}),'Wide-screen chat stays readable and centered');
  await page.setViewportSize({width:1440,height:1000});await click('[data-team="app-shell"]');
  check(!await page.locator('#view-tabs').isVisible(),'Team navigation has a single tab row');await click('[data-team-tab="changes"]');
- check(await page.locator('[data-main-view="source-control"]').getAttribute('aria-selected')==='true'&&await text('#participants').then(t=>t.includes('App shell')),'Team Changes opens Git with a clearly selected team scope');
+ check(await page.locator('[data-main-view="source-control"]').getAttribute('aria-selected')==='true'&&await text('#participants').then(t=>t.includes('Build team')),'Team Changes opens Git with a clearly selected team scope');
  check(await page.locator('[data-git-worktree="workspace-app-shell"]').getAttribute('aria-current')==='true','Team Git selects its own worktree');
  check(await text('#git-integration').then(t=>t.includes('feat/workspace/app-shell')&&t.includes('feat/workspace')),'Team integration names its source and project target');
  await page.locator('#git-message').fill('Preserve the team reading context');await click('[data-stage-file="app/workspace.tsx"]');await click('[data-stage-file="app/sidebar.tsx"]');await click('#git-commit');

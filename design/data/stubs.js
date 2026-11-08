@@ -12,7 +12,7 @@ const S={
  threads:new Map(),channels:new Map(),alerts:[],taskStories:{},agents:new Map(),agentProjects:new Map(),openTurns:new Map(),
  setup:{step:'welcome',finished:false}
 };
-let reads=null,meta=null,source='sample',sequence=0,bootedAt=0;
+let reads=null,meta=null,source='sample',sequence=0,bootedAt=0,localSets=[],withSet=null;
 const events=[],subscribers=new Set(),gitStates=new Map(),replyTimers=new Map(),signInTimers=new Map();
 const counters={project:1,task:30,machine:1,account:1,git:1,delivery:1,item:1,post:1};
 
@@ -67,6 +67,9 @@ function placeWithoutProject(a,payload){
  if(!team){team={id,name,agents:[]};project.teams.push(team)}
  team.agents.push(a);return project;
 }
+// Teams are named for the stage they work in. A second team in the same stage adds its area.
+const stageTeams={design:'Design team',plan:'Planning team',build:'Build team',review:'Review team'};
+function nameTeams(project){const count=stage=>project.teams.filter(t=>t.stage===stage).length;for(const t of project.teams)if(stageTeams[t.stage])t.name=stageTeams[t.stage]+(count(t.stage)>1?' · '+t.area:'')}
 function placeAgent(a,payload){
  const [projectId,teamId]=(payload.groups?.[0]||'').split('/'),project=projectById(projectId);
  if(!project||(!teamId&&project.lead))return placeWithoutProject(a,payload);
@@ -112,7 +115,15 @@ const handlers={
  'project.Created':(row,e)=>{S.projects.push({id:e.projectId,repoId:e.repoId,name:e.name,goal:e.goal,lead:null,workspace:e.worktreeId,teams:[],sprints:[],tasks:[]});S.projectMachines.set(e.projectId,e.machineId)},
  'project.Placed':(row,e)=>S.futureProjectMachines.set(e.projectId,e.machineId),
  'project.PreferencesChanged':(row,e)=>S.workspacePreferences.set(e.projectId,{shell:e.shell}),
- 'project.TeamAdded':(row,e)=>projectById(e.projectId).teams.push({id:e.teamId,name:e.name,agents:[],...(e.worktreeId?{workspace:e.worktreeId}:{})}),
+ 'project.TeamAdded':(row,e)=>{const project=projectById(e.projectId);project.teams.push({id:e.teamId,name:e.name,area:e.name,...(e.stage?{stage:e.stage}:{}),agents:[],...(e.worktreeId?{workspace:e.worktreeId}:{})});nameTeams(project)},
+ 'project.StageChanged':(row,e)=>{projectById(e.projectId).stage=e.stage},
+ // Mocks. The screens are the project's own code, so these record what was drawn, not the drawing.
+ 'project.MocksStarted':(row,e)=>{projectById(e.projectId).mocks={source:e.source,designFile:e.designFile,scenarios:e.scenarios||[],screens:[],data:[],components:[],approvedAt:null}},
+ 'project.MockScreenAdded':(row,e)=>projectById(e.projectId).mocks.screens.push({id:e.screenId,title:e.title,route:e.route,note:e.note||'',revisions:[{summary:'Drew '+e.title,by:row.caller.startsWith('agent:')?row.caller.slice(6):null,occurred:row.occurred_at,css:''}]}),
+ 'project.MockScreenRevised':(row,e)=>projectById(e.projectId).mocks.screens.find(s=>s.id===e.screenId)?.revisions.push({summary:e.summary,by:e.by,occurred:row.occurred_at,css:e.css||''}),
+ 'project.MockDataDrafted':(row,e)=>projectById(e.projectId).mocks.data.push({entity:e.entity,field:e.field,type:e.type,screens:e.screens||[]}),
+ 'project.MockComponentUsed':(row,e)=>projectById(e.projectId).mocks.components.push({id:e.componentId,name:e.name,origin:e.origin,path:e.path,screens:e.screens||[]}),
+ 'project.MocksApproved':(row,e)=>{const mocks=projectById(e.projectId).mocks;mocks.approvedAt=row.occurred_at;for(const c of mocks.components)if(c.origin==='draft')c.origin='promoted'},
  'project.SprintAdded':(row,e)=>projectById(e.projectId).sprints.push({id:e.sprintId,label:e.label,name:e.name,goal:e.goal,phase:e.phase,owner:e.owner,needs:e.needs||[],...(e.completion?{completion:e.completion}:{}),...(e.evidence?{evidence:e.evidence}:{})}),
  'project.TaskAdded':(row,e)=>{const project=projectById(e.projectId);project.tasks.push({id:e.taskId,title:e.title,owner:e.owner,teamId:e.teamId,sprintId:e.sprintId,state:e.state,workspace:e.worktreeId||project.workspace,...(e.addedByOwner?{addedByOwner:true}:{})});if(e.story)S.taskStories[e.taskId]=e.story},
  'project.TaskChanged':(row,e)=>{const task=S.projects.flatMap(project=>project.tasks).find(t=>t.id===e.taskId);if(task)task.state=e.state},
@@ -206,6 +217,31 @@ function saySomething(agentId,texts,options={}){
 const postToChannel=(channelId,author,text,options={})=>emit('board.PostWritten',{postId:'post-live-'+counters.post++,channelId,author,text,to:[],reply:'none'},{caller:author._tag==='owner'?'owner':'agent:'+author.agentId,...options});
 const clearAlertsFor=(id,cause)=>{for(const a of S.alerts.filter(x=>x.subject===id&&!x.cleared))emit('client.AlertCleared',{alertId:a.id,cause},{caller:'piece:client'})};
 function replyKey(target){return target.channelId?'channel:'+target.channelId:'agent:'+target.agentId}
+const slug=value=>value.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'project';
+const projectFolder=project=>'/'+S.workspaces.find(w=>w.id===project.workspace).path.replace(/^[~/]+/,'');
+function startHelper(project,{agentId,name,role,teamId}){const lead=project.lead;emit('AgentStarted',{agentId,name,role,groups:[project.id+'/'+teamId],parent:asAgent(lead.id),harness:lead.harness,account:lead.account,permission:'edit',folder:projectFolder(project),runMode:'acp'});emit('SessionOpened',{agentId,session:{_tag:'acp',sessionId:'session-'+agentId},protocolVersion:1,reloadable:true},{caller:'service:runner'})}
+// The Design team draws the first screens from the repository's own components, one at a time.
+function startDesign(project){
+ const m=reads.mocks,[leadName,designerName]=m.designers[S.projects.indexOf(project)%m.designers.length],designLead='design-lead-'+project.id,designer='designer-'+project.id,group=project.id+'/design';
+ emit('project.TeamAdded',{projectId:project.id,teamId:'design',name:'Mocks',stage:'design'});
+ startHelper(project,{agentId:designLead,name:leadName,role:'Design lead',teamId:'design'});
+ startHelper(project,{agentId:designer,name:designerName,role:'Designer',teamId:'design'});
+ emit('board.ChannelOpened',{channelId:'ch-'+project.id+'-design',name:project.id+'-design',opener:asAgent(project.lead.id),members:[project.lead.id,designLead,designer].map(asAgent),kind:'group',manager:asAgent(designLead),group,anchorAgentId:designLead},{caller:'piece:board'});
+ emit('project.StageChanged',{projectId:project.id,stage:'design'});
+ emit('project.MocksStarted',{projectId:project.id,source:{_tag:'page'},designFile:'design/'+slug(project.name)+'.fig',scenarios:m.starterScenarios});
+ saySomething(project.lead.id,m.replies.started.map(text=>fill(text,{designer:designerName})),{reply:true});
+ m.starter.forEach((screen,i)=>setTimeout(()=>{
+  emit('project.MockScreenAdded',{projectId:project.id,...screen},{caller:'agent:'+designer});
+  if(i<m.starter.length-1)return;
+  for(const row of m.starterData)emit('project.MockDataDrafted',{projectId:project.id,...row},{caller:'agent:'+designLead});
+  for(const row of m.starterComponents)emit('project.MockComponentUsed',{projectId:project.id,...row},{caller:'agent:'+designLead});
+ },m.screenDelay*(i+1)));
+}
+function reviseScreen(project,screen,text){
+ const m=reads.mocks,tweak=m.tweaks.find(t=>new RegExp(t.match,'i').test(text)),designer=project.teams.find(t=>t.stage==='design')?.agents.at(-1)||project.lead,short=text.length>60?text.slice(0,57)+'…':text,summary=tweak?tweak.summary:fill(m.fallbackSummary,{text:short});
+ emit('project.MockScreenRevised',{projectId:project.id,screenId:screen.id,summary:summary[0].toUpperCase()+summary.slice(1),by:designer.id,...(tweak?{css:tweak.css}:{})},{caller:'agent:'+designer.id});
+ saySomething(project.lead.id,[fill(m.replies.revised,{designer:designer.name,screen:screen.title,summary})],{reply:true});
+}
 
 const api={
  // Which files the page loaded: the real export, the heavy sample, or the small sample.
@@ -224,6 +260,17 @@ const api={
   meta=chosen.info;bootedAt=Date.now();
   S.settings=structuredClone(reads.settings);
   for(const row of chosen.rows){events.push(row);sequence=Math.max(sequence,row.sequence);fold(row)}
+  // A local set adds a private repository on top. Git ignores data/local/, so it never reaches the public repository.
+  localSets=await fetchJson('data/local/index.json')||[];
+  const askedSet=params.get('with');
+  if(askedSet&&localSets.some(set=>set.id===askedSet)){
+   const extra=await load('local/'+askedSet);
+   if(extra){
+    for(const row of extra.rows){events.push(row);sequence=Math.max(sequence,row.sequence);fold(row)}
+    for(const key of ['schema','design'])reads[key]={...reads[key],...extra.overlay?.[key]};
+    withSet=askedSet;
+   }
+  }
   localMachine();
   if(first){
    if(params.has('reset')){setupStore.clear();params.delete('reset');history.replaceState(null,'','?'+params)}
@@ -235,13 +282,13 @@ const api={
  },
  client:{
   // Named for client.snapshot and client.subscribe. The object stays current after this returns.
-  async snapshot(){return {...S,source,clock:meta.clock,timeZone:meta.display_time_zone||'UTC',exportedAt:meta.exported_at,harness:reads.harness,service:reads.service,diffs:reads.git.diffs,large:reads.large}},
+  async snapshot(){return {...S,source,localSets,withSet,mocksReads:reads.mocks,clock:meta.clock,timeZone:meta.display_time_zone||'UTC',exportedAt:meta.exported_at,harness:reads.harness,service:reads.service,diffs:reads.git.diffs,large:reads.large}},
   subscribe(notify){subscribers.add(notify);return ()=>subscribers.delete(notify)},
   async thread(agentId){return threadOf(agentId)},
   async roster(){return [...S.agents.values()].map(a=>({...a,...S.runtimeStates.get(a.id),project:S.agentProjects.get(a.id)}))},
   async sequence(){return sequence},
   // A prompt to an agent, or a post to a team's shared chat. A scripted reply follows.
-  async prompt(target,text,{context=[],account}={}){
+  async prompt(target,text,{context=[],account,mockScreen}={}){
    let id,reply;
    if(target.channelId){
     const channel=S.channels.get(target.channelId);
@@ -254,7 +301,9 @@ const api={
     emit('DeliveryQueued',{delivery:{id,target:agentId,sender:owner,content:{_tag:'prompt',text}}});
     emit('DeliverySent',{agentId,deliveryId:id,method:'acp'},{caller:'service:runner'});
     emit('PromptSent',{agentId,deliveryId:id,sender:owner,text});
-    reply=()=>{emit('DeliveryAccepted',{agentId,deliveryId:id},{caller:'service:runner'});saySomething(agentId,[fill(reads.replies.default,{project:project?.name||''})],{reply:true})};
+    // A lead starts the Design team when the work needs screens, and passes changes to an open mock on to it.
+    const lead=project?.lead?.id===agentId,screen=lead&&mockScreen&&project.mocks?.screens.find(s=>s.id===mockScreen),needsScreens=lead&&!project.mocks&&new RegExp('\\b('+reads.mocks.uiWords+')\\b','i').test(text);
+    reply=()=>{emit('DeliveryAccepted',{agentId,deliveryId:id},{caller:'service:runner'});if(needsScreens)startDesign(project);else if(screen)reviseScreen(project,screen,text);else saySomething(agentId,[fill(reads.replies.default,{project:project?.name||''})],{reply:true})};
    }
    if(context.length||(account&&account!=='host'))emit('project.PromptContext',{deliveryId:id,labels:context,...(account&&account!=='host'?{account}:{})});
    replyTimers.set(replyKey(target),{id,timer:setTimeout(()=>{replyTimers.delete(replyKey(target));reply()},900)});
@@ -332,6 +381,26 @@ const api={
    return {id};
   },
   async savePreferences(projectId,{shell}){emit('project.PreferencesChanged',{projectId,shell})}
+ },
+ // Proposed. Mocks are drawn from the repository's own components and invented data.
+ mocks:{
+  // Compares a field the mocks need with the repository's schema, read at request time.
+  field(repoId,row){const known=reads.schema?.[repoId]?.[row.entity]?.[row.field];return {status:known===undefined?'new':known===row.type?'matches':'differs',known}},
+  design(repoId){return reads.design?.[repoId]||null},
+  // Approval freezes the screens as the design, and hands the rest to a Planning team as tasks.
+  async approve(projectId){
+   const project=projectById(projectId),mocks=project?.mocks;if(!mocks||mocks.approvedAt)return;
+   const drafts=mocks.components.filter(c=>c.origin==='draft'),changes=mocks.data.filter(d=>api.mocks.field(project.repoId,d).status!=='matches');
+   emit('project.MocksApproved',{projectId});
+   emit('project.StageChanged',{projectId,stage:'plan'});
+   const m=reads.mocks,planner='planner-'+projectId,plannerName=m.planners[S.projects.indexOf(project)%m.planners.length],sprintId=projectId+'-from-mocks';
+   emit('project.TeamAdded',{projectId,teamId:'planning',name:'Plan',stage:'plan'});
+   startHelper(project,{agentId:planner,name:plannerName,role:'Planner',teamId:'planning'});
+   emit('project.SprintAdded',{projectId,sprintId,label:'S'+(project.sprints.length+1),name:'Build the approved mocks',goal:'Turn the approved screens into working code on real data.',phase:'Plan',owner:planner,needs:[]});
+   const titles=[...drafts.map(c=>`Move ${c.name} into the real components`),...changes.map(d=>api.mocks.field(project.repoId,d).status==='new'?`Add ${d.entity}.${d.field} to the schema`:`Change ${d.entity}.${d.field} to ${d.type}`),...mocks.screens.map(s=>`Wire ${s.title} to real data`)];
+   for(const title of titles)emit('project.TaskAdded',{projectId,taskId:'TASK-'+counters.task++,title,owner:planner,teamId:'planning',sprintId,state:'queue'});
+   saySomething(project.lead.id,[fill(m.replies.approved,{planner:plannerName,count:titles.length})]);
+  }
  },
  machines:{
   async list(){return S.machineItems},

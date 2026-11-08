@@ -14,6 +14,7 @@ Ananke's `apps/mocks`, which loads a production export without standing up the s
 | `heavy/` | 10 projects, 31 agents, and a long lead thread, at `?sample=heavy`. It is committed to git. |
 | `first/` | A service with no events, at `?sample=first`, plus what a first run can find. It is committed to git. |
 | `prod/` | A real export. Git ignores this folder, because threads hold whatever agents wrote. |
+| `local/` | Repositories from the owner's private work, added with `?with=<id>`. Git ignores this folder, because this repository is public. |
 | `export.mjs` | Copies a real database into `prod/`. |
 | `validate.mjs` | Checks an events file against the engine's contracts. |
 
@@ -56,7 +57,13 @@ todo names a new `project` piece for them. The sample uses these proposed types,
 | `project.WorktreeCreated` | A worktree, with its branch, folder, project, and team. |
 | `project.Created`, `project.Placed` | A project with its lead, and the machine for its next run. |
 | `project.PreferencesChanged` | The preferred shell for a project's terminals. |
-| `project.TeamAdded`, `project.SprintAdded` | A team and its worktree, and a sprint in a project. |
+| `project.TeamAdded`, `project.SprintAdded` | A team with its stage, area, and worktree, and a sprint in a project. |
+| `project.StageChanged` | The project moved to Design, Plan, Build, Review, or Hand over. |
+| `project.MocksStarted` | The Design team started mocks: where screens are served, the design file, and the data scenarios. |
+| `project.MockScreenAdded`, `project.MockScreenRevised` | A screen with its route and note, and one recorded change to it, with who made it. |
+| `project.MockDataDrafted` | A field the screens use, with its type and the screens that use it. |
+| `project.MockComponentUsed` | A component the screens use, where it lives, and whether it is real or a draft. |
+| `project.MocksApproved` | The owner approved the mocks, which promotes the drafts. |
 | `project.TaskAdded`, `project.TaskChanged` | A task with its story, and a change to its state. |
 | `project.QuestionLinked` | A question's title, recommendation, task, and sprint. |
 | `project.AccountPlaced` | The machine an account signs in on. |
@@ -72,6 +79,7 @@ todo names a new `project` piece for them. The sample uses these proposed types,
 1. `?sample=heavy` loads `heavy/`, and `?sample=small` loads `sample/`.
 2. Otherwise, `prod/` loads if it exists and holds an `AgentStarted` row.
 3. Otherwise, `sample/` loads. A 404 for `prod/` is expected.
+4. `?with=<id>` adds the rows in `local/<id>/` when `local/index.json` lists that id.
 
 `api.boot()` returns the snapshot, and only then does `workbench.js` start. The Design notes
 dialog says which data is showing. The page must be served, because `fetch` cannot read
@@ -98,6 +106,7 @@ means the engine has no such command yet.
 | `api.project.*`, `api.machines.*` | Proposed |
 | `api.git.*`, `api.terminal.run` | Proposed |
 | `api.setup.*` | Proposed: the first run's scan of the computer and its progress |
+| `api.mocks.*` | Proposed: compare a mock field with the schema, read a repository's design, and approve mocks |
 
 Reads return promises, as the real API will. The page awaits one snapshot at boot and keeps
 its live objects, which stands in for a snapshot plus a subscription. Commands take effect
@@ -112,6 +121,12 @@ answer synchronously, because the page reads them while it draws.
 These parts behave, but they are not real:
 
 - A prompt gets one scripted reply after 900 milliseconds, from `replies.default`.
+- A prompt to a lead whose project has no mocks starts a Design team when it mentions screens
+  or a design, from the words in `mocks.uiWords`. The screens in `mocks.starter` then arrive
+  every `mocks.screenDelay` milliseconds.
+- A prompt sent while a mock screen is open matches `mocks.tweaks`, and the change is a small
+  piece of style added to the screen. A real Design team would edit the screen's code.
+- Approving mocks writes a Planning team and its tasks from the screens, data, and drafts.
 - An answered question gets the reactions in `reactions`, or one line from the lead.
 - Sign-in and pairing each finish by themselves after 1,200 milliseconds.
 - The first run's scan takes 500 milliseconds and returns `setup.scenarios` from `first/reads.json`, chosen by `?setup=`.

@@ -13,3 +13,5 @@ test-results/
 .foundry/
 # Real events exported for the web mock. Threads hold whatever agents wrote.
 design/data/prod/
+# Private repositories shown in the web mock. They stay on this computer.
+design/data/local/

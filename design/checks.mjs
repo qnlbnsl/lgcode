@@ -94,7 +94,7 @@ try{
  await click('.project-select[data-project="workspace"]');await click('[data-sprint="sp-03"]');await click('[data-task="SH-16"]');await click('[data-show-changes="workspace-review"]');
  check(await page.locator('#participants').textContent().then(t=>t.includes('Review')),'Task changes open in the task owner’s team');
  await click('.project-select[data-project="desktop"]');
- check(await page.locator('#view-body').textContent().then(t=>t.includes('No sprints yet')&&t.includes('Nico')),'Unplanned project has an actionable board empty state');
+ check(await page.locator('#view-body').textContent().then(t=>t.includes('No sprints yet')&&t.includes('Design team')),'A project in design points its empty board at the mocks');check(await page.locator('#view-body [data-open-mocks]').count()===1,'The empty board opens the mocks');
  await click('#view-body [data-focus-lead]');check(await page.locator('#lead-chat-title').textContent()==='Nico'&&await page.locator('#message-input').evaluate(el=>el===document.activeElement),'Empty board action focuses its project lead panel');await leadChat();
  await click('.project-select[data-project="workspace"]');await leadChat();
  const longDraft=Array.from({length:18},(_,i)=>`Paragraph ${i+1}: Please keep this conversation scoped to the project.`).join('\n');

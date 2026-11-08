@@ -53,7 +53,9 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
 - In Sage's chat, select the message that Rowan needs a decision. It opens
   Rowan's exact question. Rowan stays highlighted until the question is
   answered. Answering clears Sage's request and the sprint's blocker too.
-- Expand App shell and Review to see their agents. A single workspace tab row offers Chat,
+- Expand Build team and Review team to see their agents. Teams are named for their stage:
+  Design team, Planning team, Build team, and Review team. Two teams in the same stage add
+  their area, such as Build team · Exports. A single workspace tab row offers Chat,
   Tasks, Terminal, Git, and Workspace settings in team scope. Drafts and reading position stay with each
   conversation. Teams remember their last tab.
 - Open the branch name at the top right. The list shows branches,
@@ -62,8 +64,27 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
   binding or redirect an agent. Git displays the selected workspace and follows its owning project and machine.
 - Send a message to see a reply. Stop cancels
   a pending reply. Both messages and drafts are scoped to their conversation.
-- Try the empty board in Desktop companion, or add a task to an active
-  sprint. Completed sprints do not accept new tasks.
+- Add a task to an active sprint. Completed sprints do not accept new tasks.
+- Every project board starts with a stage strip: Design, Plan, Build, Review, and Hand over.
+  The repository page lists each project's stage.
+- Open Desktop companion. It is in the Design stage, so its board is empty and points to the
+  mocks. The Mocks tab sits after Board in any project that has mocks.
+  - Screens lists each screen with its revision count. The frame shows the screen built from
+    real code, at phone or desktop size, with the four-project or ten-project data.
+  - Ask Nico for a change while a screen is open, such as "make it denser", "bluer",
+    "rounder", or "add lines". The screen changes in place, and Changes records it.
+  - Edit design shows a white placeholder where OpenPencil will run later.
+  - Data lists the fields the screens use and compares each with the schema: new,
+    matches, or differs. Components lists what the screens use, real or draft.
+  - Approve mocks promotes the drafts, moves the project to Plan, and starts a Planning team
+    with a sprint of tasks to move components, change the schema, and wire each screen.
+- Start a new project and tell its lead about screens, pages, or a design. The lead starts a
+  Design team, the Mocks tab appears, and the screens arrive one by one.
+- Open a repository page and choose Design. View shows the colors and the components every
+  project draws from, with live previews. Edit shows the OpenPencil placeholder.
+- Repositories that stay on this computer go in `data/local/`, which git ignores. Open one
+  with `?with=<id>`; Design notes lists the ones present. `?with=ananke` adds Ananke's
+  onboarding mocks, which need Ananke's mock server on port 8091.
 - Switch between Field and Dusk at the bottom of the sidebar.
 
 ## Existing page capabilities and new workspace views
@@ -139,6 +160,8 @@ new repositories, and the heavy sample.
 Run `node design/onboarding-checks.mjs` for the first run, from login to the lead's first message.
 Run `node design/home-checks.mjs` for global queues, filters, inline answers,
 merge approvals, machine-aware creation, density, and keyboard navigation.
+Run `node design/mocks-checks.mjs` for stages, stage team names, the Mocks tab, live
+revisions, approval, the repository Design tab, and a local repository when one is present.
 Each script accepts `MOCK_URL` for another preview address,
 `PLAYWRIGHT_MODULE` for a local Playwright module path, and `CHROMIUM_PATH`
 for an existing Chromium executable. It does not install dependencies.

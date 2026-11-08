@@ -471,5 +471,260 @@
     "text": "Your direction is recorded: agent conversations open in the main view. We can finish the handoff."
    }
   ]
+ },
+ "mocks": {
+  "devices": {
+   "phone": [
+    390,
+    844
+   ],
+   "desktop": [
+    1440,
+    900
+   ]
+  },
+  "designers": [
+   [
+    "Linden",
+    "Moss"
+   ],
+   [
+    "Rue",
+    "Pip"
+   ],
+   [
+    "Ondine",
+    "Hart"
+   ]
+  ],
+  "planners": [
+   "Ivy",
+   "Sorrel",
+   "Tern"
+  ],
+  "starter": [
+   {
+    "screenId": "home",
+    "title": "Home",
+    "route": "workbench.html?sample={sample}&screen=home",
+    "note": "Where requests from every project arrive."
+   },
+   {
+    "screenId": "board",
+    "title": "Project board",
+    "route": "workbench.html?sample={sample}&screen=board",
+    "note": "Sprints by status, with the lead beside them."
+   },
+   {
+    "screenId": "lead",
+    "title": "Lead conversation",
+    "route": "workbench.html?sample={sample}&screen=lead",
+    "note": "The full thread with the project lead."
+   }
+  ],
+  "starterScenarios": [
+   {
+    "id": "small",
+    "label": "Four projects"
+   },
+   {
+    "id": "heavy",
+    "label": "Ten projects"
+   }
+  ],
+  "starterData": [
+   {
+    "entity": "Project",
+    "field": "name",
+    "type": "text",
+    "screens": [
+     "home",
+     "board"
+    ]
+   },
+   {
+    "entity": "Project",
+    "field": "stage",
+    "type": "stage",
+    "screens": [
+     "board"
+    ]
+   },
+   {
+    "entity": "Request",
+    "field": "since",
+    "type": "time",
+    "screens": [
+     "home"
+    ]
+   }
+  ],
+  "starterComponents": [
+   {
+    "componentId": "button",
+    "name": "Button",
+    "origin": "real",
+    "path": "design/workbench.html · button.primary",
+    "screens": [
+     "home",
+     "board"
+    ]
+   },
+   {
+    "componentId": "composer",
+    "name": "Composer",
+    "origin": "real",
+    "path": "design/workbench.html · .composer",
+    "screens": [
+     "lead"
+    ]
+   }
+  ],
+  "uiWords": "screen|screens|page|pages|ui|interface|design|mock|mocks|layout|app|website|dashboard|form|button|look",
+  "replies": {
+   "started": [
+    "That needs screens before a plan, so I started the Design team. {designer} is drawing them from the repository’s own components, with sample data.",
+    "[Open the mocks](mocks:)"
+   ],
+   "revised": "{designer} changed {screen}: {summary}.",
+   "approved": "The mocks are approved. {planner} is turning them into a plan: {count} tasks are waiting on the board."
+  },
+  "tweaks": [
+   {
+    "match": "dens|tight|compact|spac|smaller|room",
+    "summary": "made it denser",
+    "css": "body{zoom:.9}"
+   },
+   {
+    "match": "bigger|larger|large|font|type|text|read",
+    "summary": "raised the type size",
+    "css": "body{zoom:1.1}"
+   },
+   {
+    "match": "blue",
+    "summary": "moved the accent to blue",
+    "css": "html{--color-primary:#2f5f99 !important;--color-accent:#2f5f99 !important}"
+   },
+   {
+    "match": "colou?r|accent|warm|orange|brand",
+    "summary": "warmed the accent",
+    "css": "html{--color-primary:#a4532c !important;--color-accent:#a4532c !important}"
+   },
+   {
+    "match": "round|soft",
+    "summary": "rounded the corners",
+    "css": "button,input,select,textarea,.sprint-card,.kanban-column,.home-request-row{border-radius:12px !important}"
+   },
+   {
+    "match": "square|sharp|flat",
+    "summary": "squared the corners",
+    "css": "*{border-radius:0 !important}"
+   },
+   {
+    "match": "line|border|divid",
+    "summary": "darkened the dividing lines",
+    "css": "html{--color-line:#8a9a8f !important}"
+   }
+  ],
+  "fallbackSummary": "worked in “{text}”",
+  "screenDelay": 700
+ },
+ "schema": {
+  "sheprd": {
+   "Project": {
+    "id": "text",
+    "repoId": "text",
+    "name": "text",
+    "goal": "text"
+   },
+   "Agent": {
+    "id": "text",
+    "name": "text",
+    "role": "text",
+    "harness": "text",
+    "state": "state"
+   },
+   "Request": {
+    "id": "text",
+    "title": "text",
+    "since": "time",
+    "status": "state"
+   },
+   "Task": {
+    "id": "text",
+    "title": "text",
+    "state": "text",
+    "owner": "text"
+   },
+   "Machine": {
+    "id": "text",
+    "name": "text",
+    "status": "state",
+    "slots": "number"
+   }
+  },
+  "atlas-docs": {
+   "Page": {
+    "path": "text",
+    "title": "text"
+   }
+  }
+ },
+ "design": {
+  "sheprd": {
+   "file": "design/sheprd.fig",
+   "tokens": [
+    "--color-bg",
+    "--color-surface",
+    "--color-raised",
+    "--color-text",
+    "--color-muted",
+    "--color-line",
+    "--color-primary",
+    "--color-primary-contrast",
+    "--color-selected",
+    "--color-success",
+    "--color-warn",
+    "--color-error"
+   ],
+   "components": [
+    {
+     "name": "Button",
+     "path": "design/workbench.html · button",
+     "variants": "Primary, Secondary",
+     "preview": "<button class=\"primary\">New project</button> <button class=\"secondary\">Cancel</button>"
+    },
+    {
+     "name": "Status dot",
+     "path": "design/workbench.html · .dot",
+     "variants": "Working, Waiting, Idle, Failed",
+     "preview": "<span class=\"dot\"></span> <span class=\"dot wait\"></span> <span class=\"dot idle\"></span> <span class=\"dot error\"></span>"
+    },
+    {
+     "name": "Segmented control",
+     "path": "design/workbench.html · .segmented",
+     "variants": "Selected, Not selected",
+     "preview": "<span class=\"segmented\"><button aria-pressed=\"true\">Unified</button><button aria-pressed=\"false\">Split</button></span>"
+    },
+    {
+     "name": "Inline link",
+     "path": "design/workbench.html · .inline-link",
+     "variants": "Default",
+     "preview": "<button class=\"inline-link\">Open sprint board →</button>"
+    },
+    {
+     "name": "Attention number",
+     "path": "design/workbench.html · .attention-number",
+     "variants": "Default",
+     "preview": "<span class=\"attention-number\">3</span>"
+    },
+    {
+     "name": "Task state",
+     "path": "design/workbench.html · .task-state",
+     "variants": "Up next, In progress, In review, Done, Blocked",
+     "preview": "<span class=\"task-state queue\"></span> <span class=\"task-state active\"></span> <span class=\"task-state review\"></span> <span class=\"task-state done\"></span> <span class=\"task-state blocked\"></span>"
+    }
+   ]
+  }
  }
 }
