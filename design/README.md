@@ -129,7 +129,21 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
   unavailable. The page says "Sign in to LGcode" under the logo mark. A rejected password
   shows in the error color under the field, and an expired session shows in the muted
   color. The unavailable page offers Try again as its main button.
-- Open Git in Agent console. Commit says what it needs before it can be used.
+- Open Git in Agent console. Commit says what it needs before it can be used. Below 1600
+  pixels the worktree list is a rail of icons; its button at the top opens it, and the browser
+  remembers that. Each worktree names its machine and says "2 changes". Drag or arrow the
+  handle beside the commit pane to resize it. Fetch, Pull, and Push sit in the pane's header,
+  and Integrate stays at its foot.
+- In Git, choose Stage all, then Unstage all. Choose Discard: it lists the files and asks first.
+- In `?sample=heavy`, open Git in Invoice exports. Its 26 changed files scroll between the
+  sync row and Integrate.
+- Open Git in Review team. Its worktree row says "1 conflict" in red, Conflicts sits above
+  Staged changes, and the conflict opens in the diff pane with ours, the base, and theirs for
+  each of its two conflicts. Choose Ours, Theirs, or Both for each, then Mark resolved. The
+  integrate line says how many conflicts are left and links to the file. Open in Terminal types
+  `vim` with the file, and Enter shows the conflict markers.
+- Open Terminal at 390 pixels. A row of Esc, Ctrl, Tab, and arrow keys sits above the keyboard,
+  and the prompt wraps only at the last column. Tap Ctrl, then type c, to stop a command.
 - Open Phone notifications, the phone icon at the foot of the sidebar, and choose Refresh.
   The notice appears at the top right, below the bell.
 - Expand a request on Home and answer it. The row eases open, and the answered row folds away.
@@ -280,8 +294,9 @@ groups, and service pages. This replaces the earlier disconnected controls.
 The composer shows current progress and Stop while the agent is busy, Resume in place of the
 input when it is stopped, and a tool row with Add context, the subscription, the model, the
 effort, and the context in use. Activity details link to Git.
-Terminal's plus button starts another session within that worktree. Switching
-projects, teams, or terminal sessions preserves each session's input.
+Terminal's plus button starts another session within that worktree. Hover a session's tab to
+close it, and double-click it to rename it. Switching projects, teams, or terminal sessions
+preserves each session's input.
 
 ## Home and density critique
 

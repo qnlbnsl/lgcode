@@ -293,6 +293,9 @@ that is the part that differs. All files stacks every changed file with a sticky
 | Thread | One agent's conversation. Chat stays the name of the tab. |
 | Phone notifications | Notifications sent to the owner's phone. Its badge counts failed notifications only. It was named Alerts until 2026-11-08, which a first reader confused with the bell. |
 | Inspecting | The top bar's control for the worktree whose code you look at. It was named Viewing. |
+| Ours | The worktree's own version of a conflicting change. |
+| Theirs | The version being merged in: the project branch for a team, or main. |
+| Base | The version both sides changed. |
 
 ### One density rule for records
 
@@ -819,3 +822,68 @@ tables, and what a monitor wider than 1800 pixels shows.
   requests", as the line above the composer does.
 - **A request held by the lead does not count for the owner.** The bell and Home's Needs
   attention leave it out until the lead releases it.
+
+## Git and the terminal, set on 2026-11-08
+
+These rules come from the designer's critique of 2026-11-06. Claude applied them on
+2026-11-08. They cover Git's three columns, conflicts, and terminal sessions.
+
+### Git's columns
+
+- **Diff rows are 20 pixels.** A row has no padding of its own, so about 38 rows fit on a
+  laptop screen instead of 21. File and folder rows in the commit pane are 28 pixels.
+- **The worktree list folds into a rail of 40 pixels.** The rail keeps each worktree's icon,
+  with a dot for changes and a red dot for a conflict, and hover text that names it. The
+  button at the top of the list folds and opens it.
+- **Below 1600 pixels the list starts folded.** The browser remembers the owner's choice once
+  they make one. Open, the list is 240 pixels wide. Phones keep their strip of worktrees.
+- **The commit pane can be resized.** Its handle works like the sidebar's. The arrow keys move
+  it by 16 pixels, and Home or a double click restores 280 pixels.
+- **Each worktree names its machine and labels its count,** such as "2 changes" or
+  "1 conflict". A conflict is red and has a warning icon.
+
+### The commit pane
+
+- **Sync is pinned at the top.** The header names the team or project, and holds Fetch, Pull,
+  Push, and the incoming and outgoing counts. The last Git message sits under it.
+- **Integrate is pinned at the bottom.** The commit form, the file groups, and History scroll
+  between the two, so a long file list hides neither.
+- **Changes has Stage all and Discard.** Staged changes has Unstage all. Each appears only
+  when its group has files.
+- **Discard asks first.** Its dialog lists the files and says that the change cannot be undone.
+  Its button names the count, such as "Discard 2 changes".
+- **"Back to changes" replaces the Uncommitted changes link.** It appears only while a commit
+  from History is open, so nothing that looks like a status is a link.
+
+### Conflicts
+
+- **Conflicts have their own section above Staged changes,** with a red count. Stage all and
+  Discard leave conflicted files alone.
+- **A conflict opens in the diff pane.** The pane shows the shared lines, and for each conflict
+  it shows ours, the base, and theirs, one above the other. Each conflict offers Ours,
+  Theirs, and Both. Both keeps ours, then theirs. A chosen conflict shows its result.
+- **Mark resolved finishes the file.** It needs a choice for every conflict, and the reason
+  beside it says how many are left. The file then returns to Changes for review and staging.
+- **Open in Terminal is the way out for hard cases.** It opens the worktree's terminal with
+  `vim` and the file already typed, and the editor shows the conflict markers.
+- **The integrate line names the conflict,** such as "Resolve 2 conflicts in workspace.tsx
+  first.", and the file name opens it. Conflicts come before the destination's changes,
+  because the owner can only fix their own worktree here.
+- **The whole-file conflict dialog is gone.**
+
+### Terminal sessions
+
+- **A session tab closes with its own button.** The button shows on hover and on focus, and
+  always on a phone. Closing the last session leaves "No terminal session is open." with New
+  terminal.
+- **A double click renames a session,** and so does F2. Enter keeps the name, and Escape keeps
+  the old one. The name lives in the data layer with the session.
+- **A full-screen program sits on the grid.** Its text, its status line, and its command line
+  start at the grid's left edge. The status line and the command line are one row each, and
+  the command line is the last row of the window.
+- **The prompt wraps only at the column limit,** as a terminal does, and the input takes the
+  rest of the prompt's last line.
+- **Phones have a row of special keys** above the keyboard: Escape, Control, Tab, and the four
+  arrows. Control stays pressed for the next letter, so Control and C stops a command. The keys
+  keep the focus, and with it the keyboard, in the terminal. Tab completes a word on every
+  screen size.
