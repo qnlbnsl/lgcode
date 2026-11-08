@@ -8752,3 +8752,10 @@ service and moves the state folder by hand before starting LGcode. The owner
 also updates environment variables, configuration folder names, and commands.
 Why it matters: an existing owner otherwise sees an empty installation, and
 old service settings, including the web password, do not configure LGcode.
+
+## 524. The live check's Codex tool step can fail because the agent never calls the tool
+
+Found: 2026-11-08, while checking the LGcode rename.
+State: open.
+
+In the first `pnpm live-check` run on the rename branch, the `sandbox-mcp` step failed with "codex: not attempted; exact ask tool calls=0". The Codex agent, GPT-6 Luna at low effort, made no call to the `lgcode` ask tool, so the probe had nothing to judge. The Claude agent's call succeeded in the same run. A second run passed the step for both agents, with the same code, so the failure depends on whether the model chooses to call the tool. The step should give the agent a second prompt, or run on a model that follows the instruction reliably, before it reports a failure.

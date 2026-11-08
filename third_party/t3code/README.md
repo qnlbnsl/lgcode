@@ -24,10 +24,10 @@ wrote. They are not copied code and have no rows. Every package is named
 `@lgcode/t3-<folder>` and uses only dependencies from the workspace catalog.
 The security read of every file below is in [SECURITY-REVIEW.md](SECURITY-REVIEW.md).
 
-The 2026-11-08 rename updates the workspace package metadata and LGcode's own
-notes. It leaves the source files, tests, and copyright lines unchanged. The
-internal context keys and temporary folder prefix below keep their recorded
-values.
+The 2026-11-08 rename updates the workspace package metadata, LGcode's own
+notes, and the names LGcode chose: the context keys, the temporary folder
+prefix, and the opening comment of the replay test. It leaves the code copied
+from T3 Code and its copyright lines unchanged.
 
 | Package | File here | File in T3 Code | Copyright line | Changes |
 |---|---|---|---|---|
@@ -58,14 +58,14 @@ values.
 | provider-instance | `provider-instance/src/ClaudeHome.ts` | `apps/server/src/provider/Drivers/ClaudeHome.ts` | none in original | Import lines only: `ClaudeSettings` now comes from `./settings.ts`, `expandHomePath` from `./pathExpansion.ts`, and `HostProcess` from `./HostProcess.ts`. |
 | provider-instance | `provider-instance/src/CodexHomeLayout.ts` | `apps/server/src/provider/Drivers/CodexHomeLayout.ts` | none in original | Import lines only: `ProviderDriverKind` now comes from `./providerInstance.ts`, `CodexSettings` from `./settings.ts`, `expandHomePath` from `./pathExpansion.ts`, and `HostProcess` from `./HostProcess.ts`. |
 | provider-instance | `provider-instance/src/CodexManagedHome.ts` | `apps/server/src/provider/CodexManagedHome.ts` | none in original | Import lines only: `ProviderInstanceId` now comes from `./providerInstance.ts`, `CodexSettings` from `./settings.ts`, and the layout from `./CodexHomeLayout.ts`. |
-| provider-instance | `provider-instance/src/HostProcess.ts` | `packages/shared/src/HostProcess.ts` | none in original | Written for LGcode from the T3 Code file. It keeps only `Platform`, `HomeDirectory` and `isWindows`. The context keys are `@sheprd/t3-host-process/Platform` and `@sheprd/t3-host-process/HomeDirectory`, shared with the copy in `provider-testing`, so that no `@t3tools` name remains. |
+| provider-instance | `provider-instance/src/HostProcess.ts` | `packages/shared/src/HostProcess.ts` | none in original | Written for LGcode from the T3 Code file. It keeps only `Platform`, `HomeDirectory` and `isWindows`. The context keys are `@lgcode/t3-host-process/Platform` and `@lgcode/t3-host-process/HomeDirectory`, shared with the copy in `provider-testing`, so that no `@t3tools` name remains. |
 | provider-instance | `provider-instance/src/instanceEnvironment.ts` | `packages/provider-core/src/server/instanceEnvironment.ts` | none in original | Import lines only: `ProviderInstanceEnvironment` now comes from `./providerInstance.ts` and `HostProcess` from `./HostProcess.ts`. |
 | provider-instance | `provider-instance/src/pathExpansion.ts` | `packages/provider-core/src/server/pathExpansion.ts` | none in original | Copied exactly. |
 | provider-instance | `provider-instance/src/providerInstance.ts` | `packages/contracts/src/providerInstance.ts` | none in original | Copied exactly. |
 | provider-instance | `provider-instance/src/secretReference.ts` | `packages/contracts/src/secretReference.ts` | none in original | Copied exactly. |
 | provider-instance | `provider-instance/src/settings.ts` | `packages/contracts/src/settings.ts` | none in original | Written for LGcode. It holds small local types `CodexSettings` and `ClaudeSettings` with only the fields the copied code reads, in place of T3 Code's large settings-form schemas. |
 | provider-instance | `provider-instance/test/CodexHomeLayout.test.ts` | `apps/server/src/provider/Drivers/CodexHomeLayout.test.ts` | none in original | Imports now point at `../src/CodexHomeLayout.ts`, `../src/settings.ts` and `./symlinks.ts`, because the test moved to `test/`. The `CodexSettings` schema decode became a small function that returns the local `CodexSettings` type with empty strings for missing fields. |
-| provider-instance | `provider-instance/test/symlinks.ts` | `packages/shared/src/testing/symlinks.ts` | none in original | The temporary folder prefix changed from `t3-symlink-probe-` to `sheprd-symlink-probe-`. Nothing else changed. |
+| provider-instance | `provider-instance/test/symlinks.ts` | `packages/shared/src/testing/symlinks.ts` | none in original | The temporary folder prefix changed from `t3-symlink-probe-` to `lgcode-symlink-probe-`. Nothing else changed. |
 | provider-testing | `provider-testing/src/baseSchemas.ts` | `packages/contracts/src/baseSchemas.ts` | none in original | Excerpt: lines 1, 3, 5-29 and 31 (`TrimmedString`, `isNonBlank`, `TrimmedNonEmptyString`, `NonNegativeInt`). |
 | provider-testing | `provider-testing/src/fakeCli.ts` | `packages/provider-testing/src/fakeCli.ts` | none in original | Import line only: `HostProcess` now comes from `./HostProcess.ts`. |
 | provider-testing | `provider-testing/src/HostProcess.ts` | `packages/shared/src/HostProcess.ts` | none in original | Written for LGcode from the T3 Code file. It keeps only `Platform`, with the same context key as the copy in `provider-instance`. |
