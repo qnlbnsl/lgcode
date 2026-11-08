@@ -526,6 +526,15 @@ The full design is in
   needs the owner's word, because the login rule is one user, one password and no
   pairing.
 
+## 10. Design and mock modes
+
+- **Design mode and mock mode** (requested by the owner, 2026-11-07; not
+  designed). The website gains an integrated design mode and a mock mode, so
+  the owner can use it to design and update the mocks of projects and apps.
+  Each project lists all of its mocks. For example, the owner could open the
+  website, go to Ananke's mocks, and see every one of them there. The owner is
+  adding this to the website mock first.
+
 ## Open questions
 
 - Which licence should Sheprd use?
