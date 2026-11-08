@@ -8681,14 +8681,37 @@ refused copy, where it stayed silent before.
 
 The product page supports only HTTPS and loopback, so the product should not meet the first case.
 
-## 519. The Claude and Grok review findings are not checked against `master`
+## 519. The Claude and Grok review findings are checked against `master`, and 20 remain
 
 Found: 2026-11-07, while reconciling `master` before the freeze.
-State: open, awaiting the owner's word to run the check.
+State: open. The check ran on 2026-11-07 at `95fcb14`, and the remaining findings wait until the freeze lifts.
 
-Three foundation reviews ran on the snapshot at the tag `foundation-pre-review`, and only the Codex review's fixes have reached `master`. The Claude review confirmed 51 findings, of which 25 concern the product and 26 concern tests. It left 526 findings unadjudicated and deferred 203 security findings. The Grok review confirmed 23 findings, of which 18 are distinct. It left 139 findings unadjudicated and deferred 10 security findings.
+Three foundation reviews ran on the snapshot at the tag `foundation-pre-review`, and only the Codex review's fixes reached `master`. Six Codex seats (GPT-6.1 Sol, high) then checked every confirmed and unresolved finding of the other two reviews against `master`. That was 56 Claude findings and 22 Grok findings, leaving out the three Grok security items, which belong to the owner's attack list.
 
-Nobody yet knows how many of these findings the Codex repairs already fixed. A reading on 2026-11-07 found that the Codex register's `R-009`, `R-012`, `L-038` and `FR-001` are still present on `master`, and that `R-002` still needs a manual build. The evidence is outside git, in `.scratch/foundry-runs/foundation-plans-1/`, under `review-claude/`, `review-cursor/` and `review-codex/`.
+| Review | Fixed | Partly fixed | Still present |
+|---|---|---|---|
+| Claude | 25 | 17 | 14 |
+| Grok | 14 | 2 | 6 |
+
+These product findings are still present:
+
+- `R-008`: a post to the owner that needs no reply still counts the owner as holding the asker.
+- `R-009`: when a stopped asker's question notice is withdrawn, its holder is never told or settled.
+- `R-012`, the same cause as Grok's `L-066`: a tool kind outside the known list drops the permission request, and the agent keeps waiting.
+- `R-013`: the stall rule for a lead with a busy team. Issue 520 holds the owner's ruling.
+- `R-016`: a long last turn loses its newest messages.
+- `R-023`: a symbolic link anywhere above the configuration folder fails without saying why.
+- `L-038`: an account's `enabled` flag can be left out of a snapshot that requires it.
+- `L-047`: the Alerts and Settings pages stay up after the session ends.
+- `L-119`: the owner's snapshot leaves out open alerts.
+- `L-124`: saving the web settings reports a connection failure.
+- `L-132`: a refused board post fails the notice loop, and the host restarts it. The advisory board left open whether the retry lasts forever.
+
+The other still-present findings are missing tests: `R-026`, `R-032`, `R-035`, `R-043`, `R-046`, `R-047`, `R-049` and `R-054`. The 19 partly fixed findings name what remains in each result.
+
+The check corrected one earlier reading. `FR-001` and the Claude review's `R-001` are fixed by commit `7078bd0`, because a public address must now use HTTPS, and plain HTTP is supported only on loopback.
+
+The check did not cover the 526 Claude findings and 139 Grok findings that were never adjudicated. The advisory board found eight causes among those 526 that other panels confirmed, so they are worth a later pass. The task files and results are outside git, in `.scratch/foundry-runs/foundation-plans-1/findings-check/`, and the reviews' evidence is in `review-claude/`, `review-cursor/` and `review-codex/` beside it.
 
 ## 520. The stall rule nudges a lead while its own worker is busy, and the plan contradicts itself
 
