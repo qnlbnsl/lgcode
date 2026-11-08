@@ -649,6 +649,72 @@ await run('board, sprint, task, tables, and wide screens',async()=>{
  check(await m.locator('#close-lead-panel').isVisible()&&await m.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'BOARD-2: the phone drawer keeps its close button');await m.close();
 });
 
+await run('git and the terminal',async()=>{
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ // GIT-2: 20 pixel diff rows, a 40 pixel worktree rail below 1600 pixels, and a commit pane that resizes from the keyboard.
+ const g=await fresh();const at=s=>g.locator(s).first();
+ await g.evaluate(()=>openBoard('workspace'));await at('[data-main-view="source-control"]').click();
+ const row=await at('.unified-diff .diff-line.context').evaluate(e=>{const s=getComputedStyle(e);return {h:Math.round(e.getBoundingClientRect().height),pad:s.paddingTop+' '+s.paddingBottom}});
+ check(row.h===20&&row.pad==='0px 0px','GIT-2: diff rows are 20 pixels with no row padding: '+JSON.stringify(row));
+ check(Math.round((await at('.worktree-navigation').evaluate(e=>e.getBoundingClientRect().width)))===40&&await at('.worktree-navigation .wt-text').isHidden(),'GIT-2: below 1600 pixels the worktree list starts as a 40 pixel rail');
+ await at('#worktree-fold').click();check(Math.round(await at('.worktree-navigation').evaluate(e=>e.getBoundingClientRect().width))===240&&await at('.worktree-navigation .wt-text').isVisible(),'GIT-2: the fold button opens the worktree list');
+ await g.reload();await g.waitForFunction(()=>window.lgcodeReady);await g.evaluate(()=>openBoard('workspace'));await at('[data-main-view="source-control"]').click();
+ check(await at('#worktree-fold').getAttribute('aria-expanded')==='true','GIT-2: the browser remembers the open worktree list');
+ const pane=()=>at('.git-changes').evaluate(e=>Math.round(e.getBoundingClientRect().width));
+ await at('#git-resize').focus();await g.keyboard.press('ArrowRight');check(await pane()===296&&await at('#git-resize').getAttribute('aria-valuenow')==='296','GIT-2: the arrow keys resize the commit pane');
+ await g.keyboard.press('Home');check(await pane()===280,'GIT-2: Home restores the commit pane width');
+ const wide=await fresh('',{width:1700,height:900});await wide.evaluate(()=>openGit('workspace','workspace'));
+ check(Math.round(await wide.locator('.worktree-navigation').evaluate(e=>e.getBoundingClientRect().width))===240,'GIT-2: at 1600 pixels and above the worktree list starts open');
+ // GIT-3: the machine and a labelled count on each worktree, and sync in the pane header.
+ const wt=await wide.locator('[data-git-worktree="workspace"]').textContent();
+ check(wt.includes('2 changes')&&wt.includes('Studio')&&(await wide.locator('[data-git-worktree="recovery"]').textContent()).includes('Buildbox'),'GIT-3: each worktree names its machine and labels its count: '+wt);await wide.close();
+ check(await g.locator('.git-pane-head #git-fetch, .git-pane-head #git-pull, .git-pane-head #git-push').count()===3,'GIT-3: Fetch, Pull, and Push sit in the pane header');
+ await at('#git-stage-all').click();check(await g.locator('[data-stage-file][aria-label^="Unstage"]').count()===2&&(await at('#git-commit').textContent()).trim()==='Commit 2 files','GIT-3: Stage all stages every changed file');
+ await at('#git-unstage-all').click();check(await g.locator('[data-stage-file][aria-label^="Stage"]').count()===2,'GIT-3: Unstage all returns them');
+ await at('#git-discard').click();check(await at('#discard-dialog').isVisible()&&(await at('#discard-title').textContent())==='Discard 2 changes?'&&await g.locator('#discard-files li').count()===2,'GIT-3: Discard asks first and lists the files');
+ await at('#discard-dialog [data-close="discard-dialog"].secondary').click();check(await g.locator('[data-source-file]').count()===2,'GIT-3: Cancel keeps the changes');
+ await at('#git-discard').click();await at('#confirm-discard').click();check(await g.locator('.git-changes [data-source-file]').count()===0&&(await at('#git-notice').textContent()).includes('Discarded 2 changes'),'GIT-3: confirming Discard removes the changes');
+ await g.close();
+ const h=await fresh('?sample=heavy');await h.evaluate(()=>openGit('heavy-invoices','invoices'));
+ const pinned=await h.evaluate(()=>{const p=document.querySelector('.git-changes').getBoundingClientRect(),body=document.querySelector('.git-pane-body'),foot=document.querySelector('#git-integration').getBoundingClientRect(),head=document.querySelector('.git-pane-head').getBoundingClientRect();return {files:document.querySelectorAll('.git-changes [data-source-file]').length,scrolls:body.scrollHeight>body.clientHeight,foot:Math.abs(foot.bottom-p.bottom)<=1,head:Math.abs(head.top-p.top)<=1}});
+ check(pinned.files>=20&&pinned.scrolls&&pinned.foot&&pinned.head,'GIT-3: with a long file list the sync row stays at the top and Integrate at the bottom: '+JSON.stringify(pinned));await h.close();
+ // CONFLICT-1: Open in Terminal starts the editor on the conflicted file.
+ const c=await fresh();await c.evaluate(()=>openGit('workspace-review','workspace'));
+ await c.locator('[data-open-in-terminal]').click();check(await c.locator('#terminal-command').inputValue()==='vim app/workspace.tsx','CONFLICT-1: Open in Terminal puts the editor command in the worktree\'s terminal');
+ await c.locator('#terminal-command').press('Enter');check((await c.locator('.terminal-alt').textContent()).includes('<<<<<<< feat/workspace/review'),'CONFLICT-1: the editor shows the conflict markers');
+ // TERM-2: the full-screen program's status and command lines are rows of the grid, aligned with its edge, down to the bottom.
+ const alt=await c.evaluate(()=>{const b=s=>document.querySelector(s).getBoundingClientRect(),pad=s=>parseFloat(getComputedStyle(document.querySelector(s)).paddingLeft);return {status:b('.terminal-alt-status').left+pad('.terminal-alt-status'),body:b('.terminal-alt-body').left+pad('.terminal-alt-body'),line:parseFloat(getComputedStyle(document.querySelector('#terminal-screen')).lineHeight),statusH:b('.terminal-alt-status').height,cmd:b('.is-alt .terminal-command'),screen:b('#terminal-screen').bottom}});
+ check(alt.status===alt.body&&Math.abs(alt.statusH-alt.line)<1&&Math.abs(alt.cmd.height-alt.line)<1&&Math.abs(alt.cmd.bottom-alt.screen)<=1,'TERM-2: the status line lines up with the grid, and it and the command line are one row each: '+JSON.stringify(alt));
+ await c.close();
+ // TERM-1: close on hover, rename on double click, both through the data layer.
+ const t=await fresh();await t.evaluate(()=>openBoard('workspace'));await t.locator('[data-main-view="terminal"]').first().click();
+ check(await t.locator('.terminal-close').first().evaluate(e=>getComputedStyle(e).opacity)==='0','TERM-1: the close button waits for hover on a desktop');
+ await t.locator('.terminal-tab').first().hover();check(await t.locator('.terminal-close').first().evaluate(e=>getComputedStyle(e).opacity)==='1','TERM-1: hovering a session shows its close button');
+ await t.locator('[data-terminal-session]').first().dblclick();await t.locator('[data-rename-terminal]').fill('Build');await t.locator('[data-rename-terminal]').press('Enter');
+ check((await t.locator('[data-terminal-session]').first().textContent())==='Build'&&await t.evaluate(()=>api.terminal.sessions(workspace().id)[0].name)==='Build','TERM-1: a double click renames a session, and the name is kept by the data layer');
+ await t.locator('#new-terminal').click();check(await t.locator('[data-terminal-session]').count()===2,'A new session adds a tab');
+ await t.locator('[data-close-terminal="2"]').click();check(await t.locator('[data-terminal-session]').count()===1&&await t.evaluate(()=>api.terminal.sessions(workspace().id).length)===1,'TERM-1: the close button ends a session');
+ await t.locator('[data-close-terminal]').click();check((await t.locator('#terminal-screen').textContent()).includes('No terminal session is open.')&&await t.locator('#new-terminal-empty').isVisible(),'TERM-1: closing the last session leaves one action, New terminal');
+ await t.locator('#new-terminal-empty').click();check(await t.locator('#terminal-command').isVisible(),'New terminal opens a session again');
+ check(await t.locator('.terminal-keys').isHidden(),'TERM-4: a desktop has no row of special keys');
+ await t.close();
+ // TERM-4: the phone's special keys, and a prompt that wraps only at the column limit.
+ const p=await fresh('',{width:390,height:844});await p.evaluate(()=>openBoard('workspace'));await p.locator('[data-main-view="terminal"]').first().click();
+ check(await p.locator('.terminal-keys button').count()===7&&await p.locator('.terminal-keys').isVisible()&&await p.locator('.terminal-close').first().evaluate(e=>getComputedStyle(e).opacity)==='1','TERM-4 and TERM-1: a phone has Escape, Control, Tab, and arrow keys, and shows the close button');
+ const wrap=await p.evaluate(()=>{const label=document.querySelector('#terminal-form label.terminal-prompt'),r=document.createRange();r.selectNodeContents(label);const rects=[...r.getClientRects()],right=document.querySelector('#terminal-form').getBoundingClientRect().right,lines=[...new Set(rects.map(x=>Math.round(x.top)))];const ends=lines.slice(0,-1).map(top=>Math.max(...rects.filter(x=>Math.round(x.top)===top).map(x=>x.right)));return {lines:lines.length,gaps:ends.map(e=>Math.round(right-e))}});
+ check(wrap.lines>1&&wrap.gaps.every(gap=>gap<12),'TERM-4: the prompt fills each line to the column limit before it wraps: '+JSON.stringify(wrap));
+ const cmd=p.locator('#terminal-command');await cmd.fill('ca');await p.locator('[data-terminal-key="Tab"]').click();check(await cmd.inputValue()==='cat ','TERM-4: Tab completes the word');
+ await cmd.fill('pwd');await cmd.press('Enter');await p.locator('[data-terminal-key="ArrowUp"]').click();check(await cmd.inputValue()==='pwd','TERM-4: the Up key recalls the last command');
+ await p.locator('[data-terminal-key="Control"]').click();check(await p.locator('[data-terminal-key="Control"]').getAttribute('aria-pressed')==='true'&&await cmd.evaluate(e=>e===document.activeElement),'TERM-4: Control stays pressed for the next key and keeps the focus in the terminal');
+ await cmd.pressSequentially('c');check((await p.locator('#terminal-output').textContent()).includes('^C')&&await p.locator('[data-terminal-key="Control"]').getAttribute('aria-pressed')==='false','TERM-4: Control and a letter send that control key');
+ check(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'TERM-4: the phone terminal does not scroll sideways');
+ await p.close();
+ // A lost connection disables the new controls.
+ const o=await fresh();await o.evaluate(()=>openBoard('workspace'));await o.locator('[data-main-view="source-control"]').first().click();await o.evaluate(()=>document.querySelector('[data-preview="reconnect"]').click());await o.waitForTimeout(60);
+ check(await o.locator('#git-stage-all').isDisabled()&&await o.locator('#git-discard').isDisabled()&&(await o.locator('#git-discard').getAttribute('title')||'').includes('connection'),'Stage all and Discard wait for the connection');
+ await o.locator('[data-main-view="terminal"]').first().click();check(await o.locator('[data-close-terminal]').first().isDisabled(),'Closing a terminal waits for the connection');await o.close();
+});
+
 const result={passed:checks.length,failed:failures.length,failures,errors,checks};
 writeFileSync('design/previews/revision-checks.json',JSON.stringify(result,null,2));
 console.log(JSON.stringify({passed:checks.length,failed:failures.length,failures,errors},null,1));
