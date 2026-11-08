@@ -45,7 +45,7 @@ const machine=id=>S.machineItems.find(item=>item.id===id);
 function localMachine(){if(!S.machineItems.length)S.machineItems.push({id:'local',name:'This computer',role:'Master',status:'Online',slots:8,workspaceFolder:'~/projects'});return S.machineItems[0]}
 function worktreeFor(id,repoId,fields){
  const known=reads.git.worktrees[id]||{},branch=fields.branch;
- const worktree={id,repoId,machineId:fields.machineId,branch,path:fields.path,owner:known.owner??fields.owner??'',activity:known.activity??fields.activity??'No uncommitted changes',files:[...(known.files||[])],incoming:known.incoming||0,conflicts:[...(known.conflicts||[])],history:known.history||reads.git.defaultHistory.map(c=>({...c,ref:fill(c.ref,{branch})}))};
+ const worktree={id,repoId,machineId:fields.machineId,branch,path:fields.path,owner:known.owner??fields.owner??'',activity:known.activity??fields.activity??'No uncommitted changes',files:[...(known.files||[])],incoming:known.incoming||0,conflicts:[...(known.conflicts||[])],history:known.history||reads.git.defaultHistory.map(c=>({...c,ref:fill(c.ref,{branch})})),...(known.awaiting?{awaiting:known.awaiting}:{})};
  for(const key of ['projectId','teamId','parentId'])if(fields[key])worktree[key]=fields[key];
  S.workspaces.push(worktree);return worktree;
 }
@@ -173,10 +173,10 @@ const handlers={
   S.requests.push({id:e.questionId,projectId:project?.id,agentId:e.agentId,status:'open',title:e.text.slice(0,80),summary:(a?.name||e.agentId)+' needs your answer.',question:e.text,recommendation:'',since:row.occurred_at,...(e.holder?._tag==='agent'?{holder:'lead'}:{})});
   ensureTurn(e.agentId,row).parts.push({type:'question',id:e.questionId});
  },
- QuestionAnswered:(row,e)=>{const r=request(e.questionId);if(r)r.status='resolved'},
+ QuestionAnswered:(row,e)=>{const r=request(e.questionId);if(r)Object.assign(r,{status:'resolved',answeredAt:row.occurred_at})},
  PermissionRequested:(row,e)=>S.permissionItems.push({id:e.permissionRequestId,projectId:projectOfAgent(e.agentId)?.id,agentId:e.agentId,callId:e.toolCallId,title:e.description,kind:e.toolKind||'tool',...(e.toolInput?{input:e.toolInput}:{}),...(e.inputRedacted?{redacted:true}:{}),status:'open',options:e.options,since:row.occurred_at,...(e.holder?._tag==='agent'?{holder:'lead'}:{})}),
- PermissionAnswered:(row,e)=>{const r=permission(e.permissionRequestId);if(!r)return;r.status='answered';const chosen=r.options.find(o=>o.id===e.answer.optionId);r.answer=e.answer._tag==='selected'&&/allow/i.test(chosen?.kind||'')?chosen.name:'Denied'},
- PermissionCancelled:(row,e)=>{const r=permission(e.permissionRequestId);if(r){r.status='cancelled';r.answer=e.reason}},
+ PermissionAnswered:(row,e)=>{const r=permission(e.permissionRequestId);if(!r)return;r.status='answered';r.answeredAt=row.occurred_at;const chosen=r.options.find(o=>o.id===e.answer.optionId);r.answer=e.answer._tag==='selected'&&/allow/i.test(chosen?.kind||'')?chosen.name:'Denied'},
+ PermissionCancelled:(row,e)=>{const r=permission(e.permissionRequestId);if(r){r.status='cancelled';r.answer=e.reason;r.answeredAt=row.occurred_at}},
  PermissionMoved:(row,e)=>{const r=permission(e.permissionRequestId);if(r)r.holder='lead'},
  DeliveryQueued:(row,e)=>{const d=e.delivery;S.deliveryItems.push({id:d.id,agentId:d.target,from:nameOf(d.sender),source:reads.deliveryLabels[d.id]||projectOfAgent(d.target)?.name||'',text:d.content.text||d.content._tag,history:['Queued']})},
  DeliverySent:(row,e)=>delivery(e.deliveryId)?.history.push('Sent'),
@@ -200,9 +200,11 @@ function fold(row){const handler=handlers[row.event_type];if(handler)handler(row
 
 // The same rule as threadAgent in packages/engine/src/views/apply.ts.
 const threadAgent=e=>e._tag==='DeliveryQueued'?e.delivery.target:typeof e.agentId==='string'?e.agentId:null;
+// The sample's clock keeps running from its export time, so new events and merges sort after stored ones.
+const nowAt=()=>meta.clock+1+(Date.now()-bootedAt);
 function emit(event_type,payload,{caller='owner',reply=false}={}){
  const body={_tag:event_type,...payload},engine=!/^(project|board|client)\./.test(event_type),thread=engine?threadAgent(body):null;
- const row={sequence:++sequence,event_id:'evt-'+String(sequence).padStart(5,'0'),caller,caller_rule:null,request_id:'req-'+sequence,agent_id:thread,thread_agent_id:thread,event_type,occurred_at:meta.clock+1+(Date.now()-bootedAt),payload_json:JSON.stringify(body)};
+ const row={sequence:++sequence,event_id:'evt-'+String(sequence).padStart(5,'0'),caller,caller_rule:null,request_id:'req-'+sequence,agent_id:thread,thread_agent_id:thread,event_type,occurred_at:nowAt(),payload_json:JSON.stringify(body)};
  if(reply)row.reply=true;
  events.push(row);fold(row);
  for(const notify of subscribers)notify(row,body);
@@ -495,7 +497,8 @@ const api={
  // Git is read from the worktree at request time, so these change no events.
  git:{
   state(id){
-   if(!gitStates.has(id)){const w=S.workspaces.find(x=>x.id===id);gitStates.set(id,{staged:new Set(),message:'',commits:[],incoming:w?.incoming||0,outgoing:0,pending:0,conflicts:new Set(w?.conflicts||[]),resolutions:new Map(),notice:'',lastMerge:''})}
+   // A worktree can start with commits that wait for the owner's merge; pendingSince says since when, and mergedAt when the last merge happened.
+   if(!gitStates.has(id)){const w=S.workspaces.find(x=>x.id===id),waiting=(w?.awaiting?.commits||[]).map(c=>({...c,ref:w.branch}));gitStates.set(id,{staged:new Set(),message:'',commits:waiting,incoming:w?.incoming||0,outgoing:waiting.length,pending:waiting.length,pendingSince:waiting.length?w.awaiting.since:null,mergedAt:null,conflicts:new Set(w?.conflicts||[]),resolutions:new Map(),notice:'',lastMerge:''})}
    return gitStates.get(id);
   },
   log(id){const w=S.workspaces.find(x=>x.id===id);return [...api.git.state(id).commits,...(w?.history||[])]},
@@ -503,7 +506,7 @@ const api={
   commit(id){
    const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id),files=w.files.filter(f=>g.staged.has(f)),commit='d'+(counters.git++).toString(16).padStart(6,'0');
    g.commits.unshift({id:commit,title:g.message.trim(),ref:w.branch,files});
-   w.files=w.files.filter(f=>!g.staged.has(f));g.staged.clear();g.message='';g.outgoing++;g.pending++;g.notice='Committed '+commit+' on '+w.branch+'.';
+   w.files=w.files.filter(f=>!g.staged.has(f));g.staged.clear();g.message='';g.outgoing++;if(!g.pending)g.pendingSince=nowAt();g.pending++;g.notice='Committed '+commit+' on '+w.branch+'.';
   },
   fetch(id){api.git.state(id).notice='Remote references are up to date.'},
   pull(id){const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id);g.incoming=0;g.notice='Updated '+w.branch+' from its tracked branch.'},
@@ -512,7 +515,7 @@ const api={
   integrate(id,targetId){
    const w=S.workspaces.find(x=>x.id===id),target=S.workspaces.find(x=>x.id===targetId),g=api.git.state(id),parent=api.git.state(targetId),files=[...new Set(g.commits.slice(0,g.pending).flatMap(c=>c.files))];
    parent.commits.unshift({id:'m'+(counters.git++).toString(16).padStart(6,'0'),title:'Merge '+w.branch,ref:target.branch,files:files.length?files:['docs/README.md']});
-   parent.outgoing++;parent.pending++;g.pending=0;g.lastMerge=target.branch;g.notice='Merged '+w.branch+' into '+target.branch+'.';
+   parent.outgoing++;if(!parent.pending)parent.pendingSince=nowAt();parent.pending++;g.pending=0;g.pendingSince=null;g.mergedAt=nowAt();g.lastMerge=target.branch;g.notice='Merged '+w.branch+' into '+target.branch+'.';
   },
   // Slow on purpose, so the merge dialog shows that it is waiting for results.
   async mergeEvidence(id){

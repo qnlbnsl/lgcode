@@ -88,6 +88,20 @@ files from `file://`.
 Times are not hardcoded. Home works out each wait from the event's `occurred_at` and the
 fixed clock in `meta.json`. Blocked tasks and active agent counts come from the data too.
 
+Home needs three more times, added on 2026-11-08 for the designer's Home findings:
+
+- **When a request was answered.** The reducer copies the answering event's `occurred_at`
+  into `answeredAt` on a question or permission, and on a cancelled permission too. Home
+  shows it as "Allowed 10:47" or "Answered 10:47". The engine's answer events already carry
+  this time, so the real API needs no new field.
+- **Since when a merge has waited.** `api.git.state` returns `pendingSince`, the time the
+  first unmerged commit arrived, and `mergedAt`, the time of the last merge. The engine reads
+  Git at request time, so the real service would take `pendingSince` from the oldest
+  unmerged commit's date.
+- **A merge that was already waiting.** A worktree in `reads.json` can hold `awaiting`, with
+  `since` and its `commits`. The heavy sample uses it for `docs/api-reference`, which has
+  waited 1 hour and 25 minutes for the owner's merge.
+
 ## Which stub stands for which real command
 
 The real command names come from `packages/contracts/src/client/commands.ts`. "Proposed"

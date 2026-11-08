@@ -254,11 +254,8 @@
    },
    "heavy-reference": {
     "owner": "API reference · Cato",
-    "activity": "2 changed files",
-    "files": [
-     "src/index.ts",
-     "src/rules.ts"
-    ],
+    "activity": "1 commit waiting for your merge",
+    "files": [],
     "incoming": 0,
     "conflicts": [],
     "history": [
@@ -279,7 +276,20 @@
        "docs/README.md"
       ]
      }
-    ]
+    ],
+    "awaiting": {
+     "since": 1793957460000,
+     "commits": [
+      {
+       "id": "e41b9d2",
+       "title": "Generate the reference for stable calls",
+       "files": [
+        "src/index.ts",
+        "src/rules.ts"
+       ]
+      }
+     ]
+    }
    },
    "workspace-app-shell": {
     "owner": "App shell · Rowan",
