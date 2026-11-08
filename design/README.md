@@ -51,14 +51,23 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
 - Select Workspace app to open its sprint board with Sage in the right
   chat panel. Agent recovery has Vale, and Desktop companion has Nico.
   Each project has exactly one lead. There is no Board row in the tree.
-- Close the lead panel to widen the board. The lead button reopens it. On smaller screens it opens as a drawer. Escape closes the
-  drawer. The expand control opens the full conversation, preserving its
-  messages and draft.
+- The lead button at the right end of the tab row closes and reopens the lead panel. On smaller
+  screens it opens as a drawer, and Escape closes the drawer. The Chat tab opens the full
+  conversation, preserving its messages and draft.
 - The branch appears once, in the top bar, after Inspecting. Inspect another worktree, and
   the list still marks the assigned one.
-- On the board, select a sprint to see its tasks,
-  owners, phase, dependencies, and completion evidence. Select a task to
-  see the assignment and continue to its agent or changed files.
+- On the board, Thread view and Narrow-screen pass lead with an amber line and an amber left
+  rule, because a question and two approvals wait for you. Select Thread view: its status is
+  under the title, and Rowan's question and Iris's approval come first, answerable in place.
+  SH-15 says "Blocked by an approval". Select SH-15: Talk to Iris sits at the top right, and
+  each activity step has its time.
+- Open Build team's Tasks, All projects on Home, and a repository page. Each row is one line.
+  The repository page is the All projects table without its Repository column.
+- Open Iris's thread, then Git. The lead button at the right of the tab row now says Iris, and
+  it docks her thread beside the diff.
+- Widen the window past 1800 pixels. The thread panel stays open beside every project view,
+  Chat shows the agent's task and changed files beside the thread, and board cards stop at
+  300 pixels.
 - In Sage's chat, select the message that Rowan needs a decision. It opens
   Rowan's exact question. Rowan stays highlighted until the question is
   answered. Answering clears Sage's request and the sprint's blocker too.

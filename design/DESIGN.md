@@ -34,11 +34,14 @@ conversation and composer beside the sprints. Other projects show their
 own single lead. Drafts, messages, pending replies, and reading positions
 stay with that conversation when it is opened full size.
 
-The lead button and close control can collapse the panel. At widths of
-1100 pixels or less it starts closed. The lead button opens a drawer over
-the board. The drawer contains keyboard focus, Escape closes it, and focus
-returns to the lead button. Its expand control opens the full conversation.
-The board retains its own scroll position while the conversation scrolls.
+The lead button at the right end of the tab row opens and closes the panel.
+On a desktop it is the only control that does, so the panel has no close
+button and no expand button; the Chat tab opens the full conversation. At
+widths of 1100 pixels or less the panel starts closed, and the lead button
+opens it as a drawer over the board. The drawer keeps its close button,
+because it covers the lead button. The drawer contains keyboard focus,
+Escape closes it, and focus returns to the lead button. The board retains
+its own scroll position while the conversation scrolls.
 
 ## Preserve the existing page’s operational controls
 
@@ -294,7 +297,8 @@ that is the part that differs. All files stacks every changed file with a sticky
 ### One density rule for records
 
 Comparable records are tables with rows of 46 pixels or less: Machines, Project
-placement, Subscriptions, Phone notifications, and All projects. Requests are single-line rows
+placement, Subscriptions, Phone notifications, All projects, the repository page, and
+tasks. Requests are single-line rows
 that say how long they have waited and what they block. At 900 pixels and narrower, a request
 row has a second line that starts with its kind. Expanded rows do not repeat
 their own title. No text is smaller than 11 pixels, and metadata is 12 pixels.
@@ -756,3 +760,62 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
 - **Typing @ opens the same list.** An @ typed at the start of the draft or after a space opens it.
   Adding context removes that @, and Cancel leaves it in the draft.
 
+## The board, sprints, tasks, and wide screens, set on 2026-11-08
+
+These rules come from the designer's critique of 2026-11-06. Claude applied them on
+2026-11-08. They cover the board's cards, the sprint and task pages, the project and task
+tables, and what a monitor wider than 1800 pixels shows.
+
+### Board cards
+
+- **A card leads with what waits for the owner.** A card that needs an answer or an approval
+  starts with that line, in amber, and has an amber left rule. Two or more requests read
+  "2 requests need you".
+- **Then the card names the sprint.** It shows the identifier and phase, the title, one line
+  of goal cut with an ellipsis, the owner with the others working on it, and the progress.
+- **Progress is not an empty bar.** A sprint with no finished task says how many tasks it
+  has. The bar appears once a task is done, as "1 of 2 done".
+- **Column headings have no dot.** The name and the count say everything.
+- **Cards stop at 300 pixels.** A column with more cards is wider, so its cards sit side by
+  side. A column is at least 180 pixels wide, so four fit beside the lead at 1440 pixels.
+
+### Sprint and task pages
+
+- **A sprint's status is in the line under its title,** such as "SP-02 · Build · In progress
+  · 2 requests need you". The Plan line is gone.
+- **What the page waits for comes first.** A sprint's open questions, and the approvals that
+  block its tasks, sit above its goal in the shared request block, so they can be answered
+  there. Only the first block keeps a filled button.
+- **A task blocked by its owner's approval says "Blocked by an approval".** The owner's open
+  approval blocks the task that owner is working on.
+- **A task page's actions sit at the top right,** beside the link back to the sprint. Talk to
+  the owner is the primary button unless a request waits, and then the request's answer is.
+- **A task page links its owner** and does not repeat the identifier and status from the line
+  under its title. Folders and branches are cut at their start, with the full path on hover.
+- **Each activity step says when it happened,** as a time today or a date and time before.
+- **A section's action sits on its heading's line.** Add task lines up with Plan tasks.
+
+### Tables
+
+- **Tasks are one line.** Sprint and team task lists are tables with Task, Title, Status, and
+  Owner columns, at 40 pixels a row. Team tasks use the wide frame, so they start at the tab
+  row's left edge.
+- **All projects and the repository page share one table.** Its columns are Project,
+  Repository, Lead, Stage, Machine, Status, and Branch, one line a row. The repository page
+  leaves out Repository and drops its filler sentences. Status uses the same words as All
+  projects: Needs attention with its count, Working, Designing, or Planning.
+
+### The thread panel and wide screens
+
+- **The panel docks the current thread.** It shows the agent whose view you came from: the
+  lead on the board, or Iris on Git after Iris's thread. A team's views dock the team chat.
+- **Git offers the panel at every width.** Below 1801 pixels it starts closed on Git, because
+  Git's three columns need the width, and the lead button opens it.
+- **Above 1800 pixels the panel stays open beside every project view,** including sprints,
+  tasks, Terminal, Project settings, and team Tasks. Chat is the thread itself, so it shows
+  the agent's task and changed files beside the thread instead. A lead shows its sprints in
+  flight.
+- **A lead's status counts its team's requests.** The line under Chat says "Waiting on 3
+  requests", as the line above the composer does.
+- **A request held by the lead does not count for the owner.** The bell and Home's Needs
+  attention leave it out until the lead releases it.
