@@ -38,6 +38,11 @@ LGcode's own stylesheet sets the stroke width to 1.6 instead of Lucide's 2.
 | `circle-help` | Design notes. |
 | `refresh-cw` | Reconnect now, beside the Live indicator, added on 2026-11-08. |
 | `git-branch` | Branch names. |
+| `arrow-down` and `arrow-up` | Git's incoming and outgoing counts, and the phone terminal's arrow keys, added on 2026-11-08. `arrow-up` is also Send. |
+| `arrow-left` and `arrow-right` | The phone terminal's arrow keys, too. |
+| `triangle-alert` | A file or worktree with a Git conflict, added on 2026-11-08. |
+| `terminal` | Open in Terminal, on a conflict, added on 2026-11-08. Its `polyline` and `line` elements were written as equivalent `path` elements. |
+| `panel-left-close` and `panel-left-open` | Folding Git's worktree list into a rail and opening it, added on 2026-11-08. |
 | `kanban` | The project board. |
 | `message-square` | Requests in a thread. |
 | `folder` | Repositories and folders. |
