@@ -16,6 +16,25 @@ where the code lives in LGcode, and where the licence text is.
   third_party/t3code/README.md.
   Licence text: third_party/t3code/LICENSE.
 
+- Inter (https://github.com/rsms/inter)
+  Copyright 2016 The Inter Project Authors. SIL Open Font License 1.1.
+  In LGcode: third_party/inter/InterVariable-latin.woff2, the Latin subset of
+  Inter 4.001, used by the web mock in design/.
+  Licence text: third_party/inter/OFL.txt.
+
+- JetBrains Mono (https://github.com/JetBrains/JetBrainsMono)
+  Copyright 2020 The JetBrains Mono Project Authors. SIL Open Font License 1.1.
+  In LGcode: third_party/jetbrains-mono/JetBrainsMono-latin.woff2, the Latin
+  subset of JetBrains Mono 2.211, used by the web mock in design/.
+  Licence text: third_party/jetbrains-mono/OFL.txt.
+
+- Lucide (https://lucide.dev)
+  Copyright Lucide Contributors 2022, with portions copyright Cole Bemis
+  2013-2022 as part of Feather (MIT). ISC License.
+  In LGcode: icon paths inline in design/workbench.html and design/workbench.js.
+  Each icon and where it is used are listed in third_party/lucide/README.md.
+  Licence text: third_party/lucide/LICENSE.
+
 LGcode is also inspired by Herdr Synapse
 (https://github.com/vitalysim/herdr-synapse), Copyright 2026 Vitaly
 Simonovich, Apache License 2.0. No Synapse code has been copied into LGcode.
