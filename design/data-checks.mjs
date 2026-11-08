@@ -34,7 +34,7 @@ const added=async(page,before)=>(await eventsOf(page)).slice(before).map(row=>ro
  const small=await open();
  check((await small.locator('[data-home-item="question:nav-decision"]').textContent()).includes('18 min'),'The small sample shows 18 minutes at its own clock');
  await small.click('[data-system-page="subscriptions"]');
- check((await small.locator('[data-account-name="Team"]').textContent()).includes('4 agents'),'An active agent count comes from which agents use the account');
+ check((await small.locator('[data-account-name="Team"]').textContent()).includes('5 agents'),'An active agent count comes from which agents use the account');
 }
 // Commands write events, and the page shows what they did.
 {

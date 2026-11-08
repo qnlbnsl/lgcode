@@ -1,0 +1,83 @@
+{
+ "setup": {
+  "delay": 500,
+  "rescan": {"none": "signed-out", "failed": "ready"},
+  "install": {
+   "claude": "npm install -g @anthropic-ai/claude-code",
+   "codex": "npm install -g @openai/codex",
+   "cursor": "curl https://cursor.com/install -fsS | bash",
+   "gemini": "npm install -g @google/gemini-cli"
+  },
+  "scenarios": {
+   "ready": {
+    "harnesses": [
+     {"harness": "claude", "installed": true, "signedIn": true, "version": "2.1.301"},
+     {"harness": "codex", "installed": true, "signedIn": false, "version": "0.98.0"},
+     {"harness": "cursor", "installed": false},
+     {"harness": "gemini", "installed": false}
+    ],
+    "repositories": [
+     {"name": "lumen-web", "branch": "main", "age": "2 hours ago"},
+     {"name": "billing-api", "branch": "main", "age": "Yesterday"},
+     {"name": "field-notes", "branch": "trunk", "age": "3 weeks ago"}
+    ]
+   },
+   "both": {
+    "harnesses": [
+     {"harness": "claude", "installed": true, "signedIn": true, "version": "2.1.301"},
+     {"harness": "codex", "installed": true, "signedIn": true, "version": "0.98.0"},
+     {"harness": "cursor", "installed": false},
+     {"harness": "gemini", "installed": false}
+    ],
+    "repositories": [
+     {"name": "lumen-web", "branch": "main", "age": "2 hours ago"},
+     {"name": "billing-api", "branch": "main", "age": "Yesterday"}
+    ]
+   },
+   "codex-only": {
+    "harnesses": [
+     {"harness": "claude", "installed": false},
+     {"harness": "codex", "installed": true, "signedIn": true, "version": "0.98.0"},
+     {"harness": "cursor", "installed": false},
+     {"harness": "gemini", "installed": false}
+    ],
+    "repositories": [
+     {"name": "lumen-web", "branch": "main", "age": "2 hours ago"}
+    ]
+   },
+   "signed-out": {
+    "harnesses": [
+     {"harness": "claude", "installed": true, "signedIn": false, "version": "2.1.301"},
+     {"harness": "codex", "installed": true, "signedIn": false, "version": "0.98.0"},
+     {"harness": "cursor", "installed": false},
+     {"harness": "gemini", "installed": false}
+    ],
+    "repositories": [
+     {"name": "lumen-web", "branch": "main", "age": "2 hours ago"},
+     {"name": "billing-api", "branch": "main", "age": "Yesterday"}
+    ]
+   },
+   "none": {
+    "harnesses": [
+     {"harness": "claude", "installed": false},
+     {"harness": "codex", "installed": false},
+     {"harness": "cursor", "installed": false},
+     {"harness": "gemini", "installed": false}
+    ],
+    "repositories": [
+     {"name": "lumen-web", "branch": "main", "age": "2 hours ago"}
+    ]
+   },
+   "empty": {
+    "harnesses": [
+     {"harness": "claude", "installed": true, "signedIn": true, "version": "2.1.301"},
+     {"harness": "codex", "installed": false},
+     {"harness": "cursor", "installed": false},
+     {"harness": "gemini", "installed": false}
+    ],
+    "repositories": []
+   },
+   "failed": {"failure": "Sheprd could not read this computer's folders, because the service has no permission to open ~/projects."}
+  }
+ }
+}

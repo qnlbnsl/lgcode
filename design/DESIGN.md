@@ -323,6 +323,72 @@ The owner chose the 15 Must fix findings, the two naming findings, and Enter to 
   machine, as the design note says. The critic recommended a device code screen, and Claude
   kept the design note's approach, because each harness has its own flow.
 
+## The first run, built from Ananke's onboarding rules
+
+A service with no projects opens a first run after login. It has three pages, and each does one
+job. The rules come from Ananke's onboarding specs and session reports, read on 2026-11-07.
+
+- **Value comes before any ask.** The first page says what Sheprd does and asks for nothing. Its
+  three paired promises state only what the product does. The third says "You approve what users
+  would notice", not "you approve every merge", because a fix sprint users would not notice merges
+  by itself after a full test run.
+- **The second page shows what was found and asks nothing.** It lists harnesses, sign-in state,
+  and repositories in the workspace folder. It says that Sheprd only looked. A harness that is
+  installed but signed out offers its sign-in in place, through the usual sign-in dialog.
+- **The third page is the first real ask, with its answers filled in.** It starts on the most
+  recent repository, a name from that repository, and a new worktree. It hides the machine when
+  there is one, and it hides the harness when one is signed in. It is the New project form moved
+  into the page, not a second form.
+- **Setup hands off to the lead.** Creating the project opens the lead's conversation with its
+  greeting and the composer focused. There is no tour and no setup page for the conversation.
+- **Look around first is a link, not a step.** It opens the sample, which offers Back to setup.
+- **Back never loses the place.** Reopening resumes at the furthest step reached, and a lower step
+  never lowers it. A sign-in survives a reload.
+- **Every wait has a way out.** The scan offers Back while it runs. A failed scan says why, with
+  Try again and Back. With nothing installed, each harness shows its install command, and Check
+  again finds what was installed since. An empty folder leads to Change folder or a new repository.
+- **Setup is gated by a positive record.** Finishing writes a record, so a person who later has no
+  projects does not see setup again. Ananke's tour replayed for finished users, because it checked
+  for an absent flag.
+
+Login still comes first, because the service has one password from its environment. The first run
+does not cover push alerts or a computer that joins as a worker.
+
+## Stages, stage teams, and mocks, decided on 2026-11-07
+
+The owner set this direction on 2026-11-07, after looking at how Ananke makes its mocks.
+
+- **A project moves through stages.** The stages are Design, Plan, Build, Review, and Hand over.
+  Each project board starts with a strip that shows them, and the repository page lists each
+  project's stage. A project that draws no screens starts in Plan.
+- **Teams are named for their stage.** The names are Design team, Planning team, Build team, and
+  Review team. Two teams in one stage add their area after a middle dot, such as Build team ·
+  Exports. The earlier names, such as App shell, were chosen one at a time.
+- **The Design team makes the mocks.** When the conversation with the lead turns to screens, the
+  lead starts a Design team, the Mocks tab appears after Board, and the screens arrive while the
+  owner watches. A new project's board stays empty until then, and it points to the mocks.
+- **Mocks are the project's own code.** Each screen is a page from the project's code, framed at
+  phone or desktop size, with realistic but invented data. Ananke's mocks work the same way: its
+  screens import the real components, and new parts stay drafts until the owner approves them.
+- **Changes go through the AI.** The owner asks the lead for a change while a screen is open. The
+  screen changes in place without reloading, and the change is recorded with who made it.
+- **The data is drafted with the screens.** The Data pane lists each field the screens use, and it
+  marks it as new, matching the schema, or different from it.
+- **Approval hands the work to planning.** Approve mocks promotes the draft components, moves the
+  project to Plan, and gives a Planning team the tasks: move each draft into the real components,
+  change the schema, and wire each screen to real data. Building is not part of design.
+- **The design file is the source of truth, and the mocks show exactly what it says.** OpenPencil
+  runs only while someone designs or edits. Looking at the mocks needs only the code. Edit design
+  and the repository Design tab's Edit mode show OpenPencil's web editor in a frame, open on the
+  repository's design file. It runs from `openpencil/` on port 8443 and cannot save into the
+  repository yet. When it is not running, the page says so and gives the command that starts it.
+- **The repository has a Design tab.** It shows the colors and the components that every project
+  in the repository draws from, with live previews. A component that a project's approval promoted
+  says which project it came from.
+
+A repository from the owner's other work can appear in the mock without being committed, because
+this repository is public. Its rows go in `data/local/`, which git ignores.
+
 ## The data behind the mock
 
 The mock draws what stub functions return, and those functions read JSON files shaped like the
