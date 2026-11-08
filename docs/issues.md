@@ -8759,3 +8759,27 @@ Found: 2026-11-08, while checking the LGcode rename.
 State: open.
 
 In the first `pnpm live-check` run on the rename branch, the `sandbox-mcp` step failed with "codex: not attempted; exact ask tool calls=0". The Codex agent, GPT-6 Luna at low effort, made no call to the `lgcode` ask tool, so the probe had nothing to judge. The Claude agent's call succeeded in the same run. A second run passed the step for both agents, with the same code, so the failure depends on whether the model chooses to call the tool. The step should give the agent a second prompt, or run on a model that follows the instruction reliably, before it reports a failure.
+
+## 522. Building the mock's first run exposed two faults in it
+
+Found: 2026-11-07, while adding a first run to the mock on the branch `area/web-mock`.
+State: both are fixed on that branch.
+
+- The page could not start with no projects, because it read the first project while it loaded.
+  A real service starts with none, so the mock had no way to show its first minutes.
+- A new project's lead always ran on Claude Code, and the New project form offered no choice. A
+  person signed in only to Codex would have got a lead on an account that does not work. The form
+  now offers the signed-in harnesses, and it hides the choice when there is one.
+
+## 525. OpenPencil's command-line tool guesses the width of Inter Medium and SemiBold text
+
+Found: 2026-11-08, while building the Reverse Fig skill on the branch `area/reverse-fig`.
+State: worked around in the skill; the cause is in OpenPencil 0.16.0, not in LGcode.
+
+- OpenPencil lays text out with its own font measurements. From the command line, it measures
+  Inter Regular and Bold, but Inter Medium and SemiBold fall back to a rough estimate of 0.6 of
+  the font size per letter. A label that fits in the browser then wraps onto two lines.
+- The likely cause is a name mismatch: its bundled fonts are keyed as "SemiBold", while text
+  nodes ask for "Semi Bold".
+- The skill gives each label the size the browser measured, plus one pixel. It should drop that
+  step once OpenPencil measures every bundled weight, and someone could report the fault upstream.

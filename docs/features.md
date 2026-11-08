@@ -516,6 +516,40 @@ The full design is in
   at each test.
 - **A way to freeze interfaces** (requested by the owner, 2026-11-06; not
   designed). A frozen interface cannot change while teams build against it.
+- **The design file is the source of truth** (decided by the owner, 2026-11-07;
+  not designed). A project's design lives in a Figma-format `.fig` file. LGcode
+  runs OpenPencil, the open-source editor from openpencil.dev, on the same
+  computer and shows it inside its page. OpenPencil opens only while someone is
+  designing, looking at components, or weighing an edit. Mocks that are only
+  looked at are built from the project's real code, so what the owner sees is
+  what users get, and any gap between the mock and the design gets fixed.
+  Since 2026-11-08 the web mock shows OpenPencil's web editor in a frame, built
+  from source in `design/openpencil/` on the branch `area/web-mock`. It opens a
+  repository's design file but cannot save into the repository yet. Saving back
+  needs an endpoint that writes the file, or OpenPencil's automation bridge.
+- **Teams named for their stage** (requested by the owner, 2026-11-07; not
+  designed). A project moves through a Design team, a Planning team, a Build
+  team and a Review team, in place of hand-picked names. The project page shows
+  which stage the project is in.
+- **Mocks made by the Design team** (requested by the owner, 2026-11-07; not
+  designed). A project with user interface work gets a Mocks tab. The mocks use
+  the project's real components and realistic, invented data, as Ananke's mocks
+  did. While designing, the team keeps a draft of the data schema the screens
+  need and reconciles it with the real schema. When the mocks are approved, new
+  components move into the real component folder, and wiring them to real data
+  becomes the Build team's tasks.
+- **A Reverse Fig skill** (requested by the owner, 2026-11-07; not designed).
+  When someone connects a project that already has an interface, the skill
+  turns its existing components and screens into a `.fig` file, so the design
+  becomes the source of truth and can later be turned back into code. A test
+  on 2026-11-07 did this for three of the mock's components with OpenPencil's
+  command-line tool. The result had real component sets, variants and color
+  variables, and it exported back to React components. Some styling was lost
+  on the way.
+  A first version exists on the branch `area/reverse-fig`, in
+  `skills/reverse-fig/`, since 2026-11-08. It covers color tokens and
+  components, not screens. Everything specific to a project lives in a profile
+  file, so each project tunes its own profile.
 
 ## 9. Client mode
 
