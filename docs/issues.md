@@ -9387,3 +9387,64 @@ The test verifies both acknowledgements and that the tail remains absent before 
 It retains the original assertions that stop emits the tail but does not store it, and keeps the original timeout.
 Production drain and stop behavior are unchanged.
 The original unmodified failed full trace and both original diagnostic artifacts remain preserved in the W03D evidence.
+
+## 547. Joined delivery history hides released entries
+
+Found: 2026-11-09, during conversation preparation and lead source review at `bc783b2`.
+State: open, assigned to the later W08 conversation correction.
+
+The delivery-history renderer accepts `DeliveryReleased` as a delivery event.
+Its joined history filter omits that event from the states shown under a queued delivery.
+The standalone renderer also suppresses a state when its matching queued source is present.
+A released entry therefore disappears when both its source and release have been loaded.
+This is a source finding, and no runtime reproduction is claimed yet.
+
+The W08 correction must retain the release under its actual delivery identity.
+It must preserve the existing source join and avoid duplicating prompt content.
+A consequential regression must cover a source and release together, a release before its source is loaded, and the joined state after history hydration.
+
+## 561. The launcher test assumed no system Node.js 26
+
+Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
+State: fixed.
+
+The launcher test "exits 1 with an install hint when NVM_DIR holds no Node.js" ran the launcher with only `HOME` and `NVM_DIR` set.
+The launcher's shell then used its default search path.
+Arch Linux has a system Node.js 26 at `/usr/bin/node`, and the launcher correctly used it, so the test saw exit 0.
+The test now gives the launcher an empty search-path folder.
+The launcher itself was right and is unchanged.
+
+## 562. Two engine crash tests raced the roles sheepdog
+
+Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
+State: fixed.
+
+The acceptance test "1 crash" checks the engine's own rule that nothing restarts a crashed agent.
+The client test "6.2 a failed reload keeps a crash alert open until successful idle" checks the crash alert's life.
+Both run with the roles sheepdog on, and the sheepdog resumes a crashed agent by design.
+On the build server, the sheepdog acted after the checks had finished, so both tests passed.
+On the faster computer, it resumed the agent first.
+The agent then crashed a second time and the owner was told twice, or the resumed session closed the crash alert early.
+Both tests now turn the sheepdog off, because each checks an engine rule rather than the sheepdog.
+Other tests may have the same hidden dependence on a slow computer.
+
+## 563. Context search counted item bytes without the complete result
+
+Found: 2026-11-09, during independent verification of signed `3dd4d20`.
+The manager allocated the correction to W03DF1.
+
+The documented 65,536-byte budget applies to the complete context search result.
+Admission counted only the encoded item array.
+An authenticated search over 91 actual schema-valid Git files returned a 65,529-byte item array inside a 65,557-byte result, with `truncated: false`.
+The request identifier was an ordinary universally unique identifier.
+The verifier's original probe, inputs, observation, failed log, and metadata remain unchanged.
+Earlier escaped-request-identifier probes measured larger outer replies, rather than a breach of this result-only budget.
+The earlier invalid task-title and import attempts remain historical test failures.
+
+Admission now counts the complete encoded result, including its field names and truncation flag.
+It reserves the longer `false` encoding even when truncation has already occurred.
+The byte budget excludes the reply's request identifier and the agent envelope.
+Authenticated owner and member regressions exercise real files at the original overflow and the nearest overflowing and fitting encoded results.
+They check canonical bounded prefixes, truthful truncation, smaller limits, ordinary under-budget results, empty results, and foreign-project refusal.
+The filenames include multibyte text and quotation marks, so the assertions count encoded bytes.
+The existing project access, candidate and result counts, Git read bounds, redaction, and plain-text delivery rules remain unchanged.

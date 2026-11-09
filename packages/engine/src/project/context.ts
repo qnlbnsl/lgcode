@@ -62,7 +62,8 @@ export const searchContext: ReadHandler = (input, raw) => Effect.gen(function* (
   const add = (reference: ContextReference, label: string) => Effect.gen(function* () {
     yield* identity(input, reference)
     const clean = yield* input.runtime.log.redactText(label)
-    if (result.items.length >= (p.limit ?? 100) || Buffer.byteLength(JSON.stringify([...result.items, { reference, label: clean }])) > 64 * 1024) {
+    // Budget the complete result. `false` is the larger encoded flag value.
+    if (result.items.length >= (p.limit ?? 100) || Buffer.byteLength(JSON.stringify({ items: [...result.items, { reference, label: clean }], truncated: false })) > 64 * 1024) {
       result.truncated = true; return
     }
     result.items.push({ reference, label: clean })

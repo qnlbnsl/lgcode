@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto"
 import { execFileSync } from "node:child_process"
-import { renameSync, symlinkSync, writeFileSync, rmSync } from "node:fs"
-import { join } from "node:path"
+import { mkdirSync, renameSync, symlinkSync, writeFileSync, rmSync } from "node:fs"
+import { dirname, join } from "node:path"
 import { it } from "@effect/vitest"
-import { Event } from "@lgcode/contracts"
+import { ContextPath, ContextSearchResult, Event } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
@@ -239,3 +239,64 @@ it.live("distinguishes truncated, empty and failed searches and refuses stale pl
   yield* appendSetup([Schema.decodeUnknownSync(Event)({ _tag: "project.WorktreeCreated", ...remote, machineId: "remote" })])
   expect(yield* refuse(run(f.api, "project.context.search", query))).toContain("local machine")
 }), ["context-secret-value"]).pipe(Effect.orDie))
+
+// The independent issue 563 probe established a 65,529-byte item array with
+// 91 valid real files. Keep its strict result-only oracle, and also check the
+// nearest representable overflowing and fitting results for both callers.
+for (const actor of ["owner", "member"] as const) {
+  for (const itemBytes of [65529, 65509, 65507]) {
+    it.live(`bounds the complete encoded context result for ${actor} at ${itemBytes} item bytes`, () => provideBoard(rig, Effect.gen(function* () {
+      const f = yield* setup()
+      const item = (path: string) => ({ reference: { ...f.file, _tag: "file" as const, path }, label: path })
+      const expected: Array<ReturnType<typeof item>> = []
+      const bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value))
+      const suffix = (length: number) => {
+        const parts: string[] = []
+        while (length > 255) { parts.push("x".repeat(200)); length -= 201 }
+        return [...parts, "x".repeat(length)].join("/")
+      }
+      for (let i = 0; i < 91; i++) {
+        const prefix = `budget-${String(i).padStart(2, "0")}/`
+        // UTF-8 and JSON escaping both count toward encoded bytes. Each real
+        // component still fits the filesystem's 255-byte component limit.
+        const leaf = i === 0 ? "é".repeat(60) + '"'.repeat(60) : "x".repeat(240)
+        const path = prefix + (i < 90 ? leaf : suffix((itemBytes - bytes([...expected, item(prefix)])) / 2))
+        expect(Schema.is(ContextPath)(path)).toBe(true)
+        expect(path.split("/").every((part) => Buffer.byteLength(part) <= 255)).toBe(true)
+        mkdirSync(dirname(join(rig.work, path)), { recursive: true })
+        writeFileSync(join(rig.work, path), "context-secret-value must never be inlined\n")
+        expected.push(item(path))
+      }
+      expect(bytes(expected)).toBe(itemBytes)
+      const api = actor === "owner" ? f.api : f.member
+      const read = (query: string, limit?: number) => Effect.gen(function* () {
+        const requestId = freshRequest()
+        const reply = yield* run(api, "project.context.search", { requestId, projectId: f.projectId, worktreeId: f.worktreeId, scope: "files", query, ...(limit === undefined ? {} : { limit }) })
+        expect(reply.requestId).toBe(requestId)
+        let result = reply.result
+        if (actor === "member") {
+          expect(reply.data).toMatch(/^Data from another agent \[/)
+          expect(reply.data).toMatch(/\nEnd data \[[^\]]+\]$/)
+          expect(reply).not.toHaveProperty("result")
+          const enclosed = JSON.parse(reply.data.slice(reply.data.indexOf("\n") + 1, reply.data.lastIndexOf("\n")))
+          expect(enclosed.requestId).toBe(requestId)
+          result = enclosed.result
+        }
+        const decoded = Schema.decodeUnknownSync(ContextSearchResult)(result)
+        expect(bytes(Schema.encodeSync(ContextSearchResult)(decoded))).toBeLessThanOrEqual(65536)
+        expect(JSON.stringify(reply)).not.toContain("must never be inlined")
+        expect(JSON.stringify(reply)).not.toContain("context-secret-value")
+        return decoded
+      })
+      const found = yield* read("budget-")
+      const fits = itemBytes === 65507
+      expect(found.items).toEqual(fits ? expected : expected.slice(0, -1))
+      expect(found.truncated).toBe(!fits)
+      if (!fits) expect(bytes({ items: [...found.items, expected.at(-1)!], truncated: false })).toBeGreaterThan(65536)
+      expect(yield* read("budget-", 2)).toEqual({ items: expected.slice(0, 2), truncated: true })
+      expect(yield* read("budget-00/")).toEqual({ items: expected.slice(0, 1), truncated: false })
+      expect(yield* read("budget-no-match")).toEqual({ items: [], truncated: false })
+      expect(yield* refuse(run(f.outsider, "project.context.search", { projectId: f.projectId, worktreeId: f.worktreeId, scope: "files", query: "budget-" }))).toBe("project is unavailable to this caller")
+    }), ["context-secret-value"]).pipe(Effect.orDie))
+  }
+}

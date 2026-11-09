@@ -25,7 +25,9 @@ Remote file search is unavailable before machine pairing.
 
 Search uses actual tracked and nonignored untracked Git paths.
 It inherits the Git subprocess byte and time budgets and the 200-file candidate limit.
-The combined result has a 64-kilobyte budget before the agent envelope.
+The complete `result` object has a 65,536-byte budget, including `items` and `truncated`.
+The count uses JavaScript Object Notation (JSON) encoded in the eight-bit Unicode Transformation Format (UTF-8).
+This budget excludes the reply's `requestId` and the agent envelope.
 The truncation flag distinguishes a bounded search from a complete empty result.
 Secret-bearing identities cannot be selected.
 Display labels pass through the production redactor.
