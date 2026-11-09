@@ -8807,3 +8807,38 @@ refuses symbolic-link file operations, and public review links currently support
 GitHub's standard remote forms only. The command integration must apply the
 production redactor to every service reply before delivery through the client
 application programming interface.
+
+## 533. Git rename counts and interrupted staging needed recovery corrections
+
+Found: 2026-11-08, by the independent website Git service verifier at commit
+`55d23a6`, then reproduced through the public service in the correction seat.
+State: fixed for normal Git signal cleanup, with real-repository regression tests.
+
+The numeric diff parser treated tab-bearing rename paths as count rows.
+An unchanged rename could report additions and deletions taken from its name.
+The parser now follows Git's null-delimited record grammar and consumes both
+rename or copy paths before reading the next count row.
+Tests cover both tab-bearing paths, ordinary records, mixed binary and text
+records, commit diffs, truncation and missing final newlines.
+
+A timed-out staging process previously received the unconditional kill signal.
+Git could not remove its index lock, so a legitimate retry returned `busy`.
+The runner now sends the termination signal first and allows 250 milliseconds
+for Git's own lock rollback before forcing process-group termination.
+It preserves the original failure reason throughout that grace.
+Git resolves the actual per-worktree metadata and cleans only locks it acquired.
+The service never guesses lock ownership or unlinks index locks itself.
+Tests cover single and bulk staging, timeout and cancellation, main and linked
+checkouts, unchanged index contents, successful retry, pre-existing locks,
+another live Git operation's lock and a descendant ignoring termination.
+
+The correction tests also found that staging an already staged rename passed
+its removed old pathname to Git, causing a pathspec failure.
+Staging now updates the destination of an indexed rename or copy.
+Unstaging still resets both paths.
+Single-file and bulk regression assertions cover this case.
+
+A forced kill can still leave a lock when Git cannot run its cleanup within
+the grace period, and that lock requires terminal inspection.
+No cross-process atomic cleanup or Windows recovery guarantee is claimed.
+The local filesystem race limitation in issue 49 still applies.

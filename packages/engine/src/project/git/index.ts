@@ -5,7 +5,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import * as Effect from "effect/Effect";
 import { checkedMetadata, cleanText, directory, filePath, inside, slug, smallFile } from "./paths.ts";
-import { parseChanges, parseConflict, parseFiles, parseHistory } from "./parse.ts";
+import { parseChanges, parseConflict, parseFiles, parseHistory, parseNumstat } from "./parse.ts";
 import { boundedUtf8, gitProcess, processFailure, type ProcessReply } from "./process.ts";
 import { GitFailure, type Bounded, type Change, type Conflict, type ConflictChoice, type Diff, type DiscardPlan,
   type GitFailureReason, type GitService, type Repository, type Review, type Worktree } from "./types.ts";
@@ -128,12 +128,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     if (reply.code !== 0 && !reply.truncated && !(args.includes("--no-index") && reply.code === 1)) throw processFailure(reply);
     const stats = await run(folder, [...args, "--no-ext-diff", "--no-textconv", "--numstat", "-z", "--", ...paths], signal);
     if (stats.code !== 0 && !(args.includes("--no-index") && stats.code === 1)) throw processFailure(stats);
-    let additions = 0, deletions = 0, binary = false;
-    for (const match of stats.stdout.matchAll(/(?:^|\0)(\d+|-)\t(\d+|-)\t/g)) {
-      if (match[1] === "-") binary = true;
-      else { additions += Number(match[1]); deletions += Number(match[2]); }
-    }
-    return { patch: reply.stdout, additions, deletions, binary, truncated: reply.truncated };
+    return { patch: reply.stdout, ...parseNumstat(stats.stdout), truncated: reply.truncated };
   };
   const diff = async (folder: string, options: { path?: string; staged?: boolean; commit?: string }, signal: AbortSignal): Promise<Diff> => {
     const path = options.path;
@@ -193,6 +188,9 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     else await git(folder, ["reset", "--quiet", "HEAD", "--", ...paths], signal);
   };
   const changePaths = (change: Change) => change.originalPath === null ? [change.path] : [change.originalPath, change.path];
+  // A staged rename has already removed the original path from the index.
+  // add must update its destination only; reset still needs both paths.
+  const stagePaths = (change: Change) => /[RC]/.test(change.index) ? [change.path] : changePaths(change);
   const planDiscard = async (folder: string, requested: ReadonlyArray<string> | undefined, signal: AbortSignal): Promise<DiscardPlan> => {
     const changes = await completeChanges(folder, signal);
     if (requested !== undefined && (requested.length > entries || requested.some((path) => !changes.some((change) => change.path === path && !change.conflict)))) return fail("invalid_path");
@@ -384,7 +382,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       const change = (await completeChanges(path, signal)).find((change) => change.path === requested);
       if (change === undefined) return fail("invalid_path");
       if (change.conflict) return fail("conflicts");
-      const paths = changePaths(change);
+      const paths = stagePaths(change);
       for (const file of paths) await filePath(path, file);
       await git(path, ["add", "--", ...paths], signal);
     }),
@@ -394,7 +392,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       await resetPaths(path, changePaths(change), signal);
     }),
     stageAll: (folder) => withRepo(folder, async (path, signal) => {
-      const paths = (await completeChanges(path, signal)).filter((change) => !change.conflict).flatMap(changePaths);
+      const paths = (await completeChanges(path, signal)).filter((change) => !change.conflict).flatMap(stagePaths);
       for (const file of paths) await filePath(path, file);
       if (paths.length > 0) await git(path, ["add", "--", ...new Set(paths)], signal);
     }),

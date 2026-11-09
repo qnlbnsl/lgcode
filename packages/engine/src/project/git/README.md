@@ -49,7 +49,14 @@ limit fails rather than being parsed in part. Bulk mutations refuse a file
 list larger than the limit. Limits can be lowered by trusted configuration.
 
 A command has a 10-second timeout. Each complete operation has a 60-second
-budget. Process groups are killed on timeout or interruption on Unix systems.
+budget. On timeout, interruption or an output limit, the runner sends the Unix
+process group SIGTERM, the termination signal, so Git can roll back its own
+locks. It allows at most 250 milliseconds for cleanup before SIGKILL, the
+unconditional kill signal. It also kills remaining group members when the
+process closes. The first failure reason remains fixed during that grace.
+Git resolves its own index and metadata paths, including those of linked
+worktrees. The runner never removes a lock file itself, so a pre-existing lock
+or another operation's lock is not a cleanup candidate.
 The finite operation queue serializes calls on one service instance. Keep one
 instance for each workspace setting. The queue admits at most 64 calls.
 Discovery visits at most 500 directories and goes three levels deep. It skips
@@ -76,6 +83,13 @@ stages. Binary, add/delete, symlink and submodule conflicts return
 `unsupported_conflict` for the terminal workflow. Symbolic-link file operations
 and names containing a newline or carriage return also require the terminal.
 Bare repositories are not workspace checkouts.
+
+Normal Git signal cleanup makes interrupted staging retryable. If Git cannot
+run that cleanup before the forced kill, a lock can still remain and require
+inspection through the terminal. The runner does not claim arbitrary stale
+locks belong to it. Filesystem races with another local process remain subject
+to issue 49. On Windows, termination uses the child-process signal behavior;
+Unix process-group cleanup and retry proof do not establish Windows recovery.
 
 Review URLs support GitHub's public host with standard HTTPS or SSH remotes.
 Other providers return `unsupported_provider`. Opening review does not create

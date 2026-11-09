@@ -1,5 +1,25 @@
 import { GitFailure, type Change, type Commit, type CommitFile, type ConflictSegment } from "./types.ts";
 
+// https://git-scm.com/docs/git-diff#_other_diff_formats
+// A rename/copy has an empty first pathname, then TWO NUL-terminated paths.
+// Tabs in either path are data, even when they look like another count row.
+export const parseNumstat = (text: string): { additions: number; deletions: number; binary: boolean } => {
+  const fields = text.split("\0");
+  if (fields.pop() !== "") throw new GitFailure({ reason: "git_failed" });
+  let additions = 0, deletions = 0, binary = false;
+  for (let i = 0; i < fields.length; i++) {
+    const match = /^(\d+|-)\t(\d+|-)\t([\s\S]*)$/.exec(fields[i]!);
+    if (match === null || (match[1] === "-") !== (match[2] === "-")) throw new GitFailure({ reason: "git_failed" });
+    if (match[3] === "") {
+      const before = fields[++i], after = fields[++i];
+      if (!before || !after) throw new GitFailure({ reason: "git_failed" });
+    }
+    if (match[1] === "-") binary = true;
+    else { additions += Number(match[1]); deletions += Number(match[2]); }
+  }
+  return { additions, deletions, binary };
+};
+
 export const parseChanges = (text: string): Change[] => {
   const fields = text.split("\0"), changes: Change[] = [];
   for (let i = 0; i < fields.length && fields[i] !== ""; i++) {

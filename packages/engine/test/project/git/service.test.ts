@@ -98,6 +98,8 @@ describe("bounded Git service with real temporary repositories", () => {
     const changes = (await run(service.changes(repo))).items;
     expect(changes.find((item) => item.path === "renamed file.txt")).toMatchObject({ originalPath: "file.txt", staged: true, unstaged: true, index: "R" });
     expect(changes.find((item) => item.path === "strange\tname.txt")).toMatchObject({ untracked: true });
+    await run(service.stage(repo, "renamed file.txt"));
+    expect((await run(service.changes(repo))).items.find((item) => item.path === "renamed file.txt")).toMatchObject({ staged: true, unstaged: false });
     await run(service.unstage(repo, "renamed file.txt"));
     expect((await run(service.changes(repo))).items.every((item) => !item.staged)).toBe(true);
   });
@@ -153,6 +155,26 @@ describe("bounded Git service with real temporary repositories", () => {
     expect(await reason(service.openReview(project.path, "main", "stale"))).toBe("stale_state");
     expect(await reason(service.openReview(project.path, "main", head))).toBe("missing_remote");
     expect(git(repo, ["show", "HEAD:file.txt"])).toBe("start");
+  });
+
+  it("consumes both NUL-delimited rename paths without counting tab-bearing names as statistics", async () => {
+    const old = "100\t200\told", next = "300\t400\tnew";
+    await save(repo, old, "same\n"); commit(repo, "Tab-bearing original");
+    await rename(join(repo, old), join(repo, next));
+    await run(service.stageAll(repo));
+    // This is a real zero-line rename, not a delete/add pair.
+    expect(git(repo, ["diff", "--cached", "--numstat", "-z"])).toBe(`0\t0\t\0${old}\0${next}\0`);
+    for (const options of [undefined, { staged: true }]) {
+      expect(await run(service.diff(repo, options))).toMatchObject({ additions: 0, deletions: 0, binary: false });
+    }
+    await save(repo, "file.txt", "replacement\nsecond line");
+    await save(repo, "500\t600\tordinary", "extra\n");
+    await save(repo, "binary", "\0binary");
+    await run(service.stageAll(repo));
+    const bounded = makeGitService({ workspaceFolder: root, maxDiffBytes: 80 });
+    expect(await run(bounded.diff(repo, { staged: true }))).toMatchObject({ additions: 3, deletions: 1, binary: true, truncated: true });
+    const head = await run(service.commit(repo, "Rename and mixed records"));
+    expect(await run(service.diff(repo, { commit: head }))).toMatchObject({ additions: 3, deletions: 1, binary: true });
   });
 
   it("requires a fresh explicit discard confirmation and preserves the index of partially staged files", async () => {
@@ -271,6 +293,114 @@ describe("bounded Git service with real temporary repositories", () => {
     const pending = gitProcess(repo, ["-c", "alias.wait=!sleep 10", "wait"], { bytes: 1024, timeoutMs: 5000 }, controller.signal);
     controller.abort();
     await expect(pending).rejects.toMatchObject({ reason: "cancelled" });
+  });
+
+  for (const linked of [false, true]) {
+    for (const bulk of [false, true]) {
+      for (const interruption of ["timeout", "cancel"] as const) {
+        it(`recovers ${bulk ? "bulk" : "single"} staging after ${interruption} in a ${linked ? "linked" : "main"} checkout`, async () => {
+          const folder = linked ? (await worktree("Recovery")).path : repo;
+          const index = git(folder, ["rev-parse", "--path-format=absolute", "--git-path", "index"]);
+          const marker = join(root, "filter-entered");
+          const originalIndex = await readFile(index);
+          // Status also invokes clean filters. Only pause when add holds its
+          // actual per-worktree index lock, as in the verifier's reproduction.
+          git(folder, ["config", "filter.slow.clean", `if test -f '${index}.lock'; then printf entered > '${marker}'; sleep 10; fi; cat`]);
+          await save(folder, ".gitattributes", "*.txt filter=slow\n");
+          await save(folder, "file.txt", "changed length\n");
+          const short = makeGitService({ workspaceFolder: root, timeoutMs: interruption === "timeout" ? 500 : 5000 });
+          const mutation = bulk ? short.stageAll(folder) : short.stage(folder, "file.txt");
+          if (interruption === "timeout") {
+            expect(await reason(mutation)).toBe("timeout");
+            expect(await readFile(marker, "utf8")).toBe("entered");
+          } else {
+            const controller = new AbortController();
+            const pending = Effect.runPromise(mutation, { signal: controller.signal }).then(() => "succeeded", () => "interrupted");
+            try {
+              await expect.poll(() => readFile(marker, "utf8"), { timeout: 3000 }).toBe("entered");
+            } finally { controller.abort(); }
+            expect(await pending).toBe("interrupted");
+          }
+          // The same instance's queue waits for subprocess cleanup, including
+          // after Effect has already delivered interruption to its caller.
+          await run(short.changes(folder));
+          await expect(readFile(index + ".lock")).rejects.toMatchObject({ code: "ENOENT" });
+          expect(await readFile(index)).toEqual(originalIndex);
+          git(folder, ["config", "--unset", "filter.slow.clean"]);
+          await run(bulk ? short.stageAll(folder) : short.stage(folder, "file.txt"));
+          expect((await run(service.changes(folder))).items.find((change) => change.path === "file.txt")?.staged).toBe(true);
+        });
+      }
+    }
+  }
+
+  it("preserves pre-existing and other worktrees' index locks while recovering its own failed add", async () => {
+    const linked = await worktree("Other index");
+    const mainLock = join(repo, ".git", "index.lock");
+    const linkedLock = git(linked.path, ["rev-parse", "--path-format=absolute", "--git-path", "index"]) + ".lock";
+    await writeFile(mainLock, "foreign main lock", { flag: "wx" });
+    await writeFile(linkedLock, "foreign linked lock", { flag: "wx" });
+    for (const folder of [repo, linked.path]) {
+      await save(folder, "file.txt", "changed length\n");
+      expect(await reason(service.stage(folder, "file.txt"))).toBe("busy");
+    }
+    await expect(gitProcess(linked.path, ["-c", "alias.wait=!sleep 10", "wait"], { bytes: 1024, timeoutMs: 30 }, new AbortController().signal)).rejects.toMatchObject({ reason: "timeout" });
+    expect(await readFile(mainLock, "utf8")).toBe("foreign main lock");
+    expect(await readFile(linkedLock, "utf8")).toBe("foreign linked lock");
+  });
+
+  it("bounds termination even when a descendant ignores SIGTERM and preserves the first failure", async () => {
+    const marker = join(root, "stubborn-pid");
+    const controller = new AbortController();
+    const pending = gitProcess(repo, ["-c", `alias.wait=!trap '' TERM; echo $$ > '${marker}'; while :; do :; done`, "wait"],
+      { bytes: 1024, timeoutMs: 200 }, controller.signal).catch((error: unknown) => error);
+    const started = Date.now();
+    await expect.poll(() => readFile(marker, "utf8"), { interval: 10 }).toMatch(/^\d+\n$/);
+    // Cancellation starts termination; the shorter command deadline must not
+    // overwrite that reason while the child is using its cleanup grace.
+    controller.abort();
+    expect(await pending).toMatchObject({ reason: "cancelled" });
+    expect(Date.now() - started).toBeLessThan(2000);
+    const pid = (await readFile(marker, "utf8")).trim();
+    await expect.poll(async () => {
+      try { return /\) Z /.test(await readFile(`/proc/${pid}/stat`, "utf8")); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") return true; throw error; }
+    }).toBe(true);
+  });
+
+  it("does not remove another live Git operation's lock on failure or timeout", async () => {
+    const marker = join(root, "other-filter-entered"), lock = join(repo, ".git", "index.lock");
+    git(repo, ["config", "filter.slow.clean", `if test -f '${lock}'; then printf entered > '${marker}'; sleep 10; fi; cat`]);
+    await save(repo, ".gitattributes", "*.txt filter=slow\n");
+    await save(repo, "file.txt", "other process's change\n");
+    const other = new AbortController();
+    let settled = false;
+    const pending = gitProcess(repo, ["add", "--", "file.txt"], { bytes: 1024, timeoutMs: 5000 }, other.signal)
+      .then((value) => { settled = true; return value; }, (error: unknown) => { settled = true; return error; });
+    try {
+      await expect.poll(() => readFile(marker, "utf8")).toBe("entered");
+      const original = await readFile(lock);
+      expect(await reason(service.stage(repo, "file.txt"))).toBe("busy");
+      await expect(gitProcess(repo, ["-c", "alias.wait=!sleep 10", "wait"], { bytes: 1024, timeoutMs: 30 }, new AbortController().signal)).rejects.toMatchObject({ reason: "timeout" });
+      expect(settled).toBe(false);
+      expect(await readFile(lock)).toEqual(original);
+    } finally { other.abort(); await pending; }
+    await expect(readFile(lock)).rejects.toMatchObject({ code: "ENOENT" });
+    git(repo, ["config", "--unset", "filter.slow.clean"]);
+    await run(service.stage(repo, "file.txt"));
+    expect((await run(service.changes(repo))).items.find((change) => change.path === "file.txt")?.staged).toBe(true);
+  });
+
+  it("rolls back its index lock after a real staging filter exceeds the stderr bound", async () => {
+    const lock = join(repo, ".git", "index.lock");
+    git(repo, ["config", "filter.noisy.clean", `if test -f '${lock}'; then head -c 20000 /dev/zero >&2; sleep 10; fi; cat`]);
+    await save(repo, ".gitattributes", "*.txt filter=noisy\n");
+    await save(repo, "file.txt", "changed length\n");
+    expect(await reason(service.stage(repo, "file.txt"))).toBe("output_limit");
+    await expect(readFile(lock)).rejects.toMatchObject({ code: "ENOENT" });
+    git(repo, ["config", "--unset", "filter.noisy.clean"]);
+    await run(service.stage(repo, "file.txt"));
+    expect((await run(service.changes(repo))).items.find((change) => change.path === "file.txt")?.staged).toBe(true);
   });
 
   it("fetches, pushes, reports actual ahead/behind, and fast-forward pulls using a local bare remote", async () => {

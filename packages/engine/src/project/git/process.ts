@@ -31,14 +31,24 @@ export const gitProcess = (
   const out: Buffer[] = [], err: Buffer[] = [];
   let bytes = 0, stderrBytes = 0, truncated = false;
   let failure: GitFailure | undefined;
-  const kill = () => {
+  let stopping = false, escalation: ReturnType<typeof setTimeout> | undefined;
+  const send = (signal: NodeJS.Signals) => {
     try {
-      if (process.platform !== "win32" && child.pid !== undefined) process.kill(-child.pid, "SIGKILL");
-      else child.kill("SIGKILL");
+      if (process.platform !== "win32" && child.pid !== undefined) process.kill(-child.pid, signal);
+      else child.kill(signal);
     } catch { /* The child may already have exited. */ }
   };
-  const abort = () => { failure = new GitFailure({ reason: "cancelled" }); kill(); };
-  const timer = setTimeout(() => { failure = new GitFailure({ reason: "timeout" }); kill(); }, limits.timeoutMs);
+  const stop = () => {
+    if (stopping) return;
+    stopping = true;
+    // Git's signal handlers roll back only the locks Git itself acquired,
+    // including a linked checkout's per-worktree index. Never guess ownership
+    // from a lock's age/existence or unlink a shared lock from this process.
+    send("SIGTERM");
+    escalation = setTimeout(() => send("SIGKILL"), 250);
+  };
+  const abort = () => { failure ??= new GitFailure({ reason: "cancelled" }); stop(); };
+  const timer = setTimeout(() => { failure ??= new GitFailure({ reason: "timeout" }); stop(); }, limits.timeoutMs);
   signal.addEventListener("abort", abort, { once: true });
   child.stdout.on("data", (data: Buffer) => {
     const remaining = Math.max(0, limits.bytes - bytes);
@@ -46,22 +56,26 @@ export const gitProcess = (
     bytes += data.length;
     if (bytes > limits.bytes) {
       truncated = true;
-      if (!truncate) failure = new GitFailure({ reason: "output_limit" });
-      kill();
+      if (!truncate) failure ??= new GitFailure({ reason: "output_limit" });
+      stop();
     }
   });
   child.stderr.on("data", (data: Buffer) => {
     const remaining = Math.max(0, 16_384 - stderrBytes);
     if (remaining > 0) err.push(data.subarray(0, remaining));
     stderrBytes += data.length;
-    if (stderrBytes > 16_384) { failure = new GitFailure({ reason: "output_limit" }); kill(); }
+    if (stderrBytes > 16_384) { failure ??= new GitFailure({ reason: "output_limit" }); stop(); }
   });
   child.on("error", (error: NodeJS.ErrnoException) => {
-    failure = new GitFailure({ reason: error.code === "ENOENT" ? "git_unavailable" : "git_failed" });
+    failure ??= new GitFailure({ reason: error.code === "ENOENT" ? "git_unavailable" : "git_failed" });
   });
   child.on("close", (code) => {
     clearTimeout(timer);
+    clearTimeout(escalation);
     signal.removeEventListener("abort", abort);
+    // Also reap a descendant that closed its pipes and ignored SIGTERM even
+    // when Git exited before the grace timer. No delayed kill may outlive us.
+    if (stopping) send("SIGKILL");
     if (failure !== undefined) reject(failure);
     else resolve({ stdout: boundedUtf8(Buffer.concat(out), limits.bytes), stderr: boundedUtf8(Buffer.concat(err), 16_384), code: code ?? -1, truncated });
   });
