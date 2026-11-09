@@ -243,7 +243,9 @@ const page = <T>(input: Input, raw: Record<string, unknown>, entries: ReadonlyAr
     }
     items.push(item); next = i < entries.length - 1 ? key : undefined
   }
-  return { reply: wrap({ requestId: raw.requestId, items, ...(next === undefined ? {} : { next }) }) }
+  const reply = wrap({ requestId: raw.requestId, items, ...(next === undefined ? {} : { next }) })
+  if (Buffer.byteLength(JSON.stringify(reply), "utf8") > 256 * 1024) return yield* refused("record exceeds the read budget")
+  return { reply }
 })
 const goalSet: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.goal.set">; yield* requireProject(input, p.projectId)

@@ -9374,6 +9374,30 @@ The inherited populated-page test continues to check every row, page progress an
 The reads preserve the durable log, and the real rebuild check remains enabled.
 The original independent failed probes and logs are retained unchanged.
 
+## 557. Empty project pages and the client request index bypassed their reply budgets
+
+Found: 2026-11-09, during the website engine review at `4c657279`.
+
+The generic project page helper checked complete encoded replies only when adding a row.
+The owner-only `client.requests` index had the same gap.
+An empty collection, a filter with no matches, or an exhausted valid cursor skipped that check.
+A valid request identity containing 140,000 quotation marks produced a 280,027-byte owner project reply.
+The recorded project lead received an 840,165-byte reply after the agent data envelope was encoded.
+Both replies exceeded the project's 262,144-byte limit.
+An empty client request reply with 270,000 quotation marks occupied 540,040 bytes.
+That reply exceeded the index's distinct 524,288-byte limit.
+
+Each helper now measures its final complete success reply before returning it.
+The project helper includes the actual agent data envelope in that measurement.
+The existing limits, row boundaries, cursor rules, request identities, and refusal text remain unchanged.
+The client request index remains owner-only.
+Refusal returns before any event, receipt, or read mark is written.
+
+Authenticated handler and socket regressions preserve the original failed payloads.
+They cover ordinary empty replies, filtered empty replies, exhausted pages, permitted project members, and owner-only catalogs.
+They also retain populated pagination, access refusals, stored metadata, and deterministic rebuild assertions.
+The separate `project.requests` correction tracked as issue 554 is outside this change.
+
 ## 561. The launcher test assumed no system Node.js 26
 
 Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
