@@ -93,6 +93,7 @@ export interface State {
   readonly client: unknown;
   readonly board: unknown;
   readonly roles: unknown;
+  readonly project: unknown;
   readonly sequence: EventSequence;
   readonly agents: Readonly<Record<string, AgentRow>>;
   readonly threads: Readonly<Record<string, ReadonlyArray<EventEnvelope>>>;
@@ -117,6 +118,7 @@ export const emptyViews = (views: Readonly<Record<PieceNamespace, PieceView>> = 
   client: guardPiece("views", "client", () => views.client.empty(), undefined),
   board: guardPiece("views", "board", () => views.board.empty(), undefined),
   roles: guardPiece("views", "roles", () => views.roles.empty(), undefined),
+  project: guardPiece("views", "project", () => views.project.empty(), undefined),
   sequence: zero, agents: keyed(), threads: keyed(), requests: keyed(), questions: keyed(), waits: keyed(),
   deliveries: keyed(), accounts: keyed(),
 });
@@ -348,9 +350,9 @@ const accountsAfter = (state: State, event: Event): State["accounts"] => {
 export const applyWith = (state: State, envelope: EventEnvelope, views: Readonly<Record<PieceNamespace, PieceView>> = pieceViews): State => {
   const event = envelope.event;
   const owner = threadAgent(event);
-  const pieces = { client: state.client, board: state.board, roles: state.roles };
+  const pieces = { client: state.client, board: state.board, roles: state.roles, project: state.project };
   for (const namespace of pieceNamespaces) {
-    pieces[namespace] = guardPiece("views", namespace, () => views[namespace].reduce(state[namespace], event, envelope.sequence), state[namespace]);
+    pieces[namespace] = guardPiece("views", namespace, () => views[namespace].reduce(state[namespace], event, envelope.sequence, envelope.occurredAt), state[namespace]);
   }
   const next: State = {
     ...pieces,

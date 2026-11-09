@@ -29,8 +29,13 @@ it("1.22 default tables refuse delivery and add no holds, requests or kept secre
       holdsUnsettled: [], holdsIncoming: [], ownerHeld: [],
       posts: [], completions: [], noAnswers: [], channels: [], unread: [], wakes: [],
     });
+    else if (namespace === "project") expect(section).toEqual({
+      sequence: 0, truncated: false, projects: [], repositories: [], workspaces: [], teams: [], sprints: [], tasks: [], agents: [],
+    });
     else expect(section).toBeUndefined();
-    expect(lists.snapshotSections[namespace]!({ _tag: "agent", agentId: "target" }, state)).toBeUndefined();
+    const agentSection = lists.snapshotSections[namespace]!({ _tag: "agent", agentId: "target" }, state);
+    if (namespace === "project") expect(agentSection).toEqual(section);
+    else expect(agentSection).toBeUndefined();
   }
 });
 

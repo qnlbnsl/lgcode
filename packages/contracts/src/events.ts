@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema"
+import { ProjectEvent } from "./project/events.ts"
 import { BoardEvent } from "./board/events.ts"
 import { ClientEvent } from "./client/events.ts"
 import { Account } from "./accounts.ts"
@@ -17,13 +18,13 @@ export type Actor = typeof Actor.Type
 export const Caller = Schema.Union([
   Actor,
   Schema.TaggedStruct("service", { service: Schema.NonEmptyString, rule: Schema.optionalKey(Schema.NonEmptyString) }),
-  Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles"]) })
+  Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles", "project"]) })
 ])
 export type Caller = typeof Caller.Type
 export const Sender = Schema.Union([
   Actor,
   Schema.TaggedStruct("service", { service: Schema.NonEmptyString }),
-  Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles"]) })
+  Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles", "project"]) })
 ])
 export type Sender = typeof Sender.Type
 
@@ -64,7 +65,7 @@ export const Delivery = Schema.Struct({
     Schema.TaggedStruct("permission", { id: PermissionRequestId }),
     Schema.TaggedStruct("question", { id: QuestionId }),
     Schema.TaggedStruct("wait", { id: WaitId }),
-    Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles"]), id: Schema.NonEmptyString })
+    Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles", "project"]), id: Schema.NonEmptyString })
   ]))
 })
 export type Delivery = typeof Delivery.Type
@@ -243,8 +244,8 @@ export const EngineEvent = Schema.Union([
 // Later pieces merge their event unions here, in namespace order.
 // Keep each member type while avoiding Effect's tuple-recursion limit as the
 // shared event list grows. Engine-only field schemas are exported directly.
-const eventMembers: ReadonlyArray<typeof EngineEvent.members[number] | typeof BoardEvent.members[number] | typeof ClientEvent.members[number] | typeof RolesEvent.members[number]> = [
-  ...EngineEvent.members, ...BoardEvent.members, ...ClientEvent.members, ...RolesEvent.members
+const eventMembers: ReadonlyArray<typeof EngineEvent.members[number] | typeof BoardEvent.members[number] | typeof ClientEvent.members[number] | typeof RolesEvent.members[number] | typeof ProjectEvent.members[number]> = [
+  ...EngineEvent.members, ...BoardEvent.members, ...ClientEvent.members, ...RolesEvent.members, ...ProjectEvent.members
 ]
 export const Event = Schema.Union(eventMembers)
 export type Event = typeof Event.Type
@@ -264,5 +265,6 @@ export const eventGroups = [
   { namespace: "engine", events: EngineEvent },
   { namespace: "board", events: BoardEvent },
   { namespace: "client", events: ClientEvent },
-  { namespace: "roles", events: RolesEvent }
+  { namespace: "roles", events: RolesEvent },
+  { namespace: "project", events: ProjectEvent }
 ] as const

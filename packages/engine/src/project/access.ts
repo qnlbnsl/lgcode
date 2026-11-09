@@ -1,0 +1,8 @@
+import type { Caller, Project } from "@lgcode/contracts"
+import type { Snapshot } from "../commands/internal.ts"
+import { own, projectView } from "./view.ts"
+export const canReadProject = (snapshot: Snapshot, actor: Caller, projectId: string): boolean =>
+  own(projectView(snapshot).projects, projectId) !== undefined && (actor._tag === "owner"
+    || actor._tag === "agent" && own(projectView(snapshot).agentProjects, actor.agentId) === projectId)
+export const canLeadProject = (snapshot: Snapshot, actor: Caller, project: Project): boolean =>
+  actor._tag === "owner" || actor._tag === "agent" && project.leadAgentId === actor.agentId

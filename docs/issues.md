@@ -8783,3 +8783,14 @@ State: worked around in the skill; the cause is in OpenPencil 0.16.0, not in LGc
   nodes ask for "Semi Bold".
 - The skill gives each label the size the browser measured, plus one pixel. It should drop that
   step once OpenPencil measures every bundled weight, and someone could report the fault upstream.
+
+## 527. Piece reducers could not use persisted event times for task history
+
+Found: 2026-11-08, while building the project foundation.
+State: fixed in the project foundation unit.
+
+The piece reducer table passed an event and a sequence, but omitted the event's persisted time.
+A task timeline built with the current clock would change when the log was replayed.
+The table now passes the envelope's time as a fourth argument.
+The project fold uses that time for task creation, changes, notes, and sprint completion.
+The handler tests compare the live views with a complete log rebuild after every journey.

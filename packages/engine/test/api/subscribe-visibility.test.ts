@@ -52,6 +52,22 @@ const parents: Record<string, string> = { "agent-child": "agent-self", "agent-gr
 const samples: Record<string, (a: string, n: string) => Record<string, unknown>> = {
   ...Object.fromEntries(boardEvents.map(({ _tag, ...payload }) => [_tag, () => payload])),
   ...rolesSamples,
+  "project.SettingsChanged": () => ({ settings: { workspaceFolder: "/tmp", shell: "zsh" } }),
+  "project.RepositoryAdded": () => ({ repoId: "project-repo", name: "Repository", path: "/tmp" }),
+  "project.RepositoryLocated": () => ({ repoId: "project-repo", machineId: "local", path: "/tmp" }),
+  "project.WorktreeCreated": () => ({ worktreeId: "project-workspace", repoId: "project-repo", machineId: "local", branch: "main", path: "/tmp", checkout: "main" }),
+  "project.Created": () => ({ projectId: "project-one", repoId: "project-repo", name: "Project", goal: "Exercise event privacy", leadAgentId: "agent-self", worktreeId: "project-workspace", machineId: "local" }),
+  "project.Placed": () => ({ projectId: "project-one", worktreeId: "project-workspace", machineId: "local" }),
+  "project.PreferencesChanged": () => ({ projectId: "project-one", shell: "zsh" }),
+  "project.Renamed": () => ({ projectId: "project-one", name: "Renamed project" }),
+  "project.StageChanged": () => ({ projectId: "project-one", stage: "build" }),
+  "project.TeamAdded": () => ({ projectId: "project-one", teamId: "project-team", name: "Team", worktreeId: "project-workspace" }),
+  "project.SprintAdded": () => ({ projectId: "project-one", sprintId: "project-sprint", label: "SP-01", name: "Sprint", goal: "Exercise privacy", phase: "Build", owner: "agent-self", needs: [] }),
+  "project.SprintChanged": () => ({ projectId: "project-one", sprintId: "project-sprint", phase: "Review" }),
+  "project.SprintCompleted": () => ({ projectId: "project-one", sprintId: "project-sprint", completion: "verified", evidence: "Visibility checks passed" }),
+  "project.TaskAdded": () => ({ projectId: "project-one", taskId: "project-task", title: "Task", owner: "agent-self", teamId: "project-team", sprintId: "project-sprint", state: "queue", worktreeId: "project-workspace" }),
+  "project.TaskChanged": () => ({ projectId: "project-one", taskId: "project-task", state: "active" }),
+  "project.TaskNoted": () => ({ projectId: "project-one", taskId: "project-task", title: "Note", detail: "Private project history" }),
   AgentStarted: (a) => ({ agentId: a, name: `n-${a}`, role: "worker", groups: [], parent: parents[a] === undefined ? owner : { _tag: "agent", agentId: parents[a] }, harness: "first", account: "primary", permission: "ask", folder: "/tmp", runMode: "acp" }),
   AgentStartFailed: (a) => ({ agentId: a, reason: "agent start failed" }),
   SessionOpened: (a, n) => ({ agentId: a, session: { _tag: "acp", sessionId: `s-${n}` }, protocolVersion: 2, reloadable: true }),
@@ -168,7 +184,7 @@ it("7.3 the samples cover every event type in the contracts' union (breaks when 
   expect(Object.keys(samples).sort()).toEqual(tags);
   for (const tag of tags) {
     expect(() => sample(tag, "agent-x", "check")).not.toThrow();
-    if (tag.startsWith("client.")) expect(eventVisibility[tag as keyof typeof eventVisibility]).toBe("owner-only");
+    if (tag.startsWith("client.") || tag.startsWith("project.")) expect(eventVisibility[tag as keyof typeof eventVisibility]).toBe("owner-only");
   }
 });
 

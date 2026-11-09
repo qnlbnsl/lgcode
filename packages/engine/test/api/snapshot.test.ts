@@ -34,6 +34,7 @@ it("1.7 snapshot reads one views value and every section receives that exact val
     client: (_caller: Caller, view: View) => { sectionInputs.push(view); return { records: [{ id: "one", text: "", sequence: view.sequence }] }; },
     board: (_caller: Caller, view: View) => { sectionInputs.push(view); return { sequence: view.sequence }; },
     roles: (_caller: Caller, view: View) => { sectionInputs.push(view); return { sequence: view.sequence }; },
+    project: (_caller: Caller, view: View) => { sectionInputs.push(view); return { sequence: view.sequence }; },
   } };
   const reply = await Effect.runPromise(snapshot(owner, lists).pipe(Effect.provideService(Views, {
     snapshot: Effect.sync(() => (++reads === 1 ? first : second)), applyCommitted: () => Effect.void,
@@ -43,7 +44,7 @@ it("1.7 snapshot reads one views value and every section receives that exact val
   expect(reply.client).toEqual({ records: [{ id: "one", text: "", sequence: 11 }] });
   expect(reply.board).toEqual({ sequence: 11 });
   expect(reply.roles).toEqual({ sequence: 11 });
-  expect(sectionInputs).toHaveLength(3);
+  expect(sectionInputs).toHaveLength(4);
   expect(sectionInputs.every((view) => view === first)).toBe(true);
 });
 

@@ -63,6 +63,27 @@ for (const { command, words, form } of invocations) {
       "board.channels": { after: "cursor", limit: 20 },
       "board.status": { agentId: "member" },
       "board.flush": { agentId: "member" },
+      "project.settings": {},
+      "project.settings.set": { settings: { workspaceFolder: root.work, shell: "zsh" } },
+      "project.repository.add": { name: "Product", path: root.work, machineId: "local" },
+      "project.repository.locate": { repoId: "repo", machineId: "local", path: root.work },
+      "project.repositories": { after: "repo", limit: 20 },
+      "project.workspace.register": { repoId: "repo", machineId: "local", branch: "main", path: root.work, checkout: "main" },
+      "project.workspaces": { repoId: "repo", after: "workspace", limit: 20 },
+      "project.create": { repoId: "repo", name: "Console", goal: "Track work", leadAgentId: "lead", worktreeId: "workspace", machineId: "local", shell: "zsh", stage: "plan" },
+      "project.rename": { projectId: "project", name: "Renamed" },
+      "project.place": { projectId: "project", worktreeId: "workspace" },
+      "project.preferences.set": { projectId: "project", shell: "zsh" },
+      "project.stage.set": { projectId: "project", stage: "build" },
+      "project.read": { projectId: "project", collection: "tasks", after: "task", limit: 20 },
+      "project.team.create": { projectId: "project", name: "Build", worktreeId: "workspace", stage: "build", area: "Console" },
+      "project.sprint.create": { projectId: "project", label: "SP-01", name: "Foundation", goal: "Store work", phase: "Build", owner: "lead", needs: [] },
+      "project.sprint.update": { projectId: "project", sprintId: "sprint", phase: "Review", needs: [] },
+      "project.sprint.complete": { projectId: "project", sprintId: "sprint", completion: "verified", evidence: "Tests passed at abc123" },
+      "project.task.create": { projectId: "project", title: "Work", owner: "member", teamId: "team", sprintId: "sprint", state: "queue", worktreeId: "workspace" },
+      "project.task.update": { projectId: "project", taskId: "task", state: "review", note: "Ready" },
+      "project.task.note": { projectId: "project", taskId: "task", title: "Handoff", detail: "Review it" },
+      "project.task.history": { projectId: "project", taskId: "task", after: "0", limit: 20 },
       "roles.orient": {}, "roles.handoff": { agentId: "member" },
       "roles.role-file.set": { content: roleFileContent }, "roles.role-file.get": {},
       "roles.settings.get": {}, "roles.settings.set": { settings: { sheepdog: true, limits: { stallMinutes: 10 } } },
@@ -97,6 +118,17 @@ for (const { command, words, form } of invocations) {
         "board.channels": { ...base, items: [], next: "next-cursor" },
         "board.status": { ...base, agentId: "member", unread: 1, incomingOpen: 1, ownOpen: 0, owed: 0, failedCompletions: 0, wakeQueued: true, wakeSent: false, holdsUnsettled: false, holdsIncoming: true, sequence: 100, disabled: false },
         "board.flush": { ...base, wakeId: "wake" },
+        "project.settings": { ...base, settings: { workspaceFolder: root.work, shell: "zsh" } },
+        "project.repository.add": { ...base, repoId: "repo" },
+        "project.repositories": { ...base, items: [], next: "repo" },
+        "project.workspace.register": { ...base, worktreeId: "workspace" },
+        "project.workspaces": { ...base, items: [], next: "workspace" },
+        "project.create": { ...base, projectId: "project" },
+        "project.read": { ...base, data: "Data from another agent [project-boundary] (delivery read):\n{\"items\":[]}\nEnd data [project-boundary]" },
+        "project.team.create": { ...base, teamId: "team", channelId: "channel", group: "team:project/team" },
+        "project.sprint.create": { ...base, sprintId: "sprint" },
+        "project.task.create": { ...base, taskId: "task" },
+        "project.task.history": { ...base, data: "Data from another agent [history-boundary] (delivery read):\n{\"items\":[]}\nEnd data [history-boundary]" },
         "roles.orient": { ...base, name: "Member", kind: "worker", advice: "Report to your lead." },
         "roles.handoff": { ...base, agentId: "member", text: "Continue the assigned work." },
         "roles.role-file.set": { ...base, roleFileHash }, "roles.role-file.get": { ...base, file: roleFile, roleFileHash },
@@ -119,8 +151,8 @@ for (const { command, words, form } of invocations) {
     expect(await finishCli(child)).toEqual({ code: 0, signal: null });
     expect(engine.requests).toHaveLength(1);
     expect(engine.requests[0]).toMatchObject({ _tag: "Request", tag: command, payload });
-    if (command.startsWith("roles.")) expect(JSON.parse(child.stdout())).toEqual(expectedReply);
-    if (command === "board.read") expect(child.stdout()).toBe((expectedReply as { data: string }).data + "\n");
+    if (command.startsWith("roles.") || command.startsWith("project.") && command !== "project.read" && command !== "project.task.history") expect(JSON.parse(child.stdout())).toEqual(expectedReply);
+    if (["board.read", "project.read", "project.task.history"].includes(command)) expect(child.stdout()).toBe((expectedReply as { data: string }).data + "\n");
     assertNoSecrets(child, [token]);
   });
 }
@@ -144,7 +176,7 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.read", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
   const nonAgent = Object.entries(commandAccess).filter(([, kinds]) => !(kinds as ReadonlyArray<string>).includes("agent")).map(([name]) => name);

@@ -20,7 +20,7 @@ const withDatabase = async (body: Effect.Effect<unknown, unknown, SqlClient.SqlC
 it("1.8 a namespaced migration runs once, keeps its rows and leaves every engine table intact", async () => {
   const migratePieces = await loadMigrate();
   expect(migratePieces, "E7 must run and validate piece migrations").toBeTypeOf("function");
-  const migrations = { client: [{ id: 1, statements: ["CREATE TABLE client_fixture (id TEXT PRIMARY KEY)"] }], board: [], roles: [] };
+  const migrations = { client: [{ id: 1, statements: ["CREATE TABLE client_fixture (id TEXT PRIMARY KEY)"] }], board: [], roles: [], project: [] };
   await withDatabase(Effect.gen(function* () {
     yield* migrate;
     const sql = yield* SqlClient.SqlClient;
@@ -43,7 +43,7 @@ it.each([
   await withDatabase(Effect.gen(function* () {
     yield* migrate;
     const sql = yield* SqlClient.SqlClient;
-    const result = yield* migratePieces({ client: [{ id: 1, statements: ["CREATE TABLE client_first (id TEXT)", statement] }], board: [], roles: [] }).pipe(Effect.result);
+    const result = yield* migratePieces({ client: [{ id: 1, statements: ["CREATE TABLE client_first (id TEXT)", statement] }], board: [], roles: [], project: [] }).pipe(Effect.result);
     expect(result._tag).toBe("Failure");
     expect(yield* sql`SELECT name FROM sqlite_master WHERE name IN ('client_first', 'board_intrusion', 'intrusion')`).toEqual([]);
     expect(yield* sql`SELECT COUNT(*) AS n FROM events`).toEqual([{ n: 0 }]);
