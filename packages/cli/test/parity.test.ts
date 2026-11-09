@@ -39,6 +39,9 @@ for (const { command, words, form } of invocations) {
       "client.alerts.carrier.set": { carrier: { _tag: "ntfy", server: "https://push.example", topic: "owner_alerts" } },
       "client.alerts.carrier.clear-token": {},
       start: { name: "Parity agent", role: "worker", harness: "fake", account: { _tag: "any" }, permission: "ask", folder: root.work, groups: ["review"], model: "small", effort: "low", prompt: "Check parity." },
+      configure: { agentId: "member", model: "small", effort: "low" },
+      "client.agent.configuration": { agentId: "member" },
+      "client.agent.context": { agentId: "member" },
       prompt: { agentId: "member", text: "A prompt with spaces." },
       answer: { kind: "question", id: "question", text: "The answer." },
       "pass-up": { subject: { _tag: "question", id: "question" } },
@@ -79,6 +82,9 @@ for (const { command, words, form } of invocations) {
         "client.alerts.list": { ...base, items: [], next: 10 },
         "client.alerts.settings": { ...base, kinds: [{ kind: "approval", push: false }], carrier: { _tag: "none" }, tokenSet: false },
         start: { ...base, agentId: "member" }, prompt: { ...base, deliveryId: "delivery" },
+        "client.agent.configuration": { ...base, agentId: "member", configuration: { desired: { model: "small", effort: "low" }, applied: { model: "small", effort: "low" }, status: "applied" },
+          models: { source: "negotiated", options: [{ id: "small", label: "Small" }] }, efforts: { source: "configured", options: [{ id: "low" }] } },
+        "client.agent.context": { ...base, agentId: "member", context: { _tag: "available", used: 25, window: 100, percent: 25, reportedAt: 1_800_000_000_000, model: "small" } },
         compact: { ...base, deliveryId: "delivery" }, ask: { ...base, questionId: "question" },
         wait: { ...base, waitId: "wait", members: [{ agentId: "member", reason: "settled" }], outcome: "satisfied" },
         accounts: { ...base, accounts: [] }, harnesses: { ...base, harnesses: [] },
@@ -120,6 +126,7 @@ for (const { command, words, form } of invocations) {
     expect(engine.requests).toHaveLength(1);
     expect(engine.requests[0]).toMatchObject({ _tag: "Request", tag: command, payload });
     if (command.startsWith("roles.")) expect(JSON.parse(child.stdout())).toEqual(expectedReply);
+    if (command === "configure" || command.startsWith("client.agent.")) expect(JSON.parse(child.stdout())).toEqual(expectedReply);
     if (command === "board.read") expect(child.stdout()).toBe((expectedReply as { data: string }).data + "\n");
     assertNoSecrets(child, [token]);
   });

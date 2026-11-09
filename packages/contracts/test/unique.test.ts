@@ -19,7 +19,7 @@ it("board 1.8 every real board declaration is registered once in the full API wi
 });
 
 const engineNames = [
-  "start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "release", "compact", "group",
+  "start", "configure", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "release", "compact", "group",
   "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "subscribe", "debug.compare-views",
 ];
 // Walk member declarations, rather than toTaggedUnion().cases, which has

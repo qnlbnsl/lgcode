@@ -1,3 +1,4 @@
+import { ChoiceId } from "./agentConfiguration.ts"
 import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
@@ -11,7 +12,7 @@ import { PermissionLevel } from "./permission.ts"
 import { RolesRpcGroup, rolesAccess } from "./roles/commands.ts"
 
 export const engineCommandNames = [
-  "start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "release", "compact", "group",
+  "start", "configure", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "release", "compact", "group",
   "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "subscribe", "debug.compare-views"
 ] as const
 // Compatibility for clients that still import the original engine inventory.
@@ -51,8 +52,8 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
         Schema.TaggedStruct("named", { accountId: AccountId }),
         Schema.TaggedStruct("any", {})
       ]),
-      model: Schema.optionalKey(Schema.NonEmptyString),
-      effort: Schema.optionalKey(Schema.NonEmptyString),
+      model: Schema.optionalKey(ChoiceId),
+      effort: Schema.optionalKey(ChoiceId),
       permission: PermissionLevel,
       folder: Schema.String.check(Schema.isPattern(/^\/.*$/)),
       runMode: Schema.optionalKey(RunMode),
@@ -60,6 +61,10 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
       prompt: Schema.optionalKey(Schema.String)
     },
     success: Schema.Struct({ ...request, agentId: AgentId }), error: Refused
+  }),
+  Rpc.make("configure", {
+    payload: { ...target, model: Schema.optionalKey(ChoiceId), effort: Schema.optionalKey(ChoiceId) },
+    success: Ack, error: Refused
   }),
   Rpc.make("prompt", {
     payload: { ...target, text: Schema.String },
@@ -137,7 +142,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 
 // Later pieces merge their prefixed groups here, in namespace order.
 export const WebRpcGroup = ClientRpcGroup.omit(
-  "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence",
+  "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.agent.configuration", "client.agent.context",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
   "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"
 )
@@ -155,12 +160,13 @@ export const commandAccess = {
   "client.alerts.carrier.clear-token": ["owner"],
   ...boardAccess,
   ...rolesAccess,
-  start: ["owner", "agent"], prompt: ["owner", "agent", "service"], answer: ["owner", "agent"],
+  configure: ["owner"], start: ["owner", "agent"], prompt: ["owner", "agent", "service"], answer: ["owner", "agent"],
   "pass-up": ["owner", "agent"], ask: ["owner", "agent"], wait: ["owner", "agent"],
   release: ["owner", "agent", "service"],
   stop: ["owner", "agent"], resume: ["owner", "agent", "service"], compact: ["owner", "agent", "service"], group: ["owner", "agent"],
   accounts: ["owner"], "accounts set-secret": ["owner"], "accounts mark-available": ["owner"],
   harnesses: ["owner"], subscribe: ["owner", "agent", "service"], "debug.compare-views": ["owner"],
+  "client.agent.configuration": ["owner"], "client.agent.context": ["owner"],
   "client.snapshot": clientCommandAccess["client.snapshot"], "client.roster": clientCommandAccess["client.roster"],
   "client.thread": clientCommandAccess["client.thread"], "client.subscribe": clientCommandAccess["client.subscribe"],
   "client.event": clientCommandAccess["client.event"], "client.sequence": clientCommandAccess["client.sequence"]

@@ -1,3 +1,4 @@
+import { AgentConfiguration } from "../agentConfiguration.ts"
 import { StartFailure } from "../startFailure.ts"
 import * as Schema from "effect/Schema"
 import { Actor, EventEnvelope, PermissionOption, SessionReference } from "../events.ts"
@@ -30,6 +31,7 @@ export const RosterEntry = Schema.Struct({
   openPermissionRequests: Count, openQuestionsAsked: Count,
   harness: HarnessId, account: AccountId,
   model: Schema.optionalKey(Schema.NonEmptyString), effort: Schema.optionalKey(Schema.NonEmptyString),
+  configuration: Schema.optionalKey(AgentConfiguration),
   permission: PermissionLevel, folder: Schema.String,
   session: Schema.optionalKey(SessionReference), startedAt: EpochMilliseconds
 })

@@ -1,3 +1,4 @@
+import { applyPendingConfiguration } from "../commands/configuration.ts";
 import { cacheDeliveryCurrent } from "../commands/cache.ts";
 import * as Clock from "effect/Clock";
 import { carryOnText } from "../accounts/available.ts";
@@ -305,8 +306,15 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
       && (state === "idle" || (options.recovered === true && state === "working" && reloaded(snapshot)))
       ? nextQueued(snapshot, agentId) : undefined;
   };
-  if (ready(yield* views.snapshot) === undefined) return;
+  const candidate = (yield* views.snapshot).agents[agentId];
+  if (ready(yield* views.snapshot) === undefined && candidate?.state._tag !== "idle") return;
   yield* (options.laneHeld === true ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : withLane(log, agentId))(Effect.gen(function* () {
+    const current = (yield* views.snapshot).agents[agentId];
+    if (current === undefined || (current.state._tag !== "idle" && ready(yield* views.snapshot) === undefined)) return;
+    if (!(yield* applyPendingConfiguration(agentId))) return;
+    // An idle configuration can finish without any delivery to reserve.
+    // An empty queue must not enter a writer that may have latched a failure.
+    if (ready(yield* views.snapshot) === undefined) return;
     const reserved = yield* log.transact((append) => Effect.gen(function* () {
       let snapshot = yield* views.snapshot;
       let row = ready(snapshot);
@@ -358,6 +366,8 @@ const readyAfter = (envelope: EventEnvelope): ReadonlyArray<AgentId> => {
   switch (event._tag) {
     case "DeliveryQueued": return [event.delivery.target];
     case "SessionOpened":
+    case "AgentConfigurationObserved":
+    case "AgentConfigurationChosen":
     case "TurnEnded":
     case "DeliveryReturned":
     case "DeliveryRequeued":

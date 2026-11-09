@@ -90,7 +90,7 @@ export const reloadedEvents = (
   return [
     ...(agent.state._tag === "starting" ? [] : [{ _tag: "StateChanged" as const, agentId, state: { _tag: "starting" as const } }]),
     // Named fields only: the replayed text never reaches the log (row 51).
-    { _tag: "SessionOpened", agentId, session: session.session, protocolVersion: session.protocolVersion, reloadable: session.reloadable },
+    { _tag: "SessionOpened", agentId, session: session.session, protocolVersion: session.protocolVersion, reloadable: session.reloadable, ...(session.configuration === undefined ? {} : { configuration: session.configuration }) },
     ...found.map((row): Event => ({ _tag: "DeliveryAccepted", agentId, deliveryId: row.id })),
     ...unaccepted.map((row): Event => ({ _tag: "DeliveryRequeued", agentId, deliveryId: row.id, reason: "agent interrupted" })),
     ...(carry ? [{ _tag: "DeliveryQueued" as const, delivery: {

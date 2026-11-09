@@ -8815,3 +8815,137 @@ The website seats continue to run `pnpm check` and `pnpm live-check:web`.
 The gate report must name the commit and attribute the broader live result to the manager.
 The run evidence is recorded in `.scratch/foundry-runs/website-1/run.md` in the main checkout.
 The lead's private live run is `/tmp/lgcode-live-KULrQh`.
+
+## 531. Composer choices and context usage lacked a live runner contract
+
+Found: 2026-11-08, during the website composer engine assignment.
+State: fixed on `unit/website-w05c`, pending independent verification.
+
+The engine configured a model and effort only when opening a session.
+There was no owner command to change the next turn on the same running agent.
+The existing per-turn token totals did not establish the size of the context window.
+The session-opening configuration helper also treated a successful response as an acknowledgement without checking its selected value.
+The shared start path now validates identifiers against the same bounded composer contract, including configured defaults.
+
+The change adds durable desired and applied settings, with explicit pending, refused, unsupported, and unavailable states.
+The dispatcher holds the existing agent lane through configuration acknowledgement and the next prompt or compaction write.
+A refused change retains queued owner work until the owner corrects the choice.
+A timed-out or disconnected configuration call leaves the live process uncertain.
+That process holds queued work until an explicit owner stop and resume opens a new incarnation.
+A stopped agent retains its desired settings for its next real retry.
+A fresh or reloaded process supplies its own acknowledgement.
+Configuration revision identities are registered at their event schema position in the redaction structure.
+An issue-340 regression preserves secret-colliding revisions through the real writer and receipts while prose and free-text records remain redacted.
+The owner can read bounded configured or negotiated choices, with optional redacted labels.
+Cursor's existing `auto` start setting keeps its advertised `default[]` protocol identity through the next turn and later effort-only changes.
+Only a live harness occupancy report with compatible used-token and window counts supplies a percentage.
+The ratio is divided before multiplication so valid safe-integer counts cannot round above 100 percent.
+A model change or reload invalidates old context evidence.
+
+The controlled Agent Client Protocol subprocess tests also exposed an execution-environment limit.
+Inside this Codex filesystem sandbox, an existing runner test's child exited before initialization.
+The same existing test passed outside the sandbox.
+The focused subprocess proofs therefore run outside that sandbox, with one worker.
+No product permission rule was weakened.
+
+## 532. The piece failure log test can miss its diagnostic
+
+Found: 2026-11-08, during the website worker's full repository check.
+State: an interrupted batch loss is fixed; complete verification is pending.
+
+The `FR-042 protocol=false` case in
+`packages/engine/test/pieces/piece-failure-log.test.ts` expected one safe
+diagnostic and received none during a full suite run. The same three-test
+file passed when run alone, without a source change. The failed full run is
+in `/tmp/w03-check.log`, and the isolated pass is in
+`/tmp/w03-piece-failure.log`. The assertion remains unchanged.
+
+The combined website integration check at `b038490` later missed the same
+diagnostic in the `protocol=true` case. Its actual exit was 1. The unchanged
+file then passed alone again.
+
+The service drain removed a whole pending batch before writing its entries.
+Interruption after one write could discard the rest of that removed batch.
+A deterministic regression interrupts the actual drain fiber after its first
+entry. It expected three diagnostics and captured one before the correction.
+The drain now completes each removed batch before observing interruption.
+Its idle wait remains interruptible. All four diagnostic tests pass locally.
+The original exact count, throttling, and secrecy assertions remain intact.
+The forced interruption establishes this production defect. It does not
+establish the exact scheduling of the earlier zero-entry failures.
+The complete combined check and independent review remain pending.
+
+A later complete Git check at `253ef5b` still captured zero entries in the
+original `protocol=false` case with the batch mask present.
+A separate controlled scheduler probe established a second ownership gap.
+A fork cancelled before its first evaluation never installs its `ensuring`
+finalizer. The probe retained all three pending entries and logged none.
+The parent scope now registers a final flush before scheduling the follower.
+The batch mask and the running follower's finalizer remain in place.
+Each drain removes its own snapshot once, so final flushes do not duplicate it.
+The same controlled delayed-child probe now passes and flushes all three
+entries before the child evaluates. Independent repeated-interruption and
+fresh-service lifecycle probes also pass. Complete corrected-head checks
+remain required before acceptance.
+
+## 535. Idle configuration dispatch entered the writer without queued work
+
+Found: 2026-11-08, during the website composer engine full check.
+State: correction written on `unit/website-w05c`, pending verification.
+
+The configuration dispatcher now admits an idle agent even when it has no queued delivery.
+This lets a pending owner choice apply before another prompt arrives.
+After configuration, the dispatcher entered the delivery writer without rechecking the queue.
+The baseline returned before entering the writer when no delivery was ready.
+A latched write failure rejects even an empty transaction.
+An idle dispatch could therefore emit an extra fixed delivery failure diagnostic during the runner-event append-refusal test.
+That test reported four captured lines where its exact assertion requires three.
+Asynchronous scheduling exposes the extra diagnostic, but the empty transaction is a new configuration-path regression.
+
+The correction rechecks the ready queue after configuration while retaining the same agent lane.
+It returns before entering the delivery writer when there is no work to reserve.
+The diagnostic count, fixed-message, redaction, defect-isolation, and recovery assertions remain exact.
+The orient tests also had a local running-session fixture without an applied configuration report.
+That fixture now includes the model and effort it claims the harness opened with.
+The assertions that reads do not write events remain unchanged.
+The read-only fixture audit found no other unreported direct test with a missing session configuration acknowledgement.
+Historical projection fixtures continue to represent unknown applied configuration honestly.
+
+A temporary diagnostic reproduced the pre-correction failure with the exact assertions retained.
+Its captured order was three `runner event dropped: processing failed` messages followed by `delivery dispatch failed`.
+The orient cases gained six `AgentConfigurationApplied` events each, changing sequences 21 to 27 and 15 to 21.
+An isolated baseline-dispatcher control passed the same three assertions with only the three runner-event messages and unchanged sequences.
+The corrected dispatcher and acknowledged orient fixtures also passed those three assertions.
+Their captured messages and unchanged sequences matched the baseline control.
+The temporary diagnostic instrumentation was removed after the comparison.
+
+## 536. Closing a pending Node socket could raise an uncaught exception
+
+Found: 2026-11-08, during the corrected foundations' fresh complete checks.
+State: corrected locally; independent review and complete checks are pending.
+
+The Git check at `30584ef` reported two uncaught close-before-connect errors.
+The project check at `b1978e5` later passed all 6275 assertions but exited 1
+because the same exception was uncaught. The browser stage did not run.
+The logs are `/tmp/w02f1-verifier-1/pnpm-check.log` and
+`/tmp/w01f1-verifier-1/full-check.log`.
+
+Independent controlled handshakes established a real cleanup defect.
+Cancelling or timing out before open caused each child process to exit 1.
+Effect removed its reader error listener before releasing the socket.
+Node's ws transport then emitted its close-before-connect error asynchronously.
+HTTP refusal and post-open close controls exited normally.
+This establishes the pending-handshake defect, not every original suite trigger.
+
+The Node socket acquisition now owns release through `Socket.fromWebSocket`.
+An explicit pre-open close retains its error ownership through the close event.
+Active reader errors retain their ordinary typed failure path.
+The production Node client and shared engine fixtures use that same acquisition.
+The existing socket validation and authenticated handshake headers are preserved.
+The fix does not install a process-wide error handler or discard suite errors.
+New child-process regressions cover cancellation, timeout, HTTP refusal and
+post-open close. All four pass locally, along with the diagnostic drain tests.
+Client and engine type checks pass. The targeted recovery and browser-boundary
+batch passes all 32 tests in five files. An independent five-mode probe also
+passes and retains a typed SocketReadError for an active malformed frame.
+Complete corrected-head checks remain required before acceptance.

@@ -229,6 +229,7 @@ export const seedAgent = (spec: SeedAgent) => Effect.gen(function* () {
     events.push(decodeEvent({
       _tag: "SessionOpened", agentId, session: { _tag: "acp", sessionId: `session-${spec.id}` },
       protocolVersion: 2, reloadable: spec.reloadable ?? true,
+      configuration: { model: "test-model", effort: "high" },
     }));
   }
   const after: Record<SeedState, ReadonlyArray<Event>> = {

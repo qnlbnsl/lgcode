@@ -1,3 +1,4 @@
+import { configure } from "./configuration.ts";
 import { startFailureText } from "@lgcode/contracts/startFailure";
 import { commandOutcome } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
@@ -40,6 +41,7 @@ export const planners = {
   "roles.snooze": (input, payload) => snooze(input, payload as Payload<"roles.snooze">),
   "roles.record": (input, payload) => record(input, payload as Payload<"roles.record">),
   release: (input, payload) => release(input, payload as Payload<"release">),
+  configure: (input, payload) => configure(input, payload as Payload<"configure">),
   start: (input, payload) => start(input, payload as Payload<"start">),
   prompt: targeted("prompt", (input, payload) => Effect.succeed(prompt(input, payload as Payload<"prompt">))),
   answer: (input, payload) => answer(input, payload as Payload<"answer">),

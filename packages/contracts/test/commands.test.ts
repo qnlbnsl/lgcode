@@ -20,6 +20,7 @@ import { EventEnvelope } from "../src/events.ts"
 // the test must not read the lists it checks from the code under test.
 const expectedCommands = [
   "start",
+  "configure",
   "prompt",
   "answer",
   "pass-up",
@@ -37,7 +38,7 @@ const expectedCommands = [
   "subscribe",
   "debug.compare-views"
 ]
-const clientReads = ["client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence"]
+const clientReads = ["client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.agent.configuration", "client.agent.context"]
 
 // Row 55 names `accounts set-secret`, `accounts mark-available` and `debug.compare-views` outright
 // and says every other owner-only command is excluded too. Reading: the owner-only commands are the
@@ -46,7 +47,7 @@ const clientReads = ["client.snapshot", "client.roster", "client.thread", "clien
 // events) but is not offered as an MCP tool because a stream cannot be a tool.
 const expectedWebCommands = ["client.web.settings", "client.web.settings.set"]
 const expectedApiCommands = [...expectedCommands, ...expectedWebCommands]
-const expectedOwnerOnly = ["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "board.flush",
+const expectedOwnerOnly = ["configure", "client.agent.configuration", "client.agent.context", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "board.flush",
   "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
   "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", ...expectedWebCommands]

@@ -4,6 +4,7 @@ import { expect } from "vitest";
 
 export const clientCommands = [
   "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence",
+  "client.agent.configuration", "client.agent.context",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
   "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token",
   "client.web.settings", "client.web.settings.set",

@@ -14,6 +14,7 @@ import { bounded, SETUP_TIMEOUT_MILLIS } from "../recovery/reload.ts";
 import { withLane, withPreemption } from "../routing/lanes.ts";
 import { withWaitChecks } from "../routing/waits.ts";
 import { freshRequest, readHarnesses, refused, type Input, type Payload, type Plan } from "./internal.ts";
+import { validChoiceId } from "../runner/choices.ts";
 
 export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Plan, ReturnType<typeof refused> | LogWriteFailed> =>
   Effect.gen(function* () {
@@ -27,6 +28,9 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
     if (harness === undefined || (payload.runMode !== undefined && payload.runMode !== harness.runMode)) return yield* refused();
     const model = payload.model ?? harness.defaultModel;
     const effort = payload.effort ?? harness.defaultEffort;
+    for (const value of [model, effort]) {
+      if (value !== undefined && (!validChoiceId(value) || (yield* runtime.log.redactText(value)) !== value)) return yield* refused();
+    }
     if ((model !== undefined && harness.models.length > 0 && !harness.models.includes(model))
       || (effort !== undefined && harness.efforts.length > 0 && !harness.efforts.includes(effort))) return yield* refused();
     const account = pickAccount(snapshot, payload.harness, payload.account);
@@ -72,11 +76,14 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
           // A stop that wins the lane must prevent the later process spawn.
           // Fix round 1, A2: a sign-out pauses a starting agent too; it still
           // opens its session, which the pause then keeps.
-          const waiting = (yield* runtime.views.snapshot).agents[agentId]?.state._tag;
+          const current = (yield* runtime.views.snapshot).agents[agentId];
+          const waiting = current?.state._tag;
+          const selectedModel = current?.model;
+          const selectedEffort = current?.effort;
           if (waiting !== "starting" && waiting !== "paused") return false;
           return yield* handle.cancellable(bounded(runtime, agentId, SETUP_TIMEOUT_MILLIS, Effect.suspend(() => runtime.runner.start({
             agentId, token: token.token, folder, grant, harness, account,
-            permission: payload.permission, ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }),
+            permission: payload.permission, ...(selectedModel === undefined ? {} : { model: selectedModel }), ...(selectedEffort === undefined ? {} : { effort: selectedEffort }),
           })))).pipe(
             Effect.flatMap(Option.match({ onNone: () => Effect.succeed(true), onSome: (session) => runtime.log.transact((append) => Effect.gen(function* () {
               // An exit can arrive while the session result is being returned.
@@ -93,7 +100,7 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
                 ? [{ _tag: "StateChanged", agentId, state: { _tag: "paused", reason: "signed-out", midTurn: false } }]
                 : before === "paused" ? [{ _tag: "StateChanged", agentId, state: { _tag: "idle" } }] : [];
               const opened: ReadonlyArray<Event> = [{ _tag: "SessionOpened", agentId, session: session.session,
-                protocolVersion: session.protocolVersion, reloadable: session.reloadable }, ...lifecycle];
+                protocolVersion: session.protocolVersion, reloadable: session.reloadable, ...(session.configuration === undefined ? {} : { configuration: session.configuration }) }, ...lifecycle];
               yield* append(actor, freshRequest(), randomUUID(), lifecycle.length > 0 ? withWaitChecks(snapshot, opened, runtime.lists) : opened, {});
               return false;
             })).pipe(Effect.catchTag("RequestIdReused", () => Effect.succeed(false))) })),

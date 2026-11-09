@@ -1,3 +1,5 @@
+import type { AgentChoice, AgentConfiguration } from "@lgcode/contracts";
+import { configurationMatches } from "../runner/choices.ts";
 import { safeStartFailure, type StartFailure } from "@lgcode/contracts/startFailure";
 import {
   EventSequence as EventSequenceSchema, eventEffect,
@@ -21,6 +23,7 @@ interface AgentRow {
   readonly account: string;
   readonly model?: string;
   readonly effort?: string;
+  readonly configuration?: AgentConfiguration;
   readonly permission: string;
   readonly mode?: string;
   readonly folder: string;
@@ -178,6 +181,9 @@ const withoutReason = (row: DeliveryRow): DeliveryRow => {
   return rest;
 };
 
+const desiredOf = (row: AgentRow): AgentChoice => row.configuration?.desired ?? {
+  ...(row.model === undefined ? {} : { model: row.model }), ...(row.effort === undefined ? {} : { effort: row.effort }),
+};
 const agentsAfter = (state: State, event: Event): State["agents"] => {
   switch (event._tag) {
     case "AgentStarted": return put(state.agents, event.agentId, {
@@ -187,10 +193,35 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
       ...(event.effort === undefined ? {} : { effort: event.effort }),
       permission: event.permission, folder: event.folder, runMode: event.runMode, state: { _tag: "starting" },
       compacting: false, capacityHeld: false,
+      configuration: { desired: { ...(event.model === undefined ? {} : { model: event.model }), ...(event.effort === undefined ? {} : { effort: event.effort }) }, status: "pending" },
     });
     case "SessionOpened": return change(state.agents, event.agentId, (row) => ({
       ...row, state: nextState(row.state, event), startFailure: undefined, session: event.session,
       protocolVersion: event.protocolVersion, reloadable: event.reloadable,
+      configuration: {
+        ...(row.configuration?.revision === undefined ? {} : { revision: row.configuration.revision }), desired: desiredOf(row),
+        ...(event.configuration === undefined ? {} : { applied: event.configuration }),
+        // An old session event cannot prove a requested model or effort.
+        // With no requested axes there is no outstanding configuration work.
+        status: configurationMatches(row.harness, desiredOf(row), event.configuration ?? {}) ? "applied" : "pending",
+      },
+    }));
+    case "AgentConfigurationChosen": return change(state.agents, event.agentId, (row) => ({
+      ...row, ...event.desired, configuration: { revision: event.revision, desired: event.desired, status: "pending",
+        ...(row.configuration?.applied === undefined ? {} : { applied: row.configuration.applied }) },
+    }));
+    case "AgentConfigurationObserved": return change(state.agents, event.agentId, (row) => {
+      const configuration = row.configuration ?? { desired: desiredOf(row), status: "pending" as const };
+      const matches = configurationMatches(row.harness, configuration.desired, event.applied);
+      return { ...row, configuration: { ...configuration, applied: event.applied,
+        status: configuration.status === "applied" && !matches ? "pending" : configuration.status } };
+    });
+    case "AgentConfigurationApplied": return change(state.agents, event.agentId, (row) => event.revision !== row.configuration?.revision ? row : ({
+      ...row, configuration: { ...row.configuration!, desired: desiredOf(row), applied: event.applied, status: "applied" },
+    }));
+    case "AgentConfigurationRefused": return change(state.agents, event.agentId, (row) => event.revision !== row.configuration?.revision ? row : ({
+      ...row, configuration: { desired: desiredOf(row), ...(event.revision === undefined ? {} : { revision: event.revision }),
+        ...(event.applied === undefined ? {} : { applied: event.applied }), status: event.status, reason: event.reason },
     }));
     case "AgentGrouped": return change(state.agents, event.agentId, (row) => ({ ...row, groups: event.groups }));
     case "ModeChanged": return change(state.agents, event.agentId, (row) => ({
@@ -218,7 +249,10 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
       const capacityHeld = event._tag === "DeliveryHeld" ? true
         : event._tag === "DeliveryReleased" || event._tag === "AgentStopped" || event._tag === "AgentCrashed" ? false : row.capacityHeld;
       return next === row.state && compacting === row.compacting && capacityHeld === row.capacityHeld
-        ? row : { ...row, state: next, compacting, capacityHeld };
+        && !["AgentStopped", "AgentCrashed", "AgentInterrupted", "AgentReloadFailed"].includes(event._tag)
+        ? row : { ...row, state: next, compacting, capacityHeld,
+          ...(["AgentStopped", "AgentCrashed", "AgentInterrupted", "AgentReloadFailed"].includes(event._tag)
+            ? { configuration: { ...(row.configuration?.revision === undefined ? {} : { revision: row.configuration.revision }), desired: desiredOf(row), status: "pending" as const } } : {}) };
     });
     default: return state.agents;
   }
