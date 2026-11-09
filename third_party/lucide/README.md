@@ -46,6 +46,7 @@ LGcode's own stylesheet sets the stroke width to 1.6 instead of Lucide's 2.
 | `kanban` | The project board. |
 | `message-square` | Requests in a thread. |
 | `folder` | Repositories and folders. |
+| `folder-plus` | Add repository, in a machine's row menu, added on 2026-11-08. |
 | `list-filter` | Home's Filter button, added on 2026-11-08. |
 | `copy` | Copying a large thread item, added on 2026-11-08. |
 | `maximize-2` | Opening a large thread item in full, added on 2026-11-08. Its `polyline` and `line` elements were written as equivalent `path` elements. |
