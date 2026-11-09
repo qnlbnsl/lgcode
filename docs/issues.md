@@ -9842,3 +9842,13 @@ Both calls must finish, and the approved destination must contain the reviewed c
 The test also checks the durable decision and receipt, identical retry, and a rebuild from the event log.
 Original failed probes and their historical invalid-barrier attempts remain preserved separately.
 The builder report records actual red and green execution boundaries.
+
+## Website plan documentation correction, 2026-11-09
+
+The independent review of the owner-approved simpler website plan found that the first proposed issue-recording paragraph could exempt in-unit problems from this list.
+The proposal had not been applied.
+The correction retains the requirement to record problems here in the same change.
+The manager allocates new issue numbers for defects found outside the unit being changed.
+An in-unit correction updates its existing issue documentation and result without allocating a separate number.
+The original rejected proposal and Grade 8 review remain preserved in the website run records.
+The corrected paragraph received a separate independent review.

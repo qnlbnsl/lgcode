@@ -2,7 +2,9 @@
 
 The owner approved the current mock as the reference and lifted the development
 freeze for this build on 2026-11-08.
-The scope is the whole mock.
+The scope is the complete visible screens.
+The owner ruled on 2026-11-09 that the mock data layer, record shapes and fixtures are not contracts.
+The approved simpler implementation is recorded in the unit plan.
 The five build steps are an implementation order, not a reduced scope.
 
 This list was reconciled against `master` at `5050be1` on 2026-11-08.
@@ -174,9 +176,10 @@ The mock makes this part of the website, so it no longer waits until after it.
 ### Added by the designer's critique and the mock's data layer
 
 The critique of 2026-11-06 changed these parts of the mock, and the data layer of 2026-11-07
-shows which events they need. `design/data/README.md` on `area/web-mock` lists them.
+proposes possible events. `design/data/README.md` on `area/web-mock` lists them.
+Implement only the typed records needed by the visible behaviors; do not reproduce fixture shapes.
 
-- [ ] Add the proposed `project.*` events to the new `project` piece.
+- [ ] Supply the typed project records that the visible screens need through the existing `project` piece.
 - [ ] Read merge evidence per branch head: the test result and the review verdict.
 - [ ] Let a retry after a failed start change the model and the effort.
 - [ ] Add a command to change a machine's role, with its effect stated first.
@@ -292,10 +295,10 @@ These are on `.scratch/security/attack-todo.md` as what must hold.
 
 ### Project stages, mocks, and repository Design
 
-- [ ] Store project stages and stage-derived team names, with an area for repeated stages.
+- [ ] Store project stages and unique stage-derived team names, with optional area labels.
 - [ ] Show the stage strip and the conditional Mocks tab.
-- [ ] Read actual mock screens, routes, revisions, scenarios, drafted fields, and components.
-- [ ] Compare drafted data against the repository schema.
+- [ ] Read actual mock screens, revisions, scenarios, drafted fields, and components, with routes only for each screen's supported scenarios.
+- [ ] Render optional caller-reviewed field comparisons and explicit Unavailable values without inferring an application schema.
 - [ ] Record owner mock approval and its planning handoff.
 - [ ] Show repository tokens and shared component previews in Design.
 - [ ] Keep design-to-code conversion as later Build-team tooling.

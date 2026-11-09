@@ -13,7 +13,8 @@ The design was written against the mock as it stood at 09:18 on 2026-11-06. The 
 
 ## What the owner decided
 
-All of these were decided on 2026-11-06.
+The following decisions were recorded on 2026-11-06.
+The 2026-11-09 section below supersedes the earlier golden-mock and implementation-hold wording.
 
 - The mock is golden, and the engine gets whatever it needs: "just add the missing
   support to the engine".
@@ -345,7 +346,8 @@ Repository registration checks the actual folder on the selected online machine.
 Projects show Design, Plan, Build, Review, and Hand over.
 A project with no screens starts in Plan and omits Design.
 Teams are named from their stage and optional area.
-The Mocks tab reads real screen records, revisions, drafted fields, schema comparisons, and components.
+The Mocks tab reads real screen records, revisions, drafted fields, caller-reviewed comparisons, and components.
+Omitted comparisons are Unavailable, and the engine does not infer an application schema.
 Mock approval records the owner's decision and hands its concrete work to planning.
 The repository Design tab reads its tokens and shared components.
 Design-to-code tooling remains later Build-team work.
@@ -410,3 +412,32 @@ Every build step runs `pnpm check` and `pnpm live-check:web` in the website team
 The manager runs `pnpm live-check` from the manager shell at the same gate commit.
 This follows the manager's 2026-11-08 correction in issue 526.
 The real-agent project journey, provider login, terminal vim, Git mutation, and paired second-machine journey each need their own evidence.
+
+## The owner-approved simpler implementation, 2026-11-09
+
+The visible screens remain the target and change only with the owner's approval.
+The mock itself, its data records and its fixtures are not frozen contracts.
+The owner approved these eight simplifications for the complete five-step build.
+
+1. Team area labels are optional, and generated team names remain unique.
+   Repeated stages do not require a peer-area admission rule.
+2. A screen records routes only for the typed scenarios that it supports.
+   Empty and partial binding lists are valid; unknown identities and duplicate bindings still refuse.
+3. Drafted fields use optional caller-reviewed comparison metadata.
+   Missing review is Unavailable, and the engine does not parse an application schema from mock data.
+   Actual artifact fingerprints and owner approval remain required.
+4. Pages read the existing typed engine records directly and reuse the shared request and recovery parts.
+   No client data-transfer compatibility shapes or duplicate state machines are added.
+5. Browser checks group visible behaviors across 390, 768, 1440 and 2560 pixels in both color modes.
+   They preserve authority, recovery and plain-text assertions rather than multiplying every fixture permutation.
+6. Shell use and harness sign-in share one real terminal service and emulator.
+7. Settings use one schema and loader with validated precedence.
+   Installation and update use one installer path.
+8. Worker execution uses one transport behind the existing Runner, Git and terminal interfaces.
+   The master retains the authoritative event log and duplicate-delivery protection.
+
+The owner authorized step 2 before the aggregate step-1 gate.
+A page unit waits only for its own missing accepted dependency.
+W06, W07A and W10A ship as one composed foundation with individual author evidence, one builder full, and one fresh whole-composition review and full.
+Preview/editor display remains a separate owner decision in website-1/preview-editor-owner-decision.md.
+No policy or visible-screen change follows from a proposal alone.

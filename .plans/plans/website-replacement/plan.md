@@ -3,13 +3,42 @@
 ## Authority and baseline
 
 The owner lifted the development freeze on 2026-11-08 for this build.
-The assignment is the whole current mock, not a smaller first release.
+The assignment covers the complete visible screens and all five build steps.
 The team branch is `area/website` in `qnlbnsl/lgcode`.
 The starting commit is `5050be1`.
 The branch was fetched and fast-forward checks against `origin/master` and `origin/area/website` succeeded on 2026-11-08.
 The lead must never open or merge a pull request into `master`.
 The mock folder `design/` is read-only for this team.
 Roles units 3, 4 and 11a remain out of scope.
+
+## The owner-approved simpler implementation, 2026-11-09
+
+The visible screens remain the target and change only with the owner's approval.
+The mock itself, its data records and its fixtures are not frozen contracts.
+The owner approved these eight simplifications for the complete five-step build.
+
+1. Team area labels are optional, and generated team names remain unique.
+   Repeated stages do not require a peer-area admission rule.
+2. A screen records routes only for the typed scenarios that it supports.
+   Empty and partial binding lists are valid; unknown identities and duplicate bindings still refuse.
+3. Drafted fields use optional caller-reviewed comparison metadata.
+   Missing review is Unavailable, and the engine does not parse an application schema from mock data.
+   Actual artifact fingerprints and owner approval remain required.
+4. Pages read the existing typed engine records directly and reuse the shared request and recovery parts.
+   No client data-transfer compatibility shapes or duplicate state machines are added.
+5. Browser checks group visible behaviors across 390, 768, 1440 and 2560 pixels in both color modes.
+   They preserve authority, recovery and plain-text assertions rather than multiplying every fixture permutation.
+6. Shell use and harness sign-in share one real terminal service and emulator.
+7. Settings use one schema and loader with validated precedence.
+   Installation and update use one installer path.
+8. Worker execution uses one transport behind the existing Runner, Git and terminal interfaces.
+   The master retains the authoritative event log and duplicate-delivery protection.
+
+The owner authorized step 2 before the aggregate step-1 gate.
+A page unit waits only for its own missing accepted dependency.
+W06, W07A and W10A ship as one composed foundation with individual author evidence, one builder full, and one fresh whole-composition review and full.
+Preview/editor display remains a separate owner decision in website-1/preview-editor-owner-decision.md.
+No policy or visible-screen change follows from a proposal alone.
 
 ## What changed since the earlier note and checklist
 
@@ -23,7 +52,7 @@ The following deltas supersede the earlier descriptions.
 | New project | Run on precedes the name. The goal is stored. The branch and folder are previewed. Add repository opens Machines and returns with the draft preserved. | New repository creation alone did not cover registration on another machine. |
 | Projects | Rename preserves the branch and folder. Archive stops running agents. Restore returns the project. | Only creation and shell preferences were listed. |
 | Project stages | Design, Plan, Build, Review, and Hand over are shown. Projects without screens omit Design. Team names derive from stage and area. | Teams were generic named groups. |
-| Mocks and repository Design | Show project screens, screen revisions, drafted data against schema, shared tokens, and draft components. Approval records evidence and hands work to planning. | The earlier note omitted this entire view. Design conversion remains later Build-team tooling. |
+| Mocks and repository Design | Show project screens, screen revisions, drafted fields with reviewed comparisons, shared tokens, and draft components. Approval records evidence and hands work to planning. | The earlier note omitted this entire view. Design conversion remains later Build-team tooling. |
 | Shell | The sidebar collapses to a remembered 48-pixel rail. Selection and disclosure differ. A single tab row adds Mocks when present and Tasks last for teams. Breadcrumbs navigate. | Tasks was described before Terminal. A separate Repositories destination and repeated titles are gone. |
 | Requests | Failed starts precede the oldest request. An hour is amber. Filters cover repository, project, agent, and machine. Answered history names its result and time. There is one reusable question, approval, or failed-start block. | An isolated decision card is insufficient. |
 | Composer | Enter sends and Shift+Enter inserts a line. Context search also opens with @. Subscription, model, effort, and context usage sit in the tool row. Stop reply differs from stop agent. | Initial notes only covered subscription and Add context. |
@@ -54,7 +83,7 @@ No command is advertised before it has a handler.
 | W04b | 1, high | Real project creation, default selection, worktree and lead lifecycle, rename/archive/restore. | W01, W02, W03. May build alongside W04a. | Real lead launch, collision-safe worktrees, retry and failure recovery, inherited membership, goal and shell preferences. `home-checks.mjs`, `data-checks.mjs`. |
 | W04c | 1, high | Project-linked requests, task completion and owner task delivery. | W04a and W04b integrated with W03. | Typed question links, real-writer collision and replay proof, task blockers, exactly-once completion and actual lead notification. Board and request data checks. |
 | W04D | 1, high | Bounded issue 545 engine follow-up in Git contracts, service, authenticated handlers, durable evidence/review events, and real-repository tests. React remains W09 work. | Accepted W04a/W04b composition; complete before the final engine gate and W09. | Only the owner credential may explicitly approve and merge a registered project into main/master after checking both reviewed heads. Preserve agent and original integration refusal, honest reported evidence, Approve without evidence, compare-only URLs, receipts, and conflict recovery. |
-| W05 | 1, high | Setup, project stage and mocks data, schema/design reads, notification retry/test/dismissal, and account read support. | W01 and W04. | No sample data. Real discovery, positive setup completion, stage team names, screen metadata and revision records, approval evidence, persisted notification dismissal, and fixed safe errors. `onboarding-checks.mjs`, `mocks-checks.mjs`, service cases in `revision-checks.mjs`. |
+| W05 | 1, high | Setup, project stage and mocks data, reviewed field comparisons and Design reads, notification retry/test/dismissal, and account read support. | W01 and W04. | No sample data. Real discovery, positive setup completion, stage team names, screen metadata and revision records, approval evidence, persisted notification dismissal, and fixed safe errors. `onboarding-checks.mjs`, `mocks-checks.mjs`, service cases in `revision-checks.mjs`. |
 | W06 | 2, high | React application shell, routes, authentication, tokens, external styles, local font assets, sidebar, switchers, and shared UI in `packages/web/`. | Accepted engine data needed by the shell; the owner started step 2 before the aggregate step-1 gate. | Keep authentication and current watchers. Hash routes and old alert deep links survive. Rail, drawer, breadcrumb, URL navigation, connection indicator, focus, and Field/Dusk match. `checks.mjs`, phone and foundations cases in `revision-checks.mjs`. |
 | W07 | 2, high | Home, repository list, board, sprint/task details, New project and task dialogs in web workspace views. | W06. | Shared request queue, inline answers, attention order, history, filters, focus handoff, responsive tables, stage strip, cards, and detail timeline. `home-checks.mjs`, `checks.mjs`, relevant revision cases. |
 | W08 | 2, high | Agent and team conversations, reusable request blocks, composer, thread dock, context and usage. Existing web thread recovery files remain authoritative. | W06 and W07 request primitives. | Existing large-item, lifecycle, held/unconfirmed permission, delivery, plain-text and reconnect behavior. Drafts and positions are per conversation. 1800-pixel dock. `operations-checks.mjs`, `workspace-redesign-checks.mjs`, composer and thread revision cases. |
@@ -118,7 +147,9 @@ If that environment is unavailable, report the exact missing proof to the manage
 
 The security invariant list is `.scratch/security/attack-todo.md`, under "From the website replacement".
 It describes what must hold and where, without attack recipes.
-New implementation problems are recorded with the next free number in `docs/issues.md`.
+Problems found while working are recorded in `docs/issues.md` in the same change.
+The manager allocates new issue numbers for defects found outside the unit being changed.
+An in-unit correction updates the unit's existing issue documentation and its result without allocating a separate issue number.
 New feature ideas go in `docs/features.md`.
 Do not reopen the owner's password, encryption, Unix-user, or single-user decisions.
 
