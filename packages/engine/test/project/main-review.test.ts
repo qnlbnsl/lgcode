@@ -306,3 +306,75 @@ for (const mode of ["noop", "squash", "changed-head"]) it.live(`zero-exit ${mode
   const receipts = yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE request_id = ${requestId}`
   expect(JSON.parse(receipts[0]!.result_json).reply.result).toMatchObject({ outcome: "refused", mergeHead: null })
 })).pipe(Effect.orDie))
+
+for (const withEvidence of [false, true]) it.live(`review status and owner approval complete while overlapped, recorded evidence=${withEvidence}`, () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup()
+  if (withEvidence) yield* report(f)
+  const statusPayload = { projectId: f.projectId, worktreeId: f.worktreeId }
+  const expectedEvidence = withEvidence ? "current" : "missing"
+  expect((yield* run(f.api, "project.review.status", statusPayload)).result.evidence.review.state).toBe(expectedEvidence)
+  const { review } = (yield* prepare(f)).result
+  const sql = yield* SqlClient.SqlClient
+  const bin = join(rig.root, "overlap-bin"), hold = join(rig.root, "hold-git")
+  const entered = join(rig.root, "git-entered"), writer = join(rig.root, "writer-entered")
+  mkdirSync(bin); writeFileSync(hold, "hold")
+  // The real child blocks inside status's Git gate. All commands still run
+  // actual Git; the wrapper only establishes the otherwise racy ordering.
+  writeFileSync(join(bin, "git"), `#!${process.execPath}\nimport { existsSync, writeFileSync } from 'node:fs';\nimport { spawnSync } from 'node:child_process';\nconst args = process.argv.slice(2);\nif (args.includes('rev-parse') && existsSync(${JSON.stringify(hold)})) {\n writeFileSync(${JSON.stringify(entered)}, JSON.stringify({ pid: process.pid, args }));\n while (existsSync(${JSON.stringify(hold)})) await new Promise(resolve => setTimeout(resolve, 10));\n}\nconst result = spawnSync('/usr/bin/git', args, { stdio: 'inherit' });\nprocess.exit(result.status ?? 1);\n`, { mode: 0o700 })
+  vi.stubEnv("PATH", `${bin}:${process.env.PATH}`)
+  let armed = false, statusDone = false, approvalDone = false
+  let statusReply: any, approvalReply: any
+  const transaction = sql.withTransaction.bind(sql)
+  // SqlClient runs the body only after acquiring the actual connection and
+  // executing BEGIN. This observes ownership; it does not supply a fake lock.
+  const observer = vi.spyOn(sql, "withTransaction").mockImplementation((effect) => transaction(Effect.gen(function* () {
+    if (armed) {
+      const active = yield* Effect.serviceOption(sql.transactionService)
+      expect(active._tag).toBe("Some")
+      writeFileSync(writer, "SQL connection owned after BEGIN")
+    }
+    return yield* effect
+  })))
+  const waitFor = (ready: () => boolean) => Effect.gen(function* () {
+    for (let attempt = 0; attempt < 1000 && !ready(); attempt++) yield* Effect.sleep(10)
+    expect(ready()).toBe(true)
+  })
+  try {
+    yield* run(f.api, "project.review.status", statusPayload).pipe(
+      Effect.tap((reply) => Effect.sync(() => { statusReply = reply; statusDone = true })), Effect.forkChild)
+    yield* waitFor(() => existsSync(entered))
+    expect(statusDone).toBe(false)
+    const child = JSON.parse(readFileSync(entered, "utf8"))
+    expect(child.args).toContain("rev-parse"); expect(child.pid).toBeGreaterThan(0)
+    armed = true
+    const requestId = freshRequest()
+    yield* approve(f, review, { requestId }).pipe(
+      Effect.tap((reply) => Effect.sync(() => { approvalReply = reply; approvalDone = true })), Effect.forkChild)
+    yield* waitFor(() => existsSync(writer))
+    expect(readFileSync(writer, "utf8")).toBe("SQL connection owned after BEGIN")
+    expect(approvalDone).toBe(false); expect(statusDone).toBe(false)
+    rmSync(hold)
+    yield* waitFor(() => statusDone && approvalDone)
+    expect(statusReply.result.evidence.review.state).toBe(expectedEvidence)
+    if (withEvidence) expect(statusReply.result.evidence.review.report).toMatchObject({
+      head: f.head, provenance: "reported", status: "failed", threadAgentId: f.member.agentId, threadSequence: f.threadSequence,
+    })
+    const actual = git(rig.work, "rev-parse", "HEAD")
+    expect(approvalReply.result).toMatchObject({ outcome: "merged", head: f.head, baseHead: f.baseHead, mergeHead: actual })
+    expect(git(rig.work, "merge-base", "--is-ancestor", review.head, actual)).toBe("")
+    expect(readFileSync(join(rig.work, "feature.txt"), "utf8")).toBe("actual feature\n")
+    expect(git(rig.work, "status", "--porcelain=v1")).toBe("")
+    expect(yield* approve(f, review, { requestId })).toEqual(approvalReply)
+    const events = (yield* readLog).filter(({ event }) => event._tag === "project.MainReviewDecided")
+    expect(events).toHaveLength(1)
+    expect(events[0]!.event).toMatchObject({ review: approvalReply.result })
+    const receipts = yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE request_id = ${requestId}`
+    expect(receipts).toHaveLength(1)
+    expect(JSON.parse(receipts[0]!.result_json).reply).toEqual(approvalReply)
+    expect((yield* run(f.api, "project.review.status", statusPayload)).result.review).toEqual(approvalReply.result)
+    // setup's finalizer also rebuilds the live projections from durable events.
+  } finally {
+    rmSync(hold, { force: true })
+    observer.mockRestore()
+  }
+})).pipe(Effect.orDie))

@@ -96,12 +96,17 @@ const approve: PiecePlanner = (input, raw) => Effect.gen(function* () {
     return { events: [{ _tag: "project.MainReviewDecided", review: decided }] as Event[], reply: () => reply }
   }))
 })
-const status: ReadHandler = (input, raw) => withGit(input, (git) => Effect.gen(function* () {
-  const { project, source } = yield* scope(input, raw, git)
-  const state = yield* gitCall(git.state(source.path))
+const status: ReadHandler = (input, raw) => Effect.gen(function* () {
+  const { project, source, head } = yield* withGit(input, (git) => Effect.gen(function* () {
+    const { project, source } = yield* scope(input, raw, git)
+    const state = yield* gitCall(git.state(source.path))
+    return { project, source, head: state.head ?? "" }
+  }))
+  // Commands own the SQL transaction before waiting for Git. Release the Git
+  // gate before reading thread evidence, retaining the exact head observed.
   const review = own(projectView(input.snapshot).gitReviews, source.worktreeId)
   return { reply: yield* gitReply(input, raw.requestId, { review: review?.projectId === project.projectId ? review : null,
-    evidence: yield* evidenceFor(input, project.projectId, source.worktreeId, state.head ?? "") }, true) }
-}))
+    evidence: yield* evidenceFor(input, project.projectId, source.worktreeId, head) }, true) }
+})
 export const reviewPlanners = { "project.review.report": report, "project.review.prepare": prepare, "project.review.approve": approve }
 export const reviewReads = { "project.review.status": status }

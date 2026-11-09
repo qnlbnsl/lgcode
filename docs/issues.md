@@ -9423,3 +9423,24 @@ On the faster computer, it resumed the agent first.
 The agent then crashed a second time and the owner was told twice, or the resumed session closed the crash alert early.
 Both tests now turn the sheepdog off, because each checks an engine rule rather than the sheepdog.
 Other tests may have the same hidden dependence on a slow computer.
+
+## 566. Reading review evidence could deadlock an owner approval
+
+The independent review of issues 545 and 555 found a lock-order inversion.
+The review status reader held the Git gate while validating a recorded thread through the shared Structured Query Language (SQL) connection.
+A concurrent owner approval held that connection inside its writer transaction while waiting for the Git gate.
+Both authenticated calls then remained pending after the active Git child finished.
+The matched case without recorded evidence completed because it needed no thread query.
+
+The status reader now completes its authorized project and checkout inspection under the Git gate and releases that gate before querying thread evidence.
+It evaluates the evidence against the exact source head observed during that inspection and the same authorized snapshot.
+The project, workspace, repository, branch, thread membership, redaction, and reply-budget checks remain in place.
+Command transactions and active Git child ownership are unchanged.
+The other Git read handlers do not query the SQL connection while holding the Git gate.
+
+The permanent regression overlaps actual authenticated status and approval calls with recorded thread evidence and a matched no-evidence control.
+It establishes an actual Git child barrier and observes entry after SQL begins its transaction.
+Both calls must finish, and the approved destination must contain the reviewed commit and expected bytes.
+The test also checks the durable decision and receipt, identical retry, and a rebuild from the event log.
+Original failed probes and their historical invalid-barrier attempts remain preserved separately.
+The builder report records actual red and green execution boundaries.
