@@ -399,5 +399,7 @@ Rename, remove, and leave-master controls state their effect first.
 All nine mock suites are acceptance sources.
 They include `onboarding-checks.mjs` and `mocks-checks.mjs`.
 Browser proofs cover 390, 768, 1440, and 2560 pixels in both color modes.
-Every build step runs `pnpm check`, `pnpm live-check:web`, and `pnpm live-check`.
+Every build step runs `pnpm check` and `pnpm live-check:web` in the website team.
+The manager runs `pnpm live-check` from the manager shell at the same gate commit.
+This follows the manager's 2026-11-08 correction in issue 526.
 The real-agent project journey, provider login, terminal vim, Git mutation, and paired second-machine journey each need their own evidence.

@@ -344,5 +344,7 @@ These are on `.scratch/security/attack-todo.md` as what must hold.
 - [ ] Step 4: Installer and `.lgcode` configuration.
 - [ ] Step 5: Pairing, worker mode, remote runner, and final integration.
 
-Each gate requires `pnpm check`, `pnpm live-check:web`, and `pnpm live-check`.
+Each gate requires `pnpm check` and `pnpm live-check:web` from the website team.
+The manager runs `pnpm live-check` from the manager shell at the gate commit.
+The baseline is the manager's clean-checkout result of 19 stages out of 23.
 Roles units 3, 4 and 11a remain unbuilt.

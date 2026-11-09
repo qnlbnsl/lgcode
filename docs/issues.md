@@ -8785,26 +8785,33 @@ State: worked around in the skill; the cause is in OpenPencil 0.16.0, not in LGc
   step once OpenPencil measures every bundled weight, and someone could report the fault upstream.
 
 
-## 526. The website build's pre-change live check passed fewer stages than its brief
+## 526. A live check inside the Codex seat gave a misleading build baseline
 
 Found: 2026-11-08, during the website-1 baseline on `area/website`.
-State: open.
+State: understood; step-gate live checks are run by the manager.
 
-The brief cited an earlier result of 19 passing stages out of 23.
-The clean website branch at `8b6bcf4` passed 16 stages out of 23 before any application code changed.
+The baseline is 19 passing stages out of 23.
+The manager ran `pnpm live-check` from the manager shell on a clean detached
+checkout of `8b6bcf4` and reported that result on 2026-11-08.
+Its failed stages were `removed-variables`, `always-allow`, and `token-scan`.
+Recording was skipped because earlier stages failed.
+The `state-read`, `permission-kinds`, and `reload` stages passed in that run.
+
+The website lead's earlier run inside its Codex seat passed 16 stages out of 23
+at the same application code.
+That run additionally failed `state-read`, `permission-kinds`, and `reload`.
+Several Claude probes did not attempt the exact requested command.
+The manager identified the Codex-seat execution context as the difference.
+The 16-of-23 run is retained as execution-context evidence, not the build baseline.
+
 The ordinary check passed all 457 test files and all 18 browser cases.
 The real web check passed all ten reported stages.
+The `sandbox-mcp` stage passed in the lead's run.
+The final scan of events, replies, and output passed in that run.
+The token exposure remains covered by the owner's earlier deferral in issue 240.
 
-The failed broader live stages were `removed-variables`, `state-read`, `always-allow`,
-`permission-kinds`, `reload`, and `token-scan`.
-The recording stage was skipped because earlier stages failed.
-The `sandbox-mcp` stage passed, so issue 524's specific rerun condition did not apply.
-Several Claude probes did not attempt the exact requested command.
-The token scan reported a token in process arguments without printing its value.
-The final scan of events, replies, and output passed.
-This observation does not establish a new cause for the existing token exposure findings.
-
+From this point, the manager runs `pnpm live-check` at each build-step gate.
+The website seats continue to run `pnpm check` and `pnpm live-check:web`.
+The gate report must name the commit and attribute the broader live result to the manager.
 The run evidence is recorded in `.scratch/foundry-runs/website-1/run.md` in the main checkout.
-The private live run is `/tmp/lgcode-live-KULrQh`.
-The manager was notified, and the website build continues against this measured baseline.
-A later passing ordinary check must not be presented as a passing broader live check.
+The lead's private live run is `/tmp/lgcode-live-KULrQh`.

@@ -90,7 +90,9 @@ Report 90 percent to the manager and start no seats at 97 percent.
 
 ## Stage gates and evidence
 
-At the end of every numbered build step run `pnpm check`, `pnpm live-check:web`, and `pnpm live-check`.
+At the end of every numbered build step, the website team runs `pnpm check` and `pnpm live-check:web`.
+The manager runs `pnpm live-check` from the manager shell at the exact gate commit.
+The manager changed this execution assignment on 2026-11-08 after reproducing the baseline at 19 of 23 stages.
 Live account use is authorized by the brief.
 The `sandbox-mcp` failure recorded in issue 524 gets one rerun before regression classification.
 Reports name the commit checked and any dirty files.
