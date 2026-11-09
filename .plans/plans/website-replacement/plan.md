@@ -66,6 +66,13 @@ No command is advertised before it has a handler.
 | W17 | 5, high | Remote Runner, tool forwarding, event acknowledgements, remote Git and terminal, local checks, capacity, recovery and tests. | W16. | Correct host execution, no duplicate work after reconnect, no dispatch to unconfirmed/offline/full workers, honest interruption, remote repository identity. |
 | W18 | 5, high | Final machines page wiring, installer-to-worker journey, four-width/two-mode regression and real second-machine proof. | W17. | Full paired worker flow and the complete mock matched. Final three gates, branch pushed, verifier evidence and closing report. |
 
+W05 is split into three independently verified seats.
+W05a builds notification retry, test delivery, and permanent prompt dismissal against the existing client machinery.
+W05b builds setup, stages, and mock records after W04.
+W05c builds actual next-turn model and effort changes and honest per-agent context reads against the existing runner.
+The latter completes the composer engine scope named in W03 without expanding its request and cancellation seat.
+Per-account provider usage and subscription placement remain in step 3.
+
 ## Seat rules and integration
 
 The harness is Codex on `gpt-6.1-sol` with high reasoning effort for builders and verifiers.
