@@ -579,6 +579,9 @@ The full design is in
 ## Open questions
 
 - Which licence should LGcode use?
+- Should LGcode be renamed LGTM code? The owner raised the name on
+  2026-11-09 and asked for it to be kept as a to-do. Nothing is renamed until
+  the owner decides.
 
 ## Decided
 

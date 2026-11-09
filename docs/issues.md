@@ -9338,6 +9338,21 @@ A repeated request returns its original project without another launch.
 Historical invalid settings remain decodable and pass the real rebuild check.
 The original independent bad/control artifacts and interrupted full checks remain preserved.
 
+## 547. Joined delivery history hides released entries
+
+Found: 2026-11-09, during conversation preparation and lead source review at `bc783b2`.
+State: open, assigned to the later W08 conversation correction.
+
+The delivery-history renderer accepts `DeliveryReleased` as a delivery event.
+Its joined history filter omits that event from the states shown under a queued delivery.
+The standalone renderer also suppresses a state when its matching queued source is present.
+A released entry therefore disappears when both its source and release have been loaded.
+This is a source finding, and no runtime reproduction is claimed yet.
+
+The W08 correction must retain the release under its actual delivery identity.
+It must preserve the existing source join and avoid duplicating prompt content.
+A consequential regression must cover a source and release together, a release before its source is loaded, and the joined state after history hydration.
+
 ## 554. Empty project request pages skipped the complete reply budget
 
 Found: 2026-11-09, during independent project request review at `2616fb5`.
@@ -9358,3 +9373,28 @@ A separate control proves that an identifier can fit the owner reply while excee
 The inherited populated-page test continues to check every row, page progress and complete encoded sizes.
 The reads preserve the durable log, and the real rebuild check remains enabled.
 The original independent failed probes and logs are retained unchanged.
+
+## 561. The launcher test assumed no system Node.js 26
+
+Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
+State: fixed.
+
+The launcher test "exits 1 with an install hint when NVM_DIR holds no Node.js" ran the launcher with only `HOME` and `NVM_DIR` set.
+The launcher's shell then used its default search path.
+Arch Linux has a system Node.js 26 at `/usr/bin/node`, and the launcher correctly used it, so the test saw exit 0.
+The test now gives the launcher an empty search-path folder.
+The launcher itself was right and is unchanged.
+
+## 562. Two engine crash tests raced the roles sheepdog
+
+Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
+State: fixed.
+
+The acceptance test "1 crash" checks the engine's own rule that nothing restarts a crashed agent.
+The client test "6.2 a failed reload keeps a crash alert open until successful idle" checks the crash alert's life.
+Both run with the roles sheepdog on, and the sheepdog resumes a crashed agent by design.
+On the build server, the sheepdog acted after the checks had finished, so both tests passed.
+On the faster computer, it resumed the agent first.
+The agent then crashed a second time and the owner was told twice, or the resumed session closed the crash alert early.
+Both tests now turn the sheepdog off, because each checks an engine rule rather than the sheepdog.
+Other tests may have the same hidden dependence on a slow computer.
