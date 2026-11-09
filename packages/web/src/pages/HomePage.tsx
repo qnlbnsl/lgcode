@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react"
-import type { Project } from "@lgcode/contracts"
+import { stageLabel, type Project } from "@lgcode/contracts"
 import type { ShellRoute } from "../routes.ts"
 import { shellHref } from "../routes.ts"
 import { useShellData } from "../data/ShellDataProvider.tsx"
@@ -17,19 +17,23 @@ const currentTab = (): HomeTab => {
   return tabs.some(([key]) => key === value) ? value as HomeTab : "attention"
 }
 
-export function ProjectTable({ projects }: { readonly projects: readonly Project[] }) {
+export function ProjectTable({ projects, repositoryColumn = true }: { readonly projects: readonly Project[]; readonly repositoryColumn?: boolean }) {
   const { requests = [], navigation, snapshot } = useShellData()
-  return <div className="task-table-wrap"><table className="project-table" aria-label="Projects"><thead><tr><th>Project</th><th>Lead</th><th>Status</th><th>Machine</th><th>Branch</th></tr></thead>
+  return <div className="task-table-wrap"><table className="project-table" aria-label="Projects"><thead><tr><th>Project</th>{repositoryColumn && <th className="project-secondary">Repository</th>}<th>Lead</th><th>Stage</th><th className="project-secondary">Machine</th><th>Status</th><th className="project-secondary">Branch</th></tr></thead>
     <tbody>{projects.map((project) => {
       const count = ownerRequests(requests).filter((row) => row.projectId === project.projectId).length
       const members = new Set(navigation?.agents.filter((row) => row.projectId === project.projectId).map((row) => row.agentId))
       const failed = snapshot?.agents.some((agent) => members.has(agent.agentId) && agent.startFailure !== undefined)
       const workspace = navigation?.workspaces.find((row) => row.worktreeId === project.worktreeId)
-      return <tr key={project.projectId}><td><a href={shellHref({ page: "project", projectId: project.projectId, tab: "board" })}>{visibleText(project.name)}</a>
-        <small className="repo-caption">{visibleText(navigation?.repositories.find((row) => row.repoId === project.repoId)?.name ?? project.repoId)}</small></td>
+      const repository = navigation?.repositories.find((row) => row.repoId === project.repoId)?.name ?? project.repoId
+      const attention = !project.archiving && project.archivedAt === undefined && Boolean(count || failed)
+      return <tr key={project.projectId}><td><a title={visibleText(project.name)} href={shellHref({ page: "project", projectId: project.projectId, tab: "board" })}>{visibleText(project.name)}</a></td>
+        {repositoryColumn && <td className="project-secondary" title={visibleText(repository)}>{visibleText(repository)}</td>}
         <td><a href={shellHref({ page: "thread", agentId: project.leadAgentId })}>{agentName(snapshot?.agents, project.leadAgentId)}</a></td>
-        <td className={`stack-status ${count || failed ? "project-attention-status" : ""}`}>{project.archiving ? "Archiving" : project.archivedAt !== undefined ? "Archived" : failed ? "Failed start" : count ? `${count} need${count === 1 ? "s" : ""} attention` : "Ready"}</td>
-        <td>{visibleText(project.machineId)}</td><td><code title={visibleText(workspace?.branch ?? "")}>{visibleText(workspace?.branch ?? "Unavailable")}</code></td></tr>
+        <td className="stage-cell">{project.stage === undefined ? "Not started" : stageLabel(project.stage)}</td>
+        <td className="project-secondary">{visibleText(project.machineId)}</td>
+        <td className={`stack-status ${attention ? "project-attention-status" : ""}`}>{project.archiving ? "Archiving" : project.archivedAt !== undefined ? "Archived" : attention ? `Needs attention${count ? ` · ${count}` : ""}` : "Ready"}</td>
+        <td className="project-secondary"><code title={visibleText(workspace?.branch ?? "")}>{visibleText(workspace?.branch ?? "Unavailable")}</code></td></tr>
     })}</tbody></table></div>
 }
 

@@ -583,6 +583,15 @@ The full design is in
   website, go to Ananke's mocks, and see every one of them there. The owner is
   adding this to the website mock first.
 
+- **Recorded mock previews and OpenPencil** (decided by the owner,
+  2026-11-09; implementation pending). The engine renders a project's recorded
+  mocks itself instead of starting a separate mock web server. The screen preview
+  and OpenPencil stay in sandboxed frames. Both frames use one hostname other than
+  LGcode's, so the owner's cookie never reaches them. The page's content security
+  policy permits frames from that hostname only. The engine starts and manages
+  OpenPencil with access to only the project's design folder. No separate one-file
+  capability is built. This decision does not add an editor save pipeline.
+
 ## Open questions
 
 - Which licence should LGcode use?

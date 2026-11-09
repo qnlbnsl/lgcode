@@ -9994,3 +9994,21 @@ The required data-context addition in admin-controls is a W06 test-input overlay
 The original author reports and artifacts remain separate from integration proof.
 The browser read-count, uncertainty, slow-link, live-event, socket-survival, and answer assertions remain unchanged.
 All eight viewport/theme combinations remain in the browser source.
+
+## React foundation in-unit review: project tables dropped visible fields
+
+The independent review of `a413986` reproduced four symptoms in the shared project table.
+Home and the repository page omitted the project's Stage.
+Home placed the repository below the project name instead of in a separate Repository column.
+A project with a failed agent said “Failed start” instead of “Needs attention”.
+The original independent control passed, and all four new parity assertions failed.
+This is a correction inside the foundation unit, so the manager's in-unit numbering rule assigns no separate issue number.
+
+The shared table now reads the existing typed stage and its common label.
+Home includes the Repository column, while the repository page filters its projects and omits that redundant column.
+Failed members and open owner-held requests use the attention status, with archived and archiving states taking precedence.
+The phone retains its two-line layout, with the status first on the second line.
+Desktop rows keep one line.
+Permanent tests cover the fields, filtering, stage labels, state changes, and plain-text names.
+The actual-engine browser matrix now includes both project tables at all four widths in both color modes.
+These changes await their own verification and independent review; earlier foundation passes do not prove the correction.

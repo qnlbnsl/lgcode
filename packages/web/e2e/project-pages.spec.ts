@@ -13,7 +13,7 @@ import { buildServices } from "../../engine/src/service.ts"
 import { unusedPort } from "../../engine/test/support/browserWeb.ts"
 import { makeFakeRunner } from "../../engine/test/support/fakeRunner.ts"
 import { call, makeFakeSecrets, makeRig, ownerCredential, removeRig, startPayload, success } from "../../engine/test/support/handlerRig.ts"
-import { decisionSetup } from "../../engine/test/support/projectDecisionFixtures.ts"
+import { decisionProject, decisionSetup } from "../../engine/test/support/projectDecisionFixtures.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { requestPermission } from "../../engine/test/support/routingRig.ts"
 
@@ -35,6 +35,8 @@ test("Home, boards, linked decisions and Add task use the real engine across bot
       const run = Effect.gen(function* () {
         yield* registerRebuildCheck()
         const fixture = yield* decisionSetup()
+        const otherProject = yield* decisionProject("other-repository")
+        success(yield* call(ownerCredential, "project.stage.set", { projectId: fixture.projectId, stage: "build" }))
         const taskId = success(yield* call(fixture.leadCredential, "project.task.create", fixture.task)).taskId as string
         const asked = success(yield* call(fixture.workerCredential, "ask", { projectId: fixture.projectId, taskId,
           title: "Choose the implementation", text: "Keep <script>agent text</script> plain.", proposedAnswer: "Use existing contracts", recommendation: "Keep the direct route contract" }))
@@ -57,6 +59,8 @@ test("Home, boards, linked decisions and Add task use the real engine across bot
             expect(widths.body).toBeLessThanOrEqual(widths.viewport)
           }
           const home = () => page.goto(`${origin}/#/`)
+          const allProjects = () => page.goto(`${origin}/#/?view=projects`)
+          const repository = () => page.goto(`${origin}/#/repository/${fixture.repoId}`)
           const project = () => page.goto(`${origin}/#/project/${fixture.projectId}/board`)
           const sprint = () => page.goto(`${origin}/#/project/${fixture.projectId}/sprint/${fixture.sprintId}`)
           const task = () => page.goto(`${origin}/#/project/${fixture.projectId}/task/${taskId}`)
@@ -69,6 +73,8 @@ test("Home, boards, linked decisions and Add task use the real engine across bot
             await page.setViewportSize({ width, height: 1000 })
             for (const [name, visit, ready] of [
               ["home", home, '[aria-label="Home"] .request-list'],
+              ["all-projects", allProjects, ".project-table"],
+              ["repository-projects", repository, ".project-table"],
               ["board", project, ".sprint-card"],
               ["sprint", sprint, '[aria-label="Sprint detail"] .detail-blockers'],
               ["task", task, ".task-timeline"]
@@ -76,6 +82,29 @@ test("Home, boards, linked decisions and Add task use the real engine across bot
               await visit()
               await expect(page.locator(ready).first()).toBeVisible()
               await overflow()
+              if (name === "all-projects" || name === "repository-projects") {
+                const table = page.getByRole("table", { name: "Projects", exact: true })
+                const expectedHeaders = ["Project", ...(name === "all-projects" ? ["Repository"] : []), "Lead", "Stage", "Machine", "Status", "Branch"]
+                expect(await table.locator("th").allTextContents()).toEqual(expectedHeaders)
+                await expect(table.locator("tbody tr")).toHaveCount(name === "all-projects" ? 2 : 1)
+                const row = table.locator("tbody tr").filter({ has: page.locator(`a[href="/#/project/${fixture.projectId}/board"]`) })
+                await expect(row.locator(".stage-cell")).toHaveText("Build")
+                await expect(row.locator(".stack-status")).toHaveText("Needs attention · 2")
+                await expect(row.locator(`a[href="/#/thread/${fixture.leadId}"]`)).toBeVisible()
+                if (name === "repository-projects") await expect(table.locator(`a[href="/#/project/${otherProject.projectId}/board"]`)).toHaveCount(0)
+                if (width > 700) {
+                  for (const height of await table.locator("tbody tr").evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height))) expect(height).toBeLessThanOrEqual(46)
+                  await expect(row.locator(".project-secondary").first()).toBeVisible()
+                } else {
+                  await expect(row.locator(".project-secondary").first()).toBeHidden()
+                  expect(await row.evaluate((node) => {
+                    if (!(node instanceof HTMLTableRowElement)) throw new Error("Expected a project table row")
+                    const title = node.cells[0]!.getBoundingClientRect(), status = node.querySelector(".stack-status")!.getBoundingClientRect()
+                    const others = [...node.cells].filter((cell) => cell !== node.cells[0] && !cell.classList.contains("stack-status") && cell.offsetWidth > 0)
+                    return status.top >= title.bottom - 2 && others.every((cell) => cell.getBoundingClientRect().left > status.left)
+                  })).toBe(true)
+                }
+              }
               if (name === "board") {
                 if (width !== 390) for (const box of await page.locator(".sprint-card").evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().width))) expect(box).toBeLessThanOrEqual(300)
                 await expect(page.locator("progress")).toHaveCount(0)

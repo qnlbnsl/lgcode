@@ -19,6 +19,6 @@ export function RepositoryPage({ route }: { readonly route: ShellRoute }) {
   if (repository === undefined) return <section className="pages"><Empty>This repository is unavailable.</Empty></section>
   const projects = navigation.projects.filter((row) => row.repoId === route.repoId)
   return <section className="pages" aria-label="Repository projects"><h1>{visibleText(repository.name)}</h1><RepositoryTabs route={route} />
-    {projects.length ? <ProjectTable projects={projects} /> : <Empty>No projects in this repository yet.</Empty>}
+    {projects.length ? <ProjectTable projects={projects} repositoryColumn={false} /> : <Empty>No projects in this repository yet.</Empty>}
   </section>
 }
