@@ -9309,3 +9309,31 @@ They also prove refusal of non-executable files, missing paths, linked directori
 Saved unavailable account and harness choices refuse before recording a creation intent or lead.
 All existing provider credential cases and lifecycle assertions remain intact.
 The independent original directory and executable artifacts remain unchanged.
+
+## 544. Project lead choices could freeze creation after Git effects
+
+Found: 2026-11-09, during independent lifecycle, Git and configuration composition review at `63bab1c`.
+
+Project settings admitted model and effort strings through the historical project-name schema.
+The integrated normal start command rejects control characters in these protocol choices.
+An invalid saved model could therefore pass settings and creation planning.
+The engine recorded a creation intent and initialized its real repository before normal start refused.
+No lead or project was created, and the intent retained the invalid model.
+Correcting settings did not change that frozen intent on a retry of the same request.
+The independent valid-model control created one project and cleared its intent.
+Effective harness defaults could also exceed the intent's stored-choice length limit.
+That failure surfaced only when the intent event was encoded.
+
+Settings admission now applies the existing normal-start choice validator.
+Creation validates both effective choices before recording an intent or touching its Git paths.
+It checks the stored-choice schema, normal-start protocol rules and unchanged redaction.
+The validation covers saved choices, historical settings and inherited harness defaults.
+The historical event schema remains readable for replay.
+The engine does not replace an already committed intent's selected defaults or delete its paths.
+
+Permanent public-handler regressions cover model and effort, empty and matching configured lists, control characters and both length boundaries.
+They assert the absence of an intent, repository, lead and project after refusal.
+After a valid correction, the same previously refused creation request succeeds once.
+A repeated request returns its original project without another launch.
+Historical invalid settings remain decodable and pass the real rebuild check.
+The original independent bad/control artifacts and interrupted full checks remain preserved.

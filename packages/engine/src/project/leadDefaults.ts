@@ -1,17 +1,21 @@
 import { constants } from "node:fs"
 import { access, stat } from "node:fs/promises"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import type { Account, HarnessSettings, ProjectLeadDefaults } from "@lgcode/contracts"
+import { ProjectName, type Account, type HarnessSettings, type ProjectLeadDefaults } from "@lgcode/contracts"
 import { HomeDirectory } from "@lgcode/t3-provider-instance/HostProcess"
 import { mergeProviderInstanceEnvironment } from "@lgcode/t3-provider-instance/instanceEnvironment"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
+import * as Schema from "effect/Schema"
 import { pickAccount } from "../accounts/pick.ts"
 import { credentialSourceFor } from "../accounts/credentialSource.ts"
 import { withCodexHome } from "../accounts/shadowHome.ts"
 import { buildBaseEnvironment } from "../runner/baseEnvironment.ts"
 import { harnessLogin, homeConflict, loginRefusal } from "../runner/harnesses.ts"
 import { readHarnesses, refused, type Input } from "../commands/internal.ts"
+import { validChoiceId } from "../runner/choices.ts"
+
+const validStoredChoice = Schema.is(ProjectName)
 
 // Readiness is local evidence, not a provider usage report. The normal runner
 // still establishes authentication when it opens the actual ACP session.
@@ -56,6 +60,21 @@ export const leadDefaults = (input: Input, saved?: typeof ProjectLeadDefaults.Ty
   const harnesses = (yield* readHarnesses(input.runtime)).filter((row) => saved === undefined || row.id === saved.harness)
     .sort((a, b) => a.id.localeCompare(b.id))
   for (const harness of harnesses) {
+    const model = saved?.model ?? harness.defaultModel, effort = saved?.effort ?? harness.defaultEffort
+    const permission = saved?.permission ?? harness.defaultPermission
+    // Check effective choices before persisting an intent or touching its Git
+    // paths. Keep historical settings decodable, but never freeze a choice
+    // that cannot be stored in the intent or admitted by normal start.
+    let choicesValid = true
+    for (const value of [model, effort]) {
+      if (value !== undefined && (!validStoredChoice(value) || !validChoiceId(value) || (yield* input.runtime.log.redactText(value)) !== value)) {
+        choicesValid = false
+        break
+      }
+    }
+    if (!choicesValid || model !== undefined && harness.models.length > 0 && !harness.models.includes(model)
+      || effort !== undefined && harness.efforts.length > 0 && !harness.efforts.includes(effort)
+      || harness.reportedModes.length > 0 && !harness.reportedModes.some((row) => row.id === harness.permissionMapping[permission])) continue
     let remaining = input.snapshot.accounts
     let account: Account | undefined
     for (;;) {
@@ -65,11 +84,6 @@ export const leadDefaults = (input: Input, saved?: typeof ProjectLeadDefaults.Ty
       remaining = Object.fromEntries(Object.entries(remaining).filter(([id]) => id !== candidate.id))
     }
     if (account === undefined) continue
-    const model = saved?.model ?? harness.defaultModel, effort = saved?.effort ?? harness.defaultEffort
-    const permission = saved?.permission ?? harness.defaultPermission
-    if (model !== undefined && harness.models.length > 0 && !harness.models.includes(model)
-      || effort !== undefined && harness.efforts.length > 0 && !harness.efforts.includes(effort)
-      || harness.reportedModes.length > 0 && !harness.reportedModes.some((row) => row.id === harness.permissionMapping[permission])) continue
     return { harness: harness.id, account: { _tag: "named" as const, accountId: account.id }, permission,
       ...(model === undefined ? {} : { model }), ...(effort === undefined ? {} : { effort }) }
   }

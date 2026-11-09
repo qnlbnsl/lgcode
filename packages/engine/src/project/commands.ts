@@ -14,6 +14,7 @@ import { cleanName, duplicateName } from "./names.ts"
 import { readHarnesses } from "../commands/internal.ts"
 
 import { withGit, gitCall, localMachine, safePath } from "./gitApi.ts"
+import { validChoiceId } from "../runner/choices.ts"
 
 const fresh = <S extends Schema.Top & { readonly Type: string }>(schema: S): S["Type"] => Schema.decodeUnknownSync(schema as never)(randomUUID()) as S["Type"]
 const ack = (requestId: unknown, events: ReadonlyArray<Event>) => ({ events, reply: () => ({ requestId }) })
@@ -50,7 +51,7 @@ const settingsSet: PiecePlanner = (input, raw) => Effect.gen(function* () {
     if (harness === undefined || lead.account._tag === "named" && account?.harness !== harness.id
       || lead.model !== undefined && harness.models.length > 0 && !harness.models.includes(lead.model)
       || lead.effort !== undefined && harness.efforts.length > 0 && !harness.efforts.includes(lead.effort)) return yield* refused("invalid lead defaults")
-    for (const value of [lead.model, lead.effort]) if (value !== undefined && (yield* input.runtime.log.redactText(value)) !== value) return yield* refused("invalid lead defaults")
+    for (const value of [lead.model, lead.effort]) if (value !== undefined && (!validChoiceId(value) || (yield* input.runtime.log.redactText(value)) !== value)) return yield* refused("invalid lead defaults")
   }
   return ack(p.requestId, [{ _tag: "project.SettingsChanged", settings: { workspaceFolder, shell: yield* cleanName(input, p.settings.shell), ...(lead === undefined ? {} : { lead }) } }])
 })
