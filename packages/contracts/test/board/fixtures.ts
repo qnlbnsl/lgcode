@@ -36,7 +36,7 @@ export const envelope = (event: unknown, sequence = 10) => ({
   sequence, eventId: `event-${sequence}`, occurredAt: 1_798_761_600_000,
   caller: { _tag: "piece", namespace: "board" }, event,
 });
-export const commandNames = ["board.open", "board.members", "board.post", "board.close", "board.acknowledge", "board.read", "board.channels", "board.status", "board.flush"];
+export const commandNames = ["board.open", "board.members", "board.post", "board.close", "board.acknowledge", "board.read", "board.peek", "board.channels", "board.status", "board.flush"];
 
 // The contract owns the view type; WS-2 implements its fold. No engine store
 // or fold is mocked here. These are inputs to the actual pure conditions.

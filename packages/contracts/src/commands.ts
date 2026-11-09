@@ -1,3 +1,4 @@
+import { QuestionMetadataFields } from "./questions.ts"
 import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
@@ -11,7 +12,7 @@ import { PermissionLevel } from "./permission.ts"
 import { RolesRpcGroup, rolesAccess } from "./roles/commands.ts"
 
 export const engineCommandNames = [
-  "start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "release", "compact", "group",
+  "start", "prompt", "answer", "pass-up", "ask", "wait", "cancel-reply", "stop", "resume", "release", "compact", "group",
   "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "subscribe", "debug.compare-views"
 ] as const
 // Compatibility for clients that still import the original engine inventory.
@@ -74,7 +75,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
   }),
   Rpc.make("pass-up", { payload: { ...request, subject: Subject }, success: Ack, error: Refused }),
   Rpc.make("ask", {
-    payload: { ...request, text: Schema.String },
+    payload: { ...request, text: Schema.String, ...QuestionMetadataFields },
     success: Schema.Struct({ ...request, questionId: QuestionId }), error: Refused
   }),
   Rpc.make("wait", {
@@ -88,6 +89,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
     }), error: Refused
   }),
   Rpc.make("release", { payload: { ...target, expectedHoldSequence: Schema.optionalKey(EventSequence) }, success: Ack, error: Refused }),
+  Rpc.make("cancel-reply", { payload: target, success: Ack, error: Refused }),
   Rpc.make("stop", { payload: target, success: Ack, error: Refused }),
   Rpc.make("resume", {
     payload: { ...target, fresh: Schema.optionalKey(Schema.Boolean) }, success: Ack, error: Refused
@@ -137,7 +139,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 
 // Later pieces merge their prefixed groups here, in namespace order.
 export const WebRpcGroup = ClientRpcGroup.omit(
-  "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence",
+  "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
   "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"
 )
@@ -158,11 +160,12 @@ export const commandAccess = {
   start: ["owner", "agent"], prompt: ["owner", "agent", "service"], answer: ["owner", "agent"],
   "pass-up": ["owner", "agent"], ask: ["owner", "agent"], wait: ["owner", "agent"],
   release: ["owner", "agent", "service"],
-  stop: ["owner", "agent"], resume: ["owner", "agent", "service"], compact: ["owner", "agent", "service"], group: ["owner", "agent"],
+  "cancel-reply": ["owner", "agent"], stop: ["owner", "agent"], resume: ["owner", "agent", "service"], compact: ["owner", "agent", "service"], group: ["owner", "agent"],
   accounts: ["owner"], "accounts set-secret": ["owner"], "accounts mark-available": ["owner"],
   harnesses: ["owner"], subscribe: ["owner", "agent", "service"], "debug.compare-views": ["owner"],
   "client.snapshot": clientCommandAccess["client.snapshot"], "client.roster": clientCommandAccess["client.roster"],
   "client.thread": clientCommandAccess["client.thread"], "client.subscribe": clientCommandAccess["client.subscribe"],
+  "client.requests": clientCommandAccess["client.requests"],
   "client.event": clientCommandAccess["client.event"], "client.sequence": clientCommandAccess["client.sequence"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>, ReadonlyArray<CallerKind>>
 export const ownerOnlyCommands = [...CommandsRpcGroup.requests.keys()].filter((name) => !(commandAccess[name as keyof typeof commandAccess] as ReadonlyArray<CallerKind>).includes("agent"))

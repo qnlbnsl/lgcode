@@ -72,6 +72,7 @@ export const RunnerEvent = Schema.Union([
   Schema.TaggedStruct("turnEnded", {
     agentId: AgentId, incarnation: Schema.NonEmptyString, deliveryId: DeliveryId,
     sentSequence: Schema.Int.check(Schema.isGreaterThan(0)),
+    stopped: Schema.optionalKey(Schema.Boolean),
     usage: Schema.optionalKey(TurnUsage),
   }),
   Schema.TaggedStruct("deliveryUpdate", {
@@ -131,7 +132,7 @@ export class Runner extends Context.Service<Runner, {
   readonly start: (input: Spawn) => Effect.Effect<SessionInfo, RunnerRejected>;
   readonly load: (input: Spawn & { readonly session: SessionReference }) => Effect.Effect<SessionInfo, RunnerRejected>;
   readonly prompt: (input: { readonly agentId: AgentId; readonly incarnation: string; readonly delivery: Delivery; readonly sentSequence: number }) => Effect.Effect<void, RunnerRejected>;
-  readonly cancel: (input: { readonly agentId: AgentId }) => Effect.Effect<void, RunnerRejected>;
+  readonly cancel: (input: { readonly agentId: AgentId; readonly deliveryId?: DeliveryId; readonly sentSequence?: number }) => Effect.Effect<void, RunnerRejected>;
   readonly answerPermission: (input: { readonly agentId: AgentId; readonly requestId: string; readonly optionId: string }) => Effect.Effect<void, RunnerRejected>;
   readonly setMode: (input: { readonly agentId: AgentId; readonly permission: PermissionLevel }) => Effect.Effect<void, RunnerRejected>;
   readonly compact: (input: { readonly agentId: AgentId; readonly incarnation: string; readonly delivery: Delivery; readonly sentSequence: number }) => Effect.Effect<void, RunnerRejected>;

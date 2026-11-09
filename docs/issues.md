@@ -8783,3 +8783,31 @@ State: worked around in the skill; the cause is in OpenPencil 0.16.0, not in LGc
   nodes ask for "Semi Bold".
 - The skill gives each label the size the browser measured, plus one pixel. It should drop that
   step once OpenPencil measures every bundled weight, and someone could report the fault upstream.
+
+
+## 529. Reply cancellation failures were reported as storage failures
+
+Found: 2026-11-08, while building the website's reply cancellation command.
+State: fixed in the website worker's change before handoff.
+
+The first implementation mapped a runner refusal after the command committed to
+`LogWriteFailed`. A reply can finish between the command's state check and the
+runner call, so that refusal does not establish a database failure. The shared
+post-commit effect type now permits `CommandRefused`, and cancellation uses that
+recoverable error. Tests cover a runner refusal and a naturally ending reply.
+Both tests verify that the writer accepts a later command and sends the next
+queued prompt.
+
+## Pending number for website worker 03. The piece failure log test can miss its diagnostic
+
+Found: 2026-11-08, during the website worker's full repository check.
+State: open; the cause is not established.
+
+The `FR-042 protocol=false` case in
+`packages/engine/test/pieces/piece-failure-log.test.ts` expected one safe
+diagnostic and received none during a full suite run. The same three-test
+file passed when run alone, without a source change. The failed full run is
+in `/tmp/w03-check.log`, and the isolated pass is in
+`/tmp/w03-piece-failure.log`. The assertion remains unchanged. The lead must
+assign another issue number because 529 is already reserved for this unit's
+cancellation correction.

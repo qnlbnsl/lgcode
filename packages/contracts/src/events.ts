@@ -1,3 +1,4 @@
+import { QuestionMetadataFields } from "./questions.ts"
 import * as Schema from "effect/Schema"
 import { BoardEvent } from "./board/events.ts"
 import { ClientEvent } from "./client/events.ts"
@@ -174,7 +175,7 @@ export const EngineEvent = Schema.Union([
     ...agent, itemId: Schema.NonEmptyString, content: ThreadContent, replay: Schema.Boolean
   }),
   Schema.TaggedStruct("TurnStarted", { ...agent }),
-  Schema.TaggedStruct("TurnEnded", { ...agent, compact: Schema.Boolean, usage: Schema.optionalKey(TurnUsage) }),
+  Schema.TaggedStruct("TurnEnded", { ...agent, compact: Schema.Boolean, stopped: Schema.optionalKey(Schema.Boolean), usage: Schema.optionalKey(TurnUsage) }),
   Schema.TaggedStruct("StateChanged", { ...agent, state: LifecycleState }),
   Schema.TaggedStruct("ModeChanged", { ...agent, mode: Schema.String, level: PermissionLevel }),
   Schema.TaggedStruct("ModeRefused", { ...agent, mode: Schema.String, ceiling: PermissionLevel, reason: Schema.String }),
@@ -198,7 +199,7 @@ export const EngineEvent = Schema.Union([
   }),
   Schema.TaggedStruct("PermissionMoved", { ...permission, from: Actor, to: Actor, deliveryId: DeliveryId }),
   Schema.TaggedStruct("PermissionCancelled", { ...permission, reason: Schema.String }),
-  Schema.TaggedStruct("QuestionAsked", { ...question, holder: Actor, deliveryId: DeliveryId, text: Schema.String }),
+  Schema.TaggedStruct("QuestionAsked", { ...question, holder: Actor, deliveryId: DeliveryId, text: Schema.String, ...QuestionMetadataFields }),
   Schema.TaggedStruct("QuestionAnswered", { ...question, answeredBy: Actor, text: Schema.String, deliveryId: DeliveryId }),
   Schema.TaggedStruct("QuestionMoved", { ...question, from: Actor, to: Actor, deliveryId: DeliveryId }),
   Schema.TaggedStruct("OwnerNeeded", {

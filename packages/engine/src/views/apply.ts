@@ -1,7 +1,7 @@
 import { safeStartFailure, type StartFailure } from "@lgcode/contracts/startFailure";
 import {
   EventSequence as EventSequenceSchema, eventEffect,
-  type Account, type Actor, type Caller, type PermissionAction, type AgentId, type Delivery, type Event, type EventEnvelope, type EventSequence, type LifecycleState,
+  type QuestionMetadata, type Account, type Actor, type Caller, type PermissionAction, type AgentId, type Delivery, type Event, type EventEnvelope, type EventSequence, type LifecycleState,
   pieceNamespaces, EngineEvent, type PieceNamespace, type PermissionOption, type SessionReference, type WaitMember,
 } from "@lgcode/contracts";
 import * as Schema from "effect/Schema";
@@ -36,7 +36,14 @@ interface AgentRow {
   readonly capacityHeld: boolean;
 }
 
-interface RequestRow {
+interface RequestTimes {
+  readonly sourceSequence: EventSequence;
+  readonly openedAt: EventEnvelope["occurredAt"];
+  readonly closedSequence?: EventSequence;
+  readonly answeredAt?: EventEnvelope["occurredAt"];
+}
+
+interface RequestRow extends RequestTimes {
   readonly action?: PermissionAction;
   readonly permissionRequestId: string;
   readonly agentId: AgentId;
@@ -52,7 +59,7 @@ interface RequestRow {
   readonly reason?: string;
 }
 
-interface QuestionRow {
+interface QuestionRow extends RequestTimes, QuestionMetadata {
   readonly questionId: string;
   readonly agentId: AgentId;
   readonly status: "open" | "answered";
@@ -231,10 +238,11 @@ export const permissionAction = (event: PermissionAction): PermissionAction => O
     return value === undefined ? [] : [[key, value]];
   }),
 );
-const requestsAfter = (state: State, event: Event): State["requests"] => {
+const requestsAfter = (state: State, { event, sequence, occurredAt }: EventEnvelope): State["requests"] => {
   switch (event._tag) {
     case "PermissionRequested": return put(state.requests, event.permissionRequestId, {
       permissionRequestId: event.permissionRequestId, agentId: event.agentId, status: "open", holder: event.holder,
+      sourceSequence: sequence, openedAt: occurredAt,
       deliveryId: event.deliveryId, toolCallId: event.toolCallId, description: event.description,
       options: event.options, settingsWrite: event.settingsWrite,
       ...(Object.keys(permissionAction(event)).length === 0 ? {} : { action: permissionAction(event) }),
@@ -243,26 +251,28 @@ const requestsAfter = (state: State, event: Event): State["requests"] => {
       ...row, holder: event.to, deliveryId: event.deliveryId,
     }));
     case "PermissionAnswered": return change(state.requests, event.permissionRequestId, (row) => ({
-      ...withoutAction(row), status: "answered", answer: event.answer, answeredBy: event.answeredBy,
+      ...withoutAction(row), status: "answered", closedSequence: sequence, answeredAt: occurredAt, answer: event.answer, answeredBy: event.answeredBy,
     }));
     case "PermissionCancelled": return change(state.requests, event.permissionRequestId, (row) => ({
-      ...withoutAction(row), status: "cancelled", reason: event.reason,
+      ...withoutAction(row), status: "cancelled", closedSequence: sequence, answeredAt: occurredAt, reason: event.reason,
     }));
     default: return state.requests;
   }
 };
 
-const questionsAfter = (state: State, event: Event): State["questions"] => {
+const questionsAfter = (state: State, { event, sequence, occurredAt }: EventEnvelope): State["questions"] => {
   switch (event._tag) {
     case "QuestionAsked": return put(state.questions, event.questionId, {
       questionId: event.questionId, agentId: event.agentId, status: "open", holder: event.holder,
-      deliveryId: event.deliveryId, text: event.text,
+      deliveryId: event.deliveryId, text: event.text, sourceSequence: sequence, openedAt: occurredAt,
+      ...Object.fromEntries(["title", "recommendation", "proposedAnswer", "taskId", "sprintId"]
+        .flatMap((key) => event[key as keyof typeof event] === undefined ? [] : [[key, event[key as keyof typeof event]]])),
     });
     case "QuestionMoved": return change(state.questions, event.questionId, (row) => ({
       ...row, holder: event.to, deliveryId: event.deliveryId,
     }));
     case "QuestionAnswered": return change(state.questions, event.questionId, (row) => ({
-      ...row, status: "answered", answer: event.text, answeredBy: event.answeredBy, answerDeliveryId: event.deliveryId,
+      ...row, status: "answered", closedSequence: sequence, answeredAt: occurredAt, answer: event.text, answeredBy: event.answeredBy, answerDeliveryId: event.deliveryId,
     }));
     default: return state.questions;
   }
@@ -359,8 +369,8 @@ export const applyWith = (state: State, envelope: EventEnvelope, views: Readonly
     threads: owner === undefined
       ? state.threads
       : put(state.threads, owner, [...(lookup(state.threads, owner) ?? []), envelope]),
-    requests: requestsAfter(state, event),
-    questions: questionsAfter(state, event),
+    requests: requestsAfter(state, envelope),
+    questions: questionsAfter(state, envelope),
     waits: waitsAfter(state, envelope),
     deliveries: deliveriesAfter(state, event),
     accounts: accountsAfter(state, event),

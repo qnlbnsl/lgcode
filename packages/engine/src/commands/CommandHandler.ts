@@ -151,7 +151,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     // payload is not decoded yet, so only a string id picks a lane; a lane
     // for a bad id is harmless.
     const laneFor = (name: string, rawPayload: unknown): string | undefined => {
-      if ((name !== "stop" && name !== "resume") || typeof rawPayload !== "object" || rawPayload === null) return undefined;
+      if ((name !== "stop" && name !== "resume" && name !== "cancel-reply") || typeof rawPayload !== "object" || rawPayload === null) return undefined;
       const agentId = (rawPayload as { readonly agentId?: unknown }).agentId;
       return typeof agentId === "string" ? agentId : undefined;
     };

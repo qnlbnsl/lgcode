@@ -44,7 +44,7 @@ for (const { command, words, form } of invocations) {
       "pass-up": { subject: { _tag: "question", id: "question" } },
       ask: { text: "A question?" },
       wait: { members: ["member"], mode: "all", block: false },
-      release: { agentId: "member" }, stop: { agentId: "member" }, resume: { agentId: "member", fresh: true }, compact: { agentId: "member" },
+      "cancel-reply": { agentId: "member" }, release: { agentId: "member" }, stop: { agentId: "member" }, resume: { agentId: "member", fresh: true }, compact: { agentId: "member" },
       group: { agentId: "member", add: ["review"], remove: ["build"] },
       accounts: { operation: "list" }, "accounts mark-available": { accountId: "account" },
       "client.web.settings": {},
@@ -52,7 +52,7 @@ for (const { command, words, form } of invocations) {
       harnesses: { operation: "list" }, subscribe: { after: 100 }, "debug.compare-views": {},
       "client.snapshot": {}, "client.roster": { group: "review", role: "worker", parent: "lead" },
       "client.thread": { agentId: "member", after: 100, limit: 500 },
-      "client.event": { sequence: 101 }, "client.sequence": {},
+      "client.requests": { after: 0, limit: 20, status: "answered" }, "client.event": { sequence: 101 }, "client.sequence": {},
       "client.subscribe": { after: 100, filter: { agents: ["member"], kinds: ["TurnEnded"] } },
       "board.open": { name: "Review", group: "review", anchorAgentId: "member" },
       "board.members": { channelId: "channel", add: ["member"], remove: ["former"] },
@@ -60,6 +60,7 @@ for (const { command, words, form } of invocations) {
       "board.close": { postId: "post" },
       "board.acknowledge": { postId: "post" },
       "board.read": { channelId: "channel", after: "cursor", limit: 20 },
+      "board.peek": { channelId: "channel", after: "cursor", limit: 20 },
       "board.channels": { after: "cursor", limit: 20 },
       "board.status": { agentId: "member" },
       "board.flush": { agentId: "member" },
@@ -86,6 +87,7 @@ for (const { command, words, form } of invocations) {
         "debug.compare-views": { ...base, sequence: 100, equal: true, differences: [] },
         "client.snapshot": { ...base, sequence: 100, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 },
         "client.roster": { ...base, agents: [] }, "client.thread": { ...base, items: [] },
+        "client.requests": { ...base, sequence: 100, items: [] },
         "client.sequence": { ...base, sequence: 100 },
         "client.event": { ...base, envelope: { sequence: 101, eventId: "parity-event", occurredAt: 1_800_000_000_000, caller: { _tag: "owner" }, agentId: "member", event: { _tag: "TurnEnded", agentId: "member", compact: false } } },
         "board.open": { ...base, channelId: "channel" },
@@ -94,6 +96,7 @@ for (const { command, words, form } of invocations) {
         "board.close": { ...base, postId: "post", outcome: "withdrawn" },
         "board.acknowledge": { ...base, postId: "post" },
         "board.read": { ...base, data: `Data from another agent [boundary] (delivery read):\n${JSON.stringify({ items: [{ text: '"\\\n\t🐑' }] })}\nEnd data [boundary]` },
+        "board.peek": { ...base, items: [], next: "next-cursor" },
         "board.channels": { ...base, items: [], next: "next-cursor" },
         "board.status": { ...base, agentId: "member", unread: 1, incomingOpen: 1, ownOpen: 0, owed: 0, failedCompletions: 0, wakeQueued: true, wakeSent: false, holdsUnsettled: false, holdsIncoming: true, sequence: 100, disabled: false },
         "board.flush": { ...base, wakeId: "wake" },
@@ -144,7 +147,7 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
   const nonAgent = Object.entries(commandAccess).filter(([, kinds]) => !(kinds as ReadonlyArray<string>).includes("agent")).map(([name]) => name);

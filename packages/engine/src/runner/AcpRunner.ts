@@ -72,6 +72,7 @@ interface Turn {
   replied: boolean;
   idle: boolean;
   ended: boolean;
+  cancelled?: boolean;
   text: string;
   error?: string;
   resetAt?: number;
@@ -285,14 +286,15 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     // successful text reply. Agent prose cannot establish a signed-out error.
     const candidate = turn.error !== undefined || harness === "cursor"
       ? (configuration.classifyError ?? classifyError)({ harness, text: clean }) : undefined;
-    const classification = turn.error !== undefined || candidate === "out-of-usage" ? candidate : undefined;
+    const classification = turn.cancelled ? undefined : turn.error !== undefined || candidate === "out-of-usage" ? candidate : undefined;
     yield* emit({ _tag: "promptReply", ...identity(entry), deliveryId: turn.deliveryId,
-      outcome: classification === "capacity" ? { _tag: "capacity", error: clean } : classification !== undefined ? { _tag: "pause", reason: classification, error: clean,
+      outcome: turn.cancelled ? { _tag: "success" } : classification === "capacity" ? { _tag: "capacity", error: clean } : classification !== undefined ? { _tag: "pause", reason: classification, error: clean,
         ...(classification === "out-of-usage" && turn.error !== undefined && turn.resetAt !== undefined ? { resetAt: turn.resetAt } : {}) }
         : turn.error !== undefined ? { _tag: "error", error: clean } : { _tag: "success" } });
     if (entry.turn === turn) delete entry.turn;
     yield* emit({ _tag: "turnEnded", ...identity(entry), deliveryId: turn.deliveryId,
       sentSequence: turn.sentSequence,
+      ...(turn.cancelled ? { stopped: true } : {}),
       ...(turn.usage === undefined ? {} : { usage: turn.usage }),
     });
   });
@@ -531,6 +533,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
             const usage = terminalUsage(update.usage);
             if (usage !== undefined) current.turn.usage = { ...current.turn.usage, ...usage };
             current.turn.idle = true;
+            if (update.stopReason === "cancelled") current.turn.cancelled = true;
             // ACP v2 puts the prompt's terminal error in its idle update;
             // the raw request reply is only an acknowledgement.
             if (update.error !== undefined) recordTurnError(current.turn, update.error);
@@ -767,7 +770,8 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       Effect.result, Effect.flatMap((reply) => Effect.gen(function* () {
         if (reply._tag === "Failure") yield* Deferred.fail(sent, rejected("prompt send failed"));
         if (entry.stopped || entry.dead) return;
-        const response = reply._tag === "Success" ? reply.success as { error?: unknown; usage?: unknown } : undefined;
+        const response = reply._tag === "Success" ? reply.success as { error?: unknown; usage?: unknown; stopReason?: unknown } : undefined;
+        if (entry.version === 1 && response?.stopReason === "cancelled") turn.cancelled = true;
         // ACP v1 delivers its terminal usage on the prompt reply instead.
         if (entry.version === 1) {
           const usage = terminalUsage(response?.usage);
@@ -785,11 +789,15 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   return Runner.of({
     start: (input) => spawn(input), load: (input) => spawn(input, input.session),
     prompt: (input) => send(input, false), compact: (input) => send(input, true),
-    cancel: ({ agentId }) => Effect.gen(function* () {
+    cancel: ({ agentId, deliveryId, sentSequence }) => Effect.gen(function* () {
       const entry = yield* live(agentId);
-      yield* entry.client.agent.cancel({ sessionId: entry.sessionId }).pipe(Effect.mapError(() => rejected("cancel failed")));
+      const turn = entry.turn;
+      if (deliveryId !== undefined && (turn === undefined || turn.ended || turn.deliveryId !== deliveryId
+        || turn.sentSequence !== sentSequence)) return yield* rejected("reply is no longer active");
       const holds = [...entry.holds.values()];
-      entry.holds.clear();
+      yield* entry.client.agent.cancel({ sessionId: entry.sessionId }).pipe(
+        Effect.mapError(() => rejected("cancel failed")));
+      for (const hold of holds) entry.holds.delete(hold.id);
       for (const hold of holds) yield* Deferred.succeed(hold.answer, { outcome: "cancelled" });
       for (const hold of holds) yield* Deferred.await(hold.delivered);
     }),

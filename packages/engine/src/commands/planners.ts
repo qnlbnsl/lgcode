@@ -13,6 +13,7 @@ import { harnesses } from "./harnesses.ts";
 import { prompt } from "./prompt.ts";
 import { resume } from "./resume.ts";
 import { start } from "./start.ts";
+import { cancelReply } from "./cancelReply.ts";
 import { stop } from "./stop.ts";
 import { refused, type Payload, type Planner, type PlannerTable } from "./internal.ts";
 import { setWebSettings } from "../client/settings.ts";
@@ -47,6 +48,7 @@ export const planners = {
   ask: (input, payload) => ask(input, payload as Payload<"ask">),
   wait: (input, payload) => wait(input, payload as Payload<"wait">),
   compact: targeted("compact", (input, payload) => Effect.succeed(compact(input, payload as Payload<"compact">))),
+  "cancel-reply": (input, payload) => cancelReply(input, payload as Payload<"cancel-reply">),
   stop: targeted("stop", (input, payload) => Effect.succeed(stop(input, input.snapshot.agents[payload.agentId as string]!))),
   resume: targeted("resume", (input, payload) => resume(input, input.snapshot.agents[payload.agentId as string]!, payload as Payload<"resume">)),
   group: targeted("group", (input, payload) => Effect.succeed(group(input.snapshot.agents[payload.agentId as string]!, payload as Payload<"group">))),

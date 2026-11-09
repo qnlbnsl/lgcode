@@ -63,6 +63,9 @@ export const BoardRpcGroup = RpcGroup.make(
     // Agent reads use the engine's data envelope rather than a raw page.
     success: Schema.Union([page(BoardPost), Schema.Struct({ ...request, data: Schema.String })]), error: Refused
   }),
+  Rpc.make("peek", {
+    payload: { ...request, ...paging, channelId: ChannelId }, success: page(BoardPost), error: Refused
+  }),
   Rpc.make("channels", {
     payload: { ...request, ...paging }, success: page(channel), error: Refused
   }),
@@ -87,6 +90,6 @@ export const boardAccess = {
   "board.open": ["owner", "agent"], "board.members": ["owner", "agent"],
   "board.post": ["owner", "agent", "service"], "board.close": ["owner", "agent", "service"],
   "board.acknowledge": ["owner", "agent"], "board.read": ["owner", "agent"],
-  "board.channels": ["owner", "agent"], "board.status": ["owner", "agent", "service"],
+  "board.peek": ["owner"], "board.channels": ["owner", "agent"], "board.status": ["owner", "agent", "service"],
   "board.flush": ["owner", "service"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof BoardRpcGroup>>, ReadonlyArray<CallerKind>>

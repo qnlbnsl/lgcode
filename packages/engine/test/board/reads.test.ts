@@ -127,3 +127,23 @@ it.live("5.9 board status and snapshot use the published view during a held comm
     expect(success(yield* call(ownerCredential, "board.status", { requestId: current.requestId }))).toEqual(current);
   }).pipe(Effect.ensuring(Deferred.succeed(release, undefined)), Effect.ensuring(Effect.sync(() => spy.mockRestore())));
 })).pipe(Effect.orDie));
+
+
+it.live("owner peek returns channel chat without any marks; agent reads retain their marks", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck();
+  const c = yield* seedBoard();
+  const first = yield* postAs(c.lead!, { reply: "none", to: [], text: "Team chat." });
+  const second = yield* postAs(c.lead!, { reply: "none", to: [], text: "Next post." });
+  const before = yield* readLog;
+  const marks = JSON.stringify((yield* boardState).readState);
+  const page = success(yield* call(ownerCredential, "board.peek", { channelId: "room", limit: 1 }));
+  expect(page.items).toMatchObject([{ postId: first, text: "Team chat." }]);
+  expect(page.next).toBe(first);
+  expect(success(yield* call(ownerCredential, "board.peek", { channelId: "room", after: page.next })).items).toMatchObject([{ postId: second }]);
+  expect(yield* readLog).toEqual(before);
+  expect(JSON.stringify((yield* boardState).readState)).toBe(marks);
+  expect((yield* call(c.worker!, "board.peek", { channelId: "room" }))._tag).toBe("Failure");
+  expect((yield* call(ownerCredential, "board.peek", { channelId: "missing" }))._tag).toBe("Failure");
+  success(yield* call(c.worker!, "board.read", { channelId: "room", limit: 1 }));
+  expect(eventsOf(yield* readLog, "board.Read")).toEqual([{ _tag: "board.Read", channelId: "room", reader: agent("worker"), postIds: [first] }]);
+})).pipe(Effect.orDie));

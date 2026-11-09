@@ -48,7 +48,7 @@ export interface Plan {
   readonly sideRows?: SideRows;
   readonly reply?: (batch: ReadonlyArray<EventEnvelope>) => Record<string, unknown>;
   // Runs after the commit. A blocking command returns its final reply here.
-  readonly afterCommit?: Effect.Effect<void | Record<string, unknown>, LogWriteFailed>;
+  readonly afterCommit?: Effect.Effect<void | Record<string, unknown>, CommandRefused | LogWriteFailed>;
 }
 
 // Piece planners cannot run engine hooks or omit their committed-batch reply.
