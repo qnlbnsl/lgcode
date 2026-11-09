@@ -80,8 +80,8 @@ const record: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const sources = new Map(b.sources.map((row) => [row.sourceId, row]))
   for (const screen of b.screens) {
     if (sources.get(screen.sourceId)?.kind !== "screens" || !validScreenRoute(screen.route)) return yield* refused("invalid mock screen reference")
-    if (screen.scenarioRoutes.length !== b.scenarios.length || !unique(screen.scenarioRoutes.map((row) => row.scenarioId))
-      || screen.scenarioRoutes.some((row) => !b.scenarios.some((scenario) => scenario.scenarioId === row.scenarioId) || !validScreenRoute(row.route))) return yield* refused("every screen requires one concrete route per scenario")
+    if (!unique(screen.scenarioRoutes.map((row) => row.scenarioId))
+      || screen.scenarioRoutes.some((row) => !b.scenarios.some((scenario) => scenario.scenarioId === row.scenarioId) || !validScreenRoute(row.route))) return yield* refused("invalid mock scenario route binding")
   }
   const comparisons: Array<MockRevision["comparisons"][number]> = []
   for (const field of b.draftedFields) {

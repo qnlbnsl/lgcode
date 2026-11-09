@@ -5,11 +5,13 @@ import { join } from "node:path"
 import { it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
+import * as SqlClient from "effect/sql/SqlClient"
 import { afterEach, beforeEach, expect, vi } from "vitest"
 import * as Server from "../../src/api/server.ts"
 import { dispatchQueued } from "../../src/routing/deliveries.ts"
 import { mockReach, mockApprovalSource } from "../../src/project/mockReach.ts"
 import { projectKey, projectView } from "../../src/project/view.ts"
+import { rebuild } from "../../src/views/rebuild.ts"
 import { registerRebuildCheck } from "../support/rebuildCheck.ts"
 import { connect } from "../support/socketClient.ts"
 import { provideBoard, snapshot } from "../board/wakeFixtures.ts"
@@ -99,24 +101,102 @@ it.live("uses authenticated own-project tools, freezes the reviewed revision, an
   yield* dispatchQueued(f.lead.agentId); expect(runner.callsOf("prompt")).toHaveLength(1)
 })))
 
-it.live("requires total concrete screen/scenario routes and rejects display-name guesses and placeholders", () => provideBoard(rig, Effect.gen(function* () {
+it.live("accepts an empty supported scenario list without inventing routes", () => provideBoard(rig, Effect.gen(function* () {
   yield* setup()
+  // Owner decision, 2026-11-09, website-1/brief.md, KISS item 2:
+  // “only the scenario routes each screen supplies”. This supersedes the
+  // former total-matrix rejection of an empty list with declared scenarios.
+  const b = bundle(); b.screens[0]!.scenarioRoutes = []
+  const first = yield* record({ bundle: b })
+  const read = success(yield* call(owner, "project.mocks.read", { projectId: "project" }))
+  expect(read.items[0].revisionId).toBe(first.revisionId)
+  expect(read.items[0].bundle).toEqual(b)
+  success(yield* call(owner, "project.mocks.approve", { projectId: "project", revisionId: first.revisionId }))
+  expect(projectView(yield* snapshot).mockRevisions[projectKey("project", first.revisionId)]?.bundle).toEqual(b)
+})))
+
+it.live("rejects unknown or duplicate scenario identities and invalid routes with only the existing refusal audit", () => provideBoard(rig, Effect.gen(function* () {
+  yield* setup()
+  const sql = yield* SqlClient.SqlClient
   for (const change of [
-    (b: ReturnType<typeof bundle>) => { b.screens[0]!.scenarioRoutes = [] },
     (b: ReturnType<typeof bundle>) => { b.screens[0]!.scenarioRoutes[0]!.scenarioId = "Empty" },
     (b: ReturnType<typeof bundle>) => { b.screens[0]!.scenarioRoutes[0]!.route = "/screen?sample={scenario}" },
     (b: ReturnType<typeof bundle>) => { b.screens[0]!.route = "/screen/{sample}" },
     (b: ReturnType<typeof bundle>) => { b.screens[0]!.scenarioRoutes[0]!.route = "//outside.example/screen" },
-    (b: ReturnType<typeof bundle>) => { b.scenarios.push({ ...b.scenarios[0]! }) }
+    (b: ReturnType<typeof bundle>) => { b.scenarios.push({ ...b.scenarios[0]! }) },
+    (b: ReturnType<typeof bundle>) => { b.screens[0]!.scenarioRoutes.push({ ...b.screens[0]!.scenarioRoutes[0]! }) },
+    ...["relative", "https://outside.example/screen", "/../screen", "/screen%2fother", "/screen\\other", "/screen#fragment"].flatMap((route) => [
+      (b: ReturnType<typeof bundle>) => { b.screens[0]!.scenarioRoutes[0]!.route = route },
+      (b: ReturnType<typeof bundle>) => { b.screens[0]!.route = route }
+    ])
   ]) {
     const b = bundle(); change(b)
-    expect(failureOf(yield* call(owner, "project.mocks.record", { projectId: "project", bundle: b }))).toBeDefined()
+    const before = yield* readLog, state = yield* snapshot, view = projectView(state), requestId = freshRequest()
+    const payload = { requestId, projectId: "project", bundle: b }
+    const refused = yield* call(owner, "project.mocks.record", payload)
+    expect(failureOf(refused)).toBeDefined()
     expect(Object.keys(projectView(yield* snapshot).mockRevisions)).toEqual([])
+    expect(projectView(yield* snapshot)).toEqual(view)
+    expect((yield* readLog).slice(before.length).map((row) => row.event)).toEqual([
+      { _tag: "CommandRefused", command: "project.mocks.record", reason: expect.any(String) }
+    ])
+    expect((yield* snapshot).deliveries).toEqual(state.deliveries)
+    const receipts = yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE request_id = ${requestId}`
+    expect(receipts).toHaveLength(1)
+    // Owner clarification, 2026-11-09: preserve shared refusal auditing;
+    // no product mutation or successful receipt may follow a refused route.
+    const audited = yield* readLog
+    const metadata = yield* sql<{ event_id: string; occurred_at: number }>`SELECT event_id, occurred_at FROM events WHERE request_id = ${requestId} ORDER BY sequence`
+    expect(JSON.parse(receipts[0]!.result_json)).toEqual(audited.slice(before.length).map((row, index) => ({ ...row,
+      eventId: metadata[index]!.event_id, occurredAt: metadata[index]!.occurred_at })))
+    expect(yield* call(owner, "project.mocks.record", payload)).toEqual(refused)
+    expect(yield* readLog).toEqual(audited)
   }
   const b = bundle(); b.scenarios.push({ scenarioId: "full", name: "A display label", description: "A full state" })
   b.screens[0]!.scenarioRoutes.push({ scenarioId: "full", route: "/screen?sample=concrete-recorded-value" })
   const first = yield* record({ bundle: b })
   expect(success(yield* call(owner, "project.mocks.read", { projectId: "project" })).items[0].revisionId).toBe(first.revisionId)
+})))
+
+it.live("preserves supplied scenario subsets through socket reads, exact approval, handoff and rebuild", () => provideBoard(rig, (runner) => Effect.gen(function* () {
+  const f = yield* setup(), bearer = randomBytes(32).toString("base64url"), socket = join(rig.stateFolder, "supported-routes.sock")
+  yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false })
+  const api = yield* connect(socket, bearer), designer = yield* connect(socket, f.child.token), lead = yield* connect(socket, f.lead.token)
+  const b = bundle()
+  b.scenarios.push({ scenarioId: "busy", name: "Busy label", description: "Many records" },
+    { scenarioId: "error", name: "Error label", description: "A failed state" })
+  b.screens.push({ ...b.screens[0]!, screenId: "details", name: "Details", route: "/details", scenarioRoutes: [] })
+  // A complete old matrix stays a valid, byte-stable historical revision.
+  for (const screen of b.screens) screen.scenarioRoutes = b.scenarios.map((scenario) => ({ scenarioId: scenario.scenarioId, route: `${screen.route}?case=${scenario.scenarioId}` }))
+  const previous = yield* designer["project.mocks.record"]({ requestId: freshRequest(), projectId: "project" as never, bundle: b as never })
+  const original = JSON.stringify(projectView(yield* snapshot).mockRevisions[projectKey("project", previous.revisionId)])
+  b.screens[0]!.scenarioRoutes = [{ scenarioId: "error", route: "/screen?case=failure" }, { scenarioId: "empty", route: "/screen?case=zero" }]
+  b.screens[1]!.scenarioRoutes = [{ scenarioId: "busy", route: "/details?case=many" }]
+  const request = { requestId: freshRequest(), projectId: "project" as never, expectedRevision: previous.revisionId, bundle: b as never }
+  const first = yield* designer["project.mocks.record"](request)
+  expect(yield* designer["project.mocks.record"](request)).toEqual(first)
+  const read = yield* api["project.mocks.read"]({ requestId: freshRequest(), projectId: "project" as never })
+  if (!("items" in read)) throw new Error("Owner read must be structured")
+  expect(read.items.find((row) => row.revisionId === first.revisionId)?.bundle).toEqual(b)
+  expect((yield* designer["project.mocks.approve"]({ requestId: freshRequest(), projectId: "project" as never, revisionId: first.revisionId }).pipe(Effect.result))._tag).toBe("Failure")
+  expect((yield* api["project.mocks.approve"]({ requestId: freshRequest(), projectId: "project" as never, revisionId: previous.revisionId }).pipe(Effect.result))._tag).toBe("Failure")
+  const approval = { requestId: freshRequest(), projectId: "project" as never, revisionId: first.revisionId }
+  yield* api["project.mocks.approve"](approval); yield* api["project.mocks.approve"](approval)
+  yield* dispatchQueued(f.lead.agentId)
+  expect(runner.callsOf("prompt")).toHaveLength(1)
+  expect(JSON.stringify(runner.callsOf("prompt")[0]!.input.delivery.content)).toContain(first.revisionId)
+  const handoffRead = yield* lead["project.mocks.read"]({ requestId: freshRequest(), projectId: "project" as never })
+  if (!("data" in handoffRead)) throw new Error("Lead read must use the agent envelope")
+  const handed = JSON.parse(handoffRead.data.split("\n")[1]!)
+  expect(handed.items.find((row: { revisionId: string }) => row.revisionId === first.revisionId).bundle).toEqual(b)
+  expect(handed.approval).toMatchObject({ revisionId: first.revisionId, worklist: { screens: ["home", "details"] } })
+  const log = yield* readLog, state = yield* snapshot, rebuilt = yield* rebuild(state.sequence)
+  const view = projectView(state), replay = projectView(rebuilt)
+  expect(replay).toEqual(view)
+  expect(replay.mockRevisions[projectKey("project", first.revisionId)]?.bundle).toEqual(b)
+  expect(JSON.stringify(replay.mockRevisions[projectKey("project", previous.revisionId)])).toBe(original)
+  expect(log.filter((row) => row.event._tag === "project.MockApproved")).toHaveLength(1)
+  expect(log.filter((row) => row.event._tag === "DeliverySent")).toHaveLength(1)
 })))
 
 const designFiles = (repoId: string) => {

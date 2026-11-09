@@ -9548,6 +9548,16 @@ Public reads retain the scenario identities and exact recorded bindings.
 The route metadata does not claim that a preview server is running or that a scenario has executed.
 The later page owns isolated preview display and actual server availability integration.
 
+Owner decision, 2026-11-09: Item 2 of the website simplification shortlist
+supersedes the total-binding requirement described above.
+Each screen retains its base route and only its supplied supported scenario routes.
+An empty supported list is valid even when the revision declares scenarios.
+Scenario identities and bindings remain unique, and each binding must name a
+declared scenario and a concrete internal route.
+Existing revisions and their stored bytes are not migrated.
+This is an approved product simplification, not a new defect.
+The historical finding and its original proof remain unchanged.
+
 ## 553. Another caller could replace an immutable mock or Design revision
 
 Found: 2026-11-09, during the final bounded engine review.
