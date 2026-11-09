@@ -176,6 +176,17 @@ findings on those pages:
   rename a project, archive it, and bring it back. `api.project.archive` stops the project's
   running agents first. An archived project has `archivedAt`.
 
+The phone batch of 2026-11-08 adds one command:
+
+- **Adding a repository to a machine.** `api.machines.addRepository` is proposed. It takes the
+  machine, the repository, and the folder. It writes `project.RepositoryLocated` and the
+  `project.WorktreeCreated` event for that machine's main checkout, so New project can start
+  the repository there. It refuses a machine that is not online and a machine that already has
+  the repository.
+- **The heavy sample's Mocks tab.** `heavy/reads.json` had no `mocks`, `schema`, or `design`
+  reads, so Desktop companion's Mocks tab threw an error. It now carries the same three reads as
+  `sample/reads.json`.
+
 ## Which stub stands for which real command
 
 The real command names come from `packages/contracts/src/client/commands.ts`. "Proposed"

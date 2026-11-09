@@ -446,7 +446,9 @@ const api={
   async rename(id,name){if(machine(id)&&name.trim())emit('project.MachineChanged',{machineId:id,name:name.trim().slice(0,48)})},
   // Only a machine with no projects can go, and never this computer. The page explains both rules.
   async remove(id){const m=machine(id);if(!m||m.role==='Master'||S.projects.some(p=>S.projectMachines.get(p.id)===id))return false;emit('project.MachineRemoved',{machineId:id});return true},
-  async place(projectId,machineId){emit('project.Placed',{projectId,machineId})}
+  async place(projectId,machineId){emit('project.Placed',{projectId,machineId})},
+  // The machine clones the repository into the folder, or uses the clone already there. Its main checkout becomes a worktree, so New project can start on it.
+  async addRepository(machineId,repoId,path){const m=machine(machineId),repo=S.repositories.find(r=>r.id===repoId),folder=String(path||'').trim();if(!m||m.status!=='Online'||!repo||!folder||S.repositoryLocations.has(repoId+'/'+machineId))return false;emit('project.RepositoryLocated',{repoId,machineId,path:folder});emit('project.WorktreeCreated',{worktreeId:machineId+'-'+repoId+'-main',repoId,machineId,branch:'main',path:folder,owner:'Main checkout',activity:'No uncommitted changes'});return true}
  },
  // First run. These stand for a proposed read of the computer and proposed progress records.
  setup:{
