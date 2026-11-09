@@ -8883,7 +8883,7 @@ Alert reads obtain the latest attempt time from the event log.
 ## 532. The piece failure log test can miss its diagnostic
 
 Found: 2026-11-08, during the website worker's full repository check.
-State: an interrupted batch loss is fixed; complete verification is pending.
+State: both ownership gaps are fixed and independently verified.
 
 The `FR-042 protocol=false` case in
 `packages/engine/test/pieces/piece-failure-log.test.ts` expected one safe
@@ -8905,7 +8905,7 @@ Its idle wait remains interruptible. All four diagnostic tests pass locally.
 The original exact count, throttling, and secrecy assertions remain intact.
 The forced interruption establishes this production defect. It does not
 establish the exact scheduling of the earlier zero-entry failures.
-The complete combined check and independent review remain pending.
+The initial batch correction alone did not complete verification.
 
 A later complete Git check at `253ef5b` still captured zero entries in the
 original `protocol=false` case with the batch mask present.
@@ -8917,8 +8917,15 @@ The batch mask and the running follower's finalizer remain in place.
 Each drain removes its own snapshot once, so final flushes do not duplicate it.
 The same controlled delayed-child probe now passes and flushes all three
 entries before the child evaluates. Independent repeated-interruption and
-fresh-service lifecycle probes also pass. Complete corrected-head checks
-remain required before acceptance.
+fresh-service lifecycle probes also pass.
+
+The corrected project and Git heads each passed their fresh complete checks.
+The final combined head `c4dfaf0` then passed an independent complete check.
+It passed 468 files, 6,417 tests, and all 18 browser cases, with two existing skips.
+TypeScript and copied-code credits checks also passed.
+The independent review approved that exact head with no findings.
+Its report is `.scratch/foundry-runs/website-1/w00f-verifier-1-result.md`.
+These results do not establish the exact timing of the earlier zero-entry failures.
 
 ## 533. Git rename counts and interrupted staging needed recovery corrections
 
@@ -8991,13 +8998,13 @@ This proof does not implement or verify the later first-run page.
 ## 536. Closing a pending Node socket could raise an uncaught exception
 
 Found: 2026-11-08, during the corrected foundations' fresh complete checks.
-State: corrected locally; independent review and complete checks are pending.
+State: fixed and independently verified at the combined foundation head.
 
 The Git check at `30584ef` reported two uncaught close-before-connect errors.
 The project check at `b1978e5` later passed all 6275 assertions but exited 1
 because the same exception was uncaught. The browser stage did not run.
-The logs are `/tmp/w02f1-verifier-1/pnpm-check.log` and
-`/tmp/w01f1-verifier-1/full-check.log`.
+The retained logs are `/tmp/w02f1-verifier-1/pnpm-check.log` and
+`/tmp/w01f1-verifier-1-pnpm-check-b1978e5-exit1.log`.
 
 Independent controlled handshakes established a real cleanup defect.
 Cancelling or timing out before open caused each child process to exit 1.
@@ -9017,4 +9024,9 @@ post-open close. All four pass locally, along with the diagnostic drain tests.
 Client and engine type checks pass. The targeted recovery and browser-boundary
 batch passes all 32 tests in five files. An independent five-mode probe also
 passes and retains a typed SocketReadError for an active malformed frame.
-Complete corrected-head checks remain required before acceptance.
+The corrected project and Git heads each passed their fresh complete checks.
+The final combined head `c4dfaf0` passed its independent complete check.
+That run passed 6,417 tests and all 18 browser cases, with no unhandled errors.
+The independent review approved the exact combined head with no findings.
+Its report is `.scratch/foundry-runs/website-1/w00f-verifier-1-result.md`.
+The passing checks do not identify every earlier socket exception's trigger.
