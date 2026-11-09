@@ -8827,6 +8827,30 @@ The table now passes the envelope's time as a fourth argument.
 The project fold uses that time for task creation, changes, notes, and sprint completion.
 The handler tests compare the live views with a complete log rebuild after every journey.
 
+## 528. Git reads and conflict completion needed real-repository edge-case checks
+
+Found: 2026-11-08, while building the website's bounded Git service.
+State: fixed in the Git service, with focused tests against temporary repositories.
+
+A reversed Git history limited to one commit returns the newest selected commit,
+so it cannot establish when the oldest pending commit arrived. The service reads
+bounded committer dates from the actual unmerged history and selects the earliest.
+An ours-only conflict resolution can leave no staged file difference while a merge
+still needs its final commit. The service exposes the merge head and permits that
+commit once the unmerged index entries are cleared. Generated linked checkouts can
+also appear as untracked changes in their parent when no ignore rule exists. The
+service adds a local exclusion for its `.worktrees/` folder without editing a
+tracked ignore file. A newly created repository also needs Git's orphan-worktree support before its first commit. The service creates a real
+unborn project branch in that case, and represents its missing head as null.
+Real-repository tests cover these cases.
+
+The inline conflict resolver currently refuses binary, add/delete, symlink and
+submodule conflicts. Those cases require the terminal workflow. The service also
+refuses symbolic-link file operations, and public review links currently support
+GitHub's standard remote forms only. The command integration must apply the
+production redactor to every service reply before delivery through the client
+application programming interface.
+
 ## 529. Reply cancellation failures were reported as storage failures
 
 Found: 2026-11-08, while building the website's reply cancellation command.
@@ -8895,6 +8919,41 @@ The same controlled delayed-child probe now passes and flushes all three
 entries before the child evaluates. Independent repeated-interruption and
 fresh-service lifecycle probes also pass. Complete corrected-head checks
 remain required before acceptance.
+
+## 533. Git rename counts and interrupted staging needed recovery corrections
+
+Found: 2026-11-08, by the independent website Git service verifier at commit
+`55d23a6`, then reproduced through the public service in the correction seat.
+State: fixed for normal Git signal cleanup, with real-repository regression tests.
+
+The numeric diff parser treated tab-bearing rename paths as count rows.
+An unchanged rename could report additions and deletions taken from its name.
+The parser now follows Git's null-delimited record grammar and consumes both
+rename or copy paths before reading the next count row.
+Tests cover both tab-bearing paths, ordinary records, mixed binary and text
+records, commit diffs, truncation and missing final newlines.
+
+A timed-out staging process previously received the unconditional kill signal.
+Git could not remove its index lock, so a legitimate retry returned `busy`.
+The runner now sends the termination signal first and allows 250 milliseconds
+for Git's own lock rollback before forcing process-group termination.
+It preserves the original failure reason throughout that grace.
+Git resolves the actual per-worktree metadata and cleans only locks it acquired.
+The service never guesses lock ownership or unlinks index locks itself.
+Tests cover single and bulk staging, timeout and cancellation, main and linked
+checkouts, unchanged index contents, successful retry, pre-existing locks,
+another live Git operation's lock and a descendant ignoring termination.
+
+The correction tests also found that staging an already staged rename passed
+its removed old pathname to Git, causing a pathspec failure.
+Staging now updates the destination of an indexed rename or copy.
+Unstaging still resets both paths.
+Single-file and bulk regression assertions cover this case.
+
+A forced kill can still leave a lock when Git cannot run its cleanup within
+the grace period, and that lock requires terminal inspection.
+No cross-process atomic cleanup or Windows recovery guarantee is claimed.
+The local filesystem race limitation in issue 49 still applies.
 
 ## 534. Project identities, read refusals, and initial settings failed at the persistence or wire boundary
 
