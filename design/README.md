@@ -156,8 +156,19 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
 - Open Subscriptions. Usage shows per subscription, and the row menu offers Rename and Remove.
 - Open Project settings in Agent console and choose Archive. The project leaves the sidebar
   and Home. Open All projects on Home to find it marked Archived, then choose Restore.
-- Choose New project. Type a name: the preview shows Branch and Folder on two lines. Choose a
-  repository that no online machine has, and one message links to Machines.
+- Choose New project. Type a name: the preview shows Branch and Folder on two lines. Choose
+  Buildbox in Run on and atlas-docs as the repository. One message offers "Add it to
+  Buildbox". It opens Add repository on Machines with Buildbox and a folder filled in. Add it,
+  and New project returns with Buildbox chosen and your name kept. A machine's row menu on
+  Machines offers Add repository too.
+- Narrow the window to 390 pixels. The top bar holds the menu, the project, and the bell, with
+  the connection as a dot on the bell. Open the bell for the full state and Reconnect now.
+  Inspecting sits under the tabs. The menu opens a drawer that starts with the agents needing
+  attention and scrolls as one, with the service pages at its end. The board is one list with
+  the sprints needing you first. In All projects and in a sprint's tasks, each row's second line
+  starts with its status. A diff in Git has one line-number gutter.
+- At 768 pixels with the sidebar open, Home's tabs read Attention, Projects, Questions, and
+  Approvals beside a New project icon, and the breadcrumb keeps its names.
 - Expand a request on Home and answer it. The row eases open, and the answered row folds away.
 - Open Design notes and choose Reconnecting. The Live indicator turns amber, says when it last
   heard from the service, and offers Reconnect now. Nothing on the page moves. Hover a disabled

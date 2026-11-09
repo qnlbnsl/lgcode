@@ -176,7 +176,8 @@ a project lead restores that project's assigned worktree.
 The left navigation and desktop lead panel have drag handles. Arrow keys
 resize a focused handle. Home or a double click restores its default size.
 The browser remembers these widths. Four board columns fit beside the lead
-at desktop width. A compact status strip lets phone users jump to a column.
+at desktop width. A phone shows the board as one list instead, with the sprints that need
+the owner first.
 
 Git has independent state for each worktree. Staging and unstaging change the
 commit selection. A commit records the selected files and message. Fetch,
@@ -606,7 +607,8 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
 - **Reconnecting turns into Offline after 30 seconds.** Both states say when the page last
   heard from the service, such as "Last updated 2 minutes ago". The time keeps counting.
 - **Reconnect now is a small button.** It sits beside the indicator, with a refresh icon and
-  no arrow. On a phone it shows only the icon.
+  no arrow. On a phone the indicator and the button move into the bell, as the phone rules
+  below say.
 - **Data stays readable, and actions wait.** Threads, lists, and links keep working. Every
   control that changes state is disabled, and its hover text gives the reason, such as
   "LGcode is offline. This works again when the connection returns." Drafts can still be
@@ -746,7 +748,10 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
   failed-start rows keep their own controls.
 - **A row with two states says both.** A stopped agent with an open question says "Stopped · Needs
   answer" and wears a hollow amber dot. A sidebar narrower than 210 pixels per row drops
-  "Stopped · ", and the hollow dot and the hover text still say it.
+  "Stopped · ", and the hollow dot and the hover text still say it. At the default width of
+  248 pixels an agent row is 174 pixels, so it drops it too. Claude tried shorter forms on
+  2026-11-08, such as "Stopped · Question", and none fit beside a name and read well, so the
+  rule stays.
 
 ### What a thread shows besides messages
 
@@ -907,7 +912,8 @@ New project.
 - **Actions sit at the top right.** Each page starts with a short status line and its
   actions, such as Connect machine or Add subscription. The pages have no filler subtitles.
 - **Rare actions live in a row menu.** The menu is a button with three dots at the end of
-  a row. It holds Rename and Remove. A disabled item says why beneath it.
+  a row. It holds Rename and Remove, and a machine's menu starts with Add repository. A
+  disabled item says why beneath it.
 - **Every destructive action asks first.** One shared dialog names what will be lost, with
   Cancel on the left and the action on the right.
 - **Rename uses one shared dialog.** It refuses an empty name and a name already in use.
@@ -966,5 +972,63 @@ New project.
   first run hides Goal, because the first project's goal comes from the onboarding
   conversation.
 - **Lead subscription shows when a subscription is ready.**
-- **When no machine has the repository, the dialog shows one message** with a link to
-  Machines. There is no separate error under the field.
+- **When no machine has the repository, the dialog shows one message** with a link, such as
+  "Add it to Buildbox", or "Add atlas-docs to a machine" when the chosen machine is offline. There is no separate error under the field.
+- **Add repository lives on Machines.** The link opens Machines with Add repository filled
+  in: the chosen machine, the repository, and a folder in the machine's workspace folder.
+  Adding it returns to New project with that machine chosen and the draft kept. Cancel also
+  returns to New project.
+
+## The phone, set on 2026-11-08
+
+These rules come from the designer's critique of 2026-11-06, findings TOP-3, PHONE-1,
+PHONE-2, and PHONE-3. Claude applied them on 2026-11-08. A phone is a window of 700 pixels
+or narrower.
+
+### The top bar
+
+- **The top bar holds three things.** They are the menu, the place, and the bell. The place
+  is the project, or the team inside a team. Chat's line under the tabs names the agent, so
+  the top bar does not repeat it.
+- **The connection is a dot on the bell.** The dot is green for Live, amber for Connecting
+  and Reconnecting, and red for Offline. The bell's name says the state, such as "LGcode is
+  reconnecting".
+- **The bell opens the full state.** The menu starts with the indicator, the time of the
+  last update, and Reconnect now, above Needs attention.
+- **Inspecting moves under the tabs.** It is a line of 32 pixels at the top of the tab
+  content, on every project view. A desktop keeps it in the top bar.
+
+### The drawer
+
+- **The drawer is the tree.** The whole drawer scrolls as one, and the tree has no scroll of
+  its own. The service pages and the account follow the tree at the end.
+- **Agents needing attention come first.** Under the brand, Needs attention lists each agent
+  with an open request once, in the bell's order. A row names the agent, its status, and its
+  project, and it opens the agent's thread.
+
+### Lists and tables
+
+- **The board is one list.** Sprints that need the owner come first, then In progress, In
+  review, Planned, and Done. Each card starts with its status. The column jump strip is gone.
+- **The status leads every phone row's second line.** All projects, the repository page,
+  task tables, Machines, Subscriptions, and Phone notifications put the name on the first
+  line and the status first on the second. All projects stacks below 620 pixels of table
+  width, and a task table below 480, so a 768 pixel window stacks them too.
+- **A phone diff has one line-number gutter.** It shows the new line's number, or the old
+  one for a removed line.
+
+### Tabs
+
+- **Home's tabs have short names on a narrow row.** Below 580 pixels the tabs read
+  Attention, Projects, Questions, and Approvals. Below 490 pixels New project shows only its
+  icon. The rule follows the row's width, so it holds at 768 pixels beside the sidebar.
+- **A tab row that still overflows fades** at the edge it can scroll toward.
+- **Initials never wrap** in an avatar.
+
+### Leftovers fixed in the same pass
+
+- **A narrow top bar keeps the place readable.** Below 640 pixels of top bar, the repository
+  and the word Inspecting drop out, and the branch shrinks before the breadcrumb does.
+- **A docked request has its own identifier.** Above 1800 pixels a docked thread can show a
+  request that the page beside it shows too. The docked copy's identifier starts with
+  `dock-`, and answering it keeps the focus on the copy that was answered.
