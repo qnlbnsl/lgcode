@@ -1,12 +1,14 @@
 # Replacing the website: the todo list
 
-The owner decided this on 2026-11-06. The mock, `design/workbench.html`, is
-golden, and the engine gets whatever the mock needs. There are no stages.
+The owner approved the current mock as the reference and lifted the development
+freeze for this build on 2026-11-08.
+The scope is the whole mock.
+The five build steps are an implementation order, not a reduced scope.
 
-This list was checked again on 2026-11-06 against the mock at commit `e2d5166` on the
-branch `area/web-mock`, after Claude rebuilt Terminal and Git and added Home. The mock
-now lives on that branch, and later changes add to this list. The source-to-mock map
-is `design/FEATURE-PARITY.md`.
+This list was reconciled against `master` at `5050be1` on 2026-11-08.
+The source-to-mock map is `design/FEATURE-PARITY.md`.
+The complete unit plan is `.scratch/foundry-runs/website-1/plan.md` in the main checkout.
+The website team must not edit `design/`.
 
 Each line below is one piece of work. "Agent's call" marks a choice the owner has
 not ruled on.
@@ -147,7 +149,7 @@ The mock makes this part of the website, so it no longer waits until after it.
 - [ ] Pair with an expiring code, and confirm on both computers. The owner approved
       a pairing code for machines on 2026-11-06, and chose that the website generates
       it. Web login stays one password.
-- [ ] Add `sheprd connect <address>`, which starts the pairing from the other computer.
+- [ ] Add `lgcode connect <address>`, which starts the pairing from the other computer.
 - [ ] Secure the link with a secure WebSocket and self-signed certificates that each
       side trusts after pairing, as the owner described on 2026-11-06.
 - [ ] Have the worker connect out to the master, and report its capacity in agent
@@ -156,7 +158,7 @@ The mock makes this part of the website, so it no longer waits until after it.
       and a worker cannot place projects. Moving running work is separate.
 - [ ] Run agents through the same runner commands the engine uses locally, with the
       master's event log as the only record, and no duplicate work after a failure.
-- [ ] Let an agent's Sheprd tools, the terminal and git reads reach the right machine.
+- [ ] Let an agent's LGcode tools, the terminal and git reads reach the right machine.
 - [ ] Rework who-is-calling checks, because the master cannot inspect a process on
       another machine.
 - [ ] Decide how work moves between machines. Git through the shared remote is the
@@ -200,8 +202,8 @@ shows which events they need. `design/data/README.md` on `area/web-mock` lists t
 - [ ] Build the Add Task dialog.
 - [ ] Build the conversation view: compact header, quiet owner turns, collapsed
       tool details and a growing composer that names its recipient.
-- [ ] Build one tab row that keeps its position on every view: Board, Chat, Tasks in
-      team scope, Terminal, Git and Project settings. There is no Changes tab, because Git
+- [ ] Build one tab row that keeps its position on every view: Board, Mocks when present, Chat,
+      Terminal, Git, Project settings, and Tasks last in team scope. There is no Changes tab, because Git
       covers it. Remember the last tab.
 - [ ] Build the Git view at full window height, with three columns that each scroll:
       worktrees, then the commit message above the file tree, then the diff. It has unified
@@ -250,7 +252,7 @@ The mock now shows all of these. `design/FEATURE-PARITY.md` maps each to its sou
 - [ ] Update `live-check-web.ts`, which finds elements by their current names.
 - [ ] Port `design/checks.mjs`, `operations-checks.mjs`, `workspace-tools-checks.mjs`,
       `workspace-redesign-checks.mjs`, `home-checks.mjs`, `revision-checks.mjs` and
-      `data-checks.mjs` to the browser suite at 390, 768, 1440 and 2560 pixels in both color modes.
+      `data-checks.mjs`, `onboarding-checks.mjs`, and `mocks-checks.mjs` to the browser suite at 390, 768, 1440 and 2560 pixels in both color modes.
 - [ ] Add a real-agent proof: New project with a worktree, talk to the lead, the lead
       writes a sprint and a task, and a decision is answered from the board.
 - [ ] Add real proofs for a terminal session running vim, a commit and merge from Git, a
@@ -268,3 +270,78 @@ These are on `.scratch/security/attack-todo.md` as what must hold.
 - [ ] Agent-written fields on the page.
 - [ ] The terminal, worktree creation and provider sign-in.
 - [ ] Pairing and the worker connection.
+
+
+## Requirements added by the current mock on 2026-11-08
+
+### First run and project lifecycle
+
+- [ ] Implement the three resumable setup pages after login, with real computer discovery.
+- [ ] Store positive setup completion and monotonic progress.
+- [ ] Support scan retry, Back, missing-harness install instructions, and Change folder.
+- [ ] Reuse New project for setup, with ready harness defaults and the latest repository.
+- [ ] Persist the project goal, rename, archive, and restore.
+- [ ] Stop the project's running agents before archive.
+- [ ] Implement Add repository through Machines and preserve the New project draft on return.
+
+### Project stages, mocks, and repository Design
+
+- [ ] Store project stages and stage-derived team names, with an area for repeated stages.
+- [ ] Show the stage strip and the conditional Mocks tab.
+- [ ] Read actual mock screens, routes, revisions, scenarios, drafted fields, and components.
+- [ ] Compare drafted data against the repository schema.
+- [ ] Record owner mock approval and its planning handoff.
+- [ ] Show repository tokens and shared component previews in Design.
+- [ ] Keep design-to-code conversion as later Build-team tooling.
+
+### The current shell and responsive behavior
+
+- [ ] Implement the remembered 48-pixel rail and its keyboard shortcut outside terminal focus.
+- [ ] Use the current exact tab order, with Mocks conditional and Tasks last.
+- [ ] Make breadcrumbs navigate without repeated page titles.
+- [ ] Use the current typography, spacing, control heights, local fonts, and credited icons.
+- [ ] Dock the selected thread beside every project view above 1800 pixels.
+- [ ] Give duplicate request blocks unique anchors and focus the one answered.
+- [ ] On phones, keep menu, place, and bell in the top bar and put connection details in the bell.
+- [ ] Put Inspecting below the tabs on phones.
+- [ ] Let the whole phone drawer scroll and put agents needing attention first.
+- [ ] Render the phone board as one attention-first list.
+- [ ] Stack responsive records with status first on their second line.
+- [ ] Preserve overflow fades, readable breadcrumbs, and unwrapped avatar initials.
+
+### Requests, composer, and service actions
+
+- [ ] Sort failed starts first and then longest waits in Home and the bell.
+- [ ] Mark waits of at least one hour in amber.
+- [ ] Preserve answer result and time in history.
+- [ ] Use one reusable block for questions, approvals, and failed starts.
+- [ ] Put sprint requests before its goal and show approval-blocked tasks.
+- [ ] Put timestamps on every task activity step.
+- [ ] Send on Enter and use Shift+Enter for a line break.
+- [ ] Open the context search with @ and preserve sent context references.
+- [ ] Offer subscription, model, effort, and honest context usage beside the composer.
+- [ ] Offer phone notifications at the first waiting request, outside setup.
+- [ ] Persist Not now so that the offer never returns.
+- [ ] Retry a failed notification and send a test notification through the real transport.
+- [ ] Show subscription usage/reset where the provider reports them and unavailable state otherwise.
+- [ ] Rename and remove subscriptions without combining their private logins.
+- [ ] Rename and remove machines and leave a master with the stated effects.
+
+### Git and terminal additions
+
+- [ ] Stage all, unstage all, and discard with confirmation while preserving conflicts.
+- [ ] Resolve each conflict in the diff pane with ours, base, and theirs.
+- [ ] Persist selection and drafts per worktree and expose merge evidence by branch head.
+- [ ] Support terminal session names, rename, close, paste, reconnect, and real program completion.
+- [ ] Keep terminal output out of stored events and logs.
+
+## The five ordered build gates
+
+- [ ] Step 1: Engine data, including current first-run, service, stage, and mocks data.
+- [ ] Step 2: Replace the page in React and pass the full browser parity matrix.
+- [ ] Step 3: Real terminals and subscription sign-in.
+- [ ] Step 4: Installer and `.lgcode` configuration.
+- [ ] Step 5: Pairing, worker mode, remote runner, and final integration.
+
+Each gate requires `pnpm check`, `pnpm live-check:web`, and `pnpm live-check`.
+Roles units 3, 4 and 11a remain unbuilt.

@@ -4,7 +4,8 @@
 
 This note is the design for replacing the current page with the mock in
 `design/workbench.html`, and for adding what the engine lacks. The checklist is
-`.plans/plans/website-replacement/todo.md`. None of this is built.
+`.plans/plans/website-replacement/todo.md`. The owner authorized this build on
+2026-11-08. Implementation status belongs in that checklist and the website run report.
 
 The design was written against the mock as it stood at 09:18 on 2026-11-06. The section
 "What changed in the mock after 09:18" records the later additions, against commit
@@ -21,7 +22,7 @@ All of these were decided on 2026-11-06.
 - One master runs the work, and other computers join it as workers, "basically
   spread the load of a project accross machines. and they get their commands
   through the main."
-- A new computer joins by running `sheprd connect` and entering the master's address.
+- A new computer joins by running `lgcode connect` and entering the master's address.
 - The link is "a secure WebSocket with self-signed certificates that both the host
   ... and the client Sheprd trust".
 - A pairing code is fine for machines, and the website generates it. Web login stays
@@ -160,7 +161,7 @@ engine next reads that login.
 
 1. The owner clicks Connect machine on the Machines page and names the machine. The master
    shows a code of about 20 characters that works once and expires after 10 minutes.
-2. The owner runs `sheprd connect <address>` on the other computer, which asks for the code.
+2. The owner runs `lgcode connect <address>` on the other computer, which asks for the code.
 3. The two sides exchange public keys over a secure WebSocket. Each side proves that it
    knows the code by signing both public keys with it.
 4. The machine appears on the page as awaiting confirmation, and the owner confirms it.
@@ -230,7 +231,7 @@ work together. This is the order of building and not a smaller scope.
    team chat read.
 2. **The page.** Rewritten against step 1, and replacing the current page.
 3. **Terminal and subscriptions.** Terminal first, because sign-in uses it.
-4. **Installer and `.sheprd` config.** This was already next, and a worker needs it to get Sheprd
+4. **Installer and `.lgcode` config.** This was already next, and a worker needs it to get Sheprd
    onto another computer. The workspace folder setting moves here from the page's first run.
 5. **Machines.** Pairing, the worker mode and the remote runner.
 
@@ -306,3 +307,96 @@ already decodes against the contracts. These are the rest, and they are proposal
 ## Changes the mock still needs
 
 The owner picks from the critique's remaining Should fix and Polish findings.
+
+
+## The current build reference, reconciled on 2026-11-08
+
+The current reference is the mock merged into `master` at `5050be1`.
+The owner lifted the development freeze for this build on 2026-11-08.
+The build uses five ordered steps, and all five belong to its scope.
+The run plan is `.scratch/foundry-runs/website-1/plan.md` in the main checkout.
+The mock files remain owned by the mock session.
+
+The earlier descriptions above are historical where this section replaces them.
+The product and command are LGcode and `lgcode`.
+Configuration lives under `.lgcode`.
+
+### Project discovery, setup, and lifecycle
+
+The first run follows login and has three resumable pages.
+They explain the product, show discovered harnesses and repositories, and create a project.
+Setup completion is stored positively and does not reset when projects are archived.
+Scans have retry and back controls.
+A missing harness has an install command.
+A project stores its goal.
+Renaming a project preserves its branch and folder.
+Archiving stops its running agents.
+Restoring returns it without inventing a new project.
+New project chooses Run on before the name.
+Adding a repository opens Machines and returns with the project draft preserved.
+Repository registration checks the actual folder on the selected online machine.
+
+### Project stages and mocks
+
+Projects show Design, Plan, Build, Review, and Hand over.
+A project with no screens starts in Plan and omits Design.
+Teams are named from their stage and optional area.
+The Mocks tab reads real screen records, revisions, drafted fields, schema comparisons, and components.
+Mock approval records the owner's decision and hands its concrete work to planning.
+The repository Design tab reads its tokens and shared components.
+Design-to-code tooling remains later Build-team work.
+The production page has no scripted sample reactions or Design notes.
+
+### The shell and responsive page
+
+The project tabs are Board, Mocks when present, Chat, Terminal, Git, Project settings, and Tasks for a team.
+The sidebar can fold into a remembered 48-pixel rail.
+The phone drawer remains a drawer.
+There is no separate global Repositories destination.
+At widths above 1800 pixels the selected thread can dock beside every project view.
+Each copy of a request has a unique anchor.
+The phone top bar has the menu, place, and bell.
+Its connection state lives in the bell.
+Its Inspecting control sits below the tabs.
+The phone board is one list ordered by owner attention and then sprint status.
+Responsive tables put the status first on the second line.
+Field and Dusk keep the exact approved tokens.
+The five text sizes, three weights, local fonts, credited icons, and 4-pixel spacing follow `design/DESIGN.md`.
+
+### Requests and conversations
+
+Failed starts come before the oldest request.
+Home and the bell share that ordering.
+Request history retains the answer result and time.
+Filters include repository, project, agent, and machine.
+One reusable block presents questions, approvals, and failed starts.
+The composer sends on Enter and inserts a line on Shift+Enter.
+It offers context search through Add context and @.
+The tool row exposes subscription, model, effort, and actual context usage.
+Usage that a harness does not report is unavailable rather than invented.
+The first waiting request offers phone notifications when no service is set.
+Not now is stored permanently.
+That offer is absent from first-run setup.
+Notification retry and a test notification use the real notification transport.
+
+### Git, terminal, and service records
+
+Git supports bulk stage and unstage, confirmed discard, and inline conflict choices for ours, base, and theirs.
+It keeps its selection and draft per worktree.
+The page opens a review to the base branch and never merges that branch directly.
+Git reads are bounded.
+Terminal sessions have names, close and rename controls, resize, interrupt, and reconnection.
+The character grid supports full-screen programs.
+Terminal output is neither stored as events nor logged.
+Subscriptions retain independent private login folders.
+Usage and reset times come from supported provider reports.
+Machines retain last-seen times, role, repository locations, and confirmed pairing identity.
+Rename, remove, and leave-master controls state their effect first.
+
+### Verification scope
+
+All nine mock suites are acceptance sources.
+They include `onboarding-checks.mjs` and `mocks-checks.mjs`.
+Browser proofs cover 390, 768, 1440, and 2560 pixels in both color modes.
+Every build step runs `pnpm check`, `pnpm live-check:web`, and `pnpm live-check`.
+The real-agent project journey, provider login, terminal vim, Git mutation, and paired second-machine journey each need their own evidence.

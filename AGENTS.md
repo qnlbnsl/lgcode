@@ -26,10 +26,10 @@ The foundation is merged into `master`: the engine, the client API with the
 current web page, the message board, and the foundry roles. The standing
 permission rules remain unbuilt, pending the owner's harness recordings.
 
-Development is frozen. The owner froze it on 2026-11-07, until the website
-mocks are ready, and only the owner lifts the freeze. While it holds, do not
-add application code unless the owner asks for it in the current task. Work on
-the mocks under `design/` continues, as do the documents that record them.
+The owner lifted the development freeze on 2026-11-08 for the website build.
+The current mock is the reference for the page and its engine support.
+The website team reads `design/` and does not edit it.
+Roles units 3, 4 and 11a remain unbuilt.
 
 ## Language
 
