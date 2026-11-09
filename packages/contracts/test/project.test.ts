@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import * as Schema from "effect/Schema"
 import { expect, it } from "vitest"
-import { ProjectEvent, ProjectRpcGroup, TaskStory, commandAccess, eventVisibility, projectAgentStatus, projectTeamGroup, sprintStatus } from "../src/index.ts"
+import { DesignRegistration, DesignTokensPath, ProjectEvent, ProjectRpcGroup, TaskStory, commandAccess, eventVisibility, projectAgentStatus, projectTeamGroup, sprintStatus } from "../src/index.ts"
 
 it("decodes the relevant golden event shapes without loading sample data in production", () => {
   const rows = JSON.parse(readFileSync(new URL("../../../design/data/sample/events.json", import.meta.url), "utf8")) as { payload_json: string }[]
@@ -35,4 +35,23 @@ it("requires access and visibility decisions for every registered project operat
   expect(commandAccess["project.create"]).not.toContain("agent")
   expect(commandAccess["project.settings.set"]).not.toContain("agent")
   for (const event of ProjectEvent.members) expect(eventVisibility[event.fields._tag.schema.literal]).toBe("owner-only")
+})
+
+it.each(["abc", "hunter2", "sk-ant-api03-AAAAAAAAAAAAAAAA", "secret", "secret:", "SECRET:x y",
+  "../outside.json", "/tmp/tokens.json", "design//tokens.json", "design/./tokens.json", "design/../tokens.json",
+  "design\\tokens.json", "design/%2e%2e/tokens.json", "design/.git/tokens.json", ".codex/auth.json",
+  ".env/tokens.json", "design/.env.local/tokens.json", "auth.json", "tokens.txt", "tokens.json/", "tokens\u0000.json"
+])("refuses a raw value or unconfined token-document path at contract admission: %s", (tokensPath) => {
+  expect(Schema.is(DesignTokensPath)(tokensPath)).toBe(false)
+  expect(() => Schema.decodeUnknownSync(DesignRegistration)({ repoId: "repo", worktreeId: "workspace", file: "actual.pen", tokensPath, components: [] })).toThrow()
+})
+
+it.each(["tokens.json", "design/theme.JSON", "design tokens/colors.json"])("admits an explicit relative JSON token-document path: %s", (tokensPath) => {
+  const registration = { repoId: "repo", worktreeId: "workspace", file: "actual.pen", tokensPath, components: [] }
+  expect(Schema.decodeUnknownSync(DesignRegistration)(registration)).toEqual(registration)
+})
+
+it("retains an absent token document without inventing a path", () => {
+  const registration = { repoId: "repo", worktreeId: "workspace", file: "actual.pen", components: [] }
+  expect(Schema.decodeUnknownSync(DesignRegistration)(registration)).toEqual(registration)
 })

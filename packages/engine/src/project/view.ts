@@ -5,7 +5,7 @@ export const own = <T>(rows: Readonly<Record<string, T>>, id: string): T | undef
 export const projectKey = (projectId: string, id: string) => JSON.stringify([projectId, id])
 export const projectView = (snapshot: Snapshot): ProjectView => snapshot.project as ProjectView
 const empty = <T>(): Readonly<Record<string, T>> => Object.create(null)
-export const emptyProject = (): ProjectView => ({ taskNotifications: empty(), creations: empty(), repositories: empty(), locations: empty(), workspaces: empty(), projects: empty(), teams: empty(), sprints: empty(), tasks: empty(), agentProjects: empty(), parents: empty() })
+export const emptyProject = (): ProjectView => ({ taskNotifications: empty(), setup: { step: "welcome" }, mockRevisions: empty(), mockHeads: empty(), mockApprovals: empty(), designs: empty(), designHeads: empty(), creations: empty(), repositories: empty(), locations: empty(), workspaces: empty(), projects: empty(), teams: empty(), sprints: empty(), tasks: empty(), agentProjects: empty(), parents: empty() })
 const change = <T>(rows: Readonly<Record<string, T>>, id: string, f: (row: T) => T) => {
   const row = own(rows, id)
   return row === undefined ? rows : { ...rows, [id]: f(row) }
@@ -16,6 +16,25 @@ export const projectAfter = (view: ProjectView, event: Event, sequence: number, 
   const at = occurredAt as TaskHistoryEntry["at"]
   const seq = sequence as TaskHistoryEntry["sequence"]
   switch (event._tag) {
+    case "project.DesignRecorded": {
+      const { _tag, ...record } = event
+      return { ...view, designs: { ...view.designs, [projectKey(event.design.repoId, event.revisionId)]: { ...record, at } },
+        designHeads: { ...view.designHeads, [event.design.repoId]: event.revisionId } }
+    }
+    case "project.SetupAdvanced": {
+      const steps = ["welcome", "found", "project"]
+      return steps.indexOf(event.step) > steps.indexOf(view.setup.step) && view.setup.completedAt === undefined ? { ...view, setup: { ...view.setup, step: event.step } } : view
+    }
+    case "project.SetupCompleted": return view.setup.completedAt !== undefined ? view : { ...view, setup: { step: "project", projectId: event.projectId, completedAt: at } }
+    case "project.MockRecorded": {
+      const { _tag, ...revision } = event
+      return { ...view, mockHeads: { ...view.mockHeads, [event.projectId]: event.revisionId },
+        mockRevisions: { ...view.mockRevisions, [projectKey(event.projectId, event.revisionId)]: { ...revision, at } } }
+    }
+    case "project.MockApproved": {
+      const { _tag, ...approval } = event
+      return { ...view, mockApprovals: { ...view.mockApprovals, [projectKey(event.projectId, event.approvalId)]: { ...approval, at } } }
+    }
     case "AgentStarted": {
       const parent = event.parent._tag === "agent" ? event.parent.agentId : undefined
       const projectId = parent === undefined ? undefined : own(view.agentProjects, parent)

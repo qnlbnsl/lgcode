@@ -127,6 +127,12 @@ Branch and directory collisions receive a numeric suffix.
 An unchecked worktree option uses the main checkout and its current named branch.
 An unborn repository remains unborn; creation does not invent a commit.
 
+`project.placement.preview` accepts the same placement input as `project.create`.
+It calls the same authoritative selector against the current repository and filesystem.
+It returns the observed repository folder, checkout folder, branch, and checkout type.
+It returns `reserved: false` because creation must check the placement again.
+It creates no intent, directory, branch, receipt, account login, or lead.
+
 The durable creation intent is specific to this repository, checkout, and lead journey.
 It is not a general workflow queue.
 The engine serializes project creation and archive independently of caller connections.
@@ -180,3 +186,103 @@ The archived timestamp commits only after every process stop succeeds.
 A failed stop keeps `archiving: true`; retry archive after resolving the stop failure.
 `project.restore` clears the archived state without launching a lead or resetting setup.
 An incomplete archive must finish before restore.
+
+## First-run progress and discovery
+
+The owner reads `project.setup` and advances with `project.setup.advance`.
+Progress moves through Welcome, Found, and Project without moving backward.
+`project.setup.complete` records positive completion against a successfully created project.
+Its timestamp survives restart and the archive of every project.
+Authentication remains the prerequisite for these owner-only commands.
+
+`project.setup.discover` reads the configured workspace and supported local harnesses.
+It returns actual repositories, install guidance, and the normal ready launch defaults.
+Its fixed failure asks the owner to retry or change the workspace through `project.settings.set`.
+The scan never materializes a Codex shadow home, installs software, changes login state, or starts an agent.
+Local account results distinguish a missing executable, signed-out state, unavailable evidence, and a recognized local credential.
+Every account result says remote authentication was not checked.
+The scan and project creation share the provider-specific effective-home and credential rules.
+
+Owner settings include a durable, editable `displayName`.
+The settings read and discovery can suggest the actual configured Git `user.name`.
+An absent suggestion remains absent.
+The name is redacted display prose and grants no authority.
+
+## Repository mock revisions and approval
+
+An owner or an agent in the project records a complete bounded bundle with `project.mocks.record`.
+The caller supplies the expected previous revision, preventing lost concurrent updates.
+The request identity becomes the immutable revision identity.
+An existing revision identity cannot be reused by another caller, even after the head advances.
+Identical retries by the original caller still return their durable receipt.
+The event records the actual author, timestamp, artifact fingerprints, and schema comparisons.
+`project.mocks.read` pages revisions within 256 kibibytes, including the agent data envelope.
+`project.mocks.artifact` returns bounded, redacted repository text or an explicit unavailable result.
+
+Sources distinguish screens, data, tokens, and component indexes.
+Each source names a registered project checkout and a confined relative file.
+Screen files are data artifacts of at most 8 kibibytes.
+Data and component indexes require JavaScript Object Notation files with the same bound.
+Tokens can also name a Cascading Style Sheets file, returned only as text data.
+A data schema has the form `{ "Entity": { "field": "type" } }`.
+Draft fields can name their source, entity, and affected screens.
+Comparisons report New, Matches, Differs, or Unavailable against the actual file.
+Unsupported or missing schema evidence remains unavailable.
+Approval derives its implementation changes from the actual comparisons.
+Draft field identity consists of its entity and field name together.
+The removed experimental `bundle.schemaChanges` input is explicitly forbidden at admission.
+It cannot be silently stripped as an excess property.
+Declared removals are unsupported; this contract supplies evidenced additions and type changes.
+
+Screen routes and preview origins are validated metadata.
+Every screen records exactly one concrete route for every typed scenario identity.
+Scenario display names never determine these bindings.
+The engine refuses unknown or duplicate bindings, external routes, and brace placeholders.
+The engine never fetches a preview origin, evaluates a component, or starts a preview command.
+The web client must keep preview code outside its application authority.
+Component references require matching repository byte fingerprints.
+Their screen references must identify screens in the recorded bundle.
+Omitted screen references mean that the relationship was not reported.
+A change from Draft to Shared also requires a different evidenced repository reference.
+An in-memory provenance flag does not establish that a file was moved.
+
+Projects without screens begin in Plan and omit Design.
+Recording screens moves the project into Design.
+Stage-derived team labels use their areas to distinguish teams at the same stage.
+Only the owner can approve the current revision through `project.mocks.approve`.
+Approval rechecks the actual source and component fingerprints and refuses changed or unavailable evidence.
+It records the reviewed revision, screens, remaining draft components, fields, and derived schema changes.
+It advances to Plan and queues one durable handoff to the recorded project lead.
+Retries use the normal durable receipt; fresh duplicate and stale approvals refuse.
+The strict mock-specific reach predicate rechecks the project, approval, revision, and lead during later dispatch.
+An obsolete queued handoff is withdrawn.
+The handoff creates no fixed teams, tasks, or conversations.
+
+## Registered repository Design evidence
+
+`project.design.record` records an explicit repository, registered workspace, and relative design file.
+Its revision identity is unique within the repository across all authenticated callers.
+The caller must own the project or be one of its agents.
+Registration checks the workspace's real checkout, branch, and common Git directory.
+It requires an actual bounded `.fig`, `.pen`, or `.json` file of at most one mebibyte.
+It never invents a path or launches an editor.
+An optional token document contains at most 64 named values in 8 kibibytes of JSON.
+Its path must pass public admission as a confined relative JSON-file path.
+Raw secret probes, traversal, absolute paths, and credential-file references refuse before a recorded event.
+Each optional shared component names an actual repository reference with a matching byte fingerprint.
+Each component file is bounded to 64 kibibytes.
+
+`project.design.read` takes the repository identity and an optional exact revision identity.
+An agent must also identify its own project in that repository.
+The read preserves the registration, authenticated author, event time, and recorded fingerprints.
+It compares the current file, tokens, and component bytes with their recorded fingerprints independently.
+Changed, missing, redirected, or inaccessible evidence returns explicit artifact unavailability.
+An absent registration returns explicit repository Design unavailability.
+Available tokens contain actual bounded, redacted values.
+No availability result asserts that an editor or isolated preview can run.
+
+A mock bundle may explicitly name `designRevision`.
+The revision must belong to the project's repository.
+Recording and approving the mock both recheck all required Design evidence against that exact revision.
+An omitted Design identity stays absent.
+The page must never derive a design file path from a repository or component display name.

@@ -32,9 +32,23 @@ const sprint = { projectId: identity, sprintId: identity, owner: identity, needs
 const requestLinks = { projectId: identity, taskId: identity, sprintId: identity };
 const task = { story: { fields: { activity: { elements: { fields: { question: identity } } } } }, projectId: identity, taskId: identity, owner: identity, teamId: identity, sprintId: identity, worktreeId: identity };
 
+const mockSource = { elements: { fields: { sourceId: identity, worktreeId: identity } } };
+const mockScreens = { elements: { fields: { screenId: identity, sourceId: identity, scenarioRoutes: { elements: { fields: { scenarioId: identity } } } } } };
+const schemaChanges = { elements: { fields: { sourceId: identity } } };
+const draftFields = { elements: { fields: { sourceId: identity, screens: { elements: identity } } } };
+const mockWorklist = { fields: { screens: { elements: identity }, drafts: { elements: identity }, schemaChanges, draftedFields: draftFields } };
 export const eventStructure: RedactionStructure = { taggedFields: {
   QuestionAsked: requestLinks, PermissionRequested: requestLinks,
   "project.OwnerTaskNotificationPlanned": { notificationId: identity, projectId: identity, taskId: identity, targetAgentId: identity },
+  "project.DesignRecorded": { projectId: identity, revisionId: identity, fileFingerprint: identity, tokensFingerprint: identity,
+    design: { fields: { repoId: identity, worktreeId: identity, components: { elements: { fields: { componentId: identity, fingerprint: identity } } } } } },
+  "project.SetupCompleted": { projectId: identity },
+  "project.MockRecorded": { projectId: identity, revisionId: identity, author: actor,
+    artifacts: { elements: { fields: { sourceId: identity, fingerprint: identity } } }, comparisons: { elements: { fields: { field: draftFields.elements } } },
+    bundle: { fields: { sources: mockSource, screens: mockScreens, designRevision: identity,
+      scenarios: { elements: { fields: { scenarioId: identity } } }, draftedFields: draftFields,
+      components: { elements: { fields: { componentId: identity, sourceId: identity, fingerprint: identity, screens: { elements: identity } } } } } } },
+  "project.MockApproved": { projectId: identity, approvalId: identity, revisionId: identity, leadAgentId: identity, worklist: mockWorklist },
   "project.SettingsChanged": { settings: { fields: { lead: { fields: { harness: identity, account: { fields: { accountId: identity } } } } } } },
   "project.CreationPlanned": { creation: { fields: { requestId: identity, projectId: identity,
     bodyHash: identity, repository: { fields: { repoId: identity } }, workspace: { fields: workspace },
@@ -84,7 +98,7 @@ export const eventStructure: RedactionStructure = { taggedFields: {
 } };
 
 export const receiptStructure: RedactionStructure = { fields: {
-  repoId: identity, worktreeId: identity, projectId: identity, teamId: identity, sprintId: identity, taskId: identity,
+  revisionId: identity, repoId: identity, worktreeId: identity, projectId: identity, teamId: identity, sprintId: identity, taskId: identity,
   requestId: identity, agentId: identity, deliveryId: identity, questionId: identity, waitId: identity, alertId: identity,
   roleFileHash: identity, channelId: identity, postId: identity, wakeId: identity,
   accounts: { elements: account }, harnesses: { elements: harness }, members: { elements: member },

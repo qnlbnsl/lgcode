@@ -1,6 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as Semaphore from "effect/Semaphore"
 import { type Runtime, type Input, refused } from "../commands/internal.ts"
+import type { Workspace } from "@lgcode/contracts"
 import { agentReadReply } from "../api/reads.ts"
 import { canReadProject } from "./access.ts"
 import { own, projectView } from "./view.ts"
@@ -53,6 +54,10 @@ export const workspacePath = (input: Input, raw: Record<string, unknown>, git: G
       return yield* refused("project is unavailable to this caller")
     }
   }
+  return yield* checkedWorkspace(input, workspace, git)
+})
+const checkedWorkspace = (input: Input, workspace: Workspace, git: GitService) => Effect.gen(function* () {
+  yield* localMachine(workspace.machineId)
   yield* safePath(input, workspace.path)
   const { repository, location } = yield* repositoryPath(input, workspace.repoId)
   const main = yield* gitCall(git.register(repository.path))
@@ -62,6 +67,17 @@ export const workspacePath = (input: Input, raw: Record<string, unknown>, git: G
   const state = yield* gitCall(git.state(checkout.path))
   if (state.branch !== workspace.branch) return yield* refused("registered workspace branch changed; restore the registered branch")
   return workspace
+})
+// Repository Design is shared within one repository. Agents must identify an
+// actual project in that repository; normal project Git reads remain stricter.
+export const designWorkspacePath = (input: Input, raw: { repoId: string; worktreeId: string; projectId?: string }, git: GitService) => Effect.gen(function* () {
+  const view = projectView(input.snapshot), workspace = own(view.workspaces, raw.worktreeId)
+  if (workspace?.repoId !== raw.repoId) return yield* refused("registered design workspace is unavailable")
+  if (input.actor._tag !== "owner" || raw.projectId !== undefined) {
+    const project = raw.projectId === undefined ? undefined : own(view.projects, raw.projectId)
+    if (project?.repoId !== raw.repoId || !canReadProject(input.snapshot, input.actor, project.projectId)) return yield* refused("repository design is unavailable to this caller")
+  }
+  return yield* checkedWorkspace(input, workspace, git)
 })
 // No identifier exemption applies to Git text. Paths, authors, patches, hunk
 // sides, ref names and URLs all pass through the production text redactor.

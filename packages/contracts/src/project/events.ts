@@ -1,7 +1,12 @@
 import * as Schema from "effect/Schema"
 import { CreationFolderIdentity, OwnerTaskNotification, Project, ProjectCreation, ProjectId, ProjectName, ProjectSettings, ProjectStage, ProjectText, Repository, RepositoryLocation, Sprint, SprintId, Task, TaskId, TaskState, Team, Workspace } from "./schema.ts"
 
+import { ProjectMockEvent } from "./mocks.ts"
+import { ProjectDesignEvent } from "./design.ts"
+
 export const ProjectEvent = Schema.Union([
+  ...ProjectMockEvent.members,
+  ProjectDesignEvent,
   Schema.TaggedStruct("project.SettingsChanged", { settings: ProjectSettings }),
   Schema.TaggedStruct("project.RepositoryAdded", Repository.fields),
   Schema.TaggedStruct("project.RepositoryLocated", RepositoryLocation.fields),

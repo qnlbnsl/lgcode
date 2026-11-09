@@ -18,6 +18,12 @@ export type TaskId = typeof TaskId.Type
 export const ProjectText = Schema.String.check(Schema.isMaxCodePoints(8192))
 export const ProjectName = Schema.String.check(Schema.isMinLength(1), Schema.isMaxCodePoints(128), Schema.isPattern(/\S/))
 export const ProjectPath = Schema.String.check(Schema.isMinLength(1), Schema.isMaxCodePoints(4096))
+// Repository artifacts never expand homes, follow URLs, or address credentials.
+// Filesystem reads must additionally verify the registered checkout and real path.
+export const isRepositoryArtifactPath = (value: string) => value.length <= 4096 && !/[\\\x00-\x1f\x7f%]/.test(value)
+  && !value.startsWith("/") && value.split("/").every((part) => part !== "" && part !== "." && part !== ".."
+    && ![".git", ".codex", ".claude", ".gemini", ".aws", ".ssh", ".env", "auth.json", ".credentials.json", "oauth_creds.json"].includes(part.toLowerCase())
+    && !part.toLowerCase().startsWith(".env."))
 export const ProjectStage = Schema.Literals(["design", "plan", "build", "review", "handover"])
 export const SprintPhase = Schema.Literals(["Define", "Design", "Plan", "Build", "Verify", "Review", "Hand over"])
 export const TaskState = Schema.Literals(["queue", "active", "review", "blocked", "done"])
@@ -25,7 +31,7 @@ export const ProjectLeadDefaults = Schema.Struct({
   harness: HarnessId, account: Schema.Union([Schema.TaggedStruct("any", {}), Schema.TaggedStruct("named", { accountId: AccountId })]),
   model: Schema.optionalKey(ProjectName), effort: Schema.optionalKey(ProjectName), permission: PermissionLevel
 })
-export const ProjectSettings = Schema.Struct({ workspaceFolder: ProjectPath, shell: ProjectName, lead: Schema.optionalKey(ProjectLeadDefaults) })
+export const ProjectSettings = Schema.Struct({ workspaceFolder: ProjectPath, shell: ProjectName, lead: Schema.optionalKey(ProjectLeadDefaults), displayName: Schema.optionalKey(ProjectName) })
 export type ProjectSettings = typeof ProjectSettings.Type
 export const Repository = Schema.Struct({ repoId: RepositoryId, name: ProjectName, path: ProjectPath })
 export type Repository = typeof Repository.Type

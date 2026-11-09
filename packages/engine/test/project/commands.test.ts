@@ -41,6 +41,21 @@ it.live("roundtrips every project event and receipt identity while keeping works
   const ownerId = `worker-${marker}`
   const needs = [`dependency-${marker}`]
   const events = (text: string) => [
+    { _tag: "project.SetupAdvanced", step: "found" },
+    { _tag: "project.DesignRecorded", projectId, revisionId: `design-${marker}`, author: { _tag: "agent", agentId: leadAgentId },
+      fileFingerprint: "a".repeat(64), tokensFingerprint: "b".repeat(64), design: { repoId, worktreeId, file: text, tokensPath: `design/${text}.json`,
+        components: [{ componentId: `component-${marker}`, name: text, reference: text, fingerprint: "c".repeat(64), variants: text }] } },
+    { _tag: "project.SetupCompleted", projectId },
+    { _tag: "project.MockRecorded", projectId, revisionId: `revision-${marker}`, author: { _tag: "agent", agentId: leadAgentId },
+      comparisons: [{ field: { name: text, type: text, description: text, sourceId: `source-${marker}`, screens: [`screen-${marker}`] }, status: "differs", known: text }],
+      artifacts: [{ sourceId: `source-${marker}`, fingerprint: "a".repeat(64) }], bundle: { designRevision: `design-${marker}`,
+        sources: [{ sourceId: `source-${marker}`, worktreeId, path: text, kind: "screens" }],
+        screens: [{ screenId: `screen-${marker}`, sourceId: `source-${marker}`, name: text, route: text, scenarioRoutes: [{ scenarioId: `scenario-${marker}`, route: text }] }],
+        scenarios: [{ scenarioId: `scenario-${marker}`, name: text, description: text }], draftedFields: [{ name: text, type: text, description: text, sourceId: `source-${marker}`, screens: [`screen-${marker}`] }],
+        components: [{ componentId: `component-${marker}`, sourceId: `source-${marker}`, name: text, provenance: "draft", reference: text, fingerprint: "a".repeat(64), screens: [`screen-${marker}`] }]
+      } },
+    { _tag: "project.MockApproved", projectId, approvalId: `approval-${marker}`, revisionId: `revision-${marker}`, leadAgentId,
+      worklist: { screens: [`screen-${marker}`], drafts: [`component-${marker}`], schemaChanges: [{ sourceId: `source-${marker}`, field: text, change: "add", description: text }], draftedFields: [{ name: text, type: text, description: text, sourceId: `source-${marker}`, screens: [`screen-${marker}`] }] } },
     { _tag: "project.SettingsChanged", settings: { workspaceFolder: text, shell: text,
       lead: { harness: `harness-${marker}`, account: { _tag: "named", accountId: `account-${marker}` }, permission: "ask", model: text, effort: text } } },
     { _tag: "project.CreationPlanned", creation: { requestId: `creation-${marker}`, bodyHash: `hash-${marker}`, projectId,

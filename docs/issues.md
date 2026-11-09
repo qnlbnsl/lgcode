@@ -9447,6 +9447,211 @@ Authenticated handler and socket regressions preserve the original failed payloa
 They cover ordinary empty replies, filtered empty replies, exhausted pages, permitted project members, and owner-only catalogs.
 They also retain populated pagination, access refusals, stored metadata, and deterministic rebuild assertions.
 The separate `project.requests` correction tracked as issue 554 is outside this change.
+## 548. Discovery could materialize private Codex shadow homes
+
+Found: 2026-11-09, by reading the accepted project-readiness dependency during first-run preparation.
+The manager allocated this number for the read-only discovery correction.
+
+The accepted readiness helper called `withCodexHome` to resolve the account's effective environment.
+That helper also called `materializeCodexShadowHome` before returning the environment.
+The materializer can create private home directories and maintain shared-home links.
+Reusing that launch helper while scanning would contradict the first-run promise that discovery only looked.
+
+The correction separates read-only layout and confinement resolution from explicit launch materialization.
+`resolveCodexHome` and `withCodexHome` share the same layout resolver.
+Discovery and project readiness use the read-only function.
+The real runner retains the materializing function and its post-materialization confinement check.
+Provider-specific credential recognition, effective environment expansion, executable-file checks, account ordering, and private account separation remain shared with project launch.
+No setup-only authentication policy was added.
+
+The first-run public API proof compares actual repository and home files before and after discovery.
+It checks that an absent private shadow home remains absent and that no agent or sample account was created.
+It distinguishes a missing executable, signed-out state, unavailable credential evidence, and a recognized local credential.
+Every discovery account explicitly reports remote authentication as not checked.
+The inherited provider-readiness and real Codex launch fixtures retain their assertions.
+Local credential presence does not promise a successful remote handshake or provider usage.
+
+## 549. Draft field identity conflated different entities
+
+Found: 2026-11-09, during the first-run and mocks implementation review.
+The manager allocated this number after the real public-handler counterexample failed.
+
+The draft bundle checked uniqueness using only each field's name.
+A bundle containing both `EntityA.name` and `EntityB.name` therefore refused as a duplicate.
+The golden field identity consists of the entity and field together.
+The correction compares a structured pair of entity and field name.
+A real public-handler regression records both fields and preserves both through approval.
+The original failing source and log remain in `/tmp/w05b-proof/schema-counterexamples-red-1-*` and its `.log` file.
+Re-executing the exact original source after the contract removal refuses its legacy empty `schemaChanges` input at admission.
+That result is preserved separately and is not called a passing field-identity probe.
+The permanent positive control uses the supported contract and retains the same two entity-qualified fields and approval assertion.
+
+## 550. Approval silently dropped accepted declared schema changes
+
+Found: 2026-11-09, during the first-run and mocks implementation review.
+The manager allocated this number after the real public-handler counterexample failed.
+
+The experimental bundle accepted a separate `schemaChanges` array.
+Approval derived its worklist only from field comparisons.
+A declared removal could therefore be accepted in a revision and disappear from the approved worklist and handoff.
+The original public-handler probe recorded a removal of `Project.name` and then observed an empty approved schema worklist.
+Its exact failing source and log remain preserved with the issue 549 counterexample artifacts.
+
+The correction removes declared schema changes from the supported input contract.
+Approval supports additions and type changes derived from the actual registered schema comparison.
+Declared removals are unsupported.
+The removed `bundle.schemaChanges` key has an explicit forbidden-key schema guard.
+The guard is necessary because ordinary public excess-property decoding otherwise strips unknown keys.
+A separate observation reuses the original removal payload and checks refusal before a mock revision or approval is recorded.
+The permanent regression also checks that the refused input changes no event log state.
+A valid bundle without the removed input still records and approves normally.
+An admission refusal is not reported as a passing approval-handoff probe.
+The unchanged-payload observation is retained as `/tmp/w05b-proof/schema-original-removal-admission.json`.
+It records `Failure`, the fixed refusal reason, and no added events, revisions, or approvals.
+
+## 551. Repository Design lacked a registered design-file identity and read
+
+Found: 2026-11-09, during the Mocks and Design page preparation join.
+The manager allocated this number for the bounded engine metadata correction.
+
+The pending mock sources named screens, data, tokens, and component indexes.
+They did not identify the repository Design file or expose a repository Design read.
+The page would otherwise have had to invent a filename or reuse an unrelated component path.
+
+`project.design.record` now records an immutable registration revision with explicit repository, workspace, and design-file identities.
+The normal authenticated owner or an agent in the project can register actual bounded evidence.
+The command verifies the registered checkout, branch, repository common directory, file confinement, and fingerprints.
+`project.design.read` returns the selected registration revision and current bounded artifact availability.
+Repository members must identify their own project in that repository.
+An absent registration is explicit.
+Changed, redirected, oversized, missing, and unreadable artifacts remain unavailable while retaining the registered identity.
+Tokens come from the registered bounded token document.
+Shared components retain their actual references and byte evidence.
+A mock bundle can bind one exact Design revision in its repository.
+The engine rechecks that evidence before mock approval.
+No filename is inferred, and no editor, preview, URL fetch, or design-to-code process is started.
+
+## 552. Mock scenarios lacked identities and concrete screen routes
+
+Found: 2026-11-09, during the Mocks page preparation join.
+The manager allocated this number for the typed scenario correction.
+
+The pending scenario record carried a display name and a screen reference.
+It did not retain a scenario identity or a concrete screen/scenario route binding.
+A client would otherwise have had to guess a query value or substitute a display label into a route template.
+
+Scenarios now have distinct typed identities.
+Each screen records its base route and one explicit concrete route for every registered scenario identity.
+Admission requires unique scenario identities, total route bindings, and valid references in the same mock revision.
+It refuses duplicate, missing, unknown, redirected, or placeholder routes.
+Public reads retain the scenario identities and exact recorded bindings.
+The route metadata does not claim that a preview server is running or that a scenario has executed.
+The later page owns isolated preview display and actual server availability integration.
+
+## 553. Another caller could replace an immutable mock or Design revision
+
+Found: 2026-11-09, during the final bounded engine review.
+The manager allocated this number after both authenticated public-handler probes failed.
+
+Command receipts are scoped by caller and request identity.
+Mock revisions are scoped by project and revision identity.
+Design revisions are scoped by repository and revision identity.
+Both record planners used the request identity as the revision identity without checking whether that revision row already existed.
+A designer could record revision R, then an owner with no receipt for R could submit changed real artifact metadata using R and expected revision R.
+Both commands succeeded and replaced the row's author and content under the supposedly immutable identity.
+This defect was independent of same-caller receipt idempotence.
+
+Both planners now refuse an existing revision key before constructing another recorded event.
+The guard covers all retained revisions, including a revision behind the current head.
+The ordinary command transaction serializes the check with the append.
+An identical retry by the original caller still returns its existing durable receipt.
+A fresh request identity can still create a new revision against the current expected head.
+The public regressions retain the original attack requests and successful controls.
+They assert exact refusal events and unchanged revision author, content, and approvals.
+A separate approved-revision regression also retains the exact linked Design, approval, stage, and delivery state.
+Every case compares the live views with a deterministic rebuild from the persisted event log.
+
+The original failed source remains `/tmp/w05b-proof/revision-collisions-original-red.test.ts`.
+Its source archive, source manifests, load record, and log remain under `/tmp/w05b-proof/revision-collisions-red-1-*` and its `.log` file.
+The original Design and mock observations remain the distinct `design-revision-collision-red-observation.json` and `mock-revision-collision-red-observation.json` files in that directory.
+The correction does not rewrite those red artifacts or reinterpret their original successful attacks as refusals.
+The separate `revision-collisions-original-after-correction-1` observation reruns both original probe bodies and assertions.
+Only their evidence-output filenames change, so the original observation files remain untouched.
+Both original public attack constructions now refuse, preserve the original row, replay the designer's receipt, and permit the fresh-identity positive control.
+The observer's exact derivation is recorded in `/tmp/w05b-proof/revision-collisions-observer-derivation.json`.
+
+## 558. The Design token-document path admitted raw secret probes
+
+Found: 2026-11-09, during the first explicitly granted full check of W05b.
+The manager allocated this number and approved a bounded correction after the actual command exit.
+
+`DesignRegistration.tokensPath` used the general nonempty `ProjectPath` string schema.
+The unchanged secret non-admission oracle classifies TOKEN-containing property names and tests each property schema with raw secret probes.
+The path schema admitted every original raw probe.
+The registration occurs in events, subscription replies, thread replies, the Design record payload, and the Design read reply.
+The first full check therefore failed seven existing oracle cases at that one property.
+The engine's later JSON-file check did not satisfy contract admission.
+This is a contract defect, not a sandbox failure.
+
+The correction admits only a confined relative JSON-file path for `tokensPath`.
+Contract admission and engine artifact reads share the existing repository artifact path predicate.
+Traversal, absolute paths, control characters, encoded paths, and credential-directory or credential-file references remain forbidden.
+No secret oracle, assertion, probe, or name rule changes.
+No test allowlist or exemption is introduced.
+Regressions check the original raw probes, invalid paths, valid JSON-file paths, and an absent optional path.
+The authenticated public handler also refuses invalid input before an event or project-view change, then records and reads an actual valid token document.
+The redaction fixture uses a real JSON-file path shape while retaining its original identity and prose-redaction assertions.
+
+The original eight full-check failures remain in `/tmp/w05b-proof/full-1.log` with exit 1.
+The original source manifest, patch, archive, modes, symlinks, load samples, process evidence, and original proof artifacts remain unchanged.
+The seven exact failed schema paths are recorded in `/tmp/w05b-proof/full-1-failure-paths.json`.
+A corrected focused pass cannot retroactively change that first full-check result.
+
+## 559. The exact empty project snapshot fixture omitted owner-only setup
+
+Found: 2026-11-09, during the first explicitly granted full check of W05b.
+The manager allocated this number and approved the exact fixture correction after command exit.
+
+The default-piece test expected the old empty owner project snapshot without setup.
+The implementation now supplies durable Welcome setup only to the owner.
+The test also expected the agent snapshot to equal the owner snapshot.
+That equality no longer expresses the owner-only setup boundary.
+
+The owner expectation now contains the exact base snapshot and Welcome setup.
+The agent expectation remains the exact base snapshot and explicitly has no setup field.
+Every namespace refusal, hold, request, secret, and compile-time assertion remains intact.
+No production delivery authority changes.
+The original failing assertion and actual snapshot diff remain preserved in the first full-check log.
+
+## 560. Empty mock pages bypassed the final wrapped reply budget
+
+Found: 2026-11-09, during the bounded review after the first full check.
+The manager allocated this number before the independently gated public proof.
+
+`project.mocks.read` measured candidate rows inside its pagination loop.
+An empty project or a cursor after its last revision skipped that loop.
+The final reply still echoed an unrestricted request identity.
+A quote-heavy identity expanded during JSON serialization and expanded again inside an agent's data envelope.
+Authenticated owner and project-member socket probes reproduced both empty and exhausted pages.
+The owner replies were 280,027 bytes, and the member replies were 840,165 bytes.
+All four exceeded the documented 262,144-byte limit.
+Ordinary controls returned empty pages within the limit, without added events or project changes.
+
+The read now measures its actual final wrapped reply before returning it.
+An oversized final reply refuses with the fixed internal reason `mock reply exceeds the read budget`.
+The socket retains its existing exact public `CommandError` with reason `command refused`.
+The existing row pagination, cursor, authorization, and request-identity schemas remain intact.
+Permanent regressions retain both caller identities, both empty-result paths, normal controls, and the original byte-budget assertion.
+They additionally require strict refusal for the original oversized requests and unchanged events and project state.
+
+The original four failed public probes and observations remain under `/tmp/w05b-proof/mocks-read-budget-original-red-1*` and `mocks-read-budget-*-original-observation.json`.
+The exact original probe source remains `mocks-read-budget-original-red.test.ts` in that directory.
+The separate corrected observer changes only the evidence-output filenames and preserves the original request constructions, controls, and assertions.
+The original evidence is not rewritten as a passing run.
+The first affected run after correction passed 1,582 tests and failed four added assertions that expected the internal reason at the socket.
+The unchanged socket error mapper correctly returned the fixed public refusal instead.
+The permanent tests now assert that exact public object and independently verify the internal budget reason through the authenticated command handler.
+The failed affected log and unchanged source archive remain under `/tmp/w05b-proof/affected-558-559-560-1*`.
 
 ## 561. The launcher test assumed no system Node.js 26
 
@@ -9503,3 +9708,46 @@ The fixture now compares the complete delivery map before and after every refuse
 All existing refusal, secret-redaction and deterministic rebuild assertions remain.
 The production context and owner-task delivery paths are unchanged.
 Status: corrected in the website composition; combined proof and independent review are required.
+## 564. An area-less first team stranded later teams at the same stage
+
+Found: 2026-11-09, in independent source review and the builder's actual authenticated public reproduction on signed `ce7a816`.
+The manager allocated this number and approved the bounded correction.
+
+The first Build team without an area was admitted.
+A second Build team with area Web in a real registered child worktree was then refused because its peer lacked an area.
+The refusal event stated `teams at the same stage require distinct areas`.
+The public contract permits an omitted area, and there is no team-edit recovery path.
+
+The correction removes only the peer-area admission rule.
+Stage and area remain optional.
+Stage-derived names, case-insensitive unique names, workspace validation, groups, channels and receipt semantics remain intact.
+Permanent authenticated socket regressions cover an area-less team before and after an area-labelled peer.
+They verify real registered worktrees, both successful team channels, identical receipt replay, changed-body refusal, and duplicate-name refusal on a separate unclaimed worktree.
+A further ordinary control retains a custom name with no stage or area.
+
+The original five-probe source, exact red observation, source archive and normal exit 1 log remain unchanged under `/tmp/w05b-postreview-proof`.
+The separately derived corrected observer retains the original team success expectation.
+No team-edit machinery is added.
+
+## 565. Mock artifact reads bypassed the final wrapped reply budget
+
+Found: 2026-11-09, in independent source review and the builder's actual authenticated public reproduction on signed `ce7a816`.
+The manager allocated this number and approved the bounded correction.
+
+`project.mocks.artifact` bounded its repository file but did not measure its final reply.
+An unrestricted quote-heavy request identity expanded during serialization and again inside the member data envelope.
+The actual owner available and unavailable replies were 280,157 and 280,080 bytes.
+The actual member available and unavailable replies were 840,307 and 840,226 bytes.
+All four exceeded the documented 262,144-byte limit.
+Ordinary small-request controls passed, and all reads preserved the exact event log, receipt rows and complete views.
+
+The correction measures the actual final wrapped artifact reply before returning it.
+An oversized reply refuses with the internal reason `mock artifact reply exceeds the read budget`.
+The existing public socket refusal remains `CommandError` with reason `command refused`.
+Permanent socket regressions cover both caller identities, real available files, absent registered files, ordinary controls, the original oversized payload and unchanged read state.
+They retain the original byte-budget assertion and additionally require strict public refusal.
+
+The original four complete requests, replies and observations remain unchanged under `/tmp/w05b-postreview-proof`.
+The original log remains a normal exit 1 with five failed probes, including issue 564.
+A separate corrected observer changes only output destinations and adds strict outcome assertions; its exact derivation is preserved separately.
+This correction does not change mock, schema or Design metadata contracts.
