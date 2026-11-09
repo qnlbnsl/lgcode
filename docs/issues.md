@@ -9337,3 +9337,18 @@ After a valid correction, the same previously refused creation request succeeds 
 A repeated request returns its original project without another launch.
 Historical invalid settings remain decodable and pass the real rebuild check.
 The original independent bad/control artifacts and interrupted full checks remain preserved.
+
+## 547. Joined delivery history hides released entries
+
+Found: 2026-11-09, during conversation preparation and lead source review at `bc783b2`.
+State: open, assigned to the later W08 conversation correction.
+
+The delivery-history renderer accepts `DeliveryReleased` as a delivery event.
+Its joined history filter omits that event from the states shown under a queued delivery.
+The standalone renderer also suppresses a state when its matching queued source is present.
+A released entry therefore disappears when both its source and release have been loaded.
+This is a source finding, and no runtime reproduction is claimed yet.
+
+The W08 correction must retain the release under its actual delivery identity.
+It must preserve the existing source join and avoid duplicating prompt content.
+A consequential regression must cover a source and release together, a release before its source is loaded, and the joined state after history hydration.
