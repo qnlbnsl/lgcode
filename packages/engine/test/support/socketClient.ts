@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
+import { makeNodeSocket } from "@lgcode/client/nodeSocket";
 import { CommandsRpcGroup } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -66,7 +67,7 @@ export const connect = (socketPath: string, bearer: string, options: { readonly 
         ws.on("message", (frame) => options.frames!.push(frame.toString()));
         return ws as unknown as globalThis.WebSocket;
       });
-    const socket = yield* Socket.makeWebSocket(socketUrl(socketPath), { headers, openTimeout: 30_000 }).pipe(
+    const socket = yield* makeNodeSocket(socketUrl(socketPath), { headers, openTimeout: 30_000 }).pipe(
       Effect.provide(constructor),
     );
     const protocol = yield* RpcClient.makeProtocolSocket({ retryTransientErrors: false }).pipe(
