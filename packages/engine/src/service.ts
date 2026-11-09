@@ -61,8 +61,10 @@ const pieceFollowers = (lists: EngineLists) => Layer.effectDiscard(Effect.gen(fu
   const recovery = yield* Effect.serviceOption(Restart.Restart);
   const customSender = yield* Effect.serviceOption(AlertSender);
   const sender = Option.isSome(customSender) ? customSender.value : makeNtfy(yield* SecretStoreService);
+  // Finish a removed batch before observing cancellation, so shutdown cannot
+  // discard diagnostics between clearing the pending map and writing its logs.
   const drain = Effect.suspend(() => Effect.forEach(drainPieceErrors(), (entry) =>
-    Effect.logError("piece table failed").pipe(Effect.annotateLogs({ ...entry })), { discard: true }));
+    Effect.logError("piece table failed").pipe(Effect.annotateLogs({ ...entry })), { discard: true })).pipe(Effect.uninterruptible);
   yield* Effect.forever(drain.pipe(Effect.andThen(Effect.sleep(1_000)))).pipe(Effect.ensuring(drain), Effect.forkScoped);
   for (const [namespace, reactor] of Object.entries(lists.reactors)) {
     if (reactor === undefined) continue;

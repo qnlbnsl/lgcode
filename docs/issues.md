@@ -8848,7 +8848,7 @@ Alert reads obtain the latest attempt time from the event log.
 ## 532. The piece failure log test can miss its diagnostic
 
 Found: 2026-11-08, during the website worker's full repository check.
-State: open; the cause is not established.
+State: an interrupted batch loss is fixed; complete verification is pending.
 
 The `FR-042 protocol=false` case in
 `packages/engine/test/pieces/piece-failure-log.test.ts` expected one safe
@@ -8856,3 +8856,18 @@ diagnostic and received none during a full suite run. The same three-test
 file passed when run alone, without a source change. The failed full run is
 in `/tmp/w03-check.log`, and the isolated pass is in
 `/tmp/w03-piece-failure.log`. The assertion remains unchanged.
+
+The combined website integration check at `b038490` later missed the same
+diagnostic in the `protocol=true` case. Its actual exit was 1. The unchanged
+file then passed alone again.
+
+The service drain removed a whole pending batch before writing its entries.
+Interruption after one write could discard the rest of that removed batch.
+A deterministic regression interrupts the actual drain fiber after its first
+entry. It expected three diagnostics and captured one before the correction.
+The drain now completes each removed batch before observing interruption.
+Its idle wait remains interruptible. All four diagnostic tests pass locally.
+The original exact count, throttling, and secrecy assertions remain intact.
+The forced interruption establishes this production defect. It does not
+establish the exact scheduling of the earlier zero-entry failures.
+The complete combined check and independent review remain pending.

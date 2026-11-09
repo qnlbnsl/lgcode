@@ -1,11 +1,13 @@
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
+import * as Logger from "effect/Logger";
+import { CurrentLogAnnotations } from "effect/References";
 import { afterEach, expect, it, vi } from "vitest";
 import { serviceLog } from "../../src/api/serviceLog.ts";
 import { makeRedactor } from "../../src/identity/redactor.ts";
 import { redactingLoggerLayer } from "../../src/identity/logger.ts";
 import { EventLog } from "../../src/log/EventLog.ts";
-import { drainPieceErrors } from "../../src/pieces/guardPiece.ts";
+import { drainPieceErrors, guardPiece } from "../../src/pieces/guardPiece.ts";
 import { Views } from "../../src/views/Views.ts";
 import { fixtureLists, loadLists, withFixture } from "../support/fixturePiece.ts";
 import { eventOf, freshRequest } from "../support/handlerRig.ts";
@@ -54,4 +56,33 @@ it("FR-042 the normal sink permits only fixed piece categories and their three b
   expect(entries[1]).toEqual({ timestamp: expect.any(String), level: "ERROR", message: "piece table failed" });
   expect(entries[2]).toEqual({ timestamp: expect.any(String), level: "ERROR", message: "service diagnostic" });
   expect(lines.join("\n")).not.toMatch(/Private|arbitrary/);
+});
+
+
+it("the service drain finishes the removed diagnostic batch when interrupted after its first log", async () => {
+  drainPieceErrors();
+  vi.spyOn(Date, "now").mockReturnValue(2_100_000_120_000);
+  const lines: Array<{ message: unknown; annotations: unknown }> = [];
+  let firstLog!: () => void;
+  const logged = new Promise<void>((resolve) => { firstLog = resolve; });
+  const logger = Logger.layer([Logger.make(({ fiber, message }) => {
+    if (!Array.isArray(message) || message[0] !== "piece table failed") return;
+    lines.push({ message: message[0], annotations: fiber.getRef(CurrentLogAnnotations) });
+    // Interrupt the actual service drain fiber at a deterministic batch boundary.
+    if (lines.length === 1) { fiber.interruptUnsafe(); firstLog(); }
+  })]);
+  await withFixture({ ...fixtureLists(await loadLists()), reactors: {} }, () => Effect.gen(function* () {
+    yield* registerRebuildCheck();
+    for (const table of ["views", "reach", "openMatters"]) {
+      guardPiece(table, "client", () => { throw new TypeError("private diagnostic content"); }, undefined);
+    }
+    yield* Effect.promise(() => logged);
+  }), { logger });
+  expect(lines).toHaveLength(3);
+  expect(lines.map((line) => line.annotations)).toEqual([
+    { namespace: "client", table: "views", errorClass: "TypeError" },
+    { namespace: "client", table: "reach", errorClass: "TypeError" },
+    { namespace: "client", table: "openMatters", errorClass: "TypeError" },
+  ]);
+  expect(drainPieceErrors()).toEqual([]);
 });
