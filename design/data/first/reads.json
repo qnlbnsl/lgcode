@@ -79,5 +79,15 @@
    },
    "failed": {"failure": "LGcode could not read this computer's folders, because the service has no permission to open ~/projects."}
   }
+ },
+ "settings": {
+  "push": {"approval": true, "question": true, "failure": true, "account": true, "other": true, "client.web-down": true, "board.post": true, "board.no-answer": true, "roles.stall": true, "roles.replace": true, "roles.runaway": false, "roles.rule-first-use": true},
+  "carrier": null,
+  "tokenSet": false,
+  "web": {"enabled": true, "port": 8787, "heartbeat": 25, "proxy": false, "publicAddress": ""}
+ },
+ "firstQuestion": {
+  "intro": "Thanks. One thing before I plan {project}.",
+  "text": "Who will use this first: only you, or other people too?"
  }
 }

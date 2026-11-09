@@ -61,8 +61,23 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  check((await page.locator('#sidebar').textContent()).includes('Invoice export'),'The sidebar shows the project');
  check((await page.locator('#sidebar').textContent()).includes('billing-api')||await page.evaluate(()=>repositories.length)===3,'The other repositories stay known');
  await page.fill('#message-input','Build the export');await page.click('#send-message');
- await page.waitForFunction(()=>document.querySelector('#view-body').textContent.includes('captured that direction'));
- check(true,'The first message gets a reply');
+ await page.waitForSelector('#view-body .request.is-question');
+ check((await page.locator('#view-body .request.is-question').textContent()).includes('Who will use this first'),'The first message gets a question back');
+ check(await page.locator('#attention-count').textContent()==='1','The question waits for the owner in the bell');
+ // Phone notifications are offered on the first waiting request, not during setup.
+ const prompt=page.locator('#view-body .request.is-question .push-prompt');
+ check(await prompt.isVisible()&&(await prompt.textContent()).includes('Get a phone notification the next time an agent waits for you.'),'The first waiting request offers phone notifications');
+ check(await page.locator('#view-body .push-prompt').count()===1,'The offer shows once');
+ check(!(await page.locator('#agent-controls').textContent()).includes('undefined'),'A question with no task waits without naming one');
+ check(await page.locator('#view-body .request.is-question p').filter({hasText:'Who will use this first'}).count()===0,'A short question is not repeated under its title');
+ await page.evaluate(()=>go({view:'home'}));
+ await page.locator('#view-body .home-request-row').first().click();
+ check(await page.locator('#view-body .request .push-prompt').count()===1,'Home shows the offer on the same request');
+ await page.locator('#view-body [data-dismiss-push-prompt]').click();
+ await page.waitForFunction(()=>!document.querySelector('.push-prompt'));
+ check(await page.evaluate(()=>api.debug.events().filter(r=>r.event_type==='client.AlertPromptDismissed').length)===1,'Not now is recorded once');
+ check(await page.evaluate(()=>!pushPromptDue()),'Not now ends the offer for good');
+ await page.evaluate(()=>go({view:'chat'}));
  const rows=await page.evaluate(()=>api.debug.events().map(r=>r.event_type));
  check(rows.filter(t=>t==='project.SetupFinished').length===1,'Finishing is recorded once');
  check(rows.filter(t=>t==='project.SetupProgressed').length===2,'Each step is recorded once');
@@ -73,6 +88,21 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  await page.reload();await page.waitForFunction(()=>window.lgcodeReady);
  await logIn(page);
  check(await title(page)==='LGcode','Finished setup leaves no step behind to resume');
+ await page.context().close();
+}
+// Set up phone notifications goes to the notification service, and setting one ends the offer.
+{
+ const page=await fresh();
+ await toProject(page);await page.click('#project-submit');await page.waitForSelector('#setup',{state:'hidden'});
+ await page.fill('#message-input','Build the export');await page.click('#send-message');
+ await page.waitForSelector('.push-prompt');
+ await page.locator('.push-prompt [data-fix-notifications]').click();
+ check(await page.evaluate(()=>state.view)==='settings'&&await page.evaluate(()=>document.activeElement.id)==='carrier-server','Set up phone notifications opens the notification service');
+ await page.fill('#carrier-server','https://ntfy.sh');await page.fill('#carrier-topic','lgcode-owner');await page.locator('#carrier-topic').blur();
+ await page.waitForFunction(()=>!!sampleSettings.carrier);
+ check(!await page.evaluate(()=>pushPromptDue()),'A notification service ends the offer');
+ await page.evaluate(()=>go({view:'home'}));
+ check(await page.locator('.push-prompt').count()===0,'The request no longer offers phone notifications');
  await page.context().close();
 }
 // Leaving midway, and going back.

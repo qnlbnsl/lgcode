@@ -76,6 +76,7 @@ todo names a new `project` piece for them. The sample uses these proposed types,
 | `project.MasterLeft` | This computer left the master it had joined as a worker. |
 | `project.Renamed` | A project's new name. Its branch and folder keep their names. |
 | `project.Archived`, `project.Restored` | A project was archived, or brought back from the archive. |
+| `client.AlertPromptDismissed` | The owner chose Not now when the first waiting request offered phone notifications. The engine's `client` piece would own it. |
 
 ## How the page gets its data
 
@@ -155,6 +156,10 @@ findings on those pages:
   the notification, and it stores nothing.
 - **The notification service in the samples.** The samples' default settings now have a
   notification service with no token, so a failed notification can point at the missing token.
+  The first run's settings have no notification service, as a new service would.
+- **Declining phone notifications.** `api.settings.dismissPushPrompt` is proposed. It writes
+  `client.AlertPromptDismissed`, and the reducer sets `settings.pushPromptDismissed`. The engine
+  would keep it with the other notification settings.
 - **When an offline machine was last seen.** `project.MachineAdded` and `project.MachineChanged`
   carry `lastSeenAt`. In both samples, Laptop was last seen 2 hours before the clock.
 - **Renaming and removing a machine.** `project.MachineChanged` can carry a new `name`, and the
@@ -203,6 +208,7 @@ means the engine has no such command yet.
 | `api.agents.choose`, `api.agents.usage` | Proposed: change an agent's model or effort, and read its context use |
 | `api.alerts.list`, `api.settings.*` | `client.alerts.list`, `client.alerts.settings`, `client.web.settings` |
 | `api.alerts.retry`, `api.settings.sendTest` | Proposed: send a failed notification again, and send a test notification |
+| `api.settings.dismissPushPrompt` | Proposed: record that the owner declined phone notifications |
 | `api.accounts.*` | The account commands, and a terminal on that machine for sign-in |
 | `api.accounts.usage` | Proposed: read how much of a subscription's usage limit is used |
 | `api.project.*`, `api.machines.*` | Proposed |
@@ -230,6 +236,8 @@ These parts behave, but they are not real:
   piece of style added to the screen. A real Design team would edit the screen's code.
 - Approving mocks writes a Planning team and its tasks from the screens, data, and drafts.
 - An answered question gets the reactions in `reactions`, or one line from the lead.
+- In the first run, a new lead's first reply asks `firstQuestion` from `first/reads.json`, unless
+  the prompt starts a Design team.
 - Sign-in and pairing each finish by themselves after 1,200 milliseconds.
 - The first run's scan takes 500 milliseconds and returns `setup.scenarios` from `first/reads.json`, chosen by `?setup=`.
 - First-run progress and sign-ins are kept in the browser's storage, so a reload can resume. The engine would store them.

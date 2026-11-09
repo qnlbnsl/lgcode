@@ -391,7 +391,18 @@ job. The rules come from Ananke's onboarding specs and session reports, read on 
   for an absent flag.
 
 Login still comes first, because the service has one password from its environment. The first run
-does not cover push alerts or a computer that joins as a worker.
+does not cover a computer that joins as a worker.
+
+- **Phone notifications are offered on the first waiting request, not in setup.** The owner chose
+  this on 2026-11-08. The reason is plain once an agent waits, and setup stays at three pages. The
+  offer sits at the foot of the oldest request that waits for the owner, in the thread and on
+  Home. It shows only while no notification service is set.
+- **Not now is recorded.** Declining writes a record, so the offer never returns. Service
+  settings can still turn phone notifications on.
+- **Set up phone notifications opens the notification service.** Setting a service ends the offer.
+  A missing token is then the Phone notifications page's job.
+- **The catch is the first request.** No phone notification goes out for it, because none is set
+  up yet. The owner accepted this.
 
 ## Stages, stage teams, and mocks, decided on 2026-11-07
 

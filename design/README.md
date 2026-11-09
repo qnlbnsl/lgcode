@@ -30,6 +30,9 @@ Synapse and T3 Code.
 Open the first run with `?sample=first`, or from the First run links in Design notes. The links
 cover one or two signed-in harnesses, only Codex, signed out, nothing installed, no repositories,
 and a computer that could not be read. Add `&reset=1` to start again from the login page.
+After setup, send the lead a message without the word screen or design. The lead asks who the
+project is for, and that first waiting question offers phone notifications, with Set up and Not
+now.
 
 - Start on Home. Needs attention gathers requests across projects, failed starts first and
   then the longest wait. Sort switches to Newest first. A wait of an hour or more is amber.

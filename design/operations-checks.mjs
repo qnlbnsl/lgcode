@@ -11,6 +11,7 @@ const text=s=>page.locator(s).textContent();
 const authLook=()=>page.evaluate(()=>{const m=document.querySelector('#auth-message'),f=document.querySelector('#login-password'),s=document.querySelector('#login-submit'),token=v=>{const d=document.createElement('i');d.style.color=`var(${v})`;document.body.append(d);const c=getComputedStyle(d).color;d.remove();return c};return {color:getComputedStyle(m).color,error:token('--color-error'),muted:token('--color-muted'),gap:m.getBoundingClientRect().top-f.getBoundingClientRect().bottom,beforeSubmit:m.getBoundingClientRect().bottom<=s.getBoundingClientRect().top}});
 try{
  await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.lgcodeReady);
+ check(await page.locator('.push-prompt').count()===0&&!await page.evaluate(()=>pushPromptDue()),'A service with a notification service set does not offer phone notifications');
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('#logout').count()===1,'Owner view has a Log out action');
  check(await text('#connection-status').then(t=>t.trim()==='Live'),'Connection state is visible without a sample badge');
@@ -115,6 +116,7 @@ try{
  await page.locator('#carrier-server').fill('https://other.example');await page.locator('#carrier-server').blur();
  check(await text('#token-state').then(t=>t.includes('No token')),'Changing token destination clears the old token state');
  await click('#clear-carrier');check(await page.locator('#carrier-token').isDisabled(),'Clearing carrier disables token entry');
+ check(await page.evaluate(()=>{findPushPrompt();return pushPromptDue()&&pushPromptFor.length>0}),'With no notification service, the oldest waiting request offers phone notifications');
  await page.locator('#web-public').fill('https://lgcode.example/path');await page.locator('#web-public').blur();
  check(await text('#web-public-error').then(t=>t.includes('canonical HTTPS origin')),'Settings rejects a public address with a path');
  await page.locator('#web-public').fill('https://lgcode.example');await page.locator('#web-public').blur();await page.locator('#web-proxy').check();

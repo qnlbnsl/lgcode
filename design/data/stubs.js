@@ -207,6 +207,7 @@ const handlers={
  'client.AlertSettingsChanged':(row,e)=>{S.settings.push[e.kind]=e.push},
  'client.AlertCarrierChanged':(row,e)=>{S.settings.carrier=e.carrier._tag==='none'?null:{server:e.carrier.server,topic:e.carrier.topic}},
  'client.AlertCarrierTokenSet':()=>{S.settings.tokenSet=true},
+ 'client.AlertPromptDismissed':()=>{S.settings.pushPromptDismissed=true},
  'client.AlertCarrierTokenCleared':()=>{S.settings.tokenSet=false},
  'client.WebSettingsChanged':(row,e)=>{const w=e.settings;S.settings.web={enabled:w.enabled,port:w.port,heartbeat:w.heartbeatSeconds,proxy:w.proxyMode,publicAddress:w.publicAddress||''}}
 };
@@ -228,6 +229,14 @@ function saySomething(agentId,texts,options={}){
  const caller='agent:'+agentId;
  emit('TurnStarted',{agentId},{caller,...options});
  for(const text of texts)emit('ThreadItem',{agentId,itemId:'live-'+counters.item++,content:{_tag:'text',text},replay:false},{caller,...options});
+ emit('TurnEnded',{agentId,compact:false},{caller,...options});
+}
+// A turn that ends in a question for the owner, so the request waits in the thread, on Home, and in the bell.
+function askOwner(agentId,texts,question,deliveryId,options={}){
+ const caller='agent:'+agentId;
+ emit('TurnStarted',{agentId},{caller,...options});
+ for(const text of texts)emit('ThreadItem',{agentId,itemId:'live-'+counters.item++,content:{_tag:'text',text},replay:false},{caller,...options});
+ emit('QuestionAsked',{agentId,questionId:question.id,holder:{_tag:'owner'},deliveryId,text:question.text},{caller,...options});
  emit('TurnEnded',{agentId,compact:false},{caller,...options});
 }
 const postToChannel=(channelId,author,text,options={})=>emit('board.PostWritten',{postId:'post-live-'+counters.post++,channelId,author,text,to:[],reply:'none'},{caller:author._tag==='owner'?'owner':'agent:'+author.agentId,...options});
@@ -319,7 +328,9 @@ const api={
     emit('PromptSent',{agentId,deliveryId:id,sender:owner,text});
     // A lead starts the Design team when the work needs screens, and passes changes to an open mock on to it.
     const lead=project?.lead?.id===agentId,screen=lead&&mockScreen&&project.mocks?.screens.find(s=>s.id===mockScreen),needsScreens=lead&&!project.mocks&&new RegExp('\\b('+reads.mocks.uiWords+')\\b','i').test(text);
-    reply=()=>{emit('DeliveryAccepted',{agentId,deliveryId:id},{caller:'service:runner'});if(needsScreens)startDesign(project);else if(screen)reviseScreen(project,screen,text);else saySomething(agentId,[fill(reads.replies.default,{project:project?.name||''})],{reply:true})};
+    // A data set can give a new lead one question to ask before it plans. The first run uses it, so its first request waits for the owner.
+    const first=lead&&reads.firstQuestion&&!S.requests.some(r=>r.agentId===agentId)&&{id:'first-question-'+project.id,text:fill(reads.firstQuestion.text,{project:project.name})};
+    reply=()=>{emit('DeliveryAccepted',{agentId,deliveryId:id},{caller:'service:runner'});if(needsScreens)startDesign(project);else if(screen)reviseScreen(project,screen,text);else if(first)askOwner(agentId,[fill(reads.firstQuestion.intro,{project:project.name})],first,id,{reply:true});else saySomething(agentId,[fill(reads.replies.default,{project:project?.name||''})],{reply:true})};
    }
    if(context.length||(account&&account!=='host'))emit('project.PromptContext',{deliveryId:id,labels:context,...(account&&account!=='host'?{account}:{})});
    replyTimers.set(replyKey(target),{id,timer:setTimeout(()=>{replyTimers.delete(replyKey(target));reply()},900)});
@@ -531,6 +542,8 @@ const api={
   // The token never reaches a file or an event, as in the engine.
   async setToken(){emit('client.AlertCarrierTokenSet',{origin:S.settings.carrier.server,carrierGeneration:'generation-1'})},
   async clearToken(){emit('client.AlertCarrierTokenCleared',{})},
+  // Proposed. Records that the owner declined phone notifications when the first request waited, so the page does not offer them again.
+  async dismissPushPrompt(){emit('client.AlertPromptDismissed',{},{caller:'owner'})},
   // Proposed. Sends one notification through the service now and stores nothing, so it says only whether the service took it.
   async sendTest(){const s=S.settings;await new Promise(done=>setTimeout(done,300));return s.carrier&&s.tokenSet?{sent:true,at:nowAt()}:{sent:false,reason:s.carrier?'Set the notification service token first.':'Set the notification service first.'}},
   async saveWeb(web){emit('client.WebSettingsChanged',{settings:{enabled:web.enabled,port:web.port,heartbeatSeconds:web.heartbeat,proxyMode:web.proxy,...(web.publicAddress?{publicAddress:web.publicAddress}:{})}})}

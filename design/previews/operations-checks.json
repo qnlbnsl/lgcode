@@ -1,6 +1,7 @@
 {
-  "passed": 101,
+  "passed": 103,
   "checks": [
+    "A service with a notification service set does not offer phone notifications",
     "Owner view has a Log out action",
     "Connection state is visible without a sample badge",
     "Logout hides the owner workspace and shows login",
@@ -78,6 +79,7 @@
     "Send test notification reports that it was sent",
     "Changing token destination clears the old token state",
     "Clearing carrier disables token entry",
+    "With no notification service, the oldest waiting request offers phone notifications",
     "Settings rejects a public address with a path",
     "Web settings save on change and keep the restart consequence",
     "Turning off the web server asks first",
