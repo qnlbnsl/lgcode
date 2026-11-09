@@ -31,6 +31,12 @@ const project = { projectId: identity, repoId: identity, leadAgentId: identity, 
 const sprint = { projectId: identity, sprintId: identity, owner: identity, needs: { elements: identity } };
 const requestLinks = { projectId: identity, taskId: identity, sprintId: identity };
 const task = { story: { fields: { activity: { elements: { fields: { question: identity } } } } }, projectId: identity, taskId: identity, owner: identity, teamId: identity, sprintId: identity, worktreeId: identity };
+const gitReport: RedactionStructure = { fields: { reportId: identity, projectId: identity, worktreeId: identity,
+  threadAgentId: identity, kind: identity, status: identity, provenance: identity, reportedBy: actor } };
+const gitEvidence: RedactionStructure = { fields: Object.fromEntries(["tests", "review"].map((kind) => [kind,
+  { fields: { state: identity, report: gitReport } }])) };
+const gitReview: RedactionStructure = { fields: { reviewId: identity, projectId: identity, worktreeId: identity,
+  destinationId: identity, decision: identity, outcome: identity, evidence: gitEvidence } };
 
 const mockSource = { elements: { fields: { sourceId: identity, worktreeId: identity } } };
 const mockScreens = { elements: { fields: { screenId: identity, sourceId: identity, scenarioRoutes: { elements: { fields: { scenarioId: identity } } } } } };
@@ -49,6 +55,9 @@ export const eventStructure: RedactionStructure = { taggedFields: {
       scenarios: { elements: { fields: { scenarioId: identity } } }, draftedFields: draftFields,
       components: { elements: { fields: { componentId: identity, sourceId: identity, fingerprint: identity, screens: { elements: identity } } } } } } },
   "project.MockApproved": { projectId: identity, approvalId: identity, revisionId: identity, leadAgentId: identity, worklist: mockWorklist },
+  "project.GitEvidenceReported": { report: gitReport },
+  "project.MainReviewOpened": { review: gitReview },
+  "project.MainReviewDecided": { review: gitReview },
   "project.SettingsChanged": { settings: { fields: { lead: { fields: { harness: identity, account: { fields: { accountId: identity } } } } } } },
   "project.CreationPlanned": { creation: { fields: { requestId: identity, projectId: identity,
     bodyHash: identity, repository: { fields: { repoId: identity } }, workspace: { fields: workspace },
@@ -98,6 +107,7 @@ export const eventStructure: RedactionStructure = { taggedFields: {
 } };
 
 export const receiptStructure: RedactionStructure = { fields: {
+  result: { fields: { ...gitReview.fields, review: gitReview } },
   revisionId: identity, repoId: identity, worktreeId: identity, projectId: identity, teamId: identity, sprintId: identity, taskId: identity,
   requestId: identity, agentId: identity, deliveryId: identity, questionId: identity, waitId: identity, alertId: identity,
   roleFileHash: identity, channelId: identity, postId: identity, wakeId: identity,

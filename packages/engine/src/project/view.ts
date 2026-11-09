@@ -5,7 +5,7 @@ export const own = <T>(rows: Readonly<Record<string, T>>, id: string): T | undef
 export const projectKey = (projectId: string, id: string) => JSON.stringify([projectId, id])
 export const projectView = (snapshot: Snapshot): ProjectView => snapshot.project as ProjectView
 const empty = <T>(): Readonly<Record<string, T>> => Object.create(null)
-export const emptyProject = (): ProjectView => ({ taskNotifications: empty(), setup: { step: "welcome" }, mockRevisions: empty(), mockHeads: empty(), mockApprovals: empty(), designs: empty(), designHeads: empty(), creations: empty(), repositories: empty(), locations: empty(), workspaces: empty(), projects: empty(), teams: empty(), sprints: empty(), tasks: empty(), agentProjects: empty(), parents: empty() })
+export const emptyProject = (): ProjectView => ({ gitEvidence: empty(), gitReviews: empty(), taskNotifications: empty(), setup: { step: "welcome" }, mockRevisions: empty(), mockHeads: empty(), mockApprovals: empty(), designs: empty(), designHeads: empty(), creations: empty(), repositories: empty(), locations: empty(), workspaces: empty(), projects: empty(), teams: empty(), sprints: empty(), tasks: empty(), agentProjects: empty(), parents: empty() })
 const change = <T>(rows: Readonly<Record<string, T>>, id: string, f: (row: T) => T) => {
   const row = own(rows, id)
   return row === undefined ? rows : { ...rows, [id]: f(row) }
@@ -35,6 +35,11 @@ export const projectAfter = (view: ProjectView, event: Event, sequence: number, 
       const { _tag, ...approval } = event
       return { ...view, mockApprovals: { ...view.mockApprovals, [projectKey(event.projectId, event.approvalId)]: { ...approval, at } } }
     }
+    // Retain only the latest report per kind and latest review per workspace
+    // in the projection. The durable log preserves the complete history.
+    case "project.GitEvidenceReported": return { ...view, gitEvidence: { ...view.gitEvidence, [projectKey(event.report.worktreeId, event.report.kind)]: event.report } }
+    case "project.MainReviewOpened":
+    case "project.MainReviewDecided": return { ...view, gitReviews: { ...view.gitReviews, [event.review.worktreeId]: event.review } }
     case "AgentStarted": {
       const parent = event.parent._tag === "agent" ? event.parent.agentId : undefined
       const projectId = parent === undefined ? undefined : own(view.agentProjects, parent)

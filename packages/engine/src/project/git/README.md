@@ -30,6 +30,7 @@ replies. Agent text must remain plain text in the page.
 | `fetch`, `pull`, `push` | Synchronize through `origin`. Pull requires an upstream and a clean destination, and only fast-forwards. Push sets the branch's upstream. Fixed failures report missing prerequisites, divergence and recoverable remote errors. |
 | `mergeTeam` | Merge a clean source checkout into a clean destination in the same repository. Supply the reviewed source head. A destination on `main` or `master` always refuses. A failed merge can leave real conflicts for resolution. |
 | `review`, `openReview` | Read evidence against a local base branch, keyed to both heads. Opening review returns a real GitHub compare URL after checking the published branch head. It creates no approval, provider report or merge. Missing remote, provider and publication prerequisites are explicit failures. |
+| `reviewMain`, `approveMain` | Read a complete bounded comparison between registered project and base checkouts. The separate approval method requires the engine-supplied authenticated owner and explicit confirmation, revalidates both reviewed heads and branch identities, and merges the reviewed object into main or master. It refuses incomplete or binary review data, dirty worktrees, and an active merge. It never changes `mergeTeam`'s base refusal. |
 | `conflict`, `choose`, `resolve` | Read real index stages and canonical three-way text hunks, choose each hunk, and resolve after rechecking the file and index fingerprint. Both keeps ours, then theirs. Each line retains its newline. Resolution clears the unmerged index entries and leaves the result unstaged for review. Client-supplied segments are never used as write content. |
 
 A conflict's `ours`, `base` and `theirs` fields are complete bounded file
@@ -96,6 +97,17 @@ Other providers return `unsupported_provider`. Opening review does not create
 a pull request or publish the branch. Live provider authentication and public
 review creation are not proven by the local bare-remote tests.
 
-No command registration, API authorization, API redaction, remote-machine
-routing or generated agent tools are added here. Those belong to the assigned
-integration workers. No central contracts change in this unit.
+Command registration, API authorization, durable reported evidence and approval
+outcomes, redaction, and generated tools live in the project integration layer.
+Owner approval clears the destination branch's merge options for that invocation
+and explicitly selects the standard strategy, fast-forward support, a commit,
+and no squash or autostash. It preserves the stored Git configuration.
+After Git exits successfully, it reads the destination head and verifies that
+the reviewed commit is its ancestor before returning success. A contained
+commit can succeed without moving the head. Failed verification preserves the
+actual checkout state for inspection and returns a failure, never a merge claim.
+The service receives the trusted caller from that layer for `approveMain` and
+refuses absent, agent, service, and piece callers. A payload flag never replaces
+the owner credential. The API documents receipt retries and the concrete crash
+boundary between external Git effects and the database. Remote-machine routing
+remains separate work.

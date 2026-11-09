@@ -59,8 +59,11 @@ git's failure in a form the page can show.
 - [ ] Fetch, pull and push the branch, with counts of commits ahead and behind.
 - [ ] Merge a team's branch into its project's branch, and list the conflicts when it
       stops. Refuse the merge when the destination has uncommitted changes.
-- [ ] Open a review from the project's branch to the main branch. The page must not
-      merge into the main branch directly.
+- [ ] Open a review from the project's branch to `main` or `master`. Only the owner
+      credential may explicitly approve and merge, after revalidating both reviewed
+      source and destination heads. Agents remain refused by the existing integration
+      path. Allow the explicit Approve without evidence choice. Issue 545 supplies
+      the bounded engine dependency before the engine gate.
 
 ### Projects and teams
 

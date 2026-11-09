@@ -6,6 +6,12 @@ export const projectRefusalReasons = new Set([
   "context task is unavailable",
   "context repository does not match the project",
   "context team workspace does not match",
+  "main review requires the registered project and its repository base",
+  "review thread could not be read",
+  "review report requires the caller's project thread",
+  "review report requires an existing project thread item",
+  "review identity contains a registered secret",
+  "main review is unavailable; prepare a new review",
   "set the workspace folder before using Git",
   "workspace settings changed; refresh and retry",
   "registered workspace not found",
@@ -65,4 +71,4 @@ export const projectRefusalReasons = new Set([
 ])
 
 // These fixed service reasons never include a path, URL or Git stderr.
-for (const reason of ["invalid_path", "not_repository", "invalid_ref", "output_limit", "timeout", "cancelled", "git_unavailable", "git_failed", "busy", "collision", "dirty_destination", "dirty_source", "conflicts", "confirmation_required", "stale_state", "nothing_staged", "invalid_message", "missing_remote", "missing_upstream", "authentication_required", "network_failed", "push_rejected", "pull_diverged", "base_requires_review", "unsupported_provider", "push_required", "unsupported_conflict", "incomplete_choices"]) projectRefusalReasons.add(`Git: ${reason}`)
+for (const reason of ["invalid_path", "not_repository", "invalid_ref", "output_limit", "timeout", "cancelled", "git_unavailable", "git_failed", "busy", "collision", "dirty_destination", "dirty_source", "conflicts", "confirmation_required", "stale_state", "nothing_staged", "invalid_message", "missing_remote", "missing_upstream", "authentication_required", "network_failed", "push_rejected", "pull_diverged", "base_requires_review", "unsupported_provider", "push_required", "unsupported_conflict", "incomplete_choices", "owner_required", "unsupported_review"]) projectRefusalReasons.add(`Git: ${reason}`)

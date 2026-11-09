@@ -1,3 +1,4 @@
+import { gitReviewSample } from "../../contracts/test/gitReviewFixtures.ts";
 import { CommandsRpcGroup, commandAccess, ownerOnlyCommands } from "@lgcode/contracts";
 import { afterEach, expect, it } from "vitest";
 import { action, roleFile, roleFileContent, roleFileHash } from "../../contracts/test/roles/fixtures.ts";
@@ -83,6 +84,10 @@ for (const { command, words, form } of invocations) {
       "project.pull": {"worktreeId": "workspace", "projectId": "project"},
       "project.push": {"worktreeId": "workspace", "projectId": "project"},
       "project.integrate": {"worktreeId": "workspace", "projectId": "project", "destinationId": "project-workspace", "expectedHead": "abc123"},
+      "project.review.report": {worktreeId: "workspace", projectId: "project", head: "abc123", kind: "tests", status: "failed", summary: "Actual report", threadAgentId: "lead", threadSequence: 1},
+      "project.review.prepare": {worktreeId: "workspace", projectId: "project", destinationId: "base"},
+      "project.review.status": {worktreeId: "workspace", projectId: "project"},
+      "project.review.approve": {worktreeId: "workspace", projectId: "project", reviewId: "review", expectedHead: "abc123", expectedBaseHead: "def456", confirmed: true, decision: "approve_without_evidence"},
       "project.review.open": {"worktreeId": "workspace", "projectId": "project", "base": "main", "expectedHead": "abc123"},
       "project.conflict.choose": {"worktreeId": "workspace", "projectId": "project", "selection": {"path": "src/app.ts", "head": "abc123", "fingerprint": "fingerprint", "choices": ["ours"]}, "hunk": 0, "choice": "both"},
       "project.conflict.resolve": {"worktreeId": "workspace", "projectId": "project", "selection": {"path": "src/app.ts", "head": "abc123", "fingerprint": "fingerprint", "choices": ["ours"]}},
@@ -179,6 +184,9 @@ for (const { command, words, form } of invocations) {
         "project.discard.plan": { ...base, result: { fingerprint: "fingerprint", paths: ["src/app.ts"] } },
         "project.commit": { ...base, result: { head: "abc123" } },
         "project.integrate": { ...base, result: { head: "abc123" } },
+        "project.review.prepare": { ...base, result: { review: gitReviewSample, comparison: { head: "abc123", baseHead: "def456", branch: "feature", base: "main", commits: { items: [], truncated: false }, files: { items: [], truncated: false }, diff: { patch: "", additions: 0, deletions: 0, binary: false, truncated: false } } } },
+        "project.review.status": { ...base, result: { review: gitReviewSample, evidence: gitReviewSample.evidence } },
+        "project.review.approve": { ...base, result: { ...gitReviewSample, outcome: "merged", decision: "approve_without_evidence", mergeHead: "abc123", decidedAt: 2000 } },
         "project.review.open": { ...base, result: { head: "abc123", url: "https://github.com/owner/repo/compare/main...feature?expand=1", kind: "compare", opened: false } },
         "project.conflict": { ...base, result: { path: "src/app.ts", head: "abc123", fingerprint: "fingerprint", choices: ["ours"], ours: "ours", base: "base", theirs: "theirs", segments: [] } },
         "project.conflict.choose": { ...base, result: { path: "src/app.ts", head: "abc123", fingerprint: "fingerprint", choices: ["ours"], ours: "ours", base: "base", theirs: "theirs", segments: [] } },
@@ -253,7 +261,7 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.context.search", "project.design.read", "project.design.record", "project.diff", "project.git.state", "project.history", "project.mocks.artifact", "project.mocks.read", "project.mocks.record", "project.read", "project.requests", "project.review", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.context.search", "project.design.read", "project.design.record", "project.diff", "project.git.state", "project.history", "project.mocks.artifact", "project.mocks.read", "project.mocks.record", "project.read", "project.requests", "project.review", "project.review.report", "project.review.status", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
   const nonAgent = Object.entries(commandAccess).filter(([, kinds]) => !(kinds as ReadonlyArray<string>).includes("agent")).map(([name]) => name);

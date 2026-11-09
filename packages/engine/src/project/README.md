@@ -104,6 +104,51 @@ client-supplied write content. The service reconstructs current canonical hunks.
 `project.review.open` returns a verified GitHub compare URL with `kind: compare`
 and `opened: false`. It does not create a pull request or claim provider approval.
 
+## Explicit owner review and merge to main or master
+
+`project.review.prepare` takes `projectId`, its assigned `worktreeId`, and the
+registered repository base's `destinationId`. It reads complete bounded Git
+comparison data and records an open review with both heads. It does not approve
+or merge. Binary or truncated comparison data refuses. A newer preparation
+supersedes the previous open review for that workspace.
+
+`project.review.report` stores a reported test or reviewer outcome for the
+project workspace's actual current head. It takes `kind` of `tests` or `review`,
+`status` of `passed` or `failed`, a summary, and a genuine `threadAgentId` and
+`threadSequence`. The thread item must exist and belong to that project.
+An agent can report only against its own project thread. The owner can report
+against an existing member thread. The authenticated reporter and time are
+recorded, and provenance is always `reported`, not engine-executed proof.
+The projection keeps the latest report per kind and workspace. The log keeps
+history. `project.review.status` returns that evidence and the latest review.
+Reports for another head or an unavailable thread are labeled stale.
+
+Only the owner can call `project.review.prepare` and `project.review.approve`.
+Approval takes the open `reviewId`, `expectedHead`, `expectedBaseHead`,
+`confirmed: true`, and an explicit `decision` of `approve` or
+`approve_without_evidence`. Neither decision imposes a passing-test or reviewer
+policy. Missing and failed evidence remain visible in the recorded review.
+Reports, compare URLs, and agent verdicts never supply approval authority.
+The service checks the authenticated owner again before execution. It validates
+both reviewed heads and branches, clean source and destination, no active merge,
+and exact common repository metadata. It merges the reviewed commit object.
+The original `project.integrate` and `mergeTeam` main/master refusal remains.
+
+The approval reply has an explicit `outcome` of `merged` or `refused`, with a
+fixed safe `reason` on refusal. A refusal is not a successful merge. The log and
+receipt retain the reviewed heads, decision, and outcome. Retry an uncertain
+attempt with the identical payload and request identity. A changed body refuses.
+A known refusal consumes that review; obtain a new review and approve explicitly
+after correcting the cause. Conflicted destination bytes and merge state remain
+inspectable through the existing Git operations.
+
+Git and the database are not crash-atomic. A crash after a Git effect but before
+the receipt commits can leave an uncertain outcome. Inspect actual refs, working
+bytes, and merge state before preparing another review. A changed base head
+refuses the old execution rather than silently approving the new comparison.
+The engine gate does not exclude terminal operations by the same Unix user.
+The existing local filesystem race limitation still applies.
+
 ## Real project creation and lifecycle
 
 The owner saves `project.settings.set` with a workspace folder and shell.

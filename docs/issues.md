@@ -9653,6 +9653,66 @@ The unchanged socket error mapper correctly returned the fixed public refusal in
 The permanent tests now assert that exact public object and independently verify the internal budget reason through the authenticated command handler.
 The failed affected log and unchanged source archive remain under `/tmp/w05b-proof/affected-558-559-560-1*`.
 
+## 545. Main review had no explicit owner approval and merge path
+
+Found: 2026-11-09, during the Git page preparation at `ca1d492`.
+The manager reserved this issue number and the owner authorized its bounded engine follow-up at `bc783b2`.
+
+The golden review shows tests, the reviewer result and its genuine thread, commits, and every available file diff.
+It allows an explicit Approve without evidence choice.
+The accepted `project.review.open` only verified a published source head and returned a compare URL.
+Its `kind: compare` and `opened: false` did not create a pull request or record approval.
+The original team integration correctly refused main and master.
+There was no durable head-bound test or review reporting surface and no owner approval route.
+
+The bounded correction adds a separate authenticated review preparation, evidence report, status, and explicit owner approval path.
+Preparation records both reviewed heads without approving or merging.
+Reported evidence carries the actual workspace and head, authenticated reporter, recorded time, and a validated existing project thread item.
+It is labeled reported evidence rather than engine-executed proof.
+Old-head reports remain stale, and missing or failed evidence does not impose a mandatory passing-test or reviewer policy.
+The owner may explicitly approve without evidence.
+
+Only the owner credential may approve and merge into main or master.
+The service checks the actual authenticated caller again at execution.
+It revalidates both reviewed heads, registered relationships, exact common directory, branches, clean worktrees, and merge-in-progress state.
+It merges the reviewed commit identity rather than a substituted branch.
+Agents remain refused, and the original integration refusal is unchanged.
+Binary or incomplete review data refuses honestly.
+The event log and normal receipts preserve the exact reviewed heads, explicit owner decision, and merged or refused outcome.
+An identical retry returns its original outcome instead of merging twice.
+A corrected attempt after refusal requires a new review and explicit owner approval.
+
+External Git effects and the SQLite receipt are not one crash-atomic transaction.
+A service crash after Git changed the checkout but before the outcome committed can leave an uncertain result.
+The old destination-head precondition refuses a repeated execution when that head changed.
+The owner must inspect the actual refs, bytes, and merge state before preparing another review.
+A failed merge can leave real conflicts in the destination, which remain inspectable through the existing conflict API.
+The engine never removes another process's locks or silently aborts the merge.
+Same-Unix-user edits remain within the accepted limitation in SECURITY.md.
+
+The permanent tests exercise authenticated public commands and real temporary repositories for both base names, evidence provenance and staleness, head and dirty-state refusals, authority denial, conflict recovery, production redaction, and receipt replay.
+The test artifacts and builder result record their actual execution separately.
+React, terminal support, and the rest of the five-step website scope remain separate work.
+
+## 555. Owner approval could record a merge without the reviewed commit
+
+The independent review of issue 545 found that `branch.main.mergeOptions=--squash` made an authenticated owner approval return a durable `merged` outcome while main still pointed to its old head.
+The reviewed commit was absent from main's ancestry, and the feature bytes were only staged.
+A successful Git exit did not prove the promised merge.
+The same execution path supports master.
+
+The correction overrides the destination branch's merge options for this invocation and explicitly selects a normal committed merge with fast-forward support and the standard strategy.
+It merges the exact reviewed commit object.
+Before returning success, it reads the actual destination head and verifies that the reviewed object is its ancestor.
+An already-contained reviewed commit remains a valid no-op.
+An absent ancestry or failed verification produces a refused outcome, without aborting or resetting the checkout.
+The original owner checks, both reviewed-head checks, clean-worktree guards, agent integration refusal, queue, and finite subprocess ownership remain in place.
+Git effects and the database receipt remain separate failure boundaries.
+
+Permanent regressions cover both base names, squash and uncommitted merge defaults, fast-forward and divergent merges, contained commits, receipt retries, authority denial, and zero-exit outcomes without reviewed ancestry.
+The original independent failure and its passing divergent and database-failure controls remain preserved in the run evidence.
+The builder report records executed checks separately from this implementation description.
+
 ## 561. The launcher test assumed no system Node.js 26
 
 Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
@@ -9751,3 +9811,24 @@ The original four complete requests, replies and observations remain unchanged u
 The original log remains a normal exit 1 with five failed probes, including issue 564.
 A separate corrected observer changes only output destinations and adds strict outcome assertions; its exact derivation is preserved separately.
 This correction does not change mock, schema or Design metadata contracts.
+
+## 566. Reading review evidence could deadlock an owner approval
+
+The independent review of issues 545 and 555 found a lock-order inversion.
+The review status reader held the Git gate while validating a recorded thread through the shared Structured Query Language (SQL) connection.
+A concurrent owner approval held that connection inside its writer transaction while waiting for the Git gate.
+Both authenticated calls then remained pending after the active Git child finished.
+The matched case without recorded evidence completed because it needed no thread query.
+
+The status reader now completes its authorized project and checkout inspection under the Git gate and releases that gate before querying thread evidence.
+It evaluates the evidence against the exact source head observed during that inspection and the same authorized snapshot.
+The project, workspace, repository, branch, thread membership, redaction, and reply-budget checks remain in place.
+Command transactions and active Git child ownership are unchanged.
+The other Git read handlers do not query the SQL connection while holding the Git gate.
+
+The permanent regression overlaps actual authenticated status and approval calls with recorded thread evidence and a matched no-evidence control.
+It establishes an actual Git child barrier and observes entry after SQL begins its transaction.
+Both calls must finish, and the approved destination must contain the reviewed commit and expected bytes.
+The test also checks the durable decision and receipt, identical retry, and a rebuild from the event log.
+Original failed probes and their historical invalid-barrier attempts remain preserved separately.
+The builder report records actual red and green execution boundaries.

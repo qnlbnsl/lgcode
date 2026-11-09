@@ -1,10 +1,14 @@
 import * as Schema from "effect/Schema"
+import { GitEvidence, GitMainReview } from "./git.ts"
 import { CreationFolderIdentity, OwnerTaskNotification, Project, ProjectCreation, ProjectId, ProjectName, ProjectSettings, ProjectStage, ProjectText, Repository, RepositoryLocation, Sprint, SprintId, Task, TaskId, TaskState, Team, Workspace } from "./schema.ts"
 
 import { ProjectMockEvent } from "./mocks.ts"
 import { ProjectDesignEvent } from "./design.ts"
 
 export const ProjectEvent = Schema.Union([
+  Schema.TaggedStruct("project.GitEvidenceReported", { report: GitEvidence }),
+  Schema.TaggedStruct("project.MainReviewOpened", { review: GitMainReview }),
+  Schema.TaggedStruct("project.MainReviewDecided", { review: GitMainReview }),
   ...ProjectMockEvent.members,
   ProjectDesignEvent,
   Schema.TaggedStruct("project.SettingsChanged", { settings: ProjectSettings }),
