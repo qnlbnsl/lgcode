@@ -10,20 +10,22 @@ const S={
  repositories:[],workspaces:[],projects:[],requests:[],permissionItems:[],deliveryItems:[],machineItems:[],subscriptionItems:[],
  projectMachines:new Map(),futureProjectMachines:new Map(),repositoryLocations:new Map(),runtimeStates:new Map(),workspacePreferences:new Map(),
  threads:new Map(),channels:new Map(),alerts:[],taskStories:{},agents:new Map(),agentProjects:new Map(),openTurns:new Map(),
- setup:{step:'welcome',finished:false}
+ setup:{step:'welcome',finished:false},
+ // The master this computer joined as a worker. The page keeps this object, so the reducer changes it in place.
+ master:{address:'',since:null}
 };
 let reads=null,meta=null,source='sample',sequence=0,bootedAt=0,localSets=[],withSet=null;
-const events=[],subscribers=new Set(),gitStates=new Map(),replyTimers=new Map(),signInTimers=new Map();
+const events=[],subscribers=new Set(),gitStates=new Map(),terminalSessions=new Map(),replyTimers=new Map(),signInTimers=new Map();
 const counters={project:1,task:30,machine:1,account:1,git:1,delivery:1,item:1,post:1};
 
 // First run. Where the owner has got to is stored; what the scan finds is read each time.
 const setupSteps=['welcome','found','project'];
 const setupScenario=()=>params.get('setup')||'ready';
 const setupStore={
- key:()=>'sheprd-setup-'+setupScenario(),
+ key:()=>'lgcode-setup-'+setupScenario(),
  read(){try{return JSON.parse(localStorage.getItem(setupStore.key()))||{}}catch{return {}}},
  write(patch){try{localStorage.setItem(setupStore.key(),JSON.stringify({...setupStore.read(),...patch}))}catch{}},
- clear(){try{localStorage.removeItem(setupStore.key());sessionStorage.removeItem('sheprd-session')}catch{}}
+ clear(){try{localStorage.removeItem(setupStore.key());sessionStorage.removeItem('lgcode-session')}catch{}}
 };
 let setupScans=0;
 const fetchJson=async path=>{try{const response=await fetch(path,{cache:'no-cache'});return response.ok?await response.json():null}catch{return null}};
@@ -45,7 +47,7 @@ const machine=id=>S.machineItems.find(item=>item.id===id);
 function localMachine(){if(!S.machineItems.length)S.machineItems.push({id:'local',name:'This computer',role:'Master',status:'Online',slots:8,workspaceFolder:'~/projects'});return S.machineItems[0]}
 function worktreeFor(id,repoId,fields){
  const known=reads.git.worktrees[id]||{},branch=fields.branch;
- const worktree={id,repoId,machineId:fields.machineId,branch,path:fields.path,owner:known.owner??fields.owner??'',activity:known.activity??fields.activity??'No uncommitted changes',files:[...(known.files||[])],incoming:known.incoming||0,conflicts:[...(known.conflicts||[])],history:known.history||reads.git.defaultHistory.map(c=>({...c,ref:fill(c.ref,{branch})}))};
+ const worktree={id,repoId,machineId:fields.machineId,branch,path:fields.path,owner:known.owner??fields.owner??'',activity:known.activity??fields.activity??'No uncommitted changes',files:[...(known.files||[])],incoming:known.incoming||0,conflicts:[...(known.conflicts||[])],history:known.history||reads.git.defaultHistory.map(c=>({...c,ref:fill(c.ref,{branch})})),...(known.awaiting?{awaiting:known.awaiting}:{})};
  for(const key of ['projectId','teamId','parentId'])if(fields[key])worktree[key]=fields[key];
  S.workspaces.push(worktree);return worktree;
 }
@@ -93,7 +95,7 @@ function threadPart(content,itemId){
 }
 const postEntry=(row,e)=>e.author._tag==='owner'?{type:'prompt',text:e.text,occurred:row.occurred_at,deliveryId:e.postId}:{type:'turn',agentId:e.author.agentId,occurred:row.occurred_at,parts:[{type:'text',text:e.text}],reply:row.reply};
 function addAlert(row,e){
- const subject=e.subject||{},alert={id:e.alertId,kind:e.kind,agentId:e.agentId,subject:subject.id,subjectKind:subject._tag,title:e.title,delivery:null,cleared:false};
+ const subject=e.subject||{},alert={id:e.alertId,kind:e.kind,agentId:e.agentId,subject:subject.id,subjectKind:subject._tag,title:e.title,raisedAt:row.occurred_at,delivery:null,cleared:false};
  Object.defineProperty(alert,'status',{enumerable:true,get(){
   if(subject._tag==='permission')return permission(subject.id)?.status==='open'?'open':'cleared';
   if(subject._tag==='question')return request(subject.id)?.status==='open'?'open':'cleared';
@@ -104,8 +106,12 @@ function addAlert(row,e){
 }
 
 const handlers={
- 'project.MachineAdded':(row,e)=>S.machineItems.push({id:e.machineId,name:e.name,role:e.role,status:e.status,slots:e.slots,workspaceFolder:e.workspaceFolder||'~/projects'}),
- 'project.MachineChanged':(row,e)=>Object.assign(machine(e.machineId),e.status?{status:e.status}:{},e.role?{role:e.role}:{},e.workspaceFolder?{workspaceFolder:e.workspaceFolder}:{}),
+ 'project.MachineAdded':(row,e)=>S.machineItems.push({id:e.machineId,name:e.name,role:e.role,status:e.status,slots:e.slots,workspaceFolder:e.workspaceFolder||'~/projects',lastSeenAt:e.lastSeenAt??row.occurred_at}),
+ // A machine's last contact moves on while it is online, so lastSeenAt matters only once it goes offline.
+ 'project.MachineChanged':(row,e)=>Object.assign(machine(e.machineId),e.status?{status:e.status}:{},e.role?{role:e.role}:{},e.name?{name:e.name}:{},e.workspaceFolder?{workspaceFolder:e.workspaceFolder}:{},e.lastSeenAt?{lastSeenAt:e.lastSeenAt}:{}),
+ 'project.MachineRemoved':(row,e)=>{S.machineItems.splice(S.machineItems.findIndex(m=>m.id===e.machineId),1);for(const key of [...S.repositoryLocations.keys()])if(key.endsWith('/'+e.machineId))S.repositoryLocations.delete(key)},
+ 'project.MasterJoined':(row,e)=>{Object.assign(S.master,{address:e.address,since:row.occurred_at})},
+ 'project.MasterLeft':()=>{Object.assign(S.master,{address:'',since:null})},
  'project.SetupProgressed':(row,e)=>{S.setup.step=e.step},
  'project.SetupFinished':()=>{S.setup.finished=true},
  'project.RepositoryForgotten':(row,e)=>{S.repositories.splice(S.repositories.findIndex(r=>r.id===e.repoId),1);for(const key of [...S.repositoryLocations.keys()])if(key.startsWith(e.repoId+'/'))S.repositoryLocations.delete(key);for(let i=S.workspaces.length-1;i>=0;i--)if(S.workspaces[i].repoId===e.repoId)S.workspaces.splice(i,1)},
@@ -113,8 +119,13 @@ const handlers={
  'project.RepositoryLocated':(row,e)=>S.repositoryLocations.set(e.repoId+'/'+e.machineId,e.path),
  'project.WorktreeCreated':(row,e)=>worktreeFor(e.worktreeId,e.repoId,e),
  'project.Created':(row,e)=>{S.projects.push({id:e.projectId,repoId:e.repoId,name:e.name,goal:e.goal,lead:null,workspace:e.worktreeId,teams:[],sprints:[],tasks:[]});S.projectMachines.set(e.projectId,e.machineId)},
+ 'project.Renamed':(row,e)=>{projectById(e.projectId).name=e.name},
+ // An archived project keeps its board, threads, and worktree. Only the sidebar and the attention queues leave it out.
+ 'project.Archived':(row,e)=>{projectById(e.projectId).archivedAt=row.occurred_at},
+ 'project.Restored':(row,e)=>{delete projectById(e.projectId).archivedAt},
  'project.Placed':(row,e)=>S.futureProjectMachines.set(e.projectId,e.machineId),
  'project.PreferencesChanged':(row,e)=>S.workspacePreferences.set(e.projectId,{shell:e.shell}),
+ 'project.ModelChosen':(row,e)=>{const a=S.agents.get(e.agentId);if(a)Object.assign(a,e.model?{model:e.model}:{},e.effort?{effort:e.effort}:{})},
  'project.TeamAdded':(row,e)=>{const project=projectById(e.projectId);project.teams.push({id:e.teamId,name:e.name,area:e.name,...(e.stage?{stage:e.stage}:{}),agents:[],...(e.worktreeId?{workspace:e.worktreeId}:{})});nameTeams(project)},
  'project.StageChanged':(row,e)=>{projectById(e.projectId).stage=e.stage},
  // Mocks. The screens are the project's own code, so these record what was drawn, not the drawing.
@@ -125,7 +136,7 @@ const handlers={
  'project.MockComponentUsed':(row,e)=>projectById(e.projectId).mocks.components.push({id:e.componentId,name:e.name,origin:e.origin,path:e.path,screens:e.screens||[]}),
  'project.MocksApproved':(row,e)=>{const mocks=projectById(e.projectId).mocks;mocks.approvedAt=row.occurred_at;for(const c of mocks.components)if(c.origin==='draft')c.origin='promoted'},
  'project.SprintAdded':(row,e)=>projectById(e.projectId).sprints.push({id:e.sprintId,label:e.label,name:e.name,goal:e.goal,phase:e.phase,owner:e.owner,needs:e.needs||[],...(e.completion?{completion:e.completion}:{}),...(e.evidence?{evidence:e.evidence}:{})}),
- 'project.TaskAdded':(row,e)=>{const project=projectById(e.projectId);project.tasks.push({id:e.taskId,title:e.title,owner:e.owner,teamId:e.teamId,sprintId:e.sprintId,state:e.state,workspace:e.worktreeId||project.workspace,...(e.addedByOwner?{addedByOwner:true}:{})});if(e.story)S.taskStories[e.taskId]=e.story},
+ 'project.TaskAdded':(row,e)=>{const project=projectById(e.projectId);project.tasks.push({id:e.taskId,title:e.title,owner:e.owner,teamId:e.teamId,sprintId:e.sprintId,state:e.state,workspace:e.worktreeId||project.workspace,addedAt:row.occurred_at,...(e.addedByOwner?{addedByOwner:true}:{})});if(e.story)S.taskStories[e.taskId]=e.story},
  'project.TaskChanged':(row,e)=>{const task=S.projects.flatMap(project=>project.tasks).find(t=>t.id===e.taskId);if(task)task.state=e.state},
  'project.QuestionLinked':(row,e)=>{const r=request(e.questionId);if(r)Object.assign(r,{projectId:e.projectId,teamId:e.teamId,taskId:e.taskId,sprintId:e.sprintId,title:e.title,summary:e.summary,recommendation:e.recommendation,answer:e.proposedAnswer})},
  'project.AccountPlaced':(row,e)=>{const a=account(e.accountId);if(a)a.machineId=e.machineId},
@@ -140,6 +151,7 @@ const handlers={
    S.subscriptionItems.push(a);
   }
   a.enabled=e.account.enabled!==false;
+  if(e.account.displayName)a.name=e.account.displayName;
  },
  AccountNeedsSignIn:(row,e)=>{const a=account(e.accountId);if(a)a.status='Needs sign-in'},
  AccountAvailable:(row,e)=>{const a=account(e.accountId);if(a)a.status='Available'},
@@ -147,7 +159,7 @@ const handlers={
   const known=S.agents.get(e.agentId);
   if(known){Object.assign(known,e.model?{model:e.model}:{},e.effort?{effort:e.effort}:{});Object.assign(S.runtimeStates.get(e.agentId),{state:'running',failure:null})}
   else{
-   const a={id:e.agentId,name:e.name,initial:initials(e.name),role:e.role,tool:toolName(e.harness),harness:e.harness,account:e.account};
+   const a={id:e.agentId,name:e.name,initial:initials(e.name),role:e.role,tool:toolName(e.harness),harness:e.harness,account:e.account,...(e.model?{model:e.model}:{}),...(e.effort?{effort:e.effort}:{})};
    S.agents.set(a.id,a);S.agentProjects.set(a.id,placeAgent(a,e).id);S.runtimeStates.set(a.id,{state:'running',failure:null,reloadable:true});
   }
  },
@@ -173,10 +185,10 @@ const handlers={
   S.requests.push({id:e.questionId,projectId:project?.id,agentId:e.agentId,status:'open',title:e.text.slice(0,80),summary:(a?.name||e.agentId)+' needs your answer.',question:e.text,recommendation:'',since:row.occurred_at,...(e.holder?._tag==='agent'?{holder:'lead'}:{})});
   ensureTurn(e.agentId,row).parts.push({type:'question',id:e.questionId});
  },
- QuestionAnswered:(row,e)=>{const r=request(e.questionId);if(r)r.status='resolved'},
+ QuestionAnswered:(row,e)=>{const r=request(e.questionId);if(r)Object.assign(r,{status:'resolved',answeredAt:row.occurred_at})},
  PermissionRequested:(row,e)=>S.permissionItems.push({id:e.permissionRequestId,projectId:projectOfAgent(e.agentId)?.id,agentId:e.agentId,callId:e.toolCallId,title:e.description,kind:e.toolKind||'tool',...(e.toolInput?{input:e.toolInput}:{}),...(e.inputRedacted?{redacted:true}:{}),status:'open',options:e.options,since:row.occurred_at,...(e.holder?._tag==='agent'?{holder:'lead'}:{})}),
- PermissionAnswered:(row,e)=>{const r=permission(e.permissionRequestId);if(!r)return;r.status='answered';const chosen=r.options.find(o=>o.id===e.answer.optionId);r.answer=e.answer._tag==='selected'&&/allow/i.test(chosen?.kind||'')?chosen.name:'Denied'},
- PermissionCancelled:(row,e)=>{const r=permission(e.permissionRequestId);if(r){r.status='cancelled';r.answer=e.reason}},
+ PermissionAnswered:(row,e)=>{const r=permission(e.permissionRequestId);if(!r)return;r.status='answered';r.answeredAt=row.occurred_at;const chosen=r.options.find(o=>o.id===e.answer.optionId);r.answer=e.answer._tag==='selected'&&/allow/i.test(chosen?.kind||'')?chosen.name:'Denied'},
+ PermissionCancelled:(row,e)=>{const r=permission(e.permissionRequestId);if(r){r.status='cancelled';r.answer=e.reason;r.answeredAt=row.occurred_at}},
  PermissionMoved:(row,e)=>{const r=permission(e.permissionRequestId);if(r)r.holder='lead'},
  DeliveryQueued:(row,e)=>{const d=e.delivery;S.deliveryItems.push({id:d.id,agentId:d.target,from:nameOf(d.sender),source:reads.deliveryLabels[d.id]||projectOfAgent(d.target)?.name||'',text:d.content.text||d.content._tag,history:['Queued']})},
  DeliverySent:(row,e)=>delivery(e.deliveryId)?.history.push('Sent'),
@@ -184,15 +196,18 @@ const handlers={
  DeliveryRequeued:(row,e)=>delivery(e.deliveryId)?.history.push('Requeued: '+e.reason),
  DeliveryHeld:(row,e)=>delivery(e.deliveryId)?.history.push('Held: no agent capacity'),
  DeliveryReleased:(row,e)=>S.deliveryItems.filter(d=>d.agentId===e.agentId&&d.history.at(-1).startsWith('Held')).forEach(d=>d.history.push('Released')),
+ DeliveryReturned:(row,e)=>{const d=delivery(e.deliveryId);if(d){d.history.push('Returned: '+e.reason);d.failed=true}},
+ DeliveryWithdrawn:(row,e)=>{const d=delivery(e.deliveryId);if(d){d.history.push('Withdrawn: '+e.reason);d.failed=true}},
  'board.ChannelOpened':(row,e)=>S.channels.set(e.channelId,{id:e.channelId,name:e.name,group:e.group,anchorAgentId:e.anchorAgentId,posts:[]}),
  'board.PostWritten':(row,e)=>S.channels.get(e.channelId)?.posts.push(postEntry(row,e)),
  'client.AlertRaised':addAlert,
- 'client.AlertDelivered':(row,e)=>{const a=S.alerts.find(x=>x.id===e.alertId);if(a)a.delivery={status:'Delivered',attempt:e.attempt}},
- 'client.AlertDeliveryFailed':(row,e)=>{const a=S.alerts.find(x=>x.id===e.alertId);if(a)a.delivery={status:e.final?'Failed':'Still failing',attempt:e.attempt,reason:e.reason}},
+ 'client.AlertDelivered':(row,e)=>{const a=S.alerts.find(x=>x.id===e.alertId);if(a)a.delivery={status:'Delivered',attempt:e.attempt,at:row.occurred_at}},
+ 'client.AlertDeliveryFailed':(row,e)=>{const a=S.alerts.find(x=>x.id===e.alertId);if(a)a.delivery={status:e.final?'Failed':'Still failing',attempt:e.attempt,reason:e.reason,at:row.occurred_at}},
  'client.AlertCleared':(row,e)=>{const a=S.alerts.find(x=>x.id===e.alertId);if(a)a.cleared=true},
  'client.AlertSettingsChanged':(row,e)=>{S.settings.push[e.kind]=e.push},
  'client.AlertCarrierChanged':(row,e)=>{S.settings.carrier=e.carrier._tag==='none'?null:{server:e.carrier.server,topic:e.carrier.topic}},
  'client.AlertCarrierTokenSet':()=>{S.settings.tokenSet=true},
+ 'client.AlertPromptDismissed':()=>{S.settings.pushPromptDismissed=true},
  'client.AlertCarrierTokenCleared':()=>{S.settings.tokenSet=false},
  'client.WebSettingsChanged':(row,e)=>{const w=e.settings;S.settings.web={enabled:w.enabled,port:w.port,heartbeat:w.heartbeatSeconds,proxy:w.proxyMode,publicAddress:w.publicAddress||''}}
 };
@@ -200,9 +215,11 @@ function fold(row){const handler=handlers[row.event_type];if(handler)handler(row
 
 // The same rule as threadAgent in packages/engine/src/views/apply.ts.
 const threadAgent=e=>e._tag==='DeliveryQueued'?e.delivery.target:typeof e.agentId==='string'?e.agentId:null;
+// The sample's clock keeps running from its export time, so new events and merges sort after stored ones.
+const nowAt=()=>meta.clock+1+(Date.now()-bootedAt);
 function emit(event_type,payload,{caller='owner',reply=false}={}){
  const body={_tag:event_type,...payload},engine=!/^(project|board|client)\./.test(event_type),thread=engine?threadAgent(body):null;
- const row={sequence:++sequence,event_id:'evt-'+String(sequence).padStart(5,'0'),caller,caller_rule:null,request_id:'req-'+sequence,agent_id:thread,thread_agent_id:thread,event_type,occurred_at:meta.clock+1+(Date.now()-bootedAt),payload_json:JSON.stringify(body)};
+ const row={sequence:++sequence,event_id:'evt-'+String(sequence).padStart(5,'0'),caller,caller_rule:null,request_id:'req-'+sequence,agent_id:thread,thread_agent_id:thread,event_type,occurred_at:nowAt(),payload_json:JSON.stringify(body)};
  if(reply)row.reply=true;
  events.push(row);fold(row);
  for(const notify of subscribers)notify(row,body);
@@ -212,6 +229,14 @@ function saySomething(agentId,texts,options={}){
  const caller='agent:'+agentId;
  emit('TurnStarted',{agentId},{caller,...options});
  for(const text of texts)emit('ThreadItem',{agentId,itemId:'live-'+counters.item++,content:{_tag:'text',text},replay:false},{caller,...options});
+ emit('TurnEnded',{agentId,compact:false},{caller,...options});
+}
+// A turn that ends in a question for the owner, so the request waits in the thread, on Home, and in the bell.
+function askOwner(agentId,texts,question,deliveryId,options={}){
+ const caller='agent:'+agentId;
+ emit('TurnStarted',{agentId},{caller,...options});
+ for(const text of texts)emit('ThreadItem',{agentId,itemId:'live-'+counters.item++,content:{_tag:'text',text},replay:false},{caller,...options});
+ emit('QuestionAsked',{agentId,questionId:question.id,holder:{_tag:'owner'},deliveryId,text:question.text},{caller,...options});
  emit('TurnEnded',{agentId,compact:false},{caller,...options});
 }
 const postToChannel=(channelId,author,text,options={})=>emit('board.PostWritten',{postId:'post-live-'+counters.post++,channelId,author,text,to:[],reply:'none'},{caller:author._tag==='owner'?'owner':'agent:'+author.agentId,...options});
@@ -303,7 +328,9 @@ const api={
     emit('PromptSent',{agentId,deliveryId:id,sender:owner,text});
     // A lead starts the Design team when the work needs screens, and passes changes to an open mock on to it.
     const lead=project?.lead?.id===agentId,screen=lead&&mockScreen&&project.mocks?.screens.find(s=>s.id===mockScreen),needsScreens=lead&&!project.mocks&&new RegExp('\\b('+reads.mocks.uiWords+')\\b','i').test(text);
-    reply=()=>{emit('DeliveryAccepted',{agentId,deliveryId:id},{caller:'service:runner'});if(needsScreens)startDesign(project);else if(screen)reviseScreen(project,screen,text);else saySomething(agentId,[fill(reads.replies.default,{project:project?.name||''})],{reply:true})};
+    // A data set can give a new lead one question to ask before it plans. The first run uses it, so its first request waits for the owner.
+    const first=lead&&reads.firstQuestion&&!S.requests.some(r=>r.agentId===agentId)&&{id:'first-question-'+project.id,text:fill(reads.firstQuestion.text,{project:project.name})};
+    reply=()=>{emit('DeliveryAccepted',{agentId,deliveryId:id},{caller:'service:runner'});if(needsScreens)startDesign(project);else if(screen)reviseScreen(project,screen,text);else if(first)askOwner(agentId,[fill(reads.firstQuestion.intro,{project:project.name})],first,id,{reply:true});else saySomething(agentId,[fill(reads.replies.default,{project:project?.name||''})],{reply:true})};
    }
    if(context.length||(account&&account!=='host'))emit('project.PromptContext',{deliveryId:id,labels:context,...(account&&account!=='host'?{account}:{})});
    replyTimers.set(replyKey(target),{id,timer:setTimeout(()=>{replyTimers.delete(replyKey(target));reply()},900)});
@@ -351,12 +378,16 @@ const api={
    emit('AgentStarted',{agentId:id,name:a.name,role:a.role,groups:[team?project.id+'/'+team.id:project.id],parent:owner,harness:a.harness,account:a.account,...(model?{model}:{}),...(effort?{effort}:{}),permission:'edit',folder:'/'+S.workspaces.find(w=>w.id===(team?.workspace||project.workspace)).path.replace(/^[~/]+/,''),runMode:'acp'});
    emit('SessionOpened',{agentId:id,session:{_tag:'acp',sessionId:'session-'+id+'-'+sequence},protocolVersion:1,reloadable:true},{caller:'service:runner'});
    clearAlertsFor(id,'resumed');
-  }
+  },
+  // Proposed: the model and effort an agent uses from its next turn. The engine sets both only at start.
+  async choose(id,{model,effort}={}){if(S.agents.has(id)&&(model||effort))emit('project.ModelChosen',{agentId:id,...(model?{model}:{}),...(effort?{effort}:{})})},
+  // How much of its context window an agent has used. The engine would read the harness's latest usage report.
+  usage(id){const u=reads.usage?.[id];return u?{...u,percent:Math.round(u.used/u.window*100)}:null}
  },
  project:{
   // The engine has no project piece yet. These write the proposed project.* events.
   async list(){return S.projects},
-  async create({name,repoId,plan,useWorktree,account:chosenAccount}){
+  async create({name,goal,repoId,plan,useWorktree,account:chosenAccount}){
    const n=counters.project++,id='project-'+n,leadName=reads.service.leadNames[(n-1)%reads.service.leadNames.length],machineId=plan.machineId;
    let baseId=plan.base?.id;
    if(plan.fresh){
@@ -367,7 +398,7 @@ const api={
    }
    let worktreeId=baseId;
    if(useWorktree){worktreeId='worktree-'+id;emit('project.WorktreeCreated',{worktreeId,repoId,machineId,projectId:id,branch:plan.branch,path:plan.path,owner:name+' · '+leadName,activity:'No pending changes'})}
-   emit('project.Created',{projectId:id,repoId,name,goal:'Define the outcome with your project lead.',leadAgentId:'lead-'+n,worktreeId,machineId});
+   emit('project.Created',{projectId:id,repoId,name,goal:goal||'Define the outcome with your project lead.',leadAgentId:'lead-'+n,worktreeId,machineId});
    const worktree=S.workspaces.find(w=>w.id===worktreeId),leadId='lead-'+n,accountId=chosenAccount||S.subscriptionItems.find(a=>a.harness==='claude'&&a.machineId===machineId&&a.status==='Available')?.id||'claude-'+machineId,harness=account(accountId)?.harness||'claude';
    worktree.projectId||=id;
    emit('AgentStarted',{agentId:leadId,name:leadName,role:'Project lead',groups:[id],parent:owner,harness,account:accountId,permission:'edit',folder:'/'+worktree.path.replace(/^[~/]+/,''),runMode:'acp'});
@@ -380,7 +411,12 @@ const api={
    emit('project.TaskAdded',{projectId,taskId:id,title,owner:ownerId,teamId,sprintId,state:'queue',addedByOwner:true});
    return {id};
   },
-  async savePreferences(projectId,{shell}){emit('project.PreferencesChanged',{projectId,shell})}
+  async savePreferences(projectId,{shell}){emit('project.PreferencesChanged',{projectId,shell})},
+  // A new name changes only what people read. The branch and the folder keep the name they were created with.
+  async rename(projectId,name){if(projectById(projectId)&&name.trim())emit('project.Renamed',{projectId,name:name.trim().slice(0,80)})},
+  // Archiving stops the project's running agents, which cancels their approvals. Restoring leaves them stopped.
+  async archive(projectId){const project=projectById(projectId);if(!project||project.archivedAt)return;for(const a of [project.lead,...project.teams.flatMap(t=>t.agents)])if(S.runtimeStates.get(a.id)?.state==='running'&&!S.runtimeStates.get(a.id)?.failure)await api.agents.stop(a.id);emit('project.Archived',{projectId})},
+  async restore(projectId){if(projectById(projectId)?.archivedAt)emit('project.Restored',{projectId})}
  },
  // Proposed. Mocks are drawn from the repository's own components and invented data.
  mocks:{
@@ -411,12 +447,19 @@ const api={
   async pair(name){
    const id='worker-'+counters.machine++,parts=reads.service.pairingCodeParts,code=parts.map((part,i)=>i===counters.machine%parts.length?[...part].reverse().join(''):part).join('-');
    setTimeout(()=>emit('project.MachineAdded',{machineId:id,name,role:'Worker',status:'Awaiting confirmation',slots:4,workspaceFolder:'~/projects'}),1200);
-   return {id,code,command:'sheprd connect '+reads.service.masterAddress};
+   return {id,code,command:'lgcode connect '+reads.service.masterAddress};
   },
   async confirm(id){emit('project.MachineChanged',{machineId:id,status:'Online'})},
   async setRole(id,role){emit('project.MachineChanged',{machineId:id,role})},
   async join(address){emit('project.MasterJoined',{address})},
-  async place(projectId,machineId){emit('project.Placed',{projectId,machineId})}
+  // Leaving the master stops new work arriving. Projects already here keep their worktrees.
+  async leave(){if(S.master.address)emit('project.MasterLeft',{address:S.master.address})},
+  async rename(id,name){if(machine(id)&&name.trim())emit('project.MachineChanged',{machineId:id,name:name.trim().slice(0,48)})},
+  // Only a machine with no projects can go, and never this computer. The page explains both rules.
+  async remove(id){const m=machine(id);if(!m||m.role==='Master'||S.projects.some(p=>S.projectMachines.get(p.id)===id))return false;emit('project.MachineRemoved',{machineId:id});return true},
+  async place(projectId,machineId){emit('project.Placed',{projectId,machineId})},
+  // The machine clones the repository into the folder, or uses the clone already there. Its main checkout becomes a worktree, so New project can start on it.
+  async addRepository(machineId,repoId,path){const m=machine(machineId),repo=S.repositories.find(r=>r.id===repoId),folder=String(path||'').trim();if(!m||m.status!=='Online'||!repo||!folder||S.repositoryLocations.has(repoId+'/'+machineId))return false;emit('project.RepositoryLocated',{repoId,machineId,path:folder});emit('project.WorktreeCreated',{worktreeId:machineId+'-'+repoId+'-main',repoId,machineId,branch:'main',path:folder,owner:'Main checkout',activity:'No uncommitted changes'});return true}
  },
  // First run. These stand for a proposed read of the computer and proposed progress records.
  setup:{
@@ -471,6 +514,11 @@ const api={
    return account(accountId);
   },
   async setEnabled(id,enabled){const a=account(id);emit('AccountChanged',{accountId:id,account:{id,harness:a.harness,displayName:a.name,enabled}})},
+  async rename(id,name){const a=account(id);if(a&&name.trim())emit('AccountChanged',{accountId:id,account:{id,harness:a.harness,displayName:name.trim().slice(0,48),enabled:a.enabled}})},
+  // An account with no account record is removed, as the engine folds it. Agents already running on it keep running.
+  async remove(id){if(account(id))emit('AccountChanged',{accountId:id})},
+  // How much of the current usage limit an account has used, and when the limit resets. The harness reports it, so it is read, not stored.
+  usage(id){const u=reads.accountUsage?.[id];return u?{percent:Math.round(u.used/u.limit*100),resetsAt:u.resetsAt}:null},
   // Runs the harness's own login in a terminal on that machine.
   async signIn(id){
    clearTimeout(signInTimers.get(id));
@@ -480,7 +528,11 @@ const api={
   async cancelSignIn(id){clearTimeout(signInTimers.get(id));signInTimers.delete(id)}
  },
  alerts:{
-  async list(){return S.alerts}
+  async list(){return S.alerts},
+  // Proposed. Sends a failed notification again, as the next attempt. Without the notification service and its token it fails again and says why.
+  async retry(id){const a=S.alerts.find(x=>x.id===id);if(!a?.delivery||a.delivery.status==='Delivered')return;const s=S.settings,attempt=a.delivery.attempt+1;
+   if(s.carrier&&s.tokenSet)emit('client.AlertDelivered',{alertId:id,carrier:'ntfy',generation:1,attempt},{caller:'piece:client'});
+   else emit('client.AlertDeliveryFailed',{alertId:id,carrier:'ntfy',generation:1,attempt,reason:s.carrier?'token missing':'no notification service',final:true},{caller:'piece:client'})}
  },
  settings:{
   async read(){return S.settings},
@@ -490,29 +542,44 @@ const api={
   // The token never reaches a file or an event, as in the engine.
   async setToken(){emit('client.AlertCarrierTokenSet',{origin:S.settings.carrier.server,carrierGeneration:'generation-1'})},
   async clearToken(){emit('client.AlertCarrierTokenCleared',{})},
+  // Proposed. Records that the owner declined phone notifications when the first request waited, so the page does not offer them again.
+  async dismissPushPrompt(){emit('client.AlertPromptDismissed',{},{caller:'owner'})},
+  // Proposed. Sends one notification through the service now and stores nothing, so it says only whether the service took it.
+  async sendTest(){const s=S.settings;await new Promise(done=>setTimeout(done,300));return s.carrier&&s.tokenSet?{sent:true,at:nowAt()}:{sent:false,reason:s.carrier?'Set the notification service token first.':'Set the notification service first.'}},
   async saveWeb(web){emit('client.WebSettingsChanged',{settings:{enabled:web.enabled,port:web.port,heartbeatSeconds:web.heartbeat,proxyMode:web.proxy,...(web.publicAddress?{publicAddress:web.publicAddress}:{})}})}
  },
  // Git is read from the worktree at request time, so these change no events.
  git:{
   state(id){
-   if(!gitStates.has(id)){const w=S.workspaces.find(x=>x.id===id);gitStates.set(id,{staged:new Set(),message:'',commits:[],incoming:w?.incoming||0,outgoing:0,pending:0,conflicts:new Set(w?.conflicts||[]),resolutions:new Map(),notice:'',lastMerge:''})}
+   // A worktree can start with commits that wait for the owner's merge; pendingSince says since when, and mergedAt when the last merge happened.
+   if(!gitStates.has(id)){const w=S.workspaces.find(x=>x.id===id),waiting=(w?.awaiting?.commits||[]).map(c=>({...c,ref:w.branch}));gitStates.set(id,{staged:new Set(),message:'',commits:waiting,incoming:w?.incoming||0,outgoing:waiting.length,pending:waiting.length,pendingSince:waiting.length?w.awaiting.since:null,mergedAt:null,conflicts:new Set(w?.conflicts||[]),choices:new Map(),notice:'',lastMerge:''})}
    return gitStates.get(id);
   },
   log(id){const w=S.workspaces.find(x=>x.id===id);return [...api.git.state(id).commits,...(w?.history||[])]},
   stage(id,path){const g=api.git.state(id);g.staged.has(path)?g.staged.delete(path):g.staged.add(path)},
+  // Stage all leaves conflicted files alone, because they need a resolution first.
+  stageAll(id){const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id);for(const f of w.files)if(!g.conflicts.has(f))g.staged.add(f)},
+  unstageAll(id){api.git.state(id).staged.clear()},
+  // Discard throws away uncommitted changes to these files. The page asks first.
+  discard(id,paths){const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id),gone=paths.filter(f=>w.files.includes(f)&&!g.conflicts.has(f));w.files=w.files.filter(f=>!gone.includes(f));gone.forEach(f=>g.staged.delete(f));g.notice=gone.length===1?'Discarded the changes to '+gone[0]+'.':'Discarded '+gone.length+' changes.'},
+  // A conflicted file is a list of segments: shared lines with their line number, or a conflict with ours, the base, and theirs.
+  // Theirs is the branch being merged in: the parent worktree's branch for a team, and main otherwise.
+  conflict(id,path){const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id);if(!g.choices.has(path))g.choices.set(path,[]);return {path,ours:w.branch,theirs:S.workspaces.find(x=>x.id===w.parentId)?.branch||'main',segments:reads.git.conflicts?.[path]||reads.git.conflicts?.default||[],choices:g.choices.get(path)}},
+  // Each conflict keeps ours, theirs, or both. Marking the file resolved needs a choice for every conflict.
+  choose(id,path,hunk,choice){api.git.conflict(id,path).choices[hunk]=choice},
   commit(id){
    const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id),files=w.files.filter(f=>g.staged.has(f)),commit='d'+(counters.git++).toString(16).padStart(6,'0');
    g.commits.unshift({id:commit,title:g.message.trim(),ref:w.branch,files});
-   w.files=w.files.filter(f=>!g.staged.has(f));g.staged.clear();g.message='';g.outgoing++;g.pending++;g.notice='Committed '+commit+' on '+w.branch+'.';
+   w.files=w.files.filter(f=>!g.staged.has(f));g.staged.clear();g.message='';g.outgoing++;if(!g.pending)g.pendingSince=nowAt();g.pending++;g.notice='Committed '+commit+' on '+w.branch+'.';
   },
   fetch(id){api.git.state(id).notice='Remote references are up to date.'},
   pull(id){const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id);g.incoming=0;g.notice='Updated '+w.branch+' from its tracked branch.'},
   push(id){const w=S.workspaces.find(x=>x.id===id),g=api.git.state(id);g.outgoing=0;g.notice='Pushed '+w.branch+'.'},
-  resolve(id,path,choice){const g=api.git.state(id);g.conflicts.delete(path);g.resolutions.set(path,choice);g.notice='Conflict resolved. Review and stage '+path+'.'},
+  resolve(id,path){const c=api.git.conflict(id,path),hunks=c.segments.filter(s=>!s.context).length,g=api.git.state(id);if(c.choices.filter(Boolean).length<hunks)return;g.conflicts.delete(path);g.notice='Resolved '+path+'. Review and stage it.'},
   integrate(id,targetId){
    const w=S.workspaces.find(x=>x.id===id),target=S.workspaces.find(x=>x.id===targetId),g=api.git.state(id),parent=api.git.state(targetId),files=[...new Set(g.commits.slice(0,g.pending).flatMap(c=>c.files))];
    parent.commits.unshift({id:'m'+(counters.git++).toString(16).padStart(6,'0'),title:'Merge '+w.branch,ref:target.branch,files:files.length?files:['docs/README.md']});
-   parent.outgoing++;parent.pending++;g.pending=0;g.lastMerge=target.branch;g.notice='Merged '+w.branch+' into '+target.branch+'.';
+   parent.outgoing++;if(!parent.pending)parent.pendingSince=nowAt();parent.pending++;g.pending=0;g.pendingSince=null;g.mergedAt=nowAt();g.lastMerge=target.branch;g.notice='Merged '+w.branch+' into '+target.branch+'.';
   },
   // Slow on purpose, so the merge dialog shows that it is waiting for results.
   async mergeEvidence(id){
@@ -522,6 +589,13 @@ const api={
  },
  // A real terminal is a stream, so this one answers at once.
  terminal:{
+  // Sessions belong to a worktree on its machine. Each worktree starts with one, and an empty name means the shell's own name.
+  sessions(id){if(!terminalSessions.has(id))terminalSessions.set(id,{next:2,items:[{id:1,name:''}]});return terminalSessions.get(id).items},
+  open(id){api.terminal.sessions(id);const s=terminalSessions.get(id),item={id:s.next++,name:''};s.items.push(item);return item},
+  close(id,session){api.terminal.sessions(id);const s=terminalSessions.get(id);s.items=s.items.filter(x=>x.id!==session)},
+  rename(id,session,name){const item=api.terminal.sessions(id).find(x=>x.id===session);if(item)item.name=name.trim().slice(0,40)},
+  // Tab completes the last word from the folder, the known files, and the commands this terminal answers.
+  complete(id,text){const t=reads.terminal,word=text.split(/\s+/).at(-1);if(!word)return text;const names=[...new Set([...t.ls.split(/\s+/),...Object.keys(reads.files||{}),...Object.keys(t.replies).filter(k=>!k.includes(' ')),'pwd','ls','cat','echo','git','vim','clear'])].filter(n=>n.startsWith(word)&&n!==word);if(!names.length)return text;let common=names[0];for(const n of names)while(!n.startsWith(common))common=common.slice(0,-1);return text.slice(0,text.length-word.length)+(names.length===1&&!common.endsWith('/')?common+' ':common)},
   run(id,command){
    const w=S.workspaces.find(x=>x.id===id),t=reads.terminal;
    if(command==='pwd')return w.path;

@@ -1,8 +1,8 @@
 # OpenPencil for the web mock, on port 8443 of every address this computer has.
 #   docker compose -f design/openpencil/compose.yml up -d --build
 # Each repository's design folder is mounted at /files/<repository id>/, the id the mock's data
-# uses. LGcode's own folder is /files/sheprd until the rename reaches the mock. A private project adds its own folder
-# in design/data/local/openpencil.compose.yml, which git ignores:
+# uses, so LGcode's own folder is /files/lgcode. A private project adds its own folder in
+# design/data/local/openpencil.compose.yml, which git ignores:
 #   services: { openpencil: { volumes: ["/path/to/project/design:/files/<project>:ro"] } }
 # and starts with both files:
 #   docker compose -f design/openpencil/compose.yml -f design/data/local/openpencil.compose.yml up -d
@@ -16,7 +16,7 @@ services:
     ports:
       - '8443:8443'
     volumes:
-      - ..:/files/sheprd:ro
+      - ..:/files/lgcode:ro
       # Caddy keeps its certificate authority here, so the certificate survives a restart.
       - caddy-data:/data
 

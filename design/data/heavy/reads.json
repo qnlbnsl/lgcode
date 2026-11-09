@@ -109,10 +109,34 @@
    },
    "heavy-invoices": {
     "owner": "Invoice exports · Tamsin",
-    "activity": "2 changed files",
+    "activity": "26 changed files",
     "files": [
      "src/index.ts",
-     "src/rules.ts"
+     "src/rules.ts",
+     "src/exports/csv.ts",
+     "src/exports/pdf.ts",
+     "src/exports/xlsx.ts",
+     "src/exports/schedule.ts",
+     "src/exports/filters.ts",
+     "src/exports/columns.ts",
+     "src/exports/currency.ts",
+     "src/exports/locale.ts",
+     "src/exports/index.ts",
+     "src/api/exports.ts",
+     "src/api/routes.ts",
+     "src/api/permissions.ts",
+     "src/jobs/export-worker.ts",
+     "src/jobs/retry.ts",
+     "src/storage/signed-urls.ts",
+     "src/storage/retention.ts",
+     "test/exports/csv.test.ts",
+     "test/exports/pdf.test.ts",
+     "test/exports/xlsx.test.ts",
+     "test/exports/schedule.test.ts",
+     "test/api/exports.test.ts",
+     "test/jobs/export-worker.test.ts",
+     "docs/exports.md",
+     "docs/finance-guide.md"
     ],
     "incoming": 0,
     "conflicts": [],
@@ -254,11 +278,8 @@
    },
    "heavy-reference": {
     "owner": "API reference · Cato",
-    "activity": "2 changed files",
-    "files": [
-     "src/index.ts",
-     "src/rules.ts"
-    ],
+    "activity": "1 commit waiting for your merge",
+    "files": [],
     "incoming": 0,
     "conflicts": [],
     "history": [
@@ -279,7 +300,20 @@
        "docs/README.md"
       ]
      }
-    ]
+    ],
+    "awaiting": {
+     "since": 1793957460000,
+     "commits": [
+      {
+       "id": "e41b9d2",
+       "title": "Generate the reference for stable calls",
+       "files": [
+        "src/index.ts",
+        "src/rules.ts"
+       ]
+      }
+     ]
+    }
    },
    "workspace-app-shell": {
     "owner": "App shell · Rowan",
@@ -491,7 +525,7 @@
      }
     ]
    },
-   "buildbox-sheprd-main": {
+   "buildbox-lgcode-main": {
     "owner": "Main checkout",
     "activity": "No uncommitted changes",
     "files": [],
@@ -695,6 +729,54 @@
    "engine/recovery.ts": " export async function reconnect(receipt) {\n-  return delivery.send(prompt);\n+  return delivery.resume(receipt);\n }",
    "docs/README.md": " # {repository}\n-Project setup in progress.\n+Project baseline verified.",
    "default": "@@ -1,4 +1,4 @@\n export function Workspace() {\n-  return <Chat thread={active} />;\n+  return <Conversation recipient={agent} preserveDraft />;\n }\n@@ -58,22 +58,27 @@\n function Conversation({recipient, preserveDraft}) {\n-  const [draft, setDraft] = useState(\"\");\n+  const [draft, setDraft] = useDraft(recipient.id, {enabled: preserveDraft});\n+  const position = useReadingPosition(recipient.id);\n   const thread = useThread(recipient.id);\n \n-  useEffect(() => scrollToEnd(), [thread.length]);\n+  useEffect(() => {\n+    if (position.isAtLatest) scrollToEnd();\n+  }, [thread.length, position.isAtLatest]);\n \n   return (\n     <section aria-label={recipient.name}>\n       <Thread items={thread} />\n+      <Progress agent={recipient} />\n       <Composer value={draft} onChange={setDraft} recipient={recipient} />\n     </section>\n   );\n }"
+  },
+  "conflicts": {
+   "app/workspace.tsx": [
+    {
+     "line": 56,
+     "context": [
+      "function Conversation({recipient, preserveDraft}) {",
+      "  const [draft, setDraft] = useDraft(recipient.id, {enabled: preserveDraft});"
+     ]
+    },
+    {
+     "ours": [
+      "  const position = useReadingPosition(recipient.id);"
+     ],
+     "base": [
+      "  const position = useScrollPosition(recipient.id);"
+     ],
+     "theirs": [
+      "  const position = useReadingPosition(recipient.id, {restore: true});"
+     ]
+    },
+    {
+     "line": 59,
+     "context": [
+      "  const thread = useThread(recipient.id);",
+      "",
+      "  useEffect(() => {"
+     ]
+    },
+    {
+     "ours": [
+      "    if (position.isAtLatest) scrollToEnd();"
+     ],
+     "base": [
+      "    scrollToEnd();"
+     ],
+     "theirs": [
+      "    if (position.isAtLatest) scrollToEnd({smooth: true});",
+      "    else position.markUnread(thread.length);"
+     ]
+    },
+    {
+     "line": 63,
+     "context": [
+      "  }, [thread.length, position.isAtLatest]);"
+     ]
+    }
+   ]
   }
  },
  "harness": {
@@ -721,6 +803,16 @@
    "gemini": [
     "gemini-3-pro"
    ]
+  },
+  "modelLabels": {
+   "claude-opus-5-5": "Opus 5.5",
+   "claude-sonnet-5-5": "Sonnet 5.5",
+   "claude-haiku-5-5": "Haiku 5.5",
+   "gpt-6": "GPT-6",
+   "gpt-6-luna": "GPT-6 Luna",
+   "gpt-5.5": "GPT-5.5",
+   "auto": "Auto",
+   "gemini-3-pro": "Gemini 3 Pro"
   },
   "efforts": [
    "low",
@@ -751,7 +843,7 @@
   }
  },
  "terminal": {
-  "ls": "app/  engine/  docs/  .sheprd/",
+  "ls": "app/  engine/  docs/  .lgcode/",
   "replies": {
    "whoami": "owner",
    "date": "Fri Nov  6 10:56:00 UTC 2026",
@@ -769,6 +861,136 @@
    "lines": 180,
    "line": "Check {n}: Reading view, keyboard focus, and draft continuity - review trace.",
    "fill": "Detailed review trace continuation.\n"
+  }
+ },
+ "usage": {
+  "sage": {
+   "used": 68000,
+   "window": 200000
+  },
+  "rowan": {
+   "used": 121000,
+   "window": 200000
+  },
+  "iris": {
+   "used": 88000,
+   "window": 400000
+  },
+  "finch": {
+   "used": 140000,
+   "window": 400000
+  },
+  "vale": {
+   "used": 30000,
+   "window": 200000
+  },
+  "mira": {
+   "used": 12000,
+   "window": 200000
+  },
+  "nico": {
+   "used": 9000,
+   "window": 200000
+  },
+  "lark": {
+   "used": 4000,
+   "window": 200000
+  },
+  "invoices-lead": {
+   "used": 76000,
+   "window": 200000
+  },
+  "invoices-oren": {
+   "used": 18000,
+   "window": 200000
+  },
+  "invoices-pia": {
+   "used": 216000,
+   "window": 400000
+  },
+  "invoices-dov": {
+   "used": 100000,
+   "window": 400000
+  },
+  "invoices-lena": {
+   "used": 200000,
+   "window": 400000
+  },
+  "tax-lead": {
+   "used": 70000,
+   "window": 200000
+  },
+  "tax-sana": {
+   "used": 24000,
+   "window": 200000
+  },
+  "tax-ivo": {
+   "used": 164000,
+   "window": 400000
+  },
+  "runners-lead": {
+   "used": 30000,
+   "window": 200000
+  },
+  "runners-yara": {
+   "used": 46000,
+   "window": 200000
+  },
+  "runners-kit": {
+   "used": 168000,
+   "window": 400000
+  },
+  "runners-noor": {
+   "used": 244000,
+   "window": 400000
+  },
+  "restore-lead": {
+   "used": 98000,
+   "window": 200000
+  },
+  "restore-tess": {
+   "used": 42000,
+   "window": 200000
+  },
+  "restore-ansel": {
+   "used": 116000,
+   "window": 400000
+  },
+  "push-lead": {
+   "used": 14000,
+   "window": 200000
+  },
+  "push-remy": {
+   "used": 88000,
+   "window": 200000
+  },
+  "push-juno": {
+   "used": 88000,
+   "window": 400000
+  },
+  "push-pax": {
+   "used": 224000,
+   "window": 400000
+  },
+  "reference-lead": {
+   "used": 30000,
+   "window": 200000
+  },
+  "reference-ines": {
+   "used": 86000,
+   "window": 200000
+  },
+  "reference-milo": {
+   "used": 60000,
+   "window": 400000
+  },
+  "tove": {
+   "used": 46000,
+   "window": 200000
+  },
+  "bryn": {
+   "used": 70000,
+   "window": 400000
   }
  },
  "files": {
@@ -796,7 +1018,10 @@
    "roles.runaway": false,
    "roles.rule-first-use": true
   },
-  "carrier": null,
+  "carrier": {
+   "server": "https://ntfy.sh",
+   "topic": "lgcode-owner"
+  },
   "tokenSet": false,
   "web": {
    "enabled": true,
@@ -842,5 +1067,282 @@
     "text": "Your direction is recorded: agent conversations open in the main view. We can finish the handoff."
    }
   ]
+ },
+ "accountUsage": {
+  "codex-personal": {
+   "used": 62,
+   "limit": 100,
+   "resetsAt": 1793973600000
+  },
+  "claude-studio": {
+   "used": 91,
+   "limit": 100,
+   "resetsAt": 1793966400000
+  },
+  "claude-buildbox": {
+   "used": 38,
+   "limit": 100,
+   "resetsAt": 1794214800000
+  },
+  "codex-buildbox": {
+   "used": 54,
+   "limit": 100,
+   "resetsAt": 1793979000000
+  }
+ },
+ "mocks": {
+  "devices": {
+   "phone": [
+    390,
+    844
+   ],
+   "desktop": [
+    1440,
+    900
+   ]
+  },
+  "designers": [
+   [
+    "Linden",
+    "Moss"
+   ],
+   [
+    "Rue",
+    "Pip"
+   ],
+   [
+    "Ondine",
+    "Hart"
+   ]
+  ],
+  "planners": [
+   "Ivy",
+   "Sorrel",
+   "Tern"
+  ],
+  "starter": [
+   {
+    "screenId": "home",
+    "title": "Home",
+    "route": "workbench.html?sample={sample}&screen=home",
+    "note": "Where requests from every project arrive."
+   },
+   {
+    "screenId": "board",
+    "title": "Project board",
+    "route": "workbench.html?sample={sample}&screen=board",
+    "note": "Sprints by status, with the lead beside them."
+   },
+   {
+    "screenId": "lead",
+    "title": "Lead conversation",
+    "route": "workbench.html?sample={sample}&screen=lead",
+    "note": "The full thread with the project lead."
+   }
+  ],
+  "starterScenarios": [
+   {
+    "id": "small",
+    "label": "Four projects"
+   },
+   {
+    "id": "heavy",
+    "label": "Ten projects"
+   }
+  ],
+  "starterData": [
+   {
+    "entity": "Project",
+    "field": "name",
+    "type": "text",
+    "screens": [
+     "home",
+     "board"
+    ]
+   },
+   {
+    "entity": "Project",
+    "field": "stage",
+    "type": "stage",
+    "screens": [
+     "board"
+    ]
+   },
+   {
+    "entity": "Request",
+    "field": "since",
+    "type": "time",
+    "screens": [
+     "home"
+    ]
+   }
+  ],
+  "starterComponents": [
+   {
+    "componentId": "button",
+    "name": "Button",
+    "origin": "real",
+    "path": "design/workbench.html · button.primary",
+    "screens": [
+     "home",
+     "board"
+    ]
+   },
+   {
+    "componentId": "composer",
+    "name": "Composer",
+    "origin": "real",
+    "path": "design/workbench.html · .composer",
+    "screens": [
+     "lead"
+    ]
+   }
+  ],
+  "uiWords": "screen|screens|page|pages|ui|interface|design|mock|mocks|layout|app|website|dashboard|form|button|look",
+  "replies": {
+   "started": [
+    "That needs screens before a plan, so I started the Design team. {designer} is drawing them from the repository’s own components, with sample data.",
+    "[Open the mocks](mocks:)"
+   ],
+   "revised": "{designer} changed {screen}: {summary}.",
+   "approved": "The mocks are approved. {planner} is turning them into a plan: {count} tasks are waiting on the board."
+  },
+  "tweaks": [
+   {
+    "match": "dens|tight|compact|spac|smaller|room",
+    "summary": "made it denser",
+    "css": "body{zoom:.9}"
+   },
+   {
+    "match": "bigger|larger|large|font|type|text|read",
+    "summary": "raised the type size",
+    "css": "body{zoom:1.1}"
+   },
+   {
+    "match": "blue",
+    "summary": "moved the accent to blue",
+    "css": "html{--color-primary:#2f5f99 !important;--color-accent:#2f5f99 !important}"
+   },
+   {
+    "match": "colou?r|accent|warm|orange|brand",
+    "summary": "warmed the accent",
+    "css": "html{--color-primary:#a4532c !important;--color-accent:#a4532c !important}"
+   },
+   {
+    "match": "round|soft",
+    "summary": "rounded the corners",
+    "css": "button,input,select,textarea,.sprint-card,.kanban-column,.home-request-row{border-radius:12px !important}"
+   },
+   {
+    "match": "square|sharp|flat",
+    "summary": "squared the corners",
+    "css": "*{border-radius:0 !important}"
+   },
+   {
+    "match": "line|border|divid",
+    "summary": "darkened the dividing lines",
+    "css": "html{--color-line:#8a9a8f !important}"
+   }
+  ],
+  "fallbackSummary": "worked in “{text}”",
+  "screenDelay": 700
+ },
+ "schema": {
+  "lgcode": {
+   "Project": {
+    "id": "text",
+    "repoId": "text",
+    "name": "text",
+    "goal": "text"
+   },
+   "Agent": {
+    "id": "text",
+    "name": "text",
+    "role": "text",
+    "harness": "text",
+    "state": "state"
+   },
+   "Request": {
+    "id": "text",
+    "title": "text",
+    "since": "time",
+    "status": "state"
+   },
+   "Task": {
+    "id": "text",
+    "title": "text",
+    "state": "text",
+    "owner": "text"
+   },
+   "Machine": {
+    "id": "text",
+    "name": "text",
+    "status": "state",
+    "slots": "number"
+   }
+  },
+  "atlas-docs": {
+   "Page": {
+    "path": "text",
+    "title": "text"
+   }
+  }
+ },
+ "design": {
+  "lgcode": {
+   "file": "design/lgcode.fig",
+   "tokens": [
+    "--color-bg",
+    "--color-surface",
+    "--color-raised",
+    "--color-text",
+    "--color-muted",
+    "--color-line",
+    "--color-primary",
+    "--color-primary-contrast",
+    "--color-selected",
+    "--color-success",
+    "--color-warn",
+    "--color-error"
+   ],
+   "components": [
+    {
+     "name": "Button",
+     "path": "design/workbench.html · button",
+     "variants": "Primary, Secondary",
+     "preview": "<button class=\"primary\">New project</button> <button class=\"secondary\">Cancel</button>"
+    },
+    {
+     "name": "Status dot",
+     "path": "design/workbench.html · .dot",
+     "variants": "Working, Waiting, Idle, Failed",
+     "preview": "<span class=\"dot\"></span> <span class=\"dot wait\"></span> <span class=\"dot idle\"></span> <span class=\"dot error\"></span>"
+    },
+    {
+     "name": "Segmented control",
+     "path": "design/workbench.html · .segmented",
+     "variants": "Selected, Not selected",
+     "preview": "<span class=\"segmented\"><button aria-pressed=\"true\">Unified</button><button aria-pressed=\"false\">Split</button></span>"
+    },
+    {
+     "name": "Inline link",
+     "path": "design/workbench.html · .inline-link",
+     "variants": "Default",
+     "preview": "<button class=\"inline-link\">Open sprint board →</button>"
+    },
+    {
+     "name": "Attention number",
+     "path": "design/workbench.html · .attention-number",
+     "variants": "Default",
+     "preview": "<span class=\"attention-number\">3</span>"
+    },
+    {
+     "name": "Task state",
+     "path": "design/workbench.html · .task-state",
+     "variants": "Up next, In progress, In review, Done, Blocked",
+     "preview": "<span class=\"task-state queue\"></span> <span class=\"task-state active\"></span> <span class=\"task-state review\"></span> <span class=\"task-state done\"></span> <span class=\"task-state blocked\"></span>"
+    }
+   ]
+  }
  }
 }

@@ -1,4 +1,4 @@
-# Sheprd app mockups
+# LGcode app mockups
 
 Serve this directory with `python3 -m http.server 4178 --bind 127.0.0.1`, then open
 `http://127.0.0.1:4178/workbench.html`. Opening the file directly no longer works, because
@@ -22,7 +22,7 @@ The page has three parts: `workbench.html` holds the markup and styles, `workben
 the app, and `data/stubs.js` holds the data functions.
 
 The owner requested the working app on 2026-11-05. A public marketing site
-is outside this pass. Sheprd is a separate product inspired by Herdr
+is outside this pass. LGcode is a separate product inspired by Herdr
 Synapse and T3 Code.
 
 ## What to try
@@ -30,40 +30,80 @@ Synapse and T3 Code.
 Open the first run with `?sample=first`, or from the First run links in Design notes. The links
 cover one or two signed-in harnesses, only Codex, signed out, nothing installed, no repositories,
 and a computer that could not be read. Add `&reset=1` to start again from the login page.
+After setup, send the lead a message without the word screen or design. The lead asks who the
+project is for, and that first waiting question offers phone notifications, with Set up and Not
+now.
 
-- Start on Home. Needs attention gathers requests across projects.
-  Questions and Approvals support answers in place and retain answered history.
+- Start on Home. Needs attention gathers requests across projects, failed starts first and
+  then the longest wait. Sort switches to Newest first. A wait of an hour or more is amber.
+  Questions and Approvals support answers in place. Their tab counts show open requests, and
+  answered ones fold under Answered with Allowed, Denied, or Answered and the time.
   Each request is one line; use its chevron or click the row to expand its
   details underneath. Click again to collapse. There is no split detail pane.
-  Use search and the repository, project, agent, machine, and status filters.
+  An approval's row shows its command. Expanded, it shows Command and Folder, with the
+  identifiers under Details. Choose Filter for the repository, project, agent, and machine
+  filters. Each set filter shows as a chip that removes it. Narrow the window below 900
+  pixels to see the kind start each row's second line.
   All projects opens each project's board. The bell links to the full queue.
+- In `?sample=heavy`, the Merge row has waited 1 hour and 25 minutes for the owner.
+- Open Rowan's question, Iris's approval, and Ash's failed start in their threads. All three
+  are the same block with a left rule and a label, amber for the first two and red for the
+  failed start.
 - Select a repository name to see its projects. Use its chevron to expand
   the tree. Add Project starts a named project within a known repository.
 - Select Workspace app to open its sprint board with Sage in the right
   chat panel. Agent recovery has Vale, and Desktop companion has Nico.
   Each project has exactly one lead. There is no Board row in the tree.
-- Close the lead panel to widen the board. The lead button reopens it. On smaller screens it opens as a drawer. Escape closes the
-  drawer. The expand control opens the full conversation, preserving its
-  messages and draft.
-- The project branch appears under its name and beside the board title.
-  It stays assigned when you inspect a different workspace.
-- On the board, select a sprint to see its tasks,
-  owners, phase, dependencies, and completion evidence. Select a task to
-  see the assignment and continue to its agent or changed files.
+- The lead button at the right end of the tab row closes and reopens the lead panel. On smaller
+  screens it opens as a drawer, and Escape closes the drawer. The Chat tab opens the full
+  conversation, preserving its messages and draft.
+- The branch appears once, in the top bar, after Inspecting. Inspect another worktree, and
+  the list still marks the assigned one.
+- On the board, Thread view and Narrow-screen pass lead with an amber line and an amber left
+  rule, because a question and two approvals wait for you. Select Thread view: its status is
+  under the title, and Rowan's question and Iris's approval come first, answerable in place.
+  SH-15 says "Blocked by an approval". Select SH-15: Talk to Iris sits at the top right, and
+  each activity step has its time.
+- Open Build team's Tasks, All projects on Home, and a repository page. Each row is one line.
+  The repository page is the All projects table without its Repository column.
+- Open Iris's thread, then Git. The lead button at the right of the tab row now says Iris, and
+  it docks her thread beside the diff.
+- Widen the window past 1800 pixels. The thread panel stays open beside every project view,
+  Chat shows the agent's task and changed files beside the thread, and board cards stop at
+  300 pixels.
 - In Sage's chat, select the message that Rowan needs a decision. It opens
   Rowan's exact question. Rowan stays highlighted until the question is
   answered. Answering clears Sage's request and the sprint's blocker too.
 - Expand Build team and Review team to see their agents. Teams are named for their stage:
   Design team, Planning team, Build team, and Review team. Two teams in the same stage add
-  their area, such as Build team · Exports. A single workspace tab row offers Chat,
-  Tasks, Terminal, Git, and Workspace settings in team scope. Drafts and reading position stay with each
+  their area, such as Build team · Exports. A single tab row offers Board, Chat, Terminal,
+  Git, and Project settings, and a team adds Tasks at the end, so no other tab moves. Drafts and reading position stay with each
   conversation. Teams remember their last tab.
-- Open the branch name at the top right. The list shows branches,
-  workspaces, owners, and current activity for this repository. Selecting
-  one changes the inspected code context. It does not change repository
+- Open Inspecting at the top right. The list groups this repository's worktrees as Git does,
+  one line each, with the machine at the right. Type in its search field to narrow it.
+  Selecting one changes the inspected code context. It does not change repository
   binding or redirect an agent. Git displays the selected workspace and follows its owning project and machine.
+- Select the repository, project, or team in the top bar. Each opens its page.
+- Press Control + B, or Command + B on a Mac, to fold the sidebar into a rail of icons. The
+  browser remembers it. The button at the top of the sidebar does the same.
+- Open Rowan's chat. One line under the tabs names him, his role, and his status, and no
+  title repeats the top bar.
+- Press Control + K and type "ro". Names that start with the query come first, and each row
+  shows what needs attention. Escape closes it.
 - Send a message to see a reply. Stop cancels
   a pending reply. Both messages and drafts are scoped to their conversation.
+- Look at the composer. It is one input over one tool row: Add context, the subscription by its
+  own name, the model, the effort, and how much of the context window is in use. Choose another
+  model or effort from its menu; the agent keeps it. Type @ after a space to open Add context,
+  search it, and pick a task or a file.
+- Open Nico on Desktop companion's board. He is idle, so there is no status line and no Stop.
+  Open Iris: she waits on a tool, so the line says so and offers Stop agent.
+- Stop Rowan. The input gives way to "Rowan is stopped." and a Resume button, and his sidebar row
+  keeps "Needs answer" with a hollow amber dot. Open Ash: the composer says he failed to start and
+  offers Sign in on Buildbox and Resume.
+- In Iris's thread, load the review trace. It shows its first 12 lines with Open in full and Copy.
+  Open in full fills the main area, and Escape returns to the thread. Delivery details is a quiet
+  disclosure, and the tool call sits under the approval's Details.
 - Add a task to an active sprint. Completed sprints do not accept new tasks.
 - Every project board starts with a stage strip: Design, Plan, Build, Review, and Hand over.
   The repository page lists each project's stage.
@@ -86,17 +126,68 @@ and a computer that could not be read. Add `&reset=1` to start again from the lo
 - Repositories that stay on this computer go in `data/local/`, which git ignores. Open one
   with `?with=<id>`; Design notes lists the ones present. `?with=ananke` adds Ananke's
   onboarding mocks, which need Ananke's mock server on port 8091.
-- Switch between Field and Dusk at the bottom of the sidebar.
+- Open Service settings, the gear at the foot of the sidebar, and choose Light, Dark, or Match
+  system under Appearance.
+- Open Design notes and choose Logged out, Login rejected, Session expired, or Session
+  unavailable. The page says "Sign in to LGcode" under the logo mark. A rejected password
+  shows in the error color under the field, and an expired session shows in the muted
+  color. The unavailable page offers Try again as its main button.
+- Open Git in Agent console. Commit says what it needs before it can be used. Below 1600
+  pixels the worktree list is a rail of icons; its button at the top opens it, and the browser
+  remembers that. Each worktree names its machine and says "2 changes". Drag or arrow the
+  handle beside the commit pane to resize it. Fetch, Pull, and Push sit in the pane's header,
+  and Integrate stays at its foot.
+- In Git, choose Stage all, then Unstage all. Choose Discard: it lists the files and asks first.
+- In `?sample=heavy`, open Git in Invoice exports. Its 26 changed files scroll between the
+  sync row and Integrate.
+- Open Git in Review team. Its worktree row says "1 conflict" in red, Conflicts sits above
+  Staged changes, and the conflict opens in the diff pane with ours, the base, and theirs for
+  each of its two conflicts. Choose Ours, Theirs, or Both for each, then Mark resolved. The
+  integrate line says how many conflicts are left and links to the file. Open in Terminal types
+  `vim` with the file, and Enter shows the conflict markers.
+- Open Terminal at 390 pixels. A row of Esc, Ctrl, Tab, and arrow keys sits above the keyboard,
+  and the prompt wraps only at the last column. Tap Ctrl, then type c, to stop a command.
+- Open Phone notifications, the phone icon at the foot of the sidebar, and choose Refresh.
+  The notice appears at the top right, below the bell.
+- On Phone notifications, choose Retry on a failed row. It fails again, because no token is
+  set. Choose Fix in Service settings, type a token, and leave the field. Retry now delivers,
+  and the badge drops by one.
+- Open Service settings. The section list on the left follows scrolling. Change a field and
+  leave it: "Saved" appears beside its label. Send test notification sits beside the token.
+- Open Machines in `?sample=heavy`. Studio says "Over limit" in amber, and Laptop says
+  "Last seen 2 hours ago". Open a row's menu, the three dots, to rename or remove a machine.
+- Open Subscriptions. Usage shows per subscription, and the row menu offers Rename and Remove.
+- Open Project settings in Agent console and choose Archive. The project leaves the sidebar
+  and Home. Open All projects on Home to find it marked Archived, then choose Restore.
+- Choose New project. Type a name: the preview shows Branch and Folder on two lines. Choose
+  Buildbox in Run on and atlas-docs as the repository. One message offers "Add it to
+  Buildbox". It opens Add repository on Machines with Buildbox and a folder filled in. Add it,
+  and New project returns with Buildbox chosen and your name kept. A machine's row menu on
+  Machines offers Add repository too.
+- Narrow the window to 390 pixels. The top bar holds the menu, the project, and the bell, with
+  the connection as a dot on the bell. Open the bell for the full state and Reconnect now.
+  Inspecting sits under the tabs. The menu opens a drawer that starts with the agents needing
+  attention and scrolls as one, with the service pages at its end. The board is one list with
+  the sprints needing you first. In All projects and in a sprint's tasks, each row's second line
+  starts with its status. A diff in Git has one line-number gutter.
+- At 768 pixels with the sidebar open, Home's tabs read Attention, Projects, Questions, and
+  Approvals beside a New project icon, and the breadcrumb keeps its names.
+- Expand a request on Home and answer it. The row eases open, and the answered row folds away.
+- Open Design notes and choose Reconnecting. The Live indicator turns amber, says when it last
+  heard from the service, and offers Reconnect now. Nothing on the page moves. Hover a disabled
+  button to read why. After 30 seconds it says Offline. The Offline preview shows that state at once.
+- Open the bell in `?sample=heavy`. It lists six requests, failed starts first and then the longest
+  wait, each with its age, and ends with View all 10.
 
 ## Existing page capabilities and new workspace views
 
-The navigation footer now contains Alerts, Machines, Subscriptions, Settings,
-and Log out. The top bar shows the connection state. Design notes
-contains preview controls for session expiry, login errors, connection loss,
+The navigation footer is a row of icons for Phone notifications, Machines,
+Subscriptions, Service settings, and Design notes, above the account and Log out. The top bar shows the connection state. Design notes
+contains preview controls for session expiry, login errors, connection loss and Offline,
 failed starts, permissions, and large-item failure.
 
 Agent threads retain stop/resume, failed-start reasons, permission controls,
-full large-item loading, tool calls, and delivery history. Sage surfaces team
+full large-item loading, tool calls inside their approvals, and delivery history under Delivery details. Sage surfaces team
 permission requests alongside design questions. Stopping an agent cancels
 its permissions while leaving its questions answerable.
 
@@ -109,11 +200,11 @@ Sessions keep separate history and drafts. No real command runs: `help` lists th
 Git combines a repository worktree tree, staging, commit messages,
 fetch/pull/push, conflicts, unified or split diffs, and commit history. A split diff needs 900 pixels, as Visual Studio Code does; a narrower window shows it unified.
 Team branches integrate into their project branch. Project integration into
-main opens a review. Dirty source or destination worktrees block integration. Clicking a file opens its diff directly. Workspace Settings shows
-the assigned repository, branch, folder, and machine, with a saved shell
-preference for this project. The global Settings page retains service controls.
+main opens a review. Dirty source or destination worktrees block integration. Clicking a file opens its diff directly. Project settings shows
+the assigned repository, branch, folder, and machine as a list, with a shell
+preference that saves on change, and offers Rename and Archive. The global Settings page retains service controls.
 
-New project defaults to Start work tree. Its repository list also offers New repository, which creates a folder in the workspace folder and starts on main. The project name determines its
+New project defaults to Create a worktree. Its repository list also offers New repository, which creates a folder in the workspace folder and starts on main. The project name determines its
 branch and folder, with a numeric suffix when needed. Unchecking uses the
 selected machine's main checkout. Run on chooses the machine before the
 project name. The dialog previews that host's branch and folder. Offline
@@ -186,8 +277,9 @@ Those patterns and the second type pairing were discarded.
 All three palettes are custom explorations, filtered through the UI skill's
 craft rules. Harbor uses layered blue surfaces. Field uses green-tinted light
 surfaces. Dusk uses layered plum surfaces with a peach action color. Each
-uses the operating system's available sans-serif and monospace fonts, so the
-prototype has no remote font dependency. Final type remains undecided.
+used the operating system's available sans-serif and monospace fonts. Since
+2026-11-08 the workbench uses Inter and JetBrains Mono, served from the repository, as
+DESIGN.md records.
 
 The owner selected Field as light mode and Dusk as dark mode on 2026-11-05.
 Harbor remains in the initial screenshots as a historical candidate.
@@ -215,8 +307,8 @@ Phone users can use the status strip to jump between columns. Focused chat
 is centered on larger monitors.
 
 Find project or agent opens the quick switcher. Command or Control + K
-also opens it. Arrow keys and Enter choose a result. Only projects needing you filters
-the navigation tree, and the top-bar bell opens decisions, permissions, and
+also opens it, and the hint shows the key for the system in use. Arrow keys and Enter choose a result. Only projects needing you filters
+the navigation tree, and the top-bar bell opens questions, approvals, and
 failed starts with direct links to the relevant thread item.
 
 The sidebar now groups Home and Find project or agent above a border.
@@ -225,10 +317,12 @@ tree. Repository names still open their project lists; there is no separate
 Repositories destination. Borders separate the project tree, repository
 groups, and service pages. This replaces the earlier disconnected controls.
 
-The composer shows current progress and stop/resume, a subscription picker,
-and Add context for task and file references. Activity details link to Git.
-Terminal's plus button starts another session within that worktree. Switching
-projects, teams, or terminal sessions preserves each session's input.
+The composer shows current progress and Stop while the agent is busy, Resume in place of the
+input when it is stopped, and a tool row with Add context, the subscription, the model, the
+effort, and the context in use. Activity details link to Git.
+Terminal's plus button starts another session within that worktree. Hover a session's tab to
+close it, and double-click it to rename it. Switching projects, teams, or terminal sessions
+preserves each session's input.
 
 ## Home and density critique
 

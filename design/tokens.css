@@ -1,4 +1,6 @@
-/* Shephrd: Field light mode and Dusk dark mode. Approved 2026-11-05. */
+/* LGcode: Field light mode and Dusk dark mode. Approved 2026-11-05. */
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url(fonts/inter/InterVariable-latin.woff2) format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400 800;font-display:swap;src:url(fonts/jetbrains-mono/JetBrainsMono-latin.woff2) format('woff2')}
 :root {
   color-scheme:light;
   --color-bg:#f6f8f5; --color-surface:#ffffff; --color-raised:#edf2ec;
@@ -7,17 +9,17 @@
   --color-success:#2e6848; --color-warn:#805a1b; --color-error:#a73d48;
   --color-focus:#285e43; --color-line:#ccd8cb; --color-selected:#d5e5d5;
   --shadow-1:0 4px 14px rgb(22 48 28 / .07); --shadow-2:0 18px 60px rgb(22 48 28 / .18);
-  --font-display:system-ui,-apple-system,'Segoe UI','Helvetica Neue',Arial,sans-serif;
-  --font-body:system-ui,-apple-system,'Segoe UI','Helvetica Neue',Arial,sans-serif;
-  --font-mono:ui-monospace,'SF Mono','SFMono-Regular',Consolas,'DejaVu Sans Mono',monospace;
-  --scale-xs:.75rem; --scale-sm:.8125rem; --scale-md:.9375rem;
-  --scale-lg:1.125rem; --scale-xl:1.65rem; --scale-2xl:2rem;
-  --weight-body:400; --weight-medium:550; --weight-display:650;
+  --font-display:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,'SF Mono',Consolas,monospace;
+  --text-xs:11px; --text-sm:12px; --text-md:13px; --text-lg:15px; --text-xl:20px; --text-input:16px;
+  --weight-body:400; --weight-medium:500; --weight-strong:600;
   --measure:68ch; --leading-body:1.65; --leading-tight:1.2;
-  --space-1:.25rem; --space-2:.5rem; --space-3:1rem;
-  --space-4:1.5rem; --space-5:2rem; --space-6:3rem;
-  --radius-sm:5px; --radius-md:10px; --radius-pill:999px;
-  --motion-fast:150ms; --motion-slow:250ms; --ease:cubic-bezier(.22,.7,.35,1);
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px; --space-6:24px;
+  --space-7:28px; --space-8:32px; --space-9:36px; --space-10:40px; --space-11:44px; --space-12:48px;
+  --radius-sm:4px; --radius-md:8px; --radius-pill:999px;
+  --control:32px; --control-dense:28px;
+  --motion-fast:120ms; --motion-slow:250ms; --ease:cubic-bezier(.22,.7,.35,1);
 }
 :root[data-theme="dark"] {
   color-scheme:dark;

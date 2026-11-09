@@ -13,7 +13,8 @@ compares it with the browser's photograph.
 
 The owner decided on 2026-11-07 that the design file is the source of truth, and that mocks are
 built from code. Reverse Fig is how a project that already has an interface gets its first design
-file.
+file. It goes one way only. The owner decided on 2026-11-08 that the conversion from the design file
+to code is a separate tool, built later as part of the Build team.
 
 It covers color tokens and components. It does not draw screens yet. The design file has a Screens
 page with one instance of each component, ready for that work.
@@ -70,15 +71,15 @@ Options:
 - `PLAYWRIGHT_MODULE` points at another Playwright copy, and `REVERSE_FIG_OPENPENCIL` at another
   `openpencil.js`.
 
-LGcode's own profile, `profiles/sheprd-mock.mjs`, runs against the web mock, which still says Sheprd, on the branch
-`area/web-mock`, served on port 4178. Run it from that worktree's root, and it writes
-`design/sheprd.fig`. On 2026-11-08 its first tuning passes reached 18 of 26 variants within 3
+LGcode's own profile, `profiles/lgcode-mock.mjs`, runs against the web mock in `design/`, served
+on port 4178. Run it from the repository root, and it writes
+`design/lgcode.fig`. On 2026-11-08 its first tuning passes reached 18 of 26 variants within 3
 percent, after the faults below were fixed in the scripts.
 
 ## Where a profile lives
 
 A profile is a JavaScript module, so it can hold code as well as settings. Keep it with the
-project it describes, for example as `.sheprd/reverse-fig.mjs`. A private project's profile must
+project it describes, for example as `.lgcode/reverse-fig.mjs`. A private project's profile must
 not be committed to a public repository, because its component markup and names describe that
 product.
 
@@ -105,7 +106,7 @@ shows each component on a page of its own, such as a component gallery or a mock
 
 ## What the profile hooks are for
 
-The first project after Sheprd's mock was Ananke, a React Native Web app. Its pass on 2026-11-08
+The first project after LGcode's mock was Ananke, a React Native Web app. Its pass on 2026-11-08
 added three hooks, and each one is for a kind of project, not for Ananke alone:
 
 - `tokens.read` supplies tokens from Node, for colors kept in a manifest or a theme file rather

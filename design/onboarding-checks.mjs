@@ -6,7 +6,7 @@ const check=(ok,label)=>{(ok?passed:failures).push(label)};
 const fresh=async({query='?sample=first',width=1440,height=900,scheme='dark'}={})=>{
  const context=await browser.newContext({viewport:{width,height},colorScheme:scheme}),page=await context.newPage();
  page.setDefaultTimeout(5000);page.on('pageerror',e=>errors.push(query+': '+e.message));
- await page.goto(base+query);await page.waitForFunction(()=>window.sheprdReady);
+ await page.goto(base+query);await page.waitForFunction(()=>window.lgcodeReady);
  return page;
 };
 const logIn=async page=>{await page.fill('#login-password','secret');await page.click('#login-submit')};
@@ -20,9 +20,9 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  const page=await fresh();
  check(await page.locator('#auth-gate').isVisible(),'A first run starts at the login page');
  check(!await page.locator('#setup').isVisible()&&!await page.locator('.app').isVisible(),'Nothing else shows before login');
- check(await page.locator('#auth-title').textContent()==='Log in','A first run does not say "Back to your projects"');
+ check(await page.locator('#auth-title').textContent()==='Sign in to LGcode','A first visit is asked to sign in, not welcomed back');
  await logIn(page);
- check(await title(page)==='Sheprd'&&await page.locator('#setup').isVisible(),'Login opens the first page');
+ check(await title(page)==='LGcode'&&await page.locator('#setup').isVisible(),'Login opens the first page');
  check(!await page.locator('.app').isVisible(),'The empty app stays hidden during setup');
  check(await page.locator('.setup-pairs div').count()===3,'The first page shows three paired promises');
  check(await page.locator('#setup input,#setup select,#setup textarea').filter({visible:true}).count()===0,'The first page asks for nothing');
@@ -61,8 +61,23 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  check((await page.locator('#sidebar').textContent()).includes('Invoice export'),'The sidebar shows the project');
  check((await page.locator('#sidebar').textContent()).includes('billing-api')||await page.evaluate(()=>repositories.length)===3,'The other repositories stay known');
  await page.fill('#message-input','Build the export');await page.click('#send-message');
- await page.waitForFunction(()=>document.querySelector('#view-body').textContent.includes('captured that direction'));
- check(true,'The first message gets a reply');
+ await page.waitForSelector('#view-body .request.is-question');
+ check((await page.locator('#view-body .request.is-question').textContent()).includes('Who will use this first'),'The first message gets a question back');
+ check(await page.locator('#attention-count').textContent()==='1','The question waits for the owner in the bell');
+ // Phone notifications are offered on the first waiting request, not during setup.
+ const prompt=page.locator('#view-body .request.is-question .push-prompt');
+ check(await prompt.isVisible()&&(await prompt.textContent()).includes('Get a phone notification the next time an agent waits for you.'),'The first waiting request offers phone notifications');
+ check(await page.locator('#view-body .push-prompt').count()===1,'The offer shows once');
+ check(!(await page.locator('#agent-controls').textContent()).includes('undefined'),'A question with no task waits without naming one');
+ check(await page.locator('#view-body .request.is-question p').filter({hasText:'Who will use this first'}).count()===0,'A short question is not repeated under its title');
+ await page.evaluate(()=>go({view:'home'}));
+ await page.locator('#view-body .home-request-row').first().click();
+ check(await page.locator('#view-body .request .push-prompt').count()===1,'Home shows the offer on the same request');
+ await page.locator('#view-body [data-dismiss-push-prompt]').click();
+ await page.waitForFunction(()=>!document.querySelector('.push-prompt'));
+ check(await page.evaluate(()=>api.debug.events().filter(r=>r.event_type==='client.AlertPromptDismissed').length)===1,'Not now is recorded once');
+ check(await page.evaluate(()=>!pushPromptDue()),'Not now ends the offer for good');
+ await page.evaluate(()=>go({view:'chat'}));
  const rows=await page.evaluate(()=>api.debug.events().map(r=>r.event_type));
  check(rows.filter(t=>t==='project.SetupFinished').length===1,'Finishing is recorded once');
  check(rows.filter(t=>t==='project.SetupProgressed').length===2,'Each step is recorded once');
@@ -70,9 +85,24 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  await page.click('#new-project');
  check(await page.locator('#project-dialog [data-close="project-dialog"]').first().isVisible()&&await page.locator('#project-form footer button.secondary').textContent()==='Cancel','The usual dialog is back to normal');
  await page.click('#project-form footer button.secondary');
- await page.reload();await page.waitForFunction(()=>window.sheprdReady);
+ await page.reload();await page.waitForFunction(()=>window.lgcodeReady);
  await logIn(page);
- check(await title(page)==='Sheprd','Finished setup leaves no step behind to resume');
+ check(await title(page)==='LGcode','Finished setup leaves no step behind to resume');
+ await page.context().close();
+}
+// Set up phone notifications goes to the notification service, and setting one ends the offer.
+{
+ const page=await fresh();
+ await toProject(page);await page.click('#project-submit');await page.waitForSelector('#setup',{state:'hidden'});
+ await page.fill('#message-input','Build the export');await page.click('#send-message');
+ await page.waitForSelector('.push-prompt');
+ await page.locator('.push-prompt [data-fix-notifications]').click();
+ check(await page.evaluate(()=>state.view)==='settings'&&await page.evaluate(()=>document.activeElement.id)==='carrier-server','Set up phone notifications opens the notification service');
+ await page.fill('#carrier-server','https://ntfy.sh');await page.fill('#carrier-topic','lgcode-owner');await page.locator('#carrier-topic').blur();
+ await page.waitForFunction(()=>!!sampleSettings.carrier);
+ check(!await page.evaluate(()=>pushPromptDue()),'A notification service ends the offer');
+ await page.evaluate(()=>go({view:'home'}));
+ check(await page.locator('.push-prompt').count()===0,'The request no longer offers phone notifications');
  await page.context().close();
 }
 // Leaving midway, and going back.
@@ -81,7 +111,7 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  await toProject(page);
  await page.locator('#project-form footer [data-setup-back]').click();
  check(await title(page)==='Found on this computer','Back works from the first project');
- await page.reload();await page.waitForFunction(()=>window.sheprdReady);
+ await page.reload();await page.waitForFunction(()=>window.lgcodeReady);
  await page.waitForSelector('#project-name:visible');
  check(await title(page)==='First project','Back does not lower how far the owner got');
  check(await page.locator('#auth-gate').isHidden(),'A reload in the same tab stays logged in');
@@ -95,12 +125,12 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
 {
  const page=await fresh({query:'?sample=first&setup=both'});
  await logIn(page);
- await page.click('text=Look around first');await page.waitForFunction(()=>window.sheprdReady);
+ await page.click('text=Look around first');await page.waitForFunction(()=>window.lgcodeReady);
  check(await page.locator('.app').isVisible()&&await page.evaluate(()=>projects.length)>0,'Look around first opens the sample');
  check(await page.locator('#auth-gate').isHidden(),'Looking around asks for no second login');
  check(await page.locator('#back-to-setup').isVisible(),'The sample offers its way back');
- await page.click('#back-to-setup');await page.waitForFunction(()=>window.sheprdReady);
- check(await title(page)==='Sheprd'&&page.url().includes('setup=both'),'Coming back returns to setup in the same state');
+ await page.click('#back-to-setup');await page.waitForFunction(()=>window.lgcodeReady);
+ check(await title(page)==='LGcode'&&page.url().includes('setup=both'),'Coming back returns to setup in the same state');
  await page.context().close();
  const plain=await fresh({query:''});
  check(await plain.locator('#back-to-setup').isHidden(),'The normal sample shows no way back to setup');
@@ -109,7 +139,7 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  await plain.evaluate(()=>document.querySelector('#notes').showModal());
  const links=await plain.locator('.first-run-links a').evaluateAll(all=>all.map(a=>a.getAttribute('href')));
  check(links.length===7&&links.every(l=>l.includes('reset=1')),'Design notes reach all seven first-run states');
- await plain.locator('.first-run-links a').first().click();await plain.waitForFunction(()=>window.sheprdReady);
+ await plain.locator('.first-run-links a').first().click();await plain.waitForFunction(()=>window.lgcodeReady);
  check(await plain.locator('#auth-gate').isVisible()&&!plain.url().includes('reset'),'A Design notes link really opens a first run, and a reload will not reset it');
  await plain.context().close();
 }
@@ -125,7 +155,7 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  await out.click('#sign-in-close');
  check(await out.locator('.setup-rows li',{hasText:'Claude Code'}).locator('.setup-state').textContent()==='Signed in','The row updates after sign-in');
  check(await out.locator('[data-setup-go=project]').isEnabled(),'Continue opens after sign-in');
- await out.reload();await out.waitForFunction(()=>window.sheprdReady);await out.waitForSelector('#setup-harnesses');
+ await out.reload();await out.waitForFunction(()=>window.lgcodeReady);await out.waitForSelector('#setup-harnesses');
  check(await out.locator('.setup-rows li',{hasText:'Claude Code'}).locator('.setup-state').textContent()==='Signed in','A sign-in survives a reload');
  await out.context().close();
 
@@ -187,7 +217,7 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  const codex=await fresh({query:'?sample=first&setup=codex-only'});
  await toProject(codex);await codex.click('#project-submit');await codex.waitForSelector('#setup',{state:'hidden'});
  check(await codex.evaluate(()=>projects[0].lead.tool)==='Codex','With only Codex signed in, the lead runs on Codex, not Claude Code');
- check((await codex.locator('#composer-account option').first().textContent()).startsWith('Codex'),'The composer names the harness that runs the lead');
+ check((await codex.locator('#composer-account').textContent()).startsWith('Codex'),'The composer names the harness that runs the lead');
  await codex.context().close();
 }
 // Each page at phone width, in both palettes.

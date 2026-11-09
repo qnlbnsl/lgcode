@@ -7,7 +7,7 @@ const check=(v,label)=>{if(!v)throw Error(label);checks.push(label)};
 const click=s=>page.locator(s).click(),text=s=>page.locator(s).textContent();
 const command=async value=>{await page.locator('#terminal-command').fill(value);await page.locator('#terminal-command').press('Enter')};
 try{
- await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.sheprdReady);
+ await page.goto(process.env.MOCK_URL||'http://127.0.0.1:4178/workbench.html');await page.waitForFunction(()=>window.lgcodeReady);
  await click('.project-select[data-project="workspace"]');
  check(await page.locator('#workspace-tabs [data-main-view="terminal"]').count()===1,'Project workspace offers a Terminal view');
  await click('[data-main-view="terminal"]');check(await page.locator('#terminal-form').isVisible()&&!await page.locator('#composer-wrap').isVisible(),'Terminal replaces the main conversation with command input');
@@ -38,7 +38,7 @@ try{
  check(await text('#diff-path').then(t=>t.includes('app/sidebar.tsx')),'Returning to Git restores the selected file');
  await click('[data-main-view="workspace-settings"]');
  check(await text('#view-title').then(t=>t==='Project settings')&&await text('#workspace-location').then(t=>t.includes('feat/workspace')),'Workspace has a separate Settings tab with its assigned worktree');
- await page.locator('#workspace-shell').selectOption('zsh');await click('#save-workspace-settings');
+ await page.locator('#workspace-shell').selectOption('zsh');check(await text('[data-saved-for="workspace-shell"]').then(t=>t.includes('Saved'))&&await page.locator('#save-workspace-settings').count()===0,'PSET-1: the shell saves as it changes, with a Saved mark and no Save button');
  await click('[data-main-view="source-control"]');await click('[data-main-view="workspace-settings"]');
  check(await page.locator('#workspace-shell').inputValue()==='zsh','Workspace-specific preferences survive tab navigation');
  await click('#new-project');
@@ -48,17 +48,19 @@ try{
  await click('#project-submit');await click('[data-main-view="workspace-settings"]');
  check(await text('#workspace-location').then(t=>t.includes('garden-tools')&&t.includes('.worktrees/garden-tools')),'Creating a project assigns the named worktree');
  await click('#new-project');await page.locator('#project-name').fill('Shared checkout');await page.locator('#project-worktree').uncheck();
- check(await text('#project-location-preview').then(t=>t.includes('main')&&!t.includes('.worktrees')),'Unchecking Start worktree previews the main checkout');
+ check(await text('#project-location-preview').then(t=>t.includes('main')&&!t.includes('.worktrees')),'Unchecking Create a worktree previews the main checkout');
  await click('#project-submit');await click('[data-main-view="workspace-settings"]');
  check(await text('#workspace-location').then(t=>t.includes('Main checkout')&&!t.includes('.worktrees')),'Opting out uses the repository’s main checkout');
  await click('[data-system-page="machines"]');check(await text('#view-title').then(t=>t==='Machines'),'Machines is a global page');
- await click('#connect-machine');await page.locator('#machine-name').fill('Office worker');await click('#pair-machine');check((await text('#pair-code-value')).length>=20&&(await text('#pair-command')).startsWith('sheprd connect '),'The master shows the pairing code and the command');await page.waitForFunction(()=>document.querySelector('#pair-status').textContent.includes('connected'));await click('#pair-code [data-close="machine-dialog"]');
+ await click('#connect-machine');await page.locator('#machine-name').fill('Office worker');await click('#pair-machine');check((await text('#pair-code-value')).length>=20&&(await text('#pair-command')).startsWith('lgcode connect '),'The master shows the pairing code and the command');await page.waitForFunction(()=>document.querySelector('#pair-status').textContent.includes('connected'));await click('#pair-code [data-close="machine-dialog"]');
  check(await text('#view-body').then(t=>t.includes('Office worker')&&t.includes('Awaiting confirmation')),'Pairing requires confirmation before a worker becomes available');
  await click('[data-confirm-machine]');const newWorker=page.locator('[data-project-machine="workspace"] option').last();check(await newWorker.textContent().then(t=>t.includes('Office worker'))&&await newWorker.isDisabled(),'Confirmed worker remains unavailable for placement until its repository is connected');
  await page.locator('[data-project-machine="workspace"]').selectOption('buildbox');
  check(await text('#placement-message').then(t=>t.includes('Agent console')&&t.includes('Buildbox')&&t.includes('future')),'Master can assign a future run to a paired worker with the repository');
  await click('#change-role');await click('#confirm-role');check(await page.locator('[data-project-machine]').count()===0&&await page.locator('#join-master-form').isVisible(),'Worker mode joins a master and cannot assign projects');
- await page.locator('#master-address').fill('https://studio.example');await page.locator('#master-code').fill('SAMPLE-PAIR');await click('#join-master');check(await text('#machine-mode-state').then(t=>t.includes('Paired')),'Worker preview can pair to a master');
+ await page.locator('#master-address').fill('https://studio.example');await page.locator('#master-code').fill('SAMPLE-PAIR');await click('#join-master');check(await text('#machine-mode-state').then(t=>t.includes('Connected'))&&await page.locator('#join-master-form').count()===0&&await text('.worker-status').then(t=>t.includes('https://studio.example')),'WORKER-1: a paired worker shows its master and the connection instead of the form');
+ await click('#leave-master');check(await page.locator('#confirm-dialog').isVisible()&&(await text('#confirm-title')).includes('studio.example'),'Disconnect asks first and names the master');await click('#confirm-run');check(await page.locator('#join-master-form').isVisible()&&await page.evaluate(()=>!H.master.address),'Disconnecting returns to the pairing form');
+ check(await page.locator('#join-master').evaluate(b=>b.getBoundingClientRect().top-document.querySelector('#master-code').getBoundingClientRect().bottom)>=8,'WORKER-1: the pairing button sits at least 8 pixels below its field');
  check(await page.locator('#connect-machine').count()===0,'Worker mode hides the master-only Connect worker flow');
  await click('.project-select[data-project="desktop"]');await click('[data-main-view="terminal"]');
  check(await text('.terminal-top').then(t=>t.includes('Studio')&&t.includes('Worker')),'Terminal reflects this computer’s current worker role');
@@ -69,11 +71,20 @@ try{
  check(await page.locator('[data-account-harness="codex"]').count()===3&&await text('#view-body').then(t=>t.includes('Codex extra')&&t.includes('Needs sign-in')),'Adding another Codex subscription preserves separate identity and sign-in');
  await page.locator('[data-connect-subscription]').last().click();check(await page.locator('#subscription-login').isVisible()&&await text('#subscription-login').then(t=>t.includes('stays private to this subscription')&&t.includes('codex login')),'Each subscription has its own sign-in context');
  await page.waitForFunction(()=>document.querySelector('#sign-in-status').textContent.startsWith('Signed in'));await click('#sign-in-close');check(await page.locator('[data-account-name="Codex extra"]').textContent().then(t=>t.includes('Available')),'Completing sample sign-in updates only that subscription');
+ // SUB-1: usage, a saved confirmation, and Rename and Remove in a row menu.
+ check(await text('[data-account-name="Personal"]').then(t=>t.includes('62%')&&t.includes('resets 14:00'))&&await text('[data-account-name="Work"]').then(t=>t.includes('Not reported')),'SUB-1: each subscription shows its share of the usage limit and when it resets');
+ check(await page.locator('[data-account-name="Team"] .usage-high').count()===1,'SUB-1: a limit 90 percent used is amber');
+ await page.locator('[data-account-enabled="codex-personal"]').uncheck();check(await text('[data-saved-for="account-codex-personal"]').then(t=>t.includes('Saved')),'SUB-1: Use for new work shows a Saved mark');
+ await click('[data-row-menu="subscription"][data-row-id="codex-personal"]');check(await page.locator('#row-menu').evaluate(m=>m.matches(':popover-open'))&&await page.locator('#row-menu [data-row-action]').allTextContents().then(t=>t.join()==='Rename,Remove'),'SUB-1: the row menu offers Rename and Remove');
+ await click('#row-menu [data-row-action="rename"]');await page.locator('#rename-input').fill('Personal plus');await click('#rename-submit');check(await page.locator('[data-account-name="Personal plus"]').count()===1,'Renaming a subscription keeps it and changes its name');
+ await click('[data-row-menu="subscription"][data-row-id="codex-personal"]');await click('#row-menu [data-row-action="remove"]');check(await text('#confirm-impact').then(t=>t.includes('running agents use it')),'Removing a subscription asks first and names the agents that use it');await click('#confirm-dialog footer [data-close]');check(await page.locator('[data-account-name="Personal plus"]').count()===1,'Cancel keeps the subscription');
+ await click('[data-row-menu="subscription"][data-row-id="codex-extra-1"]');await click('#row-menu [data-row-action="remove"]');await click('#confirm-run');check(await page.locator('[data-account-name="Codex extra"]').count()===0,'Confirming Remove removes the subscription');
+ await page.setViewportSize({width:390,height:844});check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)&&await page.locator('[data-account-name="Work"] [data-connect-subscription]').evaluate(b=>b.getBoundingClientRect().right<=innerWidth),'SUB-1: at 390 pixels each subscription stacks, and Connect stays on screen');await page.setViewportSize({width:1440,height:900});
  await click('#design-notes');await click('[data-preview="reconnect"]');
  check(await page.locator('[data-account-enabled]').first().isDisabled(),'Offline subscription controls cannot appear to save changes');
  await click('#retry-connection');
  for(const theme of ['light','dark']){
-  await click(`[data-theme-choice="${theme}"]`);
+  await page.evaluate(t=>setTheme(t),theme);
   for(const view of ['subscriptions','machines']){
    await click(`[data-system-page="${view}"]`);
    for(const width of [390,1440]){await page.setViewportSize({width,height:width===390?844:900});check(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${theme}: ${view} has no page overflow at ${width}px`)}

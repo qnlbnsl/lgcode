@@ -1,5 +1,5 @@
 {
-  "passed": 56,
+  "passed": 61,
   "checks": [
     "Sidebar and lead panel expose resize controls",
     "Keyboard resizing changes the sidebar width",
@@ -14,7 +14,12 @@
     "Team staging and commit draft are isolated from the project",
     "Uncommitted destination changes prevent integration",
     "A clean team branch merges into its project branch",
-    "Conflicts prevent integration",
+    "CONFLICT-2: conflicts have their own section with a count, and they prevent integration",
+    "CONFLICT-2: the worktree row is marked with its conflict",
+    "CONFLICT-2: the integrate line names the conflicts left and links to the file",
+    "CONFLICT-1: the conflict opens in the diff pane, with ours, the base, and theirs for each conflict",
+    "CONFLICT-1: each conflict takes its own choice",
+    "CONFLICT-1: Both keeps ours, then theirs",
     "Conflict resolution returns the file to changes for review and staging",
     "Project integration opens an explicit review before main",
     "Approving the project review merges into main",
