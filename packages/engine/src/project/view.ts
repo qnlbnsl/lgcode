@@ -5,7 +5,7 @@ export const own = <T>(rows: Readonly<Record<string, T>>, id: string): T | undef
 export const projectKey = (projectId: string, id: string) => JSON.stringify([projectId, id])
 export const projectView = (snapshot: Snapshot): ProjectView => snapshot.project as ProjectView
 const empty = <T>(): Readonly<Record<string, T>> => Object.create(null)
-export const emptyProject = (): ProjectView => ({ repositories: empty(), locations: empty(), workspaces: empty(), projects: empty(), teams: empty(), sprints: empty(), tasks: empty(), agentProjects: empty(), parents: empty() })
+export const emptyProject = (): ProjectView => ({ creations: empty(), repositories: empty(), locations: empty(), workspaces: empty(), projects: empty(), teams: empty(), sprints: empty(), tasks: empty(), agentProjects: empty(), parents: empty() })
 const change = <T>(rows: Readonly<Record<string, T>>, id: string, f: (row: T) => T) => {
   const row = own(rows, id)
   return row === undefined ? rows : { ...rows, [id]: f(row) }
@@ -23,6 +23,10 @@ export const projectAfter = (view: ProjectView, event: Event, sequence: number, 
         ...(projectId === undefined ? {} : { agentProjects: { ...view.agentProjects, [event.agentId]: projectId } }) }
     }
     case "project.SettingsChanged": return { ...view, settings: event.settings }
+    case "project.CreationPlanned": return { ...view, creations: { ...view.creations, [event.creation.requestId]: event.creation } }
+    case "project.CreationClaimed": return { ...view, creations: change(view.creations, event.creationRequestId, (row) => ({ ...row,
+      [event.kind === "repository" ? "repositoryIdentity" : "folderIdentity"]: event.identity })) }
+    case "project.CreationFinished": { const creations = { ...view.creations }; delete creations[event.creationRequestId]; return { ...view, creations } }
     case "project.RepositoryAdded": { const { _tag, ...row } = event; return { ...view, repositories: { ...view.repositories, [row.repoId]: row } } }
     case "project.RepositoryLocated": { const { _tag, ...row } = event; return { ...view, locations: { ...view.locations, [projectKey(row.repoId, row.machineId)]: row } } }
     case "project.WorktreeCreated": { const { _tag, ...row } = event; return { ...view, workspaces: { ...view.workspaces, [row.worktreeId]: row } } }
@@ -42,6 +46,10 @@ export const projectAfter = (view: ProjectView, event: Event, sequence: number, 
     case "project.Placed": return { ...view, projects: change(view.projects, event.projectId, (row) => ({ ...row, machineId: event.machineId, worktreeId: event.worktreeId })) }
     case "project.PreferencesChanged": return { ...view, projects: change(view.projects, event.projectId, (row) => ({ ...row, shell: event.shell })) }
     case "project.Renamed": return { ...view, projects: change(view.projects, event.projectId, (row) => ({ ...row, name: event.name })) }
+    case "project.GoalChanged": return { ...view, projects: change(view.projects, event.projectId, (row) => ({ ...row, goal: event.goal })) }
+    case "project.ArchiveStarted": return { ...view, projects: change(view.projects, event.projectId, (row) => ({ ...row, archiving: true })) }
+    case "project.Archived": return { ...view, projects: change(view.projects, event.projectId, (row) => ({ ...row, archiving: false, archivedAt: at })) }
+    case "project.Restored": return { ...view, projects: change(view.projects, event.projectId, (row) => { const { archivedAt: _a, ...rest } = row; return { ...rest, archiving: false } }) }
     case "project.StageChanged": return { ...view, projects: change(view.projects, event.projectId, (row) => ({ ...row, stage: event.stage })) }
     case "project.TeamAdded": { const { _tag, ...row } = event; return { ...view, teams: { ...view.teams, [projectKey(row.projectId, row.teamId)]: row } } }
     case "project.SprintAdded": { const { _tag, ...row } = event; return { ...view, sprints: { ...view.sprints, [projectKey(row.projectId, row.sprintId)]: row } } }

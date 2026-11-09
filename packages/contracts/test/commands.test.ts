@@ -45,7 +45,7 @@ const clientReads = ["client.snapshot", "client.roster", "client.thread", "clien
 // three named ones plus the two that change accounts and harness settings as a whole (`accounts`,
 // `harnesses`). `subscribe` is agent-callable (criterion 7.3: an agent's `subscribe` sees its own
 // events) but is not offered as an MCP tool because a stream cannot be a tool.
-const projectOwnerCommands = ["project.settings", "project.settings.set", "project.repository.add", "project.repository.locate", "project.repositories", "project.workspace.register", "project.workspaces", "project.create", "project.rename", "project.place", "project.preferences.set"]
+const projectOwnerCommands = ["project.settings", "project.settings.set", "project.repository.add", "project.repository.locate", "project.repositories", "project.workspace.register", "project.workspaces", "project.create", "project.creations", "project.goal.set", "project.archive", "project.restore", "project.rename", "project.place", "project.preferences.set"]
 const projectTools = ["project.stage.set", "project.read", "project.team.create", "project.sprint.create", "project.sprint.update", "project.sprint.complete", "project.task.create", "project.task.update", "project.task.note", "project.task.history"]
 const projectCommands = [...projectOwnerCommands, ...projectTools]
 const expectedWebCommands = ["client.web.settings", "client.web.settings.set"]

@@ -1,5 +1,17 @@
 // Fixed public reasons contain no caller-controlled text or host error output.
 export const projectRefusalReasons = new Set([
+  "only the confirmed local machine can start a project",
+  "finish pending project creations before starting another",
+  "configure the workspace folder before creating a project",
+  "repository is unavailable",
+  "main repository checkout is required",
+  "main repository checkout needs a named branch",
+  "project creation intent is unavailable",
+  "project creation is unfinished; inspect project.creations and retry the original request",
+  "project archive is unfinished because an agent could not stop",
+  "no ready signed-in lead account is available",
+  "invalid lead defaults",
+  "finish archiving the project before restoring it",
   "a path cannot contain a registered secret",
   "an existing local Git checkout root with a named branch is required",
   "board disabled",

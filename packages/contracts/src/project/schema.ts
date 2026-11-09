@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema"
-import { AgentId, EpochMilliseconds, EventSequence } from "../ids.ts"
+import { AccountId, AgentId, EpochMilliseconds, EventSequence, HarnessId, RequestId } from "../ids.ts"
 import { ChannelId } from "../board/ids.ts"
+import { PermissionLevel } from "../permission.ts"
 
 export const ProjectId = Schema.NonEmptyString.pipe(Schema.brand("ProjectId"))
 export type ProjectId = typeof ProjectId.Type
@@ -20,7 +21,11 @@ export const ProjectPath = Schema.String.check(Schema.isMinLength(1), Schema.isM
 export const ProjectStage = Schema.Literals(["design", "plan", "build", "review", "handover"])
 export const SprintPhase = Schema.Literals(["Define", "Design", "Plan", "Build", "Verify", "Review", "Hand over"])
 export const TaskState = Schema.Literals(["queue", "active", "review", "blocked", "done"])
-export const ProjectSettings = Schema.Struct({ workspaceFolder: ProjectPath, shell: ProjectName })
+export const ProjectLeadDefaults = Schema.Struct({
+  harness: HarnessId, account: Schema.Union([Schema.TaggedStruct("any", {}), Schema.TaggedStruct("named", { accountId: AccountId })]),
+  model: Schema.optionalKey(ProjectName), effort: Schema.optionalKey(ProjectName), permission: PermissionLevel
+})
+export const ProjectSettings = Schema.Struct({ workspaceFolder: ProjectPath, shell: ProjectName, lead: Schema.optionalKey(ProjectLeadDefaults) })
 export type ProjectSettings = typeof ProjectSettings.Type
 export const Repository = Schema.Struct({ repoId: RepositoryId, name: ProjectName, path: ProjectPath })
 export type Repository = typeof Repository.Type
@@ -35,9 +40,20 @@ export type Workspace = typeof Workspace.Type
 export const Project = Schema.Struct({
   projectId: ProjectId, repoId: RepositoryId, name: ProjectName, goal: ProjectText,
   leadAgentId: AgentId, worktreeId: WorkspaceId, machineId: ProjectName,
-  stage: Schema.optionalKey(ProjectStage), shell: Schema.optionalKey(ProjectName), archivedAt: Schema.optionalKey(EpochMilliseconds)
+  stage: Schema.optionalKey(ProjectStage), shell: Schema.optionalKey(ProjectName), archivedAt: Schema.optionalKey(EpochMilliseconds), archiving: Schema.optionalKey(Schema.Boolean)
 })
 export type Project = typeof Project.Type
+export const CreationFolderIdentity = Schema.Struct({ device: Schema.NonEmptyString, inode: Schema.NonEmptyString })
+// Only unfinished creation intents live in this projection. Completed requests
+// use the engine's ordinary durable receipt instead.
+export const ProjectCreation = Schema.Struct({
+  requestId: RequestId, bodyHash: Schema.NonEmptyString, projectId: ProjectId,
+  repository: Repository, workspace: Workspace, workspaceFolder: ProjectPath,
+  newRepository: Schema.Boolean, name: ProjectName, goal: ProjectText, shell: ProjectName,
+  leadName: ProjectName, lead: ProjectLeadDefaults,
+  repositoryIdentity: Schema.optionalKey(CreationFolderIdentity), folderIdentity: Schema.optionalKey(CreationFolderIdentity)
+})
+export type ProjectCreation = typeof ProjectCreation.Type
 export const Team = Schema.Struct({
   projectId: ProjectId, teamId: TeamId, name: ProjectName, worktreeId: WorkspaceId,
   stage: Schema.optionalKey(ProjectStage), area: Schema.optionalKey(ProjectName),

@@ -9018,3 +9018,101 @@ Client and engine type checks pass. The targeted recovery and browser-boundary
 batch passes all 32 tests in five files. An independent five-mode probe also
 passes and retains a typed SocketReadError for an active malformed frame.
 Complete corrected-head checks remain required before acceptance.
+
+## 538. New project could not recover repository, worktree, and lead creation
+
+Found: 2026-11-08, while implementing the real New project journey.
+State: corrected in the W04B implementation; independent review remains required.
+
+The temporary public command recorded an existing lead and checkout.
+It could not own or recover the filesystem and process effects required by New project.
+A Git operation can succeed before the final project record is written.
+Caller cancellation can also arrive after the lead and receipt commit, before launch starts.
+Returning an error proves neither rollback nor the absence of a process.
+
+Creation now persists one bounded intent before creating a repository or worktree.
+The intent fixes the request hash, project identity, paths, branch, and selected defaults.
+There are at most 64 unfinished creation intents.
+A filesystem witness bridges directory creation and its durable device and inode claim.
+Git runs only after that claim commits.
+Recovery verifies the claimed directory and the actual repository and branch.
+It never adopts an unrelated empty directory or a replaced claimed directory.
+Only the exact owned witness file is removed after its claim commits.
+Other paths and existing Git exclusion entries are never removed.
+The owner can inspect unfinished operations through the bounded `project.creations` read.
+Retrying the original request completes the same operation.
+A changed body under that request identity is refused.
+The final append records the project, lead, and ordinary receipt together.
+Normal engine restart recovery restarts that recorded lead identity when needed.
+
+Project creation and archive orchestration belong to the engine's lifetime scope.
+Disconnecting a caller cannot strand a committed lead before its start hook runs.
+The writer's transaction commits the receipt before publication, which cannot fail.
+A typed database write failure latches the writer until service recovery.
+The receipt decode and reply read happen inside the transaction before its commit.
+A test-only failure injected outside a successful transaction therefore represents a
+lost service result, rather than a production typed failure that allows more writes.
+A same-service cancellation probe gates the actual committed result before launch.
+After cancelling that caller, the engine launches the same lead exactly once.
+A retry returns the original project without another worktree or lead.
+A later session-recording failure stops the actual controlled adapter process.
+Its recorded project remains visible for ordinary service recovery.
+
+Archive records its in-progress state before stopping every project member.
+That state prevents child starts and resumes while stops are being confirmed.
+A failed stop leaves the archive unfinished and retryable.
+Only confirmed stops permit the archived timestamp to commit.
+Questions remain open, and permissions follow the ordinary stop cancellation rules.
+Restore preserves the setup and lead identity without starting another process.
+
+The local filesystem race limitation in issue 49 still applies.
+An interruption between mkdir and its witness write leaves an ambiguous planned path.
+That path stays visible in the recovery read and requires owner inspection.
+Recovery refuses it without deleting or adopting it.
+Partial Git metadata that cannot be verified also requires owner inspection.
+There is no automatic destructive cleanup or cross-process atomic filesystem claim.
+
+## 540. The reservation cancellation test could cancel before its fake peer started the turn
+
+Found: 2026-11-08, during the first complete project lifecycle check.
+State: the test synchronizes with the actual second child turn; independent review remains required.
+
+The complete check exited 1 at 2026-11-09T05:16:12.611869+00:00.
+The protocol 2 case in `packages/engine/test/runner/cancel-reservation.test.ts`
+received only the first reservation's `promptReply` and `turnEnded` events.
+It never received the stopped terminal event for reservation 42.
+That failure remains preserved in `/tmp/w04b-full-check-1.log`.
+An isolated pass of the unchanged test did not explain the failure.
+
+The production runner returns from prompt after writing its frame to the child pipe.
+That acknowledgement does not establish that the child has started its prompt handler.
+The protocol transport queues prompt requests for its server handler.
+It processes cancel notifications directly from its input reader.
+The fake agent installs a cancel signal only when its prompt handler starts.
+It discards a cancellation received before that signal exists.
+The changed `withEngine` log-wrapper branch was not on this test's path.
+The test uses the unchanged `withAcpRunner` helper.
+
+A controlled real-runner probe paused the child while the second prompt and
+current cancel reached its pipe, then resumed the child.
+Observation-only instrumentation in a temporary copy of the fake agent recorded
+cancel with no installed signal, followed by the second prompt handler installing it.
+The wire still contained prompt 1, prompt 2, and exactly one cancel, in that order.
+The original stale-cancel rejection and zero-frame assertions passed.
+The terminal wait then failed with the same missing-event report as the full run.
+The only terminal event belonged to sent sequence 17.
+A control waited for the actual second handler before sending current cancel.
+It passed the original assertions with sent sequence 42, `stopped: true`,
+and exactly one cancel frame.
+The full run did not record the child's internal scheduling.
+The probe proves this failure mechanism without reconstructing that unrecorded schedule.
+
+The permanent test now emits a unique plan marker from the second child turn.
+It waits for that actual runner delivery update before exercising either cancellation.
+The marker follows installation of the child's cancel signal.
+It is not a timer, a fabricated runner event, or a relaxed terminal assertion.
+The original reservation identities, stale-cancel failure, zero stale-cancel frames,
+stopped terminal event, and exact one-current-cancel count remain unchanged.
+The production runner, protocol transport, and shared fake agent are unchanged.
+Temporary repository probes are removed after their evidence is retained in
+`/tmp/w04b-cancel-order/`.

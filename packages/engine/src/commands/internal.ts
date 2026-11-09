@@ -59,7 +59,12 @@ export type PiecePlan = Omit<Plan, "afterCommit" | "reply"> & {
 
 export type Planner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<Plan, CommandRefused | LogWriteFailed>;
 export type PiecePlanner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<PiecePlan, CommandRefused | LogWriteFailed>;
-export type PlannerTable = Readonly<Record<string, Planner> & Record<`${import("@lgcode/contracts").PieceNamespace}.${string}`, PiecePlanner>>;
+// Piece registrations still declare PiecePlanner at their source tables.
+// Two engine-owned project lifecycle commands also compose engine plans.
+type ProjectCommand = keyof typeof import("@lgcode/contracts").projectAccess;
+export type PlannerTable = Readonly<Record<string, Planner>
+  & Record<`${Exclude<import("@lgcode/contracts").PieceNamespace, "project">}.${string}`, PiecePlanner>
+  & Partial<Record<Exclude<ProjectCommand, "project.create" | "project.archive">, PiecePlanner>>>;
 
 export const freshRequest = () => Schema.decodeUnknownSync(RequestId)(randomUUID());
 export const readHarnesses = (runtime: Runtime): Effect.Effect<ReadonlyArray<HarnessSettings>, LogWriteFailed> =>
