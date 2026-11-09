@@ -1,5 +1,12 @@
 // Fixed public reasons contain no caller-controlled text or host error output.
 export const projectRefusalReasons = new Set([
+  "set the workspace folder before using Git",
+  "workspace settings changed; refresh and retry",
+  "registered workspace not found",
+  "registered workspace branch changed; restore the registered branch",
+  "integration requires a registered team source and its project workspace",
+  "Git operation queue is full; retry shortly",
+  "Git reply exceeds the read budget; select a smaller file or page",
   "a path cannot contain a registered secret",
   "an existing local Git checkout root with a named branch is required",
   "board disabled",
@@ -38,3 +45,6 @@ export const projectRefusalReasons = new Set([
   "workspace folder must be an existing absolute directory",
   "workspace is already registered",
 ])
+
+// These fixed service reasons never include a path, URL or Git stderr.
+for (const reason of ["invalid_path", "not_repository", "invalid_ref", "output_limit", "timeout", "cancelled", "git_unavailable", "git_failed", "busy", "collision", "dirty_destination", "dirty_source", "conflicts", "confirmation_required", "stale_state", "nothing_staged", "invalid_message", "missing_remote", "missing_upstream", "authentication_required", "network_failed", "push_rejected", "pull_diverged", "base_requires_review", "unsupported_provider", "push_required", "unsupported_conflict", "incomplete_choices"]) projectRefusalReasons.add(`Git: ${reason}`)

@@ -8,6 +8,7 @@ import type * as RpcGroup from "effect/rpc/RpcGroup";
 import type { PlannerTable, Snapshot } from "../commands/internal.ts";
 import { planners } from "../commands/planners.ts";
 import { reads, type ReadHandler } from "../api/reads.ts";
+import { gitPlanners, gitReads } from "../project/gitCommands.ts";
 import { projectPlanners, projectReads } from "../project/commands.ts";
 import { snapshotFor as projectSnapshotFor } from "../project/snapshot.ts";
 import { boardPlanners, boardReads } from "../board/commands.ts";
@@ -64,8 +65,8 @@ export const engineLists: EngineLists = {
     "roles.standing-rules": [],
   }, secretCommands: ["accounts set-secret", "client.alerts.carrier.set-token"],
   access: commandAccess,
-  planners: { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners, ...projectPlanners },
-  reads: { ...reads, ...alertReads, ...boardReads, ...projectReads },
+  planners: { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners, ...projectPlanners, ...gitPlanners },
+  reads: { ...reads, ...alertReads, ...boardReads, ...projectReads, ...gitReads },
   // The tables and reactors import engine services in this same module graph.
   // Resolve their values when used, after module initialization has completed.
   get views() { return pieceViews; },

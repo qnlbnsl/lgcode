@@ -1,8 +1,6 @@
 import { randomUUID } from "node:crypto"
-import { execFile } from "node:child_process"
 import { realpath, stat } from "node:fs/promises"
 import { isAbsolute } from "node:path"
-import { promisify } from "node:util"
 import { ProjectName, RepositoryId, WorkspaceId, ProjectId, TeamId, SprintId, TaskId, ChannelId,
   projectTeamGroup, type Event, type Project, type Task } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
@@ -12,6 +10,8 @@ import { refused, type Input, type Payload, type PiecePlanner } from "../command
 import { canLeadProject, canReadProject } from "./access.ts"
 import { own, projectKey, projectView } from "./view.ts"
 import { projectAgents, taskMetadata } from "./snapshot.ts"
+
+import { withGit, gitCall, localMachine, safePath } from "./gitApi.ts"
 
 const fresh = <S extends Schema.Top & { readonly Type: string }>(schema: S): S["Type"] => Schema.decodeUnknownSync(schema as never)(randomUUID()) as S["Type"]
 const ack = (requestId: unknown, events: ReadonlyArray<Event>) => ({ events, reply: () => ({ requestId }) })
@@ -30,28 +30,16 @@ const cleanName = (input: Input, name: string) => Effect.gen(function* () {
 const duplicateName = (input: Input, project: Pick<Project, "repoId" | "name">, except?: string) =>
   Object.values(projectView(input.snapshot).projects).some((row) => row.projectId !== except && row.repoId === project.repoId && row.name.toLowerCase() === project.name.toLowerCase())
 
-// These commands register a real existing local checkout. They do not create
-// worktrees, launch leads, or claim a remote machine was probed.
-const run = promisify(execFile)
-const inspectCheckout = (path: string) => Effect.tryPromise({
-  try: async () => {
-    if (!isAbsolute(path)) throw new Error("absolute path required")
-    const folder = await realpath(path)
-    const git = async (...args: string[]) => (await run("git", ["-C", folder, ...args], {
-      timeout: 5000, maxBuffer: 16384, env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0" }
-    })).stdout.replace(/\r?\n$/, "")
-    const top = await realpath(await git("rev-parse", "--show-toplevel"))
-    if (top !== folder) throw new Error("checkout root required")
-    const common = await realpath(await git("rev-parse", "--path-format=absolute", "--git-common-dir"))
-    const directory = await realpath(await git("rev-parse", "--absolute-git-dir"))
-    const branch = await git("symbolic-ref", "--short", "HEAD")
-    return { path: folder, common, branch, checkout: directory === common ? "main" as const : "worktree" as const }
-  }, catch: () => refused("an existing local Git checkout root with a named branch is required")
-})
-const localMachine = (id: string) => id === "local" ? Effect.void : Effect.fail(refused("only the local machine can register a checkout before machine pairing"))
-const safePath = (input: Input, path: string) => Effect.gen(function* () {
-  if ((yield* input.runtime.log.redactText(path)) !== path) return yield* refused("a path cannot contain a registered secret")
-})
+// Registration uses the same trusted service and queue as public Git calls.
+const inspectCheckout = (input: Input, path: string) => withGit(input, (git) => Effect.gen(function* () {
+  const repository = yield* gitCall(git.register(path))
+  const state = yield* gitCall(git.state(repository.path))
+  const checkouts = yield* gitCall(git.worktrees(repository.path))
+  const main = checkouts.items.find((row) => row.path === repository.path)
+  if (state.branch === null || main === undefined) return yield* refused("an existing local Git checkout root with a named branch is required")
+  return { path: repository.path, common: repository.commonDirectory, branch: state.branch,
+    checkout: repository.commonDirectory === `${repository.path}/.git` ? "main" as const : "worktree" as const }
+}))
 const settingsSet: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.settings.set">
   yield* safePath(input, p.settings.workspaceFolder)
@@ -66,7 +54,7 @@ const settingsSet: PiecePlanner = (input, raw) => Effect.gen(function* () {
 const repositoryAdd: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.repository.add">
   yield* localMachine(p.machineId); yield* safePath(input, p.path)
-  const checkout = yield* inspectCheckout(p.path)
+  const checkout = yield* inspectCheckout(input, p.path)
   if (Object.values(projectView(input.snapshot).repositories).some((repo) => repo.path === checkout.path)) return yield* refused("repository is already registered")
   const repoId = fresh(RepositoryId)
   return { events: [{ _tag: "project.RepositoryAdded", repoId, name: yield* cleanName(input, p.name), path: checkout.path },
@@ -77,8 +65,8 @@ const repositoryLocate: PiecePlanner = (input, raw) => Effect.gen(function* () {
   yield* localMachine(p.machineId); yield* safePath(input, p.path)
   const repo = own(projectView(input.snapshot).repositories, p.repoId)
   if (repo === undefined) return yield* refused("repository not found")
-  const registered = yield* inspectCheckout(repo.path)
-  const located = yield* inspectCheckout(p.path)
+  const registered = yield* inspectCheckout(input, repo.path)
+  const located = yield* inspectCheckout(input, p.path)
   if (registered.common !== located.common) return yield* refused("checkout belongs to a different repository")
   return ack(p.requestId, [{ _tag: "project.RepositoryLocated", repoId: p.repoId, machineId: p.machineId, path: located.path }])
 })
@@ -88,8 +76,8 @@ const workspaceRegister: PiecePlanner = (input, raw) => Effect.gen(function* () 
   const view = projectView(input.snapshot)
   const location = own(view.locations, projectKey(p.repoId, p.machineId))
   if (location === undefined) return yield* refused("repository location not found")
-  const repo = yield* inspectCheckout(location.path)
-  const checkout = yield* inspectCheckout(p.path)
+  const repo = yield* inspectCheckout(input, location.path)
+  const checkout = yield* inspectCheckout(input, p.path)
   if (checkout.common !== repo.common || checkout.branch !== p.branch || checkout.checkout !== p.checkout) return yield* refused("checkout does not match the repository, branch and type")
   if (Object.values(view.workspaces).some((row) => row.machineId === p.machineId && row.path === checkout.path)) return yield* refused("workspace is already registered")
   if (p.parentId !== undefined) {

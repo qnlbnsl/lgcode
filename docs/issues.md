@@ -9018,3 +9018,33 @@ Client and engine type checks pass. The targeted recovery and browser-boundary
 batch passes all 32 tests in five files. An independent five-mode probe also
 passes and retains a typed SocketReadError for an active malformed frame.
 Complete corrected-head checks remain required before acceptance.
+
+## 539. Redacting conflict protocol values could invalidate Git replies
+
+Found: 2026-11-08, while wiring the public Git commands.
+State: corrected in this change. Independent review remains pending.
+
+The initial integration redacted every returned string as display text.
+A registered short secret such as `conflict` changed the segment discriminator.
+The authenticated response then failed its typed encoding contract.
+A secret such as `ours` could also change a selected hunk's control value.
+The original Git service did not have a public reply path and is unchanged.
+
+The correction preserves fixed segment kinds and choices at their protocol
+positions, while redacting paths, file contents, hunk sides, authors, subjects,
+branch names, and review evidence through the production text redactor.
+Choosing a hunk is an owner-only read of a draft, without a stored Git event.
+Resolution still regenerates canonical content from the actual index stages.
+A verified compare link is also an owner-only read and never claims to create
+an actual pull request.
+
+The real authenticated client regression registers short synthetic secrets,
+reads a real merge conflict, chooses its `ours` side, and resolves the file.
+It checks that display content is redacted and that protocol values remain valid.
+A negative control with those protocol protections removed fails with the
+actual response-encoding error.
+A separate negative control removes the queue gate and proves that concurrent
+calls can overlap after a workspace-setting change.
+Restoring the gate prevents that overlap without changing Git service signatures.
+The focused checks, complete-check result, and exact source identity are recorded
+in the worker result when the assigned check actually finishes.
