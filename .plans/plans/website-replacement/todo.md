@@ -16,8 +16,10 @@ not ruled on.
 
 ## Engine: the data the mock shows
 
-The engine has none of this today. All of it goes in a new `project` piece with
-stored events, commands, a client API section and agent tools.
+The engine is being extended through the `project` piece, with stored events,
+commands, a client API section and agent tools.
+The unit reports record which foundations have passed independent verification.
+Unchecked items below still require their complete integration proof.
 
 ### Settings
 
@@ -85,7 +87,7 @@ git's failure in a form the page can show.
 - [ ] Work out a sprint's column in one shared function, as the mock does: Planned,
       In progress, Review or Done.
 - [ ] Refuse new tasks in a completed sprint.
-- [ ] Let moving to Done happen only with completion evidence. Keep release status
+- [ ] Let a sprint move to Done only with completion evidence. Keep release status
       separate.
 - [ ] Record a task's history for its Work and handoff timeline.
 - [ ] Tell the project lead when the owner adds a task. Agent's call.
@@ -249,7 +251,7 @@ The mock now shows all of these. `design/FEATURE-PARITY.md` maps each to its sou
 
 ## Tests and proof
 
-- [ ] Rewrite the 11 browser test files for the new page.
+- [ ] Update the existing browser test files for the new page.
 - [ ] Update `live-check-web.ts`, which finds elements by their current names.
 - [ ] Port `design/checks.mjs`, `operations-checks.mjs`, `workspace-tools-checks.mjs`,
       `workspace-redesign-checks.mjs`, `home-checks.mjs`, `revision-checks.mjs` and
