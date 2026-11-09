@@ -8,7 +8,7 @@ const settings = ({ snapshot, actor }: Input, payload: Record<string, unknown>) 
   if (actor._tag !== "owner") return yield* refused();
   const view = clientView(snapshot.client);
   return { reply: { requestId: payload.requestId, kinds: alertKindNames.map((kind) => ({ kind, push: view.push[kind] })),
-    carrier: view.carrier, tokenSet: view.tokenSet } };
+    carrier: view.carrier, tokenSet: view.tokenSet, pushPromptDismissed: view.pushPromptDismissed } };
 });
 const list = ({ runtime, snapshot, actor }: Input, payload: Record<string, unknown>) => Effect.gen(function* () {
   if (actor._tag !== "owner") return yield* refused();
@@ -23,11 +23,12 @@ const list = ({ runtime, snapshot, actor }: Input, payload: Record<string, unkno
     if (items.length >= (payload.limit as number)) { next = lastSequence; break; }
     // Reducers use only events and sequences. Timestamps come from the log,
     // so both the live projection and its rebuild remain deterministic.
-    const times = yield* runtime.sql<{ sequence: number; occurred_at: number }>`
-      SELECT sequence, occurred_at FROM events WHERE sequence = ${row.sequence} OR sequence = ${row.clearedSequence ?? -1}`;
     const mark = view.delivery[row.alertId];
+    const times = yield* runtime.sql<{ sequence: number; occurred_at: number }>`
+      SELECT sequence, occurred_at FROM events WHERE sequence = ${row.sequence} OR sequence = ${row.clearedSequence ?? -1} OR sequence = ${mark?.sequence ?? -1}`;
     const delivery = mark?.generation !== view.generation ? undefined : {
       generation: mark.generation, attempt: mark.attempt,
+      at: times.find((time) => time.sequence === mark.sequence)!.occurred_at,
       ...(mark.status === "failed" ? { status: mark.status, reason: mark.reason, final: mark.final } : { status: mark.status }),
     };
     const item = { alertId: row.alertId, alertKey: row.alertKey, kind: row.kind, title: row.title,
@@ -50,6 +51,11 @@ const list = ({ runtime, snapshot, actor }: Input, payload: Record<string, unkno
 
 export const alertReads = { "client.alerts.list": list, "client.alerts.settings": settings } satisfies Record<string, ReadHandler>;
 export const alertPlanners = {
+  "client.alerts.prompt.dismiss": ({ snapshot, actor }: Input, payload: Record<string, unknown>): Effect.Effect<PiecePlan, ReturnType<typeof refused>> =>
+    actor._tag !== "owner" ? Effect.fail(refused()) : Effect.succeed({
+      events: clientView(snapshot.client).pushPromptDismissed ? [] : [{ _tag: "client.AlertPromptDismissed" }],
+      reply: () => ({ requestId: payload.requestId }),
+    }),
   "client.alerts.dismiss": ({ snapshot, actor }: Input, payload: Record<string, unknown>): Effect.Effect<PiecePlan, ReturnType<typeof refused>> => {
     if (actor._tag !== "owner") return Effect.fail(refused());
     const alerts = clientView(snapshot.client).alerts;

@@ -29,7 +29,7 @@ it("1.22 default tables refuse delivery and add no holds, requests or kept secre
       holdsUnsettled: [], holdsIncoming: [], ownerHeld: [],
       posts: [], completions: [], noAnswers: [], channels: [], unread: [], wakes: [],
     });
-    else expect(section).toBeUndefined();
+    else expect(section).toEqual({ pushPromptDismissed: false });
     expect(lists.snapshotSections[namespace]!({ _tag: "agent", agentId: "target" }, state)).toBeUndefined();
   }
 });

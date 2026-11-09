@@ -248,6 +248,12 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   | `mcp` | `dog` |
 - **Filtered live updates** (idea). A subscription for phones that is filtered by agent and by event kind, with checkpoints that keep the cursor moving.
 - **One password login** (built). The service reads the password from the environment variable `LGCODE_WEB_PASSWORD`, and the dashboard asks for it. One person uses LGcode, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
+- **Owner phone notification actions** (built, 2026-11-08). The owner can
+  retry a failed notification through the configured service and send a real test
+  notification. Retry validates the displayed generation and attempt, and records
+  the next result and its time. A test creates no alert and stores no carrier
+  response. Declining the first waiting request's phone notification offer is
+  remembered across service restarts.
 - **Phone alerts through one sender** (built). Phone alerts go through one sender interface, `AlertSender`, with ntfy as the first carrier. A later carrier, such as Expo's push service for the phone app, slots in behind it (client API row 83).
 - **Mobile login** (later). Starts by looking at what Home Assistant does.
 - **VS Code extension** (later). One of the last things, along with the mobile app, by the owner's answer of 2026-11-03.

@@ -59,7 +59,7 @@ it("1.7 a section may be included for the owner and omitted for an agent", async
   expect(Object.hasOwn(await run({ _tag: "agent", agentId: "agent-a" }), "client")).toBe(false);
 });
 
-it("1.22 default snapshots include the installed roles summary for the owner and omit it for agents", async () => {
+it("1.22 default snapshots include notification settings and the roles summary for the owner and omit them for agents", async () => {
   registerRebuildCheck({ noLog: true });
   const snapshot = await loadSnapshot();
   const lists = await loadLists();
@@ -67,7 +67,7 @@ it("1.22 default snapshots include the installed roles summary for the owner and
     snapshot: Effect.succeed(emptyViews()), applyCommitted: () => Effect.void,
   })) as Effect.Effect<SnapshotReply, unknown, never>);
   const reply = await run(owner);
-  expect(Object.hasOwn(reply, "client")).toBe(false);
+  expect(reply.client).toEqual({ pushPromptDismissed: false });
   expect(reply.board).toMatchObject({ disabled: false, holdsUnsettled: [], holdsIncoming: [], ownerHeld: [] });
   expect(reply.roles).toEqual({
     roleFile: null, settings: {}, matters: { items: [], truncated: false },
