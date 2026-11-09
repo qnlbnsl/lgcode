@@ -69,8 +69,9 @@ caps their combined memory at 80 gigabytes and turns off swap for them.
 Three tests failed on every run on the owner's computer at `4c65727`, and pass
 on the build server.
 Issue 561 covers the launcher test, which assumes no system Node.js 26.
-Issue 562 covers two crash tests, where Arch Linux's `/bin/sh` is Bash rather
-than Dash.
+Issue 562 covers two crash tests, whose cause is not yet known.
+One difference between the computers is that Arch Linux's `/bin/sh` is Bash,
+while the build server's is Dash.
 Until both are fixed, a remote `pnpm check` exits 1 on these three alone, and
 a result must be compared with that list.
 
