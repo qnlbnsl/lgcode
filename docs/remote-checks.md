@@ -36,7 +36,7 @@ Each target first copies the working tree, including uncommitted changes.
 It prints the commit and the number of changed paths, so a result can be tied
 to the source it tested.
 Each working tree gets its own copy, named after its folder, under
-`~/lgcode-remote` on the other computer.
+`~/Work/lgcode` on the other computer.
 The exit status is the remote command's.
 
 ## Settings
@@ -49,8 +49,30 @@ Set these on the `make` command line:
 - `REMOTE_NAME`: the copy's name.
 - `REMOTE_SLOTS`: how many `remote-check` and `remote-browser` runs may use the
   other computer at once, 2 by default.
+- `REMOTE_SPARE_CPUS`: how many processors stay free, 2 by default.
+- `REMOTE_MEMORY`: how much memory all remote commands share, 80G by default.
 
 Later runs wait for a free slot.
+
+## Limits on the other computer
+
+The owner asked on 2026-11-09 that the tests never use the whole computer.
+Every remote command runs on the processors its session may use, minus the
+last two.
+On the owner's computer, the system already gives login sessions 16 of its 32
+processors, so the tests run on 14.
+All remote commands also share one systemd slice, `lgcode-remote.slice`, which
+caps their combined memory at 80 gigabytes and turns off swap for them.
+
+## Tests that fail only on the owner's computer
+
+Three tests failed on every run on the owner's computer at `4c65727`, and pass
+on the build server.
+Issue 561 covers the launcher test, which assumes no system Node.js 26.
+Issue 562 covers two crash tests, where Arch Linux's `/bin/sh` is Bash rather
+than Dash.
+Until both are fixed, a remote `pnpm check` exits 1 on these three alone, and
+a result must be compared with that list.
 
 ## What is never copied
 
