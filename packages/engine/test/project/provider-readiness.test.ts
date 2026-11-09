@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process"
-import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { accessSync, constants, existsSync, mkdirSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
@@ -172,5 +172,61 @@ it.live("does not use a shared Codex login for a private shadow account", () => 
     const request = yield* setup()
     yield* harness("codex"); yield* account("private", "codex")
     yield* refused(runner, request)
+  }))
+}))
+
+
+const adapterKinds = ["executable", "symlinked executable", "directory", "non-executable file", "missing", "symlinked directory", "dangling symlink"] as const
+type AdapterKind = typeof adapterKinds[number]
+const adapter = (kind: AdapterKind) => {
+  const path = join(rig.outside, "adapter")
+  switch (kind) {
+    case "executable": return process.execPath
+    case "symlinked executable": symlinkSync(process.execPath, path); break
+    case "directory": mkdirSync(path, { mode: 0o700 }); accessSync(path, constants.X_OK); break
+    case "non-executable file": writeFileSync(path, "#!/bin/sh\nexit 0\n", { mode: 0o600 }); break
+    case "symlinked directory": symlinkSync(rig.home, path, "dir"); break
+    case "dangling symlink": symlinkSync(join(rig.outside, "absent-target"), path); break
+    case "missing": break
+  }
+  return path
+}
+const usableAdapter = (kind: AdapterKind) => kind === "executable" || kind === "symlinked executable"
+
+for (const kind of adapterKinds) it.live(`project.create selects the first usable adapter with an earlier ${kind}`, () => Effect.gen(function* () {
+  const runner = yield* makeFakeRunner(), secrets = makeFakeSecrets(), path = adapter(kind)
+  yield* provideRig(rig, { runner, secrets }, Effect.gen(function* () {
+    const request = yield* setup()
+    yield* harness("claude", path); yield* account("claude", "claude"); yield* key("claude", "ANTHROPIC_API_KEY")
+    yield* harness("cursor"); yield* account("cursor", "cursor"); yield* key("cursor", "CURSOR_API_KEY")
+    success(yield* call(owner, "project.create", request))
+    const provider = usableAdapter(kind) ? "claude" : "cursor"
+    yield* selected(runner, provider, provider)
+  }))
+}))
+
+for (const kind of adapterKinds.filter((kind) => !usableAdapter(kind))) it.live(`project.create refuses a named account with a ${kind} before recording an intent or lead`, () => Effect.gen(function* () {
+  const runner = yield* makeFakeRunner(), secrets = makeFakeSecrets(), path = adapter(kind)
+  yield* provideRig(rig, { runner, secrets }, Effect.gen(function* () {
+    const request = yield* setup()
+    yield* harness("claude", path); yield* account("named", "claude"); yield* key("named", "ANTHROPIC_API_KEY")
+    yield* harness("cursor"); yield* account("cursor", "cursor"); yield* key("cursor", "CURSOR_API_KEY")
+    success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "zsh",
+      lead: { harness: "claude", account: { _tag: "named", accountId: "named" }, permission: "ask" } } }))
+    yield* refused(runner, request)
+    expect((yield* readLog).filter(({ event }) => event._tag === "project.CreationPlanned")).toEqual([])
+  }))
+}))
+
+it.live("project.create refuses a named harness with a directory even when account selection is any", () => Effect.gen(function* () {
+  const runner = yield* makeFakeRunner(), secrets = makeFakeSecrets(), path = adapter("directory")
+  yield* provideRig(rig, { runner, secrets }, Effect.gen(function* () {
+    const request = yield* setup()
+    yield* harness("claude", path); yield* account("claude", "claude"); yield* key("claude", "ANTHROPIC_API_KEY")
+    yield* harness("cursor"); yield* account("cursor", "cursor"); yield* key("cursor", "CURSOR_API_KEY")
+    success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "zsh",
+      lead: { harness: "claude", account: { _tag: "any" }, permission: "ask" } } }))
+    yield* refused(runner, request)
+    expect((yield* readLog).filter(({ event }) => event._tag === "project.CreationPlanned")).toEqual([])
   }))
 }))

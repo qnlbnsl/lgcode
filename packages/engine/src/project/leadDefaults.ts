@@ -1,5 +1,5 @@
 import { constants } from "node:fs"
-import { access } from "node:fs/promises"
+import { access, stat } from "node:fs/promises"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import type { Account, HarnessSettings, ProjectLeadDefaults } from "@lgcode/contracts"
 import { HomeDirectory } from "@lgcode/t3-provider-instance/HostProcess"
@@ -17,6 +17,8 @@ import { readHarnesses, refused, type Input } from "../commands/internal.ts"
 // still establishes authentication when it opens the actual ACP session.
 const ready = (input: Input, harness: HarnessSettings, account: Account) => Effect.gen(function* () {
   if (harness.runMode !== "acp" || loginRefusal(harness.id, account) !== undefined) return false
+  // Follow executable symlinks, but do not mistake directory search access for a runnable file.
+  if (!(yield* Effect.tryPromise(() => stat(harness.adapterPath))).isFile()) return false
   if (!(yield* Effect.tryPromise(() => access(harness.adapterPath, constants.X_OK)).pipe(Effect.isSuccess))) return false
   let variables: Record<string, string> = {}
   for (const [name, raw] of Object.entries(account.environment ?? {})) {

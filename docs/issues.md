@@ -9140,3 +9140,24 @@ They prove supported provider keys, resolved account secrets, file-backed accoun
 They also prove refusal of unavailable named accounts, arbitrary login metadata, unknown custom harness variables, and inherited keys excluded from the child environment.
 The existing lifecycle tests use a supported Cursor fixture while preserving their assertions.
 The independent original probe and its failure and control artifacts remain unchanged.
+
+## 543. Project creation admitted a searchable directory as an adapter
+
+The independent public-command probe configured a Claude adapter path that was a directory.
+The Claude account had its own supported credential, and a later Cursor adapter was usable.
+The local readiness check tested only executable access.
+That check also succeeds for a searchable directory, so project creation selected the unusable Claude adapter.
+The real executable control correctly selected Claude in the normal order.
+
+The project-local correction requires a regular file before checking executable access.
+The file check follows symbolic links, preserving legitimate linked executable adapters.
+Missing, inaccessible, non-executable, and non-file candidates remain unavailable.
+The normal runner and public harness settings policy are unchanged.
+Local readiness still does not promise successful remote provider authentication.
+
+Permanent public-command regressions reach the real project planner and writer in isolated repositories and homes.
+They prove directory fallback, normal executable order, and linked executable admission.
+They also prove refusal of non-executable files, missing paths, linked directories, and dangling links.
+Saved unavailable account and harness choices refuse before recording a creation intent or lead.
+All existing provider credential cases and lifecycle assertions remain intact.
+The independent original directory and executable artifacts remain unchanged.
