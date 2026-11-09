@@ -49,5 +49,7 @@ export const requests: ReadHandler = (input, payload) => Effect.gen(function* ()
       break;
     }
   }
-  return { reply: reply(items.length < rows.length ? items.at(-1)?.sourceSequence : undefined) };
+  const result = reply(items.length < rows.length ? items.at(-1)?.sourceSequence : undefined);
+  if (encodedBytes(result) > 512 * 1024) return yield* refused("request identity exceeds page limit");
+  return { reply: result };
 });

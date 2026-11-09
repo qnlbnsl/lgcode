@@ -321,3 +321,107 @@ it.live("keeps a colliding validated lead and task owner through the production 
   expect(receipt.reply).toEqual(created)
   expect(receipt.envelopes[0].event).toMatchObject({ projectId, repoId, worktreeId, leadAgentId: leadId, goal: "Hide [REDACTED] here" })
 }), ["collision-marker"]).pipe(Effect.orDie))
+
+// These calls pass the public schema and authentication on both entry points.
+type PageBudgetApi = Record<string, (payload: Record<string, unknown>) => Effect.Effect<any, { readonly _tag: string; readonly reason: string; readonly requestId: string }>>
+const budgetSocket = (credential = owner) => Effect.gen(function* () {
+  const bearer = randomBytes(32).toString("base64url")
+  const socket = join(rig.stateFolder, "page-budget.sock")
+  yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false })
+  const token = credential._tag === "owner" ? bearer : Redacted.value(credential.token)
+  return (yield* connect(socket, token)) as unknown as PageBudgetApi
+})
+const pageDurability = Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  return { snapshot: yield* snapshot, receipts: yield* sql`SELECT * FROM receipts ORDER BY caller, request_id`, events: yield* sql`SELECT * FROM events ORDER BY sequence` }
+})
+const pageItems = (reply: any) => "data" in reply ? JSON.parse(reply.data.split("\n")[1]) : reply
+
+for (const actor of ["owner", "lead", "worker"] as const) {
+  it.live(`bounds empty project pages for the authenticated ${actor}, including the encoded data envelope`, () => provideBoard(rig, Effect.gen(function* () {
+    const f = yield* foundation()
+    const credential = actor === "owner" ? owner : f[actor]
+    const api = yield* budgetSocket(credential)
+    const before = yield* pageDurability
+    const base = { projectId: f.projectId, collection: "tasks" }
+    const controlId = '"'.repeat(40000)
+    const control = yield* api["project.read"]!({ ...base, requestId: controlId })
+    expect(control.requestId).toBe(controlId)
+    expect(pageItems(control)).toEqual({ requestId: controlId, items: [] })
+    expect(Buffer.byteLength(JSON.stringify(control))).toBeLessThanOrEqual(256 * 1024)
+    // The worker case fits before the agent envelope is encoded a second time.
+    const requestId = '"'.repeat(actor === "worker" ? 50000 : 140000)
+    const payload = { ...base, requestId }
+    const direct = yield* call(credential, "project.read", payload)
+    const wire = yield* api["project.read"]!(payload).pipe(Effect.result)
+    for (const [path, result] of [["handler", direct], ["socket", wire]] as const) {
+      console.log("empty-project-budget", actor, path, result._tag, result._tag === "Success" ? Buffer.byteLength(JSON.stringify(result.success)) : result.failure.reason)
+    }
+    expect(yield* pageDurability).toEqual(before)
+    expect(failureOf(direct)?.reason).toBe("record exceeds the read budget")
+    expect(wire._tag === "Failure" && wire.failure).toMatchObject({ _tag: "CommandError", requestId, reason: "record exceeds the read budget" })
+  })).pipe(Effect.orDie))
+}
+
+it.live("bounds empty owner catalog pages without changing their ordinary empty replies", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
+  const api = yield* budgetSocket()
+  const before = yield* pageDurability
+  const outcomes = []
+  for (const name of ["project.repositories", "project.workspaces", "project.creations"]) {
+    const requestId = freshRequest()
+    expect(yield* api[name]!({ requestId })).toEqual({ requestId, items: [] })
+    const payload = { requestId: '"'.repeat(140000) }
+    const direct = yield* call(owner, name, payload)
+    const wire = yield* api[name]!(payload).pipe(Effect.result)
+    console.log("empty-catalog-budget", name, direct._tag, wire._tag, wire._tag === "Success" ? Buffer.byteLength(JSON.stringify(wire.success)) : wire.failure.reason)
+    outcomes.push([direct, wire] as const)
+  }
+  expect(yield* pageDurability).toEqual(before)
+  for (const [direct, wire] of outcomes) {
+    expect(failureOf(direct)?.reason).toBe("record exceeds the read budget")
+    expect(wire._tag === "Failure" && wire.failure.reason).toBe("record exceeds the read budget")
+  }
+})).pipe(Effect.orDie))
+
+it.live("bounds filtered and exhausted pages for every project helper consumer and keeps cursor and access refusals", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* foundation()
+  const taskId = success(yield* call(f.lead, "project.task.create", f.taskPayload)).taskId
+  const ownerApi = yield* budgetSocket()
+  const workerApi = (yield* connect(join(rig.stateFolder, "page-budget.sock"), Redacted.value(f.worker._tag === "agent" ? f.worker.token : Redacted.make("")))) as unknown as PageBudgetApi
+  const strangerApi = (yield* connect(join(rig.stateFolder, "page-budget.sock"), Redacted.value(f.stranger._tag === "agent" ? f.stranger.token : Redacted.make("")))) as unknown as PageBudgetApi
+  const view = projectView(yield* snapshot)
+  const before = yield* pageDurability
+  const cases: Array<[string, Record<string, unknown>, boolean]> = [
+    ["project.repositories", { after: f.repoId }, false],
+    ["project.workspaces", { after: f.worktreeId }, false],
+    ["project.workspaces", { repoId: "absent-repository" }, false],
+    ["project.creations", {}, false],
+    ...(["projects", "teams", "sprints", "tasks", "agents"] as const).map((collection): [string, Record<string, unknown>, boolean] => {
+      const after = collection === "agents" ? "sibling" : Object.keys(view[collection]).at(-1)!
+      return ["project.read", { projectId: f.projectId, collection, after }, true]
+    }),
+    ["project.task.history", { projectId: f.projectId, taskId, after: "0" }, true],
+  ]
+  for (const [name, fields, member] of cases) {
+    for (const api of member ? [ownerApi, workerApi] : [ownerApi]) {
+      const requestId = freshRequest()
+      const control = yield* api[name]!({ ...fields, requestId })
+      expect(pageItems(control)).toEqual({ requestId, items: [] })
+      const overflowId = '"'.repeat(140000)
+      const refused = yield* api[name]!({ ...fields, requestId: overflowId }).pipe(Effect.result)
+      expect(refused._tag === "Failure" && refused.failure).toMatchObject({ requestId: overflowId, reason: "record exceeds the read budget" })
+    }
+  }
+  for (const api of [ownerApi, workerApi]) {
+    const invalid = yield* api["project.read"]!({ projectId: f.projectId, collection: "tasks", after: "missing", requestId: '"'.repeat(140000) }).pipe(Effect.result)
+    expect(invalid._tag === "Failure" && invalid.failure.reason).toBe("invalid cursor")
+  }
+  const denied = yield* strangerApi["project.read"]!({ projectId: f.projectId, collection: "tasks", requestId: freshRequest() }).pipe(Effect.result)
+  expect(denied._tag === "Failure" && denied.failure.reason).toBe("project is unavailable to this caller")
+  for (const name of ["project.repositories", "project.workspaces", "project.creations"]) {
+    const denied = yield* workerApi[name]!({ requestId: freshRequest() }).pipe(Effect.result)
+    expect(denied._tag === "Failure" && denied.failure.reason).toBe("command refused")
+  }
+  expect(yield* pageDurability).toEqual(before)
+})).pipe(Effect.orDie))

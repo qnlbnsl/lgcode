@@ -9352,3 +9352,52 @@ This is a source finding, and no runtime reproduction is claimed yet.
 The W08 correction must retain the release under its actual delivery identity.
 It must preserve the existing source join and avoid duplicating prompt content.
 A consequential regression must cover a source and release together, a release before its source is loaded, and the joined state after history hydration.
+
+## 557. Empty project pages and the client request index bypassed their reply budgets
+
+Found: 2026-11-09, during the website engine review at `4c657279`.
+
+The generic project page helper checked complete encoded replies only when adding a row.
+The owner-only `client.requests` index had the same gap.
+An empty collection, a filter with no matches, or an exhausted valid cursor skipped that check.
+A valid request identity containing 140,000 quotation marks produced a 280,027-byte owner project reply.
+The recorded project lead received an 840,165-byte reply after the agent data envelope was encoded.
+Both replies exceeded the project's 262,144-byte limit.
+An empty client request reply with 270,000 quotation marks occupied 540,040 bytes.
+That reply exceeded the index's distinct 524,288-byte limit.
+
+Each helper now measures its final complete success reply before returning it.
+The project helper includes the actual agent data envelope in that measurement.
+The existing limits, row boundaries, cursor rules, request identities, and refusal text remain unchanged.
+The client request index remains owner-only.
+Refusal returns before any event, receipt, or read mark is written.
+
+Authenticated handler and socket regressions preserve the original failed payloads.
+They cover ordinary empty replies, filtered empty replies, exhausted pages, permitted project members, and owner-only catalogs.
+They also retain populated pagination, access refusals, stored metadata, and deterministic rebuild assertions.
+The separate `project.requests` correction tracked as issue 554 is outside this change.
+
+## 561. The launcher test assumed no system Node.js 26
+
+Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
+State: fixed.
+
+The launcher test "exits 1 with an install hint when NVM_DIR holds no Node.js" ran the launcher with only `HOME` and `NVM_DIR` set.
+The launcher's shell then used its default search path.
+Arch Linux has a system Node.js 26 at `/usr/bin/node`, and the launcher correctly used it, so the test saw exit 0.
+The test now gives the launcher an empty search-path folder.
+The launcher itself was right and is unchanged.
+
+## 562. Two engine crash tests raced the roles sheepdog
+
+Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
+State: fixed.
+
+The acceptance test "1 crash" checks the engine's own rule that nothing restarts a crashed agent.
+The client test "6.2 a failed reload keeps a crash alert open until successful idle" checks the crash alert's life.
+Both run with the roles sheepdog on, and the sheepdog resumes a crashed agent by design.
+On the build server, the sheepdog acted after the checks had finished, so both tests passed.
+On the faster computer, it resumed the agent first.
+The agent then crashed a second time and the owner was told twice, or the resumed session closed the crash alert early.
+Both tests now turn the sheepdog off, because each checks an engine rule rather than the sheepdog.
+Other tests may have the same hidden dependence on a slow computer.

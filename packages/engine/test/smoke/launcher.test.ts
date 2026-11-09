@@ -163,9 +163,12 @@ describe("bin/lgcode with the environment reduced to HOME and NVM_DIR", () => {
 
   // Criterion 1.5, second half.
   it("exits 1 with an install hint when NVM_DIR holds no Node.js (breaks if the launcher continues without Node.js or prints no hint)", () => {
+    // An empty PATH folder, so a system Node.js 26 such as Arch Linux's
+    // /usr/bin/node cannot stand in for the missing one (issue 561).
     const result = run(launcher, ["serve", "--detach"], {
       HOME: home,
       NVM_DIR: emptyNvmDirectory(),
+      PATH: makeScratch("lgcode-empty-path-"),
     });
 
     expect(result.error).toBeUndefined();
