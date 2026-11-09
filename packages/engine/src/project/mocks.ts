@@ -165,7 +165,9 @@ const artifact: ReadHandler = (input, raw) => Effect.gen(function* () {
   const result = yield* sourceArtifact(input, p.projectId, source).pipe(Effect.result)
   const data = result._tag === "Success" ? { _tag: "available", text: yield* input.runtime.log.redactText(result.success.text), fingerprint: result.success.fingerprint }
     : { _tag: "unavailable", reason: "artifact unavailable" }
-  return { reply: wrap(input, p.requestId, { requestId: p.requestId, result: data }) }
+  const reply = wrap(input, p.requestId, { requestId: p.requestId, result: data })
+  if (Buffer.byteLength(JSON.stringify(reply)) > 256 * 1024) return yield* refused("mock artifact reply exceeds the read budget")
+  return { reply }
 })
 export const mockPlanners = { "project.mocks.record": record, "project.mocks.approve": approve }
 export const mockReads = { "project.mocks.read": read, "project.mocks.artifact": artifact }

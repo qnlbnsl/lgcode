@@ -9568,3 +9568,47 @@ On the faster computer, it resumed the agent first.
 The agent then crashed a second time and the owner was told twice, or the resumed session closed the crash alert early.
 Both tests now turn the sheepdog off, because each checks an engine rule rather than the sheepdog.
 Other tests may have the same hidden dependence on a slow computer.
+
+## 564. An area-less first team stranded later teams at the same stage
+
+Found: 2026-11-09, in independent source review and the builder's actual authenticated public reproduction on signed `ce7a816`.
+The manager allocated this number and approved the bounded correction.
+
+The first Build team without an area was admitted.
+A second Build team with area Web in a real registered child worktree was then refused because its peer lacked an area.
+The refusal event stated `teams at the same stage require distinct areas`.
+The public contract permits an omitted area, and there is no team-edit recovery path.
+
+The correction removes only the peer-area admission rule.
+Stage and area remain optional.
+Stage-derived names, case-insensitive unique names, workspace validation, groups, channels and receipt semantics remain intact.
+Permanent authenticated socket regressions cover an area-less team before and after an area-labelled peer.
+They verify real registered worktrees, both successful team channels, identical receipt replay, changed-body refusal, and duplicate-name refusal on a separate unclaimed worktree.
+A further ordinary control retains a custom name with no stage or area.
+
+The original five-probe source, exact red observation, source archive and normal exit 1 log remain unchanged under `/tmp/w05b-postreview-proof`.
+The separately derived corrected observer retains the original team success expectation.
+No team-edit machinery is added.
+
+## 565. Mock artifact reads bypassed the final wrapped reply budget
+
+Found: 2026-11-09, in independent source review and the builder's actual authenticated public reproduction on signed `ce7a816`.
+The manager allocated this number and approved the bounded correction.
+
+`project.mocks.artifact` bounded its repository file but did not measure its final reply.
+An unrestricted quote-heavy request identity expanded during serialization and again inside the member data envelope.
+The actual owner available and unavailable replies were 280,157 and 280,080 bytes.
+The actual member available and unavailable replies were 840,307 and 840,226 bytes.
+All four exceeded the documented 262,144-byte limit.
+Ordinary small-request controls passed, and all reads preserved the exact event log, receipt rows and complete views.
+
+The correction measures the actual final wrapped artifact reply before returning it.
+An oversized reply refuses with the internal reason `mock artifact reply exceeds the read budget`.
+The existing public socket refusal remains `CommandError` with reason `command refused`.
+Permanent socket regressions cover both caller identities, real available files, absent registered files, ordinary controls, the original oversized payload and unchanged read state.
+They retain the original byte-budget assertion and additionally require strict public refusal.
+
+The original four complete requests, replies and observations remain unchanged under `/tmp/w05b-postreview-proof`.
+The original log remains a normal exit 1 with five failed probes, including issue 564.
+A separate corrected observer changes only output destinations and adds strict outcome assertions; its exact derivation is preserved separately.
+This correction does not change mock, schema or Design metadata contracts.

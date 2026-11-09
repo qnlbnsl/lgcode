@@ -131,8 +131,6 @@ const teamCreate: PiecePlanner = (input, raw) => Effect.gen(function* () {
     || workspace.worktreeId !== project.worktreeId && workspace.parentId !== project.worktreeId) return yield* refused("invalid team workspace")
   if (Object.values(view.teams).some((row) => row.worktreeId === p.worktreeId)) return yield* refused("workspace already belongs to a team")
   const area = p.area === undefined ? undefined : yield* cleanName(input, p.area)
-  const peers = Object.values(view.teams).filter((row) => row.projectId === p.projectId && row.stage === p.stage)
-  if (p.stage !== undefined && peers.length > 0 && (area === undefined || peers.some((row) => row.area === undefined))) return yield* refused("teams at the same stage require distinct areas")
   const name = yield* cleanName(input, p.stage === undefined ? p.name : `${stageLabel(p.stage)}${area === undefined ? "" : ` · ${area}`}`)
   if (Object.values(view.teams).some((row) => row.projectId === p.projectId && row.name.toLowerCase() === name.toLowerCase())) return yield* refused("team name already exists")
   const teamId = fresh(TeamId); const channelId = fresh(ChannelId)
