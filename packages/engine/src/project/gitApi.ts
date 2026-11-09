@@ -72,6 +72,13 @@ export const gitReply = (input: Input, requestId: unknown, result: unknown, agen
     // a valid conflict into an unencodable or unresolvable reply.
     if (key === "kind" && ["context", "conflict", "compare"].includes(value as string)) return Effect.succeed(value)
     if (key === "choices" && Array.isArray(value)) return Effect.succeed(value)
+    if (key === "_tag" && ["owner", "agent"].includes(value as string)
+      || key === "kind" && ["tests", "review"].includes(value as string)
+      || key === "status" && ["passed", "failed"].includes(value as string)
+      || key === "state" && ["missing", "current", "stale"].includes(value as string)
+      || key === "provenance" && value === "reported"
+      || key === "decision" && ["approve", "approve_without_evidence"].includes(value as string)
+      || key === "outcome" && ["open", "merged", "refused"].includes(value as string)) return Effect.succeed(value)
     if (typeof value === "string") return input.runtime.log.redactText(value)
     if (Array.isArray(value)) return Effect.forEach(value, (item) => redact(item))
     if (value !== null && typeof value === "object") return Effect.forEach(Object.entries(value), ([key, item]) => redact(item, key).pipe(Effect.map((clean) => [key, clean] as const))).pipe(Effect.map(Object.fromEntries))

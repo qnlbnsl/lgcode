@@ -269,7 +269,10 @@ These additions change what the engine has to do.
 - **Git writes the repository.** The note above describes git reads only. The mock now
   stages, commits, fetches, pulls and pushes, merges a team's branch into its project's
   branch, lists conflicts, and opens a review to the main branch. A merge is refused when
-  the destination has uncommitted changes, and the page never merges into the main branch.
+  the destination has uncommitted changes. Only the owner credential may explicitly
+  approve and merge into main or master after both reviewed heads are revalidated.
+  Agents and the existing team integration remain refused. The owner may choose
+  Approve without evidence. Issue 545 supplies this separate engine path.
 - **New project can create a repository.** It makes a folder inside the workspace folder
   on the selected machine, and runs `git init`. Cloning from an address is not offered.
 - **The terminal is a real grid.** It has no input box, so the page needs a terminal
@@ -384,7 +387,11 @@ Notification retry and a test notification use the real notification transport.
 
 Git supports bulk stage and unstage, confirmed discard, and inline conflict choices for ours, base, and theirs.
 It keeps its selection and draft per worktree.
-The page opens a review to the base branch and never merges that branch directly.
+The page opens a review to the base branch.
+Only the owner credential may explicitly approve and merge into main or master.
+The engine revalidates both reviewed source and destination heads before execution.
+Agents remain refused, including through the existing team integration.
+The owner may explicitly choose Approve without evidence.
 Git reads are bounded.
 Terminal sessions have names, close and rename controls, resize, interrupt, and reconnection.
 The character grid supports full-screen programs.

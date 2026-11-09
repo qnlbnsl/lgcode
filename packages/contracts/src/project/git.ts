@@ -1,7 +1,7 @@
 import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
-import { RequestId } from "../ids.ts"
+import { AgentId, EpochMilliseconds, EventSequence, RequestId } from "../ids.ts"
 import { ProjectId, ProjectName, ProjectPath, ProjectText, RepositoryId, WorkspaceId } from "./schema.ts"
 
 const text = Schema.String.check(Schema.isMaxCodePoints(1024 * 1024))
@@ -24,6 +24,26 @@ export const GitConflict = Schema.Struct({ ...GitSelection.fields, ours: text, b
   ])) })
 export const GitDiscardPlan = Schema.Struct({ fingerprint: ProjectName, paths: Schema.Array(ProjectPath).check(Schema.isMaxLength(200)) })
 export const GitReview = Schema.Struct({ head: text, baseHead: text, branch: text, base: text, commits: items(GitCommit), files: items(GitCommitFile), diff: GitDiff })
+// Reports describe observed work. They are never approval credentials or
+// engine-executed test proof. The thread reference must exist in this project.
+export const GitEvidenceKind = Schema.Literals(["tests", "review"])
+export const GitEvidenceStatus = Schema.Literals(["passed", "failed"])
+export const GitEvidence = Schema.Struct({ reportId: RequestId, projectId: ProjectId, worktreeId: WorkspaceId,
+  head: ProjectName, kind: GitEvidenceKind, status: GitEvidenceStatus, summary: ProjectText,
+  threadAgentId: AgentId, threadSequence: EventSequence,
+  reportedBy: Schema.Union([Schema.TaggedStruct("owner", {}), Schema.TaggedStruct("agent", { agentId: AgentId })]),
+  provenance: Schema.Literal("reported"), recordedAt: EpochMilliseconds })
+export type GitEvidence = typeof GitEvidence.Type
+export const GitEvidenceSlot = Schema.Struct({ state: Schema.Literals(["missing", "current", "stale"]), report: Schema.NullOr(GitEvidence) })
+export const GitEvidenceSet = Schema.Struct({ tests: GitEvidenceSlot, review: GitEvidenceSlot })
+export type GitEvidenceSet = typeof GitEvidenceSet.Type
+export const GitApprovalDecision = Schema.Literals(["approve", "approve_without_evidence"])
+export const GitMainReview = Schema.Struct({ reviewId: RequestId, projectId: ProjectId, worktreeId: WorkspaceId,
+  destinationId: WorkspaceId, head: ProjectName, baseHead: ProjectName, branch: ProjectName, base: ProjectName,
+  evidence: GitEvidenceSet, openedAt: EpochMilliseconds,
+  decision: Schema.NullOr(GitApprovalDecision), outcome: Schema.Literals(["open", "merged", "refused"]),
+  mergeHead: nullable, reason: nullable, decidedAt: Schema.NullOr(EpochMilliseconds) })
+export type GitMainReview = typeof GitMainReview.Type
 const request = { requestId: RequestId }
 const workspace = { ...request, worktreeId: WorkspaceId, projectId: Schema.optionalKey(ProjectId) }
 const repository = { ...request, repoId: RepositoryId }
@@ -53,6 +73,15 @@ export const ProjectGitRpcGroup = RpcGroup.make(
   Rpc.make("integrate", { payload: { ...workspace, destinationId: WorkspaceId, expectedHead: ProjectName }, success: reply(Schema.Struct({ head: text })), error }),
   Rpc.make("review", { payload: { ...workspace, base: ProjectName }, success: readReply(GitReview), error }),
   Rpc.make("review.open", { payload: { ...workspace, base: ProjectName, expectedHead: ProjectName }, success: reply(Schema.Struct({ head: text, url: text, kind: Schema.Literal("compare"), opened: Schema.Literal(false) })), error }),
+  Rpc.make("review.report", { payload: { ...workspace, projectId: ProjectId, head: ProjectName, kind: GitEvidenceKind,
+    status: GitEvidenceStatus, summary: ProjectText, threadAgentId: AgentId, threadSequence: EventSequence }, success: ack, error }),
+  Rpc.make("review.prepare", { payload: { ...workspace, projectId: ProjectId, destinationId: WorkspaceId },
+    success: reply(Schema.Struct({ review: GitMainReview, comparison: GitReview })), error }),
+  Rpc.make("review.status", { payload: { ...workspace, projectId: ProjectId },
+    success: readReply(Schema.Struct({ review: Schema.NullOr(GitMainReview), evidence: GitEvidenceSet })), error }),
+  Rpc.make("review.approve", { payload: { ...workspace, projectId: ProjectId, reviewId: RequestId,
+    expectedHead: ProjectName, expectedBaseHead: ProjectName, confirmed: Schema.Boolean, decision: GitApprovalDecision },
+    success: reply(GitMainReview), error }),
   Rpc.make("conflict", { payload: { ...workspace, path: ProjectPath }, success: readReply(GitConflict), error }),
   Rpc.make("conflict.choose", { payload: { ...workspace, selection: GitSelection, hunk: count, choice: GitChoice }, success: reply(GitConflict), error }),
   Rpc.make("conflict.resolve", { payload: { ...workspace, selection: GitSelection }, success: ack, error })
@@ -64,5 +93,6 @@ export const projectGitAccess = {
   "project.changes": member, "project.diff": member, "project.history": member, "project.commit.files": member, "project.git.state": member,
   "project.stage": owner, "project.unstage": owner, "project.stage.all": owner, "project.unstage.all": owner, "project.discard.plan": owner, "project.discard": owner,
   "project.commit": owner, "project.fetch": owner, "project.pull": owner, "project.push": owner, "project.integrate": owner, "project.review": member,
-  "project.review.open": owner, "project.conflict": member, "project.conflict.choose": owner, "project.conflict.resolve": owner
+  "project.review.open": owner, "project.conflict": member, "project.conflict.choose": owner, "project.conflict.resolve": owner,
+  "project.review.report": member, "project.review.prepare": owner, "project.review.status": member, "project.review.approve": owner
 } satisfies Record<import("effect/rpc/Rpc").Tag<RpcGroup.Rpcs<typeof ProjectGitRpcGroup>>, ReadonlyArray<import("../commands.ts").CallerKind>>

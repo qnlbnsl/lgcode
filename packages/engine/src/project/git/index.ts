@@ -278,6 +278,18 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     if (reply.code !== 0) throw processFailure(reply);
     return reply.stdout.trim();
   };
+  const mainComparison = async (source: string, destination: string, signal: AbortSignal) => {
+    const from = await repository(source, signal), to = await repository(destination, signal);
+    if (from.commonDirectory !== to.commonDirectory || from.path === to.path) return fail("invalid_path");
+    const base = await branch(to.path, signal), sourceBranch = await branch(from.path, signal);
+    if (base === null || !["main", "master"].includes(base) || sourceBranch === null || ["main", "master"].includes(sourceBranch)) return fail("invalid_ref");
+    const comparison = await review(from.path, base, signal);
+    if (comparison.baseHead !== await head(to.path, signal)) return fail("stale_state");
+    // A binary or bounded partial patch is not an all-files review. This path
+    // refuses honestly instead of letting an approval imply unseen contents.
+    if (comparison.commits.truncated || comparison.files.truncated || comparison.diff.truncated || comparison.diff.binary) return fail("unsupported_review");
+    return { from, to, comparison };
+  };
   const withRepo = <A>(folder: string, body: (path: string, signal: AbortSignal) => Promise<A>) => operation(async (signal) => body((await repository(folder, signal)).path, signal));
   const excludeManagedWorktrees = async (common: string) => {
     const info = join(common, "info");
@@ -450,6 +462,29 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       return (await head(to.path, signal))!;
     }),
     review: (folder, base) => withRepo(folder, (path, signal) => review(path, base, signal)),
+    reviewMain: (source, destination) => operation(async (signal) => (await mainComparison(source, destination, signal)).comparison),
+    approveMain: (source, destination, reviewed, caller, confirmed) => operation(async (signal) => {
+      // Check trusted authority again at execution, including caller-less and
+      // piece callers. No report or payload boolean supplies this credential.
+      if (caller?._tag !== "owner") return fail("owner_required");
+      if (confirmed !== true) return fail("confirmation_required");
+      const { from, to, comparison } = await mainComparison(source, destination, signal);
+      if (comparison.head !== reviewed.head || comparison.baseHead !== reviewed.baseHead
+        || comparison.branch !== reviewed.branch || comparison.base !== reviewed.base) return fail("stale_state");
+      if ((await completeChanges(to.path, signal)).length > 0 || await mergeHead(to.path, signal) !== null) return fail("dirty_destination");
+      if ((await completeChanges(from.path, signal)).length > 0 || await mergeHead(from.path, signal) !== null) return fail("dirty_source");
+      // Terminal edits are outside the engine queue. Recheck both heads and
+      // branch identities immediately before launching Git, then merge the
+      // reviewed object ID rather than resolving a mutable source branch.
+      if (await head(from.path, signal) !== reviewed.head || await head(to.path, signal) !== reviewed.baseHead
+        || await branch(from.path, signal) !== reviewed.branch || await branch(to.path, signal) !== reviewed.base) return fail("stale_state");
+      const reply = await run(to.path, ["-c", "merge.conflictStyle=diff3", "merge", "--no-edit", "--no-autostash", reviewed.head], signal);
+      if (reply.code !== 0) {
+        if ((await completeChanges(to.path, signal)).some((change) => change.conflict)) return fail("conflicts");
+        throw processFailure(reply);
+      }
+      return (await head(to.path, signal))!;
+    }),
     openReview: (folder, base, expectedHead) => withRepo(folder, async (path, signal) => {
       const evidence = await review(path, base, signal);
       if (evidence.head !== expectedHead) return fail("stale_state");

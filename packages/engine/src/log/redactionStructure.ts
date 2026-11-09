@@ -28,8 +28,17 @@ const workspace = { worktreeId: identity, repoId: identity, projectId: identity,
 const project = { projectId: identity, repoId: identity, leadAgentId: identity, worktreeId: identity };
 const sprint = { projectId: identity, sprintId: identity, owner: identity, needs: { elements: identity } };
 const task = { projectId: identity, taskId: identity, owner: identity, teamId: identity, sprintId: identity, worktreeId: identity };
+const gitReport: RedactionStructure = { fields: { reportId: identity, projectId: identity, worktreeId: identity,
+  threadAgentId: identity, kind: identity, status: identity, provenance: identity, reportedBy: actor } };
+const gitEvidence: RedactionStructure = { fields: Object.fromEntries(["tests", "review"].map((kind) => [kind,
+  { fields: { state: identity, report: gitReport } }])) };
+const gitReview: RedactionStructure = { fields: { reviewId: identity, projectId: identity, worktreeId: identity,
+  destinationId: identity, decision: identity, outcome: identity, evidence: gitEvidence } };
 
 export const eventStructure: RedactionStructure = { taggedFields: {
+  "project.GitEvidenceReported": { report: gitReport },
+  "project.MainReviewOpened": { review: gitReview },
+  "project.MainReviewDecided": { review: gitReview },
   "project.SettingsChanged": { settings: { fields: { lead: { fields: { harness: identity, account: { fields: { accountId: identity } } } } } } },
   "project.CreationPlanned": { creation: { fields: { requestId: identity, projectId: identity,
     bodyHash: identity, repository: { fields: { repoId: identity } }, workspace: { fields: workspace },
@@ -78,6 +87,7 @@ export const eventStructure: RedactionStructure = { taggedFields: {
 } };
 
 export const receiptStructure: RedactionStructure = { fields: {
+  result: { fields: { ...gitReview.fields, review: gitReview } },
   repoId: identity, worktreeId: identity, projectId: identity, teamId: identity, sprintId: identity, taskId: identity,
   requestId: identity, agentId: identity, deliveryId: identity, questionId: identity, waitId: identity, alertId: identity,
   roleFileHash: identity, channelId: identity, postId: identity, wakeId: identity,

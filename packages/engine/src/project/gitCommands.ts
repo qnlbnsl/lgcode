@@ -5,6 +5,7 @@ import { type PiecePlanner, type Input, refused } from "../commands/internal.ts"
 import { withGit, gitCall, gitReply, workspacePath, repositoryPath, selection } from "./gitApi.ts"
 import { type GitService, type GitOperation } from "./git/index.ts"
 import { own, projectView } from "./view.ts"
+import { reviewPlanners, reviewReads } from "./gitReview.ts"
 
 type Raw = Record<string, unknown>
 const workspaceRead = (run: (git: GitService, path: string, raw: Raw) => GitOperation<unknown>): ReadHandler =>
@@ -33,6 +34,7 @@ const discover: ReadHandler = (input, raw) => withGit(input, (git) => Effect.gen
   return { reply: yield* gitReply(input, raw.requestId, { ...found, items: found.items.map(({ name, path }) => ({ name, path })) }) }
 }))
 export const gitReads = {
+  ...reviewReads,
   "project.repository.discover": discover,
   "project.branches": repositoryRead((git, path) => git.branches(path)),
   "project.checkouts": repositoryRead((git, path) => git.worktrees(path)),
@@ -51,6 +53,7 @@ export const gitReads = {
   "project.discard.plan": workspaceRead((git, path, raw) => git.planDiscard(path, raw.paths as string[] | undefined)),
 } satisfies Record<string, ReadHandler>
 export const gitPlanners = {
+  ...reviewPlanners,
   "project.stage": mutate((git, path, raw) => git.stage(path, raw.path as string)),
   "project.unstage": mutate((git, path, raw) => git.unstage(path, raw.path as string)),
   "project.stage.all": mutate((git, path) => git.stageAll(path)),

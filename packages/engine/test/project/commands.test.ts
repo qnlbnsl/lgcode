@@ -1,3 +1,4 @@
+import { gitReportSample, gitReviewSample } from "../../../contracts/test/gitReviewFixtures.ts"
 import { randomBytes } from "node:crypto"
 import { execFileSync } from "node:child_process"
 import { mkdirSync } from "node:fs"
@@ -41,6 +42,9 @@ it.live("roundtrips every project event and receipt identity while keeping works
   const ownerId = `worker-${marker}`
   const needs = [`dependency-${marker}`]
   const events = (text: string) => [
+    { _tag: "project.GitEvidenceReported", report: { ...gitReportSample, summary: text } },
+    { _tag: "project.MainReviewOpened", review: { ...gitReviewSample, branch: text } },
+    { _tag: "project.MainReviewDecided", review: { ...gitReviewSample, branch: text, decision: "approve_without_evidence", outcome: "refused", reason: text, decidedAt: 2000 } },
     { _tag: "project.SettingsChanged", settings: { workspaceFolder: text, shell: text,
       lead: { harness: `harness-${marker}`, account: { _tag: "named", accountId: `account-${marker}` }, permission: "ask", model: text, effort: text } } },
     { _tag: "project.CreationPlanned", creation: { requestId: `creation-${marker}`, bodyHash: `hash-${marker}`, projectId,

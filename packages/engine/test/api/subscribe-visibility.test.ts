@@ -8,6 +8,7 @@ import { join } from "node:path";
 
 import { expect, it } from "@effect/vitest";
 import { Event, eventVisibility, type EventEnvelope } from "@lgcode/contracts";
+import { gitReportSample, gitReviewSample } from "../../../contracts/test/gitReviewFixtures.ts";
 import { rolesSamples } from "../../../contracts/test/roles/fixtures.ts";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -52,6 +53,9 @@ const parents: Record<string, string> = { "agent-child": "agent-self", "agent-gr
 const samples: Record<string, (a: string, n: string) => Record<string, unknown>> = {
   ...Object.fromEntries(boardEvents.map(({ _tag, ...payload }) => [_tag, () => payload])),
   ...rolesSamples,
+  "project.GitEvidenceReported": () => ({ report: gitReportSample }),
+  "project.MainReviewOpened": () => ({ review: gitReviewSample }),
+  "project.MainReviewDecided": () => ({ review: { ...gitReviewSample, decision: "approve_without_evidence", outcome: "refused", reason: "stale_state", decidedAt: 2000 } }),
   "project.SettingsChanged": () => ({ settings: { workspaceFolder: "/tmp", shell: "zsh" } }),
   "project.RepositoryAdded": () => ({ repoId: "project-repo", name: "Repository", path: "/tmp" }),
   "project.RepositoryLocated": () => ({ repoId: "project-repo", machineId: "local", path: "/tmp" }),

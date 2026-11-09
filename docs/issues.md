@@ -9337,3 +9337,45 @@ After a valid correction, the same previously refused creation request succeeds 
 A repeated request returns its original project without another launch.
 Historical invalid settings remain decodable and pass the real rebuild check.
 The original independent bad/control artifacts and interrupted full checks remain preserved.
+
+
+## 545. Main review had no explicit owner approval and merge path
+
+Found: 2026-11-09, during the Git page preparation at `ca1d492`.
+The manager reserved this issue number and the owner authorized its bounded engine follow-up at `bc783b2`.
+
+The golden review shows tests, the reviewer result and its genuine thread, commits, and every available file diff.
+It allows an explicit Approve without evidence choice.
+The accepted `project.review.open` only verified a published source head and returned a compare URL.
+Its `kind: compare` and `opened: false` did not create a pull request or record approval.
+The original team integration correctly refused main and master.
+There was no durable head-bound test or review reporting surface and no owner approval route.
+
+The bounded correction adds a separate authenticated review preparation, evidence report, status, and explicit owner approval path.
+Preparation records both reviewed heads without approving or merging.
+Reported evidence carries the actual workspace and head, authenticated reporter, recorded time, and a validated existing project thread item.
+It is labeled reported evidence rather than engine-executed proof.
+Old-head reports remain stale, and missing or failed evidence does not impose a mandatory passing-test or reviewer policy.
+The owner may explicitly approve without evidence.
+
+Only the owner credential may approve and merge into main or master.
+The service checks the actual authenticated caller again at execution.
+It revalidates both reviewed heads, registered relationships, exact common directory, branches, clean worktrees, and merge-in-progress state.
+It merges the reviewed commit identity rather than a substituted branch.
+Agents remain refused, and the original integration refusal is unchanged.
+Binary or incomplete review data refuses honestly.
+The event log and normal receipts preserve the exact reviewed heads, explicit owner decision, and merged or refused outcome.
+An identical retry returns its original outcome instead of merging twice.
+A corrected attempt after refusal requires a new review and explicit owner approval.
+
+External Git effects and the SQLite receipt are not one crash-atomic transaction.
+A service crash after Git changed the checkout but before the outcome committed can leave an uncertain result.
+The old destination-head precondition refuses a repeated execution when that head changed.
+The owner must inspect the actual refs, bytes, and merge state before preparing another review.
+A failed merge can leave real conflicts in the destination, which remain inspectable through the existing conflict API.
+The engine never removes another process's locks or silently aborts the merge.
+Same-Unix-user edits remain within the accepted limitation in SECURITY.md.
+
+The permanent tests exercise authenticated public commands and real temporary repositories for both base names, evidence provenance and staleness, head and dirty-state refusals, authority denial, conflict recovery, production redaction, and receipt replay.
+The test artifacts and builder result record their actual execution separately.
+React, terminal support, and the rest of the five-step website scope remain separate work.
