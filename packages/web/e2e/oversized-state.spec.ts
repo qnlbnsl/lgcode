@@ -1,3 +1,4 @@
+import { openNavigation } from "./support/navigation.ts"
 import { randomBytes } from "node:crypto"
 import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -96,7 +97,7 @@ test("7.14 production state markers recover once over a 500-kbit/s link while li
           await page.goto(origin)
           await page.getByLabel("Password", { exact: true }).fill(password)
           await page.getByRole("button", { name: "Log in", exact: true }).click()
-          await expect(page.getByLabel("Situation", { exact: true })).toContainText("Live")
+          await expect(page.getByRole("region", { name: "Home", exact: true })).toBeVisible()
           await expect.poll(() => requests.some(({ frame }) => frame.tag === "client.subscribe")).toBe(true)
           expect(debuggerErrors).toEqual([])
           expect(ping).toContainEqual({ interval: "25 seconds", timeoutMillis: 50_000 })
@@ -119,9 +120,9 @@ test("7.14 production state markers recover once over a 500-kbit/s link while li
           adapterArguments: ["harness-prefix " + "x".repeat(300 * 1024)],
         }) }))
         yield* Effect.promise(async () => {
-          const situation = page.getByLabel("Situation", { exact: true })
-          await expect(situation).toContainText("Large state worker")
-          await expect(situation).toContainText("1 open permissions")
+          const home = page.getByRole("region", { name: "Home", exact: true })
+          await expect(home).toContainText("Large state worker")
+          await expect(home.locator(".home-request-row")).toHaveCount(1)
           for (const tag of ["AgentStarted", "PermissionRequested", "HarnessChanged"]) {
             await expect.poll(() => replies.some(({ frame }) => frame._tag === "Chunk" && frame.values?.some((value: any) => value._tag === "client.Oversized" && value.tag === tag))).toBe(true)
             await expect.poll(() => replies.some(({ frame, bytes }) => frame.exit?.value?.envelope?.event?._tag === tag && bytes > 256 * 1024)).toBe(true)
@@ -151,9 +152,9 @@ test("7.14 production state markers recover once over a 500-kbit/s link while li
           expect(elapsed).toBeLessThan(50_000)
           const stream = requests.find(({ frame }) => frame.tag === "client.subscribe")!
           expect(reads[0]!.socket).not.toBe(stream.socket)
-          await expect(page.getByLabel("Needs you", { exact: true })).toContainText("2 open permissions")
-          await expect(page.getByRole("heading", { name: "Needs you (1)", exact: true })).toBeVisible()
-          await expect(page.getByLabel("Situation", { exact: true })).toContainText("live-")
+          await expect(page.locator(".home-view .home-request-row")).toHaveCount(2)
+          await expect(page.locator(".topbar .attention-toggle")).toHaveAttribute("aria-label", "2 items need attention")
+          await expect.poll(() => replies.filter(({ frame }) => Array.isArray(frame.exit?.value?.agents)).at(-1)?.frame.exit.value.agents[0]?.groups.some((group: string) => group.startsWith("live-"))).toBe(true)
           const snapshot = replies.filter(({ frame }) => Array.isArray(frame.exit?.value?.requests)).at(-1)!.frame.exit.value
           expect(snapshot.requests.map((row: { id: string }) => row.id).sort()).toEqual(["large-request", "slow-request"])
           expect(snapshot.requests.every((row: { agentId: string; holder: { _tag: string } }) => row.agentId === worker.agentId && row.holder._tag === "owner")).toBe(true)
@@ -170,15 +171,17 @@ test("7.14 production state markers recover once over a 500-kbit/s link while li
             (window as typeof window & { __observedSockets: globalThis.WebSocket[] }).__observedSockets[index]!.close(4000, "controlled reconnect")
           }, sockets.indexOf(active.socket))
           await expect.poll(() => requests.filter(({ frame }) => frame.tag === "client.subscribe").length).toBeGreaterThan(count)
-          await expect(page.getByLabel("Needs you", { exact: true })).toContainText("2 open permissions")
+          await expect(page.locator(".home-view .home-request-row")).toHaveCount(2)
           expect(replies.filter(({ frame }) => Array.isArray(frame.exit?.value?.requests)).at(-1)!.frame.exit.value.requests.map((row: { id: string }) => row.id).sort()).toEqual(["large-request", "slow-request"])
-          await page.getByRole("link", { name: "Large state worker", exact: true }).click()
+          await openNavigation(page)
+          await page.locator(".repo-tree .agent-link").filter({ hasText: "Large state worker" }).click()
           const request = page.getByRole("region", { name: "Permission request", exact: true }).filter({ hasText: "slow-request" })
           await expect(request).toBeVisible()
           await request.getByRole("button", { name: "Allow once", exact: true }).click()
           await expect.poll(() => runner.callsOf("answerPermission").some(({ input }) => input.requestId === "slow-request" && input.optionId === "once")).toBe(true)
-          await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Situation", exact: true }).click()
-          await expect(page.getByLabel("Needs you", { exact: true })).toContainText("1 open permissions")
+          await openNavigation(page)
+          await page.getByRole("navigation", { name: "Pages" }).getByRole("link", { name: "Home", exact: true }).click()
+          await expect(page.locator(".home-view .home-request-row")).toHaveCount(1)
           await expect.poll(() => requests.filter(({ frame }) => frame.tag === "client.subscribe").length).toBeGreaterThan(count)
           expect(requests.filter(({ frame }) => frame.tag === "client.event" && frame.payload.sequence === sequence)).toHaveLength(1)
         })

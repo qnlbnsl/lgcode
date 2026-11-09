@@ -13,15 +13,15 @@ it("7.9 opens the real alert's thread link with its subject without sending a st
   }] }))
   const container = await mountThread([], {
     ...Object.fromEntries([...CommandsRpcGroup.requests.keys()]
-      .filter((name) => !["client.snapshot", "client.thread", "client.subscribe"].includes(name))
+      .filter((name) => !["client.snapshot", "client.thread", "client.subscribe", "client.requests", "client.sequence"].includes(name))
       .map((name) => [name, command])),
     "client.alerts.list": list,
   })
-  const alertsLink = Array.from(container.querySelectorAll("a")).find((link) => link.textContent === "Alerts")!
+  const alertsLink = Array.from(container.querySelectorAll("a")).find((link) => link.getAttribute("aria-label") === "Phone notifications")!
   await act(async () => { alertsLink.click() })
   expect(list).toHaveBeenCalled()
-  expect(container.querySelector('section[aria-label="Alerts"]')).toBeTruthy()
-  const link = container.querySelector<HTMLAnchorElement>('a[href*="/thread/worker-1"]')
+  expect(container.querySelector('section[aria-label="Phone notifications"]')).toBeTruthy()
+  const link = container.querySelector<HTMLAnchorElement>('section[aria-label="Phone notifications"] a[href*="/thread/worker-1"]')
   expect(link).toBeTruthy() // catches an alert without a navigable thread link
   const target = new URL(link!.href)
   expect(target.pathname).toBe("/") // catches paths the static server cannot serve

@@ -1,43 +1,21 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { Situation } from "./situation.tsx"
-import type { AgentId } from "@lgcode/contracts"
-import { Thread } from "./thread/index.tsx"
-import { threadLocation } from "./thread/links.ts"
-import { Alerts } from "./admin/alerts.tsx"
-import { Settings } from "./admin/settings.tsx"
+import { ShellDataProvider } from "./data/ShellDataProvider.tsx"
+import { Shell } from "./shell/Shell.tsx"
+import { clearRequestAttempts } from "./thread/requestAttempt.ts"
+import { clearAddTaskAttempts } from "./pages/AddTask.tsx"
 
 type Session = "checking" | "login" | "owner" | "unavailable"
-type Page = "situation" | "alerts" | "settings"
-function currentPage(href: string): Page {
-  const page = new URL(href).searchParams.get("page")
-  return page === "alerts" || page === "settings" ? page : "situation"
-}
-
 export function App() {
   const [session, setSession] = useState<Session>("checking")
   const [message, setMessage] = useState("")
   const [busy, setBusy] = useState(false)
   const [probe, setProbe] = useState(0)
   const action = useRef<AbortController | undefined>(undefined)
-  const [href, setHref] = useState(() => location.href)
-  const page = currentPage(href)
-  const route = threadLocation(href)
-  const agentId = route.agentId as AgentId | undefined
-  const subject = route.subject
   const sessionExpired = () => {
+    clearRequestAttempts(); clearAddTaskAttempts()
     setMessage("Your session ended. Log in again.")
     setSession("login")
   }
-
-  useEffect(() => {
-    const navigate = () => setHref(location.href)
-    window.addEventListener("hashchange", navigate)
-    window.addEventListener("popstate", navigate)
-    return () => {
-      window.removeEventListener("hashchange", navigate)
-      window.removeEventListener("popstate", navigate)
-    }
-  }, [])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -53,7 +31,7 @@ export function App() {
     return () => controller.abort()
   }, [probe])
 
-  useEffect(() => () => action.current?.abort(), [])
+  useEffect(() => () => { action.current?.abort(); clearRequestAttempts(); clearAddTaskAttempts() }, [])
 
   function logIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -94,7 +72,7 @@ export function App() {
       method: "POST", credentials: "same-origin", cache: "no-store", signal: controller.signal
     }).then((response) => {
       if (controller.signal.aborted) return
-      if (response.ok || response.status === 401) setSession("login")
+      if (response.ok || response.status === 401) { clearRequestAttempts(); clearAddTaskAttempts(); setSession("login") }
       else setMessage("Log out failed. Try again.")
     }).catch(() => {
       if (!controller.signal.aborted) setMessage("Could not log out. Try again.")
@@ -106,11 +84,11 @@ export function App() {
     })
   }
 
-  return <main>
-    <header>
-      <h1>LGcode</h1>
-      {session === "owner" && <button aria-label="Log out" disabled={busy} onClick={logOut}>Log out</button>}
-    </header>
+  if (session === "owner") return <ShellDataProvider onSessionExpired={sessionExpired}>
+    <Shell onSessionExpired={sessionExpired} onLogout={logOut} logoutBusy={busy} message={message} />
+  </ShellDataProvider>
+  return <main className="auth-page">
+    <h1>LGcode</h1>
     {message && <p role="alert">{message}</p>}
     {session === "checking" && <p role="status">Checking your session…</p>}
     {session === "unavailable" && <section aria-label="Connection unavailable">
@@ -122,24 +100,5 @@ export function App() {
       <input id="password" name="password" type="password" autoComplete="off" required disabled={busy} />
       <button type="submit" disabled={busy}>{busy ? "Logging in…" : "Log in"}</button>
     </form>}
-    {session === "owner" && <>
-      <nav aria-label="Pages">
-        {([
-          ["situation", "/", "Situation"], ["alerts", "/?page=alerts", "Alerts"], ["settings", "/?page=settings", "Settings"]
-        ] as const).map(([target, href, label]) => <a key={href} href={href}
-          aria-current={agentId === undefined && page === target ? "page" : undefined}
-          onClick={(event) => {
-            if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
-            event.preventDefault()
-            history.pushState(null, "", href)
-            setHref(location.href)
-          }}>{label}</a>)}
-      </nav>
-      {agentId !== undefined ? <Thread key={agentId} agentId={agentId}
-        {...(subject === undefined ? {} : { subject })} onSessionExpired={sessionExpired} />
-        : page === "alerts" ? <Alerts onSessionExpired={sessionExpired} />
-        : page === "settings" ? <Settings onSessionExpired={sessionExpired} />
-        : <Situation onSessionExpired={sessionExpired} />}
-    </>}
   </main>
 }

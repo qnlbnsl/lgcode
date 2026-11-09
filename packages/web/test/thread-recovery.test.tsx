@@ -165,3 +165,14 @@ it("opens static-index thread links without sending commands", async () => {
   expect(answer).not.toHaveBeenCalled()
   expect(prompt).not.toHaveBeenCalled()
 })
+
+it("focuses the exact request on a direct subject link and on same-thread URL selection", async () => {
+  const container = await mountThread([permissionRequest(), item(3, { _tag: 'QuestionAsked', questionId: 'q-focus', text: 'Focus this question', holder: { _tag: 'owner' } })], {},
+    threadHref(agentId, 'permission:permission-1'))
+  expect(document.activeElement).toBe(container.querySelector('[data-request-kind="permission"][data-request-id="permission-1"]'))
+  await act(async () => {
+    history.pushState(null, '', threadHref(agentId, 'question:q-focus'))
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  })
+  expect(document.activeElement).toBe(container.querySelector('[data-request-kind="question"][data-request-id="q-focus"]'))
+})

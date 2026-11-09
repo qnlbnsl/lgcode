@@ -11,6 +11,7 @@ import { PermissionAnswer, Request, requestOpen } from "./request.tsx"
 import { AlertSubjects } from "./subjects/alerts.tsx"
 import { DataText, visibleText } from "./text.tsx"
 import { watchThread, type ThreadState } from "./watch.ts"
+import { MutationProvider, useMutationDisabled, useShellData } from "../data/ShellDataProvider.tsx"
 
 function LargeItem({ item, signal, onLoaded }: {
   readonly item: typeof Oversized.Type
@@ -42,13 +43,14 @@ function LargeItem({ item, signal, onLoaded }: {
 }
 
 function Prompt({ agentId, signal, failure }: { readonly agentId: AgentId; readonly signal: AbortSignal; readonly failure?: string }) {
+  const disabled = useMutationDisabled()
   const busy = useRef(false)
   const attempt = useRef<{ text: string; requestId: ReturnType<typeof requestId> } | undefined>(undefined)
   const [sending, setSending] = useState(false)
   const [message, setMessage] = useState("")
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (busy.current || signal.aborted) return
+    if (busy.current || signal.aborted || disabled) return
     const field = event.currentTarget.elements.namedItem("prompt") as HTMLTextAreaElement
     const text = field.value
     if (!text.trim()) return
@@ -69,7 +71,7 @@ function Prompt({ agentId, signal, failure }: { readonly agentId: AgentId; reado
   }
   return <form aria-label="Prompt agent" onSubmit={submit}>
     <label>Prompt agent<textarea name="prompt" aria-label="Prompt agent" disabled={sending} required /></label>
-    <button aria-label="Send prompt" type="submit" disabled={sending}>{sending ? "Sending…" : "Send prompt"}</button>
+    <button aria-label="Send prompt" type="submit" disabled={sending || disabled} title={disabled ? "Reconnect before sending" : undefined}>{sending ? "Sending…" : "Send prompt"}</button>
     {message && <p role="status">{message}</p>}
   </form>
 }
@@ -83,15 +85,30 @@ export function Thread({ agentId, subject, onSessionExpired }: {
   const [controller] = useState(() => new AbortController())
   const watcher = useRef<ReturnType<typeof watchThread> | undefined>(undefined)
   const expired = useRef(onSessionExpired)
+  const shellDisabled = useMutationDisabled()
+  const { requestSources } = useShellData()
+  const root = useRef<HTMLElement>(null)
+  const focusedSubject = useRef<string | undefined>(undefined)
   expired.current = onSessionExpired
   useEffect(() => {
-    watcher.current = watchThread(agentId, setState, () => expired.current(), controller.signal)
+    watcher.current = watchThread(agentId, setState, () => expired.current(), controller.signal, requestSources)
     return () => controller.abort()
-  }, [agentId, controller])
+  }, [agentId, controller, requestSources])
   const envelopes = state.items.filter((item): item is ClientEnvelope => "event" in item)
   const agent = state.snapshot?.agents.find((row) => row.agentId === agentId)
-  return <section aria-label="Thread">
-    <nav><a href="/">Situation</a></nav>
+  useEffect(() => {
+    if (subject === undefined) { focusedSubject.current = undefined; return }
+    if (!state.loaded || focusedSubject.current === subject) return
+    const separator = subject.indexOf(":")
+    const kind = subject.slice(0, separator)
+    const id = subject.slice(separator + 1)
+    const target = kind === "permission" || kind === "question"
+      ? [...(root.current?.querySelectorAll<HTMLElement>("[data-request-id]") ?? [])].find((node) => node.dataset.requestId === id && node.dataset.requestKind === kind)
+      : [...(root.current?.querySelectorAll<HTMLElement>("[data-subject]") ?? [])].find((node) => node.dataset.subject === subject)
+    if (target) { target.focus(); target.scrollIntoView?.({ block: "nearest" }); focusedSubject.current = subject }
+  }, [subject, state.loaded, state.items])
+  return <MutationProvider value={shellDisabled || state.connection !== "Live"}><section ref={root} aria-label="Thread">
+    <nav><a href="/#/">Home</a></nav>
     <h2>Thread: {visibleText(agent?.name ?? agentId)}</h2>
     <p role="status">{state.connection}</p>
     {agent?.state && <Lifecycle agent={agent} signal={controller.signal} />}
@@ -121,5 +138,5 @@ export function Thread({ agentId, subject, onSessionExpired }: {
       }
     })}
     {state.loaded && <Prompt agentId={agentId} signal={controller.signal} {...(agent?.startFailure === undefined ? {} : { failure: agent.startFailure })} />}
-  </section>
+  </section></MutationProvider>
 }

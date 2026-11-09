@@ -279,6 +279,16 @@ Vitest, the complete Playwright suite, and the credit check. Install Chromium
 and its system dependencies once with `pnpm exec playwright install --with-deps chromium`
 after installing the frozen workspace dependencies. `pnpm test:browser` also
 runs the browser suite on its own. Browser execution uses at most two workers.
+The website foundation shell proof is registered in
+`packages/web/e2e/foundation-shell.spec.ts`.
+It uses the production artifact and an authenticated engine for hash routes,
+history, drawer focus, shortcut safety, remembered resizing, color modes,
+disconnected drafts, strict content policy, and screenshots at 390, 768, 1440,
+and 2560 pixels in Field and Dusk.
+The page and request proof is registered in
+`packages/web/e2e/project-pages.spec.ts`.
+It uses actual engine requests for Home, boards, linked decisions, and Add task.
+These viewport checks do not claim physical-phone testing.
 Effect code is written from Effect
 4.0.5's documentation or installed source, looked up, never from memory
 (AGENTS.md, "Language"). Every unit records a problem it finds in

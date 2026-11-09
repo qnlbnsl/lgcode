@@ -13,7 +13,10 @@ it("7.12 shows the request title and full tool input before Allow, with the acti
   })
   expect(container.textContent).toContain("Open a harmless looking file") // catches hiding the title that the owner is asked to approve
   expect(container.textContent).toContain('"command":"rm -rf /tmp/example"') // catches approving from the title without seeing the actual input
-  expect(container.textContent!.indexOf('"command":"rm -rf /tmp/example"')).toBeLessThan(container.textContent!.indexOf("Allow"))
+  const command = container.querySelector(".request-fields code")!
+  expect(command.textContent).toBe("rm -rf /tmp/example")
+  expect(command.closest("details:not([open]), [hidden]")).toBeNull()
+  expect(command.compareDocumentPosition(allow) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   const message = [...container.querySelectorAll("article")].find((article) => article.textContent?.includes("Agent message before its request."))
   const request = container.querySelector('[aria-label="Permission request"]')
   expect(message).toBeTruthy() // catches agent text being rendered in the same control region as LGcode actions

@@ -42,13 +42,31 @@ export const mountThread = async (items: ReadonlyArray<unknown>, extraClient: Re
   const root = createRoot(container)
   roots.push({ container, root })
   vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })))
-  browserClient.client = {
-    "client.snapshot": () => Effect.succeed({ sequence: 1, agents: [rosterAgent], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }),
-    "client.subscribe": () => Stream.empty,
+  let revision = 1
+  const fixtureClient = {
+    "client.snapshot": () => Effect.succeed({ sequence: 1, agents: [rosterAgent], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0, project: { sequence: 1, truncated: false, repositories: [], workspaces: [], projects: [], teams: [], agents: [], sprints: [], tasks: [] } }),
+    "client.subscribe": () => Stream.never,
+    "client.requests": () => Effect.succeed({ sequence: revision, items: [] }),
+    "client.alerts.list": () => Effect.succeed({ items: [] }),
+    "client.sequence": () => Effect.succeed({ sequence: revision }),
     "client.thread": () => Effect.succeed({ items, next: undefined }),
     answer: vi.fn(() => Effect.succeed({})),
     prompt: vi.fn(() => Effect.succeed({})),
     ...extraClient
+  }
+  type SnapshotFixture = { sequence: number; agents: ReadonlyArray<Partial<typeof rosterAgent>>; project?: unknown }
+  const snapshotRead = fixtureClient["client.snapshot"] as (...args: unknown[]) => Effect.Effect<SnapshotFixture, unknown>
+  const subscribe = fixtureClient["client.subscribe"] as (payload: { filter?: unknown }) => Stream.Stream<unknown, unknown>
+  // A mounted thread now has an independent shell subscription. Thread tests
+  // drive only the agent-filtered connection; shell tests drive the unfiltered
+  // one explicitly. This preserves their independent cursor assertions.
+  browserClient.client = { ...fixtureClient,
+    "client.snapshot": (...args: unknown[]) => snapshotRead(...args).pipe(Effect.map((value) => {
+      revision = value.sequence
+      return { ...value, agents: value.agents.map((row) => ({ ...rosterAgent, ...row })),
+        project: value.project ?? { sequence: value.sequence, truncated: false, repositories: [], workspaces: [], projects: [], teams: [], agents: [], sprints: [], tasks: [] } }
+    })),
+    "client.subscribe": (payload: { filter?: unknown }) => payload.filter === undefined && path !== "/" ? Stream.never : subscribe(payload)
   }
   await act(async () => { root.render(<App />) })
   if (waitForThread) await act(async () => {

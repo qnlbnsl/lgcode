@@ -9852,3 +9852,145 @@ The manager allocates new issue numbers for defects found outside the unit being
 An in-unit correction updates its existing issue documentation and result without allocating a separate number.
 The original rejected proposal and Grade 8 review remain preserved in the website run records.
 The corrected paragraph received a separate independent review.
+
+## 568. Request and Add task retry caches retained text across owner sessions
+
+Found: 2026-11-09, while composing the replacement website.
+State: fixed in the composed website source, awaiting its full verification and review.
+
+Unconfirmed request answers and Add task commands survive page navigation so that a retry keeps its original command identity.
+The module caches also survived logout within the same document.
+A later owner login could therefore receive the previous session's command text or submission lock.
+
+`clearRequestAttempts()` in `packages/web/src/thread/requestAttempt.ts` removes all cached entries, wipes their command data, and invalidates captured entries so that a late response cannot restore them.
+`clearAddTaskAttempts()` in `packages/web/src/pages/AddTask.tsx` removes pending task payloads and advances the session generation so that an old receipt cannot affect a later session.
+The composed `packages/web/src/app.tsx` calls both functions in `sessionExpired`, after a confirmed logout response or an already expired session response, and in its App unmount cleanup.
+An unsuccessful logout does not discard the current session's recovery identity.
+
+Both caches exist only in module memory.
+A document reload creates new empty caches.
+Neither cache writes to local storage, session storage, or IndexedDB, and this correction does not claim to purge persistent browser storage.
+It does not delete authoritative requests, change their holder or open-state logic, or erase answers already accepted by the engine.
+
+Focused tests cover retained failed and sending attempts, navigation within the same session, clearing before a new mount, and late completion isolation.
+The actual composed App also has the integrator's logout and relogin regression.
+Browser execution and the composed full verification remain separate gates.
+
+## 569. The mounted project composition test cannot observe its answer textarea on the owner's computer
+
+Found: 2026-11-09, during the composed website builder's first and second remote full checks.
+State: corrected in the composed test fixture, awaiting a newly granted full check and independent review.
+
+The original `packages/web/test/project-composition.test.tsx` fails at assertion 54 because its answer textarea is absent.
+The first full passed 7,084 tests and failed two tests.
+The second full passed 7,085 tests and failed this test alone after the separate alert section selector was corrected.
+Both commands stopped before browser execution.
+The original project composition test passed an instrumentation-free local focused run without changing its assertions or default timeout.
+The different results do not establish a host-load or timeout cause.
+
+A bounded observational copy reproduced the missing textarea on the owner's computer with one test worker and the same fourteen processors used by the full check.
+The actual request read returned an open question held by the owner, with `canAnswer` set to true.
+The actual source-event read returned the matching question, agent, sequence and proposed answer.
+On that failed run, the source reply arrived after the click's React `act` boundary ended, while `vi.waitFor` was running inside a single awaited `act`.
+Every subsequent poll still observed the full-request loading message and no textarea.
+The successful local observational run received the source reply inside the click's `act` and had the textarea at its next boundary.
+
+Controlled local and remote comparisons established the test's asynchronous React observation and commit boundary.
+They held only the actual source-event reply until after the click's `act` finished and released it during observation.
+The original helper failed with that held reply on both computers.
+The corrected helper passed both the natural-response and held-response cases on both computers, retaining every original behavioral assertion and the default timeout.
+The original natural-response control also failed on the owner's computer and passed locally.
+Both comparison commands retained their actual nonzero exits because their original-helper cases failed.
+
+The integrator's narrow fixture overlay runs `vi.waitFor` outside `act` and finishes an `act` during each polling attempt before checking the unchanged assertion.
+The corrected original test then passed its instrumentation-free local focused run.
+The original W07 author source and hash remain preserved separately from this W06 correction.
+No timeout, assertion or production component changed.
+The exact source, file modes, symbolic links, font target files and collected author artifacts remained unchanged.
+The failed full logs, original focused result and raw local and remote diagnostic observations are preserved separately.
+A newly granted exact-source full check, actual browser execution and independent whole-composition review remain required.
+
+## 570. Replacement navigation and service regions invalidated old browser entry selectors
+
+Found: 2026-11-09, in the fourth composed website verification.
+State: fixture correction prepared, awaiting focused checks and a newly authorized full verification.
+
+The original browser cases for conversation history and phone thread answering searched for a visible standalone agent link at a width of 360 pixels while navigation was closed.
+The replacement shell keeps its closed phone navigation inert.
+The agent links also include their displayed state in their accessible name.
+The original Alerts and Settings layout cases waited for regions named Alerts and Settings.
+The actual service regions are named Phone notifications and Service settings.
+All four original browser failures and their complete contexts remain preserved.
+
+The two agent cases now open the actual navigation with its existing helper and click the named agent inside the Projects navigation.
+The two service cases now select the actual named regions.
+The legacy service URLs, real navigation actions, history, delivery, answer, refresh, recovery, storage, and phone overflow assertions remain unchanged.
+No timeout is increased.
+These are W06 fixture corrections, and they do not change W10 service presentation.
+
+## 571. Native browser offline did not immediately disable shared mutations
+
+Found: 2026-11-09, in the fourth composed website verification.
+State: correction prepared, awaiting focused checks and a newly authorized full verification.
+
+The foundation browser case switched its actual browser context offline while a thread remained mounted.
+Send prompt remained enabled and failed the unchanged assertion.
+The shared mutation guard observed the snapshot watcher's connection and completed reads, but it did not observe the browser's native offline signal.
+No host-load or transport-timeout cause is claimed.
+
+The shared data provider now disables mutations on the native offline event and aborts retired watcher and projection reads through their existing scopes.
+It retains the visible view and mounted prompt draft.
+A native online event starts a new authenticated watcher generation.
+Write readiness requires that generation's actual snapshot and coherent paged collections, including the final sequence check.
+The native online event alone cannot enable writes.
+The original browser offline, draft-retention, recovery, and viewport/theme assertions remain unchanged.
+A mounted App regression exercises native offline and online while its transport streams remain live and its recovery collections are held pending.
+
+A later passive observation of the unchanged Conversation journey confirmed another recovery gap in this provider.
+The shell published snapshot revision 18, and its next authoritative request page was already at revision 19.
+The exact revision guard correctly rejected that collection, but a quiet stream supplied no later snapshot and the failed read scheduled no recovery.
+The original full failures, natural journey failure, and complete passive observation remain preserved.
+This is an in-unit coherent-recovery correction under issue 571, with no new issue number.
+
+A nonaborted collection failure now requests a fresh snapshot by restarting the existing shared watcher generation after a backoff.
+The delay starts at 250 milliseconds and increases to at most 5 seconds, and coherent success resets it.
+Previous complete reads and the mounted draft remain visible, while writes stay disabled until the new snapshot and every exact revision check agree.
+Abort, snapshot replacement, native offline, session expiry, confirmed logout, and unmount cancel the old recovery scope.
+An old scope cannot restart a later owner session.
+Deterministic mounted App regressions cover the quiet revision mismatch, held final coherence, bounded backoff, replacement, offline recovery, and session teardown without parallel shared watchers.
+The original browser journey and every assertion and timeout remain unchanged; a new browser proof is still required.
+
+## 572. Request consumers repeated an already recovered immutable source read
+
+Found: 2026-11-09, in the fourth composed website verification.
+State: correction prepared, awaiting focused checks and a newly authorized full verification.
+
+The oversized-state browser case recorded two client.event requests for the same request sequence on distinct sockets.
+The unchanged oracle requires exactly one source recovery.
+The browser client already yielded the actual recovered request envelope to the shared watcher.
+The watcher discarded that immutable source, and permission summaries, expanded request details, and later independent thread hydration owned separate source reads.
+The original failed proof and its complete context remain preserved.
+
+The owner-session data provider now owns one reader for immutable request sources.
+The shared watcher seeds the actual full request envelope before publishing the snapshot that exposes its request row.
+The shared request components and the independent thread's request hydration use that reader and share pending source reads.
+Their sequence, event kind, request identity, and agent checks remain in place.
+An identity rejection discards that cached source so that a later read can retry.
+Failed reads do not become usable cached data.
+The reader supplies no request projection and decides no holder, status, or permission to answer.
+Those decisions still use the authoritative engine data and existing request components.
+
+Only PermissionRequested and QuestionAsked envelopes are retained.
+Retention is limited to 64 sources and 8 mebibytes, with older sources evicted when necessary.
+A source larger than the byte limit is delivered whole to its caller but is not retained.
+At most 64 source reads can be pending, and an excess read receives a retryable failure.
+Unrelated conversation events are never retained by this reader.
+Provider unmount, confirmed logout, and session expiry close the reader, clear its captured sources, abort pending reads, and prevent late completion from restoring the old session's data.
+A fresh document also starts with empty memory.
+No persistent browser storage or accepted engine/client protocol implementation is changed.
+
+The RequestList and page-fixtures changes are explicitly W06 overlays on preserved W07 originals.
+The required data-context addition in admin-controls is a W06 test-input overlay on the preserved W10 original.
+The original author reports and artifacts remain separate from integration proof.
+The browser read-count, uncertainty, slow-link, live-event, socket-survival, and answer assertions remain unchanged.
+All eight viewport/theme combinations remain in the browser source.
