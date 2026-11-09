@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { it } from "@effect/vitest";
@@ -114,15 +114,22 @@ for (const source of ["terminal", "message"]) {
     const gate = join(rig.root, "never-release");
     const harness = harnessFor("first", writeFakeAdapter(rig));
     const tail = `${source} held tail`;
-    // A prior plan is the barrier; the final short text remains in the redactor.
-    const account = accountFor("first", { turns: [[reference, marker, ...(source === "terminal" ? [chunk(tail)] : [{ step: "text", text: tail }]), frame({ sessionUpdate: "available_commands_update", availableCommands: [] }), { step: "wait_for_file", path: gate }]] }, echoFile(rig));
+    const echo = echoFile(rig);
+    // The queued plan must finish before the tail. A second acknowledged FIFO
+    // round trip places actual tail handling before the direct raw-frame barrier.
+    // Neither round trip emits content that could flush the short held tail.
+    const account = accountFor("first", { turns: [[reference, marker, { step: "notification_barrier" }, ...(source === "terminal" ? [chunk(tail)] : [{ step: "text", text: tail }]), { step: "notification_barrier" }, frame({ sessionUpdate: "available_commands_update", availableCommands: [] }), { step: "wait_for_file", path: gate }]] }, echo);
     return yield* withEngine(rig, { harness, accounts: [account] }, (context) => Effect.gen(function* () {
       yield* registerRebuildCheck();
       const reply = success(yield* call(ownerCredential, "start", startPayloadFor(harness, account, rig.work, { prompt: "go" })));
       yield* context.waitFor((event) => event._tag === "deliveryUpdate" && event.kind === "plan");
-      // stdout frames are processed in order; a command notification behind the
-      // tail provides a barrier without flushing it or ending the turn.
+      // Issue 556: script order alone cannot order queued SDK notifications and
+      // direct writes. The round trips above establish the actual wire order.
       yield* context.waitFor((event) => event._tag === "deliveryUpdate" && event.kind === "available_commands_update");
+      const refusals = JSON.parse(readFileSync(echo, "utf8")).inbound.filter((row: any) => row.error?.message === "Method not found: _lgcode_test_notification_barrier");
+      expect(refusals).toHaveLength(2);
+      expect(refusals.every((row: any) => row.error.code === -32601)).toBe(true);
+      expect(JSON.stringify(context.events)).not.toContain(tail);
       success(yield* call(ownerCredential, "stop", { agentId: reply.agentId }));
       const runner = yield* eventually(Effect.sync(() => JSON.stringify(context.events)), (text) => text.includes(tail));
       expect(runner).toContain(tail);

@@ -1,4 +1,4 @@
-import type { Caller, Delivery, PieceNamespace } from "@lgcode/contracts";
+import type { Caller, ContextReference, Delivery, PieceNamespace } from "@lgcode/contracts";
 import type { Snapshot } from "../commands/internal.ts";
 import type { EngineLists } from "../pieces/lists.ts";
 import { guardPiece } from "../pieces/guardPiece.ts";
@@ -7,6 +7,7 @@ export interface ReachInput {
   readonly caller?: Caller;
   readonly target: string;
   readonly deliveryId: string;
+  readonly context?: ReadonlyArray<ContextReference>;
   readonly source: Extract<NonNullable<Delivery["source"]>, { _tag: "piece" }>;
   readonly snapshot: Snapshot;
 }

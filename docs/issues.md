@@ -9337,3 +9337,53 @@ After a valid correction, the same previously refused creation request succeeds 
 A repeated request returns its original project without another launch.
 Historical invalid settings remain decodable and pass the real rebuild check.
 The original independent bad/control artifacts and interrupted full checks remain preserved.
+
+
+## 546. The composer had no typed task and file context references
+
+Found: 2026-11-09, during the website preparation at `bc783b2`.
+The manager allocated this issue to engine unit W03D.
+
+The golden Add context and at-sign search controls select tasks and workspace files.
+The accepted prompt and board-post contracts carried only text.
+They could not preserve a selected entity through delivery, retry, or replay.
+The mock's labels were not an engine search or an authorization check.
+
+The engine now searches actual readable project tasks and registered local workspace files.
+A shared resolver in `packages/engine/src/project/context.ts` admits typed references.
+It checks the authenticated sender and the conversation recipients.
+File admission reuses the registered repository, common-directory, branch, and path checks.
+References contain canonical identities, rather than caller-supplied display labels.
+No file contents are read or stored by this surface.
+Delivery descriptions remain inside an untrusted-data envelope.
+The existing request receipt preserves the original selected identities on an unchanged retry.
+Old commands and events without context remain valid.
+
+React controls remain outside this change.
+
+## 556. The terminal stop fixture could place its barrier before the message
+
+Found: 2026-11-09, in the first W03D full check at `bc783b2`.
+The manager allocated this issue after the exact-source ordering diagnostic.
+
+The held-message stop test mixed queued Agent Client Protocol version 2 notifications with direct raw stdout frames.
+The fake agent's plan and text steps returned after queue admission, before the separate writer sent them.
+Its raw command marker could therefore overtake the plan and message.
+The original failed trace observed the command marker before the plan and no held message after stop.
+A later passing file run did not clear that failed full check.
+
+The controlled probe used the actual protocol and client from this source.
+A blocked message handler also blocked the later notification handler in the same input-reader fiber.
+A held outgoing writer reproduced the direct marker overtaking queued plan and message notifications.
+This proved the fixture's ordering defect.
+It did not prove a production message loss after the message had buffered.
+
+The fake agent now offers a test-only notification barrier.
+It sends an unknown extension request through the same outgoing queue and awaits the expected method-not-found response.
+The peer reaches that request only after its earlier awaited notification handlers finish.
+The fixture uses one barrier after its plan and another after its tail, before writing the raw command marker.
+The request emits no content, plan, or idle update that could flush the held carry.
+The test verifies both acknowledgements and that the tail remains absent before stop.
+It retains the original assertions that stop emits the tail but does not store it, and keeps the original timeout.
+Production drain and stop behavior are unchanged.
+The original unmodified failed full trace and both original diagnostic artifacts remain preserved in the W03D evidence.

@@ -17,8 +17,10 @@ const account: RedactionStructure = { identity: true, fields: {
 } };
 const harness: RedactionStructure = { identity: true, fields: { id: identity } };
 const member: RedactionStructure = { identity: true, fields: { agentId: identity, service: identity, rule: identity, namespace: identity } };
+const context: RedactionStructure = { elements: { fields: { projectId: identity, taskId: identity, repoId: identity, worktreeId: identity } } };
 const delivery: RedactionStructure = { fields: {
   id: identity, target: identity, sender: actor, source: { fields: { id: identity, namespace: identity } },
+  content: { fields: { context } },
 } };
 
 // Project owners differ by schema: a workspace owner is display text, while
@@ -61,6 +63,7 @@ export const eventStructure: RedactionStructure = { taggedFields: {
   // The configuration events' top-level revision is a branded RequestId.
   // A revision key inside prose or a free-text record remains ordinary text.
   revision: identity,
+  context,
   roleFileHash: identity, noticeRecipient: identity, postId: identity, stalledPostId: identity,
   channelId: identity, wakeId: identity, anchorAgentId: identity, targetAgentId: identity,
   decidingPostId: identity, replyToPostId: identity,

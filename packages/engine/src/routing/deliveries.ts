@@ -334,7 +334,9 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
         if (cacheCurrent && row.source?._tag !== "piece") break;
         const queued = snapshot.threads[agentId]?.find((envelope) => envelope.event._tag === "DeliveryQueued" && envelope.event.delivery.id === row!.id);
         const caller = queued?.caller;
-        if (cacheCurrent && row.source?._tag === "piece" && canReach({ ...(caller === undefined || caller._tag === "piece" ? {} : { caller }), target: agentId, deliveryId: row.id, source: row.source, snapshot }, lists)) break;
+        if (cacheCurrent && row.source?._tag === "piece" && canReach({ ...(caller === undefined || caller._tag === "piece" ? {} : { caller }),
+          ...(row.content._tag === "prompt" && row.content.context !== undefined ? { context: row.content.context } : {}),
+          target: agentId, deliveryId: row.id, source: row.source, snapshot }, lists)) break;
         const events = withWaitChecks(snapshot, [{ _tag: "DeliveryWithdrawn", agentId, deliveryId: row.id, reason: cacheCurrent ? "delivery no longer reachable" : "automatic cache action obsolete" }], lists);
         yield* append(owner, freshRequest(), randomUUID(), events, {});
         snapshot = project(snapshot, events, lists);
@@ -352,6 +354,7 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
         { _tag: "DeliverySent", agentId, deliveryId: row.id, method: decodeRunMode(snapshot.agents[agentId]!.runMode) },
         ...(row.content._tag === "compact" ? [] : [{
           _tag: "PromptSent" as const, agentId, deliveryId: row.id, sender: row.sender, text: row.content.text,
+          ...(row.content._tag === "prompt" && row.content.context !== undefined ? { context: row.content.context } : {}),
         }]),
       ], {});
       return { incarnation, delivery: asDelivery(row), sentSequence: sent[0]!.sequence };

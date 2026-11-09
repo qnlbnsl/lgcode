@@ -1,5 +1,11 @@
 // Fixed public reasons contain no caller-controlled text or host error output.
 export const projectRefusalReasons = new Set([
+  "context is unavailable to this caller",
+  "context is unavailable to this conversation",
+  "context project is archived",
+  "context task is unavailable",
+  "context repository does not match the project",
+  "context team workspace does not match",
   "set the workspace folder before using Git",
   "workspace settings changed; refresh and retry",
   "registered workspace not found",

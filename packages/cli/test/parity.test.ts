@@ -102,6 +102,7 @@ for (const { command, words, form } of invocations) {
       "project.workspaces": { repoId: "repo", after: "workspace", limit: 20 },
       "project.create": { repository: { _tag: "existing", repoId: "repo" }, name: "Console", goal: "Track work", machineId: "local", useWorktree: true },
       "project.creations": { limit: 20 },
+      "project.context.search": { projectId: "project", worktreeId: "workspace", query: "file", limit: 20 },
       "project.goal.set": { projectId: "project", goal: "New goal" },
       "project.archive": { projectId: "project" },
       "project.restore": { projectId: "project" },
@@ -176,6 +177,7 @@ for (const { command, words, form } of invocations) {
         "project.settings": { ...base, settings: { workspaceFolder: root.work, shell: "zsh" } },
         "project.repository.add": { ...base, repoId: "repo" },
         "project.creations": { ...base, items: [] },
+        "project.context.search": { ...base, result: { items: [], truncated: false } },
         "project.repositories": { ...base, items: [], next: "repo" },
         "project.workspace.register": { ...base, worktreeId: "workspace" },
         "project.workspaces": { ...base, items: [], next: "workspace" },
@@ -233,7 +235,7 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.diff", "project.git.state", "project.history", "project.read", "project.review", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.context.search", "project.diff", "project.git.state", "project.history", "project.read", "project.review", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
   const nonAgent = Object.entries(commandAccess).filter(([, kinds]) => !(kinds as ReadonlyArray<string>).includes("agent")).map(([name]) => name);

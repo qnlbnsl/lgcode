@@ -317,6 +317,33 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       return { items: items.slice(0, entries), truncated };
     }),
     register: (folder) => operation((signal) => repository(folder, signal)),
+    contextFile: (folder, requested) => withRepo(folder, async (path) => {
+      const full = await filePath(path, requested);
+      if (!(await lstat(full)).isFile() || await realpath(full) !== full) return fail("invalid_path");
+    }),
+    contextFiles: (folder, query) => withRepo(folder, async (path, signal) => {
+      // Git supplies tracked and nonignored untracked names, never contents.
+      // Discard an incomplete final name when the subprocess budget is hit.
+      const reply = await run(path, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], signal, true);
+      if (reply.code !== 0 && !reply.truncated) throw processFailure(reply);
+      const names = reply.stdout.split("\0"); names.pop();
+      const items: string[] = [];
+      let truncated = reply.truncated;
+      for (const name of new Set(names)) {
+        if (!name.toLowerCase().includes(query.toLowerCase())) continue;
+        if (signal.aborted) return fail("cancelled");
+        try {
+          const full = await filePath(path, name);
+          if (!(await lstat(full)).isFile() || await realpath(full) !== full) continue;
+        } catch (error) {
+          if (error instanceof GitFailure && error.reason === "invalid_path" || ["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) continue;
+          throw error;
+        }
+        if (items.length === entries) { truncated = true; break; }
+        items.push(name);
+      }
+      return { items, truncated };
+    }),
     createRepository: (name) => operation(async (signal) => {
       const base = await root(), path = join(base, slug(name));
       if (await exists(path)) return fail("collision");
