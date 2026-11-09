@@ -50,7 +50,9 @@ No command is advertised before it has a handler.
 | W01 | 1, high | Project contracts, events, reducer, commands, snapshot, and registration in `packages/contracts/src/project/`, `packages/engine/src/project/`, piece tables, client, command-line interface, and Model Context Protocol tool generation. | Baseline. | Projects, teams, sprints, tasks, defaults, shared status derivation, permissions, event replay, bounded snapshots, and team membership. `data-checks.mjs`. |
 | W02 | 1, high | Real Git service and tests in `packages/engine/src/project/git/`. | Service internals can start with baseline. Integration follows W01. | Safe bounded reads, repositories and worktrees, changes, history, staging, commits, sync, conflict choices, dirty destination refusal, and review creation without merging main. `workspace-tools-checks.mjs`, `workspace-redesign-checks.mjs`, Git cases in `revision-checks.mjs`. |
 | W03 | 1, high | Existing question, request, runner and board commands, contracts, client reads, and runtime tests. | Baseline. Project links follow W01. | Reply cancellation keeps agent alive. Owner chat reads leave no read mark. Question title, recommendation, proposed answer, linked task completion, request history, model/effort changes, and honest context usage. `operations-checks.mjs`, composer cases in `revision-checks.mjs`. |
-| W04 | 1, high | Project creation and Git integration in project planners and service lifecycle. | W01, W02, W03. | Real lead launch, repository creation and registration, collision-safe worktrees, inherited membership, owner task notification, rename/archive/restore, and API parity. `home-checks.mjs`, `data-checks.mjs`. |
+| W04a | 1, high | Typed Git API, command-line registration, authenticated handlers and bounded redacted replies over the W02 service. | W01, W02, W03. | Repository registration, Git reads and mutations, conflict choices, review URLs, and dirty destination refusal. Workspace and revision Git checks. |
+| W04b | 1, high | Real project creation, default selection, worktree and lead lifecycle, rename/archive/restore. | W01, W02, W03. May build alongside W04a. | Real lead launch, collision-safe worktrees, retry and failure recovery, inherited membership, goal and shell preferences. `home-checks.mjs`, `data-checks.mjs`. |
+| W04c | 1, high | Project-linked requests, task completion and owner task delivery. | W04a and W04b integrated with W03. | Typed question links, real-writer collision and replay proof, task blockers, exactly-once completion and actual lead notification. Board and request data checks. |
 | W05 | 1, high | Setup, project stage and mocks data, schema/design reads, notification retry/test/dismissal, and account read support. | W01 and W04. | No sample data. Real discovery, positive setup completion, stage team names, screen metadata and revision records, approval evidence, persisted notification dismissal, and fixed safe errors. `onboarding-checks.mjs`, `mocks-checks.mjs`, service cases in `revision-checks.mjs`. |
 | W06 | 2, high | React application shell, routes, authentication, tokens, external styles, local font assets, sidebar, switchers, and shared UI in `packages/web/`. | Step 1 passes its three gates. | Keep authentication and current watchers. Hash routes and old alert deep links survive. Rail, drawer, breadcrumb, URL navigation, connection indicator, focus, and Field/Dusk match. `checks.mjs`, phone and foundations cases in `revision-checks.mjs`. |
 | W07 | 2, high | Home, repository list, board, sprint/task details, New project and task dialogs in web workspace views. | W06. | Shared request queue, inline answers, attention order, history, filters, focus handoff, responsive tables, stage strip, cards, and detail timeline. `home-checks.mjs`, `checks.mjs`, relevant revision cases. |
@@ -68,7 +70,9 @@ No command is advertised before it has a handler.
 
 W05 is split into three independently verified seats.
 W05a builds notification retry, test delivery, and permanent prompt dismissal against the existing client machinery.
-W05b builds setup, stages, and mock records after W04.
+W04 is split into Git API wiring, project startup and lifecycle, and linked decisions.
+Each part receives its own builder and fresh verifier.
+W05b builds setup, stages, and mock records after all three W04 parts.
 W05c builds actual next-turn model and effort changes and honest per-agent context reads against the existing runner.
 The latter completes the composer engine scope named in W03 without expanding its request and cancellation seat.
 Per-account provider usage and subscription placement remain in step 3.
@@ -93,7 +97,9 @@ Use tabs named `web:<n>`, split right, with at most three panes per tab.
 Use at most eight seats at once and keep system load below 38.
 Do not touch workspace `w3` or pane `w3:pAD`.
 Read each active seat's session log `used_percent`.
-Report 90 percent to the manager and start no seats at 97 percent.
+Keep every seat on Codex throughout, including after 90 and 97 percent.
+At 99 percent, tell the manager immediately so the owner can reset usage.
+Keep running seats going and resume new starts when the meter drops.
 
 ## Stage gates and evidence
 
