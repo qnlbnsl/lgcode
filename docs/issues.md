@@ -8798,7 +8798,7 @@ recoverable error. Tests cover a runner refusal and a naturally ending reply.
 Both tests verify that the writer accepts a later command and sends the next
 queued prompt.
 
-## Pending number for website worker 03. The piece failure log test can miss its diagnostic
+## 532. The piece failure log test can miss its diagnostic
 
 Found: 2026-11-08, during the website worker's full repository check.
 State: open; the cause is not established.
@@ -8808,6 +8808,4 @@ The `FR-042 protocol=false` case in
 diagnostic and received none during a full suite run. The same three-test
 file passed when run alone, without a source change. The failed full run is
 in `/tmp/w03-check.log`, and the isolated pass is in
-`/tmp/w03-piece-failure.log`. The assertion remains unchanged. The lead must
-assign another issue number because 529 is already reserved for this unit's
-cancellation correction.
+`/tmp/w03-piece-failure.log`. The assertion remains unchanged.
