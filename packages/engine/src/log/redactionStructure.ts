@@ -42,6 +42,7 @@ const mockSource = { elements: { fields: { sourceId: identity, worktreeId: ident
 const mockScreens = { elements: { fields: { screenId: identity, sourceId: identity, scenarioRoutes: { elements: { fields: { scenarioId: identity } } } } } };
 const schemaChanges = { elements: { fields: { sourceId: identity } } };
 const draftFields = { elements: { fields: { sourceId: identity, screens: { elements: identity } } } };
+const mockComparisons = { elements: { fields: { field: draftFields.elements } } };
 const mockWorklist = { fields: { screens: { elements: identity }, drafts: { elements: identity }, schemaChanges, draftedFields: draftFields } };
 export const eventStructure: RedactionStructure = { taggedFields: {
   QuestionAsked: requestLinks, PermissionRequested: requestLinks,
@@ -50,9 +51,9 @@ export const eventStructure: RedactionStructure = { taggedFields: {
     design: { fields: { repoId: identity, worktreeId: identity, components: { elements: { fields: { componentId: identity, fingerprint: identity } } } } } },
   "project.SetupCompleted": { projectId: identity },
   "project.MockRecorded": { projectId: identity, revisionId: identity, author: actor,
-    artifacts: { elements: { fields: { sourceId: identity, fingerprint: identity } } }, comparisons: { elements: { fields: { field: draftFields.elements } } },
+    artifacts: { elements: { fields: { sourceId: identity, fingerprint: identity } } }, comparisons: mockComparisons,
     bundle: { fields: { sources: mockSource, screens: mockScreens, designRevision: identity,
-      scenarios: { elements: { fields: { scenarioId: identity } } }, draftedFields: draftFields,
+      scenarios: { elements: { fields: { scenarioId: identity } } }, draftedFields: draftFields, reviewedComparisons: mockComparisons,
       components: { elements: { fields: { componentId: identity, sourceId: identity, fingerprint: identity, screens: { elements: identity } } } } } } },
   "project.MockApproved": { projectId: identity, approvalId: identity, revisionId: identity, leadAgentId: identity, worklist: mockWorklist },
   "project.GitEvidenceReported": { report: gitReport },
