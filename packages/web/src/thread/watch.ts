@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import { connectBrowser, requestId } from "./client.ts"
 import type { ConnectionState } from "../watchSituation.ts"
+import type { RequestSources } from "../data/requestSources.ts"
 
 export type ThreadItem = ClientEnvelope | typeof Oversized.Type
 export interface ThreadState {
@@ -14,7 +15,7 @@ export interface ThreadState {
 }
 
 export function watchThread(
-  agentId: AgentId, changed: (state: ThreadState) => void, expired: () => void, signal: AbortSignal
+  agentId: AgentId, changed: (state: ThreadState) => void, expired: () => void, signal: AbortSignal, requestSources: RequestSources
 ) {
   let snapshot: ClientSnapshot | undefined
   const items = new Map<EventSequence, ThreadItem>()
@@ -34,7 +35,7 @@ export function watchThread(
     if ("event" in item) {
       const target = item.event._tag === "DeliveryQueued" ? item.event.delivery.target
         : "agentId" in item.event ? item.event.agentId : item.agentId
-      if (target === agentId) items.set(item.sequence, item)
+      if (target === agentId) { items.set(item.sequence, item); requestSources.remember(item) }
     } else if (item.agentId === agentId && contentOnlyEventTags.some((tag) => tag === item.tag)
       && !(items.has(item.sequence) && "event" in items.get(item.sequence)!)) items.set(item.sequence, item)
   }
@@ -49,10 +50,20 @@ export function watchThread(
             if (next.sequence < minimum) { yield* Effect.sleep(25); continue }
             // Snapshot rows are identities, not approval context. Recover each
             // missing request event automatically, including oversized ones.
-            for (const row of [...next.requests, ...next.questions]) {
+            for (const { row, kind } of [
+              ...next.requests.map((row) => ({ row, kind: "permission" as const })),
+              ...next.questions.map((row) => ({ row, kind: "question" as const }))
+            ]) {
               if (row.agentId !== agentId || [...items.values()].some((entry) => entry.sequence === row.sourceSequence && "event" in entry)) continue
-              const reply = yield* client["client.event"]({ requestId: requestId(), sequence: row.sourceSequence })
-              if ("envelope" in reply) put(reply.envelope)
+              const envelope = yield* Effect.tryPromise(() => requestSources.read(row.sourceSequence))
+              const event = envelope.event
+              if (!("agentId" in event) || event.agentId !== agentId || (kind === "permission"
+                ? event._tag !== "PermissionRequested" || event.permissionRequestId !== row.id
+                : event._tag !== "QuestionAsked" || event.questionId !== row.id)) {
+                requestSources.discard(envelope)
+                return yield* Effect.fail(new Error("Request source identity changed"))
+              }
+              put(envelope)
             }
             snapshot = next
             return
@@ -92,8 +103,12 @@ export function watchThread(
                 // the stream cursor, including unscoped DeliveryQueued.
                 if (item.tag.startsWith("Delivery") || item.tag === "AgentStarted" || item.tag === "QuestionAsked"
                   || item.tag === "PermissionRequested" || item.tag === "QuestionAnswered" || item.tag === "PermissionAnswered") {
-                  const reply = yield* client["client.event"]({ requestId: requestId(), sequence: item.sequence })
-                  if ("envelope" in reply) put(reply.envelope)
+                  if (item.tag === "QuestionAsked" || item.tag === "PermissionRequested") {
+                    put(yield* Effect.tryPromise(() => requestSources.read(item.sequence)))
+                  } else {
+                    const reply = yield* client["client.event"]({ requestId: requestId(), sequence: item.sequence })
+                    if ("envelope" in reply) put(reply.envelope)
+                  }
                 }
                 yield* refresh(item.sequence)
               }

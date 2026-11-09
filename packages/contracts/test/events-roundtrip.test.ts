@@ -92,7 +92,7 @@ const expectedProjectTags = [
   "project.CreationPlanned", "project.CreationClaimed", "project.CreationFinished", "project.GoalChanged", "project.ArchiveStarted", "project.Archived", "project.Restored",
   "project.SettingsChanged", "project.RepositoryAdded", "project.RepositoryLocated", "project.WorktreeCreated",
   "project.Created", "project.Placed", "project.PreferencesChanged", "project.Renamed", "project.StageChanged", "project.TeamAdded",
-  "project.SprintAdded", "project.SprintChanged", "project.SprintCompleted", "project.TaskAdded", "project.TaskChanged", "project.TaskNoted"
+  "project.SprintAdded", "project.SprintChanged", "project.SprintCompleted", "project.TaskAdded", "project.TaskChanged", "project.TaskNoted", "project.OwnerTaskNotificationPlanned"
 ]
 const expectedTags = [...expectedEngineTags, ...expectedBoardTags, ...expectedClientTags, ...expectedRolesTags, ...expectedProjectTags]
 

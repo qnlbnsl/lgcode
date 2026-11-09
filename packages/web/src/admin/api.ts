@@ -5,6 +5,16 @@ import * as Effect from "effect/Effect"
 
 export const requestId = () => crypto.randomUUID() as RequestId
 
+// A typed refusal is conclusive. A transport failure can follow a committed
+// command and must retain its request identity for receipt recovery.
+export const commandOutcome = <A, E,>(operation: Effect.Effect<A, E>) => Effect.gen(function* () {
+  const result = yield* Effect.result(operation)
+  if (result._tag === "Success") return { _tag: "acknowledged" as const, value: result.success }
+  const failure = result.failure
+  if (typeof failure === "object" && failure !== null && "_tag" in failure && failure._tag === "CommandError") return { _tag: "refused" as const }
+  return yield* Effect.fail(failure)
+})
+
 // Each operation owns a socket scope. Leaving the page cancels its pending
 // reads and commands, and releases the sockets even when a request fails.
 export function useAdminApi(onSessionExpired: () => void) {

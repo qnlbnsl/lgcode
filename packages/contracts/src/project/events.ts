@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema"
-import { CreationFolderIdentity, Project, ProjectCreation, ProjectId, ProjectName, ProjectSettings, ProjectStage, ProjectText, Repository, RepositoryLocation, Sprint, SprintId, Task, TaskId, TaskState, Team, Workspace } from "./schema.ts"
+import { CreationFolderIdentity, OwnerTaskNotification, Project, ProjectCreation, ProjectId, ProjectName, ProjectSettings, ProjectStage, ProjectText, Repository, RepositoryLocation, Sprint, SprintId, Task, TaskId, TaskState, Team, Workspace } from "./schema.ts"
 
 export const ProjectEvent = Schema.Union([
   Schema.TaggedStruct("project.SettingsChanged", { settings: ProjectSettings }),
@@ -25,6 +25,7 @@ export const ProjectEvent = Schema.Union([
     owner: Schema.optionalKey(Sprint.fields.owner), needs: Schema.optionalKey(Sprint.fields.needs) }),
   Schema.TaggedStruct("project.SprintCompleted", { projectId: ProjectId, sprintId: SprintId, completion: ProjectName, evidence: ProjectText }),
   Schema.TaggedStruct("project.TaskAdded", Task.fields),
+  Schema.TaggedStruct("project.OwnerTaskNotificationPlanned", OwnerTaskNotification.fields),
   Schema.TaggedStruct("project.TaskChanged", { projectId: ProjectId, taskId: TaskId,
     state: Schema.optionalKey(TaskState), title: Schema.optionalKey(ProjectName), owner: Schema.optionalKey(Task.fields.owner),
     teamId: Schema.optionalKey(Task.fields.teamId), sprintId: Schema.optionalKey(SprintId), worktreeId: Schema.optionalKey(Task.fields.worktreeId),

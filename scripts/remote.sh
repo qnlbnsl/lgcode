@@ -97,7 +97,11 @@ lgcode_limited() {
       systemctl --user daemon-reload
     fi
     echo "remote: limits: $keep of ${#cpus[@]} processors ($list), memory $memory shared"
-    systemd-run --user --scope --quiet --collect --slice=lgcode-remote.slice -- taskset -c "$list" bash -c "set -eo pipefail"$'\n'"$1"
+    # Chromium moves itself into its own systemd scope over the session bus,
+    # which would take the browser tests out of the memory limit, so the
+    # command runs without the bus address.
+    systemd-run --user --scope --quiet --collect --slice=lgcode-remote.slice -- \
+      env -u DBUS_SESSION_BUS_ADDRESS taskset -c "$list" bash -c "set -eo pipefail"$'\n'"$1"
   else
     echo "remote: limits: $keep of ${#cpus[@]} processors ($list); no systemd user session, so no memory limit"
     taskset -c "$list" bash -c "set -eo pipefail"$'\n'"$1"

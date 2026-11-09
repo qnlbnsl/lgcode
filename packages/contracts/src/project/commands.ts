@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
+import { ClientRequest } from "../requests.ts"
 import type { CallerKind } from "../commands.ts"
 import { AgentId, EventSequence, RequestId } from "../ids.ts"
 import { Project, ProjectCreation, ProjectId, ProjectName, ProjectSettings, ProjectStage, ProjectText, Repository, RepositoryLocation, Sprint, SprintId, Task, TaskHistoryEntry, TaskId, Team, Workspace } from "./schema.ts"
@@ -50,6 +51,8 @@ export const ProjectRpcGroup = RpcGroup.make(
   Rpc.make("stage.set", { payload: { ...project, stage: ProjectStage }, success: Ack, error: Refused }),
   Rpc.make("read", { payload: { ...request, ...paging, projectId: Schema.optionalKey(ProjectId), collection: Schema.Literals(["projects", "teams", "sprints", "tasks", "agents"]) },
     success: Schema.Union([page(Schema.Union([Project, Team, Sprint, Task, ProjectAgentSummary])), Schema.Struct({ ...request, data: Schema.String })]), error: Refused }),
+  Rpc.make("requests", { payload: { ...project, ...paging, kind: Schema.optionalKey(ClientRequest.fields.kind), status: Schema.optionalKey(ClientRequest.fields.status) },
+    success: Schema.Union([page(ClientRequest), Schema.Struct({ ...request, data: Schema.String })]), error: Refused }),
   Rpc.make("team.create", { payload: { ...project, ...team }, success: Schema.Struct({ ...request, teamId: Team.fields.teamId, channelId: Schema.NonEmptyString, group: Schema.NonEmptyString }), error: Refused }),
   Rpc.make("sprint.create", { payload: { ...project, ...sprint }, success: Schema.Struct({ ...request, sprintId: SprintId }), error: Refused }),
   Rpc.make("sprint.update", { payload: { ...project, sprintId: SprintId,
@@ -69,7 +72,7 @@ export const projectAccess = {
   "project.repositories": owner, "project.workspace.register": owner, "project.workspaces": owner, "project.create": owner,
   "project.rename": owner, "project.place": owner, "project.preferences.set": owner,
   "project.creations": owner, "project.goal.set": owner, "project.archive": owner, "project.restore": owner,
-  "project.stage.set": member, "project.read": member, "project.team.create": member,
+  "project.requests": member, "project.stage.set": member, "project.read": member, "project.team.create": member,
   "project.sprint.create": member, "project.sprint.update": member, "project.sprint.complete": member,
   "project.task.create": member, "project.task.update": member, "project.task.note": member, "project.task.history": member
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof ProjectRpcGroup>>, ReadonlyArray<CallerKind>>

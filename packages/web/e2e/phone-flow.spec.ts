@@ -91,7 +91,7 @@ test("11.1 phone flow: catches a missing alert link, login, permission answer, a
           await page.goto(origin)
           await page.getByLabel("Password", { exact: true }).fill(password)
           await page.getByRole("button", { name: "Log in", exact: true }).click()
-          await expect(page.getByLabel("Situation", { exact: true })).toBeVisible()
+          await expect(page.getByRole("region", { name: "Home", exact: true })).toBeVisible()
           expect(await page.evaluate(() => ({ secure: isSecureContext, uuid: typeof crypto.randomUUID })))
             .toEqual({ secure: true, uuid: "function" })
           expect((await page.context().cookies(origin)).some((cookie) => cookie.secure && cookie.httpOnly && cookie.sameSite === "Strict")).toBe(true)

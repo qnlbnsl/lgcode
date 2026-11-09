@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect"
 import { requestId, withClient } from "../client.ts"
 import { DataText, visibleText } from "../text.tsx"
 import type { SubjectProps } from "./index.tsx"
+import { useMutationDisabled } from "../../data/ShellDataProvider.tsx"
 
 const authorLabel = (author: BoardAuthor) => author._tag === "agent" ? `agent ${author.agentId}`
   : author._tag === "service" ? `service ${author.service}` : "owner"
@@ -11,6 +12,7 @@ const reason = (error: unknown, fallback: string) => typeof error === "object" &
   && "reason" in error && typeof error.reason === "string" ? visibleText(error.reason) : fallback
 
 export function Board({ id, alertKind }: SubjectProps) {
+  const disabled = useMutationDisabled()
   const [post, setPost] = useState<BoardPost>()
   const [answer, setAnswer] = useState<BoardPost>()
   const [busy, setBusy] = useState(false)
@@ -27,7 +29,7 @@ export function Board({ id, alertKind }: SubjectProps) {
 
   const read = async () => {
     const signal = controller.current?.signal
-    if (signal === undefined || signal.aborted || locked.current || !id) return
+    if (signal === undefined || signal.aborted || locked.current || !id || disabled) return
     locked.current = true
     setBusy(true)
     setMessage("")
@@ -47,7 +49,7 @@ export function Board({ id, alertKind }: SubjectProps) {
   const reply = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const signal = controller.current?.signal
-    if (signal === undefined || signal.aborted || locked.current || sent || post?.status !== "open") return
+    if (signal === undefined || signal.aborted || locked.current || sent || post?.status !== "open" || disabled) return
     const field = event.currentTarget.elements.namedItem("reply") as HTMLTextAreaElement
     const text = field.value
     if (!text.trim()) return
@@ -97,7 +99,7 @@ export function Board({ id, alertKind }: SubjectProps) {
   return <section aria-label="Board post">
     <h4>Board post</h4>
     <p>{boardAlertTitles[alertKind === "board.no-answer" ? "board.no-answer" : "board.post"]}</p>
-    <button aria-label="Read post" disabled={busy || !id} onClick={() => { void read() }}>{busy ? "Working…" : "Read post"}</button>
+    <button aria-label="Read post" disabled={busy || !id || disabled} onClick={() => { void read() }}>{busy ? "Working…" : "Read post"}</button>
     {post !== undefined && <>
       <p>Author: {visibleText(authorLabel(post.author))}</p>
       <p>Post: {visibleText(post.postId)}</p>
@@ -109,7 +111,7 @@ export function Board({ id, alertKind }: SubjectProps) {
       </p>)}
       {post.status === "open" && !sent && <form aria-label="Reply to post" onSubmit={(event) => { void reply(event) }}>
         <label>Reply<textarea name="reply" aria-label="Reply" required disabled={busy} /></label>
-        <button type="submit" disabled={busy}>Send reply</button>
+        <button type="submit" disabled={busy || disabled}>Send reply</button>
       </form>}
     </>}
     {answer !== undefined && <><p>Your reply</p><DataText text={answer.text} /></>}

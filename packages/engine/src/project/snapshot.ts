@@ -1,5 +1,6 @@
 import { projectAgentStatus, type Caller, type ProjectSnapshot, type Task } from "@lgcode/contracts"
 import type { Snapshot } from "../commands/internal.ts"
+import { projectedTask } from "./decisions.ts"
 import { canReadProject } from "./access.ts"
 import { own, projectView } from "./view.ts"
 
@@ -14,7 +15,7 @@ export const projectAgents = (snapshot: Snapshot, projectId: string) => {
   return Object.values(snapshot.agents).filter((agent) => own(view.agentProjects, agent.agentId) === projectId).map((agent) => ({
     agentId: agent.agentId, projectId: projectId as typeof ProjectSnapshot.Type.projects[number]["projectId"],
     status: projectAgentStatus({ needsOwner: needs.has(agent.agentId) || agent.startFailure !== undefined, state: agent.state._tag,
-      tasks: Object.values(view.tasks).filter((task) => task.projectId === projectId && task.owner === agent.agentId) })
+      tasks: Object.values(view.tasks).filter((task) => task.projectId === projectId && task.owner === agent.agentId).map((task) => projectedTask(snapshot, task)) })
   }))
 }
 export const taskMetadata = ({ history: _history, ...task }: import("@lgcode/contracts").ProjectTaskRecord): Task => task
@@ -42,7 +43,7 @@ export const snapshotFor = (caller: Caller, snapshot: Snapshot): typeof ProjectS
   fill(section.workspaces, Object.values(view.workspaces).filter((row) => caller._tag === "owner" || workspaceIds.has(row.worktreeId)))
   fill(section.teams, Object.values(view.teams).filter((row) => ids.has(row.projectId)))
   fill(section.sprints, Object.values(view.sprints).filter((row) => ids.has(row.projectId)))
-  fill(section.tasks, Object.values(view.tasks).filter((row) => ids.has(row.projectId)).map(taskMetadata))
+  fill(section.tasks, Object.values(view.tasks).filter((row) => ids.has(row.projectId)).map((task) => taskMetadata(projectedTask(snapshot, task))))
   fill(section.agents, projects.flatMap((row) => projectAgents(snapshot, row.projectId)))
   return section
 }

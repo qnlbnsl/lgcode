@@ -103,6 +103,7 @@ const summaries: Record<CommandName, string> = {
   "project.place": "Assign a stopped project to a registered workspace.",
   "project.preferences.set": "Set a project's preferred shell.",
   "project.stage.set": "Set your project's stage.",
+  "project.requests": "Read current and answered project requests as the owner or actual lead.",
   "project.read": "Read a bounded page of project records.",
   "project.team.create": "Create a project team with its group board channel.",
   "project.sprint.create": "Create a sprint with its owner and dependencies.",

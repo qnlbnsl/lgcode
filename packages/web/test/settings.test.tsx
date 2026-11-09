@@ -1,9 +1,9 @@
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import * as Effect from "effect/Effect"
-import * as Stream from "effect/Stream"
 import { afterEach, expect, it, vi } from "vitest"
 import { App } from "../src/index.ts"
+import { adminShellClient } from "./admin-shell-client.ts"
 
 const browser = vi.hoisted(() => ({ client: undefined as unknown, connect: vi.fn() }))
 vi.mock("@lgcode/client/browser", async () => {
@@ -36,7 +36,7 @@ const setControlValue = (control: HTMLInputElement, value: string) => {
 }
 
 const openSettings = async (container: HTMLElement) => {
-  const link = Array.from(container.querySelectorAll("a")).find((item) => item.textContent?.includes("Settings"))
+  const link = container.querySelector<HTMLAnchorElement>('a[aria-label="Service settings"]')
   expect(link, "the owner needs a Settings link to reach the page").toBeTruthy()
   await act(async () => { link!.click() })
 }
@@ -57,15 +57,14 @@ it("7.8 changes a kind's alert push setting through its client command", async (
   const set = vi.fn(() => Effect.tryPromise(() => pending))
   const read = vi.fn(() => Effect.succeed({ requestId: "reply", ...alertSettings }))
   browser.client = {
-    "client.snapshot": () => Effect.succeed({ requestId: "snapshot", sequence: 7, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }),
-    "client.subscribe": () => Stream.never,
+    ...adminShellClient(),
     "client.alerts.settings": read,
     "client.alerts.settings.set": set,
     "client.web.settings": () => Effect.succeed({ requestId: "reply", ...webSettings, serverState: "running" })
   }
   const container = await render()
   await openSettings(container)
-  await vi.waitFor(() => expect(container.textContent).toContain("approval"))
+  await vi.waitFor(() => expect(container.querySelector('[aria-label="Push for approval"]')).not.toBeNull())
   const control = container.querySelector<HTMLInputElement>('input[type="checkbox"]')
   expect(control, "alert push settings need a usable checkbox").toBeTruthy()
   await act(async () => {
@@ -86,8 +85,7 @@ it("7.8 changes a kind's alert push setting through its client command", async (
 it("7.8 changes the alert carrier server and topic through its client command", async () => {
   const set = vi.fn(() => Effect.succeed({ requestId: "reply" }))
   browser.client = {
-    "client.snapshot": () => Effect.succeed({ requestId: "snapshot", sequence: 7, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }),
-    "client.subscribe": () => Stream.never,
+    ...adminShellClient(),
     "client.alerts.settings": () => Effect.succeed({ requestId: "reply", ...alertSettings }),
     "client.alerts.carrier.set": set,
     "client.web.settings": () => Effect.succeed({ requestId: "reply", ...webSettings, serverState: "running" })
@@ -109,8 +107,7 @@ it("7.8 sets and clears the carrier token without reading it back", async () => 
   const setToken = vi.fn(() => Effect.succeed({ requestId: "reply" }))
   const clearToken = vi.fn(() => Effect.succeed({ requestId: "reply" }))
   browser.client = {
-    "client.snapshot": () => Effect.succeed({ requestId: "snapshot", sequence: 7, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }),
-    "client.subscribe": () => Stream.never,
+    ...adminShellClient(),
     "client.alerts.settings": () => Effect.succeed({ requestId: "reply", ...alertSettings }),
     "client.alerts.carrier.set-token": setToken,
     "client.alerts.carrier.clear-token": clearToken,
@@ -138,8 +135,7 @@ it("7.8 sets and clears the carrier token without reading it back", async () => 
 it("7.8 changes web server settings and shows the current serverState", async () => {
   const set = vi.fn(() => Effect.succeed({ requestId: "reply" }))
   browser.client = {
-    "client.snapshot": () => Effect.succeed({ requestId: "snapshot", sequence: 7, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }),
-    "client.subscribe": () => Stream.never,
+    ...adminShellClient(),
     "client.alerts.settings": () => Effect.succeed({ requestId: "reply", ...alertSettings }),
     "client.web.settings": () => Effect.succeed({ requestId: "reply", ...webSettings, serverState: "port-taken" }),
     "client.web.settings.set": set
@@ -161,8 +157,7 @@ it("7.8 changes web server settings and shows the current serverState", async ()
 it("FR-001 refuses an HTTP public address before saving and explains HTTPS", async () => {
   const set = vi.fn(() => Effect.succeed({ requestId: "reply" }))
   browser.client = {
-    "client.snapshot": () => Effect.succeed({ requestId: "snapshot", sequence: 7, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }),
-    "client.subscribe": () => Stream.never,
+    ...adminShellClient(),
     "client.alerts.settings": () => Effect.succeed({ requestId: "reply", ...alertSettings }),
     "client.web.settings": () => Effect.succeed({ requestId: "reply", ...webSettings, serverState: "running" }),
     "client.web.settings.set": set
@@ -174,6 +169,6 @@ it("FR-001 refuses an HTTP public address before saving and explains HTTPS", asy
     setControlValue(container.querySelector<HTMLInputElement>('input[name="publicAddress"]')!, "http://lgcode.example.test")
     container.querySelector("form[aria-label='Web server settings']")!.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }))
   })
-  expect(container.querySelector('[role="status"]')?.textContent).toMatch(/public address.*https/i)
+  expect(container.querySelector('section[aria-label="Service settings"] [role="status"]')?.textContent).toMatch(/public address.*https/i)
   expect(set).not.toHaveBeenCalled()
 })

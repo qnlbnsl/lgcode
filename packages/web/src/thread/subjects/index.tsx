@@ -19,7 +19,7 @@ export function SubjectPanel({ agentId, subject, alertKind }: {
   const namespace = separator < 0 ? "" : subject.slice(0, separator)
   const id = separator < 0 ? subject : subject.slice(separator + 1)
   const Panel = Object.hasOwn(subjectPanels, namespace) ? subjectPanels[namespace] : undefined
-  return <section aria-label="Subject">
+  return <section aria-label="Subject" data-subject={subject} tabIndex={-1}>
     <h3>Subject</h3>
     {Panel === undefined ? <p>{visibleText(subject)} is answered from a terminal.</p>
       : <Panel key={subject} agentId={agentId} id={id} {...(alertKind === undefined ? {} : { alertKind })} />}

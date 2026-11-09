@@ -20,6 +20,7 @@ import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { connectViewer } from "../../viewer/src/connection.ts"
 import { ViewerSession } from "../../viewer/src/session.ts"
 import { eventText } from "../../viewer/src/text.ts"
+import { openNavigation } from "./support/navigation.ts"
 
 test("both owner clients retain first/later prompts, question answers, board deliveries and oversized sources across reopen and reconnect", async ({ page }) => {
   test.setTimeout(90_000)
@@ -70,7 +71,8 @@ test("both owner clients retain first/later prompts, question answers, board del
           await page.goto(`http://127.0.0.1:${port}/`)
           await page.getByLabel("Password", { exact: true }).fill(password)
           await page.getByRole("button", { name: "Log in", exact: true }).click()
-          await page.getByRole("link", { name: "Conversation worker", exact: true }).click()
+          await openNavigation(page)
+          await page.getByRole("navigation", { name: "Projects", exact: true }).locator(".agent-link").filter({ hasText: "Conversation worker" }).click()
           await expect(page.getByRole("article", { name: "Outgoing delivery", exact: true })).toContainText("First owner prompt")
           expect(viewerText()).toContain("First owner prompt")
         })

@@ -1,5 +1,6 @@
-import type { Project, ProjectCreation, ProjectSettings, ProjectTaskRecord, Repository, RepositoryLocation, Sprint, Team, Workspace } from "./schema.ts"
+import type { OwnerTaskNotification, Project, ProjectCreation, ProjectSettings, ProjectTaskRecord, Repository, RepositoryLocation, Sprint, Team, Workspace } from "./schema.ts"
 export interface ProjectView {
+  readonly taskNotifications: Readonly<Record<string, OwnerTaskNotification>>
   readonly settings?: ProjectSettings
   readonly creations: Readonly<Record<string, ProjectCreation>>
   readonly repositories: Readonly<Record<string, Repository>>

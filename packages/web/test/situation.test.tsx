@@ -35,6 +35,8 @@ const snapshot = {
   ], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0
 }
 
+const stateOf = (container: HTMLElement, name: string) => [...container.querySelectorAll(".agent-link")].find((node) => node.querySelector(".agent-name")?.textContent === name)?.querySelector("small")?.textContent
+
 const mount = async () => {
   const container = document.createElement("div")
   document.body.append(container)
@@ -56,7 +58,7 @@ afterEach(async () => {
   browserClient.client = undefined
 })
 
-it("7.2 places snapshot agents in needs you, working and idle lanes, then applies a newer stream state", async () => {
+it("7.2 shows permission, working and idle states in navigation, then applies a newer stream state", async () => {
   const stateChanged = await Effect.runPromise(Deferred.make<ReturnType<typeof envelope>>())
   const subscribe = vi.fn(() => Stream.fromEffect(Deferred.await(stateChanged)))
   browserClient.client = {
@@ -66,30 +68,45 @@ it("7.2 places snapshot agents in needs you, working and idle lanes, then applie
   const container = await mount()
 
   await act(async () => { await vi.waitFor(() => { if (!container.textContent?.includes("needs-owner")) throw new Error("snapshot agent is not rendered") }) })
-  expect(container.querySelector('[aria-label="Needs you"]')?.textContent).toContain("needs-owner") // catches requests sorted into ordinary work
-  expect(container.querySelector('[aria-label="Working"]')?.textContent).toContain("working-agent") // catches working agents hidden from the roster
-  expect(container.querySelector('[aria-label="Idle"]')?.textContent).toContain("idle-agent") // catches idle agents treated as active
+  expect(stateOf(container, "needs-owner")).toBe("Waiting on a permission") // catches requests sorted into ordinary work
+  expect(stateOf(container, "working-agent")).toBe("Working") // catches working agents hidden from the roster
+  expect(stateOf(container, "idle-agent")).toBe("Idle") // catches idle agents treated as active
 
   // A stream state transition is authoritative over the snapshot's lane.
   await act(async () => { await Effect.runPromise(Deferred.succeed(stateChanged, envelope(8))) })
   expect(subscribe).toHaveBeenCalledWith(expect.objectContaining({ after: 7 }))
-  expect(container.querySelector('[aria-label="Working"]')?.textContent).toContain("idle-agent") // catches ignoring live state transitions
+  expect(stateOf(container, "idle-agent")).toBe("Working") // catches ignoring live state transitions
 })
 
 it("7.2 resumes a dropped stream from its last applied cursor", async () => {
+  let current = { ...snapshot, project: {
+    sequence: 7, truncated: false, projects: [], repositories: [], workspaces: [], teams: [], agents: [], tasks: [], sprints: []
+  } }
   const subscribe = vi.fn()
-    .mockImplementationOnce(() => Stream.concat(
-      Stream.fromIterable([envelope(8)]),
-      Stream.fail(new Error("connection dropped"))
-    ))
+    .mockImplementationOnce(() => {
+      // The committed state is already available to reads when event 8 is delivered.
+      current = { ...current, sequence: 8, project: { ...current.project, sequence: 8 },
+        agents: snapshot.agents.map((row) => row.agentId === "idle-agent" ? agent("idle-agent", "Working", { _tag: "working" }) : row) }
+      return Stream.concat(
+        Stream.fromIterable([envelope(8)]),
+        Stream.fail(new Error("connection dropped"))
+      )
+    })
     .mockImplementation(() => Stream.fromIterable([{ _tag: "client.Checkpoint", sequence: 8 }]))
-  browserClient.client = { "client.snapshot": () => Effect.succeed(snapshot), "client.subscribe": subscribe }
+  const readSnapshot = vi.fn(() => Effect.succeed(current))
+  browserClient.client = {
+    "client.snapshot": readSnapshot, "client.subscribe": subscribe,
+    "client.requests": () => Effect.succeed({ sequence: current.sequence, items: [] }),
+    "client.alerts.list": () => Effect.succeed({ items: [] }),
+    "client.sequence": () => Effect.succeed({ sequence: current.sequence })
+  }
   const container = await mount()
 
   await act(async () => { await vi.waitFor(() => expect(subscribe.mock.calls.length).toBeGreaterThanOrEqual(2)) })
   expect(subscribe.mock.calls[0]?.[0]).toEqual(expect.objectContaining({ after: 7 }))
   expect(subscribe.mock.calls[1]?.[0]).toEqual(expect.objectContaining({ after: 8 })) // catches reconnecting from the old snapshot cursor and losing the transition
-  expect(container.querySelector('[aria-label="Working"]')?.textContent).toContain("idle-agent")
+  expect(readSnapshot).toHaveBeenCalledTimes(1) // transport resume must retain the streamed state without fetching another snapshot
+  expect(stateOf(container, "idle-agent")).toBe("Working")
 })
 
 it.each([
@@ -105,32 +122,26 @@ it.each([
   ] }
   browserClient.client = { "client.snapshot": () => Effect.succeed(current), "client.subscribe": () => live.stream }
   const container = await mount()
-  const inLane = (lane: string) => [...container.querySelectorAll(`section[aria-label="${lane}"] li strong`)].map((node) => node.textContent)
-  const expectOnly = (lane: string) => {
-    for (const candidate of ["Needs you", "Working", "Idle"]) {
-      if (candidate === lane) expect(inLane(candidate)).toContain(name)
-      else expect(inLane(candidate)).not.toContain(name)
-    }
-  }
-  expectOnly("Needs you")
+  const attentionState = questions > 0 ? "Waiting on an answer" : name === "paused" ? "Paused for a limit" : name === "crashed" ? "Crashed" : "Interrupted"
+  expect(stateOf(container, name)).toBe(attentionState)
   await act(async () => {
     current = { ...current, sequence: 8, agents: [...snapshot.agents, agent(name, "", { _tag: ordinary === "Working" ? "working" : "idle" })] }
     await live.emit(itemForSituation(8, name, "QuestionAnswered", questions === 0 ? { _tag: ordinary === "Working" ? "working" : "idle" } : undefined))
   })
-  expectOnly(ordinary)
+  expect(stateOf(container, name)).toBe(ordinary)
   await act(async () => {
     current = { ...current, sequence: 9, agents: [...snapshot.agents, agent(name, "", state, 0, questions)] }
     await live.emit(itemForSituation(9, name, "QuestionAsked", questions === 0 ? state : undefined))
   })
-  expectOnly("Needs you")
-  expect(inLane("Needs you")).toContain("needs-owner")
-  expect(inLane("Working")).toContain("working-agent")
-  expect(inLane("Idle")).toContain("idle-agent")
+  expect(stateOf(container, name)).toBe(attentionState)
+  expect(stateOf(container, "needs-owner")).toBe("Waiting on a permission")
+  expect(stateOf(container, "working-agent")).toBe("Working")
+  expect(stateOf(container, "idle-agent")).toBe("Idle")
   await act(async () => {
     current = { ...current, sequence: 10, agents: [...snapshot.agents, agent(name, "", { _tag: ordinary === "Working" ? "working" : "idle" })] }
     await live.emit(itemForSituation(10, name, "QuestionAnswered", questions === 0 ? { _tag: ordinary === "Working" ? "working" : "idle" } : undefined))
   })
-  expectOnly(ordinary)
+  expect(stateOf(container, name)).toBe(ordinary)
 })
 
 const itemForSituation = (sequence: number, agentId: string, tag: string, state?: object) => ({

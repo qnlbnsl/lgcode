@@ -1,3 +1,4 @@
+import { openNavigation } from "./support/navigation.ts"
 import { assertPhoneWidth } from "./support/phoneWidth.ts"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
@@ -43,7 +44,8 @@ test("the production thread opens from a roster link, prompts, displays full per
           await page.goto(`http://127.0.0.1:${port}/`)
           await page.getByLabel("Password", { exact: true }).fill(password)
           await page.getByRole("button", { name: "Log in", exact: true }).click()
-          await page.getByRole("link", { name: "ThreadWorker", exact: true }).click()
+          await openNavigation(page)
+          await page.getByRole("navigation", { name: "Projects", exact: true }).locator(".agent-link").filter({ hasText: "ThreadWorker" }).click()
           await expect(page.getByRole("heading", { name: "Thread: ThreadWorker", exact: true })).toBeVisible()
           await page.reload()
           await expect(page.getByRole("heading", { name: "Thread: ThreadWorker", exact: true })).toBeVisible()
@@ -81,6 +83,7 @@ test("the production thread opens from a roster link, prompts, displays full per
           expect(runner.callsOf("answerPermission")[0]!.input).toMatchObject({ requestId: "browser-permission", optionId: "once" })
           expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0)
           expect(await page.evaluate(async () => (await indexedDB.databases()).length)).toBe(0)
+          await openNavigation(page)
           await page.getByRole("button", { name: "Log out", exact: true }).click()
           await expect(page.getByRole("form", { name: "Log in" })).toBeVisible()
           await expect(page.getByRole("region", { name: "Thread", exact: true })).toHaveCount(0)

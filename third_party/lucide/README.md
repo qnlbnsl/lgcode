@@ -62,3 +62,17 @@ LGcode's own stylesheet sets the stroke width to 1.6 instead of Lucide's 2.
 The paths are inline in `design/workbench.html` (static buttons) and in the
 `paths` table near the top of `design/workbench.js`. A comment beside the table
 names this folder. The LGcode logo mark is LGcode's own drawing, not Lucide's.
+
+## Production shell paths
+
+`packages/web/src/shell/Icon.tsx` reuses the credited `lucide-static` 0.460.0
+paths from `design/workbench.js` and `design/workbench.html` at LGcode commit
+`bef4b1090a8dc783075f835e7c5e90dbc3b8aad9`.
+The source files are `icons/chevron-right.svg`, `icons/chevron-down.svg`,
+`icons/git-branch.svg`, `icons/check.svg`, `icons/x.svg`, `icons/command.svg`,
+`icons/house.svg`, `icons/search.svg`, `icons/smartphone.svg`, `icons/monitor.svg`,
+`icons/user.svg`, `icons/settings.svg`, `icons/panel-left.svg`, `icons/menu.svg`,
+`icons/bell.svg`, `icons/refresh-cw.svg`, and `icons/arrow-left.svg`.
+The elements are React JSX rather than HTML strings.
+The stylesheet keeps LGcode's 1.6 stroke width.
+The production file retains the copyright and licence provenance comment.

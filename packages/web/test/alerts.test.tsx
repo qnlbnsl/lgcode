@@ -1,9 +1,9 @@
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import * as Effect from "effect/Effect"
-import * as Stream from "effect/Stream"
 import { afterEach, expect, it, vi } from "vitest"
 import { App } from "../src/index.ts"
+import { adminShellClient } from "./admin-shell-client.ts"
 
 const browser = vi.hoisted(() => ({ client: undefined as unknown, connect: vi.fn() }))
 vi.mock("@lgcode/client/browser", async () => {
@@ -36,7 +36,7 @@ const render = async () => {
 }
 
 const openAlerts = async (container: HTMLElement) => {
-  const link = Array.from(container.querySelectorAll("a")).find((item) => item.textContent?.includes("Alerts"))
+  const link = container.querySelector<HTMLAnchorElement>('a[aria-label="Phone notifications"]')
   expect(link, "the owner needs an Alerts link to reach the page").toBeTruthy()
   await act(async () => { link!.click() })
 }
@@ -56,8 +56,7 @@ it("7.7 lists both open and cleared alerts from the alert read", async () => {
     requestId: "reply", items: status === "cleared" ? [clearedAlert] : status === "open" ? [openAlert] : [openAlert, clearedAlert]
   }))
   browser.client = {
-    "client.snapshot": () => Effect.succeed({ requestId: "snapshot", sequence: 7, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }),
-    "client.subscribe": () => Stream.never,
+    ...adminShellClient(),
     "client.alerts.list": list
   }
   const container = await render()
@@ -73,8 +72,7 @@ it("7.7 lists both open and cleared alerts from the alert read", async () => {
 it("7.7 opens an alert's agent thread through a link without sending a command", async () => {
   const commands = vi.fn(() => Effect.succeed({ requestId: "reply" }))
   browser.client = {
-    "client.snapshot": () => Effect.succeed({ requestId: "snapshot", sequence: 7, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }),
-    "client.subscribe": () => Stream.never,
+    ...adminShellClient(),
     "client.alerts.list": () => Effect.succeed({ requestId: "reply", items: [openAlert] }),
     "client.alerts.dismiss": commands
   }
@@ -95,8 +93,7 @@ it.each([
 ])("FR-017 displays $label separately from the alert lifecycle and refreshes after recovery", async ({ label, ...delivery }) => {
   let item = { ...openAlert, delivery }
   browser.client = {
-    "client.snapshot": () => Effect.succeed({ requestId: "snapshot", sequence: 7, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 }),
-    "client.subscribe": () => Stream.never,
+    ...adminShellClient(),
     "client.alerts.list": () => Effect.succeed({ requestId: "reply", items: [item] })
   }
   const container = await render()

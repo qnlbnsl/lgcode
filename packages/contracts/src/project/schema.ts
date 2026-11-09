@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema"
-import { AccountId, AgentId, EpochMilliseconds, EventSequence, HarnessId, RequestId } from "../ids.ts"
+import { AccountId, AgentId, DeliveryId, EpochMilliseconds, EventSequence, QuestionId, HarnessId, RequestId } from "../ids.ts"
 import { ChannelId } from "../board/ids.ts"
 import { PermissionLevel } from "../permission.ts"
 
@@ -69,7 +69,7 @@ export type Sprint = typeof Sprint.Type
 const activityText = { title: ProjectName, detail: ProjectText }
 export const TaskActivity = Schema.Union([
   Schema.Struct({ ...activityText, at: Schema.optionalKey(EpochMilliseconds) }),
-  Schema.Struct({ question: Schema.NonEmptyString, open: Schema.Struct(activityText), answered: Schema.Struct(activityText), at: Schema.optionalKey(EpochMilliseconds) })
+  Schema.Struct({ question: QuestionId, open: Schema.Struct(activityText), answered: Schema.Struct(activityText), at: Schema.optionalKey(EpochMilliseconds) })
 ])
 export const TaskStory = Schema.Struct({
   summary: ProjectText, done: Schema.Array(ProjectText).check(Schema.isMaxLength(128)),
@@ -88,3 +88,9 @@ export type TaskHistoryEntry = typeof TaskHistoryEntry.Type
 export const ProjectTaskRecord = Schema.Struct({ ...Task.fields, history: Schema.Array(TaskHistoryEntry) })
 export type ProjectTaskRecord = typeof ProjectTaskRecord.Type
 export const projectTeamGroup = (projectId: string, teamId: string) => `team:${projectId}/${teamId}`
+
+export const TaskNotificationId = Schema.NonEmptyString.pipe(Schema.brand("TaskNotificationId"))
+export const OwnerTaskNotification = Schema.Struct({
+  notificationId: TaskNotificationId, projectId: ProjectId, taskId: TaskId, targetAgentId: AgentId
+})
+export type OwnerTaskNotification = typeof OwnerTaskNotification.Type & { readonly deliveryId?: typeof DeliveryId.Type }

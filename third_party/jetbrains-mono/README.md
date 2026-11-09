@@ -22,3 +22,7 @@ and it must stay there for as long as the font is in LGcode.
 
 The web mock in `design/` loads it through `design/fonts/jetbrains-mono`, a
 symbolic link to this folder, so the preview server can serve it.
+
+The production shell imports this same font from
+`packages/web/src/tokens.css`.
+Vite emits the unchanged font file into the production static assets.
