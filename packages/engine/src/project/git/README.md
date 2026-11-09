@@ -99,6 +99,13 @@ review creation are not proven by the local bare-remote tests.
 
 Command registration, API authorization, durable reported evidence and approval
 outcomes, redaction, and generated tools live in the project integration layer.
+Owner approval clears the destination branch's merge options for that invocation
+and explicitly selects the standard strategy, fast-forward support, a commit,
+and no squash or autostash. It preserves the stored Git configuration.
+After Git exits successfully, it reads the destination head and verifies that
+the reviewed commit is its ancestor before returning success. A contained
+commit can succeed without moving the head. Failed verification preserves the
+actual checkout state for inspection and returns a failure, never a merge claim.
 The service receives the trusted caller from that layer for `approveMain` and
 refuses absent, agent, service, and piece callers. A payload flag never replaces
 the owner credential. The API documents receipt retries and the concrete crash

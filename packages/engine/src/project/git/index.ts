@@ -478,12 +478,24 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       // reviewed object ID rather than resolving a mutable source branch.
       if (await head(from.path, signal) !== reviewed.head || await head(to.path, signal) !== reviewed.baseHead
         || await branch(from.path, signal) !== reviewed.branch || await branch(to.path, signal) !== reviewed.base) return fail("stale_state");
-      const reply = await run(to.path, ["-c", "merge.conflictStyle=diff3", "merge", "--no-edit", "--no-autostash", reviewed.head], signal);
+      // This approval promises a committed merge of this object. Repository
+      // merge defaults must not turn it into a squash, an uncommitted merge,
+      // a different strategy, or a fast-forward-only refusal on divergence.
+      const reply = await run(to.path, ["-c", `branch.${reviewed.base}.mergeOptions=`, "-c", "merge.conflictStyle=diff3",
+        "merge", "--strategy=ort", "--ff", "--no-squash", "--commit", "--no-edit", "--no-autostash", reviewed.head], signal);
       if (reply.code !== 0) {
         if ((await completeChanges(to.path, signal)).some((change) => change.conflict)) return fail("conflicts");
         throw processFailure(reply);
       }
-      return (await head(to.path, signal))!;
+      // A zero exit alone is insufficient. Read back the actual destination
+      // and prove it contains the reviewed object before any durable success.
+      // An already-contained object is a valid no-op; HEAD need not move.
+      const merged = await head(to.path, signal);
+      if (merged === null || await branch(to.path, signal) !== reviewed.base) return fail("stale_state");
+      const ancestry = await run(to.path, ["merge-base", "--is-ancestor", reviewed.head, merged], signal);
+      if (ancestry.code === 1) return fail("git_failed");
+      if (ancestry.code !== 0) throw processFailure(ancestry);
+      return merged;
     }),
     openReview: (folder, base, expectedHead) => withRepo(folder, async (path, signal) => {
       const evidence = await review(path, base, signal);

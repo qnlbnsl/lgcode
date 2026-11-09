@@ -9379,3 +9379,47 @@ Same-Unix-user edits remain within the accepted limitation in SECURITY.md.
 The permanent tests exercise authenticated public commands and real temporary repositories for both base names, evidence provenance and staleness, head and dirty-state refusals, authority denial, conflict recovery, production redaction, and receipt replay.
 The test artifacts and builder result record their actual execution separately.
 React, terminal support, and the rest of the five-step website scope remain separate work.
+
+## 555. Owner approval could record a merge without the reviewed commit
+
+The independent review of issue 545 found that `branch.main.mergeOptions=--squash` made an authenticated owner approval return a durable `merged` outcome while main still pointed to its old head.
+The reviewed commit was absent from main's ancestry, and the feature bytes were only staged.
+A successful Git exit did not prove the promised merge.
+The same execution path supports master.
+
+The correction overrides the destination branch's merge options for this invocation and explicitly selects a normal committed merge with fast-forward support and the standard strategy.
+It merges the exact reviewed commit object.
+Before returning success, it reads the actual destination head and verifies that the reviewed object is its ancestor.
+An already-contained reviewed commit remains a valid no-op.
+An absent ancestry or failed verification produces a refused outcome, without aborting or resetting the checkout.
+The original owner checks, both reviewed-head checks, clean-worktree guards, agent integration refusal, queue, and finite subprocess ownership remain in place.
+Git effects and the database receipt remain separate failure boundaries.
+
+Permanent regressions cover both base names, squash and uncommitted merge defaults, fast-forward and divergent merges, contained commits, receipt retries, authority denial, and zero-exit outcomes without reviewed ancestry.
+The original independent failure and its passing divergent and database-failure controls remain preserved in the run evidence.
+The builder report records executed checks separately from this implementation description.
+
+## 561. The launcher test assumed no system Node.js 26
+
+Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
+State: fixed.
+
+The launcher test "exits 1 with an install hint when NVM_DIR holds no Node.js" ran the launcher with only `HOME` and `NVM_DIR` set.
+The launcher's shell then used its default search path.
+Arch Linux has a system Node.js 26 at `/usr/bin/node`, and the launcher correctly used it, so the test saw exit 0.
+The test now gives the launcher an empty search-path folder.
+The launcher itself was right and is unchanged.
+
+## 562. Two engine crash tests raced the roles sheepdog
+
+Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
+State: fixed.
+
+The acceptance test "1 crash" checks the engine's own rule that nothing restarts a crashed agent.
+The client test "6.2 a failed reload keeps a crash alert open until successful idle" checks the crash alert's life.
+Both run with the roles sheepdog on, and the sheepdog resumes a crashed agent by design.
+On the build server, the sheepdog acted after the checks had finished, so both tests passed.
+On the faster computer, it resumed the agent first.
+The agent then crashed a second time and the owner was told twice, or the resumed session closed the crash alert early.
+Both tests now turn the sheepdog off, because each checks an engine rule rather than the sheepdog.
+Other tests may have the same hidden dependence on a slow computer.

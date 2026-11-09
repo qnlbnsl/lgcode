@@ -225,3 +225,84 @@ it.live("redacts reports, comparison prose and durable outcomes through the prod
   expect(JSON.stringify(events)).not.toContain("git-review-secret"); expect(JSON.stringify(receipts)).not.toContain("git-review-secret")
   expect(readFileSync(join(rig.work, "secret.txt"), "utf8")).toBe("git-review-secret\n")
 }), ["git-review-secret", "failed", "current", "reported"]).pipe(Effect.orDie))
+
+for (const base of ["main", "master"]) for (const [options, divergent] of [
+  ["--squash", false],
+  ["--no-ff --no-commit", true],
+  ["--squash --no-commit --ff-only -s ours", true],
+] as const) it.live(`owner merge into ${base} ignores merge defaults ${options} and records actual ancestry`, () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(base)
+  if (divergent) { save(rig.work, "base-only.txt", "independent base work\n"); commit(rig.work, "Base work") }
+  git(rig.work, "config", `branch.${base}.mergeOptions`, options)
+  git(rig.work, "config", "merge.ff", "only")
+  git(rig.work, "config", "merge.twohead", "ours")
+  git(rig.work, "config", "merge.autoStash", "true")
+  const { review } = (yield* prepare(f)).result
+  const member = yield* client(f.socket, f.member.token)
+  expect(yield* refusal(run(member, "project.review.approve", { ...f, reviewId: review.reviewId,
+    expectedHead: review.head, expectedBaseHead: review.baseHead, confirmed: true,
+    decision: "approve_without_evidence", actor: { _tag: "owner" } }))).toBe("command refused")
+  const requestId = freshRequest(), merged = yield* approve(f, review, { requestId })
+  const actual = git(rig.work, "rev-parse", `refs/heads/${base}`)
+  expect(merged.result).toMatchObject({ outcome: "merged", mergeHead: actual, head: f.head, baseHead: review.baseHead })
+  expect(git(rig.work, "merge-base", "--is-ancestor", f.head, actual)).toBe("")
+  expect(git(rig.work, "status", "--porcelain=v1")).toBe("")
+  expect(existsSync(join(rig.work, ".git", "MERGE_HEAD"))).toBe(false)
+  expect(readFileSync(join(rig.work, "feature.txt"), "utf8")).toBe("actual feature\n")
+  if (divergent) {
+    expect(git(rig.work, "rev-list", "--parents", "-n", "1", actual).split(" ").slice(1)).toEqual([review.baseHead, f.head])
+    expect(readFileSync(join(rig.work, "base-only.txt"), "utf8")).toBe("independent base work\n")
+  } else expect(actual).toBe(f.head)
+  expect(yield* approve(f, review, { requestId })).toEqual(merged)
+  expect(git(rig.work, "rev-parse", "HEAD")).toBe(actual)
+  expect((yield* readLog).filter(({ event }) => event._tag === "project.MainReviewDecided")).toHaveLength(1)
+  // Only this invocation overrides defaults; the user's settings are preserved.
+  expect(git(rig.work, "config", `branch.${base}.mergeOptions`)).toBe(options)
+})).pipe(Effect.orDie))
+
+for (const base of ["main", "master"]) it.live(`already-contained reviewed commit in ${base} is a verified no-op`, () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(base)
+  git(rig.work, "merge", "--ff-only", f.head)
+  save(rig.work, "later-base.txt", "later base work\n"); const contained = commit(rig.work, "After integration")
+  const { review } = (yield* prepare(f)).result
+  expect(review.head).toBe(f.head); expect(review.baseHead).toBe(contained)
+  const requestId = freshRequest(), result = yield* approve(f, review, { requestId })
+  expect(result.result).toMatchObject({ outcome: "merged", mergeHead: contained })
+  expect(git(rig.work, "rev-parse", "HEAD")).toBe(contained)
+  expect(git(rig.work, "merge-base", "--is-ancestor", f.head, contained)).toBe("")
+  expect(git(rig.work, "status", "--porcelain=v1")).toBe("")
+  expect(readFileSync(join(rig.work, "feature.txt"), "utf8")).toBe("actual feature\n")
+  expect(readFileSync(join(rig.work, "later-base.txt"), "utf8")).toBe("later base work\n")
+  expect(yield* approve(f, review, { requestId })).toEqual(result)
+  expect((yield* readLog).filter(({ event }) => event._tag === "project.MainReviewDecided")).toHaveLength(1)
+})).pipe(Effect.orDie))
+
+for (const mode of ["noop", "squash", "changed-head"]) it.live(`zero-exit ${mode} without reviewed ancestry persists refusal and retains actual state`, () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(), { review } = (yield* prepare(f)).result
+  const bin = join(rig.root, "merge-probe-bin"), calls = join(rig.root, "merge-calls")
+  mkdirSync(bin)
+  // Inject the process boundary only for merge. Other commands, including
+  // postcondition reads, use actual Git. Squash leaves genuine staged bytes;
+  // the changed-head case creates a real commit without the reviewed source.
+  writeFileSync(join(bin, "git"), `#!${process.execPath}\nimport { appendFileSync } from 'node:fs';\nimport { spawnSync } from 'node:child_process';\nconst args=process.argv.slice(2);\nif(args.includes('merge')) {\n appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args)+'\\n');\n const mode=${JSON.stringify(mode)};\n if(mode==='noop') process.exit(0);\n const changed=mode==='squash' ? ['merge','--squash',args.at(-1)] : ['commit','--allow-empty','-m','Unrelated destination change'];\n const r=spawnSync('/usr/bin/git',['-c','core.hooksPath=/dev/null',...changed],{stdio:'inherit'}); process.exit(r.status ?? 1);\n}\nconst r=spawnSync('/usr/bin/git',args,{stdio:'inherit'}); process.exit(r.status ?? 1);\n`, { mode: 0o700 })
+  vi.stubEnv("PATH", `${bin}:${process.env.PATH}`)
+  const requestId = freshRequest(), result = yield* approve(f, review, { requestId })
+  const actual = git(rig.work, "rev-parse", "HEAD"), status = git(rig.work, "status", "--porcelain=v1")
+  expect(result.result).toMatchObject({ outcome: "refused", reason: "git_failed", mergeHead: null, head: f.head, baseHead: f.baseHead })
+  expect(git(rig.work, "rev-list", actual).split("\n")).not.toContain(f.head)
+  expect(actual === f.baseHead).toBe(mode !== "changed-head")
+  if (mode === "squash") {
+    expect(status).toBe("A  feature.txt")
+    expect(readFileSync(join(rig.work, "feature.txt"), "utf8")).toBe("actual feature\n")
+  } else { expect(status).toBe(""); expect(existsSync(join(rig.work, "feature.txt"))).toBe(false) }
+  expect(yield* approve(f, review, { requestId })).toEqual(result)
+  expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(1)
+  expect(git(rig.work, "rev-parse", "HEAD")).toBe(actual)
+  expect(git(rig.work, "status", "--porcelain=v1")).toBe(status)
+  const decided = (yield* readLog).filter(({ event }) => event._tag === "project.MainReviewDecided")
+  expect(decided).toHaveLength(1)
+  expect(decided[0]!.event).toMatchObject({ review: { outcome: "refused", reason: "git_failed", mergeHead: null } })
+  const sql = yield* SqlClient.SqlClient
+  const receipts = yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE request_id = ${requestId}`
+  expect(JSON.parse(receipts[0]!.result_json).reply.result).toMatchObject({ outcome: "refused", mergeHead: null })
+})).pipe(Effect.orDie))
