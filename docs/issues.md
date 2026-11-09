@@ -8783,3 +8783,28 @@ State: worked around in the skill; the cause is in OpenPencil 0.16.0, not in LGc
   nodes ask for "Semi Bold".
 - The skill gives each label the size the browser measured, plus one pixel. It should drop that
   step once OpenPencil measures every bundled weight, and someone could report the fault upstream.
+
+
+## 526. The website build's pre-change live check passed fewer stages than its brief
+
+Found: 2026-11-08, during the website-1 baseline on `area/website`.
+State: open.
+
+The brief cited an earlier result of 19 passing stages out of 23.
+The clean website branch at `8b6bcf4` passed 16 stages out of 23 before any application code changed.
+The ordinary check passed all 457 test files and all 18 browser cases.
+The real web check passed all ten reported stages.
+
+The failed broader live stages were `removed-variables`, `state-read`, `always-allow`,
+`permission-kinds`, `reload`, and `token-scan`.
+The recording stage was skipped because earlier stages failed.
+The `sandbox-mcp` stage passed, so issue 524's specific rerun condition did not apply.
+Several Claude probes did not attempt the exact requested command.
+The token scan reported a token in process arguments without printing its value.
+The final scan of events, replies, and output passed.
+This observation does not establish a new cause for the existing token exposure findings.
+
+The run evidence is recorded in `.scratch/foundry-runs/website-1/run.md` in the main checkout.
+The private live run is `/tmp/lgcode-live-KULrQh`.
+The manager was notified, and the website build continues against this measured baseline.
+A later passing ordinary check must not be presented as a passing broader live check.
