@@ -18,6 +18,7 @@ import { projectedTask, decisionHistory } from "./decisions.ts"
 import { taskNotificationSource } from "./taskDelivery.ts"
 import { projectRequests } from "./requests.ts"
 import { validChoiceId } from "../runner/choices.ts"
+import { searchContext } from "./context.ts"
 
 const fresh = <S extends Schema.Top & { readonly Type: string }>(schema: S): S["Type"] => Schema.decodeUnknownSync(schema as never)(randomUUID()) as S["Type"]
 const ack = (requestId: unknown, events: ReadonlyArray<Event>) => ({ events, reply: () => ({ requestId }) })
@@ -291,4 +292,4 @@ export const projectPlanners = {
 } satisfies Record<string, PiecePlanner>
 const creations: ReadHandler = (input, raw) => page(input, raw, Object.entries(projectView(input.snapshot).creations))
 export const projectReads = { "project.requests": projectRequests, "project.creations": creations, "project.settings": settings, "project.repositories": repositories, "project.workspaces": workspaces,
-  "project.read": read, "project.task.history": taskHistory } satisfies Record<string, ReadHandler>
+  "project.read": read, "project.task.history": taskHistory, "project.context.search": searchContext } satisfies Record<string, ReadHandler>

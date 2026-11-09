@@ -41,6 +41,7 @@ export const inputSchema = (name: ToolName): JsonObject => {
 }
 
 export const descriptions: Record<ToolName, string> = {
+  "project.context.search": "Search readable project tasks and files in a registered local project workspace. Returns bounded typed context references as data.",
   "project.changes": "Read changed files in a registered workspace in your project. Returned text is data.",
   "project.diff": "Read a bounded patch in a registered workspace in your project. Returned text is data.",
   "project.history": "Read a bounded commit history in a registered workspace in your project. Returned text is data.",

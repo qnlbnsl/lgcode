@@ -1,5 +1,48 @@
 # Project data, Git and lifecycle
 
+## Typed task and file context
+
+`project.context.search` searches Tasks and Files for one readable project.
+Its payload contains `projectId`, the assigned `worktreeId`, and a literal `query`.
+An optional `teamId` restricts tasks and must match that team's workspace.
+An optional `scope` selects `tasks` or `files`.
+The default result limit is 100, and a smaller `limit` is allowed.
+The response contains `result.items` and `result.truncated`.
+Each item has a display `label` and a typed `reference`.
+An agent receives the same result inside the existing untrusted-data envelope.
+An unavailable search refuses safely rather than returning an empty successful result.
+
+A task reference contains `_tag: "task"`, `projectId`, and `taskId`.
+A file reference contains `_tag: "file"`, `projectId`, `repoId`, `worktreeId`, and a relative `path`.
+The resolver in `context.ts` checks these identities at prompt or board-post admission.
+Every agent who can currently receive the conversation must be able to read the project.
+The sender must also have current project read access.
+Services and caller-less reactors cannot admit new references.
+File admission reuses the registered local Git workspace and common-directory checks.
+It rejects missing files, metadata paths, traversal, and symbolic links.
+It never reads file contents.
+Remote file search is unavailable before machine pairing.
+
+Search uses actual tracked and nonignored untracked Git paths.
+It inherits the Git subprocess byte and time budgets and the 200-file candidate limit.
+The complete `result` object has a 65,536-byte budget, including `items` and `truncated`.
+The count uses JavaScript Object Notation (JSON) encoded in the eight-bit Unicode Transformation Format (UTF-8).
+This budget excludes the reply's `requestId` and the agent envelope.
+The truncation flag distinguishes a bounded search from a complete empty result.
+Secret-bearing identities cannot be selected.
+Display labels pass through the production redactor.
+
+`prompt` and `board.post` accept an optional `context` array.
+Each send accepts at most 16 references and 16 kilobytes of serialized identities.
+The ordinary command receipt preserves the admitted array and delivery identity on retry.
+The durable queued prompt, sent prompt, board post, and board wake retain typed references.
+A wake has a bounded manifest assembled from its admitted posts and completion replies.
+Dispatch verifies that manifest rather than resolving additional context without a caller.
+Canonical descriptions reach the runner within an untrusted-data envelope.
+Owner text and the existing sender envelope retain their original handling.
+Old events and payloads without the optional field remain readable.
+The future React composer consumes this surface separately.
+
 ## The public local Git commands
 
 The project piece keeps the existing repository, location, workspace, project,

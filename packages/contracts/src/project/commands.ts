@@ -7,6 +7,7 @@ import { AgentId, EventSequence, RequestId } from "../ids.ts"
 import { Project, ProjectCreation, ProjectId, ProjectName, ProjectSettings, ProjectStage, ProjectText, Repository, RepositoryLocation, Sprint, SprintId, Task, TaskHistoryEntry, TaskId, Team, Workspace } from "./schema.ts"
 
 import { ProjectGitRpcGroup, projectGitAccess } from "./git.ts"
+import { ContextSearchFields, ContextSearchResult } from "./context.ts"
 
 const request = { requestId: RequestId }
 const Refused = Schema.TaggedStruct("CommandError", { ...request, reason: Schema.String })
@@ -29,6 +30,8 @@ export const ProjectSnapshot = Schema.Struct({
   teams: Schema.Array(Team), sprints: Schema.Array(Sprint), tasks: Schema.Array(Task), agents: Schema.Array(ProjectAgentSummary)
 })
 export const ProjectRpcGroup = RpcGroup.make(
+  Rpc.make("context.search", { payload: { ...request, ...ContextSearchFields },
+    success: Schema.Union([Schema.Struct({ ...request, result: ContextSearchResult }), Schema.Struct({ ...request, data: Schema.String })]), error: Refused }),
   Rpc.make("settings", { payload: request, success: Schema.Struct({ ...request, settings: Schema.optionalKey(ProjectSettings) }), error: Refused }),
   Rpc.make("settings.set", { payload: { ...request, settings: ProjectSettings }, success: Ack, error: Refused }),
   Rpc.make("repository.add", { payload: { ...request, name: ProjectName, path: Repository.fields.path, machineId: ProjectName }, success: Schema.Struct({ ...request, repoId: Repository.fields.repoId }), error: Refused }),
@@ -67,6 +70,7 @@ export const ProjectRpcGroup = RpcGroup.make(
 const owner = ["owner"] as const
 const member = ["owner", "agent"] as const
 export const projectAccess = {
+  "project.context.search": member,
   ...projectGitAccess,
   "project.settings": owner, "project.settings.set": owner, "project.repository.add": owner, "project.repository.locate": owner,
   "project.repositories": owner, "project.workspace.register": owner, "project.workspaces": owner, "project.create": owner,

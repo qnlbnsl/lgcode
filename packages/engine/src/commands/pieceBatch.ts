@@ -57,7 +57,9 @@ export const checkPieceBatch = (namespace: PieceNamespace, snapshot: Snapshot, b
     const target = state.agents[request.target];
     if (target === undefined || eventEffect(target.state._tag, event._tag) === "invalid") return yield* refused();
     const delivery = event.delivery;
-    if (delivery.source?._tag !== "piece" || !canReach({ ...(caller === undefined ? {} : { caller }), target: delivery.target, deliveryId: delivery.id, source: delivery.source, snapshot: state }, lists)) return yield* refused();
+    if (delivery.source?._tag !== "piece" || request.context !== undefined && namespace !== "board"
+      || !canReach({ ...(caller === undefined ? {} : { caller }), ...(request.context === undefined ? {} : { context: request.context }),
+        target: delivery.target, deliveryId: delivery.id, source: delivery.source, snapshot: state }, lists)) return yield* refused();
     events.push(event);
     state = project(state, [event], lists);
   }

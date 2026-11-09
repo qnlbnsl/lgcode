@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { settled, type AgentId, type Event } from "@lgcode/contracts";
+import { DeliveryContextReferences, describeContext, settled, type AgentId, type ContextReference, type Event } from "@lgcode/contracts";
 import { WakeId, type BoardAddressee, type BoardAuthor } from "@lgcode/contracts/board/ids";
 import { boardLimits } from "@lgcode/contracts/board/limits";
 import type { BoardCompletion } from "@lgcode/contracts/board/schemas";
@@ -39,7 +39,7 @@ const authorLabel = (author: BoardAuthor): string => author._tag === "agent" ? `
 // Each body has its own boundary. A copied boundary in agent text cannot end
 // the next post, even when several posts ride in one engine envelope.
 const postText = (post: BoardPostView | BoardCompletion["replies"][number], state: string, mustReply = false): string => {
-  const text = escapeLeadingSlash(post.text);
+  const text = escapeLeadingSlash(post.text) + (post.context === undefined ? "" : `\n\n${describeContext(post.context)}`);
   let marker = randomBytes(18).toString("base64url");
   while (text.includes(marker)) marker = randomBytes(18).toString("base64url");
   return `Post ${post.postId} from ${authorLabel(post.author)} in channel ${post.channelId}; reply ${post.reply}; ${state}.\n`
@@ -70,6 +70,7 @@ export const completionFor = (snapshot: Snapshot, postId: string): BoardCompleti
     const reply = own(boardView(snapshot).posts, id);
     if (reply === undefined) continue;
     const item = { postId: reply.postId, channelId: reply.channelId, author: reply.author, text: reply.text,
+      ...(reply.context === undefined ? {} : { context: reply.context }),
       to: reply.to, reply: reply.reply, ...(reply.replyTo === undefined ? {} : { replyTo: reply.replyTo }) };
     const next = { ...result, replies: [...result.replies, item] };
     if (encodedBytes(next) > 64 * 1024 || encodedBytes(renderCompletion(snapshot, next)) > 64 * 1024) break;
@@ -197,19 +198,27 @@ export const buildWake = (snapshot: Snapshot, target: AgentId, options: {
   };
   let built = event;
   const parts: string[] = [];
+  let context: ReadonlyArray<ContextReference> = [];
+  const combined = (refs: ReadonlyArray<ContextReference>) => [...new Map([...context, ...refs].map((ref) => [JSON.stringify(ref), ref])).values()];
   // Reserve space for both overflow counters and the engine's author line.
-  const fits = (text: string) => encodedBytes([...parts, text].join("\n\n")) <= boardLimits.wakeBytes - 1024;
+  const fits = (text: string, refs: ReadonlyArray<ContextReference> = []) => {
+    const next = combined(refs);
+    return Schema.is(DeliveryContextReferences)(next)
+      && encodedBytes([...parts, text].join("\n\n")) + (next.length === 0 ? 0 : encodedBytes(next)) <= boardLimits.wakeBytes - 1024;
+  };
   let completionBytes = 0;
   for (const debt of Object.values(board.completions)) {
     if (debt.authorAgentId !== target || reservedCompletions.has(debt.postId)) continue;
     const completion = completionFor(snapshot, debt.postId);
     const text = renderCompletion(snapshot, completion);
     const cost = Math.max(encodedBytes(completion), encodedBytes(text));
-    if (completionBytes + cost > 128 * 1024 || !fits(text)) break;
+    const refs = completion.replies.flatMap((reply) => reply.context ?? []);
+    if (completionBytes + cost > 128 * 1024 || !fits(text, refs)) break;
     parts.push(text);
+    context = combined(refs);
     completionBytes += cost;
     built = { ...built, completions: [...built.completions, debt.postId],
-      completionReplyText: completion.replies.some((reply) => reply.text.length > 0)
+      completionReplyText: completion.replies.some((reply) => reply.text.length > 0 || (reply.context?.length ?? 0) > 0)
         ? [...built.completionReplyText, debt.postId] : built.completionReplyText };
   }
   for (const notice of Object.values(board.noAnswers)) {
@@ -238,8 +247,9 @@ export const buildWake = (snapshot: Snapshot, target: AgentId, options: {
       || (!originals.has(post.postId) && !isUnread(snapshot, { _tag: "agent", agentId: target }, post)) || reservedPosts.has(post.postId)
       || !canCarryPost(snapshot, target, post.postId)) continue;
     const text = postText(post, post.status, true);
-    if (omittedQuestions > 0 || !fits(text)) { omittedQuestions++; continue; }
+    if (omittedQuestions > 0 || !fits(text, post.context)) { omittedQuestions++; continue; }
     parts.push(text);
+    context = combined(post.context ?? []);
     built = { ...built, carried: [...built.carried, post.postId], mustReply: [...built.mustReply, post.postId] };
   }
   const hasDuty = built.completions.length + built.noAnswers.length + built.reminders.length + built.mustReply.length > 0;
@@ -251,15 +261,17 @@ export const buildWake = (snapshot: Snapshot, target: AgentId, options: {
       || (post.author._tag === "agent" && post.author.agentId === target)
       || reservedPosts.has(post.postId) || !canCarryPost(snapshot, target, post.postId)) continue;
     const text = postText(post, post.status);
-    if (noticeCount === 20 || omittedNotices > 0 || !fits(text)) { omittedNotices++; continue; }
+    if (noticeCount === 20 || omittedNotices > 0 || !fits(text, post.context)) { omittedNotices++; continue; }
     parts.push(text);
+    context = combined(post.context ?? []);
     noticeCount++;
     built = { ...built, carried: [...built.carried, post.postId] };
   }
   if (parts.length === 0) return undefined;
   if (omittedNotices > 0) parts.push(`${omittedNotices} more unread posts.`);
   if (omittedQuestions > 0) parts.push(`${omittedQuestions} more posts need your reply; run board.read with incoming set`);
-  return { event: built, delivery: { target, sourceId: built.wakeId, body: parts.join("\n\n") } };
+  return { event: { ...built, ...(context.length === 0 ? {} : { context }) },
+    delivery: { target, sourceId: built.wakeId, body: parts.join("\n\n"), ...(context.length === 0 ? {} : { context }) } };
 };
 
 export const completionOwed = (snapshot: Snapshot, post: BoardPostView, closer: BoardAuthor, withdrawn = false): boolean =>

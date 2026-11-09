@@ -2,6 +2,7 @@ import * as Schema from "effect/Schema"
 import { AgentId } from "../ids.ts"
 import { BoardAddressee, BoardAuthor, ChannelId, CloseOutcome, Disposition, PostId, WakeId } from "./ids.ts"
 import { BoardChannelName, BoardPostFields } from "./schemas.ts"
+import { DeliveryContextReferences } from "../project/context.ts"
 
 // Event identity names follow B13; command and read-page names stay unchanged.
 const { replyTo, ...postFields } = BoardPostFields
@@ -37,6 +38,7 @@ export const BoardEvent = Schema.Union([
     postId: PostId, outcome: CloseOutcome, closer: BoardAuthor, completionOwed: Schema.Boolean
   }),
   Schema.TaggedStruct("board.WakeBuilt", {
+    context: Schema.optionalKey(DeliveryContextReferences),
     wakeId: WakeId, targetAgentId: AgentId,
     carried: Schema.Array(PostId), mustReply: Schema.Array(PostId), completions: Schema.Array(PostId),
     // Exactly the completions whose captured payload contains reply text.

@@ -9338,6 +9338,56 @@ A repeated request returns its original project without another launch.
 Historical invalid settings remain decodable and pass the real rebuild check.
 The original independent bad/control artifacts and interrupted full checks remain preserved.
 
+
+## 546. The composer had no typed task and file context references
+
+Found: 2026-11-09, during the website preparation at `bc783b2`.
+The manager allocated this issue to engine unit W03D.
+
+The golden Add context and at-sign search controls select tasks and workspace files.
+The accepted prompt and board-post contracts carried only text.
+They could not preserve a selected entity through delivery, retry, or replay.
+The mock's labels were not an engine search or an authorization check.
+
+The engine now searches actual readable project tasks and registered local workspace files.
+A shared resolver in `packages/engine/src/project/context.ts` admits typed references.
+It checks the authenticated sender and the conversation recipients.
+File admission reuses the registered repository, common-directory, branch, and path checks.
+References contain canonical identities, rather than caller-supplied display labels.
+No file contents are read or stored by this surface.
+Delivery descriptions remain inside an untrusted-data envelope.
+The existing request receipt preserves the original selected identities on an unchanged retry.
+Old commands and events without context remain valid.
+
+React controls remain outside this change.
+
+## 556. The terminal stop fixture could place its barrier before the message
+
+Found: 2026-11-09, in the first W03D full check at `bc783b2`.
+The manager allocated this issue after the exact-source ordering diagnostic.
+
+The held-message stop test mixed queued Agent Client Protocol version 2 notifications with direct raw stdout frames.
+The fake agent's plan and text steps returned after queue admission, before the separate writer sent them.
+Its raw command marker could therefore overtake the plan and message.
+The original failed trace observed the command marker before the plan and no held message after stop.
+A later passing file run did not clear that failed full check.
+
+The controlled probe used the actual protocol and client from this source.
+A blocked message handler also blocked the later notification handler in the same input-reader fiber.
+A held outgoing writer reproduced the direct marker overtaking queued plan and message notifications.
+This proved the fixture's ordering defect.
+It did not prove a production message loss after the message had buffered.
+
+The fake agent now offers a test-only notification barrier.
+It sends an unknown extension request through the same outgoing queue and awaits the expected method-not-found response.
+The peer reaches that request only after its earlier awaited notification handlers finish.
+The fixture uses one barrier after its plan and another after its tail, before writing the raw command marker.
+The request emits no content, plan, or idle update that could flush the held carry.
+The test verifies both acknowledgements and that the tail remains absent before stop.
+It retains the original assertions that stop emits the tail but does not store it, and keeps the original timeout.
+Production drain and stop behavior are unchanged.
+The original unmodified failed full trace and both original diagnostic artifacts remain preserved in the W03D evidence.
+
 ## 547. Joined delivery history hides released entries
 
 Found: 2026-11-09, during conversation preparation and lead source review at `bc783b2`.
@@ -9422,3 +9472,34 @@ On the faster computer, it resumed the agent first.
 The agent then crashed a second time and the owner was told twice, or the resumed session closed the crash alert early.
 Both tests now turn the sheepdog off, because each checks an engine rule rather than the sheepdog.
 Other tests may have the same hidden dependence on a slow computer.
+
+## 563. Context search counted item bytes without the complete result
+
+Found: 2026-11-09, during independent verification of signed `3dd4d20`.
+The manager allocated the correction to W03DF1.
+
+The documented 65,536-byte budget applies to the complete context search result.
+Admission counted only the encoded item array.
+An authenticated search over 91 actual schema-valid Git files returned a 65,529-byte item array inside a 65,557-byte result, with `truncated: false`.
+The request identifier was an ordinary universally unique identifier.
+The verifier's original probe, inputs, observation, failed log, and metadata remain unchanged.
+Earlier escaped-request-identifier probes measured larger outer replies, rather than a breach of this result-only budget.
+The earlier invalid task-title and import attempts remain historical test failures.
+
+Admission now counts the complete encoded result, including its field names and truncation flag.
+It reserves the longer `false` encoding even when truncation has already occurred.
+The byte budget excludes the reply's request identifier and the agent envelope.
+Authenticated owner and member regressions exercise real files at the original overflow and the nearest overflowing and fitting encoded results.
+They check canonical bounded prefixes, truthful truncation, smaller limits, ordinary under-budget results, empty results, and foreign-project refusal.
+The filenames include multibyte text and quotation marks, so the assertions count encoded bytes.
+The existing project access, candidate and result counts, Git read bounds, redaction, and plain-text delivery rules remain unchanged.
+
+## 567. The context refusal fixture assumes no setup deliveries
+
+The merged context refusal test expected an entirely empty delivery map after its setup created owner tasks.
+The accepted task-creation path now queues legitimate lead notices during that setup.
+The combined proof passed package and root typing and failed this stale fixture assertion with three legitimate task-notification deliveries.
+The fixture now compares the complete delivery map before and after every refused context request, including raw decoder cases.
+All existing refusal, secret-redaction and deterministic rebuild assertions remain.
+The production context and owner-task delivery paths are unchanged.
+Status: corrected in the website composition; combined proof and independent review are required.

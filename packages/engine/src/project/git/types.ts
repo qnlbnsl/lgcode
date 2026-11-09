@@ -45,6 +45,8 @@ export interface Review {
 }
 export interface DiscardPlan { readonly fingerprint: string; readonly paths: ReadonlyArray<string> }
 export interface GitService {
+  readonly contextFiles: (folder: string, query: string) => GitOperation<Bounded<string>>;
+  readonly contextFile: (folder: string, path: string) => GitOperation<void>;
   discover(): GitOperation<Bounded<Repository>>;
   createRepository(name: string): GitOperation<Repository>;
   register(folder: string): GitOperation<Repository>;

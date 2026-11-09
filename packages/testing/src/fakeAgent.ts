@@ -27,6 +27,8 @@ type Step = DiagnosticStep | StepDiagnostic
   | { step: "text"; text: string }
   | { step: "report_configuration" }
   | { step: "plan"; entries: AcpSchema.PlanEntry[] }
+  // Issue 556: acknowledge queued notifications before a later direct raw frame.
+  | { step: "notification_barrier" }
   | { step: "tool_call"; toolCallId: string; title: string; kind: AcpSchema.ToolKind; status: AcpSchema.ToolCallStatus; output: string }
   | { step: "file_change"; toolCallId: string; path: string; operation: string; patch: string }
   | { step: "permission"; toolCallId: string; title: string; name?: string; options: AcpSchema.PermissionOption[]; kind?: AcpSchema.ToolCallUpdate["kind"]; rawInput?: AcpSchema.ToolCallUpdate["rawInput"]; locations?: Array<{ path: string }>; _meta?: AcpSchema.ToolCallUpdate["_meta"] }
@@ -301,6 +303,17 @@ const program = Effect.gen(function*() {
           case "text": yield* text(step.text); break
           case "report_configuration": yield* text(`configuration:${JSON.stringify({ pid: process.pid, options: session.options })}`); break
           case "plan": yield* update({ sessionUpdate: "plan_update", plan: { type: "items", planId: "script-plan", entries: step.entries } }); break
+          case "notification_barrier": {
+            // This unknown extension request shares the notification writer's FIFO.
+            // Its expected refusal arrives only after the peer's awaited handlers
+            // have processed earlier frames. It emits no text or idle/plan update,
+            // so the runner's streaming-redactor carry remains held.
+            yield* agent.raw.request("_lgcode_test_notification_barrier", {}).pipe(
+              Effect.flatMap(() => Effect.fail(AcpRequestError.internalError("Expected notification barrier refusal"))),
+              Effect.catchTags({ AcpRequestError: (error) => error.code === -32601 ? Effect.void : Effect.fail(error) })
+            )
+            break
+          }
           case "tool_call": yield* update({ sessionUpdate: "tool_call_update", toolCallId: step.toolCallId, title: step.title, kind: step.kind, status: step.status, content: [{ type: "content", content: { type: "text", text: step.output } }] }); break
           case "file_change": yield* update({ sessionUpdate: "tool_call_update", toolCallId: step.toolCallId, content: [{ type: "diff", changes: [{ operation: step.operation, path: step.path }], patch: { format: "git_patch", text: step.patch } }] } as AcpSchema.SessionNotification["update"]); break
           case "permission": {

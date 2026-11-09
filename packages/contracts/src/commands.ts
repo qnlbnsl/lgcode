@@ -1,5 +1,6 @@
 import { QuestionMetadataFields } from "./questions.ts"
 import { ChoiceId } from "./agentConfiguration.ts"
+import { ContextReferences } from "./project/context.ts"
 import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
@@ -69,7 +70,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
     success: Ack, error: Refused
   }),
   Rpc.make("prompt", {
-    payload: { ...target, text: Schema.String },
+    payload: { ...target, text: Schema.String, context: Schema.optionalKey(ContextReferences) },
     success: Schema.Struct({ ...request, deliveryId: DeliveryId }), error: Refused
   }),
   Rpc.make("answer", {

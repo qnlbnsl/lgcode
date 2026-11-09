@@ -1,4 +1,5 @@
 import { ProjectRequestLinkFields, QuestionMetadataFields } from "./questions.ts"
+import { DeliveryContextReferences } from "./project/context.ts"
 import { AgentChoice, ConfigurationReason } from "./agentConfiguration.ts"
 import * as Schema from "effect/Schema"
 import { ProjectEvent } from "./project/events.ts"
@@ -51,7 +52,7 @@ export const Delivery = Schema.Struct({
   target: AgentId,
   sender: Sender,
   content: Schema.Union([
-    Schema.TaggedStruct("prompt", { text: Schema.String }),
+    Schema.TaggedStruct("prompt", { text: Schema.String, context: Schema.optionalKey(DeliveryContextReferences) }),
     Schema.TaggedStruct("compact", {}),
     Schema.TaggedStruct("carry-on", { text: Schema.String })
   ]),
@@ -180,7 +181,7 @@ export const EngineEvent = Schema.Union([
     ...agent, revision: Schema.optionalKey(RequestId), applied: Schema.optionalKey(AgentChoice),
     status: Schema.Literals(["refused", "unsupported", "unavailable"]), reason: ConfigurationReason
   }),
-  Schema.TaggedStruct("PromptSent", { ...delivery, sender: Sender, text: Schema.String }),
+  Schema.TaggedStruct("PromptSent", { ...delivery, sender: Sender, text: Schema.String, context: Schema.optionalKey(DeliveryContextReferences) }),
   Schema.TaggedStruct("ThreadItem", {
     ...agent, itemId: Schema.NonEmptyString, content: ThreadContent, replay: Schema.Boolean
   }),

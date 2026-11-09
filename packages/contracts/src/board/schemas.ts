@@ -2,6 +2,7 @@ import * as Schema from "effect/Schema"
 import { AgentId, EventSequence, RequestId } from "../ids.ts"
 import { BoardAddressee, BoardAuthor, ChannelId, CloseOutcome, Disposition, PostId, ReplyMode } from "./ids.ts"
 import { boardLimits } from "./limits.ts"
+import { ContextReferences } from "../project/context.ts"
 
 export const BoardChannelName = Schema.String.check(Schema.isPattern(/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/))
 export const BoardPostText = Schema.String.check(Schema.isMaxCodePoints(boardLimits.postCharacters))
@@ -12,7 +13,7 @@ export const BoardDisposition = Schema.Struct({
 })
 export const BoardPostFields = {
   postId: PostId, channelId: ChannelId, author: BoardAuthor, text: BoardPostText,
-  to: BoardAddressees, reply: ReplyMode, replyTo: Schema.optionalKey(PostId)
+  to: BoardAddressees, reply: ReplyMode, replyTo: Schema.optionalKey(PostId), context: Schema.optionalKey(ContextReferences)
 }
 export const BoardPost = Schema.Struct({
   ...BoardPostFields, sequence: EventSequence, status: Schema.Literals(["open", "closed"]),
