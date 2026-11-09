@@ -7,6 +7,7 @@ import { join } from "node:path";
 
 import * as Contracts from "@lgcode/contracts";
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
+import { makeNodeSocket } from "@lgcode/client/nodeSocket";
 import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -113,7 +114,7 @@ export const fixtureLists = (base: EngineLists): EngineLists => {
 };
 
 export const fixtureClient = (socketPath: string, bearer: string, lists: EngineLists) => Effect.gen(function* () {
-  const socket = yield* Socket.makeWebSocket(socketUrl(socketPath), {
+  const socket = yield* makeNodeSocket(socketUrl(socketPath), {
     headers: { ...authorization(bearer), ...ancestryHeaders() }, openTimeout: 10_000,
   }).pipe(Effect.provide(NodeSocket.layerWebSocketConstructorWS));
   const protocol = yield* RpcClient.makeProtocolSocket({ retryTransientErrors: false }).pipe(

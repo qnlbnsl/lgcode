@@ -1,8 +1,8 @@
 import * as NodeSocket from "@effect/platform-node/NodeSocket"
 import * as Effect from "effect/Effect"
 import type * as Scope from "effect/Scope"
-import * as Socket from "effect/socket/Socket"
 import { ancestryHeaders } from "./ancestry.ts"
+import { makeNodeSocket } from "./nodeSocket.ts"
 import { ClientError } from "./errors.ts"
 import { connectWith, type Client } from "./core.ts"
 import { type Environment, resolveIdentity, stateFolder } from "./identity.ts"
@@ -42,6 +42,6 @@ export const connect = (options: ConnectOptions): Effect.Effect<Client, ClientEr
     })
 
     return yield* connectWith({ attempts: options.attempts, makeSocket: () =>
-      Socket.makeWebSocket(url, { headers, openTimeout: 5_000 }).pipe(Effect.provide(NodeSocket.layerWebSocketConstructorWS))
+      makeNodeSocket(url, { headers, openTimeout: 5_000 }).pipe(Effect.provide(NodeSocket.layerWebSocketConstructorWS))
     })
   })

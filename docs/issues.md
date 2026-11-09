@@ -8870,18 +8870,46 @@ The forced interruption establishes this production defect. It does not
 establish the exact scheduling of the earlier zero-entry failures.
 The complete combined check and independent review remain pending.
 
-## 536. Closing a pending test socket can report an uncaught exception
+A later complete Git check at `253ef5b` still captured zero entries in the
+original `protocol=false` case with the batch mask present.
+A separate controlled scheduler probe established a second ownership gap.
+A fork cancelled before its first evaluation never installs its `ensuring`
+finalizer. The probe retained all three pending entries and logged none.
+The parent scope now registers a final flush before scheduling the follower.
+The batch mask and the running follower's finalizer remain in place.
+Each drain removes its own snapshot once, so final flushes do not duplicate it.
+The same controlled delayed-child probe now passes and flushes all three
+entries before the child evaluates. Independent repeated-interruption and
+fresh-service lifecycle probes also pass. Complete corrected-head checks
+remain required before acceptance.
 
-Found: 2026-11-08, during the corrected Git unit's fresh complete check.
-State: open; the exact cause is not established.
+## 536. Closing a pending Node socket could raise an uncaught exception
 
-The complete check at `30584ef` exited 1 after the already recorded issue 532
-assertion failure. It also reported two uncaught WebSocket exceptions.
-Both said that the socket was closed before its connection was established.
-Vitest associated them with the sheepdog recovery-boundaries and board
-error-recovery test files. Those files reported passing assertions.
-The stack points to the installed Effect socket close path and the ws library.
-No Git service operation uses that socket path.
-The log is `/tmp/w02f1-verifier-1/pnpm-check.log`.
-This observation is not a proved baseline failure or an accepted check.
-The connection-close timing needs a focused investigation if it recurs.
+Found: 2026-11-08, during the corrected foundations' fresh complete checks.
+State: corrected locally; independent review and complete checks are pending.
+
+The Git check at `30584ef` reported two uncaught close-before-connect errors.
+The project check at `b1978e5` later passed all 6275 assertions but exited 1
+because the same exception was uncaught. The browser stage did not run.
+The logs are `/tmp/w02f1-verifier-1/pnpm-check.log` and
+`/tmp/w01f1-verifier-1/full-check.log`.
+
+Independent controlled handshakes established a real cleanup defect.
+Cancelling or timing out before open caused each child process to exit 1.
+Effect removed its reader error listener before releasing the socket.
+Node's ws transport then emitted its close-before-connect error asynchronously.
+HTTP refusal and post-open close controls exited normally.
+This establishes the pending-handshake defect, not every original suite trigger.
+
+The Node socket acquisition now owns release through `Socket.fromWebSocket`.
+An explicit pre-open close retains its error ownership through the close event.
+Active reader errors retain their ordinary typed failure path.
+The production Node client and shared engine fixtures use that same acquisition.
+The existing socket validation and authenticated handshake headers are preserved.
+The fix does not install a process-wide error handler or discard suite errors.
+New child-process regressions cover cancellation, timeout, HTTP refusal and
+post-open close. All four pass locally, along with the diagnostic drain tests.
+Client and engine type checks pass. The targeted recovery and browser-boundary
+batch passes all 32 tests in five files. An independent five-mode probe also
+passes and retains a typed SocketReadError for an active malformed frame.
+Complete corrected-head checks remain required before acceptance.
