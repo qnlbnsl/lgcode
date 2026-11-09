@@ -234,7 +234,7 @@ export const makeLayer = (lists: EngineLists = engineLists) => Layer.effect(Even
     if (Array.isArray(value)) return yield* Effect.forEach(value, (item) => redactReceipt(item, structure?.elements));
     if (typeof value === "object" && value !== null) {
       const entries = yield* Effect.forEach(Object.entries(value), ([key, item]) => Effect.gen(function* () {
-        return [key, yield* redactReceipt(item, fieldStructure(structure, key))] as const;
+        return [key, yield* redactReceipt(item, fieldStructure(structure, key, "_tag" in value ? value._tag : undefined))] as const;
       }));
       return Object.fromEntries(entries);
     }

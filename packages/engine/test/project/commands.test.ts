@@ -6,8 +6,11 @@ import { it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as Redacted from "effect/Redacted"
+import * as SqlClient from "effect/sql/SqlClient"
 import { afterEach, beforeEach, expect, vi } from "vitest"
-import { ClientSnapshot, CommandsRpcGroup, ProjectSnapshot, sprintStatus } from "@lgcode/contracts"
+import { ClientSnapshot, CommandsRpcGroup, Event, ProjectSnapshot, projectEventTags, sprintStatus } from "@lgcode/contracts"
+import { EventLog } from "../../src/log/EventLog.ts"
+import { engineLists } from "../../src/pieces/lists.ts"
 import * as Server from "../../src/api/server.ts"
 import { ancestryHeaders, connect, upgradeStatus } from "../support/socketClient.ts"
 import { Views } from "../../src/views/Views.ts"
@@ -27,6 +30,55 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig) })
 const snapshot = Effect.gen(function* () { return yield* (yield* Views).snapshot })
+
+it.live("roundtrips every project event and receipt identity while keeping workspace owner and nested prose redacted", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
+  const marker = "collision-marker"
+  const ids = { repoId: `repo-${marker}`, worktreeId: `workspace-${marker}`, projectId: `project-${marker}`,
+    teamId: `team-${marker}`, sprintId: `sprint-${marker}`, taskId: `task-${marker}`, leadAgentId: `lead-${marker}` }
+  const { repoId, worktreeId, projectId, teamId, sprintId, taskId, leadAgentId } = ids
+  const parentId = `parent-${marker}`
+  const ownerId = `worker-${marker}`
+  const needs = [`dependency-${marker}`]
+  const events = (text: string) => [
+    { _tag: "project.SettingsChanged", settings: { workspaceFolder: text, shell: text } },
+    { _tag: "project.RepositoryAdded", repoId, name: text, path: text },
+    { _tag: "project.RepositoryLocated", repoId, machineId: text, path: text },
+    { _tag: "project.WorktreeCreated", worktreeId, repoId, machineId: text, branch: text, path: text, projectId, teamId, parentId, owner: text, activity: text },
+    { _tag: "project.Created", projectId, repoId, name: text, goal: text, leadAgentId, worktreeId, machineId: text },
+    { _tag: "project.Placed", projectId, worktreeId, machineId: text },
+    { _tag: "project.PreferencesChanged", projectId, shell: text },
+    { _tag: "project.Renamed", projectId, name: text },
+    { _tag: "project.StageChanged", projectId, stage: "build" },
+    { _tag: "project.TeamAdded", projectId, teamId, worktreeId, name: text, area: text },
+    { _tag: "project.SprintAdded", projectId, sprintId, label: text, name: text, goal: text, phase: "Build", owner: ownerId, needs },
+    { _tag: "project.SprintChanged", projectId, sprintId, name: text, goal: text, owner: leadAgentId, needs },
+    { _tag: "project.SprintCompleted", projectId, sprintId, completion: text, evidence: text },
+    { _tag: "project.TaskAdded", projectId, taskId, teamId, sprintId, worktreeId, owner: ownerId, title: text, state: "queue",
+      story: { summary: text, done: [text], activity: [{ title: text, detail: text }, { question: text, open: { title: text, detail: text }, answered: { title: text, detail: text } }] } },
+    { _tag: "project.TaskChanged", projectId, taskId, teamId, sprintId, worktreeId, owner: leadAgentId, title: text, note: text, state: "active" },
+    { _tag: "project.TaskNoted", projectId, taskId, title: text, detail: text },
+  ].map((event) => Schema.decodeUnknownSync(Event)(event))
+  const input = events(marker)
+  expect(input.map((event) => event._tag).sort()).toEqual([...projectEventTags].sort())
+  const log = yield* EventLog
+  const requestId = freshRequest()
+  // Mutation replies return these six identities. Lead and parent references
+  // occur in events, not at the root of a mutation reply.
+  const receiptIds = { repoId, worktreeId, projectId, teamId, sprintId, taskId }
+  const reply = { requestId, ...receiptIds, owner: marker, needs: [marker], text: marker, nested: { projectId: marker } }
+  const batch = yield* log.append({ _tag: "owner" }, requestId, "a".repeat(64), input, {}, (envelopes) => ({ ...reply, envelopes }))
+  expect(batch.map((row) => row.event)).toEqual(events("[REDACTED]"))
+  const sql = yield* SqlClient.SqlClient
+  const stored = yield* sql<{ payload_json: string }>`SELECT payload_json FROM events WHERE request_id = ${requestId} ORDER BY sequence`
+  expect(stored.map((row) => JSON.parse(row.payload_json))).toEqual(events("[REDACTED]"))
+  const rows = yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE request_id = ${requestId}`
+  const receipt = JSON.parse(rows[0]!.result_json)
+  expect(receipt.envelopes).toEqual(batch)
+  expect(receipt.reply).toEqual({ requestId, ...receiptIds, owner: "[REDACTED]", needs: ["[REDACTED]"], text: "[REDACTED]", nested: { projectId: "[REDACTED]" }, envelopes: batch })
+  // A repeated receipt must replay the original identities and envelope times.
+  expect(yield* log.append({ _tag: "owner" }, requestId, "a".repeat(64), input, {}, () => reply)).toEqual(batch)
+}), ["collision-marker"]).pipe(Effect.orDie))
 const foundation = () => Effect.gen(function* () {
   yield* registerRebuildCheck(); yield* seedAccount(); yield* seedHarness()
   const lead = agentCredential((yield* seedAgent({ id: "lead", folder: rig.work })).token)
@@ -162,6 +214,10 @@ it.live("serves project commands through the authenticated typed client API with
   const payload = { requestId: freshRequest(), name: "Wire project", goal: "A real API record", repoId: f.repoId,
     worktreeId: f.worktreeId, leadAgentId: "wire-lead" as never, machineId: "local" }
   const created = yield* api["project.create"](payload)
+  const invalidCursor = yield* api["project.read"]({ requestId: freshRequest(), projectId: created.projectId, collection: "projects", after: "missing" }).pipe(Effect.result)
+  expect(invalidCursor._tag === "Failure" && invalidCursor.failure.reason).toBe("invalid cursor")
+  const missingProject = yield* api["project.read"]({ requestId: freshRequest(), collection: "tasks" }).pipe(Effect.result)
+  expect(missingProject._tag === "Failure" && missingProject.failure.reason).toBe("projectId is required for this collection")
   const reply = yield* api["project.read"]({ requestId: freshRequest(), projectId: created.projectId, collection: "projects" })
   expect("items" in reply && reply.items.some((row) => "goal" in row && row.goal === "A real API record")).toBe(true)
   const duplicate = yield* api["project.rename"]({ requestId: freshRequest(), projectId: created.projectId, name: "CONSOLE" }).pipe(Effect.result)
@@ -174,3 +230,69 @@ it.live("serves project commands through the authenticated typed client API with
   const denied = yield* workerApi["project.create"]({ ...payload, requestId: freshRequest(), name: "Denied" }).pipe(Effect.result)
   expect(denied._tag).toBe("Failure")
 })).pipe(Effect.orDie))
+
+it.live("reads absent settings over a fresh authenticated socket, then saves, rereads and rebuilds", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck(); yield* seedAccount()
+  const bearer = randomBytes(32).toString("base64url")
+  const socket = join(rig.stateFolder, "settings.sock")
+  yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false })
+  const api = yield* connect(socket, bearer)
+  expect(Object.hasOwn(success(yield* call(owner, "project.settings", {})), "settings")).toBe(false)
+  const empty = yield* api["project.settings"]({ requestId: freshRequest() })
+  expect(Object.hasOwn(empty, "settings")).toBe(false)
+  expect(projectView(yield* snapshot).settings).toBeUndefined()
+  const settings = { workspaceFolder: rig.work, shell: "zsh" }
+  yield* api["project.settings.set"]({ requestId: freshRequest(), settings })
+  expect((yield* api["project.settings"]({ requestId: freshRequest() })).settings).toEqual(settings)
+  expect(projectView(yield* snapshot).settings).toEqual(settings)
+})).pipe(Effect.orDie))
+
+it.live("keeps arbitrary read failures generic and scopes project refusal text to project commands", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck(); yield* seedAccount()
+  const bearer = randomBytes(32).toString("base64url")
+  const socket = join(rig.stateFolder, "refusals.sock")
+  const lists = { ...engineLists, reads: { ...engineLists.reads,
+    "project.read": () => Effect.fail({ reason: "synthetic-private-error" }),
+    "client.roster": () => Effect.fail({ reason: "invalid cursor" }),
+  } }
+  yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false, lists })
+  const api = yield* connect(socket, bearer)
+  const arbitrary = yield* api["project.read"]({ requestId: freshRequest(), collection: "projects" }).pipe(Effect.result)
+  expect(arbitrary._tag === "Failure" && arbitrary.failure.reason).toBe("command refused")
+  const outside = yield* api["client.roster"]({ requestId: freshRequest() }).pipe(Effect.result)
+  expect(outside._tag === "Failure" && outside.failure.reason).toBe("command refused")
+  expect(Object.hasOwn(yield* api["project.settings"]({ requestId: freshRequest() }), "settings")).toBe(false)
+})).pipe(Effect.orDie))
+
+it.live("keeps a colliding validated lead and task owner through the production writer, receipts and access checks", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck(); yield* seedAccount(); yield* seedHarness()
+  const leadId = "agent-collision-marker"
+  const workerId = "worker-collision-marker"
+  const lead = agentCredential((yield* seedAgent({ id: leadId, folder: rig.work })).token)
+  const worker = agentCredential((yield* seedAgent({ id: workerId, parent: leadId })).token)
+  const repoId = success(yield* call(owner, "project.repository.add", { name: "Product", path: rig.work, machineId: "local" })).repoId
+  const worktreeId = success(yield* call(owner, "project.workspace.register", { repoId, machineId: "local", branch: "main", path: rig.work, checkout: "main" })).worktreeId
+  const requestId = freshRequest()
+  const payload = { requestId, name: "Collision", goal: "Hide collision-marker here", leadAgentId: leadId, repoId, worktreeId, machineId: "local" }
+  const created = success(yield* call(owner, "project.create", payload))
+  const projectId = created.projectId
+  expect(success(yield* call(owner, "project.create", payload))).toEqual(created)
+  expect(projectView(yield* snapshot).projects[projectId]).toMatchObject({ projectId, repoId, worktreeId, leadAgentId: leadId, goal: "Hide [REDACTED] here" })
+  expect(projectView(yield* snapshot).agentProjects).toMatchObject({ [leadId]: projectId, [workerId]: projectId })
+  expect(success(yield* call(lead, "project.read", { projectId, collection: "projects" })).data).toContain(leadId)
+  success(yield* call(lead, "project.stage.set", { projectId, stage: "build" }))
+  const team = success(yield* call(lead, "project.team.create", { projectId, name: "Build", worktreeId }))
+  success(yield* call(lead, "group", { agentId: workerId, add: [team.group], remove: [] }))
+  const sprintId = success(yield* call(lead, "project.sprint.create", { projectId, label: "SP-01", name: "Build", goal: "", phase: "Build", owner: leadId, needs: [] })).sprintId
+  const taskId = success(yield* call(lead, "project.task.create", { projectId, teamId: team.teamId, sprintId, worktreeId, owner: workerId, title: "Build records", state: "queue" })).taskId
+  success(yield* call(worker, "project.task.update", { projectId, taskId, state: "active", note: "Hide collision-marker" }))
+  const view = projectView(yield* snapshot)
+  expect(view.sprints[projectKey(projectId, sprintId)]?.owner).toBe(leadId)
+  expect(view.tasks[projectKey(projectId, taskId)]).toMatchObject({ owner: workerId, state: "active" })
+  expect(view.tasks[projectKey(projectId, taskId)]?.history.at(-1)?.detail).toBe("Hide [REDACTED]")
+  const sql = yield* SqlClient.SqlClient
+  const rows = yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE request_id = ${requestId}`
+  const receipt = JSON.parse(rows[0]!.result_json)
+  expect(receipt.reply).toEqual(created)
+  expect(receipt.envelopes[0].event).toMatchObject({ projectId, repoId, worktreeId, leadAgentId: leadId, goal: "Hide [REDACTED] here" })
+}), ["collision-marker"]).pipe(Effect.orDie))

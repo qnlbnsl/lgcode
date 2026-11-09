@@ -258,7 +258,10 @@ const page = <T>(input: Input, raw: Record<string, unknown>, entries: ReadonlyAr
   }
   return { reply: wrap({ requestId: raw.requestId, items, ...(next === undefined ? {} : { next }) }) }
 })
-const settings: ReadHandler = (input, raw) => Effect.succeed({ reply: { requestId: raw.requestId, settings: projectView(input.snapshot).settings } })
+const settings: ReadHandler = (input, raw) => {
+  const settings = projectView(input.snapshot).settings
+  return Effect.succeed({ reply: { requestId: raw.requestId, ...(settings === undefined ? {} : { settings }) } })
+}
 const repositories: ReadHandler = (input, raw) => page(input, raw, Object.entries(projectView(input.snapshot).repositories))
 const workspaces: ReadHandler = (input, raw) => page(input, raw, Object.entries(projectView(input.snapshot).workspaces).filter(([, row]) => raw.repoId === undefined || row.repoId === raw.repoId))
 const read: ReadHandler = (input, raw) => Effect.gen(function* () {

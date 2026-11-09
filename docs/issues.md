@@ -8794,3 +8794,36 @@ A task timeline built with the current clock would change when the log was repla
 The table now passes the envelope's time as a fourth argument.
 The project fold uses that time for task creation, changes, notes, and sprint completion.
 The handler tests compare the live views with a complete log rebuild after every journey.
+
+## 534. Project identities, read refusals, and initial settings failed at the persistence or wire boundary
+
+Found: 2026-11-08, by the independent verifier of the project foundation at `0335bda`.
+State: fixed in the first correction to the project foundation.
+
+Finding F01 was an integrity bug in the production redactor.
+The planner validated a project's lead, but the writer treated the new identity fields as text.
+A registered secret that overlapped a lead identifier changed that reference before persistence.
+The original lead then lost project membership and authorization.
+This is the project integration instance of issue 340.
+The correction adds schema-position rules for repository, workspace, project, team, sprint, task, parent, and lead references.
+Sprint dependencies and sprint and task owners also preserve their typed identities.
+Event tags select these rules, so a workspace's display owner remains redacted text.
+Mutation receipt identities and nested event envelopes use the same boundary rules.
+Production-writer tests check every project event with a nonempty synthetic registered secret.
+They inspect stored events, returned envelopes, receipt replies, retries, and deterministic rebuilds.
+A real-handler journey also checks the original lead's access and the original worker's task updates.
+Unrelated prose, workspace owner text, and arbitrary nested identity-shaped text remain redacted.
+
+Finding F02 hid fixed project refusal reasons on authenticated reads.
+The read wrapper omitted the command name required by the existing explicit reason allowlist.
+The correction passes that name through both ordinary and streaming read errors.
+Socket tests check an invalid cursor, a missing project reference, and a successful subsequent read.
+They also check that arbitrary failures and project-only reasons on other commands remain generic.
+
+Finding F03 made the first project settings read fail response encoding.
+The handler returned an own `settings` property with an undefined value.
+The Effect 4 `optionalKey` contract permits an absent property instead.
+The correction omits the property until settings exist.
+A fresh authenticated socket test reads the empty state before any save, saves settings, and reads them again.
+The same journey compares the live settings with a complete event-log rebuild.
+This proof does not implement or verify the later first-run page.

@@ -6,6 +6,7 @@ export interface RedactionStructure {
   readonly identity?: true;
   readonly freeText?: true;
   readonly fields?: Readonly<Record<string, RedactionStructure>>;
+  readonly taggedFields?: Readonly<Record<string, Readonly<Record<string, RedactionStructure>>>>;
   readonly elements?: RedactionStructure;
 }
 
@@ -20,7 +21,31 @@ const delivery: RedactionStructure = { fields: {
   id: identity, target: identity, sender: actor, source: { fields: { id: identity, namespace: identity } },
 } };
 
-export const eventStructure: RedactionStructure = { fields: {
+// Project owners differ by schema: a workspace owner is display text, while
+// sprint and task owners are AgentIds. Keep all new identities at their exact
+// event positions, including array elements in sprint dependencies.
+const workspace = { worktreeId: identity, repoId: identity, projectId: identity, teamId: identity, parentId: identity };
+const project = { projectId: identity, repoId: identity, leadAgentId: identity, worktreeId: identity };
+const sprint = { projectId: identity, sprintId: identity, owner: identity, needs: { elements: identity } };
+const task = { projectId: identity, taskId: identity, owner: identity, teamId: identity, sprintId: identity, worktreeId: identity };
+
+export const eventStructure: RedactionStructure = { taggedFields: {
+  "project.RepositoryAdded": { repoId: identity },
+  "project.RepositoryLocated": { repoId: identity },
+  "project.WorktreeCreated": workspace,
+  "project.Created": project,
+  "project.Placed": { projectId: identity, worktreeId: identity },
+  "project.PreferencesChanged": { projectId: identity },
+  "project.Renamed": { projectId: identity },
+  "project.StageChanged": { projectId: identity },
+  "project.TeamAdded": { projectId: identity, teamId: identity, worktreeId: identity, channelId: identity },
+  "project.SprintAdded": sprint,
+  "project.SprintChanged": sprint,
+  "project.SprintCompleted": { projectId: identity, sprintId: identity },
+  "project.TaskAdded": task,
+  "project.TaskChanged": task,
+  "project.TaskNoted": { projectId: identity, taskId: identity },
+}, fields: {
   agentId: identity, accountId: identity, deliveryId: identity,
   roleFileHash: identity, noticeRecipient: identity, postId: identity, stalledPostId: identity,
   channelId: identity, wakeId: identity, anchorAgentId: identity, targetAgentId: identity,
@@ -39,6 +64,7 @@ export const eventStructure: RedactionStructure = { fields: {
 } };
 
 export const receiptStructure: RedactionStructure = { fields: {
+  repoId: identity, worktreeId: identity, projectId: identity, teamId: identity, sprintId: identity, taskId: identity,
   requestId: identity, agentId: identity, deliveryId: identity, questionId: identity, waitId: identity, alertId: identity,
   roleFileHash: identity, channelId: identity, postId: identity, wakeId: identity,
   accounts: { elements: account }, harnesses: { elements: harness }, members: { elements: member },
@@ -47,7 +73,12 @@ export const receiptStructure: RedactionStructure = { fields: {
   } } },
 } };
 
-export const fieldStructure = (structure: RedactionStructure | undefined, key: string): RedactionStructure | undefined =>
+export const fieldStructure = (structure: RedactionStructure | undefined, key: string, tag?: unknown): RedactionStructure | undefined => {
   // A free-text record's `_tag` entry is not a tagged-struct discriminator.
-  structure?.freeText === true ? structure : key === "_tag" ? identity
+  if (structure?.freeText === true) return structure;
+  if (key === "_tag") return identity;
+  const tagged = typeof tag === "string" && structure?.taggedFields !== undefined && Object.hasOwn(structure.taggedFields, tag)
+    ? structure.taggedFields[tag] : undefined;
+  return tagged !== undefined && Object.hasOwn(tagged, key) ? tagged[key]
     : structure?.fields !== undefined && Object.hasOwn(structure.fields, key) ? structure.fields[key] : undefined;
+};

@@ -55,9 +55,9 @@ const commandError = (requestId: unknown, reason = "command refused", command?: 
 });
 // Authentication refusals already carry a fixed public reason. Preserve it
 // across a generic read wrapper without returning arbitrary failure content.
-const readError = (requestId: unknown, error: unknown) => commandError(requestId,
+const readError = (requestId: unknown, error: unknown, command: string) => commandError(requestId,
   typeof error === "object" && error !== null && "reason" in error && typeof error.reason === "string"
-    ? error.reason : "command refused");
+    ? error.reason : "command refused", command);
 
 // This listener can be opened before migrations or recovery. Its only
 // initial response, including to an unauthenticated upgrade, is recovering.
@@ -196,7 +196,7 @@ export const application = (options: ApplicationOptions) => Effect.gen(function*
       })));
       if (RpcSchema.isStreamSchema(rpc.successSchema)) return Stream.unwrap(prepare.pipe(Effect.map((input) =>
         read(input, payload) as Stream.Stream<unknown, unknown, Services>
-      ))).pipe(Stream.mapError((error) => readError(payload.requestId, error)), Stream.provideService(EventLog, boundedLog));
+      ))).pipe(Stream.mapError((error) => readError(payload.requestId, error, name)), Stream.provideService(EventLog, boundedLog));
       return prepare.pipe(Effect.flatMap((input) => read(input, payload) as Effect.Effect<import("./reads.ts").ReadReply, unknown, Services>),
         Effect.flatMap((result) => Effect.gen(function* () {
           const marks = result.marks ?? [];
@@ -210,7 +210,7 @@ export const application = (options: ApplicationOptions) => Effect.gen(function*
             }));
           }
           return result.reply;
-        })), Effect.mapError((error) => readError(payload.requestId, error)));
+        })), Effect.mapError((error) => readError(payload.requestId, error, name)));
     }])) as unknown as Handlers));
     yield* RpcServer.make(group).pipe(Effect.provide(handlers), Effect.provideService(RpcServer.Protocol, boundedProtocol), Effect.forkScoped);
     return yield* Effect.raceFirst(httpEffect, Deferred.await(invalidated).pipe(Effect.as(HttpServerResponse.empty())));
