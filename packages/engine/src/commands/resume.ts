@@ -9,6 +9,7 @@ import { dispatchQueued } from "../routing/deliveries.ts";
 import { Runner } from "../runner/Runner.ts";
 import { Views } from "../views/Views.ts";
 import { refused, type Agent, type Input, type Payload, type Plan } from "./internal.ts";
+import { own, projectView } from "../project/view.ts";
 
 // Rows 52 and 66. `resume` reloads the agent's session and then runs
 // recovery's step 10 for this one agent: a delivery sent but not accepted is
@@ -18,6 +19,9 @@ import { refused, type Agent, type Input, type Payload, type Plan } from "./inte
 // last turn end, and each one sent but never accepted, with no carry-on.
 export const resume = ({ runtime, snapshot, actor }: Input, agent: Agent, payload: Payload<"resume">) =>
   Effect.gen(function* () {
+    const view = projectView(snapshot), id = own(view.agentProjects, agent.agentId);
+    const project = id === undefined ? undefined : own(view.projects, id);
+    if (project?.archiving || project?.archivedAt !== undefined) return yield* refused("project is archived or archiving");
     const fresh = payload.fresh === true;
     const reloads = runtime.runner.capabilities.loadSession || runtime.runner.capabilities.resumeSession;
     if (!fresh && (agent.reloadable !== true || agent.session === undefined || !reloads)) return yield* refused("cannot reload");

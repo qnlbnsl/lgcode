@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema"
-import { Project, ProjectId, ProjectName, ProjectSettings, ProjectStage, ProjectText, Repository, RepositoryLocation, Sprint, SprintId, Task, TaskId, TaskState, Team, Workspace } from "./schema.ts"
+import { CreationFolderIdentity, Project, ProjectCreation, ProjectId, ProjectName, ProjectSettings, ProjectStage, ProjectText, Repository, RepositoryLocation, Sprint, SprintId, Task, TaskId, TaskState, Team, Workspace } from "./schema.ts"
 
 export const ProjectEvent = Schema.Union([
   Schema.TaggedStruct("project.SettingsChanged", { settings: ProjectSettings }),
@@ -7,6 +7,13 @@ export const ProjectEvent = Schema.Union([
   Schema.TaggedStruct("project.RepositoryLocated", RepositoryLocation.fields),
   Schema.TaggedStruct("project.WorktreeCreated", Workspace.fields),
   Schema.TaggedStruct("project.Created", Project.fields),
+  Schema.TaggedStruct("project.CreationPlanned", { creation: ProjectCreation }),
+  Schema.TaggedStruct("project.CreationClaimed", { creationRequestId: ProjectCreation.fields.requestId, kind: Schema.Literals(["repository", "folder"]), identity: CreationFolderIdentity }),
+  Schema.TaggedStruct("project.CreationFinished", { creationRequestId: ProjectCreation.fields.requestId }),
+  Schema.TaggedStruct("project.GoalChanged", { projectId: ProjectId, goal: ProjectText }),
+  Schema.TaggedStruct("project.ArchiveStarted", { projectId: ProjectId }),
+  Schema.TaggedStruct("project.Archived", { projectId: ProjectId }),
+  Schema.TaggedStruct("project.Restored", { projectId: ProjectId }),
   Schema.TaggedStruct("project.Placed", { projectId: ProjectId, machineId: ProjectName, worktreeId: Workspace.fields.worktreeId }),
   Schema.TaggedStruct("project.PreferencesChanged", { projectId: ProjectId, shell: ProjectName }),
   Schema.TaggedStruct("project.Renamed", { projectId: ProjectId, name: ProjectName }),

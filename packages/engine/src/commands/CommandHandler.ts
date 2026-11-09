@@ -7,6 +7,7 @@ import {
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
+import * as Fiber from "effect/Fiber";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Redacted from "effect/Redacted";
@@ -35,6 +36,7 @@ import { checkPieceBatch, pieceNamespace } from "./pieceBatch.ts";
 import { SecretStore } from "./SecretStore.ts";
 import { loadFirstDefaults } from "./harnesses.ts";
 import { webSettingsCommitted } from "../client/settings.ts";
+import { prepareProjectLifecycle, projectLifecycleCommand } from "../project/lifecycle.ts";
 import { CommandRefused, freshRequest, readHarnesses, refused, type Input, type Runtime, type Snapshot } from "./internal.ts";
 
 export { CommandRefused } from "./internal.ts";
@@ -87,6 +89,16 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     const views = yield* Views;
     const runner = yield* Runner;
     const secrets = yield* SecretStore;
+    const engineScope = yield* Effect.scope;
+    // Project creation and archive own real side effects beyond an HTTP/RPC
+    // request's lifetime. Register their complete, serialized operation in the
+    // engine scope before allowing caller cancellation. Their normal bounded
+    // runner setup and stop pre-emption remain interruptible. Engine shutdown
+    // still closes them, and durable intents/receipts cover the next boot.
+    const engineOwned = <A, E, R>(operation: Effect.Effect<A, E, R>) => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
+      const fiber = yield* Effect.forkIn(operation, engineScope);
+      return yield* restore(Fiber.join(fiber));
+    }));
     const runtime: Runtime = { ...configuration, lists, sql, log, runner, secrets, views };
     // Fix round 1, N-1: the first start loads the harness defaults.
     yield* loadFirstDefaults(runtime);
@@ -152,6 +164,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     // payload is not decoded yet, so only a string id picks a lane; a lane
     // for a bad id is harmless.
     const laneFor = (name: string, rawPayload: unknown): string | undefined => {
+      if (projectLifecycleCommand(name)) return "project-lifecycle";
       if ((name !== "stop" && name !== "resume" && name !== "cancel-reply" && name !== "configure") || typeof rawPayload !== "object" || rawPayload === null) return undefined;
       const agentId = (rawPayload as { readonly agentId?: unknown }).agentId;
       return typeof agentId === "string" ? agentId : undefined;
@@ -246,6 +259,21 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
         : Effect.acquireUseRelease(preemptStart(credential, name, rawPayload), () => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
         if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
         const step = isBlockingWait(name, rawPayload) ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : restore;
+        if (projectLifecycleCommand(name)) yield* step(Effect.gen(function* () {
+          const actor = yield* resolveCredential(credential, name);
+          const rpc = lists.commands.requests.get(name);
+          if (actor._tag !== "owner" || rpc === undefined || !lists.access[name]?.includes(actor._tag)) return yield* refused();
+          const payload = yield* Effect.try({ try: () => Schema.decodeUnknownSync(Schema.toType(rpc.payloadSchema))(rawPayload) as Record<string, unknown>, catch: () => refused() });
+          const { requestId, ...body } = payload;
+          if (typeof requestId !== "string" || (yield* log.redactText(requestId)) !== requestId) return yield* refused();
+          const bodyHash = sha256Hex(canonical({ command: name, payload: body }));
+          const receipts = yield* sql<{ body_hash: string }>`SELECT body_hash FROM receipts WHERE caller = 'owner' AND request_id = ${requestId}`;
+          if (receipts[0] !== undefined) {
+            if (receipts[0].body_hash !== bodyHash) return yield* refused("request id reused");
+            return;
+          }
+          yield* prepareProjectLifecycle({ runtime, actor, snapshot: yield* views.snapshot }, name, payload, bodyHash);
+        }));
         const outcome = yield* step(log.transact((append) => Effect.gen(function* () {
           // Invalid credentials never write an event or retrieve a receipt.
           const actor = yield* resolveCredential(credential, name);
@@ -302,7 +330,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
             if (!lists.access[name]?.includes(actor._tag)) return yield* refused();
             const plan = yield* lists.planners[name]!({ runtime, actor, snapshot }, payload);
             const namespace = pieceNamespace(name);
-            if (namespace !== undefined) {
+            if (namespace !== undefined && !projectLifecycleCommand(name)) {
               if (plan.afterCommit !== undefined) return yield* refused();
               const events = yield* checkPieceBatch(namespace, snapshot, plan, actor, lists);
               return { ...plan, events };
@@ -313,11 +341,11 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
             if (planned.failure._tag === "LogWriteFailed") return yield* planned.failure;
             const failure = planned.failure;
             yield* append(actor, requestId, bodyHash, [{ _tag: "CommandRefused", command: name, reason: failure.reason }], {},
-              failure.reason === "no usable account" ? false : undefined);
+              failure.reason === "no usable account" || projectLifecycleCommand(name) ? false : undefined);
             return { failure, afterCommit: undefined };
           }
           const plan = planned.success;
-          yield* append(actor, requestId, bodyHash, pieceNamespace(name) === undefined ? withWaitChecks(snapshot, plan.events, lists) : plan.events, plan.sideRows ?? {}, (batch) =>
+          yield* append(actor, requestId, bodyHash, (pieceNamespace(name) === undefined || projectLifecycleCommand(name)) ? withWaitChecks(snapshot, plan.events, lists) : plan.events, plan.sideRows ?? {}, (batch) =>
             plan.reply === undefined ? replyFor(snapshot, name, requestId, batch, settings).reply : plan.reply(batch));
           // Return precisely the redacted result that a later retry reads.
           const written = yield* sql<{ result_json: string }>`
@@ -338,6 +366,6 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
         Effect.catchTag("RequestIdReused", () => Effect.fail(refused("request id reused"))),
         Effect.catchTag("LogWriteFailed", (error) => Effect.fail(error instanceof InvalidEvent ? refused(error.reason) : error)),
         Effect.catchTag("SqlError", () => Effect.fail(new LogWriteFailed({ reason: "database read failed" }))),
-      ), (settle) => settle),
+      ), (settle) => settle).pipe((operation) => projectLifecycleCommand(name) ? engineOwned(operation) : operation),
     });
   }));

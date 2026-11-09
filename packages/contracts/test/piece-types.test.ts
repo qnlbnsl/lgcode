@@ -51,6 +51,10 @@ it("1.5/1.22 tables reject missing visibility and namespace entries, and a piece
       const make = <A,>(value: A) => importEffect.succeed(value);
       const validRegistration: Registered = { "client.fixture": () => make(valid) };
       const engineRegistration: Registered = { stop: () => make({ events: [], afterCommit: importEffect.void }) };
+      const projectLifecycleRegistration: Registered = { "project.create": () => make({ events: [], afterCommit: importEffect.void }) };
+      // @ts-expect-error Ordinary project commands remain piece planners.
+      const badProjectHook: Registered = { "project.goal.set": () => make({ events: [], afterCommit: importEffect.void }) };
+      void [projectLifecycleRegistration, badProjectHook];
       const missingReply = { events: [] };
       const widerHook = { events: [], reply: () => ({}), afterCommit: importEffect.void };
       const broad: Plan = { events: [], reply: () => ({}) };

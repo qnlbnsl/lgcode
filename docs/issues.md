@@ -235,7 +235,6 @@ payload logging is enabled only by its exact test flag after the real
 temporary-folder check. Malformed adapter frames still produce a fixed
 diagnostic.
 
-
 ## 14. Copied environment helpers default to the whole process environment
 
 Found: 2026-11-01, in the unit 2 security read.
@@ -710,7 +709,6 @@ What changed in unit 7a: the service enables write-ahead logging before
 opening the Effect SQLite layer and builds that layer with `readerWorker:
 true`.
 
-
 ## 40. The `events.caller` column comment does not match what the log stores
 
 Found: 2026-11-01, while writing the unit 4b tests.
@@ -746,7 +744,6 @@ subscription backlog reaches 2,048 events, checked every ten milliseconds. It
 also disconnects a stream whose chunk remains unacknowledged for five seconds,
 including a stalled replay on a quiet log. The transport never drops an event
 to keep a connection alive.
-
 
 ## 42. Invalid subscription cursors could silently skip catch-up
 
@@ -1327,7 +1324,6 @@ Why it matters: a parent waiting on a child whose start failed is not woken at o
 What should happen: unit 6a writes these follow-ups through `EventLog.transact` with the views snapshot and `withWaitChecks`, like the other runner events.
 What changed in fix round 1: `start.ts` and `resume.ts` now write these follow-ups through `EventLog.transact`, with the views snapshot and `withWaitChecks`, so a waiter on that agent is resolved in the same append as the failure.
 
-
 ## 79. Nine earlier tests assumed a delivery to an idle agent stays queued
 
 Found: 2026-11-01, while building unit 5d.
@@ -1711,6 +1707,24 @@ Why it matters: without the rule, only the folder rule, the permission ceiling
 and the approval routing guard the state folder and the settings files (rows
 61, 65 and 72). `SECURITY.md` lists these harnesses.
 
+## 105. The runner's classified pause reply cannot carry a usage reset time
+
+Found: 2026-11-01, while writing unit 6b's account tests.
+State: fixed in unit 6b (`resetAt` is optional on the pause outcome and is written to `AccountOutOfUsage` and the paused state); the classification producer stays with unit 6c.
+
+What happens: the `promptReply` pause outcome in
+`packages/engine/src/runner/Runner.ts` carries only `reason` and `error`.
+The account and lifecycle event contracts already carry `resetAt`, but no
+reset time can reach their writer through this runner event.
+What should happen: add optional `resetAt` in epoch milliseconds to the
+pause outcome, preserve it through validation, and record it in
+`AccountOutOfUsage` and the paused state. The account timer must use the
+logged deadline after restart. The fake runner's test-only outcome now
+accepts that field so the tests can specify the missing seam.
+Why it matters: decisions 28, 52 and 53 require the account to return at its
+reported wall-clock reset time, including when that time passed during
+downtime. Classification itself remains unit 6c's work.
+
 ## 110. The replay test for the cursor transcript expects success, which unit 6c changes
 
 Found: 2026-11-01, by the unit 6c test writer, while writing criterion 6.9.
@@ -1804,6 +1818,76 @@ What should happen: the builder follows the reading in the unit 6c result
 owner states otherwise. The unit 6c tests do not cover this case.
 Why it matters: a second notice to a blocked parent would be delivered after
 its wait call returns and repeat what the call already told it.
+
+## 115. A pause before the session opens is not handled
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: fixed in unit 6d for the return path (`recovery/restart.ts`).
+
+What happens: row 53 says a pause before the session opens keeps no session, and when it clears the engine opens the session and then sends the first prompt. The start path (`commands/start.ts`) writes the agent, spawns, and records the session in one flow. A provider limit reported before `SessionOpened` has no pause path, and no frozen test covers it.
+What should happen: a start that is paused before its session opens keeps no session reference, and the account return opens the session first and then sends the first prompt.
+Why it matters: without it, such an agent stays stopped instead of waiting for its account. The change needs the start path restructured, which is larger than unit 6b's scope.
+
+What changed in unit 6d: when an account returns, a paused agent that has
+no session is started, not loaded, and its first queued prompt is sent after
+the session opens. Frozen test A06 covers it after a restart. The start
+command's own handling of a sign-out while starting is unchanged.
+
+## 116. A crash between an "account available" commit and the return write leaves agents paused
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: fixed in unit 6d (`recovery/restart.ts`, step 8).
+
+What happens: the agents on an account return to idle in a second transaction, written by `accounts/available.ts` after it sees the committed `AccountAvailable`. If the service stops between the two commits, the account is available and its agents stay paused. Nothing re-runs the return at startup.
+What should happen: startup recovery runs the return once for every available account that still has paused agents. The return is idempotent, so a second run writes nothing.
+Why it matters: those agents would never resume without an owner `accounts mark-available` call, which the owner cannot know to make.
+
+What changed in unit 6d: restart step 8 reads the latest `AccountAvailable`
+cause of each available account and runs the return for every account that
+still has returnable paused agents. A paused agent whose process is gone is
+reloaded, or started if it had no session. A second run writes nothing.
+
+## 117. The timer and the persistent secret store are not wired into a running service
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: fixed in units 6d and 7a.
+
+What happens: `packages/engine/src/index.ts` exports nothing, so `startAccountTimers` (`accounts/timers.ts`) and the persistent secret store layer (`accounts/SecretStore.ts`) are called only from tests. The `AcpRunner` layer also now needs `FileSystem` and `Path` services for the Codex shadow home.
+What should happen: the assembly starts `startAccountTimers` inside the service scope, provides the persistent `SecretStore` layer over the state folder, and provides the Node file system and path services.
+Why it matters: without the timer an out-of-usage account returns only by owner action, against rows 28 and 53.
+
+What changed in unit 6d: `Restart.recover` starts `startAccountTimers` at
+restart step 8, inside the scope `recover` runs in. Unit 7a must not start
+the timers a second time. It must still provide the persistent `SecretStore`
+layer and the Node file system and path services.
+
+What changed in unit 7a: the service provides the persistent secret store, the
+Node platform services, and the redactor before constructing the runner and
+the restart layer. It calls `Restart.recover` once and lets recovery start the
+account timers.
+
+## 118. A classified pause drops the provider's error text
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: open; no change planned until the owner asks.
+
+What happens: the `promptReply` pause outcome carries an `error` string, but the pause path writes only the fixed reasons ("account needs sign-in", "account is out of usage, no reset time known") so that no provider text reaches the log, a view or a reply.
+What should happen: if a diagnostic is wanted, unit 6c classifies and redacts it before it is stored, and the owner decides where it is shown.
+Why it matters: an owner sees that an account is paused but not what the provider said, which makes odd limit messages harder to diagnose.
+
+## 119. Unreferenced secrets are never collected
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: fixed in unit 6d (`recovery/restart.ts`, `accounts/SecretStore.ts`).
+
+What happens: `accounts/SecretStore.ts` stores a value before the account event that references it commits. A failed commit, or a replaced secret, leaves a value in `secrets.json` that no account event refers to.
+What should happen: startup recovery lists the secret references still used in the account views and removes the others from `secrets.json`.
+Why it matters: an unused credential stays on disk (mode 0600) longer than the owner expects.
+
+What changed in unit 6d: during restart, recovery collects every account's
+secret reference and every `secret:` environment value, and calls the
+store's `retainOnly`. The persistent store rewrites `secrets.json` only when
+something is removed, under its write lock.
 
 ## 120. The leftover-process reader does not support macOS yet
 
@@ -1911,6 +1995,15 @@ queued before the watermark. It still rejects other runner calls and keeps
 the subject-event and open-request assertions. No builder edit to the test
 was made.
 
+## 125. Fix-round test F1 assumed a sign-out pauses only the agent that reports it
+
+Found: 2026-11-01, by engine-u6bb, running the full suite for unit 6b.
+State: fixed in unit 6b by engine-lead's ruling.
+
+What happens: `routing/fix-round-one.test.ts` F1 "inherited grandchild" paused a child with the reason `signed-out` and then expected its idle caller, on the same account, to still run `wait`. Rows 28 and 53, and the frozen 6b test T1, make a sign-out pause every agent on the account, so the caller was paused and its `wait` was refused.
+What should happen: the test pauses the child with `out-of-usage` and no reset time, which pauses only that child and keeps the intent of the test (a wait on a paused member).
+Why it matters: two frozen tests disagreed, and the suite could not pass until one changed.
+
 ## 126. A detached helper could prevent the adapter's crash from being recorded
 
 Found: 2026-11-01, in unit 6c's focused review, finding F-1.
@@ -2005,104 +2098,6 @@ form. The fake agent's `out_of_usage` step already supplies `data.resetsAt`,
 but no recorded fixture holds a reset time yet, as recorded in the brief.
 Why it matters: account recovery cannot schedule a usage reset from a
 classified pause that lost its reset time.
-
-## 105. The runner's classified pause reply cannot carry a usage reset time
-
-Found: 2026-11-01, while writing unit 6b's account tests.
-State: fixed in unit 6b (`resetAt` is optional on the pause outcome and is written to `AccountOutOfUsage` and the paused state); the classification producer stays with unit 6c.
-
-What happens: the `promptReply` pause outcome in
-`packages/engine/src/runner/Runner.ts` carries only `reason` and `error`.
-The account and lifecycle event contracts already carry `resetAt`, but no
-reset time can reach their writer through this runner event.
-What should happen: add optional `resetAt` in epoch milliseconds to the
-pause outcome, preserve it through validation, and record it in
-`AccountOutOfUsage` and the paused state. The account timer must use the
-logged deadline after restart. The fake runner's test-only outcome now
-accepts that field so the tests can specify the missing seam.
-Why it matters: decisions 28, 52 and 53 require the account to return at its
-reported wall-clock reset time, including when that time passed during
-downtime. Classification itself remains unit 6c's work.
-
-## 115. A pause before the session opens is not handled
-
-Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: fixed in unit 6d for the return path (`recovery/restart.ts`).
-
-What happens: row 53 says a pause before the session opens keeps no session, and when it clears the engine opens the session and then sends the first prompt. The start path (`commands/start.ts`) writes the agent, spawns, and records the session in one flow. A provider limit reported before `SessionOpened` has no pause path, and no frozen test covers it.
-What should happen: a start that is paused before its session opens keeps no session reference, and the account return opens the session first and then sends the first prompt.
-Why it matters: without it, such an agent stays stopped instead of waiting for its account. The change needs the start path restructured, which is larger than unit 6b's scope.
-
-What changed in unit 6d: when an account returns, a paused agent that has
-no session is started, not loaded, and its first queued prompt is sent after
-the session opens. Frozen test A06 covers it after a restart. The start
-command's own handling of a sign-out while starting is unchanged.
-
-## 116. A crash between an "account available" commit and the return write leaves agents paused
-
-Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: fixed in unit 6d (`recovery/restart.ts`, step 8).
-
-What happens: the agents on an account return to idle in a second transaction, written by `accounts/available.ts` after it sees the committed `AccountAvailable`. If the service stops between the two commits, the account is available and its agents stay paused. Nothing re-runs the return at startup.
-What should happen: startup recovery runs the return once for every available account that still has paused agents. The return is idempotent, so a second run writes nothing.
-Why it matters: those agents would never resume without an owner `accounts mark-available` call, which the owner cannot know to make.
-
-What changed in unit 6d: restart step 8 reads the latest `AccountAvailable`
-cause of each available account and runs the return for every account that
-still has returnable paused agents. A paused agent whose process is gone is
-reloaded, or started if it had no session. A second run writes nothing.
-
-## 117. The timer and the persistent secret store are not wired into a running service
-
-Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: fixed in units 6d and 7a.
-
-What happens: `packages/engine/src/index.ts` exports nothing, so `startAccountTimers` (`accounts/timers.ts`) and the persistent secret store layer (`accounts/SecretStore.ts`) are called only from tests. The `AcpRunner` layer also now needs `FileSystem` and `Path` services for the Codex shadow home.
-What should happen: the assembly starts `startAccountTimers` inside the service scope, provides the persistent `SecretStore` layer over the state folder, and provides the Node file system and path services.
-Why it matters: without the timer an out-of-usage account returns only by owner action, against rows 28 and 53.
-
-What changed in unit 6d: `Restart.recover` starts `startAccountTimers` at
-restart step 8, inside the scope `recover` runs in. Unit 7a must not start
-the timers a second time. It must still provide the persistent `SecretStore`
-layer and the Node file system and path services.
-
-What changed in unit 7a: the service provides the persistent secret store, the
-Node platform services, and the redactor before constructing the runner and
-the restart layer. It calls `Restart.recover` once and lets recovery start the
-account timers.
-
-
-## 118. A classified pause drops the provider's error text
-
-Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: open; no change planned until the owner asks.
-
-What happens: the `promptReply` pause outcome carries an `error` string, but the pause path writes only the fixed reasons ("account needs sign-in", "account is out of usage, no reset time known") so that no provider text reaches the log, a view or a reply.
-What should happen: if a diagnostic is wanted, unit 6c classifies and redacts it before it is stored, and the owner decides where it is shown.
-Why it matters: an owner sees that an account is paused but not what the provider said, which makes odd limit messages harder to diagnose.
-
-## 119. Unreferenced secrets are never collected
-
-Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: fixed in unit 6d (`recovery/restart.ts`, `accounts/SecretStore.ts`).
-
-What happens: `accounts/SecretStore.ts` stores a value before the account event that references it commits. A failed commit, or a replaced secret, leaves a value in `secrets.json` that no account event refers to.
-What should happen: startup recovery lists the secret references still used in the account views and removes the others from `secrets.json`.
-Why it matters: an unused credential stays on disk (mode 0600) longer than the owner expects.
-
-What changed in unit 6d: during restart, recovery collects every account's
-secret reference and every `secret:` environment value, and calls the
-store's `retainOnly`. The persistent store rewrites `secrets.json` only when
-something is removed, under its write lock.
-
-## 125. Fix-round test F1 assumed a sign-out pauses only the agent that reports it
-
-Found: 2026-11-01, by engine-u6bb, running the full suite for unit 6b.
-State: fixed in unit 6b by engine-lead's ruling.
-
-What happens: `routing/fix-round-one.test.ts` F1 "inherited grandchild" paused a child with the reason `signed-out` and then expected its idle caller, on the same account, to still run `wait`. Rows 28 and 53, and the frozen 6b test T1, make a sign-out pause every agent on the account, so the caller was paused and its `wait` was refused.
-What should happen: the test pauses the child with `out-of-usage` and no reset time, which pauses only that child and keeps the intent of the test (a wait on a paused member).
-Why it matters: two frozen tests disagreed, and the suite could not pass until one changed.
 
 ## 131. A carry-on delivery was returned as failed instead of reaching the agent
 
@@ -2247,7 +2242,6 @@ identifier, start time, user identifier, and executable immediately after
 spawning. The service removes records of dead or replaced identities after
 recovery has swept them. Live identities remain available to the ancestry
 guard. The unsupported macOS reader remains issue 120.
-
 
 ## 154. The replay scan waits a fixed number of yields for the handler
 
@@ -2403,7 +2397,6 @@ What changed in unit 7a: adapter spawns record their process identity in the
 operational table before speaking the Agent Client Protocol. The upgrade guard
 verifies that each row still matches a live process before comparing the
 caller's claimed ancestry and group.
-
 
 ## 166. Frozen service fixtures did not reach the behaviours they asserted
 
@@ -5111,7 +5104,6 @@ The re-review labels the finding MAJOR.
 Why it matters: a matching login-folder configuration can fail after
 persisting its secret and leave later account commands refused.
 
-
 ## 270. Every terminal chunk persisted another whole retained snapshot
 
 Found: 2026-11-03, in the focused review of issue 242, finding B.
@@ -5177,7 +5169,6 @@ starvation cases and the unpublished-status flush.
 The logger regression in `terminal-lifecycle-round-7.test.ts` verifies one
 warning in each of two overflowing turns and checks that it contains no
 output text.
-
 
 ## 272. Codex's ask mode can refuse a write without requesting permission
 
@@ -6397,7 +6388,6 @@ token while durable retries continue. Regression tests exercise the writer,
 read, public schema, rebuild, restart, recovery, generation changes, clear,
 page rendering and command-line output. No live carrier or phone was used.
 
-
 ## 384. An integrated alert test still expects the earlier delivery projection
 
 Found: 2026-11-04, by the full merge check combining foundation review repairs FR-013 and FR-017.
@@ -6439,7 +6429,6 @@ activity and refuses a continuation after the lead loses management rights.
 
 Why it matters: A long worker history must remain recoverable without widening
 sequence ranges across unrelated events or refusing the summary.
-
 
 ## 386. The board-alert browser test uses an ambiguous reply locator
 
@@ -6684,7 +6673,6 @@ Validation: The cache tests failed first with missing action records. Temporary
 mutations test the shortened crash window, an ignored crash, and duplicate
 logical effects. No live harness recordings or owner phone are required for
 these local deterministic regressions.
-
 
 ## 401. Recovery completion used identities superseded by other foundation repairs
 
@@ -7117,7 +7105,6 @@ notifications.
 Blocked notifications and failed or truncated snapshot sections retain
 their existing behavior.
 
-
 ## 427. An idle reload suppresses a completed board response
 
 Found: 2026-11-05, while extending the recovery checkpoints for FR-112.
@@ -7291,7 +7278,6 @@ What happened: The source crash fixture had no active client follower. The basel
 What changed: A child now parks the real follower after it reads the source envelope and before appending its reaction. A second child parks after all baseline rows are staged on the transaction's writer connection and before commit. The parent kills each child with the SIGKILL signal.
 
 Validation: The parent verifies the durable source and absent reaction, or complete absence of baseline rows after rollback. Two reopens require one recovered alert or one complete baseline, stable alert identifiers, and progress on later sources. Temporary lost-source and split-baseline faults are rejected. The handled-write-failure and recovery-gate scenarios remain.
-
 
 ## 440. Two new alert regressions selected different baseline threads
 
@@ -8456,7 +8442,6 @@ Why it matters: Context, authority, and recovery behavior must stay
 consistent across navigation. Durable browser regressions cover these
 cases, and cold browser probes rechecked all six fixes.
 
-
 ## 507. Responsive resizing erased unsaved settings in the mock
 
 Found: 2026-11-06, while running the operational regressions.
@@ -8468,7 +8453,6 @@ What changed: The lead-panel breakpoint redraws only the board. Other views
 use their responsive styles without rebuilding their inputs.
 Why it matters: Changing window size must preserve unsaved workspace and
 service settings. A browser regression reproduces the original failure.
-
 
 ## 508. Repeated prototype disclaimers cluttered the working interface
 
@@ -8482,7 +8466,6 @@ accessible labels, save confirmations, and generated replies were cleaned up.
 Prototype boundaries remain in the design documentation.
 Why it matters: The owner is evaluating the app’s interaction and layout.
 Repeated reminders distract from the work being represented.
-
 
 ## 509. The workspace layout and navigation need a consistent scope model
 
@@ -8738,6 +8721,17 @@ State: worked around for now. The cause remains.
 
 The manager removed the `node_modules` folders from the 31 finished adjudicator seats, which brought the folder down to 56 percent of its file limit. The folders of the other finished seats remain. The Foundry should give seats a shared read-only copy, or remove a seat's temporary folder when the seat retires. The main disk is also at 96 percent.
 
+## 522. Building the mock's first run exposed two faults in it
+
+Found: 2026-11-07, while adding a first run to the mock on the branch `area/web-mock`.
+State: both are fixed on that branch.
+
+- The page could not start with no projects, because it read the first project while it loaded.
+  A real service starts with none, so the mock had no way to show its first minutes.
+- A new project's lead always ran on Claude Code, and the New project form offered no choice. A
+  person signed in only to Codex would have got a lead on an account that does not work. The form
+  now offers the signed-in harnesses, and it hides the choice when there is one.
+
 ## 523. The LGcode rename does not migrate existing state or environment variables
 
 Found: 2026-11-08, while renaming Sheprd to LGcode.
@@ -8760,17 +8754,6 @@ State: open.
 
 In the first `pnpm live-check` run on the rename branch, the `sandbox-mcp` step failed with "codex: not attempted; exact ask tool calls=0". The Codex agent, GPT-6 Luna at low effort, made no call to the `lgcode` ask tool, so the probe had nothing to judge. The Claude agent's call succeeded in the same run. A second run passed the step for both agents, with the same code, so the failure depends on whether the model chooses to call the tool. The step should give the agent a second prompt, or run on a model that follows the instruction reliably, before it reports a failure.
 
-## 522. Building the mock's first run exposed two faults in it
-
-Found: 2026-11-07, while adding a first run to the mock on the branch `area/web-mock`.
-State: both are fixed on that branch.
-
-- The page could not start with no projects, because it read the first project while it loaded.
-  A real service starts with none, so the mock had no way to show its first minutes.
-- A new project's lead always ran on Claude Code, and the New project form offered no choice. A
-  person signed in only to Codex would have got a lead on an account that does not work. The form
-  now offers the signed-in harnesses, and it hides the choice when there is one.
-
 ## 525. OpenPencil's command-line tool guesses the width of Inter Medium and SemiBold text
 
 Found: 2026-11-08, while building the Reverse Fig skill on the branch `area/reverse-fig`.
@@ -8783,7 +8766,6 @@ State: worked around in the skill; the cause is in OpenPencil 0.16.0, not in LGc
   nodes ask for "Semi Bold".
 - The skill gives each label the size the browser measured, plus one pixel. It should drop that
   step once OpenPencil measures every bundled weight, and someone could report the fault upstream.
-
 
 ## 526. A live check inside the Codex seat gave a misleading build baseline
 
@@ -9139,6 +9121,59 @@ The existing recovery and initial invalid-choice assertions remain intact.
 All four model and effort retry cases were reproduced red with the original production files restored temporarily.
 The independent verifier's original files and logs remain unchanged.
 
+## 538. New project could not recover repository, worktree, and lead creation
+
+Found: 2026-11-08, while implementing the real New project journey.
+State: corrected in the W04B implementation; independent review remains required.
+
+The temporary public command recorded an existing lead and checkout.
+It could not own or recover the filesystem and process effects required by New project.
+A Git operation can succeed before the final project record is written.
+Caller cancellation can also arrive after the lead and receipt commit, before launch starts.
+Returning an error proves neither rollback nor the absence of a process.
+
+Creation now persists one bounded intent before creating a repository or worktree.
+The intent fixes the request hash, project identity, paths, branch, and selected defaults.
+There are at most 64 unfinished creation intents.
+A filesystem witness bridges directory creation and its durable device and inode claim.
+Git runs only after that claim commits.
+Recovery verifies the claimed directory and the actual repository and branch.
+It never adopts an unrelated empty directory or a replaced claimed directory.
+Only the exact owned witness file is removed after its claim commits.
+Other paths and existing Git exclusion entries are never removed.
+The owner can inspect unfinished operations through the bounded `project.creations` read.
+Retrying the original request completes the same operation.
+A changed body under that request identity is refused.
+The final append records the project, lead, and ordinary receipt together.
+Normal engine restart recovery restarts that recorded lead identity when needed.
+
+Project creation and archive orchestration belong to the engine's lifetime scope.
+Disconnecting a caller cannot strand a committed lead before its start hook runs.
+The writer's transaction commits the receipt before publication, which cannot fail.
+A typed database write failure latches the writer until service recovery.
+The receipt decode and reply read happen inside the transaction before its commit.
+A test-only failure injected outside a successful transaction therefore represents a
+lost service result, rather than a production typed failure that allows more writes.
+A same-service cancellation probe gates the actual committed result before launch.
+After cancelling that caller, the engine launches the same lead exactly once.
+A retry returns the original project without another worktree or lead.
+A later session-recording failure stops the actual controlled adapter process.
+Its recorded project remains visible for ordinary service recovery.
+
+Archive records its in-progress state before stopping every project member.
+That state prevents child starts and resumes while stops are being confirmed.
+A failed stop leaves the archive unfinished and retryable.
+Only confirmed stops permit the archived timestamp to commit.
+Questions remain open, and permissions follow the ordinary stop cancellation rules.
+Restore preserves the setup and lead identity without starting another process.
+
+The local filesystem race limitation in issue 49 still applies.
+An interruption between mkdir and its witness write leaves an ambiguous planned path.
+That path stays visible in the recovery read and requires owner inspection.
+Recovery refuses it without deleting or adopting it.
+Partial Git metadata that cannot be verified also requires owner inspection.
+There is no automatic destructive cleanup or cross-process atomic filesystem claim.
+
 ## 539. Redacting conflict protocol values could invalidate Git replies
 
 Found: 2026-11-08, while wiring the public Git commands.
@@ -9168,7 +9203,6 @@ calls can overlap after a workspace-setting change.
 Restoring the gate prevents that overlap without changing Git service signatures.
 The focused checks, complete-check result, and exact source identity are recorded
 in the worker result when the assigned check actually finishes.
-
 
 ## 540. The reservation cancellation test could cancel before its fake peer started the turn
 
@@ -9231,3 +9265,47 @@ The fixture now expects seventeen top-level planners.
 Its exact public command equality, disjoint handler ownership, read inventory, and access assertions remain unchanged.
 No production command, authorization rule, timeout, or assertion was removed.
 The corrected candidate requires a new signed pin and complete verification.
+
+## 542. Project creation admitted credentials for another provider
+
+The independent public-command probe configured an executable Claude adapter.
+Its account had no Claude login and held only an OpenAI application programming interface key.
+A separate Cursor account had its own supported key.
+Project creation selected Claude because the lead readiness check accepted any account variable ending in `API_KEY` or `AUTH_TOKEN`.
+The same check treated arbitrary redaction leaves from login files as authentication evidence.
+Those leaves intentionally include unfamiliar metadata strings to prevent credential disclosure.
+They do not establish a provider login.
+
+The correction uses the established per-harness key mapping and the effective spawn environment.
+It recognizes only provider credential fields in the existing bounded login-file reader.
+The reader still registers all its original redaction leaves and refuses unreadable stores.
+Codex shadow homes, account homes, secret resolution, and private client-secret exclusion remain in place.
+Unknown custom harness variables cannot establish local readiness.
+These checks establish local credential presence, not successful remote authentication or provider usage.
+
+Permanent public-command tests exercise the original wrong-provider failure and ready-Cursor control.
+They prove supported provider keys, resolved account secrets, file-backed account selection, effective homes, and private Codex logins.
+They also prove refusal of unavailable named accounts, arbitrary login metadata, unknown custom harness variables, and inherited keys excluded from the child environment.
+The existing lifecycle tests use a supported Cursor fixture while preserving their assertions.
+The independent original probe and its failure and control artifacts remain unchanged.
+
+## 543. Project creation admitted a searchable directory as an adapter
+
+The independent public-command probe configured a Claude adapter path that was a directory.
+The Claude account had its own supported credential, and a later Cursor adapter was usable.
+The local readiness check tested only executable access.
+That check also succeeds for a searchable directory, so project creation selected the unusable Claude adapter.
+The real executable control correctly selected Claude in the normal order.
+
+The project-local correction requires a regular file before checking executable access.
+The file check follows symbolic links, preserving legitimate linked executable adapters.
+Missing, inaccessible, non-executable, and non-file candidates remain unavailable.
+The normal runner and public harness settings policy are unchanged.
+Local readiness still does not promise successful remote provider authentication.
+
+Permanent public-command regressions reach the real project planner and writer in isolated repositories and homes.
+They prove directory fallback, normal executable order, and linked executable admission.
+They also prove refusal of non-executable files, missing paths, linked directories, and dangling links.
+Saved unavailable account and harness choices refuse before recording a creation intent or lead.
+All existing provider credential cases and lifecycle assertions remain intact.
+The independent original directory and executable artifacts remain unchanged.

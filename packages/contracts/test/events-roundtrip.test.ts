@@ -89,6 +89,7 @@ const expectedRolesTags = [
   "roles.RoleAdviceBroken", "roles.CacheFlushed", "roles.CompactRequested", "roles.StallEnded"
 ]
 const expectedProjectTags = [
+  "project.CreationPlanned", "project.CreationClaimed", "project.CreationFinished", "project.GoalChanged", "project.ArchiveStarted", "project.Archived", "project.Restored",
   "project.SettingsChanged", "project.RepositoryAdded", "project.RepositoryLocated", "project.WorktreeCreated",
   "project.Created", "project.Placed", "project.PreferencesChanged", "project.Renamed", "project.StageChanged", "project.TeamAdded",
   "project.SprintAdded", "project.SprintChanged", "project.SprintCompleted", "project.TaskAdded", "project.TaskChanged", "project.TaskNoted"

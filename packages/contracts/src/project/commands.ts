@@ -3,7 +3,7 @@ import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
 import type { CallerKind } from "../commands.ts"
 import { AgentId, EventSequence, RequestId } from "../ids.ts"
-import { Project, ProjectId, ProjectName, ProjectSettings, ProjectStage, ProjectText, Repository, RepositoryLocation, Sprint, SprintId, Task, TaskHistoryEntry, TaskId, Team, Workspace } from "./schema.ts"
+import { Project, ProjectCreation, ProjectId, ProjectName, ProjectSettings, ProjectStage, ProjectText, Repository, RepositoryLocation, Sprint, SprintId, Task, TaskHistoryEntry, TaskId, Team, Workspace } from "./schema.ts"
 
 import { ProjectGitRpcGroup, projectGitAccess } from "./git.ts"
 
@@ -13,7 +13,6 @@ const Ack = Schema.Struct(request)
 const paging = { after: Schema.optionalKey(Schema.NonEmptyString), limit: Schema.optionalKey(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(200))) }
 const page = <S extends Schema.Constraint>(item: S) => Schema.Struct({ ...request, items: Schema.Array(item), next: Schema.optionalKey(Schema.NonEmptyString) })
 const project = { ...request, projectId: ProjectId }
-const { projectId: _p, archivedAt: _archivedAt, ...create } = Project.fields
 const { projectId: _tp, teamId: _t, channelId: _c, group: _g, ...team } = Team.fields
 const { projectId: _sp, sprintId: _s, completion: _co, evidence: _e, completedAt: _a, ...sprint } = Sprint.fields
 const { projectId: _kp, taskId: _k, ...task } = Task.fields
@@ -38,7 +37,13 @@ export const ProjectRpcGroup = RpcGroup.make(
     path: Workspace.fields.path, checkout: Schema.Literals(["main", "worktree"]), parentId: Schema.optionalKey(Workspace.fields.worktreeId) },
     success: Schema.Struct({ ...request, worktreeId: Workspace.fields.worktreeId }), error: Refused }),
   Rpc.make("workspaces", { payload: { ...request, ...paging, repoId: Schema.optionalKey(Repository.fields.repoId) }, success: page(Workspace), error: Refused }),
-  Rpc.make("create", { payload: { ...request, ...create }, success: Schema.Struct({ ...request, projectId: ProjectId }), error: Refused }),
+  Rpc.make("create", { payload: { ...request, name: ProjectName, goal: ProjectText, machineId: ProjectName,
+    repository: Schema.Union([Schema.TaggedStruct("existing", { repoId: Repository.fields.repoId }), Schema.TaggedStruct("new", { name: ProjectName })]),
+    useWorktree: Schema.optionalKey(Schema.Boolean) }, success: Schema.Struct({ ...request, projectId: ProjectId }), error: Refused }),
+  Rpc.make("creations", { payload: { ...request, ...paging }, success: page(ProjectCreation), error: Refused }),
+  Rpc.make("goal.set", { payload: { ...project, goal: ProjectText }, success: Ack, error: Refused }),
+  Rpc.make("archive", { payload: project, success: Ack, error: Refused }),
+  Rpc.make("restore", { payload: project, success: Ack, error: Refused }),
   Rpc.make("rename", { payload: { ...project, name: ProjectName }, success: Ack, error: Refused }),
   Rpc.make("place", { payload: { ...project, worktreeId: Workspace.fields.worktreeId }, success: Ack, error: Refused }),
   Rpc.make("preferences.set", { payload: { ...project, shell: ProjectName }, success: Ack, error: Refused }),
@@ -63,6 +68,7 @@ export const projectAccess = {
   "project.settings": owner, "project.settings.set": owner, "project.repository.add": owner, "project.repository.locate": owner,
   "project.repositories": owner, "project.workspace.register": owner, "project.workspaces": owner, "project.create": owner,
   "project.rename": owner, "project.place": owner, "project.preferences.set": owner,
+  "project.creations": owner, "project.goal.set": owner, "project.archive": owner, "project.restore": owner,
   "project.stage.set": member, "project.read": member, "project.team.create": member,
   "project.sprint.create": member, "project.sprint.update": member, "project.sprint.complete": member,
   "project.task.create": member, "project.task.update": member, "project.task.note": member, "project.task.history": member

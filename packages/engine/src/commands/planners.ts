@@ -21,6 +21,7 @@ import { setWebSettings } from "../client/settings.ts";
 import { setRoleFile } from "../roles/roleFile.ts";
 import { setSettings, snooze } from "../roles/sheepdog/settings.ts";
 import { record } from "../roles/sheepdog/record.ts";
+import { archiveProject, createProject } from "../project/lifecycle.ts";
 
 const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan: Planner): Planner => (input, payload) => Effect.gen(function* () {
   const { actor, snapshot } = input;
@@ -34,6 +35,8 @@ const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan
   return yield* plan(input, payload);
 });
 export const planners = {
+  "project.create": createProject,
+  "project.archive": archiveProject,
   "client.web.settings.set": setWebSettings,
   "roles.role-file.set": (input, payload) => setRoleFile(input, payload as Payload<"roles.role-file.set">),
   // Their implementation units replace these refusals; each declared command

@@ -8,7 +8,7 @@ import * as Schema from "effect/Schema"
 import * as Redacted from "effect/Redacted"
 import * as SqlClient from "effect/sql/SqlClient"
 import { afterEach, beforeEach, expect, vi } from "vitest"
-import { ClientSnapshot, CommandsRpcGroup, Event, ProjectSnapshot, projectEventTags, sprintStatus } from "@lgcode/contracts"
+import { ClientSnapshot, CommandsRpcGroup, Event, ProjectId, ProjectSnapshot, projectEventTags, sprintStatus } from "@lgcode/contracts"
 import { EventLog } from "../../src/log/EventLog.ts"
 import { engineLists } from "../../src/pieces/lists.ts"
 import * as Server from "../../src/api/server.ts"
@@ -19,7 +19,7 @@ import { snapshotFor } from "../../src/project/snapshot.ts"
 import { channelMembers } from "../../src/board/access.ts"
 import { provideBoard } from "../board/wakeFixtures.ts"
 import { registerRebuildCheck } from "../support/rebuildCheck.ts"
-import { agentCredential, call, failureOf, seedAccount, seedAgent, seedHarness, success, ownerCredential as owner, makeRig, removeRig, freshRequest, type Rig } from "../support/handlerRig.ts"
+import { appendSetup, eventOf, harnessSettings, agentCredential, call, failureOf, seedAccount, seedAgent, seedHarness, success, ownerCredential as owner, makeRig, removeRig, freshRequest, type Rig } from "../support/handlerRig.ts"
 
 let rig: Rig
 const git = (folder: string, ...args: string[]) => execFileSync("git", ["-C", folder, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
@@ -41,7 +41,17 @@ it.live("roundtrips every project event and receipt identity while keeping works
   const ownerId = `worker-${marker}`
   const needs = [`dependency-${marker}`]
   const events = (text: string) => [
-    { _tag: "project.SettingsChanged", settings: { workspaceFolder: text, shell: text } },
+    { _tag: "project.SettingsChanged", settings: { workspaceFolder: text, shell: text,
+      lead: { harness: `harness-${marker}`, account: { _tag: "named", accountId: `account-${marker}` }, permission: "ask", model: text, effort: text } } },
+    { _tag: "project.CreationPlanned", creation: { requestId: `creation-${marker}`, bodyHash: `hash-${marker}`, projectId,
+      repository: { repoId, name: text, path: text }, workspace: { worktreeId, repoId, machineId: text, branch: text, path: text },
+      workspaceFolder: text, newRepository: false, name: text, goal: text, shell: text, leadName: text,
+      lead: { harness: `harness-${marker}`, account: { _tag: "named", accountId: `account-${marker}` }, permission: "ask", model: text },
+      repositoryIdentity: { device: `device-${marker}`, inode: `inode-${marker}` } } },
+    { _tag: "project.CreationClaimed", creationRequestId: `creation-${marker}`, kind: "folder", identity: { device: `device-${marker}`, inode: `inode-${marker}` } },
+    { _tag: "project.CreationFinished", creationRequestId: `creation-${marker}` },
+    { _tag: "project.GoalChanged", projectId, goal: text },
+    { _tag: "project.ArchiveStarted", projectId }, { _tag: "project.Archived", projectId }, { _tag: "project.Restored", projectId },
     { _tag: "project.RepositoryAdded", repoId, name: text, path: text },
     { _tag: "project.RepositoryLocated", repoId, machineId: text, path: text },
     { _tag: "project.WorktreeCreated", worktreeId, repoId, machineId: text, branch: text, path: text, projectId, teamId, parentId, owner: text, activity: text },
@@ -79,6 +89,19 @@ it.live("roundtrips every project event and receipt identity while keeping works
   // A repeated receipt must replay the original identities and envelope times.
   expect(yield* log.append({ _tag: "owner" }, requestId, "a".repeat(64), input, {}, () => reply)).toEqual(batch)
 }), ["collision-marker"]).pipe(Effect.orDie))
+const historicProject = (fields: Record<string, unknown>, requestId = freshRequest()) => Effect.gen(function* () {
+  const log = yield* EventLog
+  const projectId = Schema.decodeUnknownSync(ProjectId)(`project-${requestId}`)
+  const event = eventOf({ _tag: "project.Created", ...fields, projectId })
+  yield* log.append({ _tag: "owner" }, requestId, "b".repeat(64), [event], {}, () => ({ requestId, projectId }))
+  return { requestId, projectId }
+})
+const launchSettings = () => Effect.gen(function* () {
+  yield* seedAccount("launch", "cursor")
+  success(yield* call(owner, "harnesses", { operation: "set", harness: harnessSettings("cursor", { adapterPath: process.execPath, reportedModes: [{ id: "default", level: "ask" }] }) }))
+  success(yield* call(owner, "accounts set-secret", { accountId: "launch", name: "CURSOR_API_KEY", nonce: "project-test", value: Redacted.make("synthetic-project-test-key") }))
+  success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "zsh" } }))
+})
 const foundation = () => Effect.gen(function* () {
   yield* registerRebuildCheck(); yield* seedAccount(); yield* seedHarness()
   const lead = agentCredential((yield* seedAgent({ id: "lead", folder: rig.work })).token)
@@ -88,7 +111,7 @@ const foundation = () => Effect.gen(function* () {
   success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "zsh" } }))
   const repoId = success(yield* call(owner, "project.repository.add", { name: "Product", path: rig.work, machineId: "local" })).repoId
   const worktreeId = success(yield* call(owner, "project.workspace.register", { repoId, machineId: "local", branch: "main", path: rig.work, checkout: "main" })).worktreeId
-  const projectId = success(yield* call(owner, "project.create", { name: "Console", goal: "Make work visible", leadAgentId: "lead", repoId, worktreeId, machineId: "local" })).projectId
+  const projectId = (yield* historicProject({ name: "Console", goal: "Make work visible", leadAgentId: "lead", repoId, worktreeId, machineId: "local" })).projectId
   const team = success(yield* call(lead, "project.team.create", { projectId, name: "Build", worktreeId, stage: "build" }))
   success(yield* call(lead, "group", { agentId: "worker", add: [team.group], remove: [] }))
   success(yield* call(lead, "group", { agentId: "sibling", add: [team.group], remove: [] }))
@@ -136,11 +159,12 @@ it.live("uses real handlers for ownership, project inheritance, team groups, and
 
 it.live("refuses duplicate project names and invalid repository, workspace, sprint, and task links", () => provideBoard(rig, Effect.gen(function* () {
   const f = yield* foundation()
-  const create = { name: "CONSOLE", goal: "", repoId: f.repoId, worktreeId: f.worktreeId, machineId: "local", leadAgentId: "stranger" }
+  yield* launchSettings()
+  const create = { name: "CONSOLE", goal: "", repository: { _tag: "existing", repoId: f.repoId }, machineId: "local", useWorktree: false }
   expect(failureOf(yield* call(owner, "project.create", create))?.reason).toContain("name already exists")
-  expect(failureOf(yield* call(owner, "project.create", { ...create, name: "Other", repoId: "missing" }))).toBeDefined()
+  expect(failureOf(yield* call(owner, "project.create", { ...create, name: "Other", repository: { _tag: "existing", repoId: "missing" } }))).toBeDefined()
   expect(failureOf(yield* call(owner, "project.create", { ...create, name: "Other", machineId: "missing" }))).toBeDefined()
-  expect(failureOf(yield* call(owner, "project.create", { ...create, name: "Other", leadAgentId: "worker" }))).toBeDefined()
+  expect(failureOf(yield* call(owner, "project.create", { name: "Other", goal: "", repoId: f.repoId, worktreeId: f.worktreeId, leadAgentId: "worker", machineId: "local" }))).toBeDefined()
   expect(failureOf(yield* call(owner, "project.repository.add", { name: "Subfolder", path: rig.home, machineId: "local" }))).toBeDefined()
   expect(failureOf(yield* call(owner, "project.repository.add", { name: "Wrong machine", path: rig.work, machineId: "worker-machine" }))).toBeDefined()
   expect(failureOf(yield* call(owner, "project.workspace.register", { repoId: f.repoId, machineId: "local", path: rig.work, branch: "invented", checkout: "main" }))).toBeDefined()
@@ -155,7 +179,7 @@ it.live("refuses duplicate project names and invalid repository, workspace, spri
   expect(failureOf(yield* call(owner, "project.repository.locate", { repoId: f.repoId, machineId: "local", path: otherPath }))).toBeDefined()
   expect(failureOf(yield* call(f.lead, "project.team.create", { projectId: f.projectId, name: "Wrong", worktreeId: otherWorkspace }))).toBeDefined()
   yield* seedAgent({ id: "other-lead", folder: otherPath })
-  const otherProject = success(yield* call(owner, "project.create", { ...create, repoId: otherRepo, worktreeId: otherWorkspace, leadAgentId: "other-lead" })).projectId
+  const otherProject = success(yield* call(owner, "project.create", { ...create, repository: { _tag: "existing", repoId: otherRepo } })).projectId
   expect(otherProject).not.toBe(f.projectId)
   expect(snapshotFor({ _tag: "agent", agentId: "worker" as never }, yield* snapshot)?.projects.map((row) => row.projectId)).toEqual([f.projectId])
   expect(snapshotFor({ _tag: "agent", agentId: "stranger" as never }, yield* snapshot)?.projects).toEqual([])
@@ -211,9 +235,8 @@ it.live("serves project commands through the authenticated typed client API with
   yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false })
   expect((yield* Effect.promise(() => upgradeStatus(socket, ancestryHeaders()))).status).toBe(401)
   const api = yield* connect(socket, bearer)
-  yield* seedAgent({ id: "wire-lead", folder: rig.work })
-  const payload = { requestId: freshRequest(), name: "Wire project", goal: "A real API record", repoId: f.repoId,
-    worktreeId: f.worktreeId, leadAgentId: "wire-lead" as never, machineId: "local" }
+  yield* launchSettings()
+  const payload = { requestId: freshRequest(), name: "Wire project", goal: "A real API record", repository: { _tag: "existing" as const, repoId: f.repoId }, useWorktree: false, machineId: "local" }
   const created = yield* api["project.create"](payload)
   const invalidCursor = yield* api["project.read"]({ requestId: freshRequest(), projectId: created.projectId, collection: "projects", after: "missing" }).pipe(Effect.result)
   expect(invalidCursor._tag === "Failure" && invalidCursor.failure.reason).toBe("invalid cursor")
@@ -276,9 +299,9 @@ it.live("keeps a colliding validated lead and task owner through the production 
   const worktreeId = success(yield* call(owner, "project.workspace.register", { repoId, machineId: "local", branch: "main", path: rig.work, checkout: "main" })).worktreeId
   const requestId = freshRequest()
   const payload = { requestId, name: "Collision", goal: "Hide collision-marker here", leadAgentId: leadId, repoId, worktreeId, machineId: "local" }
-  const created = success(yield* call(owner, "project.create", payload))
+  const created = yield* historicProject(payload, requestId)
   const projectId = created.projectId
-  expect(success(yield* call(owner, "project.create", payload))).toEqual(created)
+  expect(yield* historicProject(payload, requestId)).toEqual(created)
   expect(projectView(yield* snapshot).projects[projectId]).toMatchObject({ projectId, repoId, worktreeId, leadAgentId: leadId, goal: "Hide [REDACTED] here" })
   expect(projectView(yield* snapshot).agentProjects).toMatchObject({ [leadId]: projectId, [workerId]: projectId })
   expect(success(yield* call(lead, "project.read", { projectId, collection: "projects" })).data).toContain(leadId)

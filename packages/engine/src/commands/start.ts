@@ -13,6 +13,7 @@ import { agentText, senderOf } from "../routing/envelope.ts";
 import { bounded, SETUP_TIMEOUT_MILLIS } from "../recovery/reload.ts";
 import { withLane, withPreemption } from "../routing/lanes.ts";
 import { withWaitChecks } from "../routing/waits.ts";
+import { own, projectView } from "../project/view.ts";
 import { freshRequest, readHarnesses, refused, type Input, type Payload, type Plan } from "./internal.ts";
 import { validChoiceId } from "../runner/choices.ts";
 
@@ -21,6 +22,11 @@ export const start = (input: Input, payload: Payload<"start">): Effect.Effect<Pl
     const { runtime, actor, snapshot } = input;
     if (actor._tag !== "owner" && actor._tag !== "agent") return yield* refused();
     const parent = actor._tag === "agent" ? snapshot.agents[actor.agentId] : undefined;
+    if (parent !== undefined) {
+      const view = projectView(snapshot), id = own(view.agentProjects, parent.agentId);
+      const project = id === undefined ? undefined : own(view.projects, id);
+      if (project?.archiving || project?.archivedAt !== undefined) return yield* refused("project is archived or archiving");
+    }
     if (actor._tag === "agent" && (parent === undefined || !canUseMode(actor, Schema.decodeUnknownSync(PermissionLevel)(parent.permission), payload.permission))) {
       return yield* refused();
     }

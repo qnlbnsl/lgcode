@@ -30,6 +30,17 @@ const sprint = { projectId: identity, sprintId: identity, owner: identity, needs
 const task = { projectId: identity, taskId: identity, owner: identity, teamId: identity, sprintId: identity, worktreeId: identity };
 
 export const eventStructure: RedactionStructure = { taggedFields: {
+  "project.SettingsChanged": { settings: { fields: { lead: { fields: { harness: identity, account: { fields: { accountId: identity } } } } } } },
+  "project.CreationPlanned": { creation: { fields: { requestId: identity, projectId: identity,
+    bodyHash: identity, repository: { fields: { repoId: identity } }, workspace: { fields: workspace },
+    lead: { fields: { harness: identity, account: { fields: { accountId: identity } } } },
+    repositoryIdentity: { fields: { device: identity, inode: identity } }, folderIdentity: { fields: { device: identity, inode: identity } } } } },
+  "project.CreationClaimed": { creationRequestId: identity, identity: { fields: { device: identity, inode: identity } } },
+  "project.CreationFinished": { creationRequestId: identity },
+  "project.GoalChanged": { projectId: identity },
+  "project.ArchiveStarted": { projectId: identity },
+  "project.Archived": { projectId: identity },
+  "project.Restored": { projectId: identity },
   "project.RepositoryAdded": { repoId: identity },
   "project.RepositoryLocated": { repoId: identity },
   "project.WorktreeCreated": workspace,

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto"
 import { realpath, stat } from "node:fs/promises"
 import { isAbsolute } from "node:path"
-import { ProjectName, RepositoryId, WorkspaceId, ProjectId, TeamId, SprintId, TaskId, ChannelId,
+import { RepositoryId, WorkspaceId, TeamId, SprintId, TaskId, ChannelId,
   projectTeamGroup, type Event, type Project, type Task } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
@@ -10,6 +10,8 @@ import { refused, type Input, type Payload, type PiecePlanner } from "../command
 import { canLeadProject, canReadProject } from "./access.ts"
 import { own, projectKey, projectView } from "./view.ts"
 import { projectAgents, taskMetadata } from "./snapshot.ts"
+import { cleanName, duplicateName } from "./names.ts"
+import { readHarnesses } from "../commands/internal.ts"
 
 import { withGit, gitCall, localMachine, safePath } from "./gitApi.ts"
 
@@ -22,14 +24,6 @@ const requireProject = (input: Input, id: string, lead = true) => {
 }
 const member = (input: Input, projectId: string, agentId: string) =>
   own(input.snapshot.agents, agentId) !== undefined && own(projectView(input.snapshot).agentProjects, agentId) === projectId
-const cleanName = (input: Input, name: string) => Effect.gen(function* () {
-  const result = (yield* input.runtime.log.redactText(name)).trim()
-  if (!Schema.is(ProjectName)(result)) return yield* refused("name is invalid after redaction")
-  return result
-})
-const duplicateName = (input: Input, project: Pick<Project, "repoId" | "name">, except?: string) =>
-  Object.values(projectView(input.snapshot).projects).some((row) => row.projectId !== except && row.repoId === project.repoId && row.name.toLowerCase() === project.name.toLowerCase())
-
 // Registration uses the same trusted service and queue as public Git calls.
 const inspectCheckout = (input: Input, path: string) => withGit(input, (git) => Effect.gen(function* () {
   const repository = yield* gitCall(git.register(path))
@@ -49,7 +43,16 @@ const settingsSet: PiecePlanner = (input, raw) => Effect.gen(function* () {
     if (!(await stat(folder)).isDirectory()) throw new Error()
     return folder
   }, catch: () => refused("workspace folder must be an existing absolute directory") })
-  return ack(p.requestId, [{ _tag: "project.SettingsChanged", settings: { workspaceFolder, shell: yield* cleanName(input, p.settings.shell) } }])
+  const lead = p.settings.lead
+  if (lead !== undefined) {
+    const harness = (yield* readHarnesses(input.runtime)).find((row) => row.id === lead.harness)
+    const account = lead.account._tag === "named" ? own(input.snapshot.accounts, lead.account.accountId) : undefined
+    if (harness === undefined || lead.account._tag === "named" && account?.harness !== harness.id
+      || lead.model !== undefined && harness.models.length > 0 && !harness.models.includes(lead.model)
+      || lead.effort !== undefined && harness.efforts.length > 0 && !harness.efforts.includes(lead.effort)) return yield* refused("invalid lead defaults")
+    for (const value of [lead.model, lead.effort]) if (value !== undefined && (yield* input.runtime.log.redactText(value)) !== value) return yield* refused("invalid lead defaults")
+  }
+  return ack(p.requestId, [{ _tag: "project.SettingsChanged", settings: { workspaceFolder, shell: yield* cleanName(input, p.settings.shell), ...(lead === undefined ? {} : { lead }) } }])
 })
 const repositoryAdd: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.repository.add">
@@ -88,26 +91,10 @@ const workspaceRegister: PiecePlanner = (input, raw) => Effect.gen(function* () 
   return { events: [{ _tag: "project.WorktreeCreated", worktreeId, repoId: p.repoId, machineId: p.machineId, branch: p.branch,
     path: checkout.path, checkout: p.checkout, ...(p.parentId === undefined ? {} : { parentId: p.parentId }) }], reply: () => ({ requestId: p.requestId, worktreeId }) }
 })
-const create: PiecePlanner = (input, raw) => Effect.gen(function* () {
-  const p = raw as Payload<"project.create">
-  const view = projectView(input.snapshot)
-  const workspace = own(view.workspaces, p.worktreeId)
-  const lead = own(input.snapshot.agents, p.leadAgentId)
-  if (own(view.repositories, p.repoId) === undefined || workspace?.repoId !== p.repoId || workspace.machineId !== p.machineId) return yield* refused("invalid repository or assigned workspace")
-  if (lead === undefined || lead.parent._tag !== "owner" || lead.state._tag === "stopped" || lead.state._tag === "crashed"
-    || own(view.agentProjects, p.leadAgentId) !== undefined) return yield* refused("lead must be an available unassigned agent started by the owner")
-  if (lead.folder !== workspace.path) return yield* refused("lead must run in the assigned workspace")
-  const name = yield* cleanName(input, p.name)
-  if (duplicateName(input, { repoId: p.repoId, name })) return yield* refused("project name already exists in this repository")
-  const projectId = fresh(ProjectId)
-  return { events: [{ _tag: "project.Created", projectId, repoId: p.repoId, name, goal: p.goal, leadAgentId: p.leadAgentId,
-    worktreeId: p.worktreeId, machineId: p.machineId, stage: p.stage ?? "plan", ...(p.shell === undefined ? {} : { shell: yield* cleanName(input, p.shell) }) }],
-    reply: () => ({ requestId: p.requestId, projectId }) }
-})
 const rename: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.rename">; const project = yield* requireProject(input, p.projectId)
   const name = yield* cleanName(input, p.name)
-  if (duplicateName(input, { repoId: project.repoId, name }, project.projectId)) return yield* refused("project name already exists in this repository")
+  if (duplicateName(input, { repoId: project.repoId, machineId: project.machineId, name }, project.projectId)) return yield* refused("project name already exists in this repository")
   return ack(p.requestId, [{ _tag: "project.Renamed", projectId: p.projectId, name }])
 })
 const place: PiecePlanner = (input, raw) => Effect.gen(function* () {
@@ -246,6 +233,15 @@ const page = <T>(input: Input, raw: Record<string, unknown>, entries: ReadonlyAr
   }
   return { reply: wrap({ requestId: raw.requestId, items, ...(next === undefined ? {} : { next }) }) }
 })
+const goalSet: PiecePlanner = (input, raw) => Effect.gen(function* () {
+  const p = raw as Payload<"project.goal.set">; yield* requireProject(input, p.projectId)
+  return ack(p.requestId, [{ _tag: "project.GoalChanged", projectId: p.projectId, goal: p.goal }])
+})
+const restore: PiecePlanner = (input, raw) => Effect.gen(function* () {
+  const p = raw as Payload<"project.restore">; const row = yield* requireProject(input, p.projectId)
+  if (row.archiving) return yield* refused("finish archiving the project before restoring it")
+  return ack(p.requestId, row.archivedAt === undefined ? [] : [{ _tag: "project.Restored", projectId: p.projectId }])
+})
 const settings: ReadHandler = (input, raw) => {
   const settings = projectView(input.snapshot).settings
   return Effect.succeed({ reply: { requestId: raw.requestId, ...(settings === undefined ? {} : { settings }) } })
@@ -274,10 +270,11 @@ const taskHistory: ReadHandler = (input, raw) => Effect.gen(function* () {
 })
 export const projectPlanners = {
   "project.settings.set": settingsSet, "project.repository.add": repositoryAdd, "project.repository.locate": repositoryLocate,
-  "project.workspace.register": workspaceRegister, "project.create": create, "project.rename": rename, "project.place": place,
-  "project.preferences.set": preferencesSet, "project.stage.set": stageSet, "project.team.create": teamCreate,
+  "project.workspace.register": workspaceRegister, "project.rename": rename, "project.place": place,
+  "project.goal.set": goalSet, "project.restore": restore, "project.preferences.set": preferencesSet, "project.stage.set": stageSet, "project.team.create": teamCreate,
   "project.sprint.create": sprintCreate, "project.sprint.update": sprintUpdate, "project.sprint.complete": sprintComplete,
   "project.task.create": taskCreate, "project.task.update": taskUpdate, "project.task.note": taskNote
 } satisfies Record<string, PiecePlanner>
-export const projectReads = { "project.settings": settings, "project.repositories": repositories, "project.workspaces": workspaces,
+const creations: ReadHandler = (input, raw) => page(input, raw, Object.entries(projectView(input.snapshot).creations))
+export const projectReads = { "project.creations": creations, "project.settings": settings, "project.repositories": repositories, "project.workspaces": workspaces,
   "project.read": read, "project.task.history": taskHistory } satisfies Record<string, ReadHandler>

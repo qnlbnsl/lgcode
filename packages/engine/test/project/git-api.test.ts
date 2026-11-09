@@ -5,14 +5,16 @@ import { join } from "node:path"
 import * as NodeSocket from "@effect/platform-node/NodeSocket"
 import { makeNodeSocket } from "@lgcode/client/nodeSocket"
 import { connectWith, type Client } from "../../../client/src/core.ts"
-import { CommandsRpcGroup, projectEventTags } from "@lgcode/contracts"
+import { CommandsRpcGroup, Event, ProjectId, projectEventTags } from "@lgcode/contracts"
 import { it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Fiber from "effect/Fiber"
 import * as Redacted from "effect/Redacted"
+import * as Schema from "effect/Schema"
 import * as SqlClient from "effect/sql/SqlClient"
 import { afterEach, beforeEach, expect, vi } from "vitest"
 import * as Server from "../../src/api/server.ts"
+import { EventLog } from "../../src/log/EventLog.ts"
 import { Views } from "../../src/views/Views.ts"
 import { engineLists } from "../../src/pieces/lists.ts"
 import { projectView } from "../../src/project/view.ts"
@@ -45,6 +47,16 @@ const wire = () => Effect.gen(function* () {
   expect((yield* Effect.promise(() => upgradeStatus(socket, ancestryHeaders()))).status).toBe(401)
   return { api: yield* actualClient(socket, bearer), socket }
 })
+// Existing Git authorization and shared-checkout histories are seeded through
+// the real durable log. New project launch is proved by the lifecycle suite.
+const historicProject = (fields: Record<string, unknown>) => Effect.gen(function* () {
+  const log = yield* EventLog
+  const requestId = freshRequest()
+  const projectId = Schema.decodeUnknownSync(ProjectId)(`project-${requestId}`)
+  const event = Schema.decodeUnknownSync(Event)({ _tag: "project.Created", ...fields, projectId })
+  yield* log.append({ _tag: "owner" }, requestId, "b".repeat(64), [event], {}, () => ({ requestId, projectId }))
+  return { projectId }
+})
 const setup = () => Effect.gen(function* () {
   yield* registerRebuildCheck(); yield* seedAccount(); yield* seedHarness()
   const lead = yield* seedAgent({ id: "lead", folder: rig.work })
@@ -53,7 +65,7 @@ const setup = () => Effect.gen(function* () {
   success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "zsh" } }))
   const repoId = success(yield* call(owner, "project.repository.add", { name: "Product", path: rig.work, machineId: "local" })).repoId
   const worktreeId = success(yield* call(owner, "project.workspace.register", { repoId, machineId: "local", branch: "main", path: rig.work, checkout: "main" })).worktreeId
-  const projectId = success(yield* call(owner, "project.create", { name: "Git", goal: "Real Git", leadAgentId: lead.agentId, repoId, worktreeId, machineId: "local" })).projectId
+  const projectId = (yield* historicProject({ name: "Git", goal: "Real Git", leadAgentId: lead.agentId, repoId, worktreeId, machineId: "local" })).projectId
   return { repoId, worktreeId, projectId, worker, stranger }
 })
 const resultOf = (reply: any) => { expect(reply.result).toBeDefined(); return reply.result }
@@ -71,7 +83,7 @@ it.live("traces every public operation to a real handler and preserves the exact
   for (const name of reads) { expect(Object.hasOwn(engineLists.reads, name), name).toBe(true); expect(Object.hasOwn(engineLists.planners, name), name).toBe(false) }
   for (const name of writes) { expect(Object.hasOwn(engineLists.planners, name), name).toBe(true); expect(Object.hasOwn(engineLists.reads, name), name).toBe(false) }
   expect([...CommandsRpcGroup.requests.keys()].filter((name) => reads.includes(name) || writes.includes(name)).sort()).toEqual([...reads, ...writes].sort())
-  expect(projectEventTags).toEqual(["project.SettingsChanged", "project.RepositoryAdded", "project.RepositoryLocated", "project.WorktreeCreated", "project.Created", "project.Placed", "project.PreferencesChanged", "project.Renamed", "project.StageChanged", "project.TeamAdded", "project.SprintAdded", "project.SprintChanged", "project.SprintCompleted", "project.TaskAdded", "project.TaskChanged", "project.TaskNoted"])
+  expect(projectEventTags).toEqual(["project.SettingsChanged", "project.RepositoryAdded", "project.RepositoryLocated", "project.WorktreeCreated", "project.Created", "project.CreationPlanned", "project.CreationClaimed", "project.CreationFinished", "project.GoalChanged", "project.ArchiveStarted", "project.Archived", "project.Restored", "project.Placed", "project.PreferencesChanged", "project.Renamed", "project.StageChanged", "project.TeamAdded", "project.SprintAdded", "project.SprintChanged", "project.SprintCompleted", "project.TaskAdded", "project.TaskChanged", "project.TaskNoted"])
 })).pipe(Effect.orDie))
 
 it.live("uses the real authenticated client to register, enumerate, stage, unstage, commit, read history and rename paths", () => provideBoard(rig, Effect.gen(function* () {
@@ -161,10 +173,10 @@ const integration = (api: Client, repoId: string, shared = false) => Effect.gen(
   const sourceId = (yield* register(source, "team-branch", destinationId)).worktreeId
   if (shared) {
     yield* seedAgent({ id: "earlier-lead", folder: destination })
-    yield* run(api, "project.create", { name: "Earlier project sharing the checkout", goal: "Preserve existing records", repoId, worktreeId: destinationId, leadAgentId: "earlier-lead", machineId: "local" })
+    yield* historicProject({ name: "Earlier project sharing the checkout", goal: "Preserve existing records", repoId, worktreeId: destinationId, leadAgentId: "earlier-lead", machineId: "local" })
   }
   yield* seedAgent({ id: "integration-lead", folder: destination })
-  const projectId = (yield* run(api, "project.create", { name: "Integration", goal: "Merge real work", repoId, worktreeId: destinationId, leadAgentId: "integration-lead", machineId: "local" })).projectId
+  const projectId = (yield* historicProject({ name: "Integration", goal: "Merge real work", repoId, worktreeId: destinationId, leadAgentId: "integration-lead", machineId: "local" })).projectId
   yield* run(api, "project.team.create", { projectId, name: "Build", worktreeId: sourceId })
   return { source, destination, sourceId, destinationId, projectId }
 })
