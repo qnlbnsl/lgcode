@@ -25,6 +25,9 @@ export const MockComponent = Schema.Struct({ componentId: MockComponentId, name:
 const array = <S extends Schema.Constraint>(item: S) => Schema.Array(item).check(Schema.isMaxLength(64))
 export const MockBundle = Schema.Struct({ sources: array(MockSource), screens: array(MockScreen), scenarios: array(MockScenario),
   draftedFields: array(MockDraftField), components: array(MockComponent), designRevision: Schema.optionalKey(RequestId),
+  // Caller-reviewed metadata, not an engine-verified application schema.
+  // Omission preserves historical decoding and means unavailable on new records.
+  reviewedComparisons: Schema.optionalKey(array(MockFieldComparison)),
   // Public decoding normally strips excess properties. Explicitly forbid the
   // removed experimental input so a declared change cannot be accepted/lost.
   schemaChanges: Schema.optionalKey(Schema.Never) })

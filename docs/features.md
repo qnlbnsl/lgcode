@@ -540,8 +540,10 @@ The full design is in
 - **Mocks made by the Design team** (requested by the owner, 2026-11-07; not
   designed). A project with user interface work gets a Mocks tab. The mocks use
   the project's real components and realistic, invented data, as Ananke's mocks
-  did. While designing, the team keeps a draft of the data schema the screens
-  need and reconciles it with the real schema. When the mocks are approved, new
+  did. While designing, the team records the fields the screens need and supplies
+  reviewed comparisons with the real schema, as approved by the owner on 2026-11-09.
+  The engine does not infer an application schema from mock data files.
+  Fields without a supplied review remain unavailable. When the mocks are approved, new
   components move into the real component folder, and wiring them to real data
   becomes the Build team's tasks.
 - **A Reverse Fig skill** (requested by the owner, 2026-11-07; not designed).

@@ -1,4 +1,4 @@
-import { MockBundle, ProjectName, type Event, type MockRevision, type MockSource, type MockApproval } from "@lgcode/contracts"
+import { MockBundle, type Event, type MockRevision, type MockSource, type MockApproval } from "@lgcode/contracts"
 import * as Schema from "effect/Schema"
 import { fieldStructure, eventStructure, type RedactionStructure } from "../log/redactionStructure.ts"
 import * as Effect from "effect/Effect"
@@ -17,6 +17,18 @@ const requireMember = (input: Input, projectId: string) => {
     ? Effect.succeed(project) : Effect.fail(refused("project is unavailable to this caller"))
 }
 const unique = (values: ReadonlyArray<string>) => new Set(values).size === values.length
+const fieldKey = (field: MockRevision["comparisons"][number]["field"]) => JSON.stringify([field.entity, field.name])
+const fieldValue = (field: MockRevision["comparisons"][number]["field"]) => JSON.stringify([field.entity, field.name, field.type, field.description, field.sourceId, field.screens])
+// Check the complete raw reference before prose redaction can change its
+// meaning. These are claims by the recorded author, never parsed file types.
+const validReviews = (bundle: typeof MockBundle.Type) => {
+  const reviews = bundle.reviewedComparisons ?? []
+  return unique(reviews.map((row) => fieldKey(row.field))) && reviews.every((row) =>
+    bundle.draftedFields.some((field) => fieldValue(field) === fieldValue(row.field))
+    && (row.status === "unavailable" ? row.known === undefined : row.field.entity !== undefined && row.field.sourceId !== undefined
+      && (row.status === "new" ? row.known === undefined : row.known !== undefined
+        && (row.status === "matches" ? row.known === row.field.type : row.known !== row.field.type))))
+}
 const worklistFor = (revision: Pick<MockRevision, "bundle" | "comparisons">): MockApproval["worklist"] => ({
   screens: revision.bundle.screens.map((row) => row.screenId),
   drafts: revision.bundle.components.filter((row) => row.provenance === "draft").map((row) => row.componentId),
@@ -47,6 +59,7 @@ const record: PiecePlanner = (input, raw) => Effect.gen(function* () {
   // A different caller has no receipt for this request, but cannot reuse its revision.
   if (own(view.mockRevisions, projectKey(p.projectId, p.requestId)) !== undefined) return yield* refused("mock revision identity is already recorded")
   if (own(view.mockHeads, p.projectId) !== p.expectedRevision) return yield* refused("mock revision changed; refresh and retry")
+  if (!validReviews(p.bundle)) return yield* refused("invalid reviewed mock comparison")
   // References must keep their exact meaning. Refuse a secret-bearing raw
   // reference before prose redaction can turn it into another local path.
   for (const source of p.bundle.sources) yield* validateSource(input, source)
@@ -56,6 +69,7 @@ const record: PiecePlanner = (input, raw) => Effect.gen(function* () {
     for (const binding of screen.scenarioRoutes) yield* safePath(input, binding.route)
   }
   const b = yield* cleanBundle(input, p.bundle)
+  if (!validReviews(b)) return yield* refused("invalid reviewed mock comparison after redaction")
   if (!unique(b.sources.map((row) => row.sourceId)) || !unique(b.screens.map((row) => row.screenId))
     || !unique(b.components.map((row) => row.componentId)) || !unique(b.draftedFields.map((row) => JSON.stringify([row.entity, row.name])))
     || !unique(b.scenarios.map((row) => row.scenarioId))) return yield* refused("duplicate mock identity")
@@ -65,7 +79,6 @@ const record: PiecePlanner = (input, raw) => Effect.gen(function* () {
     yield* verifyDesignEvidence(input, design, p.projectId)
   }
   const artifacts: Array<{ sourceId: typeof MockSource.Type.sourceId; fingerprint: string }> = []
-  const data = new Map<string, unknown>()
   for (const source of b.sources) {
     yield* validateSource(input, source)
     // Membership and checkout identity must be valid even for an absent file.
@@ -73,7 +86,6 @@ const record: PiecePlanner = (input, raw) => Effect.gen(function* () {
     const available = yield* sourceArtifact(input, p.projectId, source).pipe(Effect.result)
     if (available._tag === "Success") {
       artifacts.push({ sourceId: source.sourceId, fingerprint: available.success.fingerprint })
-      if (source.kind === "data") { try { data.set(source.sourceId, JSON.parse(available.success.text)) } catch { /* Explicit unavailable comparison. */ } }
     }
     else if (available.failure.reason !== "artifact unavailable") return yield* available.failure
   }
@@ -86,14 +98,8 @@ const record: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const comparisons: Array<MockRevision["comparisons"][number]> = []
   for (const field of b.draftedFields) {
     if (field.screens?.some((id) => !b.screens.some((row) => row.screenId === id)) || field.sourceId !== undefined && sources.get(field.sourceId)?.kind !== "data") return yield* refused("invalid mock field reference")
-    const schema = field.sourceId === undefined ? undefined : data.get(field.sourceId)
-    if (field.entity === undefined || schema === null || typeof schema !== "object" || Array.isArray(schema)) { comparisons.push({ field, status: "unavailable" }); continue }
-    const entity = Object.hasOwn(schema, field.entity) ? (schema as Record<string, unknown>)[field.entity] : undefined
-    if (entity !== undefined && (entity === null || typeof entity !== "object" || Array.isArray(entity))) { comparisons.push({ field, status: "unavailable" }); continue }
-    const known = entity !== undefined && Object.hasOwn(entity, field.name) ? (entity as Record<string, unknown>)[field.name] : undefined
-    const safeKnown = typeof known === "string" ? yield* input.runtime.log.redactText(known) : known
-    comparisons.push(known === undefined ? { field, status: "new" } : Schema.is(ProjectName)(safeKnown)
-      ? { field, status: safeKnown === field.type ? "matches" : "differs", known: safeKnown } : { field, status: "unavailable" })
+    const reviewed = b.reviewedComparisons?.find((row) => fieldKey(row.field) === fieldKey(field))
+    comparisons.push(reviewed === undefined ? { field, status: "unavailable" } : { ...reviewed, field })
   }
   const previous = p.expectedRevision === undefined ? undefined : own(view.mockRevisions, projectKey(p.projectId, p.expectedRevision))
   for (const component of b.components) {

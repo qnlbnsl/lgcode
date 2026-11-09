@@ -215,7 +215,7 @@ The caller supplies the expected previous revision, preventing lost concurrent u
 The request identity becomes the immutable revision identity.
 An existing revision identity cannot be reused by another caller, even after the head advances.
 Identical retries by the original caller still return their durable receipt.
-The event records the actual author, timestamp, artifact fingerprints, and schema comparisons.
+The event records the actual author, timestamp, artifact fingerprints, and field comparisons.
 `project.mocks.read` pages revisions within 256 kibibytes, including the agent data envelope.
 `project.mocks.artifact` returns bounded, redacted repository text or an explicit unavailable result.
 
@@ -224,15 +224,23 @@ Each source names a registered project checkout and a confined relative file.
 Screen files are data artifacts of at most 8 kibibytes.
 Data and component indexes require JavaScript Object Notation files with the same bound.
 Tokens can also name a Cascading Style Sheets file, returned only as text data.
-A data schema has the form `{ "Entity": { "field": "type" } }`.
 Draft fields can name their source, entity, and affected screens.
-Comparisons report New, Matches, Differs, or Unavailable against the actual file.
-Unsupported or missing schema evidence remains unavailable.
-Approval derives its implementation changes from the actual comparisons.
+The engine does not interpret data artifacts as an application schema.
+The optional `bundle.reviewedComparisons` array uses the existing `MockFieldComparison` type.
+Each row contains the exact complete drafted `field`, a `status`, and an optional `known` type.
+Each field can have at most one review, and every review must match its draft before and after redaction.
+New, Matches, and Differs require an entity and a data source.
+Matches requires `known` to equal the drafted type, and Differs requires a different `known` type.
+New and Unavailable omit `known`.
+Fields without review metadata report Unavailable, regardless of the artifact's contents.
+Reported comparisons are claims reviewed by the recorded author, not engine verification of an application schema.
+The stored `reviewedComparisons`, author, and timestamp identify this provenance.
+Historical revisions without this optional input retain their original stored comparisons during reads and replay.
+Approval derives its implementation changes from the recorded comparisons and still rechecks actual artifact fingerprints.
 Draft field identity consists of its entity and field name together.
 The removed experimental `bundle.schemaChanges` input is explicitly forbidden at admission.
 It cannot be silently stripped as an excess property.
-Declared removals are unsupported; this contract supplies evidenced additions and type changes.
+Declared removals are unsupported; this contract supplies reviewed additions and type changes.
 
 Screen routes and preview origins are validated metadata.
 Every screen records exactly one concrete route for every typed scenario identity.

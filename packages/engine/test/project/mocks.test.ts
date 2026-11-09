@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
+import * as SqlClient from "effect/sql/SqlClient"
 import { afterEach, beforeEach, expect, vi } from "vitest"
 import * as Server from "../../src/api/server.ts"
 import { dispatchQueued } from "../../src/routing/deliveries.ts"
@@ -51,12 +52,23 @@ const setup = () => Effect.gen(function* () {
   return { lead, child, stranger, repoId }
 })
 const record = (extra: Record<string, unknown> = {}) => call(owner, "project.mocks.record", { projectId: "project", bundle: bundle(), ...extra }).pipe(Effect.map(success))
+// Owner-approved KISS item 3 supersedes JSON-inferred comparison fixtures.
+// The existing approval and handoff oracles now receive explicit review input.
+const reviewedBundle = () => {
+  const b = bundle()
+  return { ...b, reviewedComparisons: [
+    { field: b.draftedFields[0]!, status: "matches", known: "string" },
+    { field: b.draftedFields[1]!, status: "new" },
+    { field: b.draftedFields[2]!, status: "differs", known: "string" }
+  ] }
+}
 
 it.live("uses authenticated own-project tools, freezes the reviewed revision, and actually dispatches one planning handoff to the recorded lead", () => provideBoard(rig, (runner) => Effect.gen(function* () {
   const f = yield* setup(), bearer = randomBytes(32).toString("base64url"), socket = join(rig.stateFolder, "mocks.sock")
   yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false })
   const api = yield* connect(socket, bearer), designer = yield* connect(socket, f.child.token), stranger = yield* connect(socket, f.stranger.token)
-  const request = { requestId: freshRequest(), projectId: "project" as never, bundle: bundle() as never }
+  writeFileSync(join(rig.work, "schema.json"), "Arbitrary mock data, not an application schema")
+  const request = { requestId: freshRequest(), projectId: "project" as never, bundle: reviewedBundle() as never }
   const first = yield* designer["project.mocks.record"](request)
   expect(yield* designer["project.mocks.record"](request)).toEqual(first)
   expect((yield* stranger["project.mocks.record"]({ ...request, requestId: freshRequest() }).pipe(Effect.result))._tag).toBe("Failure")
@@ -71,6 +83,7 @@ it.live("uses authenticated own-project tools, freezes the reviewed revision, an
   expect(revision.bundle.scenarios[0]?.scenarioId).toBe("empty")
   expect(revision.bundle.screens[0]?.scenarioRoutes).toEqual([{ scenarioId: "empty", route: "/screen?sample=empty" }])
   expect(revision.comparisons.map((row) => row.status)).toEqual(["matches", "new", "differs"])
+  expect(revision.bundle.reviewedComparisons).toEqual(revision.comparisons)
   const artifact = yield* api["project.mocks.artifact"]({ requestId: freshRequest(), projectId: "project" as never, revisionId: first.revisionId, sourceId: "page" as never })
   expect(artifact).toMatchObject({ result: { _tag: "available", text: "<h1>Actual screen</h1>" } })
   expect(projectView(yield* snapshot).projects.project?.stage).toBe("design")
@@ -409,14 +422,16 @@ it.live("admits readable escaped records, pages within the agent envelope budget
   expect(rest.data).not.toContain('"next"')
 })))
 
-it.live("preserves long qualified field names and redacts schema comparison prose before recording it", () => provideBoard(rig, Effect.gen(function* () {
+it.live("preserves long qualified field names and redacts reviewed comparison prose before recording it", () => provideBoard(rig, Effect.gen(function* () {
   yield* setup()
   const secret = "private-schema-type"
   success(yield* call(owner, "accounts set-secret", { accountId: "primary", name: "TOKEN", nonce: freshRequest(), value: Redacted.make(secret) }))
   const b = bundle(), entity = "E".repeat(128), name = "N".repeat(128)
   b.draftedFields = [{ ...b.draftedFields[0]!, entity, name }, { ...b.draftedFields[1]!, name: "secretType" }]
   writeFileSync(join(rig.work, "schema.json"), JSON.stringify({ Project: { secretType: secret } }))
-  const first = yield* record({ bundle: b })
+  // The owner-approved reviewed-metadata contract replaces only JSON inference.
+  const reviewedComparisons = [{ field: b.draftedFields[0]!, status: "new" }, { field: b.draftedFields[1]!, status: "differs", known: secret }]
+  const first = yield* record({ bundle: { ...b, reviewedComparisons } })
   const read = success(yield* call(owner, "project.mocks.read", { projectId: "project" }))
   expect(read.items[0].comparisons[1].known).not.toContain(secret)
   success(yield* call(owner, "project.mocks.approve", { projectId: "project", revisionId: first.revisionId }))
@@ -452,9 +467,15 @@ it.live("keeps the same field name in different entities distinct through approv
   yield* setup(); const b = bundle()
   b.draftedFields = [{ ...b.draftedFields[0]!, entity: "EntityA" }, { ...b.draftedFields[0]!, entity: "EntityB" }]
   writeFileSync(join(rig.work, "schema.json"), JSON.stringify({ EntityA: { name: "string" }, EntityB: { name: "string" } }))
-  const first = yield* record({ bundle: b })
+  const first = yield* record({ bundle: { ...b, reviewedComparisons: [
+    { field: b.draftedFields[0]!, status: "matches", known: "string" },
+    { field: b.draftedFields[1]!, status: "differs", known: "number" }
+  ] } })
   success(yield* call(owner, "project.mocks.approve", { projectId: "project", revisionId: first.revisionId }))
   expect(Object.values(projectView(yield* snapshot).mockApprovals)[0]?.worklist.draftedFields.map((field) => [field.entity, field.name])).toEqual([["EntityA", "name"], ["EntityB", "name"]])
+  expect(Object.values(projectView(yield* snapshot).mockApprovals)[0]?.worklist.schemaChanges).toEqual([
+    { sourceId: "schema", field: "EntityB.name", change: "change", description: "Current name" }
+  ])
 })))
 
 it.live("refuses the removed declared schema input at public admission without recording or approving it", () => provideBoard(rig, Effect.gen(function* () {
@@ -469,6 +490,126 @@ it.live("refuses the removed declared schema input at public admission without r
   success(yield* call(owner, "project.mocks.approve", { projectId: "project", revisionId: first.revisionId }))
   expect(Object.values(projectView(yield* snapshot).mockApprovals)[0]?.worklist.schemaChanges).toEqual([])
 })))
+
+it.live("reports unreviewed fields unavailable for every data-file shape and keeps supplied reviews independent of those bytes", () => provideBoard(rig, Effect.gen(function* () {
+  yield* setup()
+  let expectedRevision: string | undefined
+  for (const text of [JSON.stringify({ Project: { name: "string", count: "number" } }), '{"records":[]}', "[]", "not JSON"]) {
+    writeFileSync(join(rig.work, "schema.json"), text)
+    const first = yield* record({ ...(expectedRevision === undefined ? {} : { expectedRevision }) })
+    const revision = success(yield* call(owner, "project.mocks.read", { projectId: "project" })).items.at(-1)
+    expect(revision.comparisons).toEqual(bundle().draftedFields.map((field) => ({ field, status: "unavailable" })))
+    expect(revision.bundle).not.toHaveProperty("reviewedComparisons")
+    const reviewed = yield* record({ expectedRevision: first.revisionId, bundle: reviewedBundle() })
+    expect(success(yield* call(owner, "project.mocks.read", { projectId: "project" })).items.at(-1).comparisons).toEqual(reviewedBundle().reviewedComparisons)
+    expectedRevision = reviewed.revisionId
+  }
+})))
+
+it.live("refuses invalid reviewed references without product mutation or a successful receipt, retaining ordinary refusal auditing", () => provideBoard(rig, Effect.gen(function* () {
+  yield* setup()
+  const sql = yield* SqlClient.SqlClient
+  const cases = [
+    (b: ReturnType<typeof reviewedBundle>) => { b.reviewedComparisons[0]!.field = { ...b.draftedFields[0]!, name: "foreign" } },
+    (b: ReturnType<typeof reviewedBundle>) => { b.reviewedComparisons[0]!.field = { ...b.draftedFields[0]!, type: "other" } },
+    (b: ReturnType<typeof reviewedBundle>) => { b.reviewedComparisons[0]!.field = { ...b.draftedFields[0]!, sourceId: "foreign" } },
+    (b: ReturnType<typeof reviewedBundle>) => { b.reviewedComparisons[0]!.field = { ...b.draftedFields[0]!, screens: ["foreign"] } },
+    (b: ReturnType<typeof reviewedBundle>) => { b.reviewedComparisons.push(b.reviewedComparisons[0]!) },
+    (b: ReturnType<typeof reviewedBundle>) => { b.reviewedComparisons[0]!.known = "not-the-matching-type" },
+    (b: ReturnType<typeof reviewedBundle>) => { b.reviewedComparisons[2]!.known = "number" },
+    (b: ReturnType<typeof reviewedBundle>) => { b.reviewedComparisons[1]!.known = "invented" }
+  ]
+  for (const change of cases) {
+    const b = reviewedBundle(); change(b)
+    const requestId = freshRequest(), before = yield* snapshot, log = yield* readLog
+    expect(failureOf(yield* call(owner, "project.mocks.record", { requestId, projectId: "project", bundle: b }))?.reason).toBe("invalid reviewed mock comparison")
+    const after = yield* snapshot
+    expect(projectView(after)).toEqual(projectView(before)); expect(after.deliveries).toEqual(before.deliveries)
+    expect((yield* readLog).slice(log.length).map((row) => row.event)).toEqual([
+      { _tag: "CommandRefused", command: "project.mocks.record", reason: "invalid reviewed mock comparison" }
+    ])
+    const receipts = yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE request_id = ${requestId}`
+    expect(receipts).toHaveLength(1)
+    const receipt = JSON.parse(receipts[0]!.result_json)
+    expect(Array.isArray(receipt)).toBe(true)
+    expect(receipt.map((row: any) => row.event._tag)).toEqual(["CommandRefused"])
+    expect(receipt).not.toHaveProperty("reply")
+  }
+  const before = yield* readLog, state = yield* snapshot
+  const receiptRows = yield* sql`SELECT * FROM receipts ORDER BY caller, request_id`
+  for (const reviewedComparisons of [null, [{ ...reviewedBundle().reviewedComparisons[0], status: "verified" }],
+    Array.from({ length: 65 }, () => reviewedBundle().reviewedComparisons[0]),
+    [{ ...reviewedBundle().reviewedComparisons[0], known: "x".repeat(129) }]]) {
+    expect(failureOf(yield* call(owner, "project.mocks.record", { projectId: "project", bundle: { ...bundle(), reviewedComparisons } }))).toEqual({ _tag: "CommandRefused", reason: "command refused" })
+    expect(yield* readLog).toEqual(before); expect(yield* snapshot).toEqual(state)
+  }
+  const fields = Array.from({ length: 64 }, (_, i) => ({ ...bundle().draftedFields[0]!, name: `field-${i}`, description: "x".repeat(600) }))
+  const oversized = { ...bundle(), draftedFields: fields, reviewedComparisons: fields.map((field) => ({ field, status: "new" })) }
+  expect(Buffer.byteLength(JSON.stringify(oversized))).toBeGreaterThan(64 * 1024)
+  expect(failureOf(yield* call(owner, "project.mocks.record", { projectId: "project", bundle: oversized }))).toEqual({ _tag: "CommandRefused", reason: "command refused" })
+  expect(yield* readLog).toEqual(before); expect(yield* snapshot).toEqual(state)
+  expect(yield* sql`SELECT * FROM receipts ORDER BY caller, request_id`).toEqual(receiptRows)
+})))
+
+it.live("keeps reviewed field identities structural and comparison prose redacted through durable recording and approval", () => provideBoard(rig, Effect.gen(function* () {
+  yield* setup()
+  const b = bundle(), field = { ...b.draftedFields[2]!, sourceId: "schema-private", screens: ["home-private"], description: "private description" }
+  b.sources[1]!.sourceId = field.sourceId; b.screens[0]!.screenId = "home-private"
+  b.draftedFields = [field]; b.components[0]!.screens = ["home-private"]
+  const first = yield* record({ bundle: { ...b, reviewedComparisons: [{ field, status: "differs", known: "private-type" }] } })
+  const read = success(yield* call(owner, "project.mocks.read", { projectId: "project" })).items[0]
+  expect(read.comparisons[0]).toEqual({ field: { ...field, description: "[REDACTED] description" }, status: "differs", known: "[REDACTED]-type" })
+  expect(read.bundle.reviewedComparisons).toEqual(read.comparisons)
+  success(yield* call(owner, "project.mocks.approve", { projectId: "project", revisionId: first.revisionId }))
+  expect(Object.values(projectView(yield* snapshot).mockApprovals)[0]?.worklist.schemaChanges[0]?.sourceId).toBe("schema-private")
+  const sql = yield* SqlClient.SqlClient
+  const rows = yield* sql<{ payload_json: string }>`SELECT payload_json FROM events ORDER BY sequence`
+  for (const row of rows) { expect(row.payload_json).not.toContain("private-type"); expect(row.payload_json).not.toContain("private description") }
+}), ["private"]))
+
+it.live("reopens reviewed and historical revisions from SQLite unchanged and refuses approval when their data bytes change", () => Effect.gen(function* () {
+  const saved = yield* provideBoard(rig, Effect.gen(function* () {
+    yield* setup()
+    const historicalBundle = bundle(), revisionId = freshRequest()
+    // This explicitly models an old persisted event, not a current record call.
+    yield* appendSetup([eventOf({ _tag: "project.MockRecorded", projectId: "project", revisionId,
+      bundle: historicalBundle, author: { _tag: "owner" }, artifacts: [],
+      comparisons: historicalBundle.draftedFields.map((field) => ({ field, status: "new" })) })])
+    const request = { requestId: freshRequest(), projectId: "project", expectedRevision: revisionId, bundle: reviewedBundle() }
+    const first = success(yield* call(owner, "project.mocks.record", request))
+    const approval = { requestId: freshRequest(), projectId: "project", revisionId: first.revisionId }
+    success(yield* call(owner, "project.mocks.approve", approval))
+    const sql = yield* SqlClient.SqlClient
+    return { request, approval, first, view: projectView(yield* snapshot), log: yield* readLog,
+      rows: yield* sql`SELECT * FROM events ORDER BY sequence`, receipts: yield* sql`SELECT * FROM receipts ORDER BY caller, request_id` }
+  }))
+  yield* provideBoard(rig, (runner) => Effect.gen(function* () {
+    yield* registerRebuildCheck()
+    const sql = yield* SqlClient.SqlClient
+    expect(projectView(yield* snapshot)).toEqual(saved.view)
+    expect(yield* readLog).toEqual(saved.log)
+    expect(yield* sql`SELECT * FROM events ORDER BY sequence`).toEqual(saved.rows)
+    expect(yield* sql`SELECT * FROM receipts ORDER BY caller, request_id`).toEqual(saved.receipts)
+    const bearer = randomBytes(32).toString("base64url"), socket = join(rig.stateFolder, "reopened.sock")
+    yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false })
+    const api = yield* connect(socket, bearer)
+    const read = yield* api["project.mocks.read"]({ requestId: freshRequest(), projectId: "project" as never })
+    if (!("items" in read)) throw new Error("Owner read must be structured")
+    expect(read.items.map((row) => row.comparisons.map((field) => field.status))).toEqual([["new", "new", "new"], ["matches", "new", "differs"]])
+    expect(read.items[0]!.bundle).not.toHaveProperty("reviewedComparisons")
+    expect(read.items[1]!.bundle.reviewedComparisons).toEqual(reviewedBundle().reviewedComparisons)
+    expect(success(yield* call(owner, "project.mocks.record", saved.request))).toEqual(saved.first)
+    success(yield* call(owner, "project.mocks.approve", saved.approval))
+    expect(yield* sql`SELECT * FROM events ORDER BY sequence`).toEqual(saved.rows)
+    expect(runner.callsOf("prompt")).toEqual([])
+    const next = yield* record({ expectedRevision: saved.first.revisionId, bundle: reviewedBundle() })
+    writeFileSync(join(rig.work, "schema.json"), '{"changed":"bytes"}')
+    const before = projectView(yield* snapshot)
+    expect(failureOf(yield* call(owner, "project.mocks.approve", { projectId: "project", revisionId: next.revisionId }))?.reason).toContain("artifact changed")
+    expect(projectView(yield* snapshot)).toEqual(before)
+    expect(Object.values(before.mockApprovals)).toHaveLength(1)
+  }))
+}))
 
 for (const actor of ["owner", "member"] as const) for (const page of ["empty", "exhausted"] as const) {
   it.live(`bounds ${actor} ${page} mock replies including quote-heavy request identity`, () => provideBoard(rig, Effect.gen(function* () {
