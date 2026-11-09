@@ -59,21 +59,18 @@ Later runs wait for a free slot.
 The owner asked on 2026-11-09 that the tests never use the whole computer.
 Every remote command runs on the processors its session may use, minus the
 last two.
-On the owner's computer, the system already gives login sessions 16 of its 32
-processors, so the tests run on 14.
+The owner's computer gives login sessions all 32 of its processors, so the
+tests run on 30.
 All remote commands also share one systemd slice, `lgcode-remote.slice`, which
 caps their combined memory at 80 gigabytes and turns off swap for them.
+Remote commands run without the session bus address.
+Otherwise Chromium moves its own processes into a systemd scope of its own,
+outside the slice and its memory cap.
 
-## Tests that fail only on the owner's computer
+## Tests that failed only on the owner's computer
 
-Three tests failed on every run on the owner's computer at `4c65727`, and pass
-on the build server.
-Issue 561 covers the launcher test, which assumes no system Node.js 26.
-Issue 562 covers two crash tests, whose cause is not yet known.
-One difference between the computers is that Arch Linux's `/bin/sh` is Bash,
-while the build server's is Dash.
-Until both are fixed, a remote `pnpm check` exits 1 on these three alone, and
-a result must be compared with that list.
+Issues 561 and 562 record three tests that failed only on the owner's
+computer. Both are fixed, and a remote `pnpm check` must exit 0.
 
 ## What is never copied
 
