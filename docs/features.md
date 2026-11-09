@@ -544,6 +544,11 @@ The full design is in
   need and reconciles it with the real schema. When the mocks are approved, new
   components move into the real component folder, and wiring them to real data
   becomes the Build team's tasks.
+  The owner approved supported scenario routes on 2026-11-09, in item 2 of the
+  website simplification shortlist. Each screen keeps its base route and only
+  the concrete routes supplied for its supported declared scenario identities.
+  The supported list may be empty. The engine does not invent missing routes
+  or infer bindings from scenario names. Existing revisions remain unchanged.
 - **A Reverse Fig skill** (requested by the owner, 2026-11-07; not designed).
   When someone connects a project that already has an interface, the skill
   turns its existing components and screens into a `.fig` file, so the design

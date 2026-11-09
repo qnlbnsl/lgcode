@@ -280,7 +280,7 @@ It cannot be silently stripped as an excess property.
 Declared removals are unsupported; this contract supplies evidenced additions and type changes.
 
 Screen routes and preview origins are validated metadata.
-Every screen records exactly one concrete route for every typed scenario identity.
+Each screen records routes only for the typed scenarios it supports.
 Scenario display names never determine these bindings.
 The engine refuses unknown or duplicate bindings, external routes, and brace placeholders.
 The engine never fetches a preview origin, evaluates a component, or starts a preview command.
