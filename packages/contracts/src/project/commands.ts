@@ -5,6 +5,8 @@ import type { CallerKind } from "../commands.ts"
 import { AgentId, EventSequence, RequestId } from "../ids.ts"
 import { Project, ProjectId, ProjectName, ProjectSettings, ProjectStage, ProjectText, Repository, RepositoryLocation, Sprint, SprintId, Task, TaskHistoryEntry, TaskId, Team, Workspace } from "./schema.ts"
 
+import { ProjectGitRpcGroup, projectGitAccess } from "./git.ts"
+
 const request = { requestId: RequestId }
 const Refused = Schema.TaggedStruct("CommandError", { ...request, reason: Schema.String })
 const Ack = Schema.Struct(request)
@@ -53,10 +55,11 @@ export const ProjectRpcGroup = RpcGroup.make(
   Rpc.make("task.update", { payload: { ...project, taskId: TaskId, ...taskChanges }, success: Ack, error: Refused }),
   Rpc.make("task.note", { payload: { ...project, taskId: TaskId, title: ProjectName, detail: ProjectText }, success: Ack, error: Refused }),
   Rpc.make("task.history", { payload: { ...project, taskId: TaskId, ...paging }, success: Schema.Union([page(TaskHistoryEntry), Schema.Struct({ ...request, data: Schema.String })]), error: Refused })
-).prefix("project.")
+).prefix("project.").merge(ProjectGitRpcGroup)
 const owner = ["owner"] as const
 const member = ["owner", "agent"] as const
 export const projectAccess = {
+  ...projectGitAccess,
   "project.settings": owner, "project.settings.set": owner, "project.repository.add": owner, "project.repository.locate": owner,
   "project.repositories": owner, "project.workspace.register": owner, "project.workspaces": owner, "project.create": owner,
   "project.rename": owner, "project.place": owner, "project.preferences.set": owner,

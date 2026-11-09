@@ -24,6 +24,6 @@ it("1a E2 tools derive new agent-callable piece commands but exclude streams and
   const tools = await loading;
   expect([...tools.toolNames].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.read", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.read", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.read", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.diff", "project.git.state", "project.history", "project.read", "project.review", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
 });

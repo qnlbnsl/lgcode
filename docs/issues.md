@@ -9138,3 +9138,96 @@ Additional fresh-session controls cover missing selectors, missing acknowledgeme
 The existing recovery and initial invalid-choice assertions remain intact.
 All four model and effort retry cases were reproduced red with the original production files restored temporarily.
 The independent verifier's original files and logs remain unchanged.
+
+## 539. Redacting conflict protocol values could invalidate Git replies
+
+Found: 2026-11-08, while wiring the public Git commands.
+State: corrected in this change. Independent review remains pending.
+
+The initial integration redacted every returned string as display text.
+A registered short secret such as `conflict` changed the segment discriminator.
+The authenticated response then failed its typed encoding contract.
+A secret such as `ours` could also change a selected hunk's control value.
+The original Git service did not have a public reply path and is unchanged.
+
+The correction preserves fixed segment kinds and choices at their protocol
+positions, while redacting paths, file contents, hunk sides, authors, subjects,
+branch names, and review evidence through the production text redactor.
+Choosing a hunk is an owner-only read of a draft, without a stored Git event.
+Resolution still regenerates canonical content from the actual index stages.
+A verified compare link is also an owner-only read and never claims to create
+an actual pull request.
+
+The real authenticated client regression registers short synthetic secrets,
+reads a real merge conflict, chooses its `ours` side, and resolves the file.
+It checks that display content is redacted and that protocol values remain valid.
+A negative control with those protocol protections removed fails with the
+actual response-encoding error.
+A separate negative control removes the queue gate and proves that concurrent
+calls can overlap after a workspace-setting change.
+Restoring the gate prevents that overlap without changing Git service signatures.
+The focused checks, complete-check result, and exact source identity are recorded
+in the worker result when the assigned check actually finishes.
+
+
+## 540. The reservation cancellation test could cancel before its fake peer started the turn
+
+Found: 2026-11-08, during the first complete project lifecycle check.
+State: the test synchronizes with the actual second child turn; independent review remains required.
+
+The complete check exited 1 at 2026-11-09T05:16:12.611869+00:00.
+The protocol 2 case in `packages/engine/test/runner/cancel-reservation.test.ts`
+received only the first reservation's `promptReply` and `turnEnded` events.
+It never received the stopped terminal event for reservation 42.
+That failure remains preserved in `/tmp/w04b-full-check-1.log`.
+An isolated pass of the unchanged test did not explain the failure.
+
+The production runner returns from prompt after writing its frame to the child pipe.
+That acknowledgement does not establish that the child has started its prompt handler.
+The protocol transport queues prompt requests for its server handler.
+It processes cancel notifications directly from its input reader.
+The fake agent installs a cancel signal only when its prompt handler starts.
+It discards a cancellation received before that signal exists.
+The changed `withEngine` log-wrapper branch was not on this test's path.
+The test uses the unchanged `withAcpRunner` helper.
+
+A controlled real-runner probe paused the child while the second prompt and
+current cancel reached its pipe, then resumed the child.
+Observation-only instrumentation in a temporary copy of the fake agent recorded
+cancel with no installed signal, followed by the second prompt handler installing it.
+The wire still contained prompt 1, prompt 2, and exactly one cancel, in that order.
+The original stale-cancel rejection and zero-frame assertions passed.
+The terminal wait then failed with the same missing-event report as the full run.
+The only terminal event belonged to sent sequence 17.
+A control waited for the actual second handler before sending current cancel.
+It passed the original assertions with sent sequence 42, `stopped: true`,
+and exactly one cancel frame.
+The full run did not record the child's internal scheduling.
+The probe proves this failure mechanism without reconstructing that unrecorded schedule.
+
+The permanent test now emits a unique plan marker from the second child turn.
+It waits for that actual runner delivery update before exercising either cancellation.
+The marker follows installation of the child's cancel signal.
+It is not a timer, a fabricated runner event, or a relaxed terminal assertion.
+The original reservation identities, stale-cancel failure, zero stale-cancel frames,
+stopped terminal event, and exact one-current-cancel count remain unchanged.
+The production runner, protocol transport, and shared fake agent are unchanged.
+Temporary repository probes are removed after their evidence is retained in
+`/tmp/w04b-cancel-order/`.
+
+## 541. The combined planner inventory retained a single-unit count
+
+Found: 2026-11-08, during independent configuration integration review.
+State: corrected in the isolated combined candidate. Combined verification remains pending.
+
+The configuration unit and the reply-cancellation unit each added a top-level planner.
+Each unit passed with sixteen top-level planners on its own foundation.
+Their automatic test-file merge retained sixteen after both commands were composed.
+The independent nineteen-file focused run at 20e22b2 failed its exact count assertion.
+It passed the other 771 tests, including both reservation protocols.
+The failed log remains at /tmp/w05c-integration-verifier-1/focused.log.
+
+The fixture now expects seventeen top-level planners.
+Its exact public command equality, disjoint handler ownership, read inventory, and access assertions remain unchanged.
+No production command, authorization rule, timeout, or assertion was removed.
+The corrected candidate requires a new signed pin and complete verification.

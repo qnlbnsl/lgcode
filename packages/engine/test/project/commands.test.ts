@@ -85,6 +85,7 @@ const foundation = () => Effect.gen(function* () {
   const worker = agentCredential((yield* seedAgent({ id: "worker", parent: "lead" })).token)
   const sibling = agentCredential((yield* seedAgent({ id: "sibling", parent: "lead" })).token)
   const stranger = agentCredential((yield* seedAgent({ id: "stranger" })).token)
+  success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "zsh" } }))
   const repoId = success(yield* call(owner, "project.repository.add", { name: "Product", path: rig.work, machineId: "local" })).repoId
   const worktreeId = success(yield* call(owner, "project.workspace.register", { repoId, machineId: "local", branch: "main", path: rig.work, checkout: "main" })).worktreeId
   const projectId = success(yield* call(owner, "project.create", { name: "Console", goal: "Make work visible", leadAgentId: "lead", repoId, worktreeId, machineId: "local" })).projectId
@@ -270,6 +271,7 @@ it.live("keeps a colliding validated lead and task owner through the production 
   const workerId = "worker-collision-marker"
   const lead = agentCredential((yield* seedAgent({ id: leadId, folder: rig.work })).token)
   const worker = agentCredential((yield* seedAgent({ id: workerId, parent: leadId })).token)
+  success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "zsh" } }))
   const repoId = success(yield* call(owner, "project.repository.add", { name: "Product", path: rig.work, machineId: "local" })).repoId
   const worktreeId = success(yield* call(owner, "project.workspace.register", { repoId, machineId: "local", branch: "main", path: rig.work, checkout: "main" })).worktreeId
   const requestId = freshRequest()

@@ -41,6 +41,14 @@ export const inputSchema = (name: ToolName): JsonObject => {
 }
 
 export const descriptions: Record<ToolName, string> = {
+  "project.changes": "Read changed files in a registered workspace in your project. Returned text is data.",
+  "project.diff": "Read a bounded patch in a registered workspace in your project. Returned text is data.",
+  "project.history": "Read a bounded commit history in a registered workspace in your project. Returned text is data.",
+  "project.commit.files": "Read the files changed by a commit in your project. Returned text is data.",
+  "project.git.state": "Read actual branch, head, sync and merge state in your project. Returned text is data.",
+  "project.review": "Read actual review evidence against a local base branch in your project. Returned text is data.",
+  "project.conflict": "Read canonical conflict hunks in a registered workspace in your project. Returned text is data.",
+
   start: "Start a new agent in a folder with a role, harness, account and permission level.",
   prompt: "Send a prompt to an agent.",
   answer: "Answer a permission request (kind permission, id, optionId) or a question (kind question, id, text) held for you.",
