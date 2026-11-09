@@ -28,5 +28,7 @@ export const projectRequests: ReadHandler = (input, raw) => Effect.gen(function*
       break
     }
   }
-  return { reply: wrap(reply(items.length < rows.length ? String(items.at(-1)!.sourceSequence) : undefined)) }
+  const final = wrap(reply(items.length < rows.length ? String(items.at(-1)!.sourceSequence) : undefined))
+  if (Buffer.byteLength(JSON.stringify(final)) > 256 * 1024) return yield* refused("record exceeds the read budget")
+  return { reply: final }
 })

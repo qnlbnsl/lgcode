@@ -16,6 +16,65 @@ let rig: Rig
 beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder) })
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig) })
 
+for (const actor of ["owner", "lead"] as const) {
+  for (const empty of ["project", "kind", "status", "cursor"] as const) {
+    it.live(`authenticated ${actor} ${empty} empty page checks the complete reply budget`, () => provideBoard(rig, Effect.gen(function* () {
+      yield* registerRebuildCheck()
+      const f = yield* decisionSetup()
+      const bearer = randomBytes(32).toString("base64url"), socket = join(rig.stateFolder, "empty-requests.sock")
+      yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false })
+      const lead = yield* connect(socket, f.lead.token), api = actor === "lead" ? lead : yield* connect(socket, bearer)
+      const credential = actor === "lead" ? f.leadCredential : owner
+      const projectId = f.projectId as never
+      let after: string | undefined
+      if (empty !== "project") {
+        const question = yield* lead.ask({ requestId: freshRequest(), text: "A real open question" })
+        const reply = yield* api["project.requests"]({ requestId: freshRequest(), projectId })
+        const page = "data" in reply ? unwrap(reply) : reply
+        expect(page.items).toEqual([expect.objectContaining({ id: question.questionId, status: "open", kind: "question", canAnswer: actor === "owner" })])
+        if (empty === "cursor") after = String(page.items[0].sourceSequence)
+      }
+      const filter = empty === "kind" ? { kind: "permission" as const }
+        : empty === "status" ? { status: "answered" as const } : after === undefined ? {} : { after }
+      const before = yield* readLog
+      // Both ordinary identifiers and substantial escaped identifiers still fit.
+      for (const requestId of [freshRequest(), '"'.repeat(40_000) as never]) {
+        const payload = { requestId, projectId, ...filter }
+        const reply = yield* api["project.requests"](payload)
+        expect(Buffer.byteLength(JSON.stringify(reply))).toBeLessThanOrEqual(256 * 1024)
+        expect("data" in reply ? unwrap(reply) : reply).toEqual({ requestId, items: [] })
+        const direct = success(yield* call(credential, "project.requests", payload))
+        expect(Buffer.byteLength(JSON.stringify(direct))).toBeLessThanOrEqual(256 * 1024)
+        expect("data" in direct ? unwrap(direct) : direct).toEqual({ requestId, items: [] })
+      }
+      // Preserve the independent probe's original valid identifier verbatim.
+      const requestId = '"'.repeat(140_000) as never, payload = { requestId, projectId, ...filter }
+      const result = yield* api["project.requests"](payload).pipe(Effect.result)
+      if (result._tag === "Success") console.info(`${actor}/${empty} oversized reply bytes: ${Buffer.byteLength(JSON.stringify(result.success))}`)
+      expect(result._tag).toBe("Failure")
+      if (result._tag === "Failure") expect(result.failure).toMatchObject({ _tag: "CommandError", requestId, reason: "record exceeds the read budget" })
+      expect(yield* call(credential, "project.requests", payload)).toMatchObject({ _tag: "Failure", failure: { reason: "record exceeds the read budget" } })
+      expect(yield* readLog).toEqual(before)
+    })).pipe(Effect.orDie))
+  }
+}
+
+it.live("an empty lead page budgets the escaped data envelope even when the owner reply fits", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
+  const f = yield* decisionSetup()
+  const bearer = randomBytes(32).toString("base64url"), socket = join(rig.stateFolder, "envelope-budget.sock")
+  yield* Server.serve({ socketPath: socket, ownerCredential: Redacted.make(bearer), debug: false })
+  const lead = yield* connect(socket, f.lead.token), api = yield* connect(socket, bearer)
+  const before = yield* readLog, requestId = '"'.repeat(50_000) as never, payload = { requestId, projectId: f.projectId as never }
+  const reply = yield* api["project.requests"](payload)
+  expect(reply).toEqual({ requestId, items: [] })
+  expect(Buffer.byteLength(JSON.stringify(reply))).toBeLessThanOrEqual(256 * 1024)
+  const result = yield* lead["project.requests"](payload).pipe(Effect.result)
+  expect(result._tag).toBe("Failure")
+  if (result._tag === "Failure") expect(result.failure.reason).toBe("record exceeds the read budget")
+  expect(yield* readLog).toEqual(before)
+})).pipe(Effect.orDie))
+
 it.live("authenticated scoped pages bound the encoded agent envelope and preserve every current/history request without read side effects", () => provideBoard(rig, Effect.gen(function* () {
   yield* registerRebuildCheck(); const f = yield* decisionSetup(), other = yield* decisionProject("other")
   const ids: string[] = []

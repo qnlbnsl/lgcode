@@ -9337,3 +9337,24 @@ After a valid correction, the same previously refused creation request succeeds 
 A repeated request returns its original project without another launch.
 Historical invalid settings remain decodable and pass the real rebuild check.
 The original independent bad/control artifacts and interrupted full checks remain preserved.
+
+## 554. Empty project request pages skipped the complete reply budget
+
+Found: 2026-11-09, during independent project request review at `2616fb5`.
+
+The `project.requests` read checked its encoded reply size only while adding rows.
+An empty project, a filter with no matches, or an exhausted cursor skipped that check.
+A valid request identifier containing 140,000 quotation marks produced a 280,027-byte owner success reply.
+The same identifier produced an 840,165-byte lead success reply because the agent data envelope adds another encoding layer.
+Both exceeded the 256 kibibyte complete success reply budget.
+
+The read now measures the actual final wrapped success reply before returning it.
+An oversized reply refuses without truncating an identifier or changing the shared request identifier schema.
+The existing row budget, pagination, caller checks and owner answer authority remain in place.
+
+Authenticated socket and direct-handler regressions cover the original owner and lead identifiers.
+They also cover ordinary empty replies, escaped identifiers within budget, kind and status filters, and an exhausted cursor.
+A separate control proves that an identifier can fit the owner reply while exceeding the lead envelope budget.
+The inherited populated-page test continues to check every row, page progress and complete encoded sizes.
+The reads preserve the durable log, and the real rebuild check remains enabled.
+The original independent failed probes and logs are retained unchanged.
