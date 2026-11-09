@@ -8783,3 +8783,27 @@ State: worked around in the skill; the cause is in OpenPencil 0.16.0, not in LGc
   nodes ask for "Semi Bold".
 - The skill gives each label the size the browser measured, plus one pixel. It should drop that
   step once OpenPencil measures every bundled weight, and someone could report the fault upstream.
+
+## 528. Git reads and conflict completion needed real-repository edge-case checks
+
+Found: 2026-11-08, while building the website's bounded Git service.
+State: fixed in the Git service, with focused tests against temporary repositories.
+
+A reversed Git history limited to one commit returns the newest selected commit,
+so it cannot establish when the oldest pending commit arrived. The service reads
+bounded committer dates from the actual unmerged history and selects the earliest.
+An ours-only conflict resolution can leave no staged file difference while a merge
+still needs its final commit. The service exposes the merge head and permits that
+commit once the unmerged index entries are cleared. Generated linked checkouts can
+also appear as untracked changes in their parent when no ignore rule exists. The
+service adds a local exclusion for its `.worktrees/` folder without editing a
+tracked ignore file. A newly created repository also needs Git's orphan-worktree support before its first commit. The service creates a real
+unborn project branch in that case, and represents its missing head as null.
+Real-repository tests cover these cases.
+
+The inline conflict resolver currently refuses binary, add/delete, symlink and
+submodule conflicts. Those cases require the terminal workflow. The service also
+refuses symbolic-link file operations, and public review links currently support
+GitHub's standard remote forms only. The command integration must apply the
+production redactor to every service reply before delivery through the client
+application programming interface.
