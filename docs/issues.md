@@ -8783,3 +8783,19 @@ State: worked around in the skill; the cause is in OpenPencil 0.16.0, not in LGc
   nodes ask for "Semi Bold".
 - The skill gives each label the size the browser measured, plus one pixel. It should drop that
   step once OpenPencil measures every bundled weight, and someone could report the fault upstream.
+
+## 530. Phone notification actions and prompt dismissal lacked engine support
+
+Found on 2026-11-08 while implementing the website's notification actions.
+The engine had no owner command to retry a displayed failed notification.
+It had no command to send a real test notification through the configured service.
+It did not remember the owner's choice to decline the first waiting request's
+phone notification offer.
+Its alert read exposed the attempt number but omitted the delivery time.
+
+Fixed in website unit W05a.
+The retry validates the alert identity, carrier generation, and displayed attempt.
+It shares a delivery lane with the background worker and records the actual result.
+The test command returns the transport result without creating an alert or storing a response.
+The client piece replays `client.AlertPromptDismissed` into its settings and owner snapshot.
+Alert reads obtain the latest attempt time from the event log.

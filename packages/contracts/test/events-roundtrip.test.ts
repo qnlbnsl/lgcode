@@ -63,7 +63,7 @@ const expectedEngineTags = [
 // Keep the expected list independent of the production event-tag inventory.
 const expectedClientTags = [
   "client.AlertBaseline", "client.AlertRaised", "client.AlertDelivered", "client.AlertDeliveryFailed",
-  "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
+  "client.AlertPromptDismissed", "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
   "client.AlertCarrierTokenSet", "client.AlertCarrierTokenCleared", "client.WebSettingsChanged",
   "client.WebServerDown", "client.WebServerUp"
 ]

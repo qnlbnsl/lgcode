@@ -41,6 +41,7 @@ type Handlers = { readonly [R in RpcGroup.Rpcs<typeof CommandsRpcGroup> as R["_t
 const refused = (status: number, text: string) => HttpServerResponse.text(text, { status });
 const reasons = new Set([
   "command refused", "cannot reload", "no usable account", "invalid credential",
+  "notification changed; refresh before retrying",
   "request id reused", "recovering", "board disabled", "database read failed", "database write failed",
   "database write failed: busy", "database write failed: disk full", "database write failed: constraint",
 ]);

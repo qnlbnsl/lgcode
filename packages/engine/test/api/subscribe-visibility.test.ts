@@ -93,6 +93,7 @@ const samples: Record<string, (a: string, n: string) => Record<string, unknown>>
   AccountAvailable: () => ({ accountId: "primary", cause: "owner cleared" }),
   HarnessChanged: () => ({ harness }),
   CommandRefused: () => ({ command: "start", reason: "refused" }),
+  "client.AlertPromptDismissed": () => ({}),
   "client.AlertBaseline": () => ({ position: 0 }),
   "client.AlertRaised": (a, n) => ({ alertId: `alert-${n}`, alertKey: `permission:${n}`, kind: "approval", agentId: a, subject: { _tag: "permission", id: `p-${n}` }, title: "Permission needs your approval", sourceSequence: 0 }),
   "client.AlertDelivered": (_a, n) => ({ alertId: `alert-${n}`, carrier: "ntfy", generation: 0, attempt: 1 }),

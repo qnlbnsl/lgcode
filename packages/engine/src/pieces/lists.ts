@@ -17,6 +17,7 @@ import { snapshotFor as rolesSnapshotFor } from "../roles/snapshot.ts";
 import { openMatters as rolesOpenMatters, alertSource as rolesAlertSource } from "../roles/openMatters.ts";
 import { sheepdogLoop } from "../roles/sheepdog/loop.ts";
 
+import { clientView } from "../client/alerts/view.ts";
 import { alertDelivery } from "../client/alerts/delivery.ts";
 import { carrierKeep, carrierPlanners } from "../client/alerts/token.ts";
 import { alertReactor, type AlertSourceResult, type PieceAlertSourceRequest } from "../client/alerts/reactor.ts";
@@ -67,7 +68,8 @@ export const engineLists: EngineLists = {
   // Resolve their values when used, after module initialization has completed.
   get views() { return pieceViews; },
   migrations: { client: [], board: [], roles: [] }, visibility: eventVisibility, pieceVisibility: {},
-  snapshotSections: { client: absent, board: boardSnapshotFor, roles: rolesSnapshotFor },
+  snapshotSections: { client: (caller, view) => caller._tag === "owner"
+    ? { pushPromptDismissed: clientView(view.client).pushPromptDismissed } : undefined, board: boardSnapshotFor, roles: rolesSnapshotFor },
   alertSources: { client: absent, board: boardAlertSource, roles: rolesAlertSource },
   openMatters: { client: () => [], board: boardOpenMatters, roles: rolesOpenMatters },
   get reactors() { return reactors ??= {
