@@ -1,4 +1,4 @@
-import { QuestionMetadataFields } from "./questions.ts"
+import { ProjectRequestLinkFields, QuestionMetadataFields } from "./questions.ts"
 import { AgentChoice, ConfigurationReason } from "./agentConfiguration.ts"
 import * as Schema from "effect/Schema"
 import { ProjectEvent } from "./project/events.ts"
@@ -190,7 +190,7 @@ export const EngineEvent = Schema.Union([
   Schema.TaggedStruct("ModeChanged", { ...agent, mode: Schema.String, level: PermissionLevel }),
   Schema.TaggedStruct("ModeRefused", { ...agent, mode: Schema.String, ceiling: PermissionLevel, reason: Schema.String }),
   Schema.TaggedStruct("PermissionRequested", {
-    ...permission,
+    ...permission, ...ProjectRequestLinkFields,
     holder: Actor,
     deliveryId: DeliveryId,
     toolCallId: Schema.NonEmptyString,

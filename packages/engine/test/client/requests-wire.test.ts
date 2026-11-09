@@ -1,7 +1,7 @@
 import type { ClientRequest } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import { expect, it } from "vitest";
-import { agentCredential, appendSetup, call, seedAgent, success } from "../support/handlerRig.ts";
+import { agentCredential, appendSetup, eventOf, call, seedAgent, success } from "../support/handlerRig.ts";
 import { run as runReadRig, read, readOutcome, questionFor, bytes, unwrap } from "./support/readRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
@@ -9,6 +9,11 @@ const run = <A>(program: Effect.Effect<A, any, any>) => runReadRig(program, regi
 
 it("authenticated request history keeps decision metadata and agent event reads escape its prose", async () => run(Effect.gen(function* () {
   const agent = yield* seedAgent({ id: "agent-a", state: "working" });
+  yield* appendSetup([
+    eventOf({ _tag: "project.Created", projectId: "requests-project", repoId: "requests-repo", worktreeId: "requests-workspace", name: "Requests", goal: "History", machineId: "local", leadAgentId: "agent-a" }),
+    eventOf({ _tag: "project.SprintAdded", projectId: "requests-project", sprintId: "sprint-1", label: "SP-1", name: "Requests", goal: "History", phase: "Build", owner: "agent-a", needs: [] }),
+    eventOf({ _tag: "project.TaskAdded", projectId: "requests-project", taskId: "task-1", owner: "agent-a", teamId: "requests-team", sprintId: "sprint-1", worktreeId: "requests-workspace", state: "active", title: "Decision" }),
+  ])
   const metadata = { title: "/Choose", recommendation: "/Prefer this", proposedAnswer: "/Accept", taskId: "task-1", sprintId: "sprint-1" };
   const asked = success(yield* call(agentCredential(agent.token), "ask", { text: "/Decide", ...metadata }));
   const page = yield* read("client.requests", { after: 0, limit: 200 });

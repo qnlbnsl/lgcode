@@ -7,7 +7,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 import { makeRedactor } from "../../src/identity/redactor.ts";
 import { deliveryRig, spawn, send } from "../support/deliveryRig.ts";
-import { agentCredential, call, makeRig, ownerCredential, readLog, removeRig, success, type Rig } from "../support/handlerRig.ts";
+import { agentCredential, appendSetup, eventOf, call, makeRig, ownerCredential, readLog, removeRig, success, type Rig } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { requestPermission, pause, tagged } from "../support/routingRig.ts";
 
@@ -27,6 +27,11 @@ it.live("request metadata, owner history and actual open/close times survive a f
     const worker = yield* spawn(rig, runner, lead);
     yield* send(runner, lead, "Keep routed deliveries queued.");
     yield* send(runner, worker, "Keep answers queued.");
+    yield* appendSetup([
+      eventOf({ _tag: "project.Created", projectId: "requests-project", repoId: "requests-repo", worktreeId: "requests-workspace", name: "Requests", goal: "History", machineId: "local", leadAgentId: lead.agentId }),
+      eventOf({ _tag: "project.SprintAdded", projectId: "requests-project", sprintId: "sprint-1", label: "SP-1", name: "Requests", goal: "History", phase: "Build", owner: worker.agentId, needs: [] }),
+      eventOf({ _tag: "project.TaskAdded", projectId: "requests-project", taskId: "task-1", owner: worker.agentId, teamId: "requests-team", sprintId: "sprint-1", worktreeId: "requests-workspace", state: "active", title: "Decision" }),
+    ])
     const metadata = { title: "Choose the layout", recommendation: `Keep the sidebar. ${secret}`,
       proposedAnswer: "Use the sidebar.", taskId: "task-1", sprintId: "sprint-1" };
     const { questionId } = success(yield* call(agentCredential(worker.token), "ask", { text: "Which layout?", ...metadata }));

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { realpath, stat } from "node:fs/promises"
 import { isAbsolute } from "node:path"
 import { RepositoryId, WorkspaceId, TeamId, SprintId, TaskId, ChannelId,
-  projectTeamGroup, type Event, type Project, type Task } from "@lgcode/contracts"
+  TaskNotificationId, projectTeamGroup, type Event, type Project, type Task } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { agentReadReply, type ReadHandler } from "../api/reads.ts"
@@ -14,6 +14,9 @@ import { cleanName, duplicateName } from "./names.ts"
 import { readHarnesses } from "../commands/internal.ts"
 
 import { withGit, gitCall, localMachine, safePath } from "./gitApi.ts"
+import { projectedTask, decisionHistory } from "./decisions.ts"
+import { taskNotificationSource } from "./taskDelivery.ts"
+import { projectRequests } from "./requests.ts"
 import { validChoiceId } from "../runner/choices.ts"
 
 const fresh = <S extends Schema.Top & { readonly Type: string }>(schema: S): S["Type"] => Schema.decodeUnknownSync(schema as never)(randomUUID()) as S["Type"]
@@ -171,7 +174,7 @@ const sprintComplete: PiecePlanner = (input, raw) => Effect.gen(function* () {
   if (sprint.completion !== undefined) return yield* refused("sprint is already complete")
   const view = projectView(input.snapshot)
   if (sprint.needs.some((id) => own(view.sprints, projectKey(p.projectId, id))?.completion === undefined)) return yield* refused("sprint dependencies are incomplete")
-  if (Object.values(view.tasks).some((task) => task.projectId === p.projectId && task.sprintId === p.sprintId && task.state !== "done")) return yield* refused("sprint tasks are incomplete")
+  if (Object.values(view.tasks).some((task) => task.projectId === p.projectId && task.sprintId === p.sprintId && projectedTask(input.snapshot, task).state !== "done")) return yield* refused("sprint tasks are incomplete")
   return ack(p.requestId, [{ _tag: "project.SprintCompleted", projectId: p.projectId, sprintId: p.sprintId,
     completion: yield* cleanName(input, p.completion), evidence: p.evidence }])
 })
@@ -190,7 +193,15 @@ const taskCreate: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const label = p.label === undefined ? undefined : yield* cleanName(input, p.label)
   if (label !== undefined && Object.values(projectView(input.snapshot).tasks).some((row) => row.projectId === p.projectId && row.label?.toLowerCase() === label.toLowerCase())) return yield* refused("task label already exists")
   const taskId = fresh(TaskId); const { requestId, ...fields } = p
-  return { events: [{ _tag: "project.TaskAdded", ...fields, ...(label === undefined ? {} : { label }), taskId, title: yield* cleanName(input, p.title) }], reply: () => ({ requestId, taskId }) }
+  const title = yield* cleanName(input, p.title)
+  const notificationId = input.actor._tag === "owner" ? fresh(TaskNotificationId) : undefined
+  return { events: [{ _tag: "project.TaskAdded", ...fields, ...(label === undefined ? {} : { label }), taskId, title },
+    ...(notificationId === undefined ? [] : [{ _tag: "project.OwnerTaskNotificationPlanned" as const,
+      notificationId, projectId: project.projectId, taskId, targetAgentId: project.leadAgentId }])],
+    ...(notificationId === undefined ? {} : { deliveries: [{ target: project.leadAgentId, sourceId: taskNotificationSource(notificationId),
+      body: `Owner-created task ${taskId} in project ${project.projectId}.\n${JSON.stringify({ taskId, title, owner: p.owner, sprintId: p.sprintId, teamId: p.teamId })}` }] }),
+    reply: () => ({ requestId, taskId }) }
+
 })
 const requireTask = (input: Input, projectId: string, taskId: string, write: boolean) => Effect.gen(function* () {
   const project = yield* requireProject(input, projectId, false)
@@ -260,14 +271,14 @@ const read: ReadHandler = (input, raw) => Effect.gen(function* () {
     case "projects": entries = Object.entries(view.projects).filter(([, row]) => allowed(row.projectId)); break
     case "teams": entries = Object.entries(view.teams).filter(([, row]) => allowed(row.projectId)); break
     case "sprints": entries = Object.entries(view.sprints).filter(([, row]) => allowed(row.projectId)); break
-    case "tasks": entries = Object.entries(view.tasks).filter(([, row]) => allowed(row.projectId)).map(([key, row]) => [key, taskMetadata(row)] as const); break
+    case "tasks": entries = Object.entries(view.tasks).filter(([, row]) => allowed(row.projectId)).map(([key, row]) => [key, taskMetadata(projectedTask(input.snapshot, row))] as const); break
     case "agents": entries = projectAgents(input.snapshot, p.projectId!).map((row) => [row.agentId, row] as const); break
   }
   return yield* page(input, raw, entries, true)
 })
 const taskHistory: ReadHandler = (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.task.history">; const { task } = yield* requireTask(input, p.projectId, p.taskId, false)
-  return yield* page(input, raw, task.history.map((row, index) => [String(index), row] as const), true)
+  return yield* page(input, raw, decisionHistory(input.snapshot, task).map((row, index) => [String(index), row] as const), true)
 })
 export const projectPlanners = {
   "project.settings.set": settingsSet, "project.repository.add": repositoryAdd, "project.repository.locate": repositoryLocate,
@@ -277,5 +288,5 @@ export const projectPlanners = {
   "project.task.create": taskCreate, "project.task.update": taskUpdate, "project.task.note": taskNote
 } satisfies Record<string, PiecePlanner>
 const creations: ReadHandler = (input, raw) => page(input, raw, Object.entries(projectView(input.snapshot).creations))
-export const projectReads = { "project.creations": creations, "project.settings": settings, "project.repositories": repositories, "project.workspaces": workspaces,
+export const projectReads = { "project.requests": projectRequests, "project.creations": creations, "project.settings": settings, "project.repositories": repositories, "project.workspaces": workspaces,
   "project.read": read, "project.task.history": taskHistory } satisfies Record<string, ReadHandler>

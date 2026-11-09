@@ -79,6 +79,7 @@ const samples: Record<string, (a: string, n: string) => Record<string, unknown>>
   "project.SprintCompleted": () => ({ projectId: "project-one", sprintId: "project-sprint", completion: "verified", evidence: "Visibility checks passed" }),
   "project.TaskAdded": () => ({ projectId: "project-one", taskId: "project-task", title: "Task", owner: "agent-self", teamId: "project-team", sprintId: "project-sprint", state: "queue", worktreeId: "project-workspace" }),
   "project.TaskChanged": () => ({ projectId: "project-one", taskId: "project-task", state: "active" }),
+  "project.OwnerTaskNotificationPlanned": () => ({ notificationId: "owner-task-notice", projectId: "project-one", taskId: "project-task", targetAgentId: "agent-self" }),
   "project.TaskNoted": () => ({ projectId: "project-one", taskId: "project-task", title: "Note", detail: "Private project history" }),
   AgentStarted: (a) => ({ agentId: a, name: `n-${a}`, role: "worker", groups: [], parent: parents[a] === undefined ? owner : { _tag: "agent", agentId: parents[a] }, harness: "first", account: "primary", permission: "ask", folder: "/tmp", runMode: "acp" }),
   AgentStartFailed: (a) => ({ agentId: a, reason: "agent start failed" }),

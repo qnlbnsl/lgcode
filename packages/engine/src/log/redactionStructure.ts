@@ -27,9 +27,12 @@ const delivery: RedactionStructure = { fields: {
 const workspace = { worktreeId: identity, repoId: identity, projectId: identity, teamId: identity, parentId: identity };
 const project = { projectId: identity, repoId: identity, leadAgentId: identity, worktreeId: identity };
 const sprint = { projectId: identity, sprintId: identity, owner: identity, needs: { elements: identity } };
-const task = { projectId: identity, taskId: identity, owner: identity, teamId: identity, sprintId: identity, worktreeId: identity };
+const requestLinks = { projectId: identity, taskId: identity, sprintId: identity };
+const task = { story: { fields: { activity: { elements: { fields: { question: identity } } } } }, projectId: identity, taskId: identity, owner: identity, teamId: identity, sprintId: identity, worktreeId: identity };
 
 export const eventStructure: RedactionStructure = { taggedFields: {
+  QuestionAsked: requestLinks, PermissionRequested: requestLinks,
+  "project.OwnerTaskNotificationPlanned": { notificationId: identity, projectId: identity, taskId: identity, targetAgentId: identity },
   "project.SettingsChanged": { settings: { fields: { lead: { fields: { harness: identity, account: { fields: { accountId: identity } } } } } } },
   "project.CreationPlanned": { creation: { fields: { requestId: identity, projectId: identity,
     bodyHash: identity, repository: { fields: { repoId: identity } }, workspace: { fields: workspace },

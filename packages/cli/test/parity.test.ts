@@ -117,6 +117,7 @@ for (const { command, words, form } of invocations) {
       "project.task.create": { projectId: "project", title: "Work", owner: "member", teamId: "team", sprintId: "sprint", state: "queue", worktreeId: "workspace" },
       "project.task.update": { projectId: "project", taskId: "task", state: "review", note: "Ready" },
       "project.task.note": { projectId: "project", taskId: "task", title: "Handoff", detail: "Review it" },
+      "project.requests": { projectId: "project", status: "open", after: "1", limit: 20 },
       "project.task.history": { projectId: "project", taskId: "task", after: "0", limit: 20 },
       "roles.orient": {}, "roles.handoff": { agentId: "member" },
       "roles.role-file.set": { content: roleFileContent }, "roles.role-file.get": {},
@@ -184,6 +185,7 @@ for (const { command, words, form } of invocations) {
         "project.team.create": { ...base, teamId: "team", channelId: "channel", group: "team:project/team" },
         "project.sprint.create": { ...base, sprintId: "sprint" },
         "project.task.create": { ...base, taskId: "task" },
+        "project.requests": { ...base, data: "Data from piece project [requests] (delivery read):\n{\"items\":[]}\nEnd data [requests]" },
         "project.task.history": { ...base, data: "Data from another agent [history-boundary] (delivery read):\n{\"items\":[]}\nEnd data [history-boundary]" },
         "roles.orient": { ...base, name: "Member", kind: "worker", advice: "Report to your lead." },
         "roles.handoff": { ...base, agentId: "member", text: "Continue the assigned work." },
@@ -207,8 +209,8 @@ for (const { command, words, form } of invocations) {
     expect(await finishCli(child)).toEqual({ code: 0, signal: null });
     expect(engine.requests).toHaveLength(1);
     expect(engine.requests[0]).toMatchObject({ _tag: "Request", tag: command, payload });
-    if (command.startsWith("roles.") || command.startsWith("project.") && command !== "project.read" && command !== "project.task.history") expect(JSON.parse(child.stdout())).toEqual(expectedReply);
-    if (["board.read", "project.read", "project.task.history"].includes(command)) expect(child.stdout()).toBe((expectedReply as { data: string }).data + "\n");
+    if (command.startsWith("roles.") || command.startsWith("project.") && command !== "project.read" && command !== "project.task.history" && command !== "project.requests") expect(JSON.parse(child.stdout())).toEqual(expectedReply);
+    if (["board.read", "project.read", "project.task.history", "project.requests"].includes(command)) expect(child.stdout()).toBe((expectedReply as { data: string }).data + "\n");
     if (command === "configure" || command.startsWith("client.agent.")) expect(JSON.parse(child.stdout())).toEqual(expectedReply);
     assertNoSecrets(child, [token]);
   });
@@ -233,7 +235,7 @@ it("P02 (7.5) catches MCP omitting an agent command, adding an unreviewed/owner/
   // needs review, and the CLI inventory above independently catches additions.
   expect([...names].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.diff", "project.git.state", "project.history", "project.read", "project.review", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.diff", "project.git.state", "project.history", "project.read", "project.requests", "project.review", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
   expect(new Set(names).size).toBe(names.length);
   const nonAgent = Object.entries(commandAccess).filter(([, kinds]) => !(kinds as ReadonlyArray<string>).includes("agent")).map(([name]) => name);

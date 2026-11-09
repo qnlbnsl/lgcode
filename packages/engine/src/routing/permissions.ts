@@ -7,6 +7,7 @@ import { canAnswerOption } from "../identity/ceiling.ts";
 import type { RunnerEvent } from "../runner/Runner.ts";
 import { freshDelivery, holderAbove, mayActForHolder, routedDelivery, withdrawQueued } from "./holders.ts";
 import { permissionAction } from "../views/apply.ts";
+import { permissionLinks } from "../project/decisions.ts";
 import { answerQuestion } from "./questions.ts";
 
 export const permissionRequested = (
@@ -23,7 +24,7 @@ export const permissionRequested = (
   const deliveryId = freshDelivery();
   return [{
     _tag: "PermissionRequested", agentId: event.agentId, permissionRequestId, holder, deliveryId,
-    toolCallId: event.toolCallId, description: event.description, options: event.options, settingsWrite: event.settingsWrite, ...permissionAction(event),
+    ...permissionLinks(snapshot, event.agentId), toolCallId: event.toolCallId, description: event.description, options: event.options, settingsWrite: event.settingsWrite, ...permissionAction(event),
   }, ...routedDelivery(event.agentId, holder, deliveryId, { _tag: "permission", id: permissionRequestId }, event.description, permissionAction(event))];
 });
 

@@ -3,7 +3,7 @@ import { configurationMatches } from "../runner/choices.ts";
 import { safeStartFailure, type StartFailure } from "@lgcode/contracts/startFailure";
 import {
   EventSequence as EventSequenceSchema, eventEffect,
-  type QuestionMetadata, type Account, type Actor, type Caller, type PermissionAction, type AgentId, type Delivery, type Event, type EventEnvelope, type EventSequence, type LifecycleState,
+  type ProjectRequestLink, type QuestionMetadata, type Account, type Actor, type Caller, type PermissionAction, type AgentId, type Delivery, type Event, type EventEnvelope, type EventSequence, type LifecycleState,
   pieceNamespaces, EngineEvent, type PieceNamespace, type PermissionOption, type SessionReference, type WaitMember,
 } from "@lgcode/contracts";
 import * as Schema from "effect/Schema";
@@ -46,7 +46,7 @@ interface RequestTimes {
   readonly answeredAt?: EventEnvelope["occurredAt"];
 }
 
-interface RequestRow extends RequestTimes {
+interface RequestRow extends RequestTimes, ProjectRequestLink {
   readonly action?: PermissionAction;
   readonly permissionRequestId: string;
   readonly agentId: AgentId;
@@ -281,6 +281,9 @@ const requestsAfter = (state: State, { event, sequence, occurredAt }: EventEnvel
       sourceSequence: sequence, openedAt: occurredAt,
       deliveryId: event.deliveryId, toolCallId: event.toolCallId, description: event.description,
       options: event.options, settingsWrite: event.settingsWrite,
+      ...(event.projectId === undefined ? {} : { projectId: event.projectId }),
+      ...(event.taskId === undefined ? {} : { taskId: event.taskId }),
+      ...(event.sprintId === undefined ? {} : { sprintId: event.sprintId }),
       ...(Object.keys(permissionAction(event)).length === 0 ? {} : { action: permissionAction(event) }),
     });
     case "PermissionMoved": return change(state.requests, event.permissionRequestId, (row) => ({
@@ -301,7 +304,7 @@ const questionsAfter = (state: State, { event, sequence, occurredAt }: EventEnve
     case "QuestionAsked": return put(state.questions, event.questionId, {
       questionId: event.questionId, agentId: event.agentId, status: "open", holder: event.holder,
       deliveryId: event.deliveryId, text: event.text, sourceSequence: sequence, openedAt: occurredAt,
-      ...Object.fromEntries(["title", "recommendation", "proposedAnswer", "taskId", "sprintId"]
+      ...Object.fromEntries(["title", "recommendation", "proposedAnswer", "projectId", "taskId", "sprintId"]
         .flatMap((key) => event[key as keyof typeof event] === undefined ? [] : [[key, event[key as keyof typeof event]]])),
     });
     case "QuestionMoved": return change(state.questions, event.questionId, (row) => ({

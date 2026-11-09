@@ -5,7 +5,7 @@ export const own = <T>(rows: Readonly<Record<string, T>>, id: string): T | undef
 export const projectKey = (projectId: string, id: string) => JSON.stringify([projectId, id])
 export const projectView = (snapshot: Snapshot): ProjectView => snapshot.project as ProjectView
 const empty = <T>(): Readonly<Record<string, T>> => Object.create(null)
-export const emptyProject = (): ProjectView => ({ creations: empty(), repositories: empty(), locations: empty(), workspaces: empty(), projects: empty(), teams: empty(), sprints: empty(), tasks: empty(), agentProjects: empty(), parents: empty() })
+export const emptyProject = (): ProjectView => ({ taskNotifications: empty(), creations: empty(), repositories: empty(), locations: empty(), workspaces: empty(), projects: empty(), teams: empty(), sprints: empty(), tasks: empty(), agentProjects: empty(), parents: empty() })
 const change = <T>(rows: Readonly<Record<string, T>>, id: string, f: (row: T) => T) => {
   const row = own(rows, id)
   return row === undefined ? rows : { ...rows, [id]: f(row) }
@@ -55,6 +55,18 @@ export const projectAfter = (view: ProjectView, event: Event, sequence: number, 
     case "project.SprintAdded": { const { _tag, ...row } = event; return { ...view, sprints: { ...view.sprints, [projectKey(row.projectId, row.sprintId)]: row } } }
     case "project.SprintChanged": { const { _tag, projectId, sprintId, ...patch } = event; return { ...view, sprints: change(view.sprints, projectKey(projectId, sprintId), (row) => ({ ...row, ...patch })) } }
     case "project.SprintCompleted": return { ...view, sprints: change(view.sprints, projectKey(event.projectId, event.sprintId), (row) => ({ ...row, completion: event.completion, evidence: event.evidence, completedAt: at })) }
+    case "project.OwnerTaskNotificationPlanned": {
+      const { _tag, ...row } = event
+      return { ...view, taskNotifications: { ...view.taskNotifications, [row.notificationId]: row } }
+    }
+    case "DeliveryQueued": {
+      const source = event.delivery.source
+      if (source?._tag !== "piece" || source.namespace !== "project" || !source.id.startsWith("task-notification:")) return view
+      const id = source.id.slice("task-notification:".length)
+      const row = own(view.taskNotifications, id)
+      if (row === undefined || row.deliveryId !== undefined || row.targetAgentId !== event.delivery.target) return view
+      return { ...view, taskNotifications: { ...view.taskNotifications, [id]: { ...row, deliveryId: event.delivery.id } } }
+    }
     case "project.TaskAdded": {
       const { _tag, ...row } = event
       const activity = row.story?.activity.map((step) => ({ ...step, at: step.at ?? at }))
