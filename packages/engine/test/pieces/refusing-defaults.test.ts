@@ -30,11 +30,16 @@ it("1.22 default tables refuse delivery and add no holds, requests or kept secre
       posts: [], completions: [], noAnswers: [], channels: [], unread: [], wakes: [],
     });
     else if (namespace === "project") expect(section).toEqual({
-      sequence: 0, truncated: false, projects: [], repositories: [], workspaces: [], teams: [], sprints: [], tasks: [], agents: [],
+      sequence: 0, truncated: false, setup: { step: "welcome" }, projects: [], repositories: [], workspaces: [], teams: [], sprints: [], tasks: [], agents: [],
     });
     else expect(section).toEqual({ pushPromptDismissed: false });
     const agentSection = lists.snapshotSections[namespace]!({ _tag: "agent", agentId: "target" }, state);
-    if (namespace === "project") expect(agentSection).toEqual(section);
+    if (namespace === "project") {
+      expect(agentSection).toEqual({
+        sequence: 0, truncated: false, projects: [], repositories: [], workspaces: [], teams: [], sprints: [], tasks: [], agents: [],
+      });
+      expect(Object.hasOwn(agentSection!, "setup")).toBe(false);
+    }
     else expect(agentSection).toBeUndefined();
   }
 });

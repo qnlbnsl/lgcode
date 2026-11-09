@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { realpath, stat } from "node:fs/promises"
 import { isAbsolute } from "node:path"
 import { RepositoryId, WorkspaceId, TeamId, SprintId, TaskId, ChannelId,
-  projectTeamGroup, type Event, type Project, type Task } from "@lgcode/contracts"
+  stageLabel, projectTeamGroup, type Event, type Project, type Task } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { agentReadReply, type ReadHandler } from "../api/reads.ts"
@@ -14,6 +14,7 @@ import { cleanName, duplicateName } from "./names.ts"
 import { readHarnesses } from "../commands/internal.ts"
 
 import { withGit, gitCall, localMachine, safePath } from "./gitApi.ts"
+import { ownerNameSuggestion } from "./setup.ts"
 import { validChoiceId } from "../runner/choices.ts"
 
 const fresh = <S extends Schema.Top & { readonly Type: string }>(schema: S): S["Type"] => Schema.decodeUnknownSync(schema as never)(randomUUID()) as S["Type"]
@@ -53,7 +54,8 @@ const settingsSet: PiecePlanner = (input, raw) => Effect.gen(function* () {
       || lead.effort !== undefined && harness.efforts.length > 0 && !harness.efforts.includes(lead.effort)) return yield* refused("invalid lead defaults")
     for (const value of [lead.model, lead.effort]) if (value !== undefined && (!validChoiceId(value) || (yield* input.runtime.log.redactText(value)) !== value)) return yield* refused("invalid lead defaults")
   }
-  return ack(p.requestId, [{ _tag: "project.SettingsChanged", settings: { workspaceFolder, shell: yield* cleanName(input, p.settings.shell), ...(lead === undefined ? {} : { lead }) } }])
+  return ack(p.requestId, [{ _tag: "project.SettingsChanged", settings: { workspaceFolder, shell: yield* cleanName(input, p.settings.shell), ...(lead === undefined ? {} : { lead }),
+    ...(p.settings.displayName !== undefined ? { displayName: yield* cleanName(input, p.settings.displayName) } : projectView(input.snapshot).settings?.displayName === undefined ? {} : { displayName: projectView(input.snapshot).settings!.displayName! }) } }])
 })
 const repositoryAdd: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.repository.add">
@@ -112,6 +114,11 @@ const preferencesSet: PiecePlanner = (input, raw) => Effect.gen(function* () {
 })
 const stageSet: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.stage.set">; yield* requireProject(input, p.projectId)
+  const view = projectView(input.snapshot), head = own(view.mockHeads, p.projectId)
+  const revision = head === undefined ? undefined : own(view.mockRevisions, projectKey(p.projectId, head))
+  if (p.stage === "design" && (revision?.bundle.screens.length ?? 0) === 0) return yield* refused("projects without screens begin in Plan")
+  if (p.stage !== "design" && (revision?.bundle.screens.length ?? 0) > 0
+    && !Object.values(view.mockApprovals).some((row) => row.projectId === p.projectId && row.revisionId === head)) return yield* refused("approve the current mock revision before leaving Design")
   return ack(p.requestId, [{ _tag: "project.StageChanged", projectId: p.projectId, stage: p.stage }])
 })
 const teamCreate: PiecePlanner = (input, raw) => Effect.gen(function* () {
@@ -123,13 +130,16 @@ const teamCreate: PiecePlanner = (input, raw) => Effect.gen(function* () {
     || workspace.projectId !== undefined && workspace.projectId !== p.projectId
     || workspace.worktreeId !== project.worktreeId && workspace.parentId !== project.worktreeId) return yield* refused("invalid team workspace")
   if (Object.values(view.teams).some((row) => row.worktreeId === p.worktreeId)) return yield* refused("workspace already belongs to a team")
-  const name = yield* cleanName(input, p.name)
+  const area = p.area === undefined ? undefined : yield* cleanName(input, p.area)
+  const peers = Object.values(view.teams).filter((row) => row.projectId === p.projectId && row.stage === p.stage)
+  if (p.stage !== undefined && peers.length > 0 && (area === undefined || peers.some((row) => row.area === undefined))) return yield* refused("teams at the same stage require distinct areas")
+  const name = yield* cleanName(input, p.stage === undefined ? p.name : `${stageLabel(p.stage)}${area === undefined ? "" : ` · ${area}`}`)
   if (Object.values(view.teams).some((row) => row.projectId === p.projectId && row.name.toLowerCase() === name.toLowerCase())) return yield* refused("team name already exists")
   const teamId = fresh(TeamId); const channelId = fresh(ChannelId)
   const group = projectTeamGroup(p.projectId, teamId)
   const manager = { _tag: "agent", agentId: project.leadAgentId } as const
   return { events: [{ _tag: "project.TeamAdded", projectId: p.projectId, teamId, name, worktreeId: p.worktreeId, group, channelId,
-    ...(p.stage === undefined ? {} : { stage: p.stage }), ...(p.area === undefined ? {} : { area: yield* cleanName(input, p.area) }) },
+    ...(p.stage === undefined ? {} : { stage: p.stage }), ...(area === undefined ? {} : { area }) },
     { _tag: "board.ChannelOpened", channelId, name: `Team_${teamId}`, kind: "group", opener: manager, manager,
       anchorAgentId: project.leadAgentId, group, members: [] }], reply: () => ({ requestId: p.requestId, teamId, channelId, group }) }
 })
@@ -243,10 +253,11 @@ const restore: PiecePlanner = (input, raw) => Effect.gen(function* () {
   if (row.archiving) return yield* refused("finish archiving the project before restoring it")
   return ack(p.requestId, row.archivedAt === undefined ? [] : [{ _tag: "project.Restored", projectId: p.projectId }])
 })
-const settings: ReadHandler = (input, raw) => {
+const settings: ReadHandler = (input, raw) => Effect.gen(function* () {
   const settings = projectView(input.snapshot).settings
-  return Effect.succeed({ reply: { requestId: raw.requestId, ...(settings === undefined ? {} : { settings }) } })
-}
+  const ownerNameSuggestionValue = yield* ownerNameSuggestion(input)
+  return { reply: { requestId: raw.requestId, ...(settings === undefined ? {} : { settings }), ...(ownerNameSuggestionValue === undefined ? {} : { ownerNameSuggestion: ownerNameSuggestionValue }) } }
+})
 const repositories: ReadHandler = (input, raw) => page(input, raw, Object.entries(projectView(input.snapshot).repositories))
 const workspaces: ReadHandler = (input, raw) => page(input, raw, Object.entries(projectView(input.snapshot).workspaces).filter(([, row]) => raw.repoId === undefined || row.repoId === raw.repoId))
 const read: ReadHandler = (input, raw) => Effect.gen(function* () {

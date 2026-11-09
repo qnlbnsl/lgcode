@@ -25,7 +25,7 @@ export const snapshotFor = (caller: Caller, snapshot: Snapshot): typeof ProjectS
   const ids = new Set(projects.map((row) => row.projectId))
   const repos = new Set(projects.map((row) => row.repoId))
   const section: { -readonly [K in keyof typeof ProjectSnapshot.Type]: typeof ProjectSnapshot.Type[K] extends ReadonlyArray<infer V> ? V[] : typeof ProjectSnapshot.Type[K] } = {
-    sequence: snapshot.sequence, truncated: false, projects: [], repositories: [], workspaces: [], teams: [], sprints: [], tasks: [], agents: []
+    sequence: snapshot.sequence, truncated: false, ...(caller._tag === "owner" ? { setup: view.setup } : {}), projects: [], repositories: [], workspaces: [], teams: [], sprints: [], tasks: [], agents: []
   }
   const bytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value), "utf8")
   let size = bytes(section)

@@ -88,6 +88,14 @@ const planCreation = (input: Input, payload: Payload<"project.create">, bodyHash
     ...(repositoryIdentity === undefined ? {} : { repositoryIdentity }) } satisfies ProjectCreation
 })
 
+// The exact creation selector performs only local observations. Readiness
+// resolution is read-only; paths are not claimed until lifecycle preparation.
+export const previewProjectPlacement: import("../api/reads.ts").ReadHandler = (input, raw) => Effect.gen(function* () {
+  const plan = yield* planCreation(input, raw as Payload<"project.create">, "preview")
+  return { reply: { requestId: raw.requestId, result: { repositoryPath: plan.repository.path, path: plan.workspace.path,
+    branch: plan.workspace.branch, checkout: plan.workspace.checkout!, reserved: false } } }
+})
+
 const internalWrite = (runtime: Runtime, events: ReadonlyArray<Event>) => runtime.log.transact((append) =>
   append({ _tag: "owner" }, freshRequest(), randomUUID(), events, {}, false).pipe(Effect.asVoid))
 const creation = (runtime: Runtime, requestId: string) => runtime.views.snapshot.pipe(Effect.flatMap((snapshot) => {
