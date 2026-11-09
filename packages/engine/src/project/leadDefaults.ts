@@ -2,6 +2,8 @@ import { constants } from "node:fs"
 import { access } from "node:fs/promises"
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import type { Account, HarnessSettings, ProjectLeadDefaults } from "@lgcode/contracts"
+import { HomeDirectory } from "@lgcode/t3-provider-instance/HostProcess"
+import { mergeProviderInstanceEnvironment } from "@lgcode/t3-provider-instance/instanceEnvironment"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
 import { pickAccount } from "../accounts/pick.ts"
@@ -37,14 +39,15 @@ const ready = (input: Input, harness: HarnessSettings, account: Account) => Effe
   }
   if (harness.id === "codex") variables = yield* withCodexHome({ stateFolder: input.runtime.stateFolder, home: input.runtime.home,
     accountId: account.id, variables, ...(account.home === undefined ? {} : { homePath: account.home }) }).pipe(Effect.provide(NodeServices.layer))
-  const environment = buildBaseEnvironment({ parent: process.env, accountVariables: variables, lgcodeSocket: "", lgcodeToken: "" })
-  Object.assign(environment, variables)
-  const source = credentialSourceFor({ harnessId: harness.id, home: environment.HOME ?? input.runtime.home, variables: environment })
-  const tokens = yield* source.read
-  // Explicit account credentials and supported inherited API credentials are
-  // also used by the production environment builder. Never return their text.
-  return tokens.length > 0 || (login.keyVariable !== undefined && Boolean(environment[login.keyVariable]?.trim()))
-    || Object.entries(variables).some(([key, value]) => /(?:API_KEY|AUTH_TOKEN)$/.test(key) && value.trim() !== "")
+  const base = buildBaseEnvironment({ parent: process.env, accountVariables: variables, lgcodeSocket: "", lgcodeToken: "" })
+  const environment = yield* mergeProviderInstanceEnvironment(Object.entries(variables).map(([name, value]) => ({ name, value, sensitive: false })), base)
+    .pipe(Effect.provideService(HomeDirectory, process.env.HOME ?? input.runtime.home))
+  const effective = Object.fromEntries(Object.entries(environment).filter((pair): pair is [string, string] => pair[1] !== undefined))
+  const source = credentialSourceFor({ harnessId: harness.id, home: effective.HOME ?? input.runtime.home, variables: effective })
+  const fileCredential = yield* source.hasCredential
+  // A key must belong to this harness and reach its actual spawn environment.
+  // Unknown harnesses have no established local authentication evidence.
+  return fileCredential || (login.keyVariable !== undefined && Boolean(effective[login.keyVariable]?.trim()))
 }).pipe(Effect.catch(() => Effect.succeed(false)))
 
 export const leadDefaults = (input: Input, saved?: typeof ProjectLeadDefaults.Type) => Effect.gen(function* () {

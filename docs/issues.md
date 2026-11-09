@@ -9116,3 +9116,27 @@ stopped terminal event, and exact one-current-cancel count remain unchanged.
 The production runner, protocol transport, and shared fake agent are unchanged.
 Temporary repository probes are removed after their evidence is retained in
 `/tmp/w04b-cancel-order/`.
+
+
+## 542. Project creation admitted credentials for another provider
+
+The independent public-command probe configured an executable Claude adapter.
+Its account had no Claude login and held only an OpenAI application programming interface key.
+A separate Cursor account had its own supported key.
+Project creation selected Claude because the lead readiness check accepted any account variable ending in `API_KEY` or `AUTH_TOKEN`.
+The same check treated arbitrary redaction leaves from login files as authentication evidence.
+Those leaves intentionally include unfamiliar metadata strings to prevent credential disclosure.
+They do not establish a provider login.
+
+The correction uses the established per-harness key mapping and the effective spawn environment.
+It recognizes only provider credential fields in the existing bounded login-file reader.
+The reader still registers all its original redaction leaves and refuses unreadable stores.
+Codex shadow homes, account homes, secret resolution, and private client-secret exclusion remain in place.
+Unknown custom harness variables cannot establish local readiness.
+These checks establish local credential presence, not successful remote authentication or provider usage.
+
+Permanent public-command tests exercise the original wrong-provider failure and ready-Cursor control.
+They prove supported provider keys, resolved account secrets, file-backed account selection, effective homes, and private Codex logins.
+They also prove refusal of unavailable named accounts, arbitrary login metadata, unknown custom harness variables, and inherited keys excluded from the child environment.
+The existing lifecycle tests use a supported Cursor fixture while preserving their assertions.
+The independent original probe and its failure and control artifacts remain unchanged.

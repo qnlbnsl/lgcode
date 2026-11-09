@@ -27,12 +27,12 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig) })
 
 it.live("creates through the authenticated API, launches saved defaults, inherits children and archives/restores real processes", () => {
-  const harness = harnessFor("controlled", writeFakeAdapter(rig), { models: ["model-small", "model-large"], efforts: ["low", "high"] })
+  const harness = harnessFor("cursor", writeFakeAdapter(rig), { models: ["model-small", "model-large"], efforts: ["low", "high"] })
   const echo = echoFile(rig), childEcho = echoFile(rig)
   const options = [{ optionId: "yes", name: "Allow", kind: "allow_once" }, { optionId: "no", name: "Deny", kind: "reject_once" }]
   const account = accountFor(harness.id, { configOptions: [modeOption(), modelOption(), effortOption()],
-    turns: [[{ step: "permission", toolCallId: "creation-permission", title: "Write project notes", options }]] }, echo, { PROJECT_API_KEY: "secret:project-test" })
-  const childAccount = accountFor(harness.id, { turns: [] }, childEcho, { PROJECT_API_KEY: "secret:project-test" }, "child")
+    turns: [[{ step: "permission", toolCallId: "creation-permission", title: "Write project notes", options }]] }, echo, { CURSOR_API_KEY: "secret:project-test" })
+  const childAccount = accountFor(harness.id, { turns: [] }, childEcho, { CURSOR_API_KEY: "secret:project-test" }, "child")
   return withEngine(rig, { harness, accounts: [account, childAccount], secrets: { "secret:project-test": "synthetic-project-credential-1234" } }, () => Effect.gen(function* () {
     yield* registerRebuildCheck()
     const bearer = randomBytes(32).toString("base64url")
@@ -97,8 +97,8 @@ it.live("creates through the authenticated API, launches saved defaults, inherit
 })
 
 it.live("creates an unborn new repository and a real orphan worktree without inventing a commit", () => {
-  const harness = harnessFor("controlled", writeFakeAdapter(rig))
-  const echo = echoFile(rig), account = accountFor(harness.id, { turns: [] }, echo, { PROJECT_API_KEY: "secret:project-test" }, "ready")
+  const harness = harnessFor("cursor", writeFakeAdapter(rig))
+  const echo = echoFile(rig), account = accountFor(harness.id, { turns: [] }, echo, { CURSOR_API_KEY: "secret:project-test" }, "ready")
   const unready = accountFor(harness.id, { turns: [] }, echoFile(rig), {}, "a-unready")
   return withEngine(rig, { harness, accounts: [unready, account], secrets: { "secret:project-test": "synthetic-project-credential-1234" } }, () => Effect.gen(function* () {
     yield* registerRebuildCheck()
@@ -116,8 +116,8 @@ it.live("creates an unborn new repository and a real orphan worktree without inv
 
 
 it.live("stops the actual process when session recording fails after a committed project launch", () => {
-  const harness = harnessFor("controlled", writeFakeAdapter(rig))
-  const echo = echoFile(rig), account = accountFor(harness.id, { turns: [] }, echo, { PROJECT_API_KEY: "secret:project-test" })
+  const harness = harnessFor("cursor", writeFakeAdapter(rig))
+  const echo = echoFile(rig), account = accountFor(harness.id, { turns: [] }, echo, { CURSOR_API_KEY: "secret:project-test" })
   let armed = true
   return withEngine(rig, { harness, accounts: [account], secrets: { "secret:project-test": "synthetic-project-credential-1234" },
     wrapLog: (real) => ({ ...real, transact: (use) => real.transact((append) => use((actor, id, hash, events, rows, receipt) => {
@@ -145,8 +145,8 @@ it.live("stops the actual process when session recording fails after a committed
 })
 
 it.live("keeps one visible lead and closes a real adapter rejected during setup", () => {
-  const harness = harnessFor("controlled", writeFakeAdapter(rig))
-  const echo = echoFile(rig), account = accountFor(harness.id, { sessionError: "Unexpected PRIVATE_SETUP_OUTPUT" }, echo, { PROJECT_API_KEY: "secret:project-test" })
+  const harness = harnessFor("cursor", writeFakeAdapter(rig))
+  const echo = echoFile(rig), account = accountFor(harness.id, { sessionError: "Unexpected PRIVATE_SETUP_OUTPUT" }, echo, { CURSOR_API_KEY: "secret:project-test" })
   return withEngine(rig, { harness, accounts: [account], secrets: { "secret:project-test": "synthetic-project-credential-1234" } }, () => Effect.gen(function* () {
     yield* registerRebuildCheck()
     success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.work, shell: "sh" } }))

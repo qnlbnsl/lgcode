@@ -27,9 +27,9 @@ beforeEach(() => {
 })
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig) })
 const setup = () => Effect.gen(function* () {
-  yield* registerRebuildCheck(); yield* seedAccount(); yield* seedHarness()
-  success(yield* call(owner, "harnesses", { operation: "set", harness: harnessSettings("first", { adapterPath: process.execPath, reportedModes: [{ id: "default", level: "ask" }] }) }))
-  success(yield* call(owner, "accounts set-secret", { accountId: "primary", name: "TEST_API_KEY", nonce: "test-project", value: Redacted.make("synthetic-project-credential-012345") }))
+  yield* registerRebuildCheck(); yield* seedAccount("primary", "cursor"); yield* seedHarness("cursor")
+  success(yield* call(owner, "harnesses", { operation: "set", harness: harnessSettings("cursor", { adapterPath: process.execPath, reportedModes: [{ id: "default", level: "ask" }] }) }))
+  success(yield* call(owner, "accounts set-secret", { accountId: "primary", name: "CURSOR_API_KEY", nonce: "test-project", value: Redacted.make("synthetic-project-credential-012345") }))
   success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "zsh" } }))
   return success(yield* call(owner, "project.repository.add", { name: "Product", path: rig.work, machineId: "local" })).repoId
 })
@@ -49,7 +49,7 @@ live("retains owned unrecorded worktree success and retries the same intent afte
   const runner = yield* makeFakeRunner(), secrets = makeFakeSecrets()
   const request = yield* provideRig(rig, { runner, secrets, wrapLog: failCreated() }, Effect.gen(function* () {
     const repoId = yield* setup(), request = payload(repoId)
-    success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "bash", lead: { harness: "first", account: { _tag: "named", accountId: "primary" }, model: "test-model", effort: "high", permission: "ask" } } }))
+    success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "bash", lead: { harness: "cursor", account: { _tag: "named", accountId: "primary" }, model: "test-model", effort: "high", permission: "ask" } } }))
     expect(failureOf(yield* call(owner, "project.create", request))?._tag).toBe("LogWriteFailed")
     const pending = success(yield* call(owner, "project.creations", {})).items
     expect(pending).toHaveLength(1)
@@ -66,7 +66,7 @@ live("retains owned unrecorded worktree success and retries the same intent afte
     expect(success(yield* call(owner, "project.create", request))).toEqual(created)
     expect(runner.callsOf("start")).toHaveLength(1)
     expect(runner.callsOf("start")[0]?.input).toMatchObject({ model: "test-model", effort: "high", permission: "ask", account: { id: "primary" } })
-    expect(success(yield* call(owner, "project.settings", {})).settings.lead).toMatchObject({ harness: "first", model: "test-model", effort: "high" })
+    expect(success(yield* call(owner, "project.settings", {})).settings.lead).toMatchObject({ harness: "cursor", model: "test-model", effort: "high" })
     expect(git(rig.work, "worktree", "list", "--porcelain").match(/^worktree /gm)).toHaveLength(2)
     expect((yield* readLog).filter(({ event }) => event._tag === "project.Created")).toHaveLength(1)
     expect(success(yield* call(owner, "project.creations", {})).items).toEqual([])
@@ -174,16 +174,16 @@ live("refuses unknown machines and unavailable defaults before mutations, and ch
   yield* provideRig(rig, { runner, secrets }, Effect.gen(function* () {
     const repoId = yield* setup(), request = payload(repoId)
     expect(failureOf(yield* call(owner, "project.create", { ...request, machineId: "offline" }))?.reason).toContain("confirmed local")
-    const defaults = { harness: "first", account: { _tag: "named", accountId: "primary" }, model: "test-model", effort: "high", permission: "ask" }
+    const defaults = { harness: "cursor", account: { _tag: "named", accountId: "primary" }, model: "test-model", effort: "high", permission: "ask" }
     success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "bash", lead: defaults } }))
     success(yield* call(owner, "accounts", { operation: "disable", accountId: "primary" }))
     expect(failureOf(yield* call(owner, "project.create", request))?.reason).toBe("no ready signed-in lead account is available")
     expect(success(yield* call(owner, "project.creations", {})).items).toHaveLength(0)
-    success(yield* call(owner, "accounts", { operation: "set", account: { id: "primary", harness: "first", enabled: true, environment: { TEST_API_KEY: [...secrets.stored.keys()][0] } } }))
+    success(yield* call(owner, "accounts", { operation: "set", account: { id: "primary", harness: "cursor", enabled: true, environment: { CURSOR_API_KEY: [...secrets.stored.keys()][0] } } }))
     const result = success(yield* call(owner, "project.create", request))
     const row = projectView(yield* snapshot).projects[result.projectId]!
     expect(runner.callsOf("start")[0]?.input).toMatchObject({ model: "test-model", effort: "high", permission: "ask" })
-    expect((yield* snapshot).agents[row.leadAgentId]?.harness).toBe("first")
+    expect((yield* snapshot).agents[row.leadAgentId]?.harness).toBe("cursor")
     expect(success(yield* call(owner, "project.settings", {})).settings.lead).toEqual(defaults)
   }))
 }))
