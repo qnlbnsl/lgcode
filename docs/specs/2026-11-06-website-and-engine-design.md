@@ -314,7 +314,8 @@ The owner picks from the critique's remaining Should fix and Polish findings.
 The current reference is the mock merged into `master` at `5050be1`.
 The owner lifted the development freeze for this build on 2026-11-08.
 The build uses five ordered steps, and all five belong to its scope.
-The run plan is `.scratch/foundry-runs/website-1/plan.md` in the main checkout.
+The committed plan is `.plans/plans/website-replacement/plan.md`.
+The run folder also holds a copy in `.scratch/foundry-runs/website-1/plan.md`.
 The mock files remain owned by the mock session.
 
 The earlier descriptions above are historical where this section replaces them.

@@ -7,7 +7,8 @@ The five build steps are an implementation order, not a reduced scope.
 
 This list was reconciled against `master` at `5050be1` on 2026-11-08.
 The source-to-mock map is `design/FEATURE-PARITY.md`.
-The complete unit plan is `.scratch/foundry-runs/website-1/plan.md` in the main checkout.
+The complete unit plan is `.plans/plans/website-replacement/plan.md`.
+The main checkout also keeps a copy in `.scratch/foundry-runs/website-1/plan.md`.
 The website team must not edit `design/`.
 
 Each line below is one piece of work. "Agent's call" marks a choice the owner has
