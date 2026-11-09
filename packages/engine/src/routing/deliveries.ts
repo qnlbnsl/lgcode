@@ -283,8 +283,9 @@ export const promptReply = (
 // Recovery step 10 and row 66 (`recovered`): an agent that a reload left
 // working, with a re-sent delivery or a carry-on at the head of its queue,
 // sends that head once. It counts as sent once any delivery was sent after
-// the reload's "working". `laneHeld` is for a caller that already holds the
-// agent's lane, such as `resume`.
+// the reload's "working". A later owner configuration can release that same
+// unsent head after a configuration refusal. `laneHeld` is for a caller that
+// already holds the agent's lane, such as `resume`.
 export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?: boolean; readonly laneHeld?: boolean; readonly lists?: EngineLists } = {}) => Effect.gen(function* () {
   const log = yield* EventLog;
   const views = yield* Views;
@@ -303,7 +304,11 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
     const agent = snapshot.agents[agentId];
     const state = agent?.state._tag;
     return agent !== undefined && !agent.capacityHeld && snapshot.accounts[agent.account]?.status !== "needs-sign-in"
-      && (state === "idle" || (options.recovered === true && state === "working" && reloaded(snapshot)))
+      // A refused configuration can defer recovery's first send until a later
+      // owner choice. Keep that unsent recovery reservation usable then, while
+      // the logged-send and incarnation checks still exclude an active turn.
+      && (state === "idle" || ((options.recovered === true || agent.configuration?.revision !== undefined)
+        && state === "working" && reloaded(snapshot)))
       ? nextQueued(snapshot, agentId) : undefined;
   };
   const candidate = (yield* views.snapshot).agents[agentId];

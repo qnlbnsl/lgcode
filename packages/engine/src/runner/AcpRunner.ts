@@ -118,6 +118,14 @@ interface Process {
   sent?: Deferred.Deferred<void, RunnerRejected>;
 }
 const rejected = (reason: string) => new RunnerRejected({ reason });
+const invalidateContext = (entry: Process) => {
+  // Reconciliation before a replacement session's first turn has no old
+  // occupancy to invalidate. Preserve its honest "not reported" state.
+  if (entry.context._tag !== "unavailable" || entry.context.reason !== "not-reported") {
+    entry.context = { _tag: "unavailable", reason: "configuration-changed" };
+  }
+  entry.contextNeedsTurn = true;
+};
 const tokenCount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 // The pinned ACP Usage has only these input counters. Do not infer request
 // times or cache lifetimes from arbitrary _meta. In particular, Claude 0.99.1
@@ -519,8 +527,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
             current.options = update.configOptions;
             current.applied = yield* safeApplied(current, reportedChoice(current.options));
             if (previous.model !== current.applied.model || previous.effort !== current.applied.effort) {
-              current.context = { _tag: "unavailable", reason: "configuration-changed" };
-              current.contextNeedsTurn = true;
+              invalidateContext(current);
               if (current.ready && !current.loading && !current.configuring) yield* emit({ _tag: "configurationReported", ...identity(current), applied: current.applied });
             }
           }
@@ -814,8 +821,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         // old-generation compatibility calls are not evidence of live support.
         if (option === undefined || (option.id ?? option.configId) === undefined) return failure("unsupported", "not-supported");
         if (!selectValues(option).some((item) => item.id === value) || (yield* redactText(value, entry.covered)) !== value) return failure("refused", "adapter-refused");
-        entry.context = { _tag: "unavailable", reason: "configuration-changed" };
-        entry.contextNeedsTurn = true;
+        invalidateContext(entry);
         const changed = yield* setConfig(entry.client, entry.sessionId, entry.options, category, value, entry.version).pipe(
           Effect.timeoutOption(10_000), Effect.result);
         if (changed._tag === "Failure" || Option.isNone(changed.success)) {

@@ -46,9 +46,17 @@ export const spawnInput = (
   const harness = (yield* readHarnesses(runtime)).find((settings) => settings.id === agent.harness);
   const account = snapshot.accounts[agent.account];
   if (harness === undefined || account === undefined) return yield* refused();
-  return { agentId: agent.agentId, token, folder, grant, harness, account,
-    permission: Schema.decodeUnknownSync(PermissionLevel)(agent.permission),
+  // An owner choice can use that session's advertised values, which can be
+  // wider than the optional configured launch lists. Open the
+  // replacement session first and report its actual settings. The existing
+  // configuration/send lane then revalidates and acknowledges the durable
+  // desired choice before releasing work. Unchanged initial settings retain
+  // the runner's recorded-list admission and older-protocol start calls.
+  const launchChoice = agent.configuration?.revision === undefined ? {
     ...(agent.model === undefined ? {} : { model: agent.model }), ...(agent.effort === undefined ? {} : { effort: agent.effort }),
+  } : {};
+  return { agentId: agent.agentId, token, folder, grant, harness, account,
+    permission: Schema.decodeUnknownSync(PermissionLevel)(agent.permission), ...launchChoice,
   };
 });
 

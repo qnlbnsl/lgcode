@@ -8949,3 +8949,48 @@ Client and engine type checks pass. The targeted recovery and browser-boundary
 batch passes all 32 tests in five files. An independent five-mode probe also
 passes and retains a typed SocketReadError for an active malformed frame.
 Complete corrected-head checks remain required before acceptance.
+
+## 537. Negotiated model and effort choices could prevent retry and reload
+
+Found: 2026-11-08, by the independent website composer verifier at `4914fe3`.
+State: corrected locally on `unit/website-w05cf1`, pending independent review.
+
+The owner could select an advertised model or effort absent from a nonempty configured list.
+The live adapter acknowledged that choice, and an actual prompt used it.
+The agent reducer also copied the desired value into the agent's launch fields.
+Both loaded resume and fresh resume passed those fields into the runner's configured-list admission check.
+That check rejected the replacement process before negotiation.
+The agent remained interrupted, with its desired configuration pending.
+Engine reload used the same input builder.
+
+Retry and reload now distinguish an owner's durable choice revision from unchanged initial launch settings.
+A replacement session opens without passing that revision's desired values as initial launch arguments.
+The session records only its actual reported configuration.
+The existing configuration lane then validates the desired identifiers against the new advertisement.
+It waits for acknowledgement before sending queued work.
+A missing value, missing selector, or unacknowledged setter retains an honest refusal and holds the queue.
+The owner can correct a supported choice on the replacement process.
+The correction does not change global harness settings or initial-start admission.
+Unchanged initial settings retain the older protocol's existing start calls.
+Cursor retains its exact advertised `default[]` identity for the existing `auto` launch alias.
+
+The permanent reload refusal control also exposed a related recovery reservation problem.
+Recovery can mark an agent working before its first recovered delivery is sent.
+If configuration refuses that send, a later owner correction previously could not release the unsent queue.
+Dispatch now recognizes that same unsent recovery reservation for an agent with an owner choice revision.
+The lane, logged-send, account, capacity, and incarnation guards still govern the actual send.
+An existing recovery assertion also caught a changed context reason after deferred configuration.
+A replacement process with no occupancy report now retains `not-reported` during reconciliation.
+Configuration changes still invalidate any earlier occupancy evidence.
+
+The new regression uses the real command handler and controlled Agent Client Protocol children.
+It covers both axes across loaded resume, fresh resume, and service reload.
+Nonempty configured lists exclude the negotiated choices in every case.
+Wire gates prove that no prompt is sent before acknowledgement.
+Actual child reports prove the selected settings and replacement process identity.
+The negative controls remove support from the new advertisement without making the adapter reject arbitrary setter values.
+They prove refusal, preserved queued work, and release on the same process after an owner correction.
+Additional fresh-session controls cover missing selectors, missing acknowledgement, and Cursor's alias.
+The existing recovery and initial invalid-choice assertions remain intact.
+All four model and effort retry cases were reproduced red with the original production files restored temporarily.
+The independent verifier's original files and logs remain unchanged.
