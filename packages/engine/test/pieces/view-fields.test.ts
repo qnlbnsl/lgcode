@@ -7,7 +7,7 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 registerRebuildCheck({ noLog: true });
 
-it.each(["client", "board", "roles"])("1a E6 empty views initialize the %s field before that piece is built", (namespace) => {
+it.each(["client", "board", "roles", "project"])("1a E6 empty views initialize the %s field before that piece is built", (namespace) => {
   expect(Object.hasOwn(Apply.emptyViews(), namespace)).toBe(true);
 });
 

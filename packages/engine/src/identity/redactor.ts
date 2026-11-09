@@ -218,7 +218,7 @@ const redactValue = (
     for (const [key, item] of Object.entries(value)) {
       // Defined, not assigned, so a `__proto__` key stays an ordinary field.
       Object.defineProperty(copy, key, {
-        value: redactValue(item, redactText, fieldStructure(structure, key)), enumerable: true, writable: true, configurable: true,
+        value: redactValue(item, redactText, fieldStructure(structure, key, "_tag" in value ? value._tag : undefined)), enumerable: true, writable: true, configurable: true,
       });
     }
     return copy;

@@ -45,13 +45,16 @@ const clientReads = ["client.snapshot", "client.roster", "client.thread", "clien
 // three named ones plus the two that change accounts and harness settings as a whole (`accounts`,
 // `harnesses`). `subscribe` is agent-callable (criterion 7.3: an agent's `subscribe` sees its own
 // events) but is not offered as an MCP tool because a stream cannot be a tool.
+const projectOwnerCommands = ["project.settings", "project.settings.set", "project.repository.add", "project.repository.locate", "project.repositories", "project.workspace.register", "project.workspaces", "project.create", "project.rename", "project.place", "project.preferences.set"]
+const projectTools = ["project.stage.set", "project.read", "project.team.create", "project.sprint.create", "project.sprint.update", "project.sprint.complete", "project.task.create", "project.task.update", "project.task.note", "project.task.history"]
+const projectCommands = [...projectOwnerCommands, ...projectTools]
 const expectedWebCommands = ["client.web.settings", "client.web.settings.set"]
 const expectedApiCommands = [...expectedCommands, ...expectedWebCommands]
 const expectedOwnerOnly = ["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "client.requests", "board.peek", "board.flush",
   "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record",
   "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
-  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", ...expectedWebCommands]
+  "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", ...expectedWebCommands, ...projectOwnerCommands]
 
 const expectedMcpOffered = ["start", "prompt", "answer", "pass-up", "ask", "wait", "cancel-reply", "stop", "resume", "release", "compact", "group"]
 const boardCommands = ["board.open", "board.members", "board.post", "board.close", "board.acknowledge", "board.read", "board.peek", "board.channels", "board.status", "board.flush"]
@@ -62,7 +65,7 @@ const rolesTools = ["roles.orient", "roles.handoff"]
 const clientTools = ["client.snapshot", "client.roster", "client.thread", "client.event"]
 const alertCommands = ["client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss", "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
   "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"]
-const testedCommands = [...expectedApiCommands, ...alertCommands]
+const testedCommands = [...expectedApiCommands, ...alertCommands, ...projectCommands]
 const expectedRpcCommands = [...testedCommands, ...boardCommands, ...clientReads, ...rolesCommands]
 
 const sorted = (values: ReadonlyArray<string>) => [...values].sort()
@@ -109,9 +112,9 @@ describe("command lists", () => {
 
   // Catches: a secret-setting command offered to agents. Row 55 asserts the MCP list against an
   // explicit list; this derives it the way unit 7 will (agent-callable, minus the stream).
-  it("offers twelve engine, eight board, four client and two roles tools, excluding streams, board.flush and alerts", () => {
+  it("offers twelve engine, eight board, four client, two roles and ten project tools, excluding streams, board.flush and alerts", () => {
     const offered = [...CommandsRpcGroup.requests.keys()].filter((name) => ((commandAccess as Record<string, ReadonlyArray<string>>)[name] ?? []).includes("agent") && name !== "subscribe" && name !== "client.subscribe")
-    expect(sorted(offered)).toEqual(sorted([...expectedMcpOffered, ...boardTools, ...clientTools, ...rolesTools]))
+    expect(sorted(offered)).toEqual(sorted([...expectedMcpOffered, ...boardTools, ...clientTools, ...rolesTools, ...projectTools]))
     for (const excluded of ["subscribe", "accounts set-secret", "accounts mark-available", "debug.compare-views", ...alertCommands]) {
       expect(offered, excluded).not.toContain(excluded)
     }

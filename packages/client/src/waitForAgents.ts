@@ -19,7 +19,7 @@ interface ConditionLists {
 }
 // A failed snapshot hook must not hide the piece's independent condition read.
 const conditionReads = {
-  client: undefined, board: "board.status", roles: undefined,
+  client: undefined, board: "board.status", roles: undefined, project: undefined,
 } as const satisfies Record<PieceNamespace, keyof Client | undefined>
 const keyed = <A>(rows: ReadonlyArray<A>, id: (row: A) => string) => Object.fromEntries(rows.map((row) => [id(row), row]))
 const requestId = () => globalThis.crypto.randomUUID() as RequestId

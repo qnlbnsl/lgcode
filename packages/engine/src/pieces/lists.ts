@@ -8,6 +8,8 @@ import type * as RpcGroup from "effect/rpc/RpcGroup";
 import type { PlannerTable, Snapshot } from "../commands/internal.ts";
 import { planners } from "../commands/planners.ts";
 import { reads, type ReadHandler } from "../api/reads.ts";
+import { projectPlanners, projectReads } from "../project/commands.ts";
+import { snapshotFor as projectSnapshotFor } from "../project/snapshot.ts";
 import { boardPlanners, boardReads } from "../board/commands.ts";
 import { boardReactor } from "../board/reactor.ts";
 import { snapshotFor as boardSnapshotFor } from "../board/snapshot.ts";
@@ -56,20 +58,20 @@ const absent = () => undefined;
 let reactors: EngineLists["reactors"] | undefined;
 export const engineLists: EngineLists = {
   commandGroups, eventGroups, commands: CommandsRpcGroup, event: Event, envelope: EventEnvelope,
-  reach, sourceRules, holdUnsettled, requestHeld, secretKeep: { client: carrierKeep, board: () => [], roles: () => [] },
+  reach, sourceRules, holdUnsettled, requestHeld, secretKeep: { client: carrierKeep, board: () => [], roles: () => [], project: () => [] },
   services: {
     "roles.sheepdog": ["subscribe", "client.event", "prompt", "compact", "resume", "release", "roles.record", "board.post", "board.flush", "board.status"],
     "roles.standing-rules": [],
   }, secretCommands: ["accounts set-secret", "client.alerts.carrier.set-token"],
   access: commandAccess,
-  planners: { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners },
-  reads: { ...reads, ...alertReads, ...boardReads },
+  planners: { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners, ...projectPlanners },
+  reads: { ...reads, ...alertReads, ...boardReads, ...projectReads },
   // The tables and reactors import engine services in this same module graph.
   // Resolve their values when used, after module initialization has completed.
   get views() { return pieceViews; },
-  migrations: { client: [], board: [], roles: [] }, visibility: eventVisibility, pieceVisibility: {},
+  migrations: { client: [], board: [], roles: [], project: [] }, visibility: eventVisibility, pieceVisibility: {},
   snapshotSections: { client: (caller, view) => caller._tag === "owner"
-    ? { pushPromptDismissed: clientView(view.client).pushPromptDismissed } : undefined, board: boardSnapshotFor, roles: rolesSnapshotFor },
+    ? { pushPromptDismissed: clientView(view.client).pushPromptDismissed } : undefined, board: boardSnapshotFor, roles: rolesSnapshotFor, project: projectSnapshotFor },
   alertSources: { client: absent, board: boardAlertSource, roles: rolesAlertSource },
   openMatters: { client: () => [], board: boardOpenMatters, roles: rolesOpenMatters },
   get reactors() { return reactors ??= {

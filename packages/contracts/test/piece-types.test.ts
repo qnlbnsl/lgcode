@@ -31,7 +31,7 @@ it("1.5/1.22 tables reject missing visibility and namespace entries, and a piece
       import { engineLists } from ${JSON.stringify(lists)};
       import type { PiecePlan, Plan } from ${JSON.stringify(join(root, "packages/engine/src/commands/internal.ts"))};
       type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
-      const exactNamespaces: Equal<PieceNamespace, "client" | "board" | "roles"> = true;
+      const exactNamespaces: Equal<PieceNamespace, "client" | "board" | "roles" | "project"> = true;
       const complete = engineLists.snapshotSections;
       const { roles, ...missingSection } = complete;
       // @ts-expect-error Every namespace needs its own refusing entry.

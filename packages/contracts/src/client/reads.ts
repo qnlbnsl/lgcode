@@ -1,4 +1,5 @@
 import { QuestionMetadataFields } from "../questions.ts"
+import { ProjectSnapshot } from "../project/commands.ts"
 import { StartFailure } from "../startFailure.ts"
 import * as Schema from "effect/Schema"
 import { Actor, EventEnvelope, PermissionOption, SessionReference } from "../events.ts"
@@ -83,7 +84,7 @@ export const ClientSnapshot = Schema.Struct({
     waits: Schema.Array(Schema.Struct({ agentId: AgentId, waitId: WaitId }))
   })),
   // Each later piece defines its bounded, per-caller section in its own contracts.
-  client: Schema.optionalKey(Schema.Unknown), board: Schema.optionalKey(Schema.Unknown), roles: Schema.optionalKey(Schema.Unknown),
+  project: Schema.optionalKey(ProjectSnapshot), client: Schema.optionalKey(Schema.Unknown), board: Schema.optionalKey(Schema.Unknown), roles: Schema.optionalKey(Schema.Unknown),
   failedSections: Schema.optionalKey(Schema.Array(Schema.String))
 })
 export type ClientSnapshot = typeof ClientSnapshot.Type

@@ -1,3 +1,4 @@
+import { projectVisibility } from "./project/events.ts"
 import { clientEventVisibility } from "./client/events.ts"
 import type { Event } from "./events.ts"
 import { boardVisibility } from "./board/events.ts"
@@ -6,6 +7,7 @@ import { rolesVisibility } from "./roles/visibility.ts"
 export type VisibilityClass = "agent-scoped" | "owner-only" | "piece-decided"
 export const eventVisibility = {
   ...boardVisibility,
+  ...projectVisibility,
   ...clientEventVisibility,
   ...rolesVisibility,
   AgentStarted: "agent-scoped",
