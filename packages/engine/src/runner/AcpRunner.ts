@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import { comparePermission, DeliveryId, ThreadContent, type PermissionLevel, type SessionReference, type TurnUsage } from "@lgcode/contracts";
+import { comparePermission, type AgentChoice, type AgentConfiguration, type ContextUsage, DeliveryId, ThreadContent, type PermissionLevel, type SessionReference, type TurnUsage } from "@lgcode/contracts";
 import { AcpClient, layerChildProcess } from "@lgcode/t3-effect-acp/client";
 import { AcpRequestError } from "@lgcode/t3-effect-acp/errors";
 import type { AgentCapabilities } from "@lgcode/t3-effect-acp/schema-v1";
@@ -41,6 +41,7 @@ import { classifyError } from "./classify.ts";
 import { mcpScriptPath, withLGcodeMcp } from "./codexMcp.ts";
 import { cursorMcpConfig, cursorModelId, cursorServerName } from "./cursorMcp.ts";
 import { compactPrompt } from "./compact.ts";
+import { negotiatedChoices, reportedChoice, selector, selectValues, validChoiceId } from "./choices.ts";
 import { setConfig, type ConfigOption } from "./config.ts";
 import { denyArguments } from "./denyRead.ts";
 import { reportedLevel } from "./modes.ts";
@@ -100,6 +101,11 @@ interface Process {
   dead: boolean;
   mode: string;
   options: ReadonlyArray<ConfigOption>;
+  applied: AgentChoice;
+  configuring: boolean;
+  configurationUncertain: boolean;
+  context: ContextUsage;
+  contextNeedsTurn: boolean;
   commands: ReadonlyArray<{ name: string }>;
   message?: {
     readonly id: string;
@@ -113,6 +119,14 @@ interface Process {
   sent?: Deferred.Deferred<void, RunnerRejected>;
 }
 const rejected = (reason: string) => new RunnerRejected({ reason });
+const invalidateContext = (entry: Process) => {
+  // Reconciliation before a replacement session's first turn has no old
+  // occupancy to invalidate. Preserve its honest "not reported" state.
+  if (entry.context._tag !== "unavailable" || entry.context.reason !== "not-reported") {
+    entry.context = { _tag: "unavailable", reason: "configuration-changed" };
+  }
+  entry.contextNeedsTurn = true;
+};
 const tokenCount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 // The pinned ACP Usage has only these input counters. Do not infer request
 // times or cache lifetimes from arbitrary _meta. In particular, Claude 0.99.1
@@ -486,7 +500,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       const processEntry: Process = { input, incarnation: sha256Hex(Redacted.value(input.token)), scope, child, client, secrets: resolvedSecrets, covered,
         holds: new Map(), responses: new Map(), replay: [],
         terminalOutput: makeTerminalOutput({ redactChunk: (id, text, final) => redactChunk(id, text, final, covered), redactText: (text) => redactText(text, covered) }), sessionId: session?._tag === "acp" ? session.sessionId : "", version: 0,
-        loading: session !== undefined, ready: false, stopped: false, dead: false, mode: startingMode, options: [], commands: [] };
+        loading: session !== undefined, ready: false, stopped: false, dead: false, mode: startingMode, options: [], commands: [], applied: {}, configuring: false, configurationUncertain: false, context: { _tag: "unavailable", reason: "not-reported" }, contextNeedsTurn: session !== undefined };
       entry = processEntry;
       processes.set(input.agentId, processEntry);
       yield* Scope.addFinalizer(scope, Effect.gen(function* () {
@@ -510,7 +524,15 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           return;
         }
         if (update.sessionUpdate === "config_option_update" || update.sessionUpdate === "current_mode_update") {
-          if (Array.isArray(update.configOptions)) current.options = update.configOptions;
+          if (Array.isArray(update.configOptions)) {
+            const previous = current.applied;
+            current.options = update.configOptions;
+            current.applied = yield* safeApplied(current, reportedChoice(current.options));
+            if (previous.model !== current.applied.model || previous.effort !== current.applied.effort) {
+              invalidateContext(current);
+              if (current.ready && !current.loading && !current.configuring) yield* emit({ _tag: "configurationReported", ...identity(current), applied: current.applied });
+            }
+          }
           const mode = update.currentModeId ?? current.options.find((option) => option.category === "mode")?.currentValue;
           if (current.ready && !current.loading && typeof mode === "string" && mode !== current.mode) {
             const level = reportedLevel(harness, mode, input.permission);
@@ -521,6 +543,12 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           return;
         }
         if (update.sessionUpdate === "usage_update") {
+          if (current.ready && !current.loading && !current.configuring && !current.contextNeedsTurn) {
+            current.context = tokenCount(update.used) && tokenCount(update.size) && update.size > 0 && update.used <= update.size
+              ? { _tag: "available", used: update.used, window: update.size, percent: (update.used / update.size) * 100,
+                reportedAt: Date.now(), ...(current.applied.model === undefined ? {} : { model: current.applied.model }) }
+              : { _tag: "unavailable", reason: "invalid-report" };
+          }
           // Replay and updates outside a turn must never seed the next turn.
           if (!current.loading && current.turn !== undefined && !current.turn.ended && tokenCount(update.used)) {
             current.turn.usage = { ...current.turn.usage, used: update.used };
@@ -722,6 +750,19 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       if (input.model !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "model", harness.id === "cursor" ? cursorModelId(input.model, processEntry.options) : input.model, processEntry.version);
       if (input.effort !== undefined) processEntry.options = yield* setConfig(client, processEntry.sessionId, processEntry.options, "thought_level", input.effort, processEntry.version);
       yield* setMode(processEntry, input.permission);
+      const reported: { model?: string; effort?: string } = { ...reportedChoice(processEntry.options) };
+      for (const axis of ["model", "effort"] as const) {
+        const requested = axis === "model" && input.model !== undefined && harness.id === "cursor" ? cursorModelId(input.model, processEntry.options) : input[axis];
+        if (requested === undefined) continue;
+        // v1's legacy model call acknowledges with an empty response. A
+        // negotiated select, in either generation, must report the selection.
+        if (processEntry.version === 1 && axis === "model" && selector(processEntry.options, "model") === undefined) {
+          reported.model = requested;
+        } else if (reported[axis] !== requested) return yield* new RunnerRejected({
+          reason: "adapter did not acknowledge configuration", startFailure: axis === "model" ? "model-refused" : "effort-refused",
+        });
+      }
+      processEntry.applied = yield* safeApplied(processEntry, reported);
       processEntry.ready = true;
       yield* child.exitCode.pipe(Effect.result, Effect.flatMap((result) => Effect.gen(function* () {
         processEntry.dead = true;
@@ -752,16 +793,65 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       // Every replayed update was flushed into `replay` before loading ended.
       const replay = session === undefined ? {} : { replay: processEntry.replay.splice(0) };
       return { session: { _tag: "acp" as const, sessionId: processEntry.sessionId }, protocolVersion: initialized.protocolVersion,
-        reloadable: loads || resumes, ...replay };
+        reloadable: loads || resumes, configuration: processEntry.applied, ...replay };
     }).pipe(Effect.onExit((exit) => Exit.isFailure(exit) ? entry === undefined ? Scope.close(scope, Exit.void) : close(entry) : Effect.void));
+  });
+  const safeApplied = (entry: Process, choice: AgentChoice): Effect.Effect<AgentChoice> => Effect.gen(function* () {
+    const result: { model?: string; effort?: string } = {};
+    for (const axis of ["model", "effort"] as const) {
+      const value = choice[axis];
+      if (validChoiceId(value) && (yield* redactText(value, entry.covered)) === value) result[axis] = value;
+    }
+    return result;
+  });
+  const configure = (input: Parameters<Runner["Service"]["configure"]>[0]) => Effect.gen(function* () {
+    const entry = yield* live(input.agentId, input.incarnation);
+    if (entry.turn !== undefined && !entry.turn.ended) return yield* rejected("configuration waits for turn end");
+    if (entry.configuring) return yield* rejected("configuration already reserved");
+    if (entry.configurationUncertain) return { status: "unavailable" as const, reason: "configuration-unknown" as const, applied: entry.applied };
+    entry.configuring = true;
+    return yield* Effect.gen(function* () {
+      const failure = (status: "refused" | "unsupported" | "unavailable", reason: NonNullable<AgentConfiguration["reason"]>) =>
+        ({ status, reason, applied: entry.applied });
+      for (const axis of ["model", "effort"] as const) {
+        const requested = input.desired[axis];
+        const value = axis === "model" && requested !== undefined && entry.input.harness.id === "cursor"
+          ? cursorModelId(requested, entry.options) : requested;
+        if (value === undefined || entry.applied[axis] === value) continue;
+        const category = axis === "model" ? "model" : "thought_level";
+        const option = selector(entry.options, category);
+        // Live changes use only an advertised select option. The start path's
+        // old-generation compatibility calls are not evidence of live support.
+        if (option === undefined || (option.id ?? option.configId) === undefined) return failure("unsupported", "not-supported");
+        if (!selectValues(option).some((item) => item.id === value) || (yield* redactText(value, entry.covered)) !== value) return failure("refused", "adapter-refused");
+        invalidateContext(entry);
+        const changed = yield* setConfig(entry.client, entry.sessionId, entry.options, category, value, entry.version).pipe(
+          Effect.timeoutOption(10_000), Effect.result);
+        if (changed._tag === "Failure" || Option.isNone(changed.success)) {
+          // A failed call may have reached the peer. Forget that axis rather
+          // than claiming the previous value still describes the live process.
+          const { [axis]: _unknown, ...known } = entry.applied;
+          entry.applied = known;
+          entry.configurationUncertain = changed._tag === "Success" || changed.failure.configurationUncertain === true;
+          return entry.configurationUncertain ? failure("unavailable", "configuration-unknown") : failure("refused", "adapter-refused");
+        }
+        if (entry.stopped || entry.dead || processes.get(input.agentId) !== entry) return failure("unavailable", "not-live");
+        entry.options = changed.success.value;
+        entry.applied = yield* safeApplied(entry, reportedChoice(entry.options));
+        if (entry.applied[axis] !== value) return failure("refused", "not-acknowledged");
+      }
+      return { status: "applied" as const, applied: entry.applied };
+    }).pipe(Effect.ensuring(Effect.sync(() => { entry.configuring = false; })));
   });
   const send = (input: Send, compact: boolean) => Effect.gen(function* () {
     const entry = yield* live(input.agentId, input.incarnation);
     if (input.delivery.target !== input.agentId || (!compact && input.delivery.content._tag !== "prompt" && input.delivery.content._tag !== "carry-on")) return yield* rejected("delivery does not match send");
+    if (entry.configuring || entry.configurationUncertain) return yield* rejected("configuration is not confirmed");
     if (entry.turn !== undefined && !entry.turn.ended) return yield* rejected("agent already has a turn");
     const text = compact ? yield* compactPrompt(entry.commands) : input.delivery.content._tag === "prompt" || input.delivery.content._tag === "carry-on" ? input.delivery.content.text : "";
     const turn: Turn = { deliveryId: input.delivery.id, sentSequence: input.sentSequence, replied: false, idle: false, ended: false, text: "" };
     entry.turn = turn;
+    entry.contextNeedsTurn = false;
     const sent = yield* Deferred.make<void, RunnerRejected>();
     entry.sent = sent;
     // The raw request preserves the protocol reply separately from v2's idle
@@ -789,6 +879,12 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
   return Runner.of({
     start: (input) => spawn(input), load: (input) => spawn(input, input.session),
     prompt: (input) => send(input, false), compact: (input) => send(input, true),
+    configure,
+    choices: ({ agentId, incarnation }) => Effect.gen(function* () {
+      const entry = yield* live(agentId, incarnation);
+      return yield* negotiatedChoices(entry.options, (value) => redactText(value, entry.covered));
+    }),
+    context: ({ agentId, incarnation }) => live(agentId, incarnation).pipe(Effect.map((entry) => entry.context)),
     cancel: ({ agentId, deliveryId, sentSequence }) => Effect.gen(function* () {
       const entry = yield* live(agentId);
       const turn = entry.turn;

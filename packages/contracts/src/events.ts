@@ -1,4 +1,5 @@
 import { QuestionMetadataFields } from "./questions.ts"
+import { AgentChoice, ConfigurationReason } from "./agentConfiguration.ts"
 import * as Schema from "effect/Schema"
 import { ProjectEvent } from "./project/events.ts"
 import { BoardEvent } from "./board/events.ts"
@@ -169,7 +170,15 @@ export const EngineEvent = Schema.Union([
     session: SessionReference,
     protocolVersion: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
     process: Schema.optionalKey(ProcessIdentity),
-    reloadable: Schema.Boolean
+    reloadable: Schema.Boolean,
+    configuration: Schema.optionalKey(AgentChoice)
+  }),
+  Schema.TaggedStruct("AgentConfigurationChosen", { ...agent, revision: RequestId, desired: AgentChoice }),
+  Schema.TaggedStruct("AgentConfigurationObserved", { ...agent, applied: AgentChoice }),
+  Schema.TaggedStruct("AgentConfigurationApplied", { ...agent, revision: Schema.optionalKey(RequestId), applied: AgentChoice }),
+  Schema.TaggedStruct("AgentConfigurationRefused", {
+    ...agent, revision: Schema.optionalKey(RequestId), applied: Schema.optionalKey(AgentChoice),
+    status: Schema.Literals(["refused", "unsupported", "unavailable"]), reason: ConfigurationReason
   }),
   Schema.TaggedStruct("PromptSent", { ...delivery, sender: Sender, text: Schema.String }),
   Schema.TaggedStruct("ThreadItem", {

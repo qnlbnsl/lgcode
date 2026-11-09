@@ -192,10 +192,17 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
     const calls: Array<RunnerCall> = [];
     const pubsub = yield* PubSub.unbounded<FakeRunnerEvent>();
     const subscribedSignal = yield* Deferred.make<void>();
+    const configurationFor = (input: Input<"start">) => ({
+      ...(input.model === undefined ? {} : { model: input.model }),
+      ...(input.effort === undefined ? {} : { effort: input.effort }),
+    });
     const defaults: Script = {
-      start: (input) => Effect.succeed(sessionFor(input.agentId)),
-      load: (input) => Effect.succeed({ ...sessionFor(input.agentId), session: input.session }),
+      start: (input) => Effect.succeed({ ...sessionFor(input.agentId), configuration: configurationFor(input) }),
+      load: (input) => Effect.succeed({ ...sessionFor(input.agentId), session: input.session, configuration: configurationFor(input) }),
       prompt: () => Effect.void,
+      configure: ({ desired }) => Effect.succeed({ status: "applied", applied: desired }),
+      choices: () => Effect.succeed({ models: { source: "unavailable", options: [] }, efforts: { source: "unavailable", options: [] } }),
+      context: () => Effect.succeed({ _tag: "unavailable", reason: "not-reported" }),
       cancel: () => Effect.void,
       answerPermission: () => Effect.void,
       setMode: () => Effect.void,
@@ -259,6 +266,9 @@ export const makeFakeRunner = (options: { readonly capabilities?: Partial<Runner
       start: call("start"),
       load: call("load"),
       prompt: call("prompt"),
+      configure: call("configure"),
+      choices: call("choices"),
+      context: call("context"),
       cancel: call("cancel"),
       answerPermission: call("answerPermission"),
       setMode: call("setMode"),

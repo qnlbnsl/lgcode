@@ -114,6 +114,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           const write = (events: ReadonlyArray<Event>, sideRows: SideRows = {}) => events.length === 0 ? Effect.void
             : append({ _tag: "owner" }, freshRequest(), randomUUID(), withWaitChecks(snapshot, events, lists), sideRows).pipe(Effect.asVoid);
           switch (event._tag) {
+            case "configurationReported": return yield* write([{ _tag: "AgentConfigurationObserved", agentId: event.agentId, applied: event.applied }]);
             case "permissionRequested": return yield* write(yield* permissionRequested(snapshot, event));
             case "turnEnded": return yield* write(turnEnded(snapshot, event));
             case "deliveryUpdate": return yield* write(deliveryUpdate(snapshot, event));
@@ -151,7 +152,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     // payload is not decoded yet, so only a string id picks a lane; a lane
     // for a bad id is harmless.
     const laneFor = (name: string, rawPayload: unknown): string | undefined => {
-      if ((name !== "stop" && name !== "resume" && name !== "cancel-reply") || typeof rawPayload !== "object" || rawPayload === null) return undefined;
+      if ((name !== "stop" && name !== "resume" && name !== "cancel-reply" && name !== "configure") || typeof rawPayload !== "object" || rawPayload === null) return undefined;
       const agentId = (rawPayload as { readonly agentId?: unknown }).agentId;
       return typeof agentId === "string" ? agentId : undefined;
     };

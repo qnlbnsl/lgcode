@@ -47,6 +47,9 @@ export const eventStructure: RedactionStructure = { taggedFields: {
   "project.TaskNoted": { projectId: identity, taskId: identity },
 }, fields: {
   agentId: identity, accountId: identity, deliveryId: identity,
+  // The configuration events' top-level revision is a branded RequestId.
+  // A revision key inside prose or a free-text record remains ordinary text.
+  revision: identity,
   roleFileHash: identity, noticeRecipient: identity, postId: identity, stalledPostId: identity,
   channelId: identity, wakeId: identity, anchorAgentId: identity, targetAgentId: identity,
   decidingPostId: identity, replyToPostId: identity,

@@ -1,3 +1,4 @@
+import { agentConfiguration, agentContext } from "./agentConfiguration.ts";
 import type { ClientFilter, ClientStreamItem } from "@lgcode/contracts";
 import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
@@ -61,6 +62,8 @@ const filtered: ReadHandler = (input, payload) => Stream.unwrap(Effect.gen(funct
 
 export const clientReads = {
   "client.requests": requests,
+  "client.agent.configuration": agentConfiguration,
+  "client.agent.context": agentContext,
   "client.snapshot": (input, payload) => snapshot(input.actor, input.runtime.lists).pipe(Effect.map((value) => ({ reply: { requestId: payload.requestId, ...value } }))),
   "client.roster": (input, payload) => input.runtime.views.snapshot.pipe(Effect.map((view) => ({ reply: {
     requestId: payload.requestId, agents: roster(input.actor, view).filter((row) =>

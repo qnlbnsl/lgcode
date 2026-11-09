@@ -20,6 +20,7 @@ import { EventEnvelope } from "../src/events.ts"
 // the test must not read the lists it checks from the code under test.
 const expectedCommands = [
   "start",
+  "configure",
   "prompt",
   "answer",
   "pass-up",
@@ -38,7 +39,7 @@ const expectedCommands = [
   "subscribe",
   "debug.compare-views"
 ]
-const clientReads = ["client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests"]
+const clientReads = ["client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.agent.configuration", "client.agent.context"]
 
 // Row 55 names `accounts set-secret`, `accounts mark-available` and `debug.compare-views` outright
 // and says every other owner-only command is excluded too. Reading: the owner-only commands are the
@@ -50,7 +51,7 @@ const projectTools = ["project.stage.set", "project.read", "project.team.create"
 const projectCommands = [...projectOwnerCommands, ...projectTools]
 const expectedWebCommands = ["client.web.settings", "client.web.settings.set"]
 const expectedApiCommands = [...expectedCommands, ...expectedWebCommands]
-const expectedOwnerOnly = ["accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "client.requests", "board.peek", "board.flush",
+const expectedOwnerOnly = ["configure", "client.agent.configuration", "client.agent.context", "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "debug.compare-views", "client.sequence", "client.requests", "board.peek", "board.flush",
   "roles.role-file.set", "roles.role-file.get", "roles.settings.get", "roles.settings.set", "roles.snooze", "roles.actions.list", "roles.record",
   "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",

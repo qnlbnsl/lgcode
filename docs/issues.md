@@ -8880,6 +8880,38 @@ The test command returns the transport result without creating an alert or stori
 The client piece replays `client.AlertPromptDismissed` into its settings and owner snapshot.
 Alert reads obtain the latest attempt time from the event log.
 
+## 531. Composer choices and context usage lacked a live runner contract
+
+Found: 2026-11-08, during the website composer engine assignment.
+State: fixed on `unit/website-w05c`, pending independent verification.
+
+The engine configured a model and effort only when opening a session.
+There was no owner command to change the next turn on the same running agent.
+The existing per-turn token totals did not establish the size of the context window.
+The session-opening configuration helper also treated a successful response as an acknowledgement without checking its selected value.
+The shared start path now validates identifiers against the same bounded composer contract, including configured defaults.
+
+The change adds durable desired and applied settings, with explicit pending, refused, unsupported, and unavailable states.
+The dispatcher holds the existing agent lane through configuration acknowledgement and the next prompt or compaction write.
+A refused change retains queued owner work until the owner corrects the choice.
+A timed-out or disconnected configuration call leaves the live process uncertain.
+That process holds queued work until an explicit owner stop and resume opens a new incarnation.
+A stopped agent retains its desired settings for its next real retry.
+A fresh or reloaded process supplies its own acknowledgement.
+Configuration revision identities are registered at their event schema position in the redaction structure.
+An issue-340 regression preserves secret-colliding revisions through the real writer and receipts while prose and free-text records remain redacted.
+The owner can read bounded configured or negotiated choices, with optional redacted labels.
+Cursor's existing `auto` start setting keeps its advertised `default[]` protocol identity through the next turn and later effort-only changes.
+Only a live harness occupancy report with compatible used-token and window counts supplies a percentage.
+The ratio is divided before multiplication so valid safe-integer counts cannot round above 100 percent.
+A model change or reload invalidates old context evidence.
+
+The controlled Agent Client Protocol subprocess tests also exposed an execution-environment limit.
+Inside this Codex filesystem sandbox, an existing runner test's child exited before initialization.
+The same existing test passed outside the sandbox.
+The focused subprocess proofs therefore run outside that sandbox, with one worker.
+No product permission rule was weakened.
+
 ## 532. The piece failure log test can miss its diagnostic
 
 Found: 2026-11-08, during the website worker's full repository check.
@@ -8995,6 +9027,37 @@ A fresh authenticated socket test reads the empty state before any save, saves s
 The same journey compares the live settings with a complete event-log rebuild.
 This proof does not implement or verify the later first-run page.
 
+## 535. Idle configuration dispatch entered the writer without queued work
+
+Found: 2026-11-08, during the website composer engine full check.
+State: correction written on `unit/website-w05c`, pending verification.
+
+The configuration dispatcher now admits an idle agent even when it has no queued delivery.
+This lets a pending owner choice apply before another prompt arrives.
+After configuration, the dispatcher entered the delivery writer without rechecking the queue.
+The baseline returned before entering the writer when no delivery was ready.
+A latched write failure rejects even an empty transaction.
+An idle dispatch could therefore emit an extra fixed delivery failure diagnostic during the runner-event append-refusal test.
+That test reported four captured lines where its exact assertion requires three.
+Asynchronous scheduling exposes the extra diagnostic, but the empty transaction is a new configuration-path regression.
+
+The correction rechecks the ready queue after configuration while retaining the same agent lane.
+It returns before entering the delivery writer when there is no work to reserve.
+The diagnostic count, fixed-message, redaction, defect-isolation, and recovery assertions remain exact.
+The orient tests also had a local running-session fixture without an applied configuration report.
+That fixture now includes the model and effort it claims the harness opened with.
+The assertions that reads do not write events remain unchanged.
+The read-only fixture audit found no other unreported direct test with a missing session configuration acknowledgement.
+Historical projection fixtures continue to represent unknown applied configuration honestly.
+
+A temporary diagnostic reproduced the pre-correction failure with the exact assertions retained.
+Its captured order was three `runner event dropped: processing failed` messages followed by `delivery dispatch failed`.
+The orient cases gained six `AgentConfigurationApplied` events each, changing sequences 21 to 27 and 15 to 21.
+An isolated baseline-dispatcher control passed the same three assertions with only the three runner-event messages and unchanged sequences.
+The corrected dispatcher and acknowledged orient fixtures also passed those three assertions.
+Their captured messages and unchanged sequences matched the baseline control.
+The temporary diagnostic instrumentation was removed after the comparison.
+
 ## 536. Closing a pending Node socket could raise an uncaught exception
 
 Found: 2026-11-08, during the corrected foundations' fresh complete checks.
@@ -9030,3 +9093,48 @@ That run passed 6,417 tests and all 18 browser cases, with no unhandled errors.
 The independent review approved the exact combined head with no findings.
 Its report is `.scratch/foundry-runs/website-1/w00f-verifier-1-result.md`.
 The passing checks do not identify every earlier socket exception's trigger.
+
+## 537. Negotiated model and effort choices could prevent retry and reload
+
+Found: 2026-11-08, by the independent website composer verifier at `4914fe3`.
+State: corrected locally on `unit/website-w05cf1`, pending independent review.
+
+The owner could select an advertised model or effort absent from a nonempty configured list.
+The live adapter acknowledged that choice, and an actual prompt used it.
+The agent reducer also copied the desired value into the agent's launch fields.
+Both loaded resume and fresh resume passed those fields into the runner's configured-list admission check.
+That check rejected the replacement process before negotiation.
+The agent remained interrupted, with its desired configuration pending.
+Engine reload used the same input builder.
+
+Retry and reload now distinguish an owner's durable choice revision from unchanged initial launch settings.
+A replacement session opens without passing that revision's desired values as initial launch arguments.
+The session records only its actual reported configuration.
+The existing configuration lane then validates the desired identifiers against the new advertisement.
+It waits for acknowledgement before sending queued work.
+A missing value, missing selector, or unacknowledged setter retains an honest refusal and holds the queue.
+The owner can correct a supported choice on the replacement process.
+The correction does not change global harness settings or initial-start admission.
+Unchanged initial settings retain the older protocol's existing start calls.
+Cursor retains its exact advertised `default[]` identity for the existing `auto` launch alias.
+
+The permanent reload refusal control also exposed a related recovery reservation problem.
+Recovery can mark an agent working before its first recovered delivery is sent.
+If configuration refuses that send, a later owner correction previously could not release the unsent queue.
+Dispatch now recognizes that same unsent recovery reservation for an agent with an owner choice revision.
+The lane, logged-send, account, capacity, and incarnation guards still govern the actual send.
+An existing recovery assertion also caught a changed context reason after deferred configuration.
+A replacement process with no occupancy report now retains `not-reported` during reconciliation.
+Configuration changes still invalidate any earlier occupancy evidence.
+
+The new regression uses the real command handler and controlled Agent Client Protocol children.
+It covers both axes across loaded resume, fresh resume, and service reload.
+Nonempty configured lists exclude the negotiated choices in every case.
+Wire gates prove that no prompt is sent before acknowledgement.
+Actual child reports prove the selected settings and replacement process identity.
+The negative controls remove support from the new advertisement without making the adapter reject arbitrary setter values.
+They prove refusal, preserved queued work, and release on the same process after an owner correction.
+Additional fresh-session controls cover missing selectors, missing acknowledgement, and Cursor's alias.
+The existing recovery and initial invalid-choice assertions remain intact.
+All four model and effort retry cases were reproduced red with the original production files restored temporarily.
+The independent verifier's original files and logs remain unchanged.

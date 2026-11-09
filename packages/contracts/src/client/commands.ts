@@ -1,3 +1,4 @@
+import { AgentChoices, AgentConfiguration, ContextUsage } from "../agentConfiguration.ts"
 import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
@@ -21,6 +22,14 @@ export const EventReply = Schema.Struct({ ...request, envelope: EventEnvelope })
 // Definitions only. A unit installs its subset into CommandsRpcGroup when it
 // supplies the handlers, so the running service never advertises a stub.
 export const ClientRpcGroup = RpcGroup.make(
+  Rpc.make("agent.configuration", {
+    payload: { ...request, agentId: AgentId },
+    success: Schema.Struct({ ...request, agentId: AgentId, configuration: AgentConfiguration, ...AgentChoices.fields }), error: Refused
+  }),
+  Rpc.make("agent.context", {
+    payload: { ...request, agentId: AgentId },
+    success: Schema.Struct({ ...request, agentId: AgentId, context: ContextUsage }), error: Refused
+  }),
   Rpc.make("snapshot", { payload: request, success: Schema.Struct({ ...request, ...ClientSnapshot.fields }), error: Refused }),
   Rpc.make("roster", {
     payload: { ...request, group: Schema.optionalKey(Schema.NonEmptyString), role: Schema.optionalKey(Schema.String), parent: Schema.optionalKey(AgentId) },
@@ -70,6 +79,7 @@ export const ClientRpcGroup = RpcGroup.make(
 ).prefix("client.")
 
 export const clientCommandAccess = {
+  "client.agent.configuration": ["owner"], "client.agent.context": ["owner"],
   "client.snapshot": ["owner", "agent", "service"], "client.roster": ["owner", "agent", "service"],
   "client.thread": ["owner", "agent", "service"], "client.subscribe": ["owner", "agent", "service"],
   "client.requests": ["owner"], "client.event": ["owner", "agent", "service"], "client.sequence": ["owner", "service"],
@@ -81,6 +91,6 @@ export const clientCommandAccess = {
 
 // The alert units install their implemented commands.
 export const AlertRpcGroup = ClientRpcGroup.omit(
-  "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests",
+  "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.agent.configuration", "client.agent.context",
   "client.web.settings", "client.web.settings.set"
 )
