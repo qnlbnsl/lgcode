@@ -5,7 +5,7 @@ import type { CallerKind } from "../commands.ts"
 import { EventEnvelope } from "../events.ts"
 import { AgentId, EventSequence, RequestId } from "../ids.ts"
 import { Alert, AlertDeliveryFailure, AlertId, AlertKind, AlertSettings, CarrierSettings } from "./alerts.ts"
-import { ClientFilter, ClientSnapshot, ClientStreamItem, RosterEntry } from "./reads.ts"
+import { ClientFilter, ClientRequest, ClientSnapshot, ClientStreamItem, RosterEntry } from "./reads.ts"
 import { WebServerState, WebSettings } from "./settings.ts"
 
 const request = { requestId: RequestId }
@@ -37,6 +37,12 @@ export const ClientRpcGroup = RpcGroup.make(
   Rpc.make("event", {
     payload: { ...request, sequence: EventSequence }, success: Schema.Union([EventReply, AgentData]), error: Refused
   }),
+  Rpc.make("requests", {
+    payload: { ...request, ...page, agentId: Schema.optionalKey(AgentId),
+      kind: Schema.optionalKey(Schema.Literals(["permission", "question"])),
+      status: Schema.optionalKey(Schema.Literals(["open", "answered", "cancelled"])) },
+    success: Schema.Struct({ ...request, sequence: EventSequence, items: Schema.Array(ClientRequest), next: Schema.optionalKey(EventSequence) }), error: Refused
+  }),
   Rpc.make("sequence", { payload: request, success: Schema.Struct({ ...request, sequence: EventSequence }), error: Refused }),
   Rpc.make("alerts.list", {
     payload: { ...request, ...page, status: Schema.optionalKey(Schema.Literals(["open", "cleared"])) },
@@ -66,7 +72,7 @@ export const ClientRpcGroup = RpcGroup.make(
 export const clientCommandAccess = {
   "client.snapshot": ["owner", "agent", "service"], "client.roster": ["owner", "agent", "service"],
   "client.thread": ["owner", "agent", "service"], "client.subscribe": ["owner", "agent", "service"],
-  "client.event": ["owner", "agent", "service"], "client.sequence": ["owner", "service"],
+  "client.requests": ["owner"], "client.event": ["owner", "agent", "service"], "client.sequence": ["owner", "service"],
   "client.alerts.retry": ["owner"], "client.alerts.test": ["owner"], "client.alerts.prompt.dismiss": ["owner"],
   "client.alerts.list": ["owner"], "client.alerts.dismiss": ["owner"], "client.alerts.settings": ["owner"],
   "client.alerts.settings.set": ["owner"], "client.alerts.carrier.set": ["owner"], "client.alerts.carrier.set-token": ["owner"],
@@ -75,6 +81,6 @@ export const clientCommandAccess = {
 
 // The alert units install their implemented commands.
 export const AlertRpcGroup = ClientRpcGroup.omit(
-  "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence",
+  "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests",
   "client.web.settings", "client.web.settings.set"
 )

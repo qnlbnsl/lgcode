@@ -19,7 +19,7 @@ import { Restart } from "../recovery/service.ts";
 import { Runner, type RunnerEvent } from "../runner/Runner.ts";
 import { Views } from "../views/Views.ts";
 import { envelope } from "./envelope.ts";
-import { freshDelivery, moveHeld, passAtTurnEnd } from "./holders.ts";
+import { withdrawQueued, freshDelivery, moveHeld, passAtTurnEnd } from "./holders.ts";
 import { withLane } from "./lanes.ts";
 import { project, withWaitChecks } from "./waits.ts";
 
@@ -119,7 +119,7 @@ export const targetGone = (snapshot: Snapshot, agentId: AgentId, cause: "stopped
 
 // The delivery that started the agent's current turn: the last one sent
 // since the previous turn end. None while the agent is not working.
-const currentSend = (snapshot: Snapshot, agentId: string) => {
+export const currentSend = (snapshot: Snapshot, agentId: string) => {
   if (snapshot.agents[agentId]?.state._tag !== "working") return undefined;
   const thread = snapshot.threads[agentId] ?? [];
   const sent = thread.slice(thread.findLastIndex((row) => row.event._tag === "TurnEnded") + 1)
@@ -136,7 +136,13 @@ export const turnEnded = (snapshot: Snapshot, event: Extract<RunnerEvent, { _tag
   const sent = currentSend(snapshot, agentId);
   if (sent?.event.deliveryId !== deliveryId || sent.sequence !== event.sentSequence) return [];
   const compact = snapshot.deliveries[deliveryId]?.content._tag === "compact";
-  return [{ _tag: "TurnEnded", agentId, compact,
+  const cancelled: Event[] = event.stopped ? Object.values(snapshot.requests)
+    .filter((row) => row.agentId === agentId && row.status === "open")
+    .flatMap((row): Event[] => [{ _tag: "PermissionCancelled", agentId,
+      permissionRequestId: row.permissionRequestId as import("@lgcode/contracts").PermissionRequestId, reason: "reply stopped" },
+      ...withdrawQueued(snapshot, row.deliveryId)]) : [];
+  return [...cancelled, { _tag: "TurnEnded", agentId, compact,
+    ...(event.stopped ? { stopped: true } : {}),
     ...(event.usage === undefined ? {} : { usage: event.usage }),
   }, ...passAtTurnEnd(snapshot, agentId)];
 };

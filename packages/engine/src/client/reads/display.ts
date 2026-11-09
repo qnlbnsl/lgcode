@@ -30,9 +30,18 @@ export const display = (envelope: EventEnvelope) => {
     preview: cutUtf8(event._tag === "PermissionRequested" ? event.description : event.text, 512),
     options: [] as Array<(typeof options)[number]>, optionCount: options.length,
     ...(event._tag === "PermissionRequested" ? {
-      settingsWrite: event.settingsWrite,
+      settingsWrite: event.settingsWrite, inputAvailable: event.toolInput !== undefined,
+      ...(event.inputRedacted === undefined ? {} : { inputRedacted: event.inputRedacted }),
+      ...(event.inputTruncated === undefined ? {} : { inputTruncated: event.inputTruncated }),
       ...(event.toolKind === undefined ? {} : { toolKind: toolKinds.has(event.toolKind) ? event.toolKind : "unknown" }),
-    } : {}),
+    } : {
+      ...Object.fromEntries(["title", "recommendation", "proposedAnswer", "taskId", "sprintId"].flatMap((key) => {
+        const value = event[key as keyof typeof event];
+        // References stay whole. An oversized reference requires client.event.
+        return typeof value !== "string" || (["taskId", "sprintId"].includes(key) && Buffer.byteLength(value) > 128)
+          ? [] : [[key, cutUtf8(value, key === "title" ? 256 : 512)]];
+      })),
+    }),
     bytes: encodedBytes(envelope),
   };
   if (encodedBytes(result) > 4096) return undefined;

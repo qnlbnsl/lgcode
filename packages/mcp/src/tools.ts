@@ -47,6 +47,7 @@ export const descriptions: Record<ToolName, string> = {
   "pass-up": "Pass a permission request or question up to the agent above you.",
   ask: "Ask the agent above you, or the owner, a question.",
   wait: "Wait for agents to settle. With block true the call stays open until the wait is satisfied or cancelled.",
+  "cancel-reply": "Cancel only an active reply of an agent you manage, keeping the process running.",
   stop: "Stop an agent.",
   resume: "Resume a stopped or crashed agent; fresh true starts a new session.",
   release: "Release an agent's capacity hold.",

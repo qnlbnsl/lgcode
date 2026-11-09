@@ -8815,6 +8815,20 @@ The website seats continue to run `pnpm check` and `pnpm live-check:web`.
 The gate report must name the commit and attribute the broader live result to the manager.
 The run evidence is recorded in `.scratch/foundry-runs/website-1/run.md` in the main checkout.
 The lead's private live run is `/tmp/lgcode-live-KULrQh`.
+
+## 529. Reply cancellation failures were reported as storage failures
+
+Found: 2026-11-08, while building the website's reply cancellation command.
+State: fixed in the website worker's change before handoff.
+
+The first implementation mapped a runner refusal after the command committed to
+`LogWriteFailed`. A reply can finish between the command's state check and the
+runner call, so that refusal does not establish a database failure. The shared
+post-commit effect type now permits `CommandRefused`, and cancellation uses that
+recoverable error. Tests cover a runner refusal and a naturally ending reply.
+Both tests verify that the writer accepts a later command and sends the next
+queued prompt.
+
 ## 530. Phone notification actions and prompt dismissal lacked engine support
 
 Found on 2026-11-08 while implementing the website's notification actions.
@@ -8830,3 +8844,15 @@ It shares a delivery lane with the background worker and records the actual resu
 The test command returns the transport result without creating an alert or storing a response.
 The client piece replays `client.AlertPromptDismissed` into its settings and owner snapshot.
 Alert reads obtain the latest attempt time from the event log.
+
+## 532. The piece failure log test can miss its diagnostic
+
+Found: 2026-11-08, during the website worker's full repository check.
+State: open; the cause is not established.
+
+The `FR-042 protocol=false` case in
+`packages/engine/test/pieces/piece-failure-log.test.ts` expected one safe
+diagnostic and received none during a full suite run. The same three-test
+file passed when run alone, without a source change. The failed full run is
+in `/tmp/w03-check.log`, and the isolated pass is in
+`/tmp/w03-piece-failure.log`. The assertion remains unchanged.

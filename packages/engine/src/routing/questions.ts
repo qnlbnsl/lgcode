@@ -15,6 +15,8 @@ export const ask = ({ actor, snapshot }: Input, payload: Payload<"ask">): Effect
   const deliveryId = freshDelivery();
   return Effect.succeed({ events: [{
     _tag: "QuestionAsked", agentId: actor.agentId, questionId, holder, deliveryId, text: payload.text,
+    ...Object.fromEntries(["title", "recommendation", "proposedAnswer", "taskId", "sprintId"]
+      .flatMap((key) => payload[key as keyof typeof payload] === undefined ? [] : [[key, payload[key as keyof typeof payload]]])),
   }, ...routedDelivery(actor.agentId, holder, deliveryId, { _tag: "question", id: questionId }, payload.text)] });
 };
 

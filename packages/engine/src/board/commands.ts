@@ -194,10 +194,11 @@ const channels: ReadHandler = (input, payload) => input.runtime.lists?.boardEnab
   })), payload, (channel) => channel.channelId, undefined, Object.keys(boardView(input.snapshot).channels),
 ) });
 
-const read: ReadHandler = (input, payload) => Effect.gen(function* () {
+const readPosts = (peek: boolean): ReadHandler => (input, payload) => Effect.gen(function* () {
   if (input.runtime.lists?.boardEnabled === false) return yield* refused("board disabled");
   const { snapshot, actor } = input;
   if (actor._tag !== "owner" && actor._tag !== "agent") return yield* refused();
+  if (peek && actor._tag !== "owner") return yield* refused();
   const board = boardView(snapshot);
   const referenced = typeof payload.post === "string" ? own(board.posts, payload.post)
     : typeof payload.repliesTo === "string" ? own(board.posts, payload.repliesTo) : undefined;
@@ -232,7 +233,7 @@ const read: ReadHandler = (input, payload) => Effect.gen(function* () {
     byChannel.set(post.channelId, ids);
   }
   const marks: Event[] = [...byChannel].map(([channelId, postIds]) => ({ _tag: "board.Read", channelId, reader: actor, postIds }));
-  return { reply, marks };
+  return { reply, marks: peek ? [] : marks };
 });
 
 const status = (input: Input, raw: Record<string, unknown>): Effect.Effect<ReadReply, ReturnType<typeof refused>> => Effect.gen(function* () {
@@ -282,4 +283,4 @@ const status = (input: Input, raw: Record<string, unknown>): Effect.Effect<ReadR
 
 export const boardPlanners = { "board.open": open, "board.members": members, "board.post": post,
   "board.close": close, "board.acknowledge": acknowledge, "board.flush": flush } satisfies Record<string, Planner>;
-export const boardReads = { "board.read": read, "board.channels": channels, "board.status": status } satisfies Record<string, ReadHandler>;
+export const boardReads = { "board.read": readPosts(false), "board.peek": readPosts(true), "board.channels": channels, "board.status": status } satisfies Record<string, ReadHandler>;

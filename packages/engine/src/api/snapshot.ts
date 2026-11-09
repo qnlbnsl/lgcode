@@ -27,11 +27,11 @@ export const snapshot = (caller: Caller, lists: EngineLists = engineLists) => Ef
     .find(({ event }) => event._tag === tag && ("permissionRequestId" in event ? event.permissionRequestId === id : "questionId" in event && event.questionId === id));
   const requests = filter(view.requests, (row) => row.status === "open" && readable(row.agentId)).map((row) => ({
     id: row.permissionRequestId, agentId: row.agentId, holder: row.holder,
-    sourceSequence: source(row.agentId, "PermissionRequested", row.permissionRequestId)?.sequence ?? 0,
+    sourceSequence: row.sourceSequence, openedAt: row.openedAt,
   }));
   const questions = filter(view.questions, (row) => row.status === "open" && readable(row.agentId)).map((row) => ({
     id: row.questionId, agentId: row.agentId, holder: row.holder,
-    sourceSequence: source(row.agentId, "QuestionAsked", row.questionId)?.sequence ?? 0,
+    sourceSequence: row.sourceSequence, openedAt: row.openedAt,
   }));
   const withDisplays = (rows: typeof requests, tag: string) => {
     const newest = new Set([...rows].sort((a, b) => b.sourceSequence - a.sourceSequence).slice(0, 256).map((row) => row.id));

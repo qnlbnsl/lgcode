@@ -11,6 +11,7 @@ import { decodeRowWith, LogReadFailed, subscribe, type EventRow } from "../../lo
 import { envelope, escapeLeadingSlash } from "../../routing/envelope.ts";
 import { threadAgent } from "../../views/apply.ts";
 import { encodedBytes } from "./display.ts";
+import { requests } from "./requests.ts";
 import { roster } from "./roster.ts";
 
 // Escape agent prose before JSON encoding. Metadata and identifiers stay
@@ -18,7 +19,7 @@ import { roster } from "./roster.ts";
 export const agentReadReply = (requestId: unknown, reply: Record<string, unknown>) => ({
   requestId,
   data: envelope("read", JSON.stringify(reply, (key, value) =>
-    typeof value === "string" && ["text", "description", "title", "stderr", "prompt"].includes(key) ? escapeLeadingSlash(value) : value)),
+    typeof value === "string" && ["text", "description", "title", "recommendation", "proposedAnswer", "stderr", "prompt"].includes(key) ? escapeLeadingSlash(value) : value)),
 });
 
 const filtered: ReadHandler = (input, payload) => Stream.unwrap(Effect.gen(function* () {
@@ -59,6 +60,7 @@ const filtered: ReadHandler = (input, payload) => Stream.unwrap(Effect.gen(funct
 }));
 
 export const clientReads = {
+  "client.requests": requests,
   "client.snapshot": (input, payload) => snapshot(input.actor, input.runtime.lists).pipe(Effect.map((value) => ({ reply: { requestId: payload.requestId, ...value } }))),
   "client.roster": (input, payload) => input.runtime.views.snapshot.pipe(Effect.map((view) => ({ reply: {
     requestId: payload.requestId, agents: roster(input.actor, view).filter((row) =>
