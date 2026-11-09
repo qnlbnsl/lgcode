@@ -82,7 +82,8 @@ await run('board',async()=>{
  check(!await page.locator('.board-summary').isVisible(),'Column counts appear once on a desktop board');
  check((await text('[data-sprint="sp-02"]')).includes('Iris'),'A sprint card names who is working on it');
  await page.setViewportSize({width:390,height:844});
- check(await page.locator('.board-summary').isVisible(),'Phones keep the column jump strip');
+ await page.waitForTimeout(60);
+ check(await page.locator('.board-list').isVisible()&&!await page.locator('.board-summary').isVisible()&&!await page.locator('.kanban').count(),'PHONE-3: a phone shows the board as one list, without the column jump strip');
  await page.setViewportSize({width:1440,height:900});
 });
 
@@ -758,6 +759,80 @@ await run('machines, project settings, and new project',async()=>{
  await f.locator('#project-name').fill('Field notes');await f.locator('#project-goal').fill('Ship offline notes');
  check(await f.locator('#project-location-preview dt').allTextContents().then(t=>t.join()==='Branch,Folder')&&await f.locator('#project-location-preview dd').first().textContent().then(t=>t.startsWith('field-notes')),'NEW-1: the preview is two labelled lines, Branch and Folder');
  await f.locator('#project-submit').click();check(await f.evaluate(()=>p().goal)==='Ship offline notes','The goal reaches the new project');
+ await f.close();
+});
+
+// The phone, from the designer's critique: TOP-3, PHONE-1, PHONE-2, and PHONE-3, and the last leftovers.
+await run('phone',async()=>{
+ const fresh=async(path='',size={width:390,height:844})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const m=await fresh();
+ // TOP-3
+ await m.evaluate(()=>openBoard('workspace'));await m.waitForTimeout(40);
+ const bar=await m.evaluate(()=>({shown:[...document.querySelector('.topbar').children].filter(e=>e.getBoundingClientRect().width>0).map(e=>e.id),crumb:[...document.querySelectorAll('#breadcrumb > *')].filter(e=>e.getBoundingClientRect().width>0).map(e=>e.textContent),branch:document.querySelector('#context-toggle').closest('#phone-context')!==null&&document.querySelector('#context-toggle').getBoundingClientRect().width>0,dot:document.querySelector('#bell-dot').getBoundingClientRect().width>0&&document.querySelector('#bell-dot').className}));
+ check(bar.shown.join()==='menu,breadcrumb,attention-toggle'&&bar.crumb.join()==='Agent console','TOP-3: a phone top bar holds only the menu, the project, and the bell: '+JSON.stringify(bar));
+ check(bar.branch&&/^bell-dot dot $/.test(bar.dot),'TOP-3: the branch sits under the tabs, and Live is a green dot on the bell: '+JSON.stringify(bar));
+ await m.evaluate(()=>openAgent('rowan','workspace'));await m.waitForTimeout(40);
+ check(await m.evaluate(()=>[...document.querySelectorAll('#breadcrumb > *')].filter(e=>e.getBoundingClientRect().width>0).map(e=>e.textContent).join())==='Build team'&&(await m.locator('#view-title').textContent())==='Rowan','TOP-3: inside a team the top bar names the team, and Chat’s line names the agent');
+ await m.evaluate(()=>document.querySelector('[data-preview="reconnect"]').click());await m.waitForTimeout(40);
+ check(await m.locator('#bell-dot').evaluate(e=>e.classList.contains('wait'))&&(await m.locator('#attention-toggle').getAttribute('aria-label')).endsWith('LGcode is reconnecting')&&await m.locator('#connection-status').isHidden(),'TOP-3: a lost connection turns the bell’s dot amber, and the bell’s name says so');
+ await m.locator('#attention-toggle').click();
+ check(await m.locator('#attention-menu #connection-state').isVisible()&&(await m.locator('#connection-state').textContent())==='Reconnecting'&&await m.locator('#attention-menu #retry-connection').isVisible()&&(await m.locator('#retry-connection').textContent()).includes('Reconnect now'),'TOP-3: the bell opens the full connection state with Reconnect now');
+ await m.locator('#retry-connection').click();await m.waitForTimeout(40);check(await m.locator('#bell-dot').evaluate(e=>!e.classList.contains('wait')&&!e.classList.contains('error')),'TOP-3: Reconnect now from the bell brings the dot back to Live');
+ await m.keyboard.press('Escape');
+ await m.setViewportSize({width:1440,height:900});await m.waitForTimeout(60);
+ check(await m.evaluate(()=>['connection-status','retry-connection','context-toggle'].every(id=>document.getElementById(id).parentElement.matches('.topbar')))&&await m.locator('#connection-status').isVisible()&&await m.locator('#bell-dot').isHidden()&&await m.locator('#phone-context').isHidden(),'TOP-3: a desktop keeps Live and Inspecting in the top bar');
+ await m.setViewportSize({width:390,height:844});await m.waitForTimeout(60);
+ // PHONE-1
+ await m.evaluate(()=>openTeam('app-shell','workspace'));await m.waitForTimeout(40);
+ check(await m.evaluate(()=>[...document.querySelectorAll('.avatar')].filter(a=>a.offsetParent).every(a=>getComputedStyle(a).whiteSpace==='nowrap'&&a.getBoundingClientRect().height<=26)),'PHONE-1: avatar initials stay on one line');
+ await m.evaluate(()=>openHome('attention'));await m.waitForTimeout(40);
+ const tabs=await m.evaluate(()=>{const n=document.querySelector('#home-tabs');return {labels:[...n.querySelectorAll('[role=tab]')].map(t=>t.innerText.replace(/\s*\d+$/,'').trim()),fits:n.scrollWidth<=n.clientWidth,inside:[...n.querySelectorAll('[role=tab]')].every(t=>t.getBoundingClientRect().right<=document.querySelector('[data-home-new-project]').getBoundingClientRect().left)}});
+ check(tabs.labels.join()==='Attention,Projects,Questions,Approvals'&&tabs.fits&&tabs.inside,'PHONE-1: Home’s four short tabs fit beside New project at 390 pixels: '+JSON.stringify(tabs));
+ await m.setViewportSize({width:340,height:700});await m.waitForTimeout(80);
+ check(await m.locator('#home-tabs').evaluate(n=>n.scrollWidth>n.clientWidth&&n.classList.contains('fade-end')),'PHONE-1: tabs that still overflow fade at the edge they scroll toward');
+ await m.setViewportSize({width:768,height:1024});await m.waitForTimeout(80);
+ check(await m.evaluate(()=>{const n=document.querySelector('#home-tabs'),approvals=document.querySelector('#home-tab-approvals').getBoundingClientRect(),button=document.querySelector('[data-home-new-project]').getBoundingClientRect();return n.scrollWidth<=n.clientWidth&&approvals.right<=button.left})&&await m.locator('.home-new-label').evaluate(e=>e.getBoundingClientRect().width<=1),'PHONE-1: at 768 pixels Home’s tabs and New project fit without scrolling');
+ // The breadcrumb keeps its names at 768 pixels.
+ await m.evaluate(()=>openTeam('app-shell','workspace'));await m.waitForTimeout(40);
+ check(await m.evaluate(()=>[...document.querySelectorAll('#breadcrumb .crumb')].filter(c=>c.offsetWidth).every(c=>c.scrollWidth<=c.clientWidth+1)),'The breadcrumb is not cut at 768 pixels with the sidebar open');
+ await m.setViewportSize({width:390,height:844});await m.waitForTimeout(60);
+ // PHONE-2
+ await m.evaluate(()=>openBoard('workspace'));await m.locator('#menu').click();
+ const drawer=await m.evaluate(()=>{const s=document.querySelector('#sidebar'),tree=document.querySelector('#repo-tree'),rows=[...document.querySelectorAll('#drawer-attention [data-drawer-agent]')].map(b=>b.dataset.drawerAgent),first=attentionQueue()[0];return {rows,first:first.agentId,top:document.querySelector('#drawer-attention').getBoundingClientRect().top<document.querySelector('#home-link').getBoundingClientRect().top,service:document.querySelector('.service-row').getBoundingClientRect().top>=tree.getBoundingClientRect().bottom,scrolls:s.scrollHeight>s.clientHeight&&getComputedStyle(tree).overflowY==='visible'}});
+ check(drawer.rows[0]===drawer.first&&drawer.rows.length===4&&drawer.top,'PHONE-2: the drawer starts with the agents needing attention, in the bell’s order: '+JSON.stringify(drawer));
+ check(drawer.service&&drawer.scrolls,'PHONE-2: the drawer is one scroll, with the service pages after the tree');
+ await m.locator('#drawer-attention [data-drawer-agent="iris"]').click();await m.waitForTimeout(40);
+ check((await m.locator('#view-title').textContent())==='Iris'&&await m.locator('#sidebar').isHidden(),'PHONE-2: an agent in the drawer opens its thread and closes the drawer');
+ // PHONE-3: the newest request stays visible below the header.
+ for(const id of ['rowan','iris','finch']){await m.evaluate(id=>openAgent(id,'workspace'),id);await m.waitForTimeout(60);const seen=await m.evaluate(()=>{const blocks=[...document.querySelectorAll('#view-body .request.is-open')],b=blocks.at(-1),body=document.querySelector('#view-body').getBoundingClientRect(),r=b.getBoundingClientRect();return r.top>=body.top-1&&r.bottom<=body.bottom+1});check(seen,`PHONE-3: ${id}’s newest request is fully visible at 390 by 844 pixels`)}
+ await m.evaluate(()=>openBoard('workspace'));await m.waitForTimeout(40);
+ const list=await m.evaluate(()=>{const cards=[...document.querySelectorAll('.board-list .sprint-card')];return {needs:cards.map(c=>c.classList.contains('needs-attention')),states:cards.map(c=>c.querySelector('.sprint-id .sprint-list-state')?.textContent),inside:cards.every(c=>c.getBoundingClientRect().right<=innerWidth)}});
+ check(list.needs.join()==='true,true,false,false'&&list.states.every(Boolean)&&list.inside,'PHONE-3: the phone board lists sprints needing you first, each starting with its status: '+JSON.stringify(list));
+ await m.evaluate(()=>openHome('projects'));await m.waitForTimeout(40);
+ check(await m.evaluate(()=>[...document.querySelectorAll('.project-table tbody tr')].every(r=>{const name=r.cells[0].getBoundingClientRect(),status=r.querySelector('.stack-status').getBoundingClientRect(),others=[...r.cells].filter(c=>c!==r.cells[0]&&!c.classList.contains('stack-status')&&c.offsetWidth);return status.top>name.bottom-2&&others.every(c=>c.getBoundingClientRect().left>status.left)&&status.right<=innerWidth})),'PHONE-3: an All projects row on a phone starts its second line with the status');
+ await m.evaluate(()=>{openBoard('workspace');openSprint('sp-02')});await m.waitForTimeout(40);
+ check(await m.evaluate(()=>[...document.querySelectorAll('.task-list tbody tr')].every(r=>{const t=r.querySelector('.task-title').getBoundingClientRect(),s=r.querySelector('.task-status').getBoundingClientRect(),o=r.querySelector('.task-owner').getBoundingClientRect();return s.top>t.bottom-2&&s.left<o.left&&o.right<=innerWidth})),'PHONE-3: a task row on a phone has its title, then its status before its owner');
+ await m.evaluate(()=>openGit('workspace-app-shell','workspace'));await m.waitForTimeout(40);
+ check(await m.evaluate(()=>{const row=document.querySelector('.unified-diff .diff-line.removed'),shown=[...row.querySelectorAll('span')].filter(s=>s.offsetWidth);return shown.length===1&&shown[0].classList.contains('line-one')&&shown[0].textContent.trim()!==''}),'PHONE-3: a phone diff has one line-number gutter');
+ await m.close();
+ // Above 1800 pixels a docked thread and the sprint page show one request without sharing an identifier.
+ const w=await fresh('',{width:2560,height:1300});await w.evaluate(()=>{openAgent('iris','workspace');openSprint('sp-02')});await w.waitForTimeout(60);
+ check(await w.evaluate(()=>{const ids=[...document.querySelectorAll('[id]')].map(e=>e.id);return ids.length===new Set(ids).size&&!!document.querySelector('#view-body #permission-perm-iris')&&!!document.querySelector('#lead-chat-body #dock-permission-perm-iris')}),'Above 1800 pixels the docked copy of a request has its own identifier');
+ await w.locator('#lead-chat-body [data-permission-answer="deny"][data-permission-id="perm-iris"]').click();await w.waitForTimeout(40);
+ check(await w.evaluate(()=>document.activeElement?.id==='dock-permission-perm-iris'),'Answering in the docked thread keeps the focus on the docked request');
+ await w.close();
+ // NEW-2: a machine gets a repository, and New project's message leads there.
+ const f=await fresh('',{width:1440,height:900});
+ await f.evaluate(()=>document.querySelector('[data-system-page="machines"]').click());
+ await f.locator('[data-row-menu="machine"][data-row-id="laptop"]').click();check(await f.locator('#row-menu [data-row-action="add-repository"]').isDisabled()&&(await f.locator('#row-menu .menu-reason').first().textContent()).includes('offline'),'NEW-2: an offline machine cannot take a repository, and the menu says why');await f.keyboard.press('Escape');
+ await f.locator('[data-new-on-machine="buildbox"]').click();await f.locator('#project-repo').selectOption('atlas-docs');await f.locator('#project-name').fill('Docs on Buildbox');
+ check(await f.locator('#project-submit').isDisabled()&&(await f.locator('#project-location-preview').textContent())==='Buildbox does not have atlas-docs. Add it to Buildbox','NEW-2: New project’s one message offers to add the repository to the chosen machine');
+ await f.locator('[data-connect-repository]').click();
+ check(await f.locator('#repository-dialog').isVisible()&&await f.evaluate(()=>state.view==='machines')&&(await f.locator('#repository-machine').inputValue())==='buildbox'&&(await f.locator('#repository-choice').inputValue())==='atlas-docs'&&(await f.locator('#repository-folder').inputValue())==='~/work/atlas-docs','NEW-2: the link opens Add repository on Machines with the machine, the repository, and its folder filled in');
+ await f.locator('#repository-submit').click();await f.waitForTimeout(60);
+ check(await f.locator('#project-dialog').isVisible()&&(await f.locator('#project-machine').inputValue())==='buildbox'&&(await f.locator('#project-name').inputValue())==='Docs on Buildbox'&&!await f.locator('#project-submit').isDisabled()&&await f.evaluate(()=>repositoryLocations.get('atlas-docs/buildbox')==='~/work/atlas-docs'),'NEW-2: adding it returns to New project with the machine chosen and the draft kept');
+ await f.locator('[data-close="project-dialog"]').first().click();
+ await f.locator('[data-row-menu="machine"][data-row-id="buildbox"]').click();check(await f.locator('#row-menu [data-row-action="add-repository"]').isDisabled()&&(await f.locator('#row-menu .menu-reason').first().textContent())==='Buildbox has every repository.','NEW-2: a machine with every repository says so');
  await f.close();
 });
 
