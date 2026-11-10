@@ -9391,17 +9391,22 @@ The original unmodified failed full trace and both original diagnostic artifacts
 ## 547. Joined delivery history hides released entries
 
 Found: 2026-11-09, during conversation preparation and lead source review at `bc783b2`.
-State: open, assigned to the later W08 conversation correction.
+State: historical finding not reproduced with the accepted event contract at `056a69c`.
 
-The delivery-history renderer accepts `DeliveryReleased` as a delivery event.
-Its joined history filter omits that event from the states shown under a queued delivery.
-The standalone renderer also suppresses a state when its matching queued source is present.
-A released entry therefore disappears when both its source and release have been loaded.
-This is a source finding, and no runtime reproduction is claimed yet.
+The preparation observed that the delivery-history renderer accepts `DeliveryReleased` as a delivery event.
+It observed that the joined filter omits that event from the states shown under a queued delivery.
+It inferred that matching-source suppression would hide the standalone release too.
+That last inference did not account for the actual release event shape.
+The W08 implementation rechecked the complete accepted contract and release command.
+`DeliveryReleased` contains `agentId` and an optional `holdSequence`, and has no `deliveryId`.
+The joined-history suppression requires `deliveryId`, so a valid release remains visible as a separate agent state.
+The original claimed disappearing release relied on a field that this event does not carry.
 
-The W08 correction must retain the release under its actual delivery identity.
-It must preserve the existing source join and avoid duplicating prompt content.
-A consequential regression must cover a source and release together, a release before its source is loaded, and the joined state after history hydration.
+No production correction is needed for that historical claim.
+`packages/web/test/delivery-release.test.tsx` decodes actual event shapes and covers a source and release together, a release before its source is loaded, and the visible state after history hydration.
+The release keeps its agent and hold identity without inventing a delivery identity or duplicating source content.
+Focused component verification is recorded in the W08 author evidence.
+It does not establish browser execution.
 
 ## 554. Empty project request pages skipped the complete reply budget
 
@@ -10339,3 +10344,91 @@ The strict pre-effect grammar does not recognize these complete shapes, so they 
 The manager accepted the reviewed unit at Grade 8, with no blockers, majors or flags.
 The classifier stays conservative in this change.
 Any later widening must prove exact pre-effect refusal shapes without treating local partial effects as authentication failures.
+
+## 594. Board subject retries could replace a committed reply after an uncertain outcome
+
+Found: 2026-11-10, by the W08 conversation author and the root's recovery review.
+State: The correction has local actual-handler proof and passed the second ordinary full's unit stage. The full failed three other browser cases. Browser acceptance remains outstanding.
+
+The Board subject discarded its request identifier on every typed command error.
+Editing the reply also replaced its request before the original outcome was known.
+Navigation discarded the local attempt.
+A database failure or a later admission error can follow a committed first transport attempt.
+Those errors do not establish that the original reply was refused.
+
+The existing authenticated owner-session conversation registry now retains the complete reply body, target, addressees, and request identifier.
+An uncertain reply has an explicit recovery action that sends that same payload through navigation and draft edits.
+A bounded authenticated event read can establish a durable refusal for the exact owner, command, and request.
+An unavailable read or a later admission error leaves the original attempt frozen.
+Success, a confirmed durable refusal, or owner-session disposal retires the attempt.
+Explicit Read post, access checks, subject focus, and plain-text rendering remain in place.
+
+Two controls failed against the original Board subject.
+The actual CommandHandler, database, receipt, and board-event regressions now cover a lost committed reply, an edited draft, navigation, and a later admission error.
+They verify one stored reply, the unchanged receipt, and no duplicate delivery.
+The same proof covers a receipted planner refusal followed by a corrected new attempt, logout, expiry, and late completion.
+The external harness and browser session transport in these local tests remain controlled fixtures.
+
+## Conversation in-unit follow-on: cancellation outlived its conditional action
+
+Found: 2026-11-10, in the second ordinary conversation full verification.
+State: The original mounted Thread failed three settlement controls. The correction has focused local proof and awaits a newly authorized full verification.
+
+The Stop reply action mounted only while an actual delivery was active.
+Its settlement effect disappeared when terminal evidence removed that action.
+The worker became idle, but the conversation still said that it was waiting for the turn to end.
+The mounted Thread now owns settlement throughout its loaded history lifetime.
+A stop acknowledgement alone still does not establish that a reply stopped.
+Only actual terminal evidence for that agent after the original delivery settles the attempt.
+Incomplete history retains the original attempt, and a late acknowledgement cannot restore a settled attempt.
+The mounted regression covers stopped and normally ended turns, a later actual prompt and cancellation, navigation, unrelated terminal evidence, and active and idle offline controls without writes or draft loss.
+The former standalone action settlement test moved into this mounted production Thread proof.
+This is a correction inside the conversation unit, with no separate issue number under the manager's rule.
+
+The same failed browser run found two fixture steps that expected Send while an actual turn still owned Stop reply.
+The history fixture now completes the addressed member's actual Board read and reply before ending that turn.
+It retains the original Board delivery, complete outgoing source, receipt, viewer, reopen, and reconnect assertions.
+The foundation fixture ends its historical current reservation through the real runner event path.
+It checks both active Stop reply and idle Send prompt during an actual transport outage, including the complete draft and absence of mutation frames or runner writes.
+Neither fixture adds another Send control, submits through Enter to evade an active control, or extends a timeout.
+These browser fixture changes have type proof but have not yet executed in a newly authorized browser run.
+
+## Conversation in-unit follow-on: a committed team post did not invalidate the shell snapshot
+
+Found: 2026-11-10, after the first bounded conversation-workspace browser journey.
+State: The authorized one-tag correction is prepared. The consequential authenticated socket control awaits execution where a Unix socket can listen.
+
+The browser journey committed an actual owner Board post, but its original five-second assertion did not find the new message.
+The failed run did not measure the poll phase, read duration, visibility, or rendering schedule.
+Those timing details remain unproved.
+Reading the complete event path established a separate concrete gap.
+The existing shell watcher received Board post events but advanced its cursor without refreshing its snapshot.
+The team conversation therefore had no immediate event-driven invalidation through Shell's snapshot sequence.
+
+The existing watcher now includes only `board.PostWritten` in its refresh tags.
+It reuses the actual minimum-sequence snapshot read, provider, coherent recovery, Shell sequence prop, and owner `board.peek` read.
+The existing poll, timeouts, authorization, owner lifetimes, and oversized-event predicate are unchanged.
+Root explicitly authorized this accepted foundation file as an overlay within the conversation unit.
+No separate issue number is allocated.
+
+The new mounted App, provider, Shell, and team control uses the real authenticated socket, handler, SQLite writer, and committed event stream.
+It holds only the team reader's fallback poll and records the actual event, minimum snapshot, owner peek, and rendered post.
+It checks the saved older anchor, offset, and Latest action with explicitly simulated layout.
+It also compares actual member read marks, acknowledgements, and durable events before and after owner viewing.
+The first local attempt failed at socket listen with `EPERM`, before reaching a behavioral assertion.
+That environment failure is preserved and is not an original behavioral red.
+The original and candidate inputs are preserved for separate execution authority.
+The original browser journey, later oracles, and timeouts remain unchanged.
+
+## Conversation proof update after the accepted flow join
+
+The manager's corrected actual-stream original run failed the new-post assertion, and its candidate run passed with the same test and only the watcher tag changed.
+The actual after-sync watcher hashes are preserved in the selected original-run-3.log and candidate-run-2.log.
+The earlier first two reported original runs are withdrawn histories and are not behavioral results.
+The manager's third complete workspace journey passed once on content b25415e2, full identity 34978da4, parent 6c4657a.
+It retained the original timeout and all full-input, receipt, authority, anchor, unread, lifecycle and owner-session disposal assertions.
+The two intervening fixture corrections opened actual phone navigation before the unchanged exact logout action and named the same worker in its member-status read while checking the returned identity.
+The complete failed runs, original source pins, reached screenshots and correction deltas remain sealed.
+The W08 work is now composed onto accepted flow b974da06 without relabelling that old-pin pass as proof of this composition.
+A new exact ordinary full and fresh independent whole-unit review remain outstanding.
+The reviewer must explicitly check both browser fixture corrections and every prior authority and recovery edit.

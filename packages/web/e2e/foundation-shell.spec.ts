@@ -11,7 +11,7 @@ import { serve } from "../../engine/src/client/web/server.ts"
 import { engineLists } from "../../engine/src/pieces/lists.ts"
 import { Redactor } from "../../engine/src/log/Redactor.ts"
 import { unusedPort } from "../../engine/test/support/browserWeb.ts"
-import { makeFakeRunner } from "../../engine/test/support/fakeRunner.ts"
+import { incarnationOf, makeFakeRunner } from "../../engine/test/support/fakeRunner.ts"
 import { makeFakeSecrets, makeRig, removeRig } from "../../engine/test/support/handlerRig.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { decisionSetup } from "../../engine/test/support/projectDecisionFixtures.ts"
@@ -27,6 +27,13 @@ test("foundation shell: URL history, focus, sizing, themes and eight viewport ca
   const staticRoot = join(rig.root, "page")
   const violations: string[] = []
   const errors: string[] = []
+  const mutationFrames: string[] = []
+  page.on("websocket", (socket) => socket.on("framesent", ({ payload }) => {
+    const decoded = JSON.parse(payload.toString())
+    for (const frame of Array.isArray(decoded) ? decoded : [decoded]) {
+      if (frame._tag === "Request" && ["prompt", "cancel-reply"].includes(frame.tag)) mutationFrames.push(frame.tag)
+    }
+  }))
   page.on("pageerror", (error) => errors.push(error.message))
   page.on("console", (message) => { if (message.type() === "error" && /content.security.policy|refused to (?:apply|execute|load)/iu.test(message.text())) violations.push(message.text()) })
   await page.addInitScript(() => {
@@ -45,6 +52,29 @@ test("foundation shell: URL history, focus, sizing, themes and eight viewport ca
       yield* Effect.scoped(Effect.gen(function* () {
         yield* registerRebuildCheck()
         const project = yield* decisionSetup()
+        const draft = page.getByRole("form", { name: "Prompt agent", exact: true }).getByRole("textbox")
+        const offlineControl = async (name: "Stop reply" | "Send prompt") => {
+          const control = page.getByRole("button", { name, exact: true })
+          await expect(control).toBeEnabled()
+          const beforeFrames = mutationFrames.length
+          const beforeCancels = runner.callsOf("cancel").length
+          const beforePrompts = runner.callsOf("prompt").length
+          await page.context().setOffline(true)
+          try {
+            // Keep the real active/idle control and actual transport outage.
+            await expect(control).toBeDisabled()
+            await control.evaluate((node: HTMLButtonElement) => node.click())
+            await expect(draft).toHaveValue("Retain this draft while disconnected")
+            expect(mutationFrames).toHaveLength(beforeFrames)
+            expect(runner.callsOf("cancel")).toHaveLength(beforeCancels)
+            expect(runner.callsOf("prompt")).toHaveLength(beforePrompts)
+          } finally { await page.context().setOffline(false) }
+          await expect(control).toBeEnabled()
+          await expect(draft).toHaveValue("Retain this draft while disconnected")
+          expect(mutationFrames).toHaveLength(beforeFrames)
+          expect(runner.callsOf("cancel")).toHaveLength(beforeCancels)
+          expect(runner.callsOf("prompt")).toHaveLength(beforePrompts)
+        }
         yield* serve({ password: Redacted.make(password), staticRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
         yield* Effect.promise(async () => {
@@ -128,16 +158,18 @@ test("foundation shell: URL history, focus, sizing, themes and eight viewport ca
           await page.emulateMedia({ colorScheme: "dark" })
           await expect(page.locator("html")).toHaveAttribute("data-theme", "dark")
           await page.goto(`${origin}/#/thread/${project.workerId}`)
-          const draft = page.getByRole("textbox", { name: "Prompt agent", exact: true })
           await draft.fill("Retain this draft while disconnected")
           await draft.press("Control+k")
           await expect(page.getByRole("dialog", { name: "Find project or agent", exact: true })).toHaveCount(0)
-          await page.context().setOffline(true)
-          try {
-            // A real transport interruption, with no app or DTO replacement.
-            await expect(page.getByRole("button", { name: "Send prompt", exact: true })).toBeDisabled()
-            await expect(draft).toHaveValue("Retain this draft while disconnected")
-          } finally { await page.context().setOffline(false) }
+          await expect(page.getByRole("button", { name: "Send prompt", exact: true })).toHaveCount(0)
+          await offlineControl("Stop reply")
+        })
+        // End the historical fixture's exact current reservation through the
+        // real runner event path, rather than replacing the busy controls.
+        yield* runner.emit({ _tag: "turnEnded", agentId: project.worker.agentId, incarnation: incarnationOf(project.worker.token) })
+        yield* Effect.promise(async () => {
+          await expect(page.getByRole("button", { name: "Stop reply", exact: true })).toHaveCount(0)
+          await offlineControl("Send prompt")
           expect(violations).toEqual([])
           expect(errors).toEqual([])
           expect(await page.evaluate(() => (window as typeof window & { shellPolicyViolations: string[] }).shellPolicyViolations)).toEqual([])

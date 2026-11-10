@@ -1,3 +1,4 @@
+import { ConversationSession } from "../src/thread/conversationState.tsx"
 import { act, type ReactNode } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, vi } from "vitest"
@@ -7,7 +8,14 @@ import { createRequestSources } from "../src/data/requestSources.ts"
 
 const pageEnvironment = vi.hoisted(() => ({ data: undefined as unknown as ShellData, disabled: false, client: {} as Record<string, unknown> }))
 export const environment = pageEnvironment
-vi.mock("../src/data/ShellDataProvider.tsx", () => ({ useShellData: () => pageEnvironment.data, useMutationDisabled: () => pageEnvironment.disabled }))
+vi.mock("../src/data/ShellDataProvider.tsx", async () => {
+  const React = await import("react")
+  return { useShellData: () => pageEnvironment.data, useMutationDisabled: () => pageEnvironment.disabled,
+    useConversation: (identity: import("../src/thread/conversationState.tsx").ConversationIdentity) => {
+      const session = pageEnvironment.data.conversations, entry = session.entry(identity)
+      return { session, entry, state: React.useSyncExternalStore(entry.subscribe, entry.snapshot, entry.snapshot) }
+    } }
+})
 vi.mock("@lgcode/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(pageEnvironment.client) }
@@ -16,7 +24,7 @@ vi.mock("@lgcode/client/browser", async () => {
 export { snapshot, request, questionEvent } from "./project-fixtures.ts"
 export function resetData() {
   const value = snapshot()
-  environment.data = { snapshot: value, navigation: value.project!, requests: [], alerts: [], connection: "Live", complete: true, retry: vi.fn(), onSessionExpired: vi.fn(), requestSources: createRequestSources() }
+  environment.data = { snapshot: value, navigation: value.project!, requests: [], alerts: [], connection: "Live", complete: true, retry: vi.fn(), onSessionExpired: vi.fn(), requestSources: createRequestSources(), conversations: new ConversationSession() }
   environment.disabled = false
   environment.client = {}
   Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true, value: function(this: HTMLDialogElement) { this.open = true } })
@@ -41,7 +49,7 @@ export async function click(container: HTMLElement, text: string) {
 afterEach(async () => {
   for (const { root, container } of mounts.splice(0)) { await act(async () => root.unmount()); container.remove() }
   history.replaceState({}, "", "/")
-  environment.data?.requestSources.close()
+  environment.data?.requestSources.close(); environment.data?.conversations.dispose()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })

@@ -147,10 +147,10 @@ it("keeps a draft while a disconnected shell disables the independent live threa
   browser.client = { ...client(), prompt, 'client.thread': () => Effect.succeed({ items: [] }),
     'client.subscribe': ({ filter }: { filter?: unknown }) => filter === undefined ? shellStream.stream : Stream.never }
   const container = await mount('/#/thread/lead')
-  const field = container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Prompt agent"]')!
+  const field = container.querySelector<HTMLTextAreaElement>('form[aria-label="Prompt agent"] textarea')!
   const send = container.querySelector<HTMLButtonElement>('[aria-label="Send prompt"]')!
+  await act(async () => { field.value = 'Retain my draft'; field.dispatchEvent(new Event('input', { bubbles: true })) })
   await eventually(() => expect(send.disabled).toBe(false))
-  field.value = 'Retain my draft'
   await act(async () => shellStream.fail())
   expect(send.disabled).toBe(true)
   expect(field.value).toBe('Retain my draft')
@@ -164,10 +164,10 @@ it("blocks a live thread immediately on native offline and waits for coherent re
   browser.client = { ...client(), prompt, 'client.thread': () => Effect.succeed({ items: [] }),
     'client.requests': () => recovering ? Deferred.await(recovered).pipe(Effect.as({ sequence: 7, items: [] })) : Effect.succeed({ sequence: 7, items: [] }) }
   const container = await mount('/#/thread/lead')
-  const field = container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Prompt agent"]')!
+  const field = container.querySelector<HTMLTextAreaElement>('form[aria-label="Prompt agent"] textarea')!
   const send = container.querySelector<HTMLButtonElement>('[aria-label="Send prompt"]')!
+  await act(async () => { field.value = 'Private draft survives native offline'; field.dispatchEvent(new Event('input', { bubbles: true })) })
   await eventually(() => expect(send.disabled).toBe(false))
-  field.value = 'Private draft survives native offline'
   await act(async () => window.dispatchEvent(new Event('offline')))
   expect(send.disabled).toBe(true)
   expect(field.value).toBe('Private draft survives native offline')
@@ -339,10 +339,10 @@ async function mismatchedRecovery() {
     'client.sequence': () => state.final === undefined ? Effect.succeed({ sequence: state.sequence })
       : Deferred.await(state.final).pipe(Effect.as({ sequence: state.sequence })) }
   const container = await mount('/#/thread/lead')
-  const field = container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Prompt agent"]')!
+  const field = container.querySelector<HTMLTextAreaElement>('form[aria-label="Prompt agent"] textarea')!
   const send = container.querySelector<HTMLButtonElement>('[aria-label="Send prompt"]')!
+  await act(async () => { field.value = 'Draft retained through incompatible revisions'; field.dispatchEvent(new Event('input', { bubbles: true })) })
   await eventually(() => expect(send.disabled).toBe(false))
-  field.value = 'Draft retained through incompatible revisions'
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
   const publish = async (sequence: number) => {
     state.snapshot = { ...snapshot, sequence }
@@ -446,8 +446,11 @@ it.each(['logout', 'expiry', 'unmount'] as const)('cancels an old collection ret
   browser.client = { ...client(), 'client.thread': () => Effect.succeed({ items: [] }) }
   vi.useRealTimers()
   const later = await mount('/#/thread/lead')
+  const newField = later.querySelector<HTMLTextAreaElement>('form[aria-label="Prompt agent"] textarea')!
+  expect(newField.value).toBe('')
+  await act(async () => { newField.value = 'New owner draft'; newField.dispatchEvent(new Event('input', { bubbles: true })) })
   await eventually(() => expect(later.querySelector<HTMLButtonElement>('[aria-label="Send prompt"]')?.disabled).toBe(false))
-  expect(later.querySelector<HTMLTextAreaElement>('textarea[aria-label="Prompt agent"]')?.value).toBe('')
+  expect(newField.value).toBe('New owner draft')
   expect(h.snapshots).toHaveBeenCalledTimes(before)
   expect(h.state.maximum).toBe(1)
 })
@@ -467,11 +470,14 @@ it('aborts a held coherent-read attempt at unmount and ignores its late failure 
   browser.client = { ...client(), 'client.thread': () => Effect.succeed({ items: [] }) }
   vi.useRealTimers()
   const later = await mount('/#/thread/lead')
+  const newField = later.querySelector<HTMLTextAreaElement>('form[aria-label="Prompt agent"] textarea')!
+  expect(newField.value).toBe('')
+  await act(async () => { newField.value = 'New owner draft'; newField.dispatchEvent(new Event('input', { bubbles: true })) })
   await eventually(() => expect(later.querySelector<HTMLButtonElement>('[aria-label="Send prompt"]')?.disabled).toBe(false))
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
   await act(async () => { await Effect.runPromise(Deferred.fail(h.state.final!, new Error('retired read failed'))) })
   await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
   expect(h.snapshots).toHaveBeenCalledTimes(before)
   expect(later.querySelector<HTMLButtonElement>('[aria-label="Send prompt"]')?.disabled).toBe(false)
-  expect(later.querySelector<HTMLTextAreaElement>('textarea[aria-label="Prompt agent"]')?.value).toBe('')
+  expect(newField.value).toBe('New owner draft')
 })

@@ -78,7 +78,7 @@ test("both owner clients retain first/later prompts, question answers, board del
         })
         yield* finish
         yield* Effect.promise(async () => {
-          await page.getByRole("textbox", { name: "Prompt agent", exact: true }).fill("Later owner prompt")
+          await page.getByRole("form", { name: "Prompt agent", exact: true }).getByRole("textbox").fill("Later owner prompt")
           await page.getByRole("button", { name: "Send prompt", exact: true }).click()
           await expect(page.getByRole("article", { name: "Outgoing delivery" }).filter({ hasText: "Later owner prompt" })).toContainText("Sent")
           await expect.poll(viewerText).toContain("Later owner prompt")
@@ -100,10 +100,24 @@ test("both owner clients retain first/later prompts, question answers, board del
         })
         yield* promptCount(3)
         yield* finish
-        yield* owner["board.post"]({ requestId: freshRequest(), direct: { _tag: "agent", agentId: worker.agentId },
+        const boardPost = yield* owner["board.post"]({ requestId: freshRequest(), direct: { _tag: "agent", agentId: worker.agentId },
           text: "Board roundtrip context", to: [{ _tag: "agent", agentId: worker.agentId }], reply: "all" })
         yield* promptCount(4)
+        // Complete the addressed member's actual read/reply duty before its
+        // turn ends. Otherwise the board correctly starts a reminder turn.
+        const readPost = yield* agent["board.read"]({ requestId: freshRequest(), post: boardPost.postId })
+        expect("data" in readPost && readPost.data.includes(boardPost.postId)).toBe(true)
+        const boardReply = yield* agent["board.post"]({ requestId: freshRequest(), direct: { _tag: "owner" },
+          replyTo: boardPost.postId, text: "Board context received.", to: [], reply: "none" })
         yield* finish
+        const settledPost = yield* owner["board.read"]({ requestId: freshRequest(), post: boardPost.postId })
+        expect("items" in settledPost && settledPost.items.find((post) => post.postId === boardPost.postId)).toMatchObject({
+          status: "closed", dispositions: [{ addressee: { _tag: "agent", agentId: worker.agentId }, disposition: "replied" }],
+        })
+        const actualReply = yield* owner["board.read"]({ requestId: freshRequest(), post: boardReply.postId })
+        expect("items" in actualReply && actualReply.items.find((post) => post.postId === boardReply.postId)).toMatchObject({
+          author: { _tag: "agent", agentId: worker.agentId }, text: "Board context received.", replyTo: boardPost.postId,
+        })
         yield* Effect.promise(async () => {
           await expect(page.getByRole("article", { name: "Outgoing delivery" }).filter({ hasText: "Board roundtrip context" })).toContainText("Accepted")
           await expect.poll(viewerText).toContain("Board roundtrip context")
@@ -111,15 +125,21 @@ test("both owner clients retain first/later prompts, question answers, board del
             && item.event.delivery.source.namespace === "board")).toBe(true)
           // Exceeds the live stream's 256 KiB envelope budget. Both clients
           // must recover its actual source rather than just current state.
-          await page.getByRole("textbox", { name: "Prompt agent", exact: true }).fill(`Large outgoing source ${"x".repeat(270_000)} END-OF-OUTGOING-SOURCE`)
+          await expect(page.getByRole("button", { name: "Stop reply", exact: true })).toHaveCount(0)
+          await page.getByRole("form", { name: "Prompt agent", exact: true }).getByRole("textbox").fill(`Large outgoing source ${"x".repeat(270_000)} END-OF-OUTGOING-SOURCE`)
+          await expect(page.getByRole("button", { name: "Send prompt", exact: true })).toBeEnabled()
           await page.getByRole("button", { name: "Send prompt", exact: true }).click()
-          await expect(page.getByRole("article", { name: "Outgoing delivery" }).filter({ hasText: "Large outgoing source" })).toContainText("END-OF-OUTGOING-SOURCE")
+          await page.getByRole("article", { name: "Outgoing delivery" }).filter({ hasText: "Large outgoing source" }).getByRole("button", { name: "Open Prompt in full", exact: true }).click()
+          await expect(page.getByRole("dialog", { name: "Prompt in full", exact: true }).locator("pre")).toContainText("END-OF-OUTGOING-SOURCE")
+          await page.getByRole("button", { name: "Back to conversation", exact: true }).click()
           await expect.poll(() => viewerText().includes("END-OF-OUTGOING-SOURCE")).toBe(true)
           await viewer!.start()
           await page.reload()
           await expect(page.getByRole("article", { name: "Question answer" })).toContainText("Use the safe branch")
           await expect(page.getByRole("article", { name: "Outgoing delivery" }).filter({ hasText: "First owner prompt" })).toContainText("Accepted")
-          await expect(page.getByRole("article", { name: "Outgoing delivery" }).filter({ hasText: "Large outgoing source" })).toContainText("END-OF-OUTGOING-SOURCE")
+          await page.getByRole("article", { name: "Outgoing delivery" }).filter({ hasText: "Large outgoing source" }).getByRole("button", { name: "Open Prompt in full", exact: true }).click()
+          await expect(page.getByRole("dialog", { name: "Prompt in full", exact: true }).locator("pre")).toContainText("END-OF-OUTGOING-SOURCE")
+          await page.getByRole("button", { name: "Back to conversation", exact: true }).click()
           expect(viewerText()).toContain("First owner prompt")
           expect(viewerText()).toContain("Board roundtrip context")
           expect(viewerText()).toContain("END-OF-OUTGOING-SOURCE")

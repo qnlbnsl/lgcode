@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react"
+import { createContext, useCallback, useContext, useEffect, useRef, useState, useMemo, useSyncExternalStore, type ReactNode } from "react"
 import type { Alert, ClientRequest, ClientSnapshot, EventSequence } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
 import { requestId, withClient } from "../thread/client.ts"
@@ -6,7 +6,10 @@ import { watchSituation, type ConnectionState } from "../watchSituation.ts"
 import { readNavigation, type NavigationData } from "./projectReads.ts"
 import { createRequestSources, type RequestSources } from "./requestSources.ts"
 
+import { ConversationSession, conversationKey, type ConversationIdentity } from "../thread/conversationState.tsx"
+
 export interface ShellData {
+  readonly conversations: ConversationSession
   readonly snapshot?: ClientSnapshot
   readonly navigation?: NavigationData
   readonly requests?: ReadonlyArray<ClientRequest>
@@ -28,6 +31,14 @@ export function useShellData() {
   return value
 }
 
+export function useConversation(identity: ConversationIdentity) {
+  const session = useShellData().conversations
+  const key = conversationKey(identity)
+  const entry = useMemo(() => session.entry(identity), [session, key])
+  const state = useSyncExternalStore(entry.subscribe, entry.snapshot)
+  return { session, entry, state }
+}
+
 export function ShellDataProvider({ children, onSessionExpired }: { readonly children: ReactNode; readonly onSessionExpired: () => void }) {
   const [snapshot, setSnapshot] = useState<ClientSnapshot>()
   const [connection, setConnection] = useState<ConnectionState | "Offline">("Connecting")
@@ -38,6 +49,7 @@ export function ShellDataProvider({ children, onSessionExpired }: { readonly chi
   const [generation, setGeneration] = useState(0)
   const [online, setOnline] = useState(() => navigator.onLine)
   const [requestSources] = useState(createRequestSources)
+  const [conversations] = useState(() => new ConversationSession())
   const complete = online && revision?.snapshot === snapshot && revision?.generation === generation
   const expired = useRef(onSessionExpired)
   expired.current = onSessionExpired
@@ -49,15 +61,15 @@ export function ShellDataProvider({ children, onSessionExpired }: { readonly chi
   const endSession = useCallback(() => {
     ended.current = true
     stopRead()
-    requestSources.close()
+    requestSources.close(); conversations.dispose()
     expired.current()
-  }, [requestSources, stopRead])
+  }, [requestSources, conversations, stopRead])
   const retry = useCallback(() => {
     if (ended.current || !onlineNow.current) return
     stopRead()
     setGeneration((value) => value + 1)
   }, [stopRead])
-  useEffect(() => () => { ended.current = true; stopRead(); requestSources.close() }, [requestSources, stopRead])
+  useEffect(() => () => { ended.current = true; stopRead(); requestSources.close(); conversations.dispose() }, [requestSources, conversations, stopRead])
   useEffect(() => {
     const offline = () => { onlineNow.current = false; stopRead(); setOnline(false); setRevision(undefined); setConnection("Offline") }
     const online = () => {
@@ -133,7 +145,7 @@ export function ShellDataProvider({ children, onSessionExpired }: { readonly chi
     return () => controller.abort()
   }, [snapshot, snapshotGeneration, generation, online, retry])
   return <ShellContext.Provider value={{ ...(snapshot === undefined ? {} : { snapshot }), ...reads, complete, connection,
-    ...(lastUpdated === undefined ? {} : { lastUpdated }), onSessionExpired: endSession, retry, requestSources }}>
+    ...(lastUpdated === undefined ? {} : { lastUpdated }), onSessionExpired: endSession, retry, requestSources, conversations }}>
     <MutationProvider value={!online || connection !== "Live" || !complete}>{children}</MutationProvider>
   </ShellContext.Provider>
 }

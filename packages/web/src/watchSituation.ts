@@ -19,7 +19,7 @@ const refreshTags = new Set([
   "AgentStarted", "AgentStartFailed", "SessionOpened", "AgentGrouped", "ModeChanged",
   "TurnStarted", "TurnEnded", "AgentCrashed", "AgentInterrupted", "AgentStopped", "AgentReloadFailed",
   "DeliverySent", "DeliveryHeld", "DeliveryReleased", "PermissionRequested", "PermissionAnswered",
-  "PermissionCancelled", "PermissionMoved", "QuestionAsked", "QuestionAnswered", "QuestionMoved"
+  "PermissionCancelled", "PermissionMoved", "QuestionAsked", "QuestionAnswered", "QuestionMoved", "board.PostWritten"
 ])
 
 export async function watchSituation(observer: Observer, signal: AbortSignal): Promise<void> {

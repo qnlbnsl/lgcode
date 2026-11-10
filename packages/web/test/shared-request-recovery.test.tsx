@@ -132,7 +132,7 @@ it.each(["ClientError", "CommandError"])("failed-start Resume handles %s receipt
   expect(resume).toHaveBeenCalledTimes(2)
   const first = resume.mock.calls[0]![0], second = resume.mock.calls[1]![0]
   expect(first).toMatchObject({ agentId: agent.agentId, fresh: true })
-  expect(second.requestId === first.requestId).toBe(tag === "ClientError")
+  expect(second).toEqual(first)
   expect(container.textContent).not.toMatch(/agent (?:is )?running/i)
 })
 

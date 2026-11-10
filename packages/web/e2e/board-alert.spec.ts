@@ -131,7 +131,7 @@ test("7.4 a phone owner follows the board alert, reads and replies, and wakes th
           const reads = () => rows().filter((row) => row._tag === "board.Read" && row.reader._tag === "owner" && row.postIds.includes(postId))
           expect(reads()).toHaveLength(0)
           await page.goto(notification.headers.click as string)
-          await expect(page.getByRole("heading", { name: "Thread: Thread lead", exact: true })).toBeVisible()
+          await expect(page.getByRole("heading", { name: "Thread lead", exact: true })).toBeVisible()
           const read = page.getByRole("button", { name: "Read post", exact: true })
           await expect(read).toBeVisible() // catches a notification link that opens no board subject entry
           await expect(page.getByText("question text")).toHaveCount(0) // catches reading the post merely by following the link

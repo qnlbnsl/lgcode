@@ -59,7 +59,7 @@ test("the production admin pages use real RPCs and fit a 360-pixel browser", asy
           await expect(threadLink).toHaveAttribute("href", "/#/thread/phone-worker")
           await threadLink.click()
           await expect(page).toHaveURL(`http://127.0.0.1:${port}/#/thread/phone-worker`)
-          await expect(page.getByRole("heading", { name: "Thread: name-phone-worker", exact: true })).toBeVisible()
+          await expect(page.getByRole("heading", { name: "name-phone-worker", exact: true })).toBeVisible()
           await expect(page.getByRole("region", { name: "Question", exact: true })).toContainText("Which branch should I use?")
           await openService("Phone notifications")
           await page.reload()

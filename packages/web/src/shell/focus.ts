@@ -12,7 +12,13 @@ export function useContainedFocus(open: boolean, element: RefObject<HTMLElement 
       .filter((item) => !item.closest("[hidden],[inert]") && item.getAttribute("aria-hidden") !== "true" && getComputedStyle(item).display !== "none" && getComputedStyle(item).visibility !== "hidden")
     ;(root.querySelector<HTMLElement>("[data-autofocus]") ?? focusable()[0] ?? root).focus()
     const keydown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close() }
+      // Native modal readers and context pickers own their focus and keys.
+      if (event.target instanceof Element && event.target.closest("dialog[open]")) return
+      if (event.key === "Escape") {
+        // A nested native reader, context picker or choice menu owns Escape.
+        if (event.target instanceof Element && event.target.closest('[role="menu"]')) return
+        event.preventDefault(); event.stopPropagation(); close()
+      }
       if (event.key === "Tab") {
         const items = focusable()
         const index = items.indexOf(document.activeElement as HTMLElement)

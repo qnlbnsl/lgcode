@@ -1,3 +1,4 @@
+import { ConversationSession } from "../src/thread/conversationState.tsx"
 import { act, type ReactNode } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
@@ -30,7 +31,7 @@ const workspaces = [
 ] as Workspace[]
 const snapshot = { sequence: 7, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0 } as unknown as ClientSnapshot
 const baseData = (): ShellData => ({ snapshot, navigation: { projects: [project], repositories: [repository], workspaces, teams: [], agents: [] },
-  requests: [], alerts: [], complete: true, connection: "Live", retry: vi.fn(), onSessionExpired: vi.fn(), requestSources: createRequestSources() })
+  requests: [], alerts: [], complete: true, connection: "Live", retry: vi.fn(), onSessionExpired: vi.fn(), requestSources: createRequestSources(), conversations: new ConversationSession() })
 const alertSettings = { kinds: [{ kind: "approval", push: true }], carrier: { _tag: "ntfy", server: "https://push.example", topic: "alerts" }, tokenSet: true }
 const webSettings = { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false, serverState: "running" }
 const failed = { alertId: "notice", alertKey: "other.notice", sourceSequence: 1, kind: "other", title: "Attention", raisedAt: 1, status: "open",

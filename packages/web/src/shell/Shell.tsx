@@ -18,6 +18,8 @@ import { RepositoryPage, RepositoryTabs } from "../pages/RepositoryPage.tsx"
 import { SprintPage } from "../pages/SprintPage.tsx"
 import { TaskPage } from "../pages/TaskPage.tsx"
 import { FailedStartList, RequestList, byRequestAge } from "../requests/RequestList.tsx"
+import { TeamConversation } from "../thread/team.tsx"
+import { ConversationContext } from "./ConversationContext.tsx"
 import { Thread } from "../thread/index.tsx"
 import { visibleText } from "../thread/text.tsx"
 import { Icon, type IconName } from "./Icon.tsx"
@@ -31,7 +33,7 @@ const serviceNames = { alerts: "Phone notifications", machines: "Machines", subs
 const serviceIcons: Record<keyof typeof serviceNames, IconName> = { alerts: "phone", machines: "machines", subscriptions: "subscriptions", settings: "settings" }
 const tabNames: Record<WorkspaceTab, string> = { board: "Board", chat: "Chat", terminal: "Terminal", git: "Git", settings: "Project settings", tasks: "Tasks" }
 
-function OverflowRow({ children }: { readonly children: ReactNode }) {
+function OverflowRow({ children, inert = false }: { readonly children: ReactNode; readonly inert?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   const update = useCallback(() => {
     const element = ref.current
@@ -45,7 +47,7 @@ function OverflowRow({ children }: { readonly children: ReactNode }) {
     if (ref.current) observer?.observe(ref.current)
     return () => observer?.disconnect()
   }, [children, update])
-  return <div className="workspace-tabs" ref={ref} onScroll={update}>{children}</div>
+  return <div className="workspace-tabs" ref={ref} onScroll={update} {...(inert ? { inert: true } : {})}>{children}</div>
 }
 
 export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
@@ -67,6 +69,15 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
   const [collapsed, setCollapsed] = useState(() => readPreference("lgcode-sidebar") === "rail")
   const [width, setWidth] = useState(savedPanelWidth)
   const [phone, setPhone] = useState(() => window.matchMedia?.("(max-width:700px)").matches ?? false)
+  const [dockWide, setDockWide] = useState(() => window.matchMedia?.("(min-width:1801px)").matches ?? false)
+  const [dockCompact, setDockCompact] = useState(() => window.matchMedia?.("(max-width:1100px)").matches ?? false)
+  const [dockOpen, setDockOpen] = useState(() => !(window.matchMedia?.("(max-width:1100px)").matches ?? false))
+  const [gitDockOpen, setGitDockOpen] = useState(false)
+  const [dockWidth, setDockWidth] = useState(() => Math.max(320, Math.min(600, Number(readPreference("lgcode-layout-lead")) || 360)))
+  const dock = useRef<HTMLElement>(null)
+  const dockTrigger = useRef<HTMLButtonElement>(null)
+  const dockResize = useRef<{ pointer: number; x: number; width: number } | undefined>(undefined)
+  const lastAgent = useRef(new Map<string, AgentId>())
   const [drawer, setDrawer] = useState(false)
   const [quick, setQuick] = useState(false)
   const [bell, setBell] = useState(false)
@@ -108,7 +119,7 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
   useEffect(() => {
     const keys = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing || shortcutInField(event.target) || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return
-      if (event.key.toLowerCase() === "k") { event.preventDefault(); setDrawer(false); setBell(false); setWorkspaces(false); setQuick((value) => !value) }
+      if (event.key.toLowerCase() === "k") { event.preventDefault(); setDockOpen(false); setGitDockOpen(false); setDrawer(false); setBell(false); setWorkspaces(false); setQuick((value) => !value) }
       else if (event.key.toLowerCase() === "b" && !phone && !quick && !bell && !workspaces) { event.preventDefault(); toggleRail() }
     }
     document.addEventListener("keydown", keys)
@@ -185,6 +196,41 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
     <span role="status">{data.connection}</span>{data.lastUpdated !== undefined && <small>Updated {new Date(data.lastUpdated).toLocaleTimeString()}</small>}
     <button className="icon-button" aria-label="Reconnect now" onClick={data.retry}><Icon name="refresh" /></button></div>
   const threadId: AgentId | undefined = route.page === "thread" ? route.agentId : route.page === "project" && route.tab === "chat" && scope.team === undefined ? scope.project?.leadAgentId : undefined
+  const isGit = route.page === "project" && route.tab === "git"
+  const isChat = threadId !== undefined || route.page === "project" && route.tab === "chat"
+  const dockEligible = projectId !== undefined && !isChat && (dockWide || route.page === "project" && (route.tab === "board" || isGit))
+  const showDock = dockEligible && (isGit && !dockWide ? gitDockOpen : dockOpen)
+  const dockModal = showDock && dockCompact
+  const closeDock = useCallback(() => { setDockOpen(false); setGitDockOpen(false); dockTrigger.current?.focus({ preventScroll: true }) }, [])
+  const toggleDock = () => { if (showDock) closeDock(); else if (isGit && !dockWide) setGitDockOpen(true); else setDockOpen(true) }
+  useContainedFocus(dockModal, dock, closeDock)
+  useEffect(() => {
+    const wide = window.matchMedia?.("(min-width:1801px)"), compact = window.matchMedia?.("(max-width:1100px)")
+    const update = () => {
+      setDockWide(wide?.matches ?? false); setDockCompact(compact?.matches ?? false)
+      if (wide?.matches) setDockOpen(true)
+      if (compact?.matches) { setDockOpen(false); setGitDockOpen(false) }
+    }
+    wide?.addEventListener("change", update); compact?.addEventListener("change", update)
+    return () => { wide?.removeEventListener("change", update); compact?.removeEventListener("change", update) }
+  }, [])
+  useEffect(() => {
+    if (route.page === "thread" && projectId !== undefined) lastAgent.current.set(projectId, route.agentId)
+    if (!dockWide) { setDockOpen(!dockCompact); setGitDockOpen(false) }
+  }, [routeIdentity])
+  useEffect(() => { app.current?.style.setProperty("--lead-width", `${dockWidth}px`) }, [dockWidth])
+  const resizeDock = (value: number) => {
+    const width = Math.round(Math.max(320, Math.min(600, Math.max(320, innerWidth - 650), value)))
+    setDockWidth(width); writePreference("lgcode-layout-lead", String(width))
+  }
+  const previousAgent = projectId === undefined ? undefined : lastAgent.current.get(projectId)
+  const remembered = data.snapshot?.agents.find((row) => row.agentId === previousAgent && (row.agentId === scope.project?.leadAgentId || row.folder === scope.assignedWorkspace?.path))
+  const dockAgentId = remembered?.agentId ?? scope.project?.leadAgentId
+  const dockName = scope.team?.name ?? data.snapshot?.agents.find((row) => row.agentId === dockAgentId)?.name ?? "Project lead"
+  const teamConversation = scope.team && scope.project && (scope.team.channelId === undefined ? <section className="conversation"><h2>{visibleText(scope.team.name)}</h2><p>This team's chat channel is unavailable.</p></section> : <TeamConversation projectId={scope.project.projectId} teamId={scope.team.teamId}
+    channelId={scope.team.channelId} name={scope.team.name} disabled={mutationDisabled} onSessionExpired={expireSession}
+    scope={{ projectId: scope.project.projectId, teamId: scope.team.teamId, worktreeId: scope.team.worktreeId }}
+    {...(data.snapshot ? { sequence: data.snapshot.sequence } : {})} />)
   const unavailable = !data.complete ? undefined
     : (route.page === "project" || route.page === "sprint" || route.page === "task") && scope.project === undefined ? "This project is unavailable."
     : route.page === "project" && route.teamId !== undefined && scope.team === undefined ? "This team is unavailable in this project."
@@ -194,7 +240,7 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
   return <div ref={app} className={`app${collapsed ? " sidebar-collapsed" : ""}`} onClick={intercept}>
     {drawer && phone && <div className="drawer-backdrop" onClick={closeDrawer} aria-hidden="true" />}
     <aside ref={sidebar} id="sidebar" className={`sidebar${drawer ? " open" : ""}`} aria-label="Repositories, projects and teams"
-      {...(phone && !drawer || quick || bell || workspaces ? { inert: true } : {})} {...(drawer && phone ? { role: "dialog", "aria-modal": true } : {})}>
+      {...(phone && !drawer || quick || bell || workspaces || dockModal ? { inert: true } : {})} {...(drawer && phone ? { role: "dialog", "aria-modal": true } : {})}>
       <div className="brand-row"><span className="brand">LGcode</span><button className="icon-button" id="collapse-sidebar" aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed} aria-controls="sidebar" onClick={toggleRail}><Icon name="panel" /></button>
         <button className="icon-button close-navigation" aria-label="Close navigation" onClick={closeDrawer}><Icon name="x" /></button></div>
       {phone && attention.length > 0 && <section className="drawer-attention" aria-label="Needs attention"><h2>Needs attention <small>{attention.length}</small></h2>{[...new Set(attention.map((item) => item.agentId))].map((id) => {
@@ -221,7 +267,7 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
         onPointerUp={() => { resizeStart.current = undefined }} onPointerCancel={() => { resizeStart.current = undefined }} onLostPointerCapture={() => { resizeStart.current = undefined }} />
     </aside>
     <main className="main" {...(drawer && phone || quick || bell || workspaces ? { inert: true } : {})}>
-      <header className="topbar"><button className="icon-button mobile-menu" id="menu" aria-label="Open navigation" aria-expanded={drawer} aria-controls="sidebar" onClick={() => setDrawer(true)}><Icon name="menu" /></button>
+      <header className="topbar" {...(dockModal ? { inert: true } : {})}><button className="icon-button mobile-menu" id="menu" aria-label="Open navigation" aria-expanded={drawer} aria-controls="sidebar" onClick={() => setDrawer(true)}><Icon name="menu" /></button>
         <nav className="breadcrumb" aria-label="Breadcrumb"><span className="phone-crumb">{visibleText(place)}</span>
           {scope.repository && <><a className="repo-crumb" href={shellHref({ page: "repository", repoId: scope.repository.repoId })}>{visibleText(scope.repository.name)}</a>{scope.project && <span className="crumb-sep">/</span>}</>}
           {scope.project && <a href={shellHref({ page: "project", projectId: scope.project.projectId, tab: "board" })}>{visibleText(scope.project.name)}</a>}
@@ -231,7 +277,7 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
         <button className="icon-button attention-toggle" aria-label={`${data.complete ? attention.length : "Unknown number of"} items need attention`} aria-haspopup="dialog" aria-expanded={bell} onClick={() => setBell(true)}><Icon name="bell" />
           {phone && <span className={`bell-dot dot${data.connection === "Live" ? "" : " wait"}`} />}{attention.length > 0 && <small className="attention-number">{attention.length}</small>}</button>
       </header>
-      {projectId !== undefined && <OverflowRow><nav role="tablist" aria-label="Workspace tabs" onKeyDown={(event) => {
+      {projectId !== undefined && <OverflowRow inert={dockModal}><nav role="tablist" aria-label="Workspace tabs" onKeyDown={(event) => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return
         const tabs = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>('[role="tab"]')]
         const current = tabs.indexOf(document.activeElement as HTMLAnchorElement)
@@ -241,13 +287,17 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
         const selected = route.page === "thread" ? tab === "chat" : route.page === "project" ? route.tab === tab : tab === "board"
         return <a key={tab} role="tab" aria-selected={selected} tabIndex={selected ? 0 : -1} href={shellHref(projectRoute(tab))}>{tabNames[tab]}</a>
       })}</nav></OverflowRow>}
-      {phone && inspectingControl && <div className="phone-context">{inspectingControl}</div>}
-      <NotificationPrompt onSessionExpired={expireSession} />
-      <section ref={content} className="view-body" id="view-body" tabIndex={-1} aria-label="Current view">
+      {dockEligible && <button className="conversation-toggle" ref={dockTrigger} aria-label={`Conversation with ${visibleText(dockName)}`}
+        {...(dockModal ? { inert: true } : {})} aria-controls="conversation-dock" aria-expanded={showDock} onClick={toggleDock}>{visibleText(dockName)} · Chat</button>}
+      {phone && inspectingControl && <div className="phone-context" {...(dockModal ? { inert: true } : {})}>{inspectingControl}</div>}
+      <div {...(dockModal ? { inert: true } : {})}><NotificationPrompt onSessionExpired={expireSession} /></div>
+      <div className="workspace-surface">
+      <section ref={content} {...(dockModal ? { inert: true } : {})} className="view-body" id="view-body" tabIndex={-1} aria-label="Current view">
         {message && <p role="alert">{message}</p>}
         {route.page === "invalid" ? <p role="alert">This page address is invalid. <a href="/#/">Go Home</a></p>
           : unavailable !== undefined ? <p role="alert">{unavailable} <a href="/#/">Go Home</a></p>
           : threadId !== undefined ? <Thread key={threadId} agentId={threadId} {...(route.page === "thread" && route.subject !== undefined ? { subject: route.subject } : {})} onSessionExpired={expireSession} />
+          : route.page === "project" && route.tab === "chat" && scope.team ? teamConversation
           : route.page === "home" ? <HomePage route={route} onNewProject={openProject} newProjectButtonRef={projectTrigger} />
           : route.page === "service" && route.service === "alerts" ? <Alerts onSessionExpired={expireSession} />
           : route.page === "service" && route.service === "settings" ? <Settings onSessionExpired={expireSession} />
@@ -267,6 +317,23 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
           : route.page === "project" && (route.tab === "board" || route.tab === "tasks") ? <ProjectPage route={route} />
           : shellPending(route.page === "project" ? tabNames[route.tab] : "Conversation")}
       </section>
+      {dockWide && threadId !== undefined && scope.project && scope.assignedWorkspace && <ConversationContext project={scope.project}
+        agentId={threadId} worktreeId={scope.assignedWorkspace.worktreeId} />}
+      {dockEligible && <aside id="conversation-dock" ref={dock} hidden={!showDock} className={`conversation-dock${dockModal ? " is-modal" : ""}`}
+        aria-label={scope.team ? "Team conversation dock" : "Lead conversation"} {...(dockModal ? { role: "dialog", "aria-modal": true } : {})}>
+        <div className="resize-handle conversation-resize" role="separator" tabIndex={0} aria-label="Resize the thread panel" aria-orientation="vertical" aria-valuemin={320} aria-valuemax={600} aria-valuenow={dockWidth}
+          onDoubleClick={() => resizeDock(360)} onKeyDown={(event) => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return
+            event.preventDefault(); resizeDock(event.key === "Home" ? 360 : event.key === "End" ? 540 : dockWidth + (event.key === "ArrowLeft" ? 16 : -16))
+          }} onPointerDown={(event) => { if (event.button !== 0) return; event.preventDefault(); dockResize.current = { pointer: event.pointerId, x: event.clientX, width: dockWidth }; event.currentTarget.setPointerCapture(event.pointerId) }}
+          onPointerMove={(event) => { if (dockResize.current?.pointer === event.pointerId) resizeDock(dockResize.current.width + dockResize.current.x - event.clientX) }}
+          onPointerUp={() => { dockResize.current = undefined }} onPointerCancel={() => { dockResize.current = undefined }} onLostPointerCapture={() => { dockResize.current = undefined }} />
+        <header className="conversation-dock-heading"><span>{scope.team ? "Team chat" : dockAgentId === scope.project?.leadAgentId ? "Project lead" : "Agent conversation"}</span>
+          <a href={scope.team ? shellHref({ page: "project", projectId: scope.team.projectId, teamId: scope.team.teamId, tab: "chat" }) : shellHref({ page: "thread", agentId: dockAgentId! })}>Open conversation in full</a>
+          <button onClick={closeDock} aria-label="Close the thread">×</button></header>
+        {showDock && (scope.team ? teamConversation : dockAgentId ? <Thread agentId={dockAgentId} onSessionExpired={expireSession} /> : <p>The project lead is unavailable.</p>)}
+      </aside>}
+      </div>
     </main>
     <NewProjectDialog creation={creation} disabled={mutationDisabled || logoutBusy} onAddRepository={addRepository}
       onSettings={() => { creation.close(); navigate({ page: "service", service: "settings" }) }} onCreated={projectCreated} />
