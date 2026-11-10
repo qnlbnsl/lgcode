@@ -21,8 +21,6 @@ import { unusedPort } from "../../engine/test/support/browserWeb.ts"
 import { makeFakeRunner } from "../../engine/test/support/fakeRunner.ts"
 import { appendSetup, call, eventOf, freshRequest, harnessSettings, makeFakeSecrets, makeRig, ownerCredential, removeRig, seedAccount, seedAgent, success } from "../../engine/test/support/handlerRig.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
-// TEMP-OBSERVE: safe registered-handler/wire phases for the three actual Git failures.
-import { observeGit } from "./git-temp-observation.ts"
 test.describe.configure({ timeout: 120_000 })
 
 // Build the production web root, authenticate through App, and navigate the
@@ -31,12 +29,9 @@ test.describe.configure({ timeout: 120_000 })
 const git = (folder: string, ...args: string[]) => execFileSync("/usr/bin/git", ["-C", folder, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
 const save = (folder: string, name: string, text: string) => writeFileSync(join(folder, name), text)
 const commit = (folder: string, title: string) => { git(folder, "add", "--all"); git(folder, "commit", "-m", title); return git(folder, "rev-parse", "HEAD") }
-// TEMP-OBSERVE: expose only explicit assertion phase labels to the scoped fixture observer.
-interface Fixture { readonly base: string; readonly source: Workspace; readonly project: Project; readonly repository: Repository; readonly root: string; readonly boundary: (phase: string) => void }
+interface Fixture { readonly base: string; readonly source: Workspace; readonly project: Project; readonly repository: Repository; readonly root: string }
 async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture) => void, body: (f: Fixture) => Promise<void>, options: { readonly loseCommitReply?: boolean; readonly reportedFailure?: boolean } = {}) {
   const rig = makeRig(), previous = process.env.LGCODE_HOME
-  // TEMP-OBSERVE: this table is passed to both actual services and the actual listener.
-  const observation = observeGit(page, test.info().outputPath("git-command-boundaries.json")), lists = observation.registeredReads(engineLists)
   process.env.LGCODE_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url"), staticRoot = join(rig.root, "page"), port = await unusedPort()
   try {
@@ -54,8 +49,7 @@ async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture
         success(yield* call(ownerCredential, "project.workspace.register", { repoId: added.repoId, path: rig.work, branch: base, machineId: "local", checkout: "main" }))
         const created = success(yield* call(ownerCredential, "project.create", { name: "Browser work", goal: "Prove the owned Git component", machineId: "local", repository: { _tag: "existing", repoId: added.repoId }, useWorktree: true }))
         const view = projectView(yield* (yield* Views).snapshot), project = view.projects[created.projectId]!, source = view.workspaces[project.worktreeId]!, repository = view.repositories[added.repoId]!
-        // TEMP-OBSERVE: no request, scheduling or production-state changes.
-        const fixture: Fixture = { base: rig.work, source, project, repository, root: rig.root, boundary: observation.boundary }
+        const fixture: Fixture = { base: rig.work, source, project, repository, root: rig.root }
         prepare(fixture)
         if (options.reportedFailure) {
           const member = yield* seedAgent({ id: "browser-reviewer", parent: project.leadAgentId, folder: source.path })
@@ -63,8 +57,7 @@ async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture
           for (const kind of ["tests", "review"] as const) success(yield* call(ownerCredential, "project.review.report", { projectId: project.projectId, worktreeId: source.worktreeId,
             head: git(source.path, "rev-parse", "HEAD"), kind, status: "failed", summary: "Reported failure <script>literal</script>", threadAgentId: member.agentId, threadSequence: thread!.sequence }))
         }
-        // TEMP-OBSERVE: retain every original registered handler beneath the passive wrapper.
-        yield* serve({ password: Redacted.make(password), staticRoot, lists, settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
+        yield* serve({ password: Redacted.make(password), staticRoot, lists: engineLists, settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
         yield* Effect.promise(async () => {
           const route = `http://127.0.0.1:${port}/#/project/${encodeURIComponent(project.projectId)}/git`
           await page.goto(route)
@@ -75,29 +68,23 @@ async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture
           await expect(page.locator("#view-body > .git-workspace")).toHaveCount(1)
           await expect(page.getByRole("region", { name: "Git", exact: true })).toBeVisible()
           await expect(page.getByRole("button", { name: "Refresh Git", exact: true })).toBeEnabled()
-          // TEMP-OBSERVE: actual assertion lifetime and pre-cleanup DOM counts, without payloads.
-          observation.boundary("body-start")
-          try { await body(fixture) } finally { observation.boundary("body-end"); await observation.dom() }
+          await body(fixture)
         })
       })
       const redactor = makeRedactor({ secrets: () => [Redacted.make("synthetic-browser-git-key")], tokenHashes: () => new Set() })
       const dependencies = Layer.mergeAll(runner.layer, secrets.layer, redactor.layer)
-      // TEMP-OBSERVE: same read table as the actual listener, including registered Git reads.
-      const real = buildServices(rig, lists).pipe(Layer.provide(dependencies))
+      const real = buildServices(rig, engineLists).pipe(Layer.provide(dependencies))
       const services = Layer.effect(CommandHandler, Effect.gen(function* () {
         const handler = yield* CommandHandler; let lose = true
-        // TEMP-OBSERVE: retain the original post-handler typed failure and observe its actual exit.
-        return { ...handler, execute: (credential, name, payload) => observation.command(name, payload, handler.execute(credential, name, payload).pipe(Effect.flatMap((reply) => {
+        return { ...handler, execute: (credential, name, payload) => handler.execute(credential, name, payload).pipe(Effect.flatMap((reply) => {
           if (options.loseCommitReply && name === "project.commit" && lose) { lose = false; return Effect.fail(new LogWriteFailed({ reason: "database read failed" })) }
           return Effect.succeed(reply)
-        }))) }
+        })) }
       })).pipe(Layer.provideMerge(real))
       yield* Effect.scoped(run).pipe(Effect.provide(services), Effect.provide(runner.layer))
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped)
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
   } finally {
-    // TEMP-OBSERVE: write on failure as well as success; cleanup remains unconditional.
-    observation.boundary("scope-end"); observation.finish()
     if (previous === undefined) delete process.env.LGCODE_HOME; else process.env.LGCODE_HOME = previous
     removeRig(rig)
   }
@@ -216,8 +203,7 @@ test("Git: actual bulk stage/unstage, stale discard and a real literal rename co
     await page.getByRole("button", { name: "Discard", exact: true }).click(); await expect(page.getByRole("dialog")).toBeVisible()
     save(f.source.path, "new.txt", "later edit stays\n"); await page.getByRole("button", { name: "Confirm discard", exact: true }).click()
     await expect(page.locator(".git-pane-head")).toContainText("state changed"); expect(readFileSync(join(f.source.path, "new.txt"), "utf8")).toBe("later edit stays\n")
-    // TEMP-OBSERVE: bracket the unchanged original post-stage oracle.
-    f.boundary("stage-click"); await page.getByRole("button", { name: "Stage all", exact: true }).click(); f.boundary("stage-assert-start"); await expect(page.getByRole("button", { name: "Commit 2 files", exact: true })).toBeDisabled(); f.boundary("stage-assert-pass")
+    await page.getByRole("button", { name: "Stage all", exact: true }).click(); await expect(page.getByRole("button", { name: "Commit 2 files", exact: true })).toBeDisabled()
     await page.getByLabel("Commit message", { exact: true }).fill("Real rename and later edit")
     await page.getByRole("button", { name: "Commit 2 files", exact: true }).click()
     await expect(page.locator("#git-notice")).toContainText("Committed ")
@@ -280,8 +266,7 @@ test("Git: a typed lost reply refreshes to terminal uncertainty without replay o
     await page.getByRole("button", { name: "Stage all", exact: true }).click()
     await page.getByLabel("Commit message", { exact: true }).fill("Original receipt body")
     await page.getByRole("button", { name: "Commit 1 file", exact: true }).click()
-    // TEMP-OBSERVE: bracket the unchanged original terminal-uncertainty oracle.
-    f.boundary("uncertainty-assert-start"); await expect(page.locator(".git-workspace [role=alert]")).toContainText("does not establish"); f.boundary("uncertainty-assert-pass")
+    await expect(page.locator(".git-workspace [role=alert]")).toContainText("does not establish")
     expect(git(f.source.path, "rev-list", "--count", "HEAD")).toBe("2")
     await expect(page.locator("#git-notice")).toHaveCount(0)
     await page.getByLabel("Commit message", { exact: true }).fill("Keep the next draft")
@@ -326,8 +311,7 @@ test("Git: fetch, fast-forward pull and push use only the owned temporary remote
     save(other, "incoming.txt", "actual remote bytes\n"); commit(other, "Incoming"); git(other, "push", "origin", f.source.branch)
   }, async (f) => {
     await page.getByRole("button", { name: "Fetch", exact: true }).click(); await expect(page.locator("#git-sync-state")).toContainText("1 incoming")
-    // TEMP-OBSERVE: bracket the unchanged original post-pull oracle.
-    f.boundary("pull-click"); await page.getByRole("button", { name: "Pull", exact: true }).click(); f.boundary("pull-assert-start"); await expect(page.locator("#git-sync-state")).toContainText("0 incoming"); f.boundary("pull-assert-pass")
+    await page.getByRole("button", { name: "Pull", exact: true }).click(); await expect(page.locator("#git-sync-state")).toContainText("0 incoming")
     expect(readFileSync(join(f.source.path, "incoming.txt"), "utf8")).toBe("actual remote bytes\n")
     save(f.source.path, "outgoing.txt", "actual outgoing bytes\n"); await refresh(page)
     await page.getByRole("button", { name: "Stage all", exact: true }).click(); await page.getByLabel("Commit message", { exact: true }).fill("Outgoing")

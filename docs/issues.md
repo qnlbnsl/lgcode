@@ -10401,3 +10401,12 @@ The new-project eight-size creation case reached its original 30-second case tim
 Neither failure has an established cause, and no deadline was increased.
 The complete full output and both original failure contexts remain in `.scratch/w09-evidence/minor-corrections/` in the W09 author worktree.
 The full-check requirement remains unmet, and issue numbers remain manager-owned.
+
+The later full on `8c50353` passed typing and all unit tests but failed three Git browser publication assertions and the same project-creation case.
+A bounded registered-handler and wire observation reproduced the lost-reply failure without changing its original oracle.
+Its five-second assertion began before the typed commit failure arrived, and the final coherent identity read was still pending when the assertion failed.
+An auxiliary checkout count read also entered the shared runtime Git gate before the inspected state read.
+The UI now defers those auxiliary summaries until the inspected coherent working refresh publishes, while keeping current count generations and their cancellation guards.
+A consequential mounted control failed against the original production ordering because an auxiliary read started while the inspected refresh was held.
+The original browser assertions and deadlines remain unchanged, and this observation does not establish a load, network or universal latency cause.
+The manager owns the separate new-project disposition; that case is not repeated to chase a pass.

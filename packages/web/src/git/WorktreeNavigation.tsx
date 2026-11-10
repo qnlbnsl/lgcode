@@ -5,10 +5,10 @@ import { requestId, withClient } from "../thread/client.ts"
 import { visibleText } from "../thread/text.tsx"
 import { probeSession, readResult, workspaceKey, type GitSession } from "./state.ts"
 
-export function WorktreeNavigation({ repository, projects, teams, workspaces, inspected, assigned, onInspect, onSessionExpired, session, folded, toggle, revision }: {
+export function WorktreeNavigation({ repository, projects, teams, workspaces, inspected, assigned, onInspect, onSessionExpired, session, folded, toggle, revision, deferReads }: {
   readonly repository: Repository; readonly projects: ReadonlyArray<Project>; readonly teams: ReadonlyArray<Team>; readonly workspaces: ReadonlyArray<Workspace>
   readonly inspected: WorkspaceId; readonly assigned: WorkspaceId; readonly onInspect: (id: WorkspaceId) => void; readonly session: GitSession; readonly folded: boolean; readonly revision: number; readonly toggle: () => void
-  readonly onSessionExpired: () => void
+  readonly onSessionExpired: () => void; readonly deferReads: boolean
 }) {
   const rows = workspaces.filter((row) => row.repoId === repository.repoId)
   const key = rows.map((row) => JSON.stringify([row.worktreeId, row.machineId])).join(":")
@@ -18,6 +18,9 @@ export function WorktreeNavigation({ repository, projects, teams, workspaces, in
     const controller = new AbortController()
     const candidates = rows.filter((row) => row.machineId === "local" && row.worktreeId !== inspected).slice(0, 32)
     setCounts(new Map(candidates.map((row) => [row.worktreeId, "Checking changes…"])))
+    // All registered Git reads share the runtime gate. Finish the inspected
+    // coherent refresh before admitting auxiliary checkout summaries.
+    if (deferReads) return () => controller.abort()
     // Counts are actual reads, including for unvisited rows. An unavailable or
     // bounded result is labeled, never rendered as a clean checkout.
     void withClient((client) => Effect.gen(function* () {
@@ -33,7 +36,7 @@ export function WorktreeNavigation({ repository, projects, teams, workspaces, in
       }
     }), controller.signal).catch(() => { if (!controller.signal.aborted) { setCounts(new Map(candidates.map((row) => [row.worktreeId, "Unavailable"]))); void probeSession(controller.signal, expired.current) } })
     return () => controller.abort()
-  }, [key, inspected, revision])
+  }, [key, inspected, revision, deferReads])
   const label = (row: Workspace) => row.checkout === "main" ? "Main checkout" : teams.find((team) => team.worktreeId === row.worktreeId)?.name
     ?? projects.find((project) => project.worktreeId === row.worktreeId)?.name ?? row.branch
   const ordered: Workspace[] = []

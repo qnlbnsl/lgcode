@@ -206,7 +206,8 @@ function GitWorkspace(props: GitPageProps & { readonly workspace: Workspace; rea
   }
   const resizeTo = (value: number) => session.update(key, { width: Math.max(240, Math.min(maxWidth, value)) })
   return <section ref={host} className={`git-workspace${folded ? " rail" : ""}${hideTree ? " split-wide" : ""}`} aria-label="Git">
-    <WorktreeNavigation {...props} inspected={workspace.worktreeId} assigned={props.assigned.worktreeId} folded={folded} revision={view.revision} toggle={() => session.update(key, { folded: !folded })} />
+    <WorktreeNavigation {...props} inspected={workspace.worktreeId} assigned={props.assigned.worktreeId} folded={folded} revision={view.revision}
+      deferReads={workspace.machineId === "local" && !view.ready} toggle={() => session.update(key, { folded: !folded })} />
     <section className="git-changes" aria-label="Changes and history"><header className="git-pane-head"><h2>{visibleText(team?.name ?? project?.name ?? "Main checkout")}</h2>
       <p className="git-inspecting">Inspecting <code>{visibleText(workspace.branch)}</code> · {visibleText(workspace.machineId)}{workspace.worktreeId !== props.assigned.worktreeId && <> · Assigned: <code>{visibleText(props.assigned.branch)}</code></>}</p>
       <div className="git-sync">{([['project.fetch', 'Fetch'], ['project.pull', 'Pull'], ['project.push', 'Push']] as const).map(([tag, label]) => <button key={tag} disabled={disabled} onClick={() => sync(tag)}>{label}</button>)}
