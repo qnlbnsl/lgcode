@@ -198,9 +198,12 @@ export function Settings({ onSessionExpired }: { readonly onSessionExpired: () =
     const settings: WebSettings = {
       enabled: input(form, "enabled").checked, port: Number(input(form, "port").value),
       heartbeatSeconds: Number(input(form, "heartbeatSeconds").value), proxyMode: input(form, "proxyMode").checked,
-      ...(publicAddress === "" ? {} : { publicAddress })
+      ...(publicAddress === "" ? {} : { publicAddress }),
+      ...(input(form, "displayAddress").value.trim() === "" ? {} : { display: {
+        publicAddress: input(form, "displayAddress").value.trim(), port: Number(input(form, "displayPort").value)
+      } })
     }
-    if (!Schema.is(WebSettings)(settings)) { setMessage("Enter a valid port and a positive whole number of seconds."); return }
+    if (!Schema.is(WebSettings)(settings)) { setMessage("Enter valid ports and a positive whole number of seconds. Displays require a different HTTPS hostname and listener port."); return }
     const { serverState: _, requestId: _request, ...previous } = web as Web & { requestId?: string }
     if (JSON.stringify(settings) === JSON.stringify(previous)) return
     if (web.enabled && !settings.enabled) {
@@ -261,6 +264,9 @@ export function Settings({ onSessionExpired }: { readonly onSessionExpired: () =
                 <label className="admin-check"><input name="proxyMode" type="checkbox" defaultChecked={web.proxyMode} onChange={(event) => { void saveWeb(event.currentTarget.form!) }} />Use proxy mode</label>
                 <label>Public address (HTTPS)<input name="publicAddress" type="url" placeholder="https://lgcode.example" aria-describedby="public-address-help" defaultValue={web.publicAddress ?? ""} /></label>
                 <p className="admin-note" id="public-address-help">Use HTTPS through your proxy. For an SSH tunnel, open http://127.0.0.1 at the server’s port and leave the public address empty.</p>{savedMark("web")}
+                <label>Preview and design address (HTTPS)<input name="displayAddress" type="url" defaultValue={web.display?.publicAddress ?? ""} aria-describedby="display-address-help" /></label>
+                <label>Preview and design listener port<input name="displayPort" type="number" min={1} max={65535} defaultValue={web.display?.port ?? ""} /></label>
+                <p className="admin-note" id="display-address-help">Use a different hostname through your proxy, with its own loopback port. Leave the address empty to disable previews and the design editor.</p>
               </fieldset>
             </form>
           </section>

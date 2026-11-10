@@ -3,6 +3,8 @@ import type { Socket } from "node:net";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import { NodeWS } from "@effect/platform-node/NodeSocket";
 import { defaultWebSettings, type WebSettings } from "@lgcode/contracts";
+import { DisplayClose, DisplayOpen } from "@lgcode/contracts/project/display";
+import * as Schema from "effect/Schema";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import * as Semaphore from "effect/Semaphore";
@@ -27,6 +29,18 @@ import { makeSession } from "./session.ts";
 import { webCaller } from "./webCaller.ts";
 import { requestPolicy } from "./proxy.ts";
 import { staticResponse } from "./static.ts";
+import { CommandHandler } from "../../commands/CommandHandler.ts";
+import { configuredDisplay } from "./display/policy.ts";
+import { serveDisplay } from "./display/service.ts";
+import { openPencilImage } from "./display/openPencil.ts";
+
+const boundedBody = (request: HttpServerRequest.HttpServerRequest) => request.stream.pipe(Stream.runFold(
+  () => ({ bytes: 0, chunks: [] as Uint8Array[] }),
+  (body, chunk) => {
+    const bytes = Math.min(4097, body.bytes + chunk.byteLength);
+    return { bytes, chunks: bytes <= 4096 ? [...body.chunks, chunk] : [] };
+  }
+), Effect.orElseSucceed(() => ({ bytes: 4097, chunks: [] as Uint8Array[] })));
 
 export const serve = (options: {
   readonly password: Redacted.Redacted<string> | undefined;
@@ -37,6 +51,7 @@ export const serve = (options: {
 }) => Effect.gen(function* () {
   const ownerScope = yield* Effect.scope;
   const views = yield* Views;
+  const handler = yield* CommandHandler;
   // Capture only the approved piece-batch helper's ambient requirements.
   // This piece never receives the raw writer service.
   const batchServices = yield* Effect.context<Effect.Services<ReturnType<typeof writePieceBatch>>>();
@@ -64,6 +79,42 @@ export const serve = (options: {
   const needsRetry = Latch.makeUnsafe(false);
   const lifecycle = yield* Semaphore.make(1);
   const disconnect = Effect.sync(() => { for (const socket of connections.keys()) socket.terminate(); connections.clear(); });
+  let display: Awaited<ReturnType<typeof serveDisplay>> | undefined;
+  let displayGeneration = 0, displayCleanupFailed = false;
+  const stopDisplay = Effect.suspend(() => {
+    displayGeneration++;
+    const active = display;
+    if (active === undefined) return Effect.succeed(true);
+    return Effect.tryPromise(() => active.close()).pipe(
+      Effect.andThen(Effect.sync(() => { if (display === active) display = undefined; return true; })),
+      Effect.catchCause(() => {
+        displayCleanupFailed = true;
+        return Effect.logError("isolated display cleanup unconfirmed").pipe(Effect.as(false));
+      })
+    );
+  });
+  const displayFor = (headers: Readonly<Record<string, string | undefined>>) => lifecycle.withPermits(1)(Effect.gen(function* () {
+    if (stopped || displayCleanupFailed || options.registerSecret === undefined || !settings.enabled || webCaller(session, headers) === undefined
+      || !requestPolicy(headers, settings, port, false).accepted) return undefined;
+    const configuration = yield* Effect.try(() => configuredDisplay(settings, port)).pipe(Effect.orElseSucceed(() => undefined));
+    if (configuration === undefined) return undefined;
+    if (display === undefined) {
+      const started = yield* Effect.tryPromise(() => serveDisplay({ configuration, image: openPencilImage,
+        dockerSocket: "/var/run/docker.sock",
+        input: () => Effect.runPromise(Effect.gen(function* () {
+          if (Option.isSome(recovery) && !(yield* recovery.value.ready)) throw new Error("recovering");
+          const caller = webCaller(session, headers);
+          if (caller === undefined) throw new Error("display session unavailable");
+          return yield* handler.input(caller);
+        })),
+        registerSecret: (secret) => options.registerSecret?.(Redacted.make(secret)),
+        onCleanupFailure: () => { displayCleanupFailed = true; }
+      })).pipe(Effect.option);
+      if (Option.isNone(started)) return undefined;
+      display = started.value;
+    }
+    return { service: display, generation: displayGeneration };
+  }));
 
   const ready = Option.isSome(recovery) ? recovery.value.whenReady : Effect.void;
   const outage = (down: boolean) => ready.pipe(Effect.andThen(writePieceBatch({ namespace: "client", kind: "reactor", sourceSequence: 0,
@@ -88,13 +139,7 @@ export const serve = (options: {
     if (path === "/api/login" && request.method === "POST" && !upgrade) {
       // Drain oversized bodies without retaining their contents. Cancelling
       // the Node stream would destroy the socket before the HTTP 401 reply.
-      const body = yield* request.stream.pipe(Stream.runFold(
-        () => ({ bytes: 0, chunks: [] as Uint8Array[] }),
-        (body, chunk) => {
-          const bytes = Math.min(4097, body.bytes + chunk.byteLength);
-          return { bytes, chunks: bytes <= 4096 ? [...body.chunks, chunk] : [] };
-        }
-      ), Effect.orElseSucceed(() => ({ bytes: 4097, chunks: [] as Uint8Array[] })));
+      const body = yield* boundedBody(request);
       if (body.bytes > 4096) return HttpServerResponse.empty({ status: 401 });
       const text = Buffer.concat(body.chunks).toString("utf8");
       let value: unknown;
@@ -102,12 +147,53 @@ export const serve = (options: {
       if (!session.checkPassword(value)) return HttpServerResponse.empty({ status: 401 });
       return HttpServerResponse.empty({ status: 204, headers: { "set-cookie": session.cookie(policy.secure) } });
     }
-    if (navigation) return yield* staticResponse(options.staticRoot, request.url, request.method === "HEAD");
+    if (navigation) {
+      const configuration = yield* Effect.try(() => configuredDisplay(settings, port)).pipe(Effect.orElseSucceed(() => undefined));
+      return yield* staticResponse(options.staticRoot, request.url, request.method === "HEAD", configuration?.displayOrigin);
+    }
     if (caller === undefined) return HttpServerResponse.empty({ status: 401 });
     if (path === "/api/session" && request.method === "POST" && !upgrade) return HttpServerResponse.empty({ status: 204 });
     if (path === "/api/logout" && request.method === "POST" && !upgrade) {
       session.rotate(); yield* disconnect;
-      return HttpServerResponse.empty({ status: 204 });
+      const cleaned = yield* lifecycle.withPermits(1)(stopDisplay);
+      return HttpServerResponse.empty({ status: cleaned ? 204 : 503 });
+    }
+    if ((path === "/api/display/open" || path === "/api/display/close") && !upgrade) {
+      if (request.method !== "POST" || request.url !== path) return HttpServerResponse.empty({ status: 405 });
+      const body = yield* boundedBody(request);
+      if (body.bytes > 4096) return HttpServerResponse.empty({ status: 413 });
+      const decoded = yield* Effect.try(() => {
+        const raw: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(body.chunks)));
+        return path === "/api/display/open"
+          ? { kind: "open" as const, value: Schema.decodeUnknownSync(DisplayOpen, { onExcessProperty: "error" })(raw) }
+          : { kind: "close" as const, value: Schema.decodeUnknownSync(DisplayClose, { onExcessProperty: "error" })(raw) };
+      }).pipe(Effect.option);
+      if (Option.isNone(decoded)) return HttpServerResponse.empty({ status: 400 });
+      if (webCaller(session, request.headers) === undefined || !settings.enabled) return HttpServerResponse.empty({ status: 401 });
+      if (!requestPolicy(request.headers, settings, port, false).accepted) return HttpServerResponse.empty({ status: 403 });
+      if (decoded.value.kind === "close") {
+        const id = decoded.value.value.id;
+        return yield* Effect.tryPromise(async () => { await display?.closeSession(id); return HttpServerResponse.empty({ status: 204 }); })
+          .pipe(Effect.orElseSucceed(() => HttpServerResponse.empty({ status: 503 })));
+      }
+      const active = yield* displayFor(request.headers);
+      if (active === undefined) return HttpServerResponse.empty({ status: 503 });
+      const selection = decoded.value.value;
+      return yield* Effect.promise(async (signal) => {
+        try {
+          const frame = await active.service.open(selection);
+          const committed = settingsOf((await Effect.runPromise(views.snapshot)).client) ?? settings;
+          // A cancelled request, logout, disable or configuration change may
+          // finish while the real editor is starting. Never return that frame.
+          if (signal.aborted || stopped || !settings.enabled || displayCleanupFailed || committed !== settings
+            || active.generation !== displayGeneration || webCaller(session, request.headers) === undefined
+            || !requestPolicy(request.headers, settings, port, false).accepted) {
+            await active.service.closeSession(frame.id);
+            return HttpServerResponse.empty({ status: 401 });
+          }
+          return HttpServerResponse.text(JSON.stringify(frame), { headers: { "content-type": "application/json", "cache-control": "no-store" } });
+        } catch { return HttpServerResponse.empty({ status: 503 }); }
+      });
     }
     if (path === "/api" && upgrade) return yield* rpc;
     return HttpServerResponse.empty({ status: 404 });
@@ -189,6 +275,7 @@ export const serve = (options: {
     if (stopped || next === settings) return;
     settings = next;
     yield* disconnect;
+    yield* stopDisplay;
     if (!settings.enabled) {
       if (listener !== undefined) {
         yield* listener.stop;
@@ -208,6 +295,7 @@ export const serve = (options: {
     stopped = true; removeRuntime();
     if (retry !== undefined) yield* Fiber.interrupt(retry);
     yield* disconnect;
+    yield* lifecycle.withPermits(1)(stopDisplay);
     if (listener !== undefined) { yield* listener.close; listener = undefined; }
   });
   yield* Effect.addFinalizer(() => close);

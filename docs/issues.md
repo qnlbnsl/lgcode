@@ -10563,3 +10563,133 @@ Only this test now uses a 120-second budget.
 Every creation, persistence, single-lead, branch and exact-thread assertion remains unchanged.
 The previous failed full and isolated failure remain recorded as failures.
 The manager requires the failed and related new-project browser file, without another full check or review round.
+
+## 573. Repository registration discarded uncertain typed failures
+
+Found: 2026-11-09, during W07B's source review of W10B's independent registration controller.
+The manager allocated this number and approved the bounded author correction.
+
+The controller treated every typed `CommandError` as a conclusive admission refusal.
+The public application programming interface also uses that error for database failures.
+The original authenticated controls reproduced add and locate requests losing their frozen identity at controlled boundaries before append and after actual commit.
+The original web logout control also showed that the typed-error path skipped the session probe and retained the private draft.
+The original source archive, unchanged-source manifest, observations, and normal exit 1 remain under `.proof/w10b/recovery-red-1*`.
+Two additional failed assertions in that run expected `Git: not_repository` for a folder outside the configured root.
+The actual fixed admission reason was `Git: invalid_path`.
+The corrected controls preserve the same no-registration and editable-retry assertions with that actual reason.
+
+The author correction keeps database, generic, and unknown failures uncertain.
+Only exact proved pre-registration admission reasons release the frozen request.
+Every failed operation now probes the session, including a typed refusal.
+An actual unauthorized session response disposes the private state and invokes expiry.
+The constructor and public controller and content exports remain unchanged.
+Corrected add and locate controls require the same request through Cancel and retry, one actual registration effect, editable recovery after conclusive refusal, and disposal after actual web logout.
+The first bounded remote proof passed recursive and root typing and stopped at two pre-append recovery fixture assertions.
+Those assertions expected the deliberately latched writer to recover in the same service.
+The corrected fixtures retain the same controller, complete body, and request while the writer remains latched, then close the actual services and run normal restart recovery before retrying.
+They assert a new authenticated client and the unchanged controller and payload.
+The ten actual-engine controls and nine controlled presentation regressions then passed locally with one worker.
+The restart helper names its empty host process reader and signal control; it does not kill actual host processes.
+No production writer, receipt, database row, or view was repaired or weakened.
+Status: bounded correction proof passed; independent review remains pending.
+
+## Recorded mock companions lost their private folder scope in the unfinished display unit
+
+Found: 2026-11-10, during the bounded actual opaque-frame prerequisite.
+This correction belongs to the unfinished W10B display unit.
+No separate issue number has been allocated.
+
+The document carried its private session identity in its query.
+Its root-relative stylesheet and image had neither that identity nor a usable referrer.
+They reached the unchanged no-editor fallback and returned empty 503 responses.
+The module request failed without an observed response status.
+Its exact failure mechanism remains unproved.
+The original failed native run and the later passive diagnostic remain preserved.
+
+The bounded author correction scopes direct stylesheet, script and image addresses
+in the delivered HTML to the same issued private session.
+Root-relative and ordinary relative addresses resolve against the actual selected route.
+The recorded source and companion files remain unchanged.
+The engine still verifies the recorded fingerprint before making that delivery representation.
+The parser adds no owner API authority, cookie, origin or folder access.
+The opaque sandbox and Content Security Policy remain unchanged.
+
+Nested root-relative addresses in stylesheets or modules remain unsupported.
+This correction is not general rendering acceptance.
+Actual module execution, orange pixels, decoded images, editor import and isolation
+still need the separately authorized browser proof.
+Status: engine typing and all 27 focused controls passed; native retry is held.
+
+## 574. Incomplete mock history cleared an uncertain approval
+
+Found: 2026-11-09, during W10B's author review of approval recovery.
+The manager allocated this number and approved the smallest helper correction.
+
+An incomplete paged history read returned the same stale outcome as a conclusively superseded revision.
+The Mocks page therefore discarded its session-owned uncertain approval request.
+The original controlled document object model regression showed the recovery action disappearing after an incomplete read.
+Its unchanged source, original log, and normal exit 1 remain under `.proof/w10b/recovery-red-1*`.
+
+The helper now keeps incomplete history uncertain.
+The exact request and revision stay available through navigation and later retry.
+The regression requires incomplete history to issue no replacement approval command and preserves the original request for successful recovery.
+The correction adds no history contract, parser, owner authority, or synthetic approval.
+The exact corrected source remained frozen throughout bounded remote proof 1.
+That run passed recursive and root typing, then stopped at two unrelated pre-append registration recovery controls.
+The document object model command was consequently unexecuted.
+This entry was appended after the remote run exited, as an explicitly recorded document-only delta.
+The later local controlled presentation run passed all nine regressions, including incomplete history, navigation, and recovery with the original request.
+Status: bounded correction proof passed; independent review remains pending.
+
+## 601. The editor image config reference was unavailable in the containerd store
+
+Found: 2026-11-10, during manager preparation for the W10B native display proof.
+The manager allocated this number.
+The approved image was present under its transferred name and tag on the remote personal computer.
+The engine's config-digest reference returned `No such image`.
+The original remote typing failure, later passing typing and Docker inspection records remain preserved separately.
+
+The owner ruled that every host finds the editor by `lgcode-openpencil:w10b-cb71737-build1`.
+The engine now inspects that local tag on every launch and requires Linux on AMD64.
+No digest lookup or equality decides image presence.
+A missing image is refused without building, pulling, retagging or choosing a fallback.
+The existing `--pull=never`, non-root user, isolated network, folder mounts, resource limits, socket deadline and owned-name cleanup remain.
+The native fixture uses the same tag and checks the actual generated container name.
+Its original display, import, pixel, isolation and cleanup assertions remain.
+Temporary static launcher diagnostics are retained separately and must not be committed.
+Status: product and fixture corrected; independent remote typing and focused checks passed.
+The native follow-up below records the later startup failures and their disposition.
+The issue remains open pending unit review and integration.
+
+
+### The later editor boot failure is separate from image presence
+
+The source23 and direct remote native cases started the named editor image and opened its frame.
+The registered document assertion failed before the capability assertion ran.
+The approved temporary boot-notice read then measured a localStorage SecurityError in the opaque sandbox.
+The original failures, cleanup outcomes and temporary observation remain preserved in website-1/w10b-document-import.
+On 2026-11-10, the owner approved adding allow-same-origin to the editor iframe and its content security policy sandbox directive.
+Recorded mocks keep their opaque sandbox.
+The editor keeps its separate display hostname, credential-omitting document import, owner-cookie exclusion, frame ancestors, referrer policy, revocation and logout controls.
+The temporary boot-notice read was removed before this correction's commit.
+No OpenPencil source patch or image rebuild is applied.
+At product commit e740c19, remote engine, web and native-input typing passed.
+All 34 tests across the display boundaries, project review and actual engine review files passed.
+The related native case first exposed an unhandled Playwright response-body read, then Docker's CAP_NET_BIND_SERVICE spelling.
+The case now proves file bytes with a credential-omitting browser read of the exact issued URL, while retaining the original import status, component and canvas checks.
+The capability assertion normalizes only the optional CAP_ prefix and still requires exactly the one approved capability.
+The final native run passed in 10.6 seconds, including actual modules, WebAssembly, registered file import, screenshots, owner isolation, logout and cleanup.
+Its outcome records completed=true and owned containers absent; a separate Docker listing was empty.
+The screenshots still show OpenPencil's font-unavailable-or-substituted warning.
+This proves the selected document renders, but does not establish exact font fidelity or whole-unit acceptance.
+All original failed logs remain in website-1/w10b-document-import, alongside the passing logs and screenshots.
+
+### The first ordinary full check found two missed repository guards
+
+The full remote check of 720077d returned 1 after typechecking passed.
+Vitest reported 7,650 passing tests, two skipped tests and two failing guards; browser and credit stages did not run.
+The display input callback constructed an owner credential outside webCaller.
+It now obtains and revalidates its caller through webCaller before each engine input read.
+The pure display-boundary and markup tests also omitted their required rebuild declarations.
+Both now register noLog=true because neither opens an event log.
+The original full log and direct exit remain preserved in website-1/w10b-document-import.

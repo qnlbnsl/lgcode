@@ -378,6 +378,9 @@ importers:
       effect:
         specifier: 4.0.5
         version: 4.0.5
+      parse5:
+        specifier: 8.1.0
+        version: 8.1.0
       ws:
         specifier: 'catalog:'
         version: 8.22.0
