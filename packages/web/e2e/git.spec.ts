@@ -76,10 +76,17 @@ async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture
       const real = buildServices(rig, engineLists).pipe(Layer.provide(dependencies))
       const services = Layer.effect(CommandHandler, Effect.gen(function* () {
         const handler = yield* CommandHandler; let lose = true
-        return { ...handler, execute: (credential, name, payload) => handler.execute(credential, name, payload).pipe(Effect.flatMap((reply) => {
-          if (options.loseCommitReply && name === "project.commit" && lose) { lose = false; return Effect.fail(new LogWriteFailed({ reason: "database read failed" })) }
-          return Effect.succeed(reply)
-        })) }
+        return { ...handler, execute: (credential, name, payload) => {
+          // TEMP-OBSERVE: fixed command family, exit and elapsed time only; no payload or error content.
+          const observed = ["project.fetch", "project.pull", "project.push"].includes(name), started = performance.now()
+          if (observed) console.info("TEMP-OBSERVE", JSON.stringify({ phase: "handler-call", operation: name, unixMs: Date.now() }))
+          return handler.execute(credential, name, payload).pipe(Effect.onExit((exit) => Effect.sync(() => {
+            if (observed) console.info("TEMP-OBSERVE", JSON.stringify({ phase: "handler-exit", operation: name, unixMs: Date.now(), durationMs: performance.now() - started, exit: exit._tag }))
+          })), Effect.flatMap((reply) => {
+            if (options.loseCommitReply && name === "project.commit" && lose) { lose = false; return Effect.fail(new LogWriteFailed({ reason: "database read failed" })) }
+            return Effect.succeed(reply)
+          }))
+        } }
       })).pipe(Layer.provideMerge(real))
       yield* Effect.scoped(run).pipe(Effect.provide(services), Effect.provide(runner.layer))
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped)
@@ -312,7 +319,19 @@ test("Git: fetch, fast-forward pull and push use only the owned temporary remote
     save(f.source.path, "outgoing.txt", "actual outgoing bytes\n"); await refresh(page)
     await page.getByRole("button", { name: "Stage all", exact: true }).click(); await page.getByLabel("Commit message", { exact: true }).fill("Outgoing")
     await page.getByRole("button", { name: "Commit 1 file", exact: true }).click(); await expect(page.locator("#git-sync-state")).toContainText("1 outgoing")
-    await page.getByRole("button", { name: "Push", exact: true }).click(); await expect(page.locator("#git-sync-state")).toContainText("0 outgoing")
+    try {
+      await page.getByRole("button", { name: "Push", exact: true }).click(); await expect(page.locator("#git-sync-state")).toContainText("0 outgoing")
+    } finally {
+      // TEMP-OBSERVE: bounded fixed UI flags and parsed counts, never DOM text or protected data.
+      console.info("TEMP-OBSERVE", JSON.stringify(await page.evaluate(() => {
+        const counts = /^(\d+) incoming · (\d+) outgoing/.exec(document.querySelector("#git-sync-state")?.textContent ?? "")
+        const buttons = [...document.querySelectorAll<HTMLButtonElement>("button")]
+        return { phase: "push-assertion-end", unixMs: Date.now(), incoming: counts ? Number(counts[1]) : null, outgoing: counts ? Number(counts[2]) : null,
+          pushAcknowledged: document.querySelector("#git-notice")?.textContent === "push completed.", hasAlert: !!document.querySelector(".git-workspace [role=alert]"),
+          pushDisabled: buttons.find((button) => button.textContent === "Push")?.disabled,
+          refreshing: buttons.some((button) => button.textContent === "Refreshing…") }
+      }).catch(() => ({ phase: "push-assertion-end", uiUnavailable: true }))))
+    }
     expect(git(join(f.root, "remote.git"), "rev-parse", `refs/heads/${f.source.branch}`)).toBe(git(f.source.path, "rev-parse", "HEAD"))
     expect(git(join(f.root, "remote.git"), "show", `${f.source.branch}:outgoing.txt`)).toBe("actual outgoing bytes")
   })
