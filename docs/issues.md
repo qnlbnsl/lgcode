@@ -10252,6 +10252,11 @@ These results do not retrospectively establish the cause of the full15 failure.
 The complete remote check then passed all 7,675 unit tests and all 37 browser cases, with two unit tests skipped.
 The temporary browser observer, assertion reporter and explicit aggregate probe were subsequently removed from delivery under the owner's observability rule.
 Their original source and artifacts remain in the retained investigation evidence.
+The observer-free related browser run passed ten cases and failed the final push count assertion.
+One diagnostic execution and three bounded repetitions passed, so those observations do not establish the cause of that failure.
+The browser now requires the visible push acknowledgment separately before its existing fresh outgoing-count assertion.
+Both assertions retain the default five-second timeout, and the case retains its original 120-second timeout.
+All temporary observations were removed again before delivery.
 
 ## 589. Credential-name exclusion blocked owner Git operations and whole agent reads
 
