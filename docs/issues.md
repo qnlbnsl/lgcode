@@ -10532,4 +10532,11 @@ A shared read checks at most 64 subsequent events within two seconds and require
 Only that positive refusal retires the attempt, preserving the current draft and references.
 Missing or unavailable evidence retains the frozen body and key through navigation and later admission failures.
 Late evidence cannot restore a disposed owner session.
-Status: correction prepared; affected remote proof and the final full check remain pending.
+The candidate remote run on 4e4ddbc passed 92 cases in nine affected files, including all four original controls.
+Real lost-committed-reply controls also preserve each prompt, team post and configuration through a later actual invalid-credential refusal and exact receipt recovery, with one effect.
+Mounted evidence controls retain immutable requests for missing anchors, unrelated callers, commands and keys, stale sequences, incomplete or unavailable reads and evidence beyond the 64-event bound.
+Navigation retains later edits, while logout and expiry discard protected state and ignore late evidence.
+Web typing and copied-code credits passed on the same candidate.
+The combined remote command exited 129 only at the final Git whitespace check because the remote source copy excludes its Git metadata.
+The local read-only Git whitespace check passed.
+Status: corrected; the author result records the final full-check outcome and lead handoff.
