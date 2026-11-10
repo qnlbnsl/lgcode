@@ -22,6 +22,18 @@ const agentId = Schema.decodeUnknownSync(AgentId)("1b4e28ba-2fa1-4a64-8711-12345
 const instance = (secret: string) => makeRedactor({ secrets: () => [Redacted.make(secret)], tokenHashes: () => new Set() });
 const event = (text: string): Event => ({ _tag: "ThreadItem", agentId, itemId: "item", content: { _tag: "text", text }, replay: false });
 
+it.effect.each(["conflicts", "push_rejected", "pull_diverged", "network_failed", "authentication_required"] as const)(
+  "issue 590: fixed GitFinished refusal %s survives enum collisions while arbitrary refusal text stays redacted",
+  (refusal) => Effect.gen(function* () {
+    const redactor = yield* Redactor;
+    const finished = Schema.decodeUnknownSync(Event)({ _tag: "project.GitFinished", caller: { _tag: "owner" }, operationRequestId: "fixed-refusal", refusal });
+    expect(yield* redactor.redact(finished)).toEqual(finished);
+    expect(yield* redactor.redact({ _tag: "CommandRefused", command: "project.integrate", reason: `Git: ${refusal}` })).toMatchObject({ reason: "Git: [REDACTED]" });
+    const unknown = Schema.decodeUnknownSync(Event)({ _tag: "project.GitFinished", caller: { _tag: "owner" }, operationRequestId: "unknown", outcome: "uncertain" });
+    expect(yield* redactor.redact(unknown)).toEqual(unknown);
+  }).pipe(Effect.provide(instance(refusal).layer)),
+);
+
 it.effect("board completionReplyText preserves a whole post id containing a registered secret", () => {
   // A synthetic collision marker, never an actual credential.
   const marker = "synthetic-collision";

@@ -28,7 +28,7 @@ export const withGit = <A, E, R>(input: Input, body: (git: GitService) => Effect
     return yield* Effect.uninterruptible(body(state.service!))
   })), () => Effect.sync(() => { state.queued-- }))
 })
-export const gitCall = <A>(effect: GitOperation<A>) => effect.pipe(Effect.mapError((error) => error.uncertain ? new CommandUncertain({ reason: "Git outcome is uncertain; retry the identical request" }) : refused(`Git: ${error.reason}`)))
+export const gitCall = <A>(effect: GitOperation<A>) => effect.pipe(Effect.mapError((error) => error.uncertain ? new CommandUncertain({ reason: "Git outcome is uncertain; refresh Git state" }) : refused(`Git: ${error.reason}`)))
 export const localMachine = (id: string) => id === "local" ? Effect.void : Effect.fail(refused("only the local machine can register a checkout before machine pairing"))
 export const safePath = (input: Input, path: string) => Effect.gen(function* () {
   if ((yield* input.runtime.log.redactText(path)) !== path) return yield* refused("a path cannot contain a registered secret")

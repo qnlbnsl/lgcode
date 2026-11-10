@@ -243,14 +243,28 @@ it.live("issue 577: another worker cannot link a task; task owner and project le
   }
 })).pipe(Effect.orDie))
 
-it.live("issue 577: an admitted linked question cannot finish a task reassigned before its answer", () => provideBoard(rig, Effect.gen(function* () {
+it.live("issue 592: a reassigned linked task receives the answer without unauthorized completion or a stuck blocker", () => provideBoard(rig, Effect.gen(function* () {
   yield* registerRebuildCheck()
   const f = yield* decisionSetup(), taskId = yield* createTask(f)
   const question = success(yield* call(f.workerCredential, "ask", { text: "Choose", taskId }))
   success(yield* call(f.leadCredential, "project.task.update", { projectId: f.projectId, taskId, owner: f.leadId }))
+  expect(yield* taskState(f.projectId, taskId)).toBe("blocked")
+  const request = { requestId: freshRequest(), kind: "question", id: question.questionId, text: "Answer answer-secret-value" }
+  expect(failureOf(yield* call(f.workerCredential, "answer", request))).toBeDefined()
   const before = yield* readLog
-  expect(failureOf(yield* call(f.leadCredential, "answer", { kind: "question", id: question.questionId, text: "Answer" }))?.reason).toBe("invalid question links")
-  expect((yield* readLog).slice(before.length).filter((row) => row.event._tag === "QuestionAnswered" || row.event._tag === "project.TaskChanged")).toEqual([])
-  expect((yield* snapshot).questions[question.questionId]?.status).toBe("open")
-  expect(yield* taskState(f.projectId, taskId)).not.toBe("done")
-})).pipe(Effect.orDie))
+  const result = success(yield* call(f.leadCredential, "answer", request))
+  expect(success(yield* call(f.leadCredential, "answer", request))).toEqual(result)
+  const written = (yield* readLog).slice(before.length)
+  expect(written.filter((row) => row.event._tag === "QuestionAnswered")).toHaveLength(1)
+  expect(written.filter((row) => row.event._tag === "project.TaskChanged")).toEqual([])
+  expect(JSON.stringify(written)).not.toContain("answer-secret-value")
+  const state = yield* snapshot
+  expect(state.questions[question.questionId]).toMatchObject({ status: "answered", answer: "Answer [REDACTED]" })
+  expect(projectView(state).tasks[projectKey(f.projectId, taskId)]).toMatchObject({ owner: f.leadId, state: "active" })
+  expect(yield* taskState(f.projectId, taskId)).toBe("active")
+  const history = success(yield* call(owner, "project.task.history", { projectId: f.projectId, taskId })).items
+  expect(history.find((row: any) => row.title === "Question answered")).toMatchObject({ state: "active" })
+  expect((yield* readLog).filter((row) => row.requestId === request.requestId && row.event._tag === "QuestionAnswered")).toHaveLength(1)
+  const sql = yield* SqlClient.SqlClient
+  expect(yield* sql`SELECT request_id FROM receipts WHERE caller = ${`agent:${f.leadId}`} AND request_id = ${request.requestId}`).toHaveLength(1)
+}), ["answer-secret-value"]).pipe(Effect.orDie))

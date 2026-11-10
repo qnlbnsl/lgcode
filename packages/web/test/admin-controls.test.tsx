@@ -207,7 +207,7 @@ it("confirms archive, retains an unfinished archive identity, and restores witho
   expect(restore).toHaveBeenCalledTimes(1)
 })
 
-it.each(["working", "stopped"] as const)("shows the assigned checkout without offering unavailable placement for %s agents", async (state) => {
+it.each(["working", "stopped"] as const)("keeps placement and retry disabled with pairing tooltips and no request for %s agents", async (state) => {
   history.replaceState(null, "", "/#/service/machines?project=project")
   const data = baseData()
   mock.data = { ...data, navigation: { ...data.navigation!, agents: [{ agentId: "lead", projectId: "project", status: state }] },
@@ -216,7 +216,16 @@ it.each(["working", "stopped"] as const)("shows the assigned checkout without of
   mock.client = { "project.place": place }
   const { element } = await render(<Machines onSessionExpired={vi.fn()} />)
   expect(document.activeElement).toBe(element.querySelector("tr[data-placement=project]"))
-  expect(element.querySelector("select")).toBeNull()
+  const select = element.querySelector<HTMLSelectElement>("select")!
+  const retry = button(element, "Retry same placement")!
+  expect(select.disabled).toBe(true)
+  expect(retry.disabled).toBe(true)
+  for (const control of [select, retry]) expect(control.title).toBe("Moving a project to another machine waits for machine pairing.")
+  await act(async () => {
+    select.dispatchEvent(new Event("change", { bubbles: true }))
+    retry.click()
+    retry.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+  })
   expect(element.textContent).toContain("/repo/.worktrees/field")
   expect(element.textContent).not.toContain("/repo/.worktrees/other")
   expect(element.textContent).toContain("requires machine pairing, which is not available yet")

@@ -112,7 +112,8 @@ the owner credential. The API documents receipt retries and the concrete crash
 boundary between external Git effects and the database. Remote-machine routing
 remains separate work.
 
-Repository credential filenames use the same predicate as artifacts and context.
+Agent-visible Git file reads use the same credential-name predicate as artifacts and context.
+Aggregate agent reads omit excluded files; owner Git operations retain the ordinary literal path rules.
 Literal Git path syntax remains separate, so ordinary tab-bearing filenames retain their supported behavior.
 Owner-controlled Git configuration can run content filters or merge drivers as the same Unix user.
 The current local-owner security boundary accepts that scope; this service does not claim to sandbox repository configuration.

@@ -7,7 +7,7 @@ import { requiredModule } from "../support/callerRules.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 registerRebuildCheck({ noLog: true });
 
-it.each(["src/project/design.ts", "src/pieces/lists.ts", "scripts/live/driver.ts", "src/client/alerts/reactor.ts", "src/pieces/viewTables.ts"])(
+it.each(["src/project/design.ts", "src/project/lifecycle.ts", "src/pieces/lists.ts", "scripts/live/driver.ts", "src/client/alerts/reactor.ts", "src/pieces/viewTables.ts"])(
   "FR-157 initializes all piece registrations when %s is the first plain Node import", (entry) => {
     const probe = spawnSync(process.execPath, ["--input-type=module", "-e", `
       import assert from "node:assert/strict";
@@ -22,9 +22,16 @@ it.each(["src/project/design.ts", "src/pieces/lists.ts", "scripts/live/driver.ts
       const planners = engineLists.planners, reads = engineLists.reads;
       assert.equal(engineLists.planners, planners, "planner table identity must be stable");
       assert.equal(engineLists.reads, reads, "read table identity must be stable");
-      for (const name of ["start", "board.post", "client.alerts.dismiss", "roles.record", "project.design.record"]) {
+      for (const name of ["start", "board.post", "client.alerts.dismiss", "roles.record", "project.design.record", "project.create", "project.archive"]) {
         assert.ok(Object.hasOwn(planners, name), name);
         assert.equal(typeof planners[name], "function", name);
+      }
+      const { planners: corePlanners } = await import("../../src/commands/planners.ts");
+      for (const name of ["project.create", "project.archive"]) {
+        assert.equal(planners[name], corePlanners[name], name + " keeps its actual registration");
+        // Construction must remain safe after either import order. Do not run
+        // the Effect, acquire a writer or create/archive anything in this child.
+        assert.ok(Effect.isEffect(planners[name](undefined, {})), name + " returns an Effect");
       }
       for (const name of ["board.status", "project.design.read"]) {
         assert.ok(Object.hasOwn(reads, name), name);

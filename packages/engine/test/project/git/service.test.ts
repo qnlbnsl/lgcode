@@ -5,10 +5,34 @@ import { tmpdir } from "node:os";
 import * as Effect from "effect/Effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
-import { gitProcess } from "../../../src/project/git/process.ts";
+import { gitProcess, processFailure } from "../../../src/project/git/process.ts";
 import { makeGitService, type GitOperation, type GitService } from "../../../src/project/git/index.ts";
 
 registerRebuildCheck({ noLog: true });
+
+it.each([
+  { name: "modern no-connection suffix", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to 127.0.0.1 port 1 after 0 ms: Could not connect to server\n", truncated: false, expected: true },
+  { name: "failed-connect suffix without port detail", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to fixture.invalid: Could not connect to server\n", truncated: false, expected: true },
+  { name: "legacy no-connection suffix", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Could not connect to server\n", truncated: false, expected: true },
+  { name: "generic lost transport", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': outcome transport lost\n", truncated: false, expected: false },
+  { name: "connection reset", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Recv failure: Connection reset by peer\n", truncated: false, expected: false },
+  { name: "timeout", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Operation timed out\n", truncated: false, expected: false },
+  { name: "failed-connect disconnect without refusal suffix", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to fixture.invalid: connection disconnected; outcome unknown\n", truncated: false, expected: false },
+  { name: "failed-connect reset without refusal suffix", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to fixture.invalid: Recv failure: Connection reset by peer\n", truncated: false, expected: false },
+  { name: "failed-connect timeout without refusal suffix", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to fixture.invalid: Operation timed out\n", truncated: false, expected: false },
+  { name: "missing completed exit", code: -1, stderr: "Connection refused\n", truncated: false, expected: false },
+  { name: "truncated legacy diagnostic", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Could not connect to server\n", truncated: true, expected: false },
+  { name: "truncated failed-connect diagnostic without port detail", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to fixture.invalid: Could not connect to server\n", truncated: true, expected: false },
+  { name: "zero exit", code: 0, stderr: "fatal: unable to access 'https://fixture.invalid/': Could not connect to server\n", truncated: false, expected: false },
+  { name: "phrase only inside remote URL", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/: Could not connect to server': outcome transport lost\n", truncated: false, expected: false },
+  { name: "failed-connect phrase only inside remote URL", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/: Failed to connect to fixture.invalid: Could not connect to server': outcome transport lost\n", truncated: false, expected: false },
+  { name: "phrase without network mapping", code: 128, stderr: "Could not connect to server\n", truncated: false, expected: false },
+  { name: "generic diagnostic continues after phrase", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Could not connect to server; previous outcome unknown\n", truncated: false, expected: false },
+  { name: "failed-connect diagnostic continues after phrase", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to fixture.invalid: Could not connect to server; previous outcome unknown\n", truncated: false, expected: false },
+])("issue 590: completed refusal evidence and unknown transport remain distinct: $name", ({ code, stderr, truncated, expected }) => {
+  const failure = processFailure({ code, stderr, stdout: "", truncated });
+  expect(failure.determinate === true).toBe(expected);
+});
 
 let root: string, repo: string, service: GitService;
 const run = <A>(operation: GitOperation<A>) => Effect.runPromise(operation);

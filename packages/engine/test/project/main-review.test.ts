@@ -203,23 +203,23 @@ it.live("denies agents, service/caller-less execution, missing approval and unre
   expect(git(rig.work, "rev-parse", "HEAD")).toBe(f.baseHead)
 })).pipe(Effect.orDie))
 
-it.live("leaves a real failed owner merge uncertain, does not repeat it, and reconciles after actual resolution", () => provideBoard(rig, Effect.gen(function* () {
+it.live("issue 590: records a proven conflicting owner merge as refused, replays it and permits a fresh review after resolution", () => provideBoard(rig, Effect.gen(function* () {
   const f = yield* setup()
   save(f.source, "file.txt", "theirs\n"); commit(f.source, "Project edit")
   save(rig.work, "file.txt", "ours\n"); commit(rig.work, "Base edit")
   const { review } = (yield* prepare(f)).result
-  const storedReview = projectView(yield* snapshot).gitReviews[f.worktreeId]
   const mergeCalls = observeMerges(), requestId = freshRequest()
-  expect(yield* refusal(approve(f, review, { requestId }))).toBe("Git outcome is uncertain; retry the identical request")
+  const rejected = yield* approve(f, review, { requestId })
+  expect(rejected.result).toMatchObject({ outcome: "refused", reason: "conflicts" })
   expect(git(rig.work, "rev-parse", "MERGE_HEAD")).toBe(review.head)
   const unresolved = readFileSync(join(rig.work, "file.txt"), "utf8")
   expect(unresolved).toContain("<<<<<<<"); expect(unresolved).toContain("ours\n"); expect(unresolved).toContain("theirs\n")
-  expect(projectView(yield* snapshot).gitReviews[f.worktreeId]).toEqual(storedReview)
-  yield* noGitReceipt(requestId)
-  expect(yield* refusal(approve(f, review, { requestId }))).toBe("Git outcome is uncertain; retry the identical request")
+  expect(projectView(yield* snapshot).gitReviews[f.worktreeId]).toMatchObject({ outcome: "refused", reason: "conflicts" })
+  expect(Object.values(projectView(yield* snapshot).gitAttempts)).toHaveLength(0)
+  expect(yield* approve(f, review, { requestId })).toEqual(rejected)
   expect(mergeCalls()).toBe(1)
   expect(readFileSync(join(rig.work, "file.txt"), "utf8")).toBe(unresolved)
-  yield* noGitReceipt(requestId)
+  expect(Object.values(projectView(yield* snapshot).gitAttempts)).toHaveLength(0)
   // The ordinary service admission still refuses a new merge before effects.
   const service = makeGitService({ workspaceFolder: rig.root })
   expect(yield* refusal(service.approveMain(f.source, rig.work, review, { _tag: "owner" }, true))).toBe("dirty_destination")
@@ -236,9 +236,11 @@ it.live("leaves a real failed owner merge uncertain, does not repeat it, and rec
   expect(git(rig.work, "merge-base", "--is-ancestor", review.head, actual)).toBe("")
   expect(git(rig.work, "merge-base", "--is-ancestor", review.baseHead, actual)).toBe("")
   expect((yield* run(f.api, "project.git.state", { worktreeId: f.destinationId })).result.mergeHead).toBe(null)
-  const reconciled = yield* approve(f, review, { requestId })
+  expect(yield* approve(f, review, { requestId })).toEqual(rejected)
+  const freshReview = (yield* prepare(f)).result.review
+  const reconciled = yield* approve(f, freshReview)
   expect(reconciled.result).toMatchObject({ outcome: "merged", mergeHead: actual })
-  expect(yield* approve(f, review, { requestId })).toEqual(reconciled)
+  expect(yield* approve(f, review, { requestId })).toEqual(rejected)
   expect(mergeCalls()).toBe(1)
   expect((yield* readLog).filter((row) => row.requestId === requestId && row.event._tag === "project.MainReviewDecided")).toHaveLength(1)
 })).pipe(Effect.orDie))
@@ -339,7 +341,7 @@ for (const mode of ["noop", "squash", "changed-head"]) it.live(`zero-exit ${mode
   vi.stubEnv("PATH", `${bin}:${process.env.PATH}`)
   const requestId = freshRequest(), result = yield* refusal(approve(f, review, { requestId }))
   const actual = git(rig.work, "rev-parse", "HEAD"), status = git(rig.work, "status", "--porcelain=v1")
-  expect(result).toBe("Git outcome is uncertain; retry the identical request")
+  expect(result).toBe("Git outcome is uncertain; refresh Git state")
   expect(git(rig.work, "rev-list", actual).split("\n")).not.toContain(f.head)
   expect(actual === f.baseHead).toBe(mode !== "changed-head")
   if (mode === "squash") {
@@ -353,12 +355,27 @@ for (const mode of ["noop", "squash", "changed-head"]) it.live(`zero-exit ${mode
   const decided = (yield* readLog).filter(({ event }) => event._tag === "project.MainReviewDecided")
   expect(decided).toHaveLength(0)
   expect(Object.values(projectView(yield* snapshot).gitAttempts)).toHaveLength(1)
+  yield* noGitReceipt(requestId)
   const sql = yield* SqlClient.SqlClient
   const receipts = yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE request_id = ${requestId}`
   expect(receipts).toHaveLength(0)
   const wrongBody = yield* refusal(approve(f, review, { requestId, confirmed: false }))
   expect(wrongBody).toBe("request id reused")
   expect(yield* refusal(run(f.api, "project.preferences.set", { requestId, projectId: f.projectId, shell: "bash" }))).toBe("request id reused")
+  expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(1)
+  // A real state refresh clears the bulky attempt but reserves its identity as
+  // terminal uncertainty. It neither decides the open review nor runs Git again.
+  const openReview = projectView(yield* snapshot).gitReviews[f.worktreeId]
+  yield* run(f.api, "project.git.state", { worktreeId: f.worktreeId })
+  expect(Object.values(projectView(yield* snapshot).gitAttempts)).toHaveLength(0)
+  expect(projectView(yield* snapshot).gitReviews[f.worktreeId]).toEqual(openReview)
+  expect(yield* refusal(approve(f, review, { requestId }))).toBe(result)
+  expect(yield* refusal(approve(f, review, { requestId, confirmed: false }))).toBe("request id reused")
+  expect(yield* refusal(run(f.api, "project.preferences.set", { requestId, projectId: f.projectId, shell: "bash" }))).toBe("request id reused")
+  const finished = (yield* readLog).filter((row) => row.requestId === requestId).map((row) => row.event)
+  expect(finished.filter((event) => event._tag === "project.GitFinished")).toMatchObject([{ outcome: "uncertain" }])
+  expect(finished.filter((event) => event._tag === "CommandRefused")).toEqual([])
+  expect(yield* sql`SELECT result_json FROM receipts WHERE caller = 'owner' AND request_id = ${requestId}`).toHaveLength(1)
   expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(1)
 })).pipe(Effect.orDie))
 

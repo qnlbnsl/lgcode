@@ -58,7 +58,8 @@ export const decisionHistory = (snapshot: Snapshot, task: ProjectTaskRecord): Re
     entries.push({ sequence: row.sourceSequence, at: row.openedAt, state: "blocked",
       title: question ? "Question asked" : "Approval requested", detail: cutUtf8(question ? row.text : row.description, 8192) })
     if (row.closedSequence !== undefined && row.answeredAt !== undefined) entries.push({ sequence: row.closedSequence, at: row.answeredAt,
-      state: stateAt(row.closedSequence, question), title: row.status === "cancelled" ? "Approval cancelled" : question ? "Question answered" : "Approval answered",
+      state: stateAt(row.closedSequence, question && task.history.some((entry) => entry.sequence === row.closedSequence! + 1
+        && entry.state === "done" && entry.detail === "Linked question answered")), title: row.status === "cancelled" ? "Approval cancelled" : question ? "Question answered" : "Approval answered",
       detail: cutUtf8(question ? row.answer ?? "Answered" : row.status === "cancelled" ? row.reason ?? "Cancelled" : "Answer recorded", 8192) })
   }
   return entries.sort((a, b) => a.sequence - b.sequence)

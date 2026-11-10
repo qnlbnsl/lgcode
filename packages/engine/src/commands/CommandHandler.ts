@@ -38,7 +38,7 @@ import { SecretStore } from "./SecretStore.ts";
 import { loadFirstDefaults } from "./harnesses.ts";
 import { webSettingsCommitted } from "../client/settings.ts";
 import { gitPlanners } from "../project/gitCommands.ts";
-import { planGitOperation } from "./gitOperation.ts";
+import { planGitOperation, refreshGitState } from "./gitOperation.ts";
 import { prepareRegistration, registrationPlanners } from "../project/commands.ts";
 import { prepareDesignRecord } from "../project/design.ts";
 import { prepareMock } from "../project/mocks.ts";
@@ -46,7 +46,7 @@ import { prepareContextFiles } from "../project/context.ts";
 import { promptPlanner } from "./planners.ts";
 import { postPlanner } from "../board/commands.ts";
 import { own, projectKey, projectView } from "../project/view.ts";
-import { prepareProjectLifecycle, projectLifecycleCommand } from "../project/lifecycle.ts";
+import { checkoutMainReason, prepareProjectLifecycle, projectLifecycleCommand } from "../project/lifecycle.ts";
 import { CommandRefused, CommandUncertain, type Plan, type Planner, freshRequest, readHarnesses, refused, type Input, type Runtime, type Snapshot } from "./internal.ts";
 
 export { CommandRefused } from "./internal.ts";
@@ -73,6 +73,11 @@ const canonical = (value: unknown): string => {
 
 const replyFor = (snapshot: Snapshot, name: string, requestId: RequestId, envelopes: ReadonlyArray<EventEnvelope>, settings: ReadonlyArray<HarnessSettings>) => {
   const events = envelopes.map((envelope) => envelope.event);
+  if (events.some((event) => event._tag === "project.GitFinished" && event.outcome === "uncertain")) {
+    return { failure: new CommandUncertain({ reason: "Git outcome is uncertain; refresh Git state" }) };
+  }
+  const gitRefusal = events.find((event) => event._tag === "project.GitFinished" && event.refusal !== undefined);
+  if (gitRefusal?._tag === "project.GitFinished" && gitRefusal.refusal !== undefined) return { failure: refused(`Git: ${gitRefusal.refusal}`) };
   const failure = events.find((event) => event._tag === "CommandRefused");
   if (failure !== undefined) return { failure: refused(failure.reason) };
   const reply: Record<string, unknown> = { requestId };
@@ -240,7 +245,10 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
         catch: () => refused(),
       });
       const snapshot = yield* views.snapshot;
-      const read = lists.reads[name]!({ runtime, actor, snapshot }, payload);
+      const input = { runtime, actor, snapshot };
+      const invoke = (current: Input) => lists.reads[name]!(current, payload);
+      const read = name === "project.git.state" ? refreshGitState(input, payload, (current) =>
+        invoke(current) as Effect.Effect<import("../api/reads.ts").ReadReply, unknown, EventLog | Views | SqlClient.SqlClient>) : invoke(input);
       if (!Effect.isEffect(read)) return yield* refused();
       const result = yield* (read as Effect.Effect<import("../api/reads.ts").ReadReply, unknown, EventLog | Views | SqlClient.SqlClient>);
       const marks = result.marks ?? [];
@@ -414,9 +422,11 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           if (planned._tag === "Failure") {
             if (planned.failure._tag === "LogWriteFailed") return yield* planned.failure;
             const failure = planned.failure;
-            if (external?.plan !== undefined || failure instanceof CommandUncertain) return yield* new CommandUncertain({ reason: "Git outcome is uncertain; retry the identical request" });
+            if (external?.plan !== undefined || failure instanceof CommandUncertain) return yield* new CommandUncertain({ reason: "Git outcome is uncertain; refresh Git state" });
+            const initialMainRefusal = name === "project.create" && failure.reason === checkoutMainReason
+              && own(projectView(snapshot).creations, requestId) === undefined;
             yield* append(actor, requestId, bodyHash, [...(external?.finished === undefined ? [] : [external.finished]), { _tag: "CommandRefused", command: name, reason: failure.reason }], {},
-              failure.reason === "no usable account" || projectLifecycleCommand(name) ? false : undefined);
+              failure.reason === "no usable account" || projectLifecycleCommand(name) && !initialMainRefusal ? false : undefined);
             return { failure, afterCommit: undefined };
           }
           const plan = planned.success;

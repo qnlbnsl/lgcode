@@ -1,7 +1,7 @@
 // Fixed public reasons contain no caller-controlled text or host error output.
 export const projectRefusalReasons = new Set([
   "project state changed; refresh and retry",
-  "Git outcome is uncertain; retry the identical request",
+  "Git outcome is uncertain; refresh Git state",
   "Git attempt metadata is unavailable",
   "project placement cannot change before machine pairing",
   "only a project lead or owner can change the stage",
@@ -32,6 +32,7 @@ export const projectRefusalReasons = new Set([
   "repository is unavailable",
   "main repository checkout is required",
   "main repository checkout needs a named branch",
+  "check out main or master in the main repository checkout before creating a project",
   "project creation intent is unavailable",
   "project creation is unfinished; inspect project.creations and retry the original request",
   "project archive is unfinished because an agent could not stop",

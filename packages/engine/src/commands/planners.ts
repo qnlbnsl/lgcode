@@ -36,8 +36,10 @@ const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan
 });
 export const promptPlanner = (files?: import("../project/context.ts").ContextFiles): Planner => targeted("prompt", (input, payload) => prompt(input, payload as Payload<"prompt">, files));
 export const planners = {
-  "project.create": createProject,
-  "project.archive": archiveProject,
+  // Lifecycle can be the first import in this cyclic service graph. Resolve
+  // its const planners at invocation, after module initialization completes.
+  "project.create": (input, payload) => createProject(input, payload),
+  "project.archive": (input, payload) => archiveProject(input, payload),
   "client.web.settings.set": setWebSettings,
   "roles.role-file.set": (input, payload) => setRoleFile(input, payload as Payload<"roles.role-file.set">),
   // Their implementation units replace these refusals; each declared command

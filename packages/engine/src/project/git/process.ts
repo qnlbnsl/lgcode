@@ -83,8 +83,16 @@ export const gitProcess = (
 
 export const processFailure = (reply: ProcessReply): GitFailure => {
   const text = reply.stderr;
-  return new GitFailure({ reason: /index\.lock|another git process/i.test(text) ? "busy"
+  const reason = /index\.lock|another git process/i.test(text) ? "busy"
     : /authentication|permission denied|could not read (?:Username|Password)|terminal prompts disabled/i.test(text) ? "authentication_required"
     : /could not resolve|unable to access|could not read from remote|connection refused|does not appear to be a git repository/i.test(text) ? "network_failed"
-    : /\[rejected\]|non-fast-forward|fetch first/i.test(text) ? "push_rejected" : "git_failed" });
+    : /\[rejected\]|non-fast-forward|fetch first/i.test(text) ? "push_rejected" : "git_failed";
+  // Only an actual completed Git response proving a rejection/refusal settles
+  // a started operation. A disconnect or generic transport failure does not.
+  // Git/curl can omit the port detail or report only the fixed suffix. A
+  // phrase in the quoted URL or an incomplete response is not evidence.
+  const refusedConnection = !reply.truncated && reason === "network_failed"
+    && /^fatal: unable to access '[^\r\n]*': (?:Failed to connect to [^\r\n]+: )?Could not connect to server\r?$/im.test(text);
+  const determinate = reply.code > 0 && (refusedConnection || /\[rejected\]|non-fast-forward|fetch first|could not resolve|connection refused|does not appear to be a git repository|authentication failed|permission denied|terminal prompts disabled/i.test(text));
+  return new GitFailure({ reason, ...(determinate ? { determinate: true } : {}) });
 };

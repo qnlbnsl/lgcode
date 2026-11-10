@@ -3,6 +3,7 @@ import { useShellData } from "../data/ShellDataProvider.tsx"
 import { shellHref } from "../routes.ts"
 import { visibleText } from "../thread/text.tsx"
 import "./admin.css"
+const pairingAdvice = "Moving a project to another machine waits for machine pairing."
 
 export function Machines(_props: { readonly onSessionExpired: () => void }) {
   const data = useShellData()
@@ -29,13 +30,17 @@ export function Machines(_props: { readonly onSessionExpired: () => void }) {
     <p className="admin-note">Pairing, remote machines, and remote dispatch are not available yet.</p>
     <section className="admin-settings-section" aria-label="Project placement"><h3>Project placement</h3>
       <p className="admin-note">Projects keep their assigned checkout. Changing to another checkout or machine requires machine pairing, which is not available yet.</p>
+      <span title={pairingAdvice}><button disabled title={pairingAdvice}>Retry same placement</button></span>
       {projects === undefined ? <p>Project placement has not loaded.</p> : projects.length === 0 ? <p>No projects.</p> : <div className="admin-table-wrap"><table className="admin-table" aria-label="Project placement">
         <thead><tr><th>Project</th><th>Repository</th><th>Branch</th><th>Checkout</th></tr></thead><tbody>{projects.map((project) => {
           const workspace = data.navigation?.workspaces.find((row) => row.worktreeId === project.worktreeId)
           const repository = data.navigation?.repositories.find((row) => row.repoId === project.repoId)
           return <tr key={project.projectId} data-placement={project.projectId} tabIndex={-1}><td className="admin-record-name"><a href={shellHref({ page: "project", projectId: project.projectId, tab: "settings" })}>{visibleText(project.name)}</a>{project.archivedAt !== undefined && <small>Archived</small>}</td>
             <td>{visibleText(repository?.name ?? "Repository unavailable")}</td><td><code>{visibleText(workspace?.branch ?? "Branch unavailable")}</code></td>
-            <td className="admin-record-status">{visibleText(workspace?.path ?? "Current checkout unavailable")}</td>
+            <td className="admin-record-status"><label title={pairingAdvice}>Assigned checkout<select disabled title={pairingAdvice}
+              aria-label={`Checkout for ${visibleText(project.name)}`} value={project.worktreeId}>
+              <option value={project.worktreeId}>{visibleText(workspace === undefined ? "Current checkout unavailable" : `${workspace.branch} · ${workspace.path}`)}</option>
+            </select></label></td>
           </tr>
         })}</tbody></table></div>}
     </section>

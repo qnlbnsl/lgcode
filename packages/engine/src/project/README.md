@@ -46,7 +46,8 @@ The future React composer consumes this surface separately.
 ## The public local Git commands
 
 The project piece keeps the existing repository, location, workspace, project,
-team, sprint, and task records. Git reads do not create stored Git events.
+team, sprint, and task records. A successful Git state refresh can finish pending
+attempt records without performing a Git mutation.
 Git mutations have ordinary command receipts. Repeating a committed request
 identifier returns its original receipt, without repeating the Git mutation.
 
@@ -136,8 +137,8 @@ The original `project.integrate` and `mergeTeam` main/master refusal remains.
 
 The approval reply has an explicit `outcome` of `merged` or `refused`, with a
 fixed safe `reason` on refusal. A refusal is not a successful merge. The log and
-receipt retain the reviewed heads, decision, and outcome. Retry an uncertain
-attempt with the identical payload and request identity. A changed body refuses.
+receipt retain the reviewed heads, decision, and outcome. An unknown outcome
+asks the owner to refresh Git state. A changed body refuses.
 A known refusal consumes that review; obtain a new review and approve explicitly
 after correcting the cause. Conflicted destination bytes and merge state remain
 inspectable through the existing Git operations.
@@ -351,11 +352,18 @@ Git mutations use the existing event log for a bounded attempt before possible e
 The attempt binds the caller, request, canonical body hash, operation, workspace, and pre-effect Git identities.
 It stores no raw payload or commit message.
 The request lane covers a short writer preflight, Git under the runtime gate outside the writer, and a short final outcome transaction.
-A possible effect followed by failure returns a fixed uncertain error without a success or refusal receipt.
+A Git-proven conflict, rejection, divergence or remote refusal retains its fixed reason and durable refused outcome.
+A genuinely unknown possible effect returns “Git outcome is uncertain; refresh Git state” without a success or refusal receipt.
 An identical retry never clears that attempt merely because the current state appears unchanged.
 Main approval can reconcile both reviewed ancestors in the actual registered destination.
 Commit reconciliation checks the frozen tree, branch, intended retry message, and all expected parents, including a pending merge parent.
-Other unresolved operation attempts remain pending because their exact prior result cannot yet be proven.
+A successful actual project.git.state refresh serializes with mutations, then finishes pending attempts for that workspace in short current-binding transactions.
+The existing GitFinished event records terminal uncertainty in the ordinary envelope receipt, preserving the original caller, request and body hash after clearing the pending attempt.
+For fresh determinate conflicts, rejected push, diverged pull and refused-remote outcomes, its optional fixed refusal enum preserves the known reason across receipt replay and registered-secret collisions.
+Arbitrary CommandRefused reason text remains redacted.
+Identical retries still return uncertainty after rebuild, and changed bodies or commands refuse; cleanup never makes an old mutation executable again.
+Failed or stale reads leave attempts unchanged.
+The same command-layer finalizer serves direct and authenticated transport reads; an agent read grants no Git mutation authority.
 The normal writer failure latch still requires recovery before writes or receipt replay.
 
 Registration and project creation observe checkouts outside the writer too.
@@ -375,3 +383,9 @@ Later artifact reads continue to compare actual bytes with the recorded fingerpr
 The owner can use `project.creation.abandon` to release a pending creation reservation.
 Abandonment takes the lifecycle lane and records only `project.CreationFinished`.
 It leaves the repository, checkout, branches, exclusions, witnesses, files, and modes untouched.
+
+
+The fixed correctable creation refusal for a main checkout outside main or master is “check out main or master in the main repository checkout before creating a project”.
+Creation checks this before effects, including saved intent retries, and never records a feature branch as its main review destination.
+Only a current-admitted initial branch refusal with no creation intent receives a terminal refusal receipt; unavailable accounts and unfinished intents retain their existing retry behavior.
+The later New project consumer joins this fixed reason directly; unknown creation errors retain their frozen request handling.

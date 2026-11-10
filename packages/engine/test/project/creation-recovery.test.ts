@@ -7,7 +7,10 @@ import * as Effect from "effect/Effect"
 import * as Deferred from "effect/Deferred"
 import * as Fiber from "effect/Fiber"
 import * as Redacted from "effect/Redacted"
+import * as SqlClient from "effect/sql/SqlClient"
 import { afterEach, beforeEach, expect, vi } from "vitest"
+import { checkoutMainReason } from "../../src/project/lifecycle.ts"
+import * as Lifecycle from "../../src/project/lifecycle.ts"
 import { EventLog, LogWriteFailed } from "../../src/log/EventLog.ts"
 import { RunnerRejected } from "../../src/runner/Runner.ts"
 import { projectView } from "../../src/project/view.ts"
@@ -485,3 +488,83 @@ for (const state of ["paused", "interrupted", "idle"] as const) for (const canSt
     }), { secrets, logLines })
   }))
 }
+
+live("issue 591: stale branch-refusal admission creates no terminal receipt until current binding is restored", () => Effect.gen(function* () {
+  const runner = yield* makeFakeRunner(), secrets = makeFakeSecrets()
+  yield* provideRig(rig, { runner, secrets }, Effect.gen(function* () {
+    const repoId = yield* setup(), request = payload(repoId)
+    git(rig.work, "checkout", "-b", "feature")
+    const ready = yield* Deferred.make<void>(), release = yield* Deferred.make<void>()
+    yield* Effect.addFinalizer(() => Deferred.succeed(release, undefined))
+    const actual = Lifecycle.prepareProjectLifecycle
+    vi.spyOn(Lifecycle, "prepareProjectLifecycle").mockImplementation((...args) => actual(...args).pipe(Effect.tap(() =>
+      Deferred.succeed(ready, undefined).pipe(Effect.andThen(Deferred.await(release))))))
+    const pending = yield* call(owner, "project.create", request).pipe(Effect.forkChild)
+    yield* Deferred.await(ready).pipe(Effect.timeout("5 seconds"))
+    success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.work, shell: "bash" } }))
+    yield* Deferred.succeed(release, undefined)
+    expect(failureOf(yield* Fiber.join(pending))?.reason).toBe("project state changed; refresh and retry")
+    const sql = yield* SqlClient.SqlClient
+    expect(yield* sql`SELECT request_id FROM receipts WHERE request_id = ${request.requestId}`).toEqual([])
+    expect(projectView(yield* snapshot).creations).toEqual({})
+    expect((yield* readLog).some((row) => row.event._tag === "project.CreationPlanned")).toBe(false)
+    expect(runner.callsOf("start")).toHaveLength(0)
+    vi.restoreAllMocks()
+    success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "zsh" } }))
+    expect(failureOf(yield* call(owner, "project.create", request))?.reason).toBe(checkoutMainReason)
+    expect(yield* sql`SELECT request_id FROM receipts WHERE request_id = ${request.requestId}`).toHaveLength(1)
+    git(rig.work, "checkout", "main")
+    expect(failureOf(yield* call(owner, "project.create", request))?.reason).toBe(checkoutMainReason)
+    expect(projectView(yield* snapshot).creations).toEqual({})
+    expect(runner.callsOf("start")).toHaveLength(0)
+  }))
+}))
+
+for (const branch of ["feature", "detached"]) live(`issue 591: refuses an existing ${branch} main checkout before an intent or filesystem effect`, () => Effect.gen(function* () {
+  const runner = yield* makeFakeRunner(), secrets = makeFakeSecrets()
+  yield* provideRig(rig, { runner, secrets }, Effect.gen(function* () {
+    const repoId = yield* setup()
+    if (branch === "detached") git(rig.work, "checkout", "--detach")
+    else git(rig.work, "checkout", "-b", branch)
+    const before = repositoryBytes(rig.work), request = payload(repoId)
+    for (const name of ["project.placement.preview", "project.create"]) {
+      const refused = yield* call(owner, name, request)
+      expect(failureOf(refused)?.reason).toBe(checkoutMainReason)
+      expect(failureOf(yield* call(owner, name, request))?.reason).toBe(checkoutMainReason)
+      expect(repositoryBytes(rig.work)).toEqual(before)
+    }
+    expect(projectView(yield* snapshot).creations).toEqual({})
+    expect(projectView(yield* snapshot).workspaces).toEqual({})
+    expect(runner.callsOf("start")).toHaveLength(0)
+    expect((yield* readLog).filter((row) => row.event._tag === "project.CreationPlanned")).toEqual([])
+    const refusalRows = (yield* readLog).filter((row) => row.requestId === request.requestId)
+    expect(refusalRows.map((row) => row.event)).toMatchObject([{ _tag: "CommandRefused", command: "project.create", reason: checkoutMainReason }])
+    expect(failureOf(yield* call(owner, "project.create", { ...request, goal: "Changed" }))?.reason).toBe("request id reused")
+    git(rig.work, "checkout", "main")
+    // The initial refusal receipt remains exact; a corrected form uses a new id.
+    expect(failureOf(yield* call(owner, "project.create", request))?.reason).toBe(checkoutMainReason)
+    expect((yield* readLog).filter((row) => row.requestId === request.requestId)).toEqual(refusalRows)
+    const result = success(yield* call(owner, "project.create", { ...request, requestId: freshRequest() }))
+    expect(projectView(yield* snapshot).projects[result.projectId]).toBeDefined()
+    expect(Object.values(projectView(yield* snapshot).workspaces).find((row) => row.checkout === "main")?.branch).toBe("main")
+    expect(runner.callsOf("start")).toHaveLength(1)
+  }))
+}))
+
+live("issue 591: an existing master checkout remains a usable owner review destination", () => Effect.gen(function* () {
+  const runner = yield* makeFakeRunner(), secrets = makeFakeSecrets()
+  yield* provideRig(rig, { runner, secrets }, Effect.gen(function* () {
+    const repoId = yield* setup()
+    git(rig.work, "branch", "-m", "master")
+    const request = payload(repoId), preview = success(yield* call(owner, "project.placement.preview", request)).result
+    const created = success(yield* call(owner, "project.create", request))
+    expect(success(yield* call(owner, "project.create", request))).toEqual(created)
+    const view = projectView(yield* snapshot), project = view.projects[created.projectId]!
+    const main = Object.values(view.workspaces).find((row) => row.checkout === "main")!
+    expect(main.branch).toBe("master")
+    expect(view.workspaces[project.worktreeId]!.path).toBe(preview.path)
+    const reviewed = success(yield* call(owner, "project.review.prepare", { projectId: project.projectId, worktreeId: project.worktreeId, destinationId: main.worktreeId })).result.review
+    expect(reviewed).toMatchObject({ base: "master", outcome: "open" })
+    expect(runner.callsOf("start")).toHaveLength(1)
+  }))
+}))

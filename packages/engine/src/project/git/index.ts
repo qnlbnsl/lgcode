@@ -4,6 +4,7 @@ import { lstat, mkdir, mkdtemp, open, opendir, realpath, rename, rm, stat, write
 import { basename, dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import * as Effect from "effect/Effect";
+import { isRepositoryCredentialPath } from "@lgcode/contracts";
 import { checkedMetadata, cleanText, directory, filePath, inside, slug, smallFile } from "./paths.ts";
 import { parseChanges, parseConflict, parseFiles, parseHistory, parseNumstat } from "./parse.ts";
 import { boundedUtf8, gitProcess, processFailure, type ProcessReply } from "./process.ts";
@@ -22,6 +23,7 @@ export interface GitConfiguration {
   readonly networkTimeoutMs?: number;
 }
 const fail = (reason: GitFailureReason): never => { throw new GitFailure({ reason }); };
+const determinate = (reason: GitFailureReason): never => { throw new GitFailure({ reason, determinate: true }); };
 const hash = (...parts: ReadonlyArray<string | Buffer>) => {
   const value = createHash("sha256");
   for (const part of parts) { value.update(String(Buffer.byteLength(part))); value.update(":"); value.update(part); }
@@ -62,7 +64,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       try { return await body(signal); }
       catch (error) {
         const failure = error instanceof GitFailure ? error : new GitFailure({ reason: "invalid_path" });
-        throw new GitFailure({ reason: failure.reason, ...(failure.uncertain || mutations.has(signal) ? { uncertain: true } : {}) });
+        throw new GitFailure({ reason: failure.reason, ...(failure.uncertain || mutations.has(signal) && !failure.determinate ? { uncertain: true } : {}) });
       }
     },
     catch: (error) => error instanceof GitFailure ? error : new GitFailure({ reason: "invalid_path" }),
@@ -128,8 +130,12 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
   };
   const history = async (folder: string, revision: string, signal: AbortSignal, maximum = entries) =>
     list(parseHistory(await git(folder, ["log", `--max-count=${maximum + 1}`, "-z", "--format=%H%x00%P%x00%an%x00%cI%x00%s", revision, "--"], signal)), maximum);
-  const filesBetween = async (folder: string, args: string[], signal: AbortSignal) =>
-    list(parseFiles(await git(folder, [...args, "--no-ext-diff", "--no-textconv", "--name-status", "-z", "--find-renames", "--"], signal)));
+  const readable = (row: { path: string; originalPath: string | null }) => !isRepositoryCredentialPath(row.path)
+    && (row.originalPath === null || !isRepositoryCredentialPath(row.originalPath));
+  const filesBetween = async (folder: string, args: string[], signal: AbortSignal, agentRead = false) => {
+    const files = parseFiles(await git(folder, [...args, "--no-ext-diff", "--no-textconv", "--name-status", "-z", "--find-renames", "--"], signal));
+    return list(agentRead ? files.filter(readable) : files);
+  };
   const patch = async (folder: string, args: string[], signal: AbortSignal, paths: string[] = []): Promise<Diff> => {
     const reply = await run(folder, [...args, "--no-ext-diff", "--no-textconv", "--no-color", "--patch", "--", ...paths], signal, true, diffBytes);
     if (reply.code !== 0 && !reply.truncated && !(args.includes("--no-index") && reply.code === 1)) throw processFailure(reply);
@@ -137,9 +143,23 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     if (stats.code !== 0 && !(args.includes("--no-index") && stats.code === 1)) throw processFailure(stats);
     return { patch: reply.stdout, ...parseNumstat(stats.stdout), truncated: reply.truncated };
   };
-  const diff = async (folder: string, options: { path?: string; staged?: boolean; commit?: string }, signal: AbortSignal): Promise<Diff> => {
+  const diff = async (folder: string, options: { path?: string; staged?: boolean; commit?: string; agentRead?: boolean }, signal: AbortSignal): Promise<Diff> => {
     const path = options.path;
+    let aggregatePaths: string[] | undefined;
+    if (options.agentRead) {
+      if (path !== undefined && isRepositoryCredentialPath(path)) return fail("invalid_path");
+      const changes = options.commit === undefined ? await completeChanges(folder, signal)
+        : parseFiles(await git(folder, ["diff-tree", "--root", "--no-commit-id", "-r", "-m", "--first-parent", await ref(folder, options.commit, signal), "--name-status", "-z", "--find-renames", "--"], signal));
+      if (path !== undefined && changes.some((row) => row.path === path && !readable(row))) return fail("invalid_path");
+      if (path === undefined) {
+        aggregatePaths = changes.filter(readable).flatMap((row) => row.originalPath === null ? [row.path] : [row.originalPath, row.path]);
+        // Never pass an empty path list to Git: that would mean all files.
+        if (aggregatePaths.length === 0) return { patch: "", additions: 0, deletions: 0, binary: false, truncated: false };
+        for (const name of aggregatePaths) await filePath(folder, name);
+      }
+    }
     if (path !== undefined) await filePath(folder, path);
+    else if (aggregatePaths !== undefined) { /* The selected paths were checked above. */ }
     else if (options.commit !== undefined) {
       const names = await git(folder, ["show", "--format=", "--first-parent", "--name-only", "-z", await ref(folder, options.commit, signal), "--"], signal);
       for (const name of names.split("\0").filter(Boolean)) await filePath(folder, name);
@@ -151,7 +171,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     }
     if (options.commit !== undefined) {
       const commit = await ref(folder, options.commit, signal);
-      return patch(folder, ["show", "--format=", "--first-parent", commit], signal, path === undefined ? [] : [path]);
+      return patch(folder, ["show", "--format=", "--first-parent", commit], signal, path === undefined ? aggregatePaths ?? [] : [path]);
     }
     const currentHead = options.staged === undefined ? await head(folder, signal) : null;
     const diffArgs = ["diff", ...(options.staged === true ? ["--cached"] : currentHead === null ? [] : [currentHead])];
@@ -164,12 +184,13 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     }
     const tracked = options.staged === undefined && currentHead === null
       ? { patch: "", additions: 0, deletions: 0, binary: false, truncated: false }
-      : await patch(folder, diffArgs, signal);
+      : await patch(folder, diffArgs, signal, aggregatePaths ?? []);
     if (options.staged === true) return tracked;
     let result = tracked;
     for (const change of await completeChanges(folder, signal)) {
+      if (options.agentRead && !readable(change)) continue;
       if ((!change.untracked && !(options.staged === undefined && currentHead === null && change.index === "A")) || result.truncated) continue;
-      const next = await diff(folder, { path: change.path }, signal);
+      const next = await diff(folder, { path: change.path, agentRead: options.agentRead === true }, signal);
       const joined = Buffer.from(result.patch + next.patch);
       result = { patch: boundedUtf8(joined, diffBytes), additions: result.additions + next.additions,
         deletions: result.deletions + next.deletions, binary: result.binary || next.binary,
@@ -271,14 +292,18 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     if (selection.choices.length !== actual.choices.length || selection.choices.some((choice) => choice !== null && !["ours", "theirs", "both"].includes(choice))) return fail("incomplete_choices");
     return actual;
   };
-  const review = async (folder: string, base: string, signal: AbortSignal): Promise<Review> => {
+  const review = async (folder: string, base: string, signal: AbortSignal, agentRead = false): Promise<Review> => {
     const currentBranch = await branch(folder, signal), currentHead = await head(folder, signal);
     if (currentBranch === null || currentHead === null) return fail("invalid_ref");
     const baseHead = await localBranch(folder, base, signal);
+    const files = await filesBetween(folder, ["diff", `${baseHead}...${currentHead}`], signal, agentRead);
+    const paths = files.items.flatMap((row) => row.originalPath === null ? [row.path] : [row.originalPath, row.path]);
+    if (agentRead) for (const path of paths) await filePath(folder, path);
     return { head: currentHead, baseHead, branch: currentBranch, base,
       commits: await history(folder, `${baseHead}..${currentHead}`, signal),
-      files: await filesBetween(folder, ["diff", `${baseHead}...${currentHead}`], signal),
-      diff: await patch(folder, ["diff", `${baseHead}...${currentHead}`], signal) };
+      files,
+      diff: agentRead && paths.length === 0 ? { patch: "", additions: 0, deletions: 0, binary: false, truncated: false }
+        : await patch(folder, ["diff", `${baseHead}...${currentHead}`], signal, agentRead ? paths : []) };
   };
   const remote = async (folder: string, signal: AbortSignal) => {
     if (!(await git(folder, ["remote"], signal)).split("\n").includes("origin")) return fail("missing_remote");
@@ -361,6 +386,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     }),
     register: (folder) => operation((signal) => repository(folder, signal)),
     contextFile: (folder, requested) => withRepo(folder, async (path) => {
+      if (isRepositoryCredentialPath(requested)) return fail("invalid_path");
       const full = await filePath(path, requested);
       if (!(await lstat(full)).isFile() || await realpath(full) !== full) return fail("invalid_path");
     }),
@@ -373,6 +399,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       const items: string[] = [];
       let truncated = reply.truncated;
       for (const name of new Set(names)) {
+        if (isRepositoryCredentialPath(name)) continue;
         if (!name.toLowerCase().includes(query.toLowerCase())) continue;
         if (signal.aborted) return fail("cancelled");
         try {
@@ -425,10 +452,13 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       }
       return fail("collision");
     }),
-    changes: (folder) => withRepo(folder, async (path, signal) => list(parseChanges(await git(path, ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"], signal)))),
+    changes: (folder, agentRead = false) => withRepo(folder, async (path, signal) => {
+      const changes = parseChanges(await git(path, ["status", "--porcelain=v1", "-z", "--untracked-files=all", "--ignore-submodules=none"], signal));
+      return list(agentRead ? changes.filter(readable) : changes);
+    }),
     diff: (folder, options = {}) => withRepo(folder, (path, signal) => diff(path, options, signal)),
     history: (folder, limit) => withRepo(folder, async (path, signal) => await head(path, signal) === null ? list([]) : history(path, "HEAD", signal, bound(limit, entries, entries))),
-    commitFiles: (folder, commit) => withRepo(folder, async (path, signal) => filesBetween(path, ["diff-tree", "--root", "--no-commit-id", "-r", "-m", "--first-parent", await ref(path, commit, signal)], signal)),
+    commitFiles: (folder, commit, agentRead = false) => withRepo(folder, async (path, signal) => filesBetween(path, ["diff-tree", "--root", "--no-commit-id", "-r", "-m", "--first-parent", await ref(path, commit, signal)], signal, agentRead)),
     state: (folder, target) => withRepo(folder, async (path, signal) => {
       const currentHead = await head(path, signal), currentBranch = await branch(path, signal);
       const upstreamReply = await run(path, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], signal);
@@ -493,7 +523,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       if ((await completeChanges(path, signal)).length > 0) return fail("dirty_destination");
       await remote(path, signal); await upstream(path, signal);
       const reply = await mutateRun(path, ["pull", "--ff-only", "--no-rebase"], signal);
-      if (reply.code !== 0) { if (/fast-forward|divergent/i.test(reply.stderr)) return fail("pull_diverged"); throw processFailure(reply); }
+      if (reply.code !== 0) { if (/fast-forward|divergent/i.test(reply.stderr)) return determinate("pull_diverged"); throw processFailure(reply); }
     }, true),
     push: (folder) => withRepo(folder, async (path, signal) => {
       await remote(path, signal);
@@ -514,12 +544,12 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       if (sourceHead !== expectedHead) return fail("stale_state");
       const reply = await mutateRun(to.path, ["-c", "merge.conflictStyle=diff3", "merge", "--no-edit", "--no-autostash", sourceHead!], signal);
       if (reply.code !== 0) {
-        if ((await completeChanges(to.path, signal)).some((change) => change.conflict)) return fail("conflicts");
+        if (await mergeHead(to.path, signal) !== null && (await completeChanges(to.path, signal)).some((change) => change.conflict)) return determinate("conflicts");
         throw processFailure(reply);
       }
       return (await head(to.path, signal))!;
     }),
-    review: (folder, base) => withRepo(folder, (path, signal) => review(path, base, signal)),
+    review: (folder, base, agentRead = false) => withRepo(folder, (path, signal) => review(path, base, signal, agentRead)),
     reviewMain: (source, destination) => operation(async (signal) => (await mainComparison(source, destination, signal)).comparison),
     approveMain: (source, destination, reviewed, caller, confirmed, reconcileOnly = false) => operation(async (signal) => {
       // Check trusted authority again at execution, including caller-less and
@@ -556,7 +586,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       const reply = await mutateRun(to.path, ["-c", `branch.${reviewed.base}.mergeOptions=`, "-c", "merge.conflictStyle=diff3",
         "merge", "--strategy=ort", "--ff", "--no-squash", "--commit", "--no-edit", "--no-autostash", reviewed.head], signal);
       if (reply.code !== 0) {
-        if ((await completeChanges(to.path, signal)).some((change) => change.conflict)) return fail("conflicts");
+        if (await mergeHead(to.path, signal) !== null && (await completeChanges(to.path, signal)).some((change) => change.conflict)) return determinate("conflicts");
         throw processFailure(reply);
       }
       // A zero exit alone is insufficient. Read back the actual destination
@@ -569,7 +599,10 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       if (ancestry.code !== 0) throw processFailure(ancestry);
       return merged;
     }),
-    conflict: (folder, path) => withRepo(folder, (base, signal) => conflict(base, path, signal)),
+    conflict: (folder, path, agentRead = false) => withRepo(folder, (base, signal) => {
+      if (agentRead && isRepositoryCredentialPath(path)) return fail("invalid_path");
+      return conflict(base, path, signal);
+    }),
     choose: (folder, selection, hunk, choice) => withRepo(folder, async (path, signal) => {
       const actual = await checkedSelection(path, selection, signal);
       if (!Number.isInteger(hunk) || hunk < 0 || hunk >= actual.choices.length || !["ours", "theirs", "both"].includes(choice)) return fail("incomplete_choices");
