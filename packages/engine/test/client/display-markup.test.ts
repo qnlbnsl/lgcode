@@ -1,5 +1,8 @@
 import { expect, it } from "vitest"
 import { scopeMockMarkup } from "../../src/client/web/display/markup.ts"
+import { registerRebuildCheck } from "../support/rebuildCheck.ts"
+
+registerRebuildCheck({ noLog: true })
 
 const origin = "https://design.example", token = "a".repeat(43), prefix = `/session/${token}`
 const scope = (text: string, route = "/pages/home?state=empty") => scopeMockMarkup(text, route, origin, token)

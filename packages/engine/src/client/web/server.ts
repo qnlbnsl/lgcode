@@ -103,7 +103,9 @@ export const serve = (options: {
         dockerSocket: "/var/run/docker.sock",
         input: () => Effect.runPromise(Effect.gen(function* () {
           if (Option.isSome(recovery) && !(yield* recovery.value.ready)) throw new Error("recovering");
-          return yield* handler.input({ _tag: "owner" });
+          const caller = webCaller(session, headers);
+          if (caller === undefined) throw new Error("display session unavailable");
+          return yield* handler.input(caller);
         })),
         registerSecret: (secret) => options.registerSecret?.(Redacted.make(secret)),
         onCleanupFailure: () => { displayCleanupFailed = true; }

@@ -40,3 +40,13 @@ The ordinary logs, actual exits, final native case and useful screenshots are in
 The active native input remains .scratch/w10b-foundation-resume/display-tag601/display.spec.ts, with its existing configuration and entry files.
 No local test, direct Secure Shell command, new manifest, collection receipt or frozen request was produced.
 No full-check pass, completed Shell integration, push, merge or unit acceptance is claimed.
+
+## The first ordinary full check and its correction
+
+The ordinary run-remote-test check at 720077d returned 1.
+Typechecking passed, and Vitest reported 7,650 passing tests, two skipped tests and two failed repository guards.
+Browser and credit stages were not executed after that failure.
+The display callback now revalidates its caller through the existing webCaller boundary instead of constructing an owner credential.
+The two pure display test files now declare their event-log-free rebuild registration.
+The failed and related checks, followed by the final full gate, are running on the corrected signed commit.
+The image, sandbox ruling, native input, deadlines and isolation controls remain unchanged.

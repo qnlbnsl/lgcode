@@ -10459,3 +10459,13 @@ Its outcome records completed=true and owned containers absent; a separate Docke
 The screenshots still show OpenPencil's font-unavailable-or-substituted warning.
 This proves the selected document renders, but does not establish exact font fidelity or whole-unit acceptance.
 All original failed logs remain in website-1/w10b-document-import, alongside the passing logs and screenshots.
+
+### The first ordinary full check found two missed repository guards
+
+The full remote check of 720077d returned 1 after typechecking passed.
+Vitest reported 7,650 passing tests, two skipped tests and two failing guards; browser and credit stages did not run.
+The display input callback constructed an owner credential outside webCaller.
+It now obtains and revalidates its caller through webCaller before each engine input read.
+The pure display-boundary and markup tests also omitted their required rebuild declarations.
+Both now register noLog=true because neither opens an event log.
+The original full log and direct exit remain preserved in website-1/w10b-document-import.

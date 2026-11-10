@@ -9,6 +9,9 @@ import { openPencilImage, openPencilLaunch } from "../../src/client/web/display/
 import { makeDisplaySessions } from "../../src/client/web/display/sessions.ts"
 import { readDisplayResource } from "../../src/client/web/display/resources.ts"
 import { displayUrl } from "../../src/client/web/display/url.ts"
+import { registerRebuildCheck } from "../support/rebuildCheck.ts"
+
+registerRebuildCheck({ noLog: true })
 
 let temporary: string | undefined
 afterEach(async () => { if (temporary !== undefined) await rm(temporary, { recursive: true, force: true }); temporary = undefined })
