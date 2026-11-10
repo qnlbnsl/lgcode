@@ -5,7 +5,7 @@ import { fingerprint } from "../../../project/artifacts.ts"
 import * as Effect from "effect/Effect"
 import type { DisplayFrame, DisplayOpen } from "@lgcode/contracts/project/display"
 import type { Input } from "../../../commands/internal.ts"
-import { designDisplay, mockDisplay } from "../../../project/display.ts"
+import { designDisplay, mockDisplay, componentDisplay } from "../../../project/display.ts"
 import { makeMockRenderer, type DisplayResponse } from "./renderer.ts"
 import { displayHeaders, displayRequestAllowed, type DisplayConfiguration } from "./policy.ts"
 import { makeDisplaySessions } from "./sessions.ts"
@@ -69,7 +69,7 @@ export const serveDisplay = async (options: {
   const render = async (url: string, method: string, headers: Readonly<Record<string, string | undefined>>): Promise<DisplayResponse> => {
     if (closed || !displayRequestAllowed(configuration, headers, method)) return empty(403)
     const session = sessions.authorize(url, headers.referer)
-    if (session?.target.kind === "mock") return renderMock({ url, method, headers })
+    if (session?.target.kind === "mock" || session?.target.kind === "component") return renderMock({ url, method, headers })
     try {
       const target = displayUrl(url, configuration.displayOrigin)
       if (target === undefined || target.path === "/api" || target.path.startsWith("/api/") || target.path.startsWith("/files/")) return empty(404)
@@ -125,10 +125,12 @@ export const serveDisplay = async (options: {
     open: (selection: DisplayOpen) => track((async (): Promise<DisplayFrame> => {
       if (closed) throw new Error("isolated display unavailable")
       const openingGeneration = generation, input = await options.input()
-      if (selection._tag === "mock") {
-        const current = await Effect.runPromise(mockDisplay(input, selection))
+      if (selection._tag === "mock" || selection._tag === "component") {
+        const current = selection._tag === "component"
+          ? await Effect.runPromise(componentDisplay(input, selection))
+          : await Effect.runPromise(mockDisplay(input, selection))
         if (closed || openingGeneration !== generation) throw new Error("display session ended")
-        const frame = sessions.issue({ kind: "mock", selection })
+        const frame = sessions.issue(selection._tag === "component" ? { kind: "component", selection } : { kind: "mock", selection })
         try {
           const result = { id: frame.id, expiresAt: frame.expiresAt, displayOrigin: configuration.displayOrigin, url: frame.mockUrl(current.route) }
           expire(result); return result

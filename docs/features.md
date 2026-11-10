@@ -669,5 +669,8 @@ The full design is in
 
 `pnpm live-check:web` exercises a private engine with a real Codex agent and
 Chromium. It verifies streamed replies, prompts, command permission answers,
-reload, stop, resume and safe startup failures. It remains separate from
+reload, stop, resume and safe startup failures. It also creates a real project
+and worktree through first-run setup, has its actual lead create a linked
+sprint, task and question with supported tools, answers from the board, and
+checks the durable result and exact receipt again after service restart. It remains separate from
 `pnpm check` because it consumes the signed-in account's allowance.

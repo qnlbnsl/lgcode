@@ -1,3 +1,4 @@
+import { completedSetup } from "./support/completedSetup.ts"
 import { randomBytes } from "node:crypto"
 import { createServer } from "node:http"
 import { chmodSync, writeFileSync } from "node:fs"
@@ -82,6 +83,7 @@ test("7.4 a phone owner follows the board alert, reads and replies, and wakes th
         success(yield* call(ownerCredential, "client.web.settings.set", { settings: {
           enabled: true, port, heartbeatSeconds: 25, proxyMode: true, publicAddress: origin,
         } }))
+        yield* completedSetup()
         yield* serve({ password: Redacted.make(password), staticRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: true, publicAddress: origin } })
         success(yield* call(ownerCredential, "client.alerts.carrier.set", {

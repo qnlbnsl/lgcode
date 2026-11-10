@@ -7,6 +7,7 @@ import * as Cause from "effect/Cause"
 import * as Stream from "effect/Stream"
 import * as Redacted from "effect/Redacted"
 import { afterEach, expect, it, vi } from "vitest"
+import { completedSetup } from "../e2e/support/completedSetup.ts"
 import { CommandHandler } from "../../engine/src/commands/CommandHandler.ts"
 import { makeFakeRunner, type FakeRunner } from "../../engine/test/support/fakeRunner.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
@@ -88,6 +89,7 @@ const mountedJourney = async (body: (journey: Journey) => Promise<void>, wrap?: 
       success(yield* call(owner, "harnesses", { operation: "set", harness: harnessSettings("cursor", { adapterPath: process.execPath, reportedModes: [{ id: "default", level: "ask" }] }) }))
       success(yield* call(owner, "accounts", { operation: "add", account: { id: "primary", harness: "cursor", enabled: true } }))
       success(yield* call(owner, "accounts set-secret", { accountId: "primary", name: "CURSOR_API_KEY", nonce: freshRequest(), value: Redacted.make("synthetic-mounted-new-project") }))
+      yield* completedSetup(undefined, rig.work, "Actual Product")
       const handler = yield* CommandHandler
       const execute: Execute = (name, payload) => handler.execute(owner, name, { requestId: freshRequest(), ...payload }).pipe(
         Effect.tapCause((cause) => Effect.sync(() => console.error("Mounted fixture handler failure", name, Cause.pretty(cause))))
@@ -122,7 +124,7 @@ it("mounts the single real form from Home, registers at Machines, returns the ex
     await click(container, "New project")
     await eventually(() => expect(container.querySelector("dialog")?.open).toBe(true))
     const dialog = container.querySelector("dialog")!
-    await eventually(() => expect(dialog.textContent).toContain("No repositories are registered"))
+    await eventually(() => expect(field(dialog, "Project name").value).toBe("Actual Product"))
     await fill(dialog, "Project name", "Mounted goal")
     await fill(dialog, "Goal", "Keep this exact draft across Machines")
     await click(dialog, "Add repository")
@@ -154,7 +156,7 @@ it("Cancel at the actual Machines registration returns to the same draft and Esc
   await mountedJourney(async ({ container, runner, execute }) => {
     await click(container, "New project")
     const dialog = container.querySelector("dialog")!
-    await eventually(() => expect(dialog.textContent).toContain("No repositories are registered"))
+    await eventually(() => expect(field(dialog, "Project name").value).toBe("Actual Product"))
     await fill(dialog, "Project name", "Keep on Cancel")
     await fill(dialog, "Goal", "Do not drop this draft")
     const original = button(container, "New project")
@@ -169,7 +171,7 @@ it("Cancel at the actual Machines registration returns to the same draft and Esc
     await act(async () => dialog.dispatchEvent(new Event("cancel", { cancelable: true })))
     expect(dialog.open).toBe(false)
     expect(document.activeElement).toBe(current)
-    expect((await Effect.runPromise(execute("project.repositories", {}))).items).toEqual([])
+    expect((await Effect.runPromise(execute("project.repositories", {}))).items).toHaveLength(1)
     expect(runner.callsOf("start")).toHaveLength(0)
   })
 })
@@ -178,7 +180,6 @@ it("a committed lost create reply stays frozen through Machines and recovers the
   const attempts: Record<string, unknown>[] = []
   let lose = true
   await mountedJourney(async ({ container, rig, runner, execute }) => {
-    await Effect.runPromise(execute("project.repository.add", { name: "Actual Product", path: rig.work, machineId: "local" }))
     await click(container, "New project")
     const dialog = container.querySelector("dialog")!
     await fill(dialog, "Project name", "Lost mounted reply")
@@ -217,7 +218,7 @@ it("typed registration expiry ends the actual owner mount and neither controller
   await mountedJourney(async ({ container, rig, runner }) => {
     await click(container, "New project")
     const dialog = container.querySelector("dialog")!
-    await eventually(() => expect(dialog.textContent).toContain("No repositories are registered"))
+    await eventually(() => expect(field(dialog, "Project name").value).toBe("Actual Product"))
     await fill(dialog, "Project name", "Private old project")
     await fill(dialog, "Goal", "Private old goal")
     await click(dialog, "Add repository")
@@ -237,22 +238,21 @@ it("typed registration expiry ends the actual owner mount and neither controller
     await eventually(() => expect(button(container, "New project")).toBeDefined())
     await click(container, "New project")
     const next = container.querySelector("dialog")!
-    expect(field(next, "Project name").value).toBe("")
+    await eventually(() => expect(field(next, "Project name").value).toBe("Actual Product"))
     expect(field(next, "Goal").value).toBe("")
-    await eventually(() => expect(next.textContent).toContain("No repositories are registered"))
+    await eventually(() => expect(field(next, "Project name").value).toBe("Actual Product"))
     await click(next, "Add repository")
     const fresh = container.querySelector(".review-page[aria-labelledby]")!
-    expect(field(fresh, "Name").value).toBe("")
-    expect(field(fresh, "Existing checkout folder").value).toBe("")
+    expect(field(fresh, "Name").value).toBe("Actual Product")
+    expect(field(fresh, "Existing checkout folder").value).toBe(rig.work)
     expect(runner.callsOf("start")).toHaveLength(0)
-  }, (execute) => (name, payload) => name === "project.repository.add"
+  }, (execute) => (name, payload) => (name === "project.repository.add" || name === "project.repository.locate")
     ? Effect.fail({ _tag: "CommandError", reason: "invalid credential" }) : execute(name, payload))
 })
 
 it("actual logout disposes an in-flight owner operation and its late committed reply cannot navigate or refill the next owner form", async () => {
   let release: (() => void) | undefined
   await mountedJourney(async ({ container, rig, runner, execute }) => {
-    await Effect.runPromise(execute("project.repository.add", { name: "Actual Product", path: rig.work, machineId: "local" }))
     await click(container, "New project")
     const dialog = container.querySelector("dialog")!
     await fill(dialog, "Project name", "Late owner reply")

@@ -1,6 +1,6 @@
 import type { AgentId, ProjectId, RepositoryId, SprintId, TaskId, TeamId, WorkspaceId } from "@lgcode/contracts"
 
-export const workspaceTabs = ["board", "chat", "terminal", "git", "settings", "tasks"] as const
+export const workspaceTabs = ["board", "mocks", "chat", "terminal", "git", "settings", "tasks"] as const
 export type WorkspaceTab = typeof workspaceTabs[number]
 export type ServicePage = "alerts" | "machines" | "subscriptions" | "settings"
 export type ShellRoute =

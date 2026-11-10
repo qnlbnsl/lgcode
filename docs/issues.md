@@ -10794,3 +10794,43 @@ The lead runs the complete Git browser file after this correction.
 The manager owns the subsequent merged full and service check.
 The requested complete Git browser file passed remotely, with all 11 cases passing in 3.3 minutes and wrapper exit 0.
 The existing layout assertion passed without an assertion or deadline change.
+
+
+## W11 integration corrections without a new issue allocation
+
+Found: 2026-11-10, while checking the accepted website against the original browser reference.
+
+The accepted Shell did not mount the delivered first-run Setup, Mocks, or repository Design pages.
+The integration now uses the original author exports and the authenticated owner's existing controller lifetimes.
+Setup requires positive durable completion, and project stages omit Design when the complete mock history has no screens.
+Historical browser fixtures explicitly complete setup without bypassing the genuine first-run journey.
+
+A complete mock revision history with no approval did not prove that a generic typed CommandError was a durable refusal.
+A real writer-boundary control reproduced retirement of the original approval identity before append.
+Approval now keeps its exact body and key across ambiguous failures and navigation.
+It retires that attempt only after success, conclusively stale revision evidence, or a durable owner CommandRefused event for that exact approval.
+The real before-append and after-commit controls recover one approval after runtime restart.
+
+Repository Design's evidence table and editor did not provide live component View previews.
+The existing isolated display path now selects a registered repository revision and component identity.
+It reuses the current owner issuance, opaque sandbox, session revocation, fingerprint, path and private-data checks.
+Component previews are inert while the owner can still open and close them.
+Unsupported source formats explicitly remain unavailable.
+The original mock and editor retain their existing interaction policies.
+
+The historical live reply assertion expected a literal Agent data prefix that the current plain-text export no longer renders.
+The correction preserves the complete exact sentence and exactly one new reply block.
+The W11 builder result records the actual live failures, ordinary full overlap, later corrections and their validation separately.
+
+The actual-provider first-run journey also established a created lead with
+`model-refused` and an exact durable `project.setup.complete` prerequisite
+refusal. The inline Open lead conversation button previously retried Setup
+completion, so the owner could not reach the existing model/effort remedy.
+It now opens that same lead's existing Thread as a Setup detour. Return to
+first project retains the original project and creation. Setup remains pending
+until configure/resume succeeds. Only an exact durable completion refusal
+permits a new completion key; ambiguous failures retain the original key.
+
+### W11 actual-provider selector boundary (unallocated)
+
+The real Codex adapter selector does not advertise the exact requested gpt-6.1-sol. The minimal owned-service probe confirmed that the request's configId belongs to that same selector and that the correctly shaped setting receives InvalidParams. It printed fixed booleans, without options, raw errors or credentials. This is an external provider/adapter configuration limit, not an established local runner bug. The requested model and provider remain unchanged. Actual-provider completion, private-login halt and restart receipt/rebuild proof remain incomplete. W11 merge is blocked pending manager disposition. The named W11 builder result retains the failed attempts and ordinary diagnostic log.

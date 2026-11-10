@@ -1,3 +1,4 @@
+import { completedSetup } from "./support/completedSetup.ts"
 import { randomBytes } from "node:crypto"
 import { execFileSync } from "node:child_process"
 import { mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
@@ -49,6 +50,7 @@ async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture
         success(yield* call(ownerCredential, "project.workspace.register", { repoId: added.repoId, path: rig.work, branch: base, machineId: "local", checkout: "main" }))
         const created = success(yield* call(ownerCredential, "project.create", { name: "Browser work", goal: "Prove the owned Git component", machineId: "local", repository: { _tag: "existing", repoId: added.repoId }, useWorktree: true }))
         const view = projectView(yield* (yield* Views).snapshot), project = view.projects[created.projectId]!, source = view.workspaces[project.worktreeId]!, repository = view.repositories[added.repoId]!
+        yield* completedSetup(project.projectId)
         const fixture: Fixture = { base: rig.work, source, project, repository, root: rig.root }
         prepare(fixture)
         if (options.reportedFailure) {

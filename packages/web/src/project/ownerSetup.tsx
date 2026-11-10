@@ -9,18 +9,19 @@ type OwnerSetupProps = Omit<ComponentProps<typeof Setup>, "renderProject"> & {
   readonly disabled?: boolean
   readonly onAddRepository: () => void
   readonly onSettings: () => void
+  readonly onOpenLead?: (project: Project) => void
 }
 
 // Shell owns this accepted session. Setup neither constructs nor disposes it.
 // The same accepted form stays mounted through Back. Shell keeps this setup
 // mount hidden during Machines/Settings detours and mounts no second dialog.
-export function OwnerSetup({ creation, disabled, onAddRepository, onSettings, ...setup }: OwnerSetupProps) {
+export function OwnerSetup({ creation, disabled, onAddRepository, onSettings, onOpenLead, ...setup }: OwnerSetupProps) {
   return <Setup {...setup} renderProject={(onCreated) => <FirstProject creation={creation}
-    {...(disabled === undefined ? {} : { disabled })} onAddRepository={onAddRepository} onSettings={onSettings} onCreated={onCreated} />} />
+    {...(disabled === undefined ? {} : { disabled })} onAddRepository={onAddRepository} onSettings={onSettings} {...(onOpenLead === undefined ? {} : { onOpenLead })} onCreated={onCreated} />} />
 }
 function FirstProject(props: {
   readonly creation: NewProjectSession; readonly disabled?: boolean
-  readonly onAddRepository: () => void; readonly onSettings: () => void; readonly onCreated: (project: Project) => void
+  readonly onAddRepository: () => void; readonly onSettings: () => void; readonly onOpenLead?: (project: Project) => void; readonly onCreated: (project: Project) => void
 }) {
   // Inline presentation does not need to open Home's native dialog. Refresh
   // uses the actual accepted controller and preserves any frozen attempt.

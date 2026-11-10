@@ -1,3 +1,4 @@
+import { completedSetup } from "./support/completedSetup.ts"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
@@ -52,6 +53,7 @@ test("foundation shell: URL history, focus, sizing, themes and eight viewport ca
       yield* Effect.scoped(Effect.gen(function* () {
         yield* registerRebuildCheck()
         const project = yield* decisionSetup()
+        yield* completedSetup(project.projectId)
         const draft = page.getByRole("form", { name: "Prompt agent", exact: true }).getByRole("textbox")
         const offlineControl = async (name: "Stop reply" | "Send prompt") => {
           const control = page.getByRole("button", { name, exact: true })

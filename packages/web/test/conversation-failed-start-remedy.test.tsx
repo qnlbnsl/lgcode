@@ -1,3 +1,4 @@
+import { completedSetup } from "../e2e/support/completedSetup.ts"
 import { act } from "react"
 import * as Effect from "effect/Effect"
 import { expect, it, vi } from "vitest"
@@ -25,6 +26,7 @@ for (const axis of ["model", "effort"] as const) it(`issue 603: mounted ${axis}-
   try {
     await Effect.runPromise(provideBoard(rig, (runner) => Effect.gen(function* () {
       yield* registerRebuildCheck(); yield* seedAccount()
+      yield* completedSetup()
       yield* appendSetup([eventOf({ _tag: "HarnessChanged", harness: harnessSettings("first", {
         models: ["test-model", "valid-model"], efforts: ["high", "low"],
       }) })])

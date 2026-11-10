@@ -1,3 +1,4 @@
+import { completedSetup } from "../e2e/support/completedSetup.ts"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
 import { act } from "react"
@@ -72,6 +73,7 @@ it("refreshes a real team post through the authenticated shell stream without po
     await Effect.runPromise(provideBoard(rig, Effect.gen(function* () {
       yield* registerRebuildCheck()
       const fixture = yield* decisionSetup()
+      yield* completedSetup(fixture.projectId)
       const log = yield* EventLog
       let subscriptions = 0
       const socketPath = join(rig.stateFolder, "conversation.sock")

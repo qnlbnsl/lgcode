@@ -11,12 +11,13 @@ export interface NewProjectProps {
   readonly onAddRepository: () => void
   readonly onSettings: () => void
   readonly onCreated: (project: Project) => void
+  readonly onOpenLead?: (project: Project) => void
 }
 
 // Home and setup render exactly this form, using the same session instance.
 // A setup mount renders inline; the ordinary mount uses native modal focus,
 // background inertness, and Escape. No protected data enters browser storage.
-export function NewProjectDialog({ creation, presentation = "dialog", disabled = false, onAddRepository, onSettings, onCreated }: NewProjectProps) {
+export function NewProjectDialog({ creation, presentation = "dialog", disabled = false, onAddRepository, onSettings, onCreated, onOpenLead = onCreated }: NewProjectProps) {
   const state = useSyncExternalStore(creation.subscribe, creation.getSnapshot)
   const id = useId()
   const dialog = useRef<HTMLDialogElement>(null)
@@ -61,6 +62,7 @@ export function NewProjectDialog({ creation, presentation = "dialog", disabled =
       {draft.repository?._tag === "new" && <><label htmlFor={`${id}-repository-name`}>Repository name</label>
         <input id={`${id}-repository-name`} required maxLength={128} value={draft.repository.name} placeholder="billing-api"
           onChange={(event) => creation.update({ repository: { _tag: "new", name: event.currentTarget.value } })} /></>}
+      <button className="inline-link" type="button" onClick={() => { creation.addRepository(); onAddRepository() }}>Add repository</button>
       <label htmlFor={`${id}-machine`}>Run on</label>
       <select ref={focus} id={`${id}-machine`} value={draft.machineId} disabled={disabled || locked || !state.loaded}
         onChange={(event) => creation.update({ machineId: event.currentTarget.value })}>
@@ -69,12 +71,12 @@ export function NewProjectDialog({ creation, presentation = "dialog", disabled =
       </select>
       <label htmlFor={`${id}-name`}>Project name</label>
       <input id={`${id}-name`} required maxLength={128} placeholder="Billing export" value={draft.name} onChange={(event) => creation.update({ name: event.currentTarget.value })} />
-      <label htmlFor={`${id}-goal`}>Goal</label>
+      {!inline && <><label htmlFor={`${id}-goal`}>Goal</label>
       <input id={`${id}-goal`} maxLength={8192} placeholder="Optional. What should this project achieve?" value={draft.goal}
-        onChange={(event) => creation.update({ goal: event.currentTarget.value })} />
+        onChange={(event) => creation.update({ goal: event.currentTarget.value })} /></>}
     </fieldset>
     {state.loading && <p role="status">Reading this computer, repositories, and lead readiness…</p>}
-    {state.loaded && state.repositories.length === 0 && <p>No repositories are registered. Choose New repository or <button className="inline-link" type="button" onClick={() => { creation.addRepository(); onAddRepository() }}>Add repository</button>.</p>}
+    {state.loaded && state.repositories.length === 0 && <p>No repositories are registered. Choose New repository or Add repository above.</p>}
     {state.loaded && !ready && <div role="status"><p>{state.settings === undefined ? "Set the workspace folder before creating a project."
       : "No ready lead defaults are available. Configure an executable harness, its account, and valid model and effort choices."}</p>
       <button className="inline-link" type="button" onClick={onSettings}>Open Settings</button></div>}
@@ -103,7 +105,7 @@ export function NewProjectDialog({ creation, presentation = "dialog", disabled =
       <button type="button" disabled={state.loading || state.busy || disabled} onClick={() => { void creation.refresh() }}>Refresh</button>
       {state.phase === "refused" && !planned && <button type="button" disabled={state.busy || disabled} onClick={creation.correctRefusal}>Correct form</button>}
       {retry ? <button type="button" className="primary" disabled={state.busy || disabled} onClick={() => { void creation.start() }}>Check same creation</button>
-        : state.phase === "created" && state.project !== undefined ? <button type="button" className="primary" onClick={() => onCreated(state.project!)}>Open lead conversation</button>
+        : state.phase === "created" && state.project !== undefined ? <button type="button" className="primary" onClick={() => onOpenLead(state.project!)}>Open lead conversation</button>
         : <button type="submit" className="primary" disabled={!canCreate}>{state.busy ? "Creating project…" : "Create project"}</button>}
     </footer>
   </form>

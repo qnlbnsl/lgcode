@@ -1,4 +1,4 @@
-import { parse, type DefaultTreeAdapterTypes } from "parse5"
+import { parse, serialize, type DefaultTreeAdapterTypes } from "parse5"
 import { displaySessionParameter } from "./sessions.ts"
 import { displayUrl } from "./url.ts"
 
@@ -8,7 +8,7 @@ const escapeAttribute = (value: string) => value.replaceAll("&", "&amp;").replac
 // A delivery representation only: the caller has already verified the actual
 // recorded artifact. This never writes files, issues authority or executes HTML.
 // Nested CSS/module URLs and dynamic script-created URLs are not transformed.
-export const scopeMockMarkup = (text: string, route: string, origin: string, token: string): string => {
+export const scopeMockMarkup = (text: string, route: string, origin: string, token: string, inert = false): string => {
   const selected = displayUrl(route, origin)
   if (selected === undefined || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw unavailable()
   const address = (reference: string): string | undefined => {
@@ -54,6 +54,13 @@ export const scopeMockMarkup = (text: string, route: string, origin: string, tok
     if (edit.end > boundary) throw unavailable()
     result = result.slice(0, edit.start) + edit.text + result.slice(edit.end)
     boundary = edit.start
+  }
+  if (inert) {
+    const preview = parse(result)
+    const html = preview.childNodes.find((node) => "tagName" in node && node.tagName === "html")
+    const body = html && "childNodes" in html ? html.childNodes.find((node) => "tagName" in node && node.tagName === "body") : undefined
+    if (body && "attrs" in body && !body.attrs.some((attr) => attr.name === "inert")) body.attrs.push({ name: "inert", value: "" })
+    return serialize(preview)
   }
   return result
 }

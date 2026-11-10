@@ -1,3 +1,4 @@
+import { completedSetup } from "./support/completedSetup.ts"
 import { openNavigation } from "./support/navigation.ts"
 import { randomBytes } from "node:crypto"
 import { readdirSync, readFileSync } from "node:fs"
@@ -90,6 +91,7 @@ test("7.14 production state markers recover once over a 500-kbit/s link while li
         yield* registerRebuildCheck()
         yield* seedHarness()
         yield* seedAccount()
+        yield* completedSetup()
         yield* serve({ password: Redacted.make(password), staticRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: true, publicAddress: origin } })
         yield* Effect.promise(async () => {

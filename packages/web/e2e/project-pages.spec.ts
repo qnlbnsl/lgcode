@@ -1,3 +1,4 @@
+import { completedSetup } from "./support/completedSetup.ts"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
@@ -35,6 +36,7 @@ test("Home, boards, linked decisions and Add task use the real engine across bot
       const run = Effect.gen(function* () {
         yield* registerRebuildCheck()
         const fixture = yield* decisionSetup()
+        yield* completedSetup(fixture.projectId)
         const otherProject = yield* decisionProject("other-repository")
         success(yield* call(ownerCredential, "project.stage.set", { projectId: fixture.projectId, stage: "build" }))
         const taskId = success(yield* call(fixture.leadCredential, "project.task.create", fixture.task)).taskId as string

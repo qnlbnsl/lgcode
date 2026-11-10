@@ -1,9 +1,10 @@
+import * as Effect from "effect/Effect"
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type { Discovery, Project, ProjectId, ProjectSettings, RequestId, SetupState } from "@lgcode/contracts"
 import { requestId, useAdminApi } from "../admin/api.ts"
 import { visibleText } from "../thread/text.tsx"
 import { setupHarnessGuidance } from "../setup-guidance.ts"
-import { advanceSetup, changeSetupSettings, completeSetup, readSetup } from "./setupRead.ts"
+import { advanceSetup, changeSetupSettings, completeSetup, readSetup, setupCompletionRefused } from "./setupRead.ts"
 import "./review.css"
 
 type Step = SetupState["step"]
@@ -25,6 +26,7 @@ export function Setup({ renderProject, onCompleted, onLogout, onSessionExpired }
   const [shell, setShell] = useState("")
   const [name, setName] = useState("")
   const [notice, setNotice] = useState("")
+  const [createdProject, setCreatedProject] = useState<ProjectId>()
   const nameEdited = useRef(false)
   const initialized = useRef(false)
   const finish = useRef<{ projectId: ProjectId; requestId: RequestId } | undefined>(undefined)
@@ -59,9 +61,18 @@ export function Setup({ renderProject, onCompleted, onLogout, onSessionExpired }
   const created = async (projectId: ProjectId) => {
     const attempt = finish.current ?? { projectId, requestId: requestId() }
     finish.current = attempt
-    const next = await api.run((client) => completeSetup(client, attempt))
-    if (next?.completedAt !== undefined) { finish.current = undefined; onCompleted(next.projectId) }
-    else setNotice("Setup completion is unconfirmed. Your project has not been replaced. Retry completion.")
+    setCreatedProject(projectId)
+    const outcome = await api.run((client) => Effect.gen(function* () {
+      const result = yield* completeSetup(client, attempt).pipe(Effect.result)
+      if (result._tag === "Success") return { setup: result.success, refused: false }
+      if (yield* setupCompletionRefused(client, attempt.requestId)) return { setup: undefined, refused: true }
+      return yield* Effect.fail(result.failure)
+    }))
+    if (outcome?.setup?.completedAt !== undefined) { finish.current = undefined; onCompleted(outcome.setup.projectId) }
+    else {
+      if (outcome?.refused) finish.current = undefined
+      setNotice("Setup completion is unconfirmed. Your project has not been replaced. Open its lead’s conversation to review a failed start, then return and retry completion.")
+    }
   }
   const discovery = read?.discovery
   const usable = discovery?.state === "available" && discovery.readyDefaults !== undefined
@@ -90,6 +101,6 @@ export function Setup({ renderProject, onCompleted, onLogout, onSessionExpired }
       <footer><button disabled={api.busy} onClick={() => void go("welcome")}>Back</button><button disabled={api.busy || !usable} onClick={() => void go("project")}>Continue</button></footer>
     </>}
     <div hidden={page !== "project"}>{startedForm && renderProject((project) => { void created(project.projectId) })}</div>
-    {page === "project" && <footer><button disabled={api.busy} onClick={() => void go("found")}>Back</button>{finish.current && <button disabled={api.busy} onClick={() => void created(finish.current!.projectId)}>Retry completion</button>}</footer>}
+    {page === "project" && <footer><button disabled={api.busy} onClick={() => void go("found")}>Back</button>{createdProject !== undefined && <button disabled={api.busy} onClick={() => void created(createdProject)}>Retry completion</button>}</footer>}
   </main>
 }

@@ -38,8 +38,10 @@ function DesignContent({ repoId, revisionId, projectId, refreshKey, onSessionExp
       <h2>Tokens</h2>
       {result.tokens._tag === "unavailable" ? <p>Token evidence is unavailable or changed.</p> : <><DataText text={result.tokens.fingerprint} /><dl className="review-tokens">{result.tokens.tokens.map((token) => <div key={token.name}><dt>{visibleText(token.name)}</dt><dd>{/^#(?:[a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})$/i.test(token.value) && <svg className="review-swatch" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect width="20" height="20" fill={token.value} /></svg>}{visibleText(token.value)}</dd></div>)}</dl></>}
       <h2>Shared components</h2>
-      <div className="review-table"><table><thead><tr><th>Component</th><th>Reference</th><th>Variants</th><th>Current evidence</th></tr></thead><tbody>{result.components.map((row) => <tr key={row.componentId}><td>{visibleText(row.name)}</td><td><code>{visibleText(row.reference)}</code><DataText text={row.fingerprint} /></td><td>{row.variants === undefined ? "Not reported" : visibleText(row.variants)}</td><td>{row.availability._tag === "available" ? "Matches recorded fingerprint" : "Unavailable or changed"}</td></tr>)}</tbody></table></div>
-      <p>Component previews are unavailable until an isolated production preview service is connected.</p>
+      <div className="review-table"><table><thead><tr><th>Component</th><th>Reference</th><th>Variants</th><th>Current evidence</th><th>Preview</th></tr></thead><tbody>{result.components.map((row) => <tr key={row.componentId}><td>{visibleText(row.name)}</td><td><code>{visibleText(row.reference)}</code><DataText text={row.fingerprint} /></td><td>{row.variants === undefined ? "Not reported" : visibleText(row.variants)}</td><td>{row.availability._tag === "available" ? "Matches recorded fingerprint" : "Unavailable or changed"}</td><td>{/\.(?:html|svg)$/i.test(row.reference)
+          ? <IsolatedDisplay title={`${visibleText(row.name)} preview`} action="View component" inert disabled={row.availability._tag !== "available" || result.file._tag !== "available"} onSessionExpired={onSessionExpired}
+            selection={{ _tag: "component", repoId, revisionId: result.record.revisionId, componentId: row.componentId }} />
+          : <p>Preview unavailable for this source format.</p>}</td></tr>)}</tbody></table></div>
     </>}
   </section>
 }

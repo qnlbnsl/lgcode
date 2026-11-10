@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect"
 import type { Input } from "../../../commands/internal.ts"
-import { mockDisplay } from "../../../project/display.ts"
+import { mockDisplay, componentDisplay } from "../../../project/display.ts"
 import { displayHeaders, displayRequestAllowed, type DisplayConfiguration } from "./policy.ts"
 import { readDisplayResource } from "./resources.ts"
 import { displaySessionParameter, type makeDisplaySessions } from "./sessions.ts"
@@ -22,10 +22,12 @@ export const makeMockRenderer = (options: {
   if (!displayRequestAllowed(configuration, request.headers, request.method)) return empty(403)
   const session = sessions.authorize(request.url, request.headers.referer)
   if (session === undefined) return empty(401)
-  if (session.target.kind !== "mock") return empty(404)
+  if (session.target.kind === "editor") return empty(404)
   try {
     const input = await options.input()
-    const current = await Effect.runPromise(mockDisplay(input, session.target.selection))
+    const current = session.target.kind === "component"
+      ? await Effect.runPromise(componentDisplay(input, session.target.selection))
+      : await Effect.runPromise(mockDisplay(input, session.target.selection))
     const parsed = displayUrl(request.url, configuration.displayOrigin)
     if (parsed === undefined) return empty(404)
     const { url } = parsed
@@ -35,7 +37,7 @@ export const makeMockRenderer = (options: {
     if (parts[1] === "session") url.pathname = "/" + parts.slice(3).join("/")
     const headers = displayHeaders(configuration, "mock")
     if (url.pathname === selected.pathname && url.searchParams.toString() === selected.searchParams.toString()) {
-      const text = current.contentType.startsWith("text/html") ? scopeMockMarkup(current.text, current.route, configuration.displayOrigin, session.token) : current.text
+      const text = current.contentType.startsWith("text/html") ? scopeMockMarkup(current.text, current.route, configuration.displayOrigin, session.token, session.target.kind === "component") : current.text
       if (sessions.authorize(request.url, request.headers.referer)?.id !== session.id) return empty(401)
       return { status: 200, headers: { ...headers, "content-type": current.contentType }, body: request.method === "HEAD" ? new Uint8Array() : Buffer.from(text) }
     }

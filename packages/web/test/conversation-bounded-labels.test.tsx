@@ -1,3 +1,4 @@
+import { completedSetup } from "../e2e/support/completedSetup.ts"
 import { act } from "react"
 import * as Effect from "effect/Effect"
 import { expect, it, vi } from "vitest"
@@ -30,6 +31,7 @@ for (const kind of ["tool-call", "file-change"] as const) it(`issue 604: mounted
   try {
     await Effect.runPromise(provideBoard(rig, Effect.gen(function* () {
       yield* registerRebuildCheck(); yield* seedAccount(); yield* seedHarness()
+      yield* completedSetup()
       const target = yield* seedAgent({ id: "bounded-label", name: "Worker one", folder: rig.work })
       const event = eventOf({ _tag: "ThreadItem", agentId: target.agentId, itemId: `long-${kind}`, replay: false,
         content: kind === "tool-call" ? { _tag: kind, callId: "tool-604", title: text, status: "completed", input: body, output: body }

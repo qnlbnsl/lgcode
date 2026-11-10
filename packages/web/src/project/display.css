@@ -1,2 +1,6 @@
 .review-display { min-width: 0; max-width: 100%; }
 .review-display-frame { display: block; width: 100%; height: clamp(24rem, 65vh, 56rem); border: 1px solid var(--color-line); background: var(--color-surface); }
+.review-display-inert .review-display-frame { pointer-events: none; }
+
+.review-display-viewport { width: 100%; height: var(--preview-scaled-height, 24rem); overflow: hidden; }
+.review-display-viewport .review-display-frame { border: 0; outline: 1px solid var(--color-line); outline-offset: -1px; width: var(--preview-width, 100%); height: var(--preview-height, 24rem); transform: scale(var(--preview-scale, 1)); transform-origin: top left; }

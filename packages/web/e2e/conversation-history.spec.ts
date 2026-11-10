@@ -1,3 +1,4 @@
+import { completedSetup } from "./support/completedSetup.ts"
 import { randomBytes } from "node:crypto"
 import { chmodSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -45,6 +46,7 @@ test("both owner clients retain first/later prompts, question answers, board del
         yield* seedHarness()
         yield* seedAccount()
         yield* serveApi({ socketPath, ownerCredential: Redacted.make(credential.toString("base64url")), debug: false })
+        yield* completedSetup()
         yield* serve({ password: Redacted.make(password), staticRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
         const owner = yield* connect(socketPath, credential.toString("base64url"))

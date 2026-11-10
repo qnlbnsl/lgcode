@@ -1,3 +1,4 @@
+import { completedSetup } from "./support/completedSetup.ts"
 import { openNavigation } from "./support/navigation.ts"
 import { assertPhoneWidth } from "./support/phoneWidth.ts"
 import { randomBytes } from "node:crypto"
@@ -36,6 +37,7 @@ test("the production shell logs in, follows real client RPCs, fits a phone, and 
         yield* registerRebuildCheck()
         yield* seedHarness()
         yield* seedAccount()
+        yield* completedSetup()
         yield* serve({ password: Redacted.make(password), staticRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
         yield* Effect.promise(async () => {

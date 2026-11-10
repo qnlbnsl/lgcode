@@ -45,20 +45,23 @@ afterEach(async () => {
 })
 
 it.each([
-  { selection: { _tag: "editor", repoId: "repo" as never } as const, sandbox: "allow-scripts allow-same-origin" },
-  { selection: { _tag: "mock", projectId, revisionId, screenId: "home" } as const, sandbox: "allow-scripts" }
-])("embeds only an actual owner endpoint frame with $sandbox and closes that exact identity", async ({ selection, sandbox }) => {
+  { selection: { _tag: "editor", repoId: "repo" as never } as const, sandbox: "allow-scripts allow-same-origin", inert: false },
+  { selection: { _tag: "mock", projectId, revisionId, screenId: "home" } as const, sandbox: "allow-scripts", inert: false },
+  { selection: { _tag: "component", repoId: "repo" as never, revisionId, componentId: "card" } as const, sandbox: "allow-scripts", inert: true }
+])("embeds only an actual owner endpoint frame with $sandbox and closes that exact identity", async ({ selection, sandbox, inert }) => {
   const calls: Array<{ path: string; body: unknown; credentials: unknown }> = []
   const frame = { id: "controlled-owner-frame", url: "https://display.example/recorded?private=controlled", displayOrigin: "https://display.example", expiresAt: Date.now() + 60_000 }
   vi.stubGlobal("fetch", async (path: string, options: RequestInit) => {
     calls.push({ path, body: JSON.parse(String(options.body)), credentials: options.credentials })
     return path.endsWith("/open") ? new Response(JSON.stringify(frame), { status: 200 }) : new Response(null, { status: 204 })
   })
-  const { container, root } = await mount(<IsolatedDisplay title="Controlled preview" action="Open preview" selection={selection} onSessionExpired={() => {}} />)
+  const { container, root } = await mount(<IsolatedDisplay title="Controlled preview" action="Open preview" inert={inert} selection={selection} onSessionExpired={() => {}} />)
   expect(container.querySelector("iframe")).toBeNull()
   await click(container, "Open preview")
   const iframe = container.querySelector("iframe")!
   expect(iframe.getAttribute("sandbox")).toBe(sandbox)
+  expect(iframe.parentElement!.hasAttribute("inert")).toBe(inert)
+  expect(iframe.tabIndex).toBe(inert ? -1 : 0)
   expect(iframe.getAttribute("src") === frame.url).toBe(true)
   expect(calls[0]).toEqual({ path: "/api/display/open", body: selection, credentials: "same-origin" })
   await act(async () => { iframe.dispatchEvent(new Event("load")) })
@@ -107,7 +110,7 @@ it("keeps an uncertain approval locked to the same request and displays the auth
     "project.mocks.artifact": () => Effect.succeed({ result: { _tag: "available", text: "Current source", fingerprint: "a".repeat(64) } }),
     "project.mocks.approve": (payload: { requestId: string; revisionId: string }) => {
       attempts.push(payload)
-      if (attempts.length === 1) return Effect.fail({ _tag: "RpcClientError" })
+      if (attempts.length === 1) return Effect.fail({ _tag: "CommandError", reason: "database write failed" })
       approval = { projectId, revisionId, approvalId: payload.requestId, leadAgentId: "actual-lead", at: 123459, worklist: { screens: ["home"], drafts: [], schemaChanges: [], draftedFields: [] } }
       return Effect.succeed({ requestId: payload.requestId })
     }

@@ -6,6 +6,7 @@ import { ProjectId, RepositoryId, ProjectName } from "./schema.ts"
 // path, hostname, command, container image or file URL.
 export const DisplayOpen = Schema.Union([
   Schema.TaggedStruct("mock", { projectId: ProjectId, revisionId: RequestId, screenId: ProjectName, scenarioId: Schema.optionalKey(ProjectName) }),
+  Schema.TaggedStruct("component", { repoId: RepositoryId, revisionId: RequestId, componentId: ProjectName }),
   Schema.TaggedStruct("editor", { repoId: RepositoryId, revisionId: Schema.optionalKey(RequestId), projectId: Schema.optionalKey(ProjectId) })
 ])
 export type DisplayOpen = typeof DisplayOpen.Type

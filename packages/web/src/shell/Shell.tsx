@@ -9,6 +9,11 @@ import { NewProjectSession } from "../project/creation.ts"
 import { NewProjectDialog } from "../project/newProject.tsx"
 import { RepositoryRegistration } from "../project/registration.ts"
 import { AddRepository } from "../project/addRepository.tsx"
+import { OwnerSetup } from "../project/ownerSetup.tsx"
+import { MockApprovalSession } from "../project/mockApproval.ts"
+import { ProjectMocksPage, RepositoryDesignPage } from "../project/pages.tsx"
+import { readMockHistory, type MockHistory } from "../project/mockRead.ts"
+import { withClient } from "../thread/client.ts"
 import { parseShellRoute, scopeKey, shellHref, type ShellRoute, type WorkspaceTab } from "../routes.ts"
 import { Machines } from "../admin/machines.tsx"
 import { Subscriptions } from "../admin/subscriptions.tsx"
@@ -32,7 +37,7 @@ import { QuickSwitcher } from "./QuickSwitcher.tsx"
 
 const serviceNames = { alerts: "Phone notifications", machines: "Machines", subscriptions: "Subscriptions", settings: "Service settings" } as const
 const serviceIcons: Record<keyof typeof serviceNames, IconName> = { alerts: "phone", machines: "machines", subscriptions: "subscriptions", settings: "settings" }
-const tabNames: Record<WorkspaceTab, string> = { board: "Board", chat: "Chat", terminal: "Terminal", git: "Git", settings: "Project settings", tasks: "Tasks" }
+const tabNames: Record<WorkspaceTab, string> = { board: "Board", chat: "Chat", terminal: "Terminal", git: "Git", mocks: "Mocks", settings: "Project settings", tasks: "Tasks" }
 
 function OverflowRow({ children, inert = false }: { readonly children: ReactNode; readonly inert?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -64,9 +69,17 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
   const expireSession = useCallback(() => endOwner.current(), [])
   const [creation] = useState(() => new NewProjectSession(expireSession))
   const [registration] = useState(() => new RepositoryRegistration(expireSession))
+  const [approvals] = useState(() => new MockApprovalSession())
+  const [setupRequired, setSetupRequired] = useState<boolean>()
+  const [setupDetour, setSetupDetour] = useState(false)
+  useEffect(() => {
+    if (setupRequired === undefined && data.complete && data.snapshot?.project?.setup !== undefined) {
+      setSetupRequired(data.snapshot.project.setup.completedAt === undefined)
+    }
+  }, [setupRequired, data.complete, data.snapshot])
   const projectTrigger = useRef<HTMLButtonElement>(null)
-  endOwner.current = () => { gitSession.close(); creation.dispose(); registration.dispose(); data.onSessionExpired() }
-  useEffect(() => () => { creation.dispose(); registration.dispose() }, [creation, registration])
+  endOwner.current = () => { gitSession.close(); creation.dispose(); registration.dispose(); approvals.dispose(); data.onSessionExpired() }
+  useEffect(() => () => { creation.dispose(); registration.dispose(); approvals.dispose() }, [creation, registration, approvals])
   const [href, setHref] = useState(() => location.href)
   const route = parseShellRoute(href)
   const scope = selectedScope(route, data.navigation, data.snapshot)
@@ -144,26 +157,49 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
   }, [])
   const openProject = useCallback(() => {
     setQuick(false); setBell(false); setWorkspaces(false)
+    if (setupRequired) { setSetupDetour(false); return }
     creation.open(`${location.pathname}${location.search}${location.hash}`, () => projectTrigger.current)
-  }, [creation])
+  }, [creation, setupRequired])
   const addRepository = useCallback(() => {
     const state = creation.getSnapshot(), selected = state.draft.repository
     const repository = selected?._tag === "existing" ? state.repositories.find((row) => row.repoId === selected.repoId) : undefined
+    if (setupRequired) setSetupDetour(true)
     registration.open(repository === undefined ? undefined : { repository })
     navigate({ page: "service", service: "machines" })
-  }, [creation, registration, navigate])
+  }, [creation, registration, navigate, setupRequired])
+  const returnToSetup = useCallback(() => {
+    registration.close()
+    if (creation.getSnapshot().detour) creation.returnFromMachines()
+    else void creation.refresh()
+    setSetupDetour(false)
+  }, [creation, registration])
   const returnToProject = useCallback(() => {
+    if (setupRequired) { returnToSetup(); return }
     registration.close()
     const state = creation.getSnapshot()
     if (!state.detour) return
     const origin = parseShellRoute(state.origin)
     navigate(origin.page === "invalid" ? { page: "home" } : origin, origin.page === "invalid" ? undefined : state.origin, false)
     creation.returnFromMachines()
-  }, [creation, registration, navigate])
+  }, [creation, registration, navigate, setupRequired, returnToSetup])
   const repositoryRegistered = useCallback(() => { data.retry(); returnToProject() }, [data.retry, returnToProject])
   const projectCreated = useCallback((project: Project) => {
     creation.close(); data.retry()
     navigate({ page: "thread", agentId: project.leadAgentId })
+  }, [creation, data.retry, navigate])
+  const openSettings = useCallback(() => {
+    if (setupRequired) setSetupDetour(true)
+    creation.close(); navigate({ page: "service", service: "settings" })
+  }, [creation, navigate, setupRequired])
+  const openSetupLead = useCallback((project: Project) => {
+    if (creation.getSnapshot().project?.projectId !== project.projectId) return
+    setSetupDetour(true)
+    navigate({ page: "thread", agentId: project.leadAgentId })
+  }, [creation, navigate])
+  const setupCompleted = useCallback((completedId?: Project["projectId"]) => {
+    const project = creation.getSnapshot().project
+    creation.close(); setSetupRequired(false); setSetupDetour(false); data.retry()
+    if (project !== undefined && project.projectId === completedId) navigate({ page: "thread", agentId: project.leadAgentId })
   }, [creation, data.retry, navigate])
   const intercept = (event: MouseEvent) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || !(event.target instanceof Element)) return
@@ -189,6 +225,17 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
   const place = scope.team?.name ?? scope.project?.name ?? scope.repository?.name ?? scope.agent?.name
     ?? (route.page === "service" ? serviceNames[route.service] : route.page === "home" ? "Home" : route.page === "invalid" ? "Page not found" : data.complete ? "Unavailable" : "Loading…")
   const projectId = scope.project?.projectId
+  const [mockHistory, setMockHistory] = useState<{ projectId: NonNullable<typeof projectId>; history: MockHistory }>()
+  useEffect(() => {
+    if (projectId === undefined) return
+    const controller = new AbortController()
+    void withClient((client) => readMockHistory(client, projectId), controller.signal).then((history) => {
+      if (!controller.signal.aborted) setMockHistory({ projectId, history })
+    }).catch(() => { /* Failed reads never establish an empty screen collection. */ })
+    return () => controller.abort()
+  }, [projectId, data.snapshot?.sequence])
+  const hasScreens = mockHistory !== undefined && mockHistory.projectId === projectId && mockHistory.history.complete
+    ? (mockHistory.history.items.at(-1)?.bundle.screens.length ?? 0) > 0 : undefined
   const projectRoute = (tab: WorkspaceTab): ShellRoute => projectId === undefined ? route : {
     page: "project", projectId, tab, ...(scope.team === undefined ? {} : { teamId: scope.team.teamId }),
     ...(route.page !== "project" || route.workspaceId === undefined ? {} : { workspaceId: route.workspaceId })
@@ -203,7 +250,7 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
   const threadId: AgentId | undefined = route.page === "thread" ? route.agentId : route.page === "project" && route.tab === "chat" && scope.team === undefined ? scope.project?.leadAgentId : undefined
   const isGit = route.page === "project" && route.tab === "git"
   const isChat = threadId !== undefined || route.page === "project" && route.tab === "chat"
-  const dockEligible = projectId !== undefined && !isChat && (dockWide || route.page === "project" && (route.tab === "board" || isGit))
+  const dockEligible = projectId !== undefined && !isChat && (dockWide || route.page === "project" && (route.tab === "board" || route.tab === "mocks" || isGit))
   const showDock = dockEligible && (isGit && !dockWide ? gitDockOpen : dockOpen)
   const dockModal = showDock && dockCompact
   const closeDock = useCallback(() => { setDockOpen(false); setGitDockOpen(false); dockTrigger.current?.focus({ preventScroll: true }) }, [])
@@ -242,7 +289,13 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
     : route.page === "project" && route.workspaceId !== undefined && scope.inspectedWorkspace === undefined ? "This worktree is unavailable in this repository."
     : route.page === "repository" && scope.repository === undefined ? "This repository is unavailable." : undefined
   const shellPending = (label: string) => <section className="pending-page"><h1>{label}</h1><p>This page is awaiting integration.</p></section>
-  return <div ref={app} className={`app${collapsed ? " sidebar-collapsed" : ""}`} onClick={intercept}>
+  const showSetup = setupRequired === true && !setupDetour
+  return <>
+    {setupRequired && <div hidden={!showSetup}><OwnerSetup creation={creation} disabled={mutationDisabled || logoutBusy}
+      onAddRepository={addRepository} onSettings={openSettings} onOpenLead={openSetupLead} onCompleted={setupCompleted} onLogout={onLogout} onSessionExpired={expireSession} /></div>}
+    <div hidden={showSetup}>
+    {setupRequired && setupDetour && <section className="review-page"><button type="button" disabled={mutationDisabled || logoutBusy} onClick={returnToSetup}>Return to first project</button></section>}
+    <div ref={app} className={`app${collapsed ? " sidebar-collapsed" : ""}`} onClick={intercept}>
     {drawer && phone && <div className="drawer-backdrop" onClick={closeDrawer} aria-hidden="true" />}
     <aside ref={sidebar} id="sidebar" className={`sidebar${drawer ? " open" : ""}`} aria-label="Repositories, projects and teams"
       {...(phone && !drawer || quick || bell || workspaces || dockModal ? { inert: true } : {})} {...(drawer && phone ? { role: "dialog", "aria-modal": true } : {})}>
@@ -288,7 +341,7 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
         const current = tabs.indexOf(document.activeElement as HTMLAnchorElement)
         const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (current + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length
         event.preventDefault(); tabs[next]?.click(); tabs[next]?.focus()
-      }}>{(["board", "chat", "terminal", "git", "settings", ...(scope.team ? ["tasks" as const] : [])] as const).map((tab) => {
+      }}>{(["board", ...(hasScreens || route.page === "project" && route.tab === "mocks" ? ["mocks" as const] : []), "chat", "terminal", "git", "settings", ...(scope.team ? ["tasks" as const] : [])] as const).map((tab) => {
         const selected = route.page === "thread" ? tab === "chat" : route.page === "project" ? route.tab === tab : tab === "board"
         const target = tab === "chat" && dockEligible && scope.team === undefined && dockAgentId !== undefined ? { page: "thread" as const, agentId: dockAgentId } : projectRoute(tab)
         return <a key={tab} role="tab" aria-selected={selected} tabIndex={selected ? 0 : -1} href={shellHref(target)}>{tabNames[tab]}</a>
@@ -316,12 +369,13 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
             <Machines onSessionExpired={expireSession} />
           </>
           : route.page === "service" && route.service === "subscriptions" ? <Subscriptions onSessionExpired={expireSession} />
-          : route.page === "repository" && route.tab === "design" ? <section className="pages"><RepositoryTabs route={route} />{shellPending("Design")}</section>
+          : route.page === "repository" && route.tab === "design" ? <section className="pages"><RepositoryTabs route={route} /><RepositoryDesignPage repoId={route.repoId} /></section>
           : route.page === "repository" ? <RepositoryPage route={route} />
           : route.page === "sprint" ? <SprintPage route={route} />
           : route.page === "task" ? <TaskPage route={route} />
+          : route.page === "project" && route.tab === "mocks" ? <ProjectMocksPage projectId={route.projectId} approvals={approvals} />
           : route.page === "project" && route.tab === "settings" ? <ProjectSettingsPage route={route} />
-          : route.page === "project" && (route.tab === "board" || route.tab === "tasks") ? <ProjectPage route={route} />
+          : route.page === "project" && (route.tab === "board" || route.tab === "tasks") ? <ProjectPage route={route} {...(hasScreens === undefined ? {} : { hasScreens })} />
           : route.page === "project" && route.tab === "git" && scope.repository && scope.assignedWorkspace && scope.inspectedWorkspace && data.navigation ? <GitPage
             repository={scope.repository} projects={data.navigation.projects} teams={data.navigation.teams} workspaces={data.navigation.workspaces}
             assignedWorkspaceId={scope.assignedWorkspace.worktreeId} inspectedWorkspaceId={scope.inspectedWorkspace.worktreeId}
@@ -345,8 +399,8 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
       </aside>}
       </div>
     </main>
-    <NewProjectDialog creation={creation} disabled={mutationDisabled || logoutBusy} onAddRepository={addRepository}
-      onSettings={() => { creation.close(); navigate({ page: "service", service: "settings" }) }} onCreated={projectCreated} />
+    {!setupRequired && <NewProjectDialog creation={creation} disabled={mutationDisabled || logoutBusy} onAddRepository={addRepository}
+      onSettings={openSettings} onCreated={projectCreated} />}
     {quick && <QuickSwitcher close={closeQuick} navigate={navigate} />}
     {bell && <div className="modal-cover" onClick={closeBell}><div ref={bellRef} className="attention-menu" role="dialog" aria-modal="true" aria-label="Needs attention" tabIndex={-1} onClick={(event) => event.stopPropagation()}>
       {connection}<h2>Needs attention</h2>{!data.complete && <p role="status">Showing the last received requests. <button onClick={data.retry}>Retry</button></p>}
@@ -360,5 +414,7 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
         <span>{workspace.checkout === "main" ? "Main checkout" : visibleText(data.navigation?.teams.find((team) => team.teamId === workspace.teamId && team.projectId === workspace.projectId)?.name ?? scope.project?.name ?? "Worktree")}</span><code title={visibleText(workspace.branch)}>{visibleText(workspace.branch)}</code><small>{visibleText(workspace.machineId)}{scope.assignedWorkspace?.worktreeId === workspace.worktreeId ? " · Assigned" : ""}</small>
       </button>)}
     </div></div>}
-  </div>
+    </div>
+    </div>
+  </>
 }

@@ -470,3 +470,54 @@ for (const addressing of ["root-relative", "relative"] as const) it.live(`serves
     expect(hash(JSON.stringify(yield* readLog))).toBe(originalLog)
   }))
 }))
+
+for (const boundary of ["before append", "after commit"] as const) live(`retains exact mock approval through a real typed database CommandError ${boundary}`, () => Effect.gen(function* () {
+  const runner = yield* makeFakeRunner(), secrets = makeFakeSecrets()
+  let armed = false, once = true
+  const wrapLog: NonNullable<Fakes["wrapLog"]> = (real) => ({ ...real, transact: (use) => {
+    let approving = false
+    return real.transact((append) => use((actor, requestId, bodyHash, events, rows, receipt) => {
+      if (armed && once && events.some((event) => event._tag === "project.MockApproved")) {
+        approving = true
+        if (boundary === "before append") { once = false; return Effect.fail(new LogWriteFailed({ reason: "database write failed" })) }
+      }
+      return append(actor, requestId, bodyHash, events, rows, receipt)
+    })).pipe(Effect.flatMap((result) => {
+      if (approving && once && boundary === "after commit") { once = false; return Effect.fail(new LogWriteFailed({ reason: "database write failed" })) }
+      return Effect.succeed(result)
+    }))
+  } })
+  const previous = yield* provideRig(rig, { runner, secrets, wrapLog }, Effect.gen(function* () {
+    yield* registerRebuildCheck(); yield* configured()
+    const client = yield* open()
+    const repoId = (yield* client["project.repository.add"]({ requestId: freshRequest(), name: "Approval recovery", path: rig.work, machineId: "local" })).repoId
+    const { projectId } = yield* client["project.create"]({ requestId: freshRequest(), name: "Approval recovery", goal: "", machineId: "local", repository: { _tag: "existing", repoId } })
+    const { CommandHandler } = yield* Effect.promise(() => import("../../src/commands/CommandHandler.ts"))
+    const { projectView } = yield* Effect.promise(() => import("../../src/project/view.ts"))
+    const view = projectView((yield* (yield* CommandHandler).input({ _tag: "owner" })).snapshot)
+    const project = view.projects[projectId]!, folder = view.workspaces[project.worktreeId]!.path
+    writeFileSync(join(folder, "screen.html"), "<h1>Approval recovery</h1>")
+    const { revisionId } = yield* client["project.mocks.record"]({ requestId: freshRequest(), projectId, bundle: {
+      sources: [{ sourceId: "screen" as never, worktreeId: project.worktreeId, path: "screen.html", kind: "screens" }],
+      screens: [{ screenId: "home" as never, sourceId: "screen" as never, name: "Home", route: "/", scenarioRoutes: [] }], scenarios: [], components: [], draftedFields: [] } })
+    const approvalId = freshRequest()
+    armed = true
+    const first = yield* approveMockRevision(client, projectId, revisionId, approvalId)
+    expect(first.state).toBe(boundary === "before append" ? "uncertain" : "approved")
+    expect(first.history.complete).toBe(true)
+    if (boundary === "before append") {
+      expect(first.history.complete && first.history.approval).toBeUndefined()
+      expect((yield* approveMockRevision(client, projectId, revisionId, approvalId)).state).toBe("uncertain")
+    }
+    expect((yield* readLog).filter((row) => row.event._tag === "project.MockApproved")).toHaveLength(boundary === "before append" ? 0 : 1)
+    return { projectId, revisionId, approvalId }
+  }))
+  yield* provideRestart(rig, runner.layer, Effect.gen(function* () {
+    yield* registerRebuildCheck(); yield* recover
+    const client = yield* open()
+    expect((yield* approveMockRevision(client, previous.projectId, previous.revisionId, previous.approvalId)).state).toBe("approved")
+    const approvals = (yield* readLog).filter((row) => row.event._tag === "project.MockApproved")
+    expect(approvals).toHaveLength(1)
+    expect(approvals[0]!.requestId).toBe(previous.approvalId)
+  }), { secrets })
+}))

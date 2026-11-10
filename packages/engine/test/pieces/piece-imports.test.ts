@@ -7,7 +7,7 @@ import { requiredModule } from "../support/callerRules.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 registerRebuildCheck({ noLog: true });
 
-it.each(["src/project/design.ts", "src/project/lifecycle.ts", "src/pieces/lists.ts", "scripts/live/driver.ts", "src/client/alerts/reactor.ts", "src/pieces/viewTables.ts"])(
+it.each(["src/project/display.ts", "src/client/web/display/service.ts", "src/project/design.ts", "src/project/lifecycle.ts", "src/pieces/lists.ts", "scripts/live/driver.ts", "src/client/alerts/reactor.ts", "src/pieces/viewTables.ts"])(
   "FR-157 initializes all piece registrations when %s is the first plain Node import", (entry) => {
     const probe = spawnSync(process.execPath, ["--input-type=module", "-e", `
       import assert from "node:assert/strict";

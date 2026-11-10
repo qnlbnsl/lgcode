@@ -1,3 +1,4 @@
+import { completedSetup } from "./support/completedSetup.ts"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
@@ -44,6 +45,7 @@ test("11.1 phone flow: catches a missing alert link, login, permission answer, a
         yield* registerRebuildCheck()
         yield* seedHarness()
         yield* seedAccount()
+        yield* completedSetup()
         yield* serve({ password: Redacted.make(password), staticRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: true, publicAddress: origin } })
         yield* configure(ntfy.origin)

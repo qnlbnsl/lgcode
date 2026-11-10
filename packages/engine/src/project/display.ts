@@ -80,3 +80,42 @@ export const designDisplay = (input: Input, selection: DesignDisplaySelection) =
       revisionId: record.revisionId, ...resolved }
   }))
 })
+
+
+export type ComponentDisplaySelection = {
+  readonly repoId: RepositoryId
+  readonly revisionId: RequestId
+  readonly componentId: string
+}
+
+// A component identity resolves only inside an explicitly registered immutable
+// Design revision. It grants the component's dedicated folder, not a caller
+// path or the checkout root. Every document/asset read revalidates this binding.
+export const componentDisplay = (input: Input, selection: ComponentDisplaySelection) => Effect.gen(function* () {
+  if (input.actor._tag !== "owner") return yield* refused("display requires the owner session")
+  const view = projectView(input.snapshot)
+  const record = own(view.designs, projectKey(selection.repoId, selection.revisionId))
+  const project = record === undefined ? undefined : own(view.projects, record.projectId)
+  const component = record?.design.components.find((row) => row.componentId === selection.componentId)
+  if (record === undefined || project === undefined || project.repoId !== selection.repoId || project.archiving || project.archivedAt !== undefined
+    || component === undefined || !validArtifactPath(component.reference)
+    || ![".html", ".svg"].includes(extname(component.reference).toLowerCase())) return yield* refused("registered component preview is unavailable")
+  // Resolve after module initialization; design readers also register API reads.
+  const { verifyDesignEvidence } = yield* Effect.promise(() => import("./design.ts"))
+  yield* verifyDesignEvidence(input, record, project.projectId)
+  yield* safePath(input, component.reference)
+  return yield* withGit(input, (git) => Effect.gen(function* () {
+    const workspace = yield* designWorkspacePath(input, { repoId: selection.repoId, worktreeId: record.design.worktreeId, projectId: project.projectId }, git)
+    const artifact = yield* Effect.tryPromise({ try: async () => {
+      const root = await realpath(workspace.path), file = await filePath(root, component.reference), folder = await realpath(dirname(file))
+      if (folder === root || !inside(root, folder)) throw new Error()
+      const bytes = await smallFile(file, 64 * 1024)
+      if (fingerprint(bytes) !== component.fingerprint) throw new Error()
+      return { folder, text: new TextDecoder("utf-8", { fatal: true }).decode(bytes) }
+    }, catch: () => refused("registered component artifact changed or is unavailable") })
+    if ((yield* input.runtime.log.redactText(artifact.text)) !== artifact.text) return yield* refused("registered component artifact contains private data")
+    yield* safePath(input, artifact.folder)
+    return { ...artifact, route: extname(component.reference).toLowerCase() === ".svg" ? "/component.svg" : "/component.html",
+      contentType: extname(component.reference).toLowerCase() === ".svg" ? "image/svg+xml" : "text/html; charset=utf-8" }
+  }))
+})

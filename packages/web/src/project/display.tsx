@@ -8,6 +8,8 @@ type Props = {
   readonly title: string
   readonly action: string
   readonly disabled?: boolean
+  readonly inert?: boolean
+  readonly viewport?: "phone" | "desktop"
   readonly onSessionExpired: () => void
 }
 
@@ -17,11 +19,12 @@ type Props = {
 export function IsolatedDisplay(props: Props) {
   return <DisplayContent key={JSON.stringify(props.selection)} {...props} />
 }
-function DisplayContent({ selection, title, action, disabled = false, onSessionExpired }: Props) {
+function DisplayContent({ selection, title, action, disabled = false, inert = false, viewport, onSessionExpired }: Props) {
   const [frame, setFrame] = useState<DisplayFrame>()
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState("")
   const [unclosed, setUnclosed] = useState(false)
+  const viewportHost = useRef<HTMLDivElement>(null)
   const current = useRef<DisplayFrame | undefined>(undefined)
   const alive = useRef(true), generation = useRef(0), expired = useRef(onSessionExpired)
   expired.current = onSessionExpired
@@ -82,12 +85,28 @@ function DisplayContent({ selection, title, action, disabled = false, onSessionE
     const timer = setTimeout(() => { void close() }, Math.max(0, frame.expiresAt - Date.now()))
     return () => clearTimeout(timer)
   }, [frame])
+  useEffect(() => {
+    const host = viewportHost.current
+    if (host === null || viewport === undefined || frame === undefined) return
+    const width = viewport === "phone" ? 390 : 1440, height = viewport === "phone" ? 844 : 900
+    const update = () => {
+      const scale = Math.min(1, host.clientWidth / width)
+      host.style.setProperty("--preview-width", `${width}px`)
+      host.style.setProperty("--preview-height", `${height}px`)
+      host.style.setProperty("--preview-scale", String(scale))
+      host.style.setProperty("--preview-scaled-height", `${height * scale}px`)
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(host)
+    return () => observer.disconnect()
+  }, [viewport, frame])
   return <section className="review-display" aria-label={title}>
     {frame === undefined ? <>
       <p role="status">{busy ? "Updating display…" : "No display is open."}</p>
       <button disabled={busy || disabled || selection === undefined || unclosed} onClick={() => void open()}>{action}</button>
     </> : <>
-      <iframe className="review-display-frame" title={title} src={frame.url} sandbox={selection?._tag === "editor" ? "allow-scripts allow-same-origin" : "allow-scripts"} referrerPolicy="same-origin" />
+      <div ref={viewportHost} inert={inert} className={[inert ? "review-display-inert" : "", viewport === undefined ? "" : "review-display-viewport"].join(" ")}><iframe tabIndex={inert ? -1 : undefined} className="review-display-frame" title={title} src={frame.url} sandbox={selection?._tag === "editor" ? "allow-scripts allow-same-origin" : "allow-scripts"} referrerPolicy="same-origin" /></div>
       <button disabled={busy} onClick={() => void close()}>Close display</button>
     </>}
     {unclosed && <button disabled={busy} onClick={() => void close()}>Retry closing display</button>}

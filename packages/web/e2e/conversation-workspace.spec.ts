@@ -1,3 +1,4 @@
+import { completedSetup } from "./support/completedSetup.ts"
 import { randomBytes } from "node:crypto"
 import { execFileSync } from "node:child_process"
 import { writeFileSync } from "node:fs"
@@ -88,6 +89,7 @@ test("conversations retain drafts, real context, delivery and owner peek across 
         // Historical project membership enters through the typed event writer.
         // New teams, tasks, posts and all browser mutations use real handlers.
         yield* appendSetup([eventOf({ _tag: "project.Created", projectId, repoId, worktreeId, leadAgentId: lead.agentId, machineId: "local", name: "Conversation project", goal: "Keep real conversation state" })])
+        yield* completedSetup(projectId)
         const team = success(yield* call(ownerCredential, "project.team.create", { projectId, worktreeId, name: "Build team" }))
         success(yield* call(ownerCredential, "group", { agentId: worker.agentId, add: [team.group], remove: [] }))
         const sprintId = success(yield* call(ownerCredential, "project.sprint.create", { projectId, label: "SP-1", name: "Conversation", goal: "", phase: "Build", owner: lead.agentId, needs: [] })).sprintId

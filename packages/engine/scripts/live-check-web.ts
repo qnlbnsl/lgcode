@@ -13,6 +13,7 @@ import * as Exit from "effect/Exit";
 import * as Scope from "effect/Scope";
 import { resolveHarnessDefaults } from "../src/runner/harnesses.ts";
 import { startLiveService, type LiveService } from "./live/service.ts";
+import { webProject } from "./live/webProject.ts";
 import { assertReply, replySentence } from "./live/webReply.ts";
 
 // This uses a real Codex account and browser. It is deliberately separate
@@ -43,7 +44,7 @@ const main = async () => {
   let scope: Scope.Closeable | undefined;
   let owner: Client | undefined;
   let browser: Browser | undefined;
-  let page: Page;
+  let page!: Page;
   let agentId: AgentId;
   let failedId: AgentId;
   const agents: AgentId[] = [];
@@ -78,7 +79,7 @@ const main = async () => {
   const idle = async () => expect.poll(async () => (await snapshot()).agents.find((agent) => agent.agentId === agentId)?.state._tag,
     { timeout: 180_000, intervals: [250, 500, 1_000] }).toBe("idle");
   const send = async (text: string) => {
-    await page.getByRole("textbox", { name: "Prompt agent", exact: true }).fill(text);
+    await page.getByRole("form", { name: "Prompt agent", exact: true }).getByRole("textbox").fill(text);
     await page.getByRole("button", { name: "Send prompt", exact: true }).click();
     await expect(page.getByRole("status").filter({ hasText: "Prompt sent." })).toBeVisible();
   };
@@ -107,10 +108,14 @@ const main = async () => {
       const codex = harnesses.harnesses.find((entry) => entry.id === "codex");
       if (codex === undefined) throw new Error("Codex adapter is not installed");
       activeStep = "private engine: harness setup";
-      await run(owner!.harnesses({ requestId: id(), operation: "set", harness: codex }));
+      // Explicit configured choices keep this proof's same model/effort reachable
+      // after a failed spawn. They are not negotiated-capability claims.
+      await run(owner!.harnesses({ requestId: id(), operation: "set", harness: { ...codex, models: ["gpt-6.1-sol"], efforts: ["high"] } }));
       await run(owner!.accounts({ requestId: id(), operation: "add", account: { id: codexAccount, harness: codexHarness, displayName: "Codex", enabled: true,
         environment: { CODEX_CONFIG: JSON.stringify({ shell_environment_policy: { inherit: "core" } }),
           ...(process.env.CODEX_HOME === undefined ? {} : { CODEX_HOME: process.env.CODEX_HOME }) } } }));
+      await run(owner!["project.settings.set"]({ requestId: id(), settings: { workspaceFolder: service!.work, shell: "/bin/sh",
+        lead: { harness: codexHarness, account: { _tag: "named", accountId: codexAccount }, model: "gpt-6.1-sol", effort: "high", permission: "ask" } } }));
       activeStep = "private engine: agent start";
       const started = await run(owner!.start({ requestId: id(), name: "Web live worker", role: "worker", harness: codexHarness, account: { _tag: "named", accountId: codexAccount },
         permission: "ask", folder: service!.work, model: "gpt-6.1-sol", effort: "high", prompt: "Reply with exactly HELLO_WEB and do nothing else." }));
@@ -124,12 +129,18 @@ const main = async () => {
       await page.goto(origin);
       await page.getByLabel("Password", { exact: true }).fill(password);
       await page.getByRole("button", { name: "Log in", exact: true }).click();
-      await expect(page.getByRole("region", { name: "Situation", exact: true })).toBeVisible();
+      await expect(page.getByRole("main", { name: "Set up LGcode", exact: true })).toBeVisible();
     });
-    await step("agent listed", async () => { await expect(page.getByRole("link", { name: "Web live worker", exact: true })).toBeVisible(); });
+    const projectJourney = await webProject(page, owner!, origin, step, (agent) => agents.push(agent));
+    const workerLink = () => page.getByRole("navigation", { name: "Projects", exact: true }).locator(".agent-link").filter({ hasText: "Web live worker" });
+    const navigation = async () => {
+      const menu = page.getByRole("button", { name: "Open navigation", exact: true });
+      if (await menu.isVisible() && await menu.getAttribute("aria-expanded") !== "true") await menu.click();
+    };
+    await step("agent listed", async () => { await navigation(); await expect(workerLink()).toBeVisible(); });
     await step("thread opens", async () => {
-      await page.getByRole("link", { name: "Web live worker", exact: true }).click();
-      await expect(page.getByRole("heading", { name: "Thread: Web live worker", exact: true })).toBeVisible();
+      await workerLink().click();
+      await expect(page.getByRole("heading", { name: "Web live worker", exact: true })).toBeVisible();
     });
     const firstPrompt = () => page.getByRole("article", { name: "Outgoing delivery", exact: true }).filter({ hasText: "HELLO_WEB" });
     const messages = () => page.getByRole("article", { name: "Agent message", exact: true });
@@ -144,7 +155,7 @@ const main = async () => {
     await step("one prompt, one reply block", async () => {
       replyIndex = await messages().count();
       await send(`Reply with exactly this sentence and nothing else. Do not use any tools: ${replySentence}`);
-      await expect(replies()).toHaveText(`Agent data${replySentence}`, { timeout: 180_000 });
+      await expect(replies()).toHaveText(replySentence, { timeout: 180_000 });
       await idle();
       await assertReply(messages(), replyIndex, replySentence);
     });
@@ -162,16 +173,21 @@ const main = async () => {
     await step("reload retains prompts, replies, command and permission answer", async () => {
       await page.reload();
       await expect(firstPrompt()).toHaveCount(1);
-      await expect(replies()).toHaveText(`Agent data${replySentence}`);
+      await expect(replies()).toHaveText(replySentence);
       await expect(page.getByRole("article", { name: "Permission answer", exact: true })).toHaveCount(1);
       await expect(page.getByRole("article", { name: "Agent message", exact: true }).filter({ hasText: "printf" })).toHaveCount(1);
     });
-    await step("stop and resume from page", async () => {
+    await step("stop from page reaches actual stopped state", async () => {
       await page.getByRole("button", { name: "Stop agent", exact: true }).click();
       await expect(page.getByRole("button", { name: "Resume agent", exact: true })).toBeVisible();
-      await page.getByRole("link", { name: "Situation", exact: true }).first().click();
-      await expect(page.getByRole("region", { name: "Stopped", exact: true }).getByRole("link", { name: "Web live worker", exact: true })).toBeVisible();
-      await page.getByRole("link", { name: "Web live worker", exact: true }).click();
+      await expect.poll(async () => (await snapshot()).agents.find((agent) => agent.agentId === agentId)?.state._tag).toBe("stopped");
+    });
+    await step("stopped agent remains visible in the roster", async () => {
+      await page.goto(`${origin}/#/`); await navigation();
+      await expect(workerLink()).toContainText("Stopped");
+      await workerLink().click();
+    });
+    await step("resume from page reaches actual idle state", async () => {
       await page.getByRole("button", { name: "Resume agent", exact: true }).click();
       await idle();
       await expect(page.getByRole("button", { name: "Stop agent", exact: true })).toBeVisible();
@@ -186,15 +202,30 @@ const main = async () => {
       await expect.poll(async () => (await snapshot()).agents.find((agent) => agent.agentId === failedId)?.startFailure, { timeout: 180_000 }).toBe("private-login-not-signed-in");
       await page.goto(`${origin}/#/thread/${encodeURIComponent(failedId)}`);
       await expect(page.getByRole("article", { name: "Failed start", exact: true })).toContainText("private login");
-      await sendFailedPrompt();
-      await page.getByRole("link", { name: "Situation", exact: true }).first().click();
-      await expect(page.getByRole("region", { name: "Stopped", exact: true })).toContainText("private login");
+      const form = page.getByRole("form", { name: "Prompt agent", exact: true });
+      await expect(form.locator("textarea")).toBeHidden();
+      await expect(page.getByRole("button", { name: "Send prompt", exact: true })).toBeHidden();
+      const before = await run(owner!["client.thread"]({ requestId: id(), agentId: failedId, after: 0 as never, limit: 100 }));
+      // Even a programmatic submit cannot bypass the real halted composer.
+      await form.evaluate((node: HTMLFormElement) => node.requestSubmit());
+      const after = await run(owner!["client.thread"]({ requestId: id(), agentId: failedId, after: 0 as never, limit: 100 }));
+      if (!("items" in before) || !("items" in after)) throw new Error("Failed-start thread unavailable");
+      expect(after.items).toEqual(before.items);
+      await page.goto(`${origin}/#/`);
+      await expect(page.locator(".failed-start-list")).toContainText("private login");
     });
-    async function sendFailedPrompt() {
-      await page.getByRole("textbox", { name: "Prompt agent", exact: true }).fill("try again");
-      await page.getByRole("button", { name: "Send prompt", exact: true }).click();
-      await expect(page.getByRole("status").filter({ hasText: "Failed to start:" })).toContainText("private login");
-    }
+    await step("project: restart rebuilds the linked result, lead delivery and exact answer receipt", async () => {
+      await run(Scope.close(scope!, Exit.void)); scope = undefined; owner = undefined;
+      await service!.stop();
+      service = startLiveService(process.env, { root: service!.root, output: "", known: new Map() }, password);
+      await openOwner();
+      // Owner cookies are deliberately in-memory and revoked by service stop.
+      // Reauthenticate through the real page before inspecting rebuilt state.
+      await page.reload();
+      await page.getByLabel("Password", { exact: true }).fill(password);
+      await page.getByRole("button", { name: "Log in", exact: true }).click();
+      await projectJourney.verify(owner!);
+    });
   } finally {
     await cleanup();
     process.removeListener("SIGINT", interrupted);

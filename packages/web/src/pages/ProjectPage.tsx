@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { sprintStatus, type Sprint } from "@lgcode/contracts"
+import { projectStages, sprintStatus, type Sprint, type Project } from "@lgcode/contracts"
 import { useMutationDisabled, useShellData } from "../data/ShellDataProvider.tsx"
 import { shellHref, type ShellRoute } from "../routes.ts"
 import { visibleText } from "../thread/text.tsx"
@@ -8,7 +8,6 @@ import { Empty, ReadState, TaskTable, agentName } from "./common.tsx"
 import { ownerRequests, sprintRequests, useProjectBoard, type BoardData } from "./projectData.ts"
 import "./pages.css"
 
-const stages = ["design", "plan", "build", "review", "handover"] as const
 const names = { planned: "Planned", active: "In progress", review: "Review", done: "Done" }
 
 function SprintCard({ sprint, board }: { readonly sprint: Sprint; readonly board: BoardData }) {
@@ -56,11 +55,11 @@ function SprintBoard({ board }: { readonly board: BoardData }) {
   })}</div>
 }
 
-export function ProjectPage({ route }: { readonly route: ShellRoute }) {
+export function ProjectPage({ route, hasScreens }: { readonly route: ShellRoute; readonly hasScreens?: boolean }) {
   if (route.page !== "project") return null
-  return <ProjectContent key={`${route.projectId}/${route.teamId ?? ""}`} route={route} />
+  return <ProjectContent key={`${route.projectId}/${route.teamId ?? ""}`} route={route} {...(hasScreens === undefined ? {} : { hasScreens })} />
 }
-function ProjectContent({ route }: { readonly route: Extract<ShellRoute, { page: "project" }> }) {
+function ProjectContent({ route, hasScreens }: { readonly route: Extract<ShellRoute, { page: "project" }>; readonly hasScreens?: boolean }) {
   const { navigation, snapshot } = useShellData()
   const { data: board, failed, ready } = useProjectBoard(route.projectId)
   const disabled = useMutationDisabled()
@@ -72,12 +71,13 @@ function ProjectContent({ route }: { readonly route: Extract<ShellRoute, { page:
   if (route.teamId !== undefined && team === undefined) return <section className="pages"><Empty>This team is unavailable.</Empty></section>
   const tasks = board.tasks.filter((row) => route.teamId === undefined || row.teamId === route.teamId)
   const stage = team?.stage ?? project.stage
+  const stages: ReadonlyArray<NonNullable<Project["stage"]>> = projectStages(hasScreens === true)
   const canAdd = ready && !disabled && !project.archiving && project.archivedAt === undefined
   return <section className="pages project-page" aria-label={route.tab === "tasks" ? "Team tasks" : "Project board"}>
     <ol className="stage-strip" aria-label="Project stages">{stages.map((value) => <li key={value} aria-current={stage === value ? "step" : undefined} className={stage !== undefined && stages.indexOf(value) < stages.indexOf(stage) ? "stage-passed" : ""}>{value === "handover" ? "Hand over" : value[0]!.toUpperCase() + value.slice(1)}</li>)}</ol>
     {project.archivedAt !== undefined && <p>Archived. Restore this project in Project settings to add work.</p>}
     {route.tab === "tasks" ? <><div className="section-heading"><h2>{tasks.filter((row) => row.state === "done").length} of {tasks.length} tasks complete</h2><button disabled={!canAdd} onClick={() => setAdding(true)}>Add task</button></div><TaskTable tasks={tasks} label="Team tasks" /></>
-      : board.sprints.length ? <SprintBoard board={board} /> : <Empty action={<a className="primary" href={shellHref({ page: "thread", agentId: project.leadAgentId })}>Talk to {agentName(snapshot?.agents, project.leadAgentId)}</a>}>No sprints yet.</Empty>}
+      : board.sprints.length ? <SprintBoard board={board} /> : hasScreens && project.stage === "design" ? <Empty action={<a className="primary" href={shellHref({ ...route, tab: "mocks" })}>Open the mocks</a>}>No sprints until you approve the mocks.</Empty> : <Empty action={<a className="primary" href={shellHref({ page: "thread", agentId: project.leadAgentId })}>Talk to {agentName(snapshot?.agents, project.leadAgentId)}</a>}>No sprints yet.</Empty>}
     <AddTask project={project} board={board} open={adding} {...(route.teamId === undefined ? {} : { teamId: route.teamId })} onClose={() => setAdding(false)}
       onCreated={(taskId) => { setAdding(false); location.hash = shellHref({ page: "task", projectId: project.projectId, taskId }).slice(2) }} />
   </section>

@@ -1,3 +1,4 @@
+import { completedSetup } from "./support/completedSetup.ts"
 import { assertPhoneWidth } from "./support/phoneWidth.ts"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
@@ -43,6 +44,7 @@ for (const [name, path, ready] of [
         yield* seedHarness()
         yield* seedAccount()
         const worker = yield* seedAgent({ id: "phone-worker", state: "working" })
+        yield* completedSetup()
         yield* serve({ password: Redacted.make(password), staticRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
         success(yield* call(agentCredential(worker.token), "ask", { text: "Which branch should I use?" }))

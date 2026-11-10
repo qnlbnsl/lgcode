@@ -1,10 +1,11 @@
 import { randomBytes, randomUUID } from "node:crypto"
 import { isRepositoryArtifactPath } from "@lgcode/contracts"
-import type { MockDisplaySelection, DesignDisplaySelection } from "../../../project/display.ts"
+import type { MockDisplaySelection, DesignDisplaySelection, ComponentDisplaySelection } from "../../../project/display.ts"
 import type { DisplayConfiguration } from "./policy.ts"
 import { displayUrl } from "./url.ts"
 
-type Selection = { readonly kind: "mock"; readonly selection: MockDisplaySelection }
+type Selection = { readonly kind: "component"; readonly selection: ComponentDisplaySelection }
+  | { readonly kind: "mock"; readonly selection: MockDisplaySelection }
   | { readonly kind: "editor"; readonly selection: DesignDisplaySelection }
 type Entry = { readonly id: string; readonly token: string; readonly expiresAt: number; readonly target: Selection }
 export const displaySessionParameter = "__lgcode_display_session"

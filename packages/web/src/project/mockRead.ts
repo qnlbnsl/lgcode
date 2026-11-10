@@ -1,5 +1,6 @@
 import type { Client } from "@lgcode/client/browser"
-import type { MockApproval, MockRevision, ProjectId, RequestId } from "@lgcode/contracts"
+import { EventEnvelope, type EventSequence, type MockApproval, type MockRevision, type ProjectId, type RequestId } from "@lgcode/contracts"
+import * as Schema from "effect/Schema"
 import * as Effect from "effect/Effect"
 import { requestId } from "../thread/client.ts"
 
@@ -45,6 +46,23 @@ export const artifactState = (revision: MockRevision, sourceId: string, result: 
   return recorded === result.fingerprint ? "current" : "stale"
 }
 
+// A public CommandError can also encode a database or receipt failure. Only
+// an authenticated durable refusal for this exact owner command retires it.
+// The bounded search may miss older evidence; absence stays uncertain.
+const approvalRefused = (client: Client, original: RequestId) => Effect.gen(function* () {
+  const id = requestId(), head = yield* client["client.sequence"]({ requestId: id })
+  if (head.requestId !== id) return false
+  for (let sequence = head.sequence; sequence > Math.max(0, head.sequence - 64); sequence--) {
+    const readId = requestId()
+    const reply = yield* client["client.event"]({ requestId: readId, sequence: sequence as EventSequence })
+    if (reply.requestId !== readId || !("envelope" in reply) || !Schema.is(EventEnvelope)(reply.envelope)) continue
+    const row = reply.envelope
+    if (row.sequence === sequence && row.requestId === original && row.caller._tag === "owner"
+      && row.event._tag === "CommandRefused" && row.event.command === "project.mocks.approve") return true
+  }
+  return false
+}).pipe(Effect.catch(() => Effect.succeed(false)))
+
 // Revalidation prevents an old selection being silently replaced with the head.
 // The engine performs the final artifact/head check atomically with approval.
 export const approveMockRevision = (client: Client, projectId: ProjectId, revisionId: RequestId, approvalId: RequestId) => Effect.gen(function* () {
@@ -56,7 +74,8 @@ export const approveMockRevision = (client: Client, projectId: ProjectId, revisi
   if (result._tag === "Failure") {
     const current = yield* readMockHistory(client, projectId)
     if (current.complete && current.approval?.revisionId === revisionId) return { state: "approved" as const, history: current }
-    return { state: result.failure._tag === "CommandError" ? "refused" as const : "uncertain" as const, history: current }
+    if (current.complete && current.items.at(-1)?.revisionId !== revisionId) return { state: "stale" as const, history: current }
+    return { state: (yield* approvalRefused(client, approvalId)) ? "refused" as const : "uncertain" as const, history: current }
   }
   return { state: "approved" as const, history: yield* readMockHistory(client, projectId) }
 })

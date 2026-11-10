@@ -21,6 +21,7 @@ function MockContent({ projectId, repoId, approvals, refreshKey, disabled = fals
   const [screenId, setScreenId] = useState("")
   const [scenario, setScenario] = useState("")
   const [pane, setPane] = useState("screens")
+  const [viewport, setViewport] = useState<"phone" | "desktop">(() => window.matchMedia?.("(max-width:700px)").matches ? "phone" : "desktop")
   const [artifacts, setArtifacts] = useState<ReadonlyArray<{ sourceId: string; state: string; text?: string; fingerprint?: string }>>()
   const [notice, setNotice] = useState("")
   const [confirm, setConfirm] = useState(false)
@@ -87,13 +88,13 @@ function MockContent({ projectId, repoId, approvals, refreshKey, disabled = fals
       </select></label>
     </>}
     {revision && <>
-      <p>{revision.author._tag === "owner" ? "Owner" : visibleText(revision.author.agentId)} · <time dateTime={new Date(revision.at).toISOString()}>{new Date(revision.at).toLocaleString()}</time> · {approvalLabel}</p>
+      <p>{revision.author._tag === "owner" ? "Owner" : visibleText(revision.author.agentId)} · <time dateTime={new Date(revision.at).toISOString()}>{new Date(revision.at).toLocaleString()}</time> · {revision.bundle.screens.length} screens · {approvalLabel}</p>
       <nav aria-label="Mock panes">{["screens", "data", "components", "tokens"].map((name) => <button key={name} aria-pressed={pane === name} onClick={() => setPane(name)}>{name[0]!.toUpperCase() + name.slice(1)}</button>)}</nav>
       {pane === "screens" && <>
         <div className="review-screen-layout"><nav className="review-screen-list" aria-label="Screens">{revision.bundle.screens.map((row) => <button key={row.screenId} aria-current={selectedScreen?.screenId === row.screenId} onClick={() => { setScreenId(row.screenId); setScenario("") }}>{visibleText(row.name)}</button>)}</nav><div>
-        <div className="review-controls"><label>Scenario <select value={scenario} onChange={(event) => setScenario(event.target.value)}><option value="">Base view</option>{supportedScenarios.map((row) => <option key={row.scenarioId} value={row.scenarioId}>{visibleText(row.name)}</option>)}</select></label></div>
+        <div className="review-controls"><div role="group" aria-label="Preview viewport">{(["desktop", "phone"] as const).map((size) => <button key={size} aria-pressed={viewport === size} onClick={() => setViewport(size)}>{size === "phone" ? "Phone" : "Desktop"}</button>)}</div><label>Scenario <select value={scenario} onChange={(event) => setScenario(event.target.value)}><option value="">Base view</option>{supportedScenarios.map((row) => <option key={row.scenarioId} value={row.scenarioId}>{visibleText(row.name)}</option>)}</select></label></div>
         <p>Recorded route: {route === undefined ? "Unavailable" : <code>{visibleText(route)}</code>}</p>
-        <IsolatedDisplay title="Recorded mock preview" action="Open preview" disabled={disabled} onSessionExpired={onSessionExpired}
+        <IsolatedDisplay title="Recorded mock preview" action="Open preview" viewport={viewport} disabled={disabled} onSessionExpired={onSessionExpired}
           {...(route === undefined || selectedScreen === undefined ? {} : { selection: { _tag: "mock" as const, projectId, revisionId: revision.revisionId, screenId: selectedScreen.screenId,
             ...(scenario === "" ? {} : { scenarioId: scenario }) } })} />
         {repoId === undefined || revision.bundle.designRevision === undefined
