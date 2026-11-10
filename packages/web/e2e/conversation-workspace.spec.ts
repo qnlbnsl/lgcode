@@ -126,6 +126,10 @@ test("conversations retain drafts, real context, delivery and owner peek across 
           await input.fill("Next prompt survives cancellation"); await input.press("Enter")
           await expect.poll(() => runner.callsOf("prompt").filter((row) => row.input.agentId === worker.agentId).length).toBe(2)
           expect(runner.callsOf("stop")).toHaveLength(0)
+          // Runner delivery can precede the browser's receipt and coherent
+          // write admission. Finish that send before testing another one.
+          await expect(input).toHaveValue("")
+          await expect(page.getByRole("button", { name: "Stop reply", exact: true })).toBeEnabled()
           await input.fill("Unsure message"); dropPrompt = true; await input.press("Enter")
           await expect.poll(() => dropped).toBe(true)
           await expect(page.getByRole("button", { name: "Recover original send", exact: true })).toBeVisible()

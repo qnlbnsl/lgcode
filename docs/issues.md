@@ -10540,3 +10540,11 @@ Web typing and copied-code credits passed on the same candidate.
 The combined remote command exited 129 only at the final Git whitespace check because the remote source copy excludes its Git metadata.
 The local read-only Git whitespace check passed.
 Status: corrected; the author result records the final full-check outcome and lead handoff.
+
+The first correction full on 8c9eeb4 passed 516 files and 7,715 tests, with two skips, but its browser suite exited 1 with 26 passes.
+The conversation journey had not observed the intended lost prompt reply at its five-second assertion.
+Its captured page retained the next draft alongside the preceding successful send acknowledgement.
+The fixture had waited for runner delivery, which does not establish browser acknowledgement or coherent write admission.
+It now requires the preceding empty acknowledged draft and the real enabled Stop reply control before starting the next send fault.
+The original fault, four identical prompt frames, complete body and key, owner authority, eight-view matrix and lifecycle/session consequences remain unchanged.
+The exact blocked guard at the original keypress was not measured, and no production timing defect is claimed.
