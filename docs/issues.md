@@ -10012,3 +10012,48 @@ Desktop rows keep one line.
 Permanent tests cover the fields, filtering, stage labels, state changes, and plain-text names.
 The actual-engine browser matrix now includes both project tables at all four widths in both color modes.
 These changes await their own verification and independent review; earlier foundation passes do not prove the correction.
+
+## New project in-unit integration: focus after returning from Machines
+
+Found: 2026-11-09, while joining the authored form to the accepted React foundation.
+State: the mounted regression and the native browser case passed in the first joined full run.
+
+Home unmounts when Add repository opens Machines.
+Retaining its original button would restore focus to a detached element after registration or Cancel returned to Home.
+The owner-scoped creation session now resolves the current Home button when the native dialog closes.
+The Machines return retains the original route, draft, and frozen creation request.
+The mounted regression checks that Escape focuses the replacement Home button.
+The separate native browser case passed its focus assertion in that run.
+The full run failed at the distinct lost-reply fixture described below.
+
+## New project in-unit follow-on: dedicated worktrees and the lost-reply fixture
+
+The owner released F2, issue576, after the first joined full run.
+Every project now requests its own worktree, and the form no longer offers a checkbox.
+The original New project author owns this controller and form overlay.
+The flow-fix author owns the separate engine refusal of main-checkout requests.
+No pending engine correction is imported here.
+
+The first joined full passed every unit case and failed one browser assertion.
+Its lost-reply fixture expected manual uncertainty after terminating sockets once while leaving the listener available.
+The collected document instead showed the actual project lead's live thread and original goal.
+The existing client retries transport failures with the same request, so a single close permits automatic receipt recovery.
+The failed run did not retain its wire-frame count, and the exact replay is not claimed as measured evidence.
+The revised fixture separates a single-close automatic control from a disabled-listener case that exhausts normal transport retries before manual recovery.
+The original five-second uncertainty assertion, failure and frozen source remain preserved.
+Both new cases retain exact-body, one-receipt, one-project and one-lead assertions.
+Both cases passed the bounded proof and the later ordinary full's browser phase.
+The later full failed at the separate keyboard boundary described below.
+
+## New project in-unit follow-on: native modal keyboard boundary
+
+The second joined full failed when Shift+Tab from Close moved focus outside the dialog.
+The preserved passive diagnostic reproduced it with stable dialog and control identities.
+The dialog stayed open and modal, while the active element became BODY and the document lost focus.
+The recorded controls stayed enabled, so those observations support native boundary departure rather than a readiness change or remount.
+The dialog now handles only Tab at its current visible, enabled endpoints in both directions.
+Native initial focus, Escape, and opener restoration remain in place.
+The original browser containment assertion remains, with a forward-wrap consequence added.
+The focused test covers both directions and changed disabled or hidden endpoints.
+The diagnostic source and failed selector attempt are preserved separately.
+This correction awaits its own bounded verification; the previous full remains failed.
