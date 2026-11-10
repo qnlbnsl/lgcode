@@ -352,12 +352,15 @@ Git mutations use the existing event log for a bounded attempt before possible e
 The attempt binds the caller, request, canonical body hash, operation, workspace, and pre-effect Git identities.
 It stores no raw payload or commit message.
 The request lane covers a short writer preflight, Git under the runtime gate outside the writer, and a short final outcome transaction.
-A Git-proven conflict, rejection, divergence or remote refusal retains its fixed reason and durable refused outcome.
+A Git-proven conflict, rejected push, diverged pull or remote refusal retains its fixed reason and durable refused outcome.
+Only explicit network commands can classify fixed remote-refusal diagnostics; a local permission or mixed-reference failure after possible effects stays uncertain.
+A conflict requires both MERGE_HEAD and actual unmerged entries.
 A genuinely unknown possible effect returns “Git outcome is uncertain; refresh Git state” without a success or refusal receipt.
 An identical retry never clears that attempt merely because the current state appears unchanged.
-Main approval can reconcile both reviewed ancestors in the actual registered destination.
-Commit reconciliation checks the frozen tree, branch, intended retry message, and all expected parents, including a pending merge parent.
-A successful actual project.git.state refresh serializes with mutations, then finishes pending attempts for that workspace in short current-binding transactions.
+Prior attempts return uncertainty without re-executing commit or approval, including before a refresh.
+A new owner approval request can use actual containment of both reviewed ancestors in the registered destination, without another merge.
+Only a project.git.state read that observes a pending attempt takes the workspace operation lane before reading Git and finishing attempts in short current-binding transactions.
+An ordinary state read does not take that lane or settle attempts that started after its initial check.
 The existing GitFinished event records terminal uncertainty in the ordinary envelope receipt, preserving the original caller, request and body hash after clearing the pending attempt.
 For fresh determinate conflicts, rejected push, diverged pull and refused-remote outcomes, its optional fixed refusal enum preserves the known reason across receipt replay and registered-secret collisions.
 Arbitrary CommandRefused reason text remains redacted.

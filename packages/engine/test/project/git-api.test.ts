@@ -22,6 +22,7 @@ import { engineLists } from "../../src/pieces/lists.ts"
 import { refreshGitState } from "../../src/commands/gitOperation.ts"
 import { CommandHandler } from "../../src/commands/CommandHandler.ts"
 import * as GitProcess from "../../src/project/git/process.ts"
+import * as GitApi from "../../src/project/gitApi.ts"
 import { projectView } from "../../src/project/view.ts"
 import { ancestryHeaders, authorization, socketUrl, upgradeStatus } from "../support/socketClient.ts"
 import { provideBoard } from "../board/wakeFixtures.ts"
@@ -517,3 +518,39 @@ for (const reader of ["owner", "member", "stale binding", "revoked access"] as c
     expect(Object.values(projectView(yield* snapshot).gitAttempts)).toHaveLength(0)
   }))
 }).pipe(Effect.orDie))
+
+it.live("issue 597: an ordinary state read completes beside a mutation preparing without a pending attempt", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(), { api } = yield* wire()
+  const hold = join(rig.root, "own-preparation-hold")
+  writeFileSync(hold, "owned preparation barrier")
+  yield* Effect.addFinalizer(() => Effect.sync(() => rmSync(hold, { force: true })))
+  let preparing = false, first = true, laneAttempts = 0
+  const actualGit = GitApi.withGit, actualLane = Lanes.withLane
+  const observedGit: typeof GitApi.withGit = (input, body) => Effect.gen(function* () {
+    if (first) {
+      first = false; preparing = true
+      while (existsSync(hold)) yield* Effect.sleep("10 millis")
+    }
+    return yield* actualGit(input, body)
+  })
+  vi.spyOn(GitApi, "withGit").mockImplementation(observedGit)
+  const observedLane: typeof Lanes.withLane = (log, key) => (effect) => Effect.sync(() => {
+    if (key === `git-operation:${f.worktreeId}`) laneAttempts++
+  }).pipe(Effect.andThen(actualLane(log, key)(effect)))
+  vi.spyOn(Lanes, "withLane").mockImplementation(observedLane)
+  save(rig.work, "ordinary-overlap.txt", "stage after observation\n")
+  const mutation = yield* run(api, "project.stage", { worktreeId: f.worktreeId, path: "ordinary-overlap.txt" }).pipe(Effect.forkChild)
+  expect(yield* eventually(Effect.sync(() => preparing), Boolean)).toBe(true)
+  expect(laneAttempts).toBe(1)
+  expect(Object.values(projectView(yield* snapshot).gitAttempts)).toHaveLength(0)
+  let completed = false
+  const read = yield* run(api, "project.git.state", { worktreeId: f.worktreeId }).pipe(
+    Effect.tap(() => Effect.sync(() => { completed = true })), Effect.forkChild)
+  expect(yield* eventually(Effect.sync(() => completed), Boolean)).toBe(true)
+  expect(existsSync(hold)).toBe(true)
+  expect(laneAttempts).toBe(1)
+  expect(Object.values(projectView(yield* snapshot).gitAttempts)).toHaveLength(0)
+  rmSync(hold)
+  yield* Fiber.join(read); yield* Fiber.join(mutation)
+  expect(git(rig.work, "diff", "--cached")).toContain("stage after observation")
+})).pipe(Effect.orDie))

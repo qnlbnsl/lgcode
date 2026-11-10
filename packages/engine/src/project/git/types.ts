@@ -47,7 +47,6 @@ export interface Review {
 export interface DiscardPlan { readonly fingerprint: string; readonly paths: ReadonlyArray<string> }
 export interface GitService {
   mutationIdentity(folder: string): GitOperation<GitMutationIdentity>;
-  reconcileCommit(folder: string, before: GitMutationIdentity, message: string): GitOperation<string | null>;
   readonly contextFiles: (folder: string, query: string) => GitOperation<Bounded<string>>;
   readonly contextFile: (folder: string, path: string) => GitOperation<void>;
   discover(): GitOperation<Bounded<Repository>>;
@@ -77,7 +76,7 @@ export interface GitService {
   // A distinct execution boundary, never a bypass on mergeTeam. The engine
   // supplies the authenticated caller, not a field from the command payload.
   approveMain(source: string, destination: string, reviewed: Pick<Review, "head" | "baseHead" | "branch" | "base">,
-    caller: Caller | undefined, confirmed: boolean, reconcileOnly?: boolean): GitOperation<string>;
+    caller: Caller | undefined, confirmed: boolean): GitOperation<string>;
   conflict(folder: string, path: string, agentRead?: boolean): GitOperation<Conflict>;
   choose(folder: string, selection: Conflict, hunk: number, choice: ConflictChoice): GitOperation<Conflict>;
   resolve(folder: string, selection: Conflict): GitOperation<void>;

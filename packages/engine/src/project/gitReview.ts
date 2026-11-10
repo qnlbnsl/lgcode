@@ -96,7 +96,7 @@ const approve: PiecePlanner = (input, raw) => Effect.gen(function* () {
     const target = yield* destination(input, { ...raw, destinationId: review.destinationId }, git, project.repoId)
     // Evidence is recorded data. Both choices explicitly authorize this
     // reviewed pair; no test result or reviewer verdict is a merge policy.
-    const result = yield* git.approveMain(source.path, target.path, review, input.actor, p.confirmed, input.gitRetry === true).pipe(Effect.result)
+    const result = yield* git.approveMain(source.path, target.path, review, input.actor, p.confirmed).pipe(Effect.result)
     if (result._tag === "Failure" && result.failure.uncertain) return yield* new CommandUncertain({ reason: "Git outcome is uncertain; refresh Git state" })
     const decided: GitMainReview = { ...review, decision: p.decision, decidedAt: (yield* Clock.currentTimeMillis) as GitMainReview["decidedAt"],
       outcome: result._tag === "Success" ? "merged" : "refused", mergeHead: result._tag === "Success" ? result.success : null,

@@ -234,7 +234,8 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
       && rawPayload !== null && (rawPayload as { readonly block?: unknown }).block === true;
 
     // Direct callers use the same read table as the transport. A read always
-    // rechecks current credentials and access, and never creates a receipt.
+    // rechecks current credentials and access. A Git state refresh may record
+    // terminal uncertainty receipts for existing pending mutations.
     const executeRead = (credential: Credential, name: string, rawPayload: unknown) => Effect.gen(function* () {
       if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
       const actor = yield* resolveCredential(credential, name);

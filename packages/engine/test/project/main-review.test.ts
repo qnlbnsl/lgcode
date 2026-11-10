@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto"
 import { execFileSync } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { it } from "@effect/vitest"
 import * as NodeSocket from "@effect/platform-node/NodeSocket"
@@ -14,6 +14,7 @@ import { afterEach, beforeEach, expect, vi } from "vitest"
 import * as Server from "../../src/api/server.ts"
 import { CommandHandler } from "../../src/commands/CommandHandler.ts"
 import * as GitApi from "../../src/project/gitApi.ts"
+import * as GitProcesses from "../../src/project/git/process.ts"
 import { reviewPlanners } from "../../src/project/gitReview.ts"
 import { makeGitService } from "../../src/project/git/index.ts"
 import { makeFakeRunner } from "../support/fakeRunner.ts"
@@ -532,7 +533,9 @@ it.live("issue 579/583: queued registration and creation do not block a positive
 })).pipe(Effect.orDie))
 
 
-for (const divergent of [false, true]) it.live(`issue 575: actual SQL failure after ${divergent ? "divergent" : "fast-forward"} Git merge retains the restart latch and reconciles after rebuild`, () => Effect.gen(function* () {
+for (const divergent of [false, true]) it.live(`issue 575: actual SQL failure after ${divergent ? "divergent" : "fast-forward"} Git merge retains the restart latch and terminal uncertainty after rebuild`, () => Effect.gen(function* () {
+  const observedProcesses = vi.spyOn(GitProcesses, "gitProcess")
+  yield* Effect.addFinalizer(() => Effect.sync(() => observedProcesses.mockRestore()))
   const runner = yield* makeFakeRunner(), secrets = makeFakeSecrets()
   let armed = true
   let breakWriter: Effect.Effect<void> = Effect.die(new Error("uninitialized SQL fault"))
@@ -566,15 +569,37 @@ for (const divergent of [false, true]) it.live(`issue 575: actual SQL failure af
   }))
   yield* provideRig(rig, { runner, secrets }, Effect.gen(function* () {
     yield* registerRebuildCheck()
-    const result = success(yield* call(owner, "project.review.approve", saved.request))
+    const prior = yield* call(owner, "project.review.approve", saved.request)
+    expect(prior._tag).toBe("Failure")
+    if (prior._tag === "Failure") expect(prior.failure.reason).toBe("Git outcome is uncertain; refresh Git state")
+    expect(projectView(yield* snapshot).gitReviews[saved.request.worktreeId]?.outcome).toBe("open")
+    success(yield* call(owner, "project.git.state", { worktreeId: saved.request.worktreeId, projectId: saved.request.projectId }))
+    expect(Object.values(projectView(yield* snapshot).gitAttempts)).toHaveLength(0)
+    const terminal = yield* call(owner, "project.review.approve", saved.request)
+    expect(terminal._tag).toBe("Failure")
+    if (terminal._tag === "Failure") expect(terminal.failure.reason).toBe("Git outcome is uncertain; refresh Git state")
+    // A new owner request uses the existing containment proof, without another
+    // merge or retroactive success on the old uncertain identity.
+    const fresh = { ...saved.request, requestId: freshRequest() }
+    const result = success(yield* call(owner, "project.review.approve", fresh))
     expect(result.result).toMatchObject({ outcome: "merged", mergeHead: saved.actual })
-    expect(success(yield* call(owner, "project.review.approve", saved.request))).toEqual(result)
+    expect(success(yield* call(owner, "project.review.approve", fresh))).toEqual(result)
     expect(git(rig.work, "rev-parse", "HEAD")).toBe(saved.actual)
     expect((yield* readLog).filter((row) => row.event._tag === "project.MainReviewDecided")).toHaveLength(1)
   }))
+  yield* provideRig(rig, { runner, secrets }, Effect.gen(function* () {
+    yield* registerRebuildCheck()
+    const old = yield* call(owner, "project.review.approve", saved.request)
+    expect(old._tag).toBe("Failure")
+    if (old._tag === "Failure") expect(old.failure.reason).toBe("Git outcome is uncertain; refresh Git state")
+    expect(Object.values(projectView(yield* snapshot).gitAttempts)).toHaveLength(0)
+  }))
+  expect(observedProcesses.mock.calls.filter(([, args]) => args.includes("merge"))).toHaveLength(1)
 }).pipe(Effect.orDie))
 
-for (const merging of [false, true]) it.live(`issue 575: commit reconciliation after actual SQL failure includes merge parent=${merging}`, () => Effect.gen(function* () {
+for (const merging of [false, true]) it.live(`issue 575: commit uncertainty after actual SQL failure preserves merge parent=${merging}`, () => Effect.gen(function* () {
+  const observedProcesses = vi.spyOn(GitProcesses, "gitProcess")
+  yield* Effect.addFinalizer(() => Effect.sync(() => observedProcesses.mockRestore()))
   const runner = yield* makeFakeRunner(), secrets = makeFakeSecrets()
   let requestId = "", armed = true
   let breakWriter: Effect.Effect<void> = Effect.die(new Error("The writer fault was not initialized"))
@@ -621,12 +646,61 @@ for (const merging of [false, true]) it.live(`issue 575: commit reconciliation a
   yield* provideRig(rig, { runner, secrets }, Effect.gen(function* () {
     yield* registerRebuildCheck()
     expect((yield* call(owner, "project.commit", { ...saved.request, message: "Different body" }))._tag).toBe("Failure")
-    const result = success(yield* call(owner, "project.commit", saved.request))
-    expect(result.result).toEqual({ head: saved.actual })
-    expect(success(yield* call(owner, "project.commit", saved.request))).toEqual(result)
+    const prior = yield* call(owner, "project.commit", saved.request)
+    expect(prior._tag).toBe("Failure")
+    if (prior._tag === "Failure") expect(prior.failure.reason).toBe("Git outcome is uncertain; refresh Git state")
+    success(yield* call(owner, "project.git.state", { projectId: saved.request.projectId, worktreeId: saved.request.worktreeId }))
+    const terminal = yield* call(owner, "project.commit", saved.request)
+    expect(terminal._tag).toBe("Failure")
+    if (terminal._tag === "Failure") expect(terminal.failure.reason).toBe("Git outcome is uncertain; refresh Git state")
+    expect((yield* call(owner, "project.commit", { ...saved.request, message: "Different body" }))._tag).toBe("Failure")
     expect(git(saved.source, "rev-parse", "HEAD")).toBe(saved.actual)
     expect(Object.values(projectView(yield* snapshot).gitAttempts)).toHaveLength(0)
     const sql = yield* SqlClient.SqlClient
     expect(yield* sql`SELECT request_id FROM receipts WHERE request_id = ${saved.request.requestId}`).toHaveLength(1)
+    const events = (yield* readLog).filter((row) => row.requestId === saved.request.requestId).map((row) => row.event)
+    expect(events).toMatchObject([{ _tag: "project.GitFinished", outcome: "uncertain" }])
   }))
+  yield* provideRig(rig, { runner, secrets }, Effect.gen(function* () {
+    yield* registerRebuildCheck()
+    const old = yield* call(owner, "project.commit", saved.request)
+    expect(old._tag).toBe("Failure")
+    if (old._tag === "Failure") expect(old.failure.reason).toBe("Git outcome is uncertain; refresh Git state")
+    expect(Object.values(projectView(yield* snapshot).gitAttempts)).toHaveLength(0)
+  }))
+  expect(observedProcesses.mock.calls.filter(([, args]) => args.includes("commit"))).toHaveLength(1)
 }).pipe(Effect.orDie))
+
+it.live("issue 595: partial main checkout permission failure leaves the review open and its request uncertain", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup()
+  mkdirSync(join(rig.work, "dir")); save(rig.work, "dir/existing", "tracked directory\n")
+  save(rig.work, "a.txt", "before a\n"); save(rig.work, "z.txt", "before z\n"); commit(rig.work, "Permission base")
+  git(f.source, "merge", "--no-edit", "main")
+  save(f.source, "a.txt", "after a\n"); save(f.source, "z.txt", "after z\n"); save(f.source, "dir/new", "cannot create\n"); commit(f.source, "Incoming files")
+  const { review } = (yield* prepare(f)).result, before = git(rig.work, "rev-parse", "HEAD"), mergeCalls = observeMerges()
+  const request = { requestId: freshRequest(), projectId: f.projectId, worktreeId: f.worktreeId, reviewId: review.reviewId,
+    expectedHead: review.head, expectedBaseHead: review.baseHead, confirmed: true, decision: "approve_without_evidence" }
+  chmodSync(join(rig.work, "dir"), 0o555)
+  yield* Effect.addFinalizer(() => Effect.sync(() => chmodSync(join(rig.work, "dir"), 0o755)))
+  const failed = yield* call(owner, "project.review.approve", request)
+  expect(failed._tag).toBe("Failure")
+  if (failed._tag === "Failure") expect(failed.failure).toMatchObject({ reason: "Git outcome is uncertain; refresh Git state" })
+  expect(readFileSync(join(rig.work, "a.txt"), "utf8")).toBe("after a\n")
+  expect(readFileSync(join(rig.work, "z.txt"), "utf8")).toBe("after z\n")
+  expect(git(rig.work, "rev-parse", "HEAD")).toBe(before)
+  expect(projectView(yield* snapshot).gitReviews[f.worktreeId]?.outcome).toBe("open")
+  const sql = yield* SqlClient.SqlClient
+  expect(yield* sql`SELECT request_id FROM receipts WHERE request_id = ${request.requestId}`).toHaveLength(0)
+  expect((yield* readLog).filter((row) => row.event._tag === "project.MainReviewDecided")).toHaveLength(0)
+  const retry = yield* call(owner, "project.review.approve", request)
+  expect(retry._tag).toBe("Failure")
+  if (retry._tag === "Failure") expect(retry.failure.reason).toBe("Git outcome is uncertain; refresh Git state")
+  expect(mergeCalls()).toBe(1)
+  yield* run(f.api, "project.git.state", { projectId: f.projectId, worktreeId: f.worktreeId })
+  expect(Object.values(projectView(yield* snapshot).gitAttempts)).toHaveLength(0)
+  const afterRefresh = yield* call(owner, "project.review.approve", request)
+  expect(afterRefresh._tag).toBe("Failure")
+  if (afterRefresh._tag === "Failure") expect(afterRefresh.failure.reason).toBe("Git outcome is uncertain; refresh Git state")
+  expect(mergeCalls()).toBe(1)
+  expect(projectView(yield* snapshot).gitReviews[f.worktreeId]?.outcome).toBe("open")
+})).pipe(Effect.orDie))

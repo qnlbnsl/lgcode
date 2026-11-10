@@ -77,9 +77,9 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     mutations.add(signal);
     return run(folder, args, signal);
   };
-  const mutateGit = async (folder: string, args: ReadonlyArray<string>, signal: AbortSignal) => {
+  const mutateGit = async (folder: string, args: ReadonlyArray<string>, signal: AbortSignal, network?: "fetch" | "push") => {
     const reply = await mutateRun(folder, args, signal);
-    if (reply.code !== 0) throw processFailure(reply);
+    if (reply.code !== 0) throw processFailure(reply, network);
     return reply.stdout;
   };
   const git = async (folder: string, args: ReadonlyArray<string>, signal: AbortSignal) => {
@@ -145,11 +145,12 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
   };
   const diff = async (folder: string, options: { path?: string; staged?: boolean; commit?: string; agentRead?: boolean }, signal: AbortSignal): Promise<Diff> => {
     const path = options.path;
+    // One complete status snapshot serves path admission and both aggregates.
+    const workingChanges = options.commit === undefined ? await completeChanges(folder, signal) : undefined;
     let aggregatePaths: string[] | undefined;
     if (options.agentRead) {
       if (path !== undefined && isRepositoryCredentialPath(path)) return fail("invalid_path");
-      const changes = options.commit === undefined ? await completeChanges(folder, signal)
-        : parseFiles(await git(folder, ["diff-tree", "--root", "--no-commit-id", "-r", "-m", "--first-parent", await ref(folder, options.commit, signal), "--name-status", "-z", "--find-renames", "--"], signal));
+      const changes = workingChanges ?? parseFiles(await git(folder, ["diff-tree", "--root", "--no-commit-id", "-r", "-m", "--first-parent", await ref(folder, options.commit!, signal), "--name-status", "-z", "--find-renames", "--"], signal));
       if (path !== undefined && changes.some((row) => row.path === path && !readable(row))) return fail("invalid_path");
       if (path === undefined) {
         aggregatePaths = changes.filter(readable).flatMap((row) => row.originalPath === null ? [row.path] : [row.originalPath, row.path]);
@@ -164,7 +165,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       const names = await git(folder, ["show", "--format=", "--first-parent", "--name-only", "-z", await ref(folder, options.commit, signal), "--"], signal);
       for (const name of names.split("\0").filter(Boolean)) await filePath(folder, name);
     } else {
-      for (const change of await completeChanges(folder, signal)) {
+      for (const change of workingChanges!) {
         await filePath(folder, change.path);
         if (change.originalPath !== null) await filePath(folder, change.originalPath);
       }
@@ -176,8 +177,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     const currentHead = options.staged === undefined ? await head(folder, signal) : null;
     const diffArgs = ["diff", ...(options.staged === true ? ["--cached"] : currentHead === null ? [] : [currentHead])];
     if (path !== undefined) {
-      const changes = await completeChanges(folder, signal);
-      const change = changes.find((item) => item.path === path);
+      const change = workingChanges!.find((item) => item.path === path);
       if ((change?.untracked || options.staged === undefined && currentHead === null && change?.index === "A") && options.staged !== true) return patch(folder, ["diff", "--no-index"], signal, ["/dev/null", await filePath(folder, path)]);
       if (change?.originalPath !== null && change?.originalPath !== undefined) await filePath(folder, change.originalPath);
       return patch(folder, diffArgs, signal, change?.originalPath ? [change.originalPath, path] : [path]);
@@ -187,10 +187,12 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       : await patch(folder, diffArgs, signal, aggregatePaths ?? []);
     if (options.staged === true) return tracked;
     let result = tracked;
-    for (const change of await completeChanges(folder, signal)) {
+    for (const change of workingChanges!) {
       if (options.agentRead && !readable(change)) continue;
       if ((!change.untracked && !(options.staged === undefined && currentHead === null && change.index === "A")) || result.truncated) continue;
-      const next = await diff(folder, { path: change.path, agentRead: options.agentRead === true }, signal);
+      // Issue 588: the aggregate already resolved HEAD and status. Use the
+      // original Git author's bounded direct patch, after agent filtering.
+      const next = await patch(folder, ["diff", "--no-index"], signal, ["/dev/null", await filePath(folder, change.path)]);
       const joined = Buffer.from(result.patch + next.patch);
       result = { patch: boundedUtf8(joined, diffBytes), additions: result.additions + next.additions,
         deletions: result.deletions + next.deletions, binary: result.binary || next.binary,
@@ -299,11 +301,11 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     const files = await filesBetween(folder, ["diff", `${baseHead}...${currentHead}`], signal, agentRead);
     const paths = files.items.flatMap((row) => row.originalPath === null ? [row.path] : [row.originalPath, row.path]);
     if (agentRead) for (const path of paths) await filePath(folder, path);
+    const diff = agentRead && paths.length === 0 ? { patch: "", additions: 0, deletions: 0, binary: false, truncated: false }
+      : await patch(folder, ["diff", `${baseHead}...${currentHead}`], signal, agentRead ? paths : []);
     return { head: currentHead, baseHead, branch: currentBranch, base,
-      commits: await history(folder, `${baseHead}..${currentHead}`, signal),
-      files,
-      diff: agentRead && paths.length === 0 ? { patch: "", additions: 0, deletions: 0, binary: false, truncated: false }
-        : await patch(folder, ["diff", `${baseHead}...${currentHead}`], signal, agentRead ? paths : []) };
+      commits: await history(folder, `${baseHead}..${currentHead}`, signal), files,
+      diff: { ...diff, truncated: diff.truncated || agentRead && files.truncated } };
   };
   const remote = async (folder: string, signal: AbortSignal) => {
     if (!(await git(folder, ["remote"], signal)).split("\n").includes("origin")) return fail("missing_remote");
@@ -352,16 +354,6 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       const tree = await run(path, ["write-tree"], signal);
       return { head: await head(path, signal), branch: await branch(path, signal),
         tree: tree.code === 0 ? tree.stdout.trim() : null, mergeHead: await mergeHead(path, signal) };
-    }),
-    reconcileCommit: (folder, before, message) => withRepo(folder, async (path, signal) => {
-      const current = await head(path, signal);
-      if (current === null || current === before.head || before.tree === null || await branch(path, signal) !== before.branch) return null;
-      const parents = (await git(path, ["show", "-s", "--format=%P", current], signal)).trim().split(" ").filter(Boolean);
-      const expected = [before.head, before.mergeHead].filter((value): value is string => value !== null);
-      if (JSON.stringify(parents) !== JSON.stringify(expected)) return null;
-      if ((await git(path, ["rev-parse", `${current}^{tree}`], signal)).trim() !== before.tree) return null;
-      if ((await git(path, ["show", "-s", "--format=%B", current], signal)).trimEnd() !== message.trimEnd()) return null;
-      return current;
     }),
     discover: () => operation(async (signal) => {
       const base = await root(), pending = [{ path: base, depth: 0 }], items: Repository[] = [];
@@ -518,19 +510,19 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
       await mutateGit(path, ["commit", "-m", message], signal);
       return (await head(path, signal))!;
     }),
-    fetch: (folder) => withRepo(folder, async (path, signal) => { await remote(path, signal); await mutateGit(path, ["fetch", "--prune", "origin"], signal); }, true),
+    fetch: (folder) => withRepo(folder, async (path, signal) => { await remote(path, signal); await mutateGit(path, ["fetch", "--prune", "origin"], signal, "fetch"); }, true),
     pull: (folder) => withRepo(folder, async (path, signal) => {
       if ((await completeChanges(path, signal)).length > 0) return fail("dirty_destination");
       await remote(path, signal); await upstream(path, signal);
       const reply = await mutateRun(path, ["pull", "--ff-only", "--no-rebase"], signal);
-      if (reply.code !== 0) { if (/fast-forward|divergent/i.test(reply.stderr)) return determinate("pull_diverged"); throw processFailure(reply); }
+      if (reply.code !== 0) { if (!reply.truncated && reply.code > 0 && /^fatal: Not possible to fast-forward, aborting\.\r?$/m.test(reply.stderr)) return determinate("pull_diverged"); throw processFailure(reply, "pull"); }
     }, true),
     push: (folder) => withRepo(folder, async (path, signal) => {
       await remote(path, signal);
       const name = await branch(path, signal);
       if (name === null) return fail("invalid_ref");
       await localBranch(path, name, signal);
-      await mutateGit(path, ["push", "--set-upstream", "origin", `refs/heads/${name}:refs/heads/${name}`], signal);
+      await mutateGit(path, ["push", "--set-upstream", "origin", `refs/heads/${name}:refs/heads/${name}`], signal, "push");
     }, true),
     mergeTeam: (source, destination, expectedHead) => operation(async (signal) => {
       const from = await repository(source, signal), to = await repository(destination, signal);
@@ -551,7 +543,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     }),
     review: (folder, base, agentRead = false) => withRepo(folder, (path, signal) => review(path, base, signal, agentRead)),
     reviewMain: (source, destination) => operation(async (signal) => (await mainComparison(source, destination, signal)).comparison),
-    approveMain: (source, destination, reviewed, caller, confirmed, reconcileOnly = false) => operation(async (signal) => {
+    approveMain: (source, destination, reviewed, caller, confirmed) => operation(async (signal) => {
       // Check trusted authority again at execution, including caller-less and
       // piece callers. No report or payload boolean supplies this credential.
       if (caller?._tag !== "owner") return fail("owner_required");
@@ -569,7 +561,6 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
         };
         if (await contains(reviewed.baseHead) && await contains(reviewed.head)) return actual;
       }
-      if (reconcileOnly) throw new GitFailure({ reason: "stale_state", uncertain: true });
       const { comparison } = await mainComparison(source, destination, signal);
       if (comparison.head !== reviewed.head || comparison.baseHead !== reviewed.baseHead
         || comparison.branch !== reviewed.branch || comparison.base !== reviewed.base) return fail("stale_state");

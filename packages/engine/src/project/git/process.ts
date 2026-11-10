@@ -81,18 +81,22 @@ export const gitProcess = (
   });
 });
 
-export const processFailure = (reply: ProcessReply): GitFailure => {
+// The service supplies this only at a network command boundary. Local index,
+// checkout and reference failures never acquire a known-outcome marker here.
+export const processFailure = (reply: ProcessReply, network?: "fetch" | "pull" | "push"): GitFailure => {
   const text = reply.stderr;
+  const diagnostic = text.replace(/\r?\n$/, "");
+  const authentication = network !== undefined && reply.stdout === "" && /^(?:fatal: Authentication failed for '[^\r\n]*'|fatal: could not read (?:Username|Password) for '[^\r\n]*': terminal prompts disabled)\r?$/i.test(diagnostic);
+  const rejectedPush = network === "push" && /^\s*! \[rejected\] /m.test(text);
   const reason = /index\.lock|another git process/i.test(text) ? "busy"
-    : /authentication|permission denied|could not read (?:Username|Password)|terminal prompts disabled/i.test(text) ? "authentication_required"
-    : /could not resolve|unable to access|could not read from remote|connection refused|does not appear to be a git repository/i.test(text) ? "network_failed"
-    : /\[rejected\]|non-fast-forward|fetch first/i.test(text) ? "push_rejected" : "git_failed";
-  // Only an actual completed Git response proving a rejection/refusal settles
-  // a started operation. A disconnect or generic transport failure does not.
-  // Git/curl can omit the port detail or report only the fixed suffix. A
-  // phrase in the quoted URL or an incomplete response is not evidence.
-  const refusedConnection = !reply.truncated && reason === "network_failed"
-    && /^fatal: unable to access '[^\r\n]*': (?:Failed to connect to [^\r\n]+: )?Could not connect to server\r?$/im.test(text);
-  const determinate = reply.code > 0 && (refusedConnection || /\[rejected\]|non-fast-forward|fetch first|could not resolve|connection refused|does not appear to be a git repository|authentication failed|permission denied|terminal prompts disabled/i.test(text));
+    : authentication ? "authentication_required"
+    : network !== undefined && /could not resolve|unable to access|could not read from remote|connection refused|does not appear to be a git repository/i.test(text) ? "network_failed"
+    : rejectedPush ? "push_rejected" : "git_failed";
+  // A fixed pre-connection diagnostic proves refusal only for the network
+  // phase. A mixed-ref fetch rejection or a local permission error may follow
+  // real effects and remains uncertain in the service's mutation boundary.
+  const refusedConnection = network !== undefined && reason === "network_failed" && reply.stdout === ""
+    && /^fatal: unable to access '[^\r\n]*': (?:Failed to connect to [^\r\n]+: )?Could not connect to server\r?$/i.test(diagnostic);
+  const determinate = reply.code > 0 && !reply.truncated && (refusedConnection || rejectedPush || authentication);
   return new GitFailure({ reason, ...(determinate ? { determinate: true } : {}) });
 };

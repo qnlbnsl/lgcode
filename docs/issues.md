@@ -10020,14 +10020,16 @@ Git mutations now use a typed attempt in the existing event log, followed by a s
 An attempt preserves the exact caller, request, body hash, workspace, and pre-effect Git identities without storing a raw message or payload.
 A prior unresolved attempt takes precedence over later failed admission.
 An uncertain outcome has no success or refusal receipt, and the normal writer failure latch remains mandatory.
-Main reconciliation requires the durable reviewed pair and proves that both reviewed heads are ancestors of the actual registered destination.
+The original signed correction reconciled the durable reviewed pair only when both reviewed heads were ancestors of the actual registered destination.
 A divergent reviewed source need not descend from the reviewed base.
-Commit reconciliation compares the frozen index tree, intended message supplied on retry, branch, and complete parent set, including a pending merge parent.
+Its commit reconciliation compared the frozen index tree, intended retry message, branch, and complete parent set, including a pending merge parent.
+Issue 596 retires these retry branches in favor of terminal uncertainty; a fresh owner approval keeps the actual two-ancestor containment proof.
 The original equivalent-state failure remains preserved separately from actual post-merge SQL failure tests.
 The first bounded corrected run passed fast-forward and divergent post-effect failure controls.
 The signed 75f48a8 source passed its actual full check: 7,532 tests, two skips, 500 files, and 20 browser tests, with recursive and root typing and credits passed.
 The independent round-one review remains Grade 6, with no blockers, three majors, four minors, and no flags.
-Issue 590 records the subsequent reply and pending-attempt cleanup correction, which needs new proof and review.
+Issue 590 records the subsequent reply and cleanup correction, whose signed 27e38c85 source passed its full check.
+The Grade 7 review remains preserved; current corrections in issues 595–598 await independent re-check.
 
 ## 576. A new project repository lacked a usable main destination
 
@@ -10156,6 +10158,14 @@ The current security boundary accepts that repository-configuration scope.
 This unit documents the limit and does not claim to sandbox owner-controlled Git configuration or introduce a different threat model.
 
 
+## 588. Aggregate untracked patches repeated full status scans
+
+The original Git author isolated a recursive aggregate diff call that repeated HEAD and status reads for every untracked file.
+The manager supplied that paused author's exact two-file patch for the shared correction in this unit.
+Both owner and filtered agent aggregates now reuse one complete status snapshot and one HEAD observation, then use the same bounded direct no-index patch per admitted untracked file.
+Literal paths, binary flags, full text statistics, byte and entry bounds, symlink checks and agent exclusions remain consequential in the adopted real process-count controls.
+This is one canonical correction, shared with issue 598; its new proof and independent re-check remain pending.
+
 ## 589. Credential-name exclusion blocked owner Git operations and whole agent reads
 
 The round-one independent review found that the credential-name predicate was inside the shared literal Git path validator.
@@ -10164,7 +10174,9 @@ Aggregate diffs also failed instead of omitting excluded agent-visible files.
 The correction keeps ordinary owner literal path rules and applies the shared predicate before actual agent-visible file and patch reads.
 Agent working, staged, committed and review aggregates omit excluded entries, including renames with an excluded side.
 Context and artifact exclusions, containment, symlink checks, redaction and reply budgets remain.
-Consequential owner mutation and agent read controls are written; corrected-source proof and independent re-review remain pending.
+Consequential owner mutation and agent read controls passed on that signed source.
+The full check on signed 27e38c85, exact source 6b6cd964, passed recursive/root typing, 7,565 tests across 500 files with two skips, all 20 browser cases, and credits.
+The original Grade 6 and later Grade 7 reviews remain preserved; the current whole-unit correction and independent re-check remain pending.
 
 ## 590. Git failures lost known reasons and uncertain attempts accumulated
 
@@ -10172,9 +10184,11 @@ The original attempt marker treated every failure after a subprocess started as 
 The reply asked for an identical retry even when no positive reconciliation was supported.
 The correction preserves fixed conflicts, rejected push, diverged pull and refused-remote reasons only when actual Git evidence establishes them.
 Those determinate outcomes have ordinary durable refusals or explicit refused review outcomes and replay without another mutation.
-Timeout, cancellation and lost outcome transport remain unknown without positive reconciliation.
+Timeout, cancellation and lost outcome transport remain unknown.
+Issue 595 records the later review finding that the initial determinate classifier was too broad after local partial effects; its correction is not credited to the prior full pass.
 The fixed unknown reply is “Git outcome is uncertain; refresh Git state”.
-A successful actual Git state read holds the workspace operation lane before observing Git, then takes each original request lane before a short writer transaction.
+A successful actual Git state read with a pending attempt holds the workspace operation lane before observing Git, then takes each original request lane before a short writer transaction.
+Ordinary reads without a pending attempt keep only the shared Git gate, as issue 597 requires.
 Current workspace, root, placement and caller access are checked again before cleanup.
 The existing GitFinished event carries an optional uncertain outcome, and the existing receipt preserves the original caller, request and body hash.
 Its bounded optional refusal enum preserves the five known Git outcome codes across replay while ordinary refusal prose stays redacted.
@@ -10182,7 +10196,8 @@ The old request remains terminal uncertainty after cleanup and restart; it canno
 A failed or stale read leaves the attempt unchanged, and a live mutation cannot be closed by a queued refresh.
 The project piece remains free of writer orchestration, and no Git gate is acquired under the writer.
 The original crash, ancestry, writer-latch and open-review controls remain, with new cleanup, binding and authority controls written.
-Corrected-source proof and independent re-review remain pending.
+The full check on signed 27e38c85, exact source 6b6cd964, passed recursive/root typing, 7,565 tests across 500 files with two skips, all 20 browser cases, and credits.
+The original Grade 6 and later Grade 7 reviews remain preserved; the current whole-unit correction and independent re-check remain pending.
 
 ## 591. Existing repository creation could persist a feature branch as main
 
@@ -10194,7 +10209,8 @@ The exact actionable pre-effect reason is “check out main or master in the mai
 An initial branch refusal enters current final admission and receives a terminal receipt only while no intent exists; unfinished-intent and unavailable-account retries keep their existing policy.
 The New project controller's original author will consume this fixed reason directly at composition; no peer controller is edited here.
 First-main initialization, dedicated worktrees, intent ownership, receipt identity and owner review remain.
-Corrected-source proof and independent re-review remain pending.
+The full check on signed 27e38c85, exact source 6b6cd964, passed recursive/root typing, 7,565 tests across 500 files with two skips, all 20 browser cases, and credits.
+The original Grade 6 and later Grade 7 reviews remain preserved; the current whole-unit correction and independent re-check remain pending.
 
 ## 592. Task reassignment left a valid linked question permanently open
 
@@ -10204,7 +10220,8 @@ A valid holder answer now closes the question and delivers its redacted answer n
 Only the TaskChanged completion event is omitted when the original asker lacks current task authority.
 The task's projected state and answer history preserve that distinction.
 Holder checks, atomic delivery, terminal receipt and authorized task completion remain.
-Corrected-source proof and independent re-review remain pending.
+The full check on signed 27e38c85, exact source 6b6cd964, passed recursive/root typing, 7,565 tests across 500 files with two skips, all 20 browser cases, and credits.
+The original Grade 6 and later Grade 7 reviews remain preserved; the current whole-unit correction and independent re-check remain pending.
 
 ## 593. Git process-wrapper tests are sensitive to host load
 
@@ -10214,3 +10231,40 @@ That is attributed reviewer evidence, not a builder rerun or a passing result at
 The wrappers start a Node.js process for each Git call.
 This unit records the sensitivity without increasing timeouts, rewriting wrappers broadly or running a loaded local full.
 Original failures, original timeouts and the lightly loaded remote full proof remain preserved.
+
+
+## 595. Broad failure text marked partial Git effects as determinate
+
+The Grade 7 re-review found that local permission errors and mixed-reference fetch failures could acquire a known refusal after Git had changed files or references.
+Local process failures now remain conservative and never map permission text to authentication_required.
+Only explicit fetch, pull and push boundaries can classify constrained remote refusal evidence; push rejection is specific to push, and pull divergence uses its exact terminal diagnostic.
+Conflict admission still requires both MERGE_HEAD and actual unmerged entries.
+Real partial fast-forward merge, pull permission, mixed-reference fetch and main-approval controls retain actual changed bytes/references and uncertainty without a durable refusal or successful review decision.
+Implementation and controls are written; new proof and independent re-check remain pending.
+
+## 596. Refresh made the old reconciliation branches mostly unreachable
+
+The state refresh policy clears attempts into terminal uncertainty, so commit and approval reconciliation on identical retry added a parallel policy that the page rarely reached.
+Those retry reconciliation branches are retired.
+An old attempt returns uncertainty before and after refresh, while exact caller, command and body reservations survive rebuild.
+A new owner approval request still uses the existing actual two-ancestor containment proof without another Git merge.
+The read comment now documents terminal uncertainty receipts.
+The actual post-Git SQL failure, writer latch, parent/ancestry and open-review controls remain, with expectations updated to this simpler policy.
+New proof and independent re-check remain pending.
+
+## 597. Ordinary Git state reads unnecessarily queued for mutation lanes
+
+The state-read cleanup originally acquired a workspace operation lane even when no pending attempt existed.
+It now observes current authority and workspace identity, then takes that lane only if the current workspace has a pending attempt.
+The ordinary path retains the shared runtime Git gate and does not clean up attempts that started after its check.
+The pending path retains current binding/access admission, original request lanes and short writer settlement after Git observations.
+A positive ordinary-read overlap and the existing real held-Git pending-refresh controls cover the two paths without changing deadlines.
+New proof and independent re-check remain pending.
+
+## 598. Filtered review patches omitted bounded files without marking truncation
+
+An agent review selected paths from its bounded file list but did not mark the resulting patch truncated when that list omitted files.
+Its diff now reports truncation whenever the filtered file list is truncated, while owner aggregate range behavior remains.
+Its aggregate working-read cost is the same status-rescan defect as issue 588 and uses that one supplied canonical correction.
+New bounded review and adopted literal-path/process-count/binary/size/symlink controls preserve credential filtering and reply limits.
+New proof and independent re-check remain pending.

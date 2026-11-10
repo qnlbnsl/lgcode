@@ -65,9 +65,6 @@ export const gitPlanners = {
   "project.discard": mutate((git, path, raw) => git.discard(path, raw.plan as import("./git/types.ts").DiscardPlan, raw.confirmed as boolean)),
   "project.commit": mutate((git, path, raw, input) => Effect.gen(function* () {
     const attempt = own(projectView(input.snapshot).gitAttempts, projectKey(callerKey(input.actor), raw.requestId as string))
-    const recovered = attempt === undefined ? null : yield* gitCall(git.reconcileCommit(path, attempt.before, raw.message as string))
-    if (recovered !== null) return { head: recovered }
-    if (input.gitRetry) return yield* new CommandUncertain({ reason: "Git outcome is uncertain; refresh Git state" })
     if (attempt !== undefined && JSON.stringify(yield* gitCall(git.mutationIdentity(path))) !== JSON.stringify(attempt.before)) return yield* refused("Git: stale_state")
     return { head: yield* gitCall(git.commit(path, raw.message as string)) }
   })),

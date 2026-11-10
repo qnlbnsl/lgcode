@@ -40,8 +40,6 @@ export interface Runtime {
   readonly harnessDefaults?: Effect.Effect<ReadonlyArray<HarnessSettings>>;
 }
 export interface Input {
-  /** Internal retry context from a durable Git attempt; never a client field. */
-  readonly gitRetry?: true;
   readonly runtime: Runtime;
   readonly actor: Caller;
   readonly snapshot: Snapshot;
