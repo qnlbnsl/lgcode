@@ -10225,6 +10225,31 @@ Both owner and filtered agent aggregates now reuse one complete status snapshot 
 Literal paths, binary flags, full text statistics, byte and entry bounds, symlink checks and agent exclusions remain consequential in the adopted real process-count controls.
 This is one canonical correction, shared with issue 598; its new proof and independent re-check remain pending.
 
+The original Git author's sealed diagnostic recorded 71 recursive entries and 302 actual Git child calls.
+Its original five-second assertion failed with 55 child calls unsettled.
+The observed gate wait was 0.027 milliseconds, with no competing admission during that execution.
+Call-to-spawn intervals and child wall intervals remain separate evidence, without a CPU, network or load cause claim.
+The original narrower three-path preparation and all its proof remain archived in that author's retained worktree.
+The author's later accepted-source join supersedes those engine paths with the canonical implementation and regressions from b974da0.
+The original browser failures remain failed; the accepted flow proofs do not prove the subsequently joined Git page.
+
+The joined page's later full12 passed its unit checks and failed three browser cases.
+Its aggregate returned complete data near the original assertion boundary, without a proved allocation between gate waiting and child work.
+The page also withheld received sync counts behind final working identity checks and invalidated coherent data after read-only review preparation.
+Shared projection completeness restarted Git reads even while the connection remained live.
+Seven consequential mounted controls failed on that original page; a lost preparation reply remained uncertain in the eighth passing compatibility control.
+The scoped UI correction separates received counts from mutation readiness, preserves read continuity with explicit reconnect recovery, and retains review readiness only for an exact matching coherent generation.
+The candidate's two mounted files passed all 50 controls, and web typing and credits passed.
+The canonical aggregate engine implementation is unchanged.
+The later full15 passed 7,675 unit tests and 36 browser cases, but the layout case again missed its five-second 71-file assertion.
+Its second aggregate delivered complete data and the observer later counted 71 wrappers; the assertion deadline was not recorded, so that trace does not establish the cause.
+The unchanged selected run16 passed and remains inconclusive about that failure.
+The layout fixture now indexes its same 71 real files before opening the page, leaving file contents, layout assertions, commit count and deadlines unchanged.
+The separate real aggregate regressions retain the untracked-file and process-count coverage.
+The corrected layout case passed its eight viewport and theme combinations remotely with the original assertions and deadlines.
+All nine selected real aggregate regressions also passed remotely, including the six 71-file owner and agent cases.
+These results do not retrospectively establish the cause of the full15 failure.
+
 ## 589. Credential-name exclusion blocked owner Git operations and whole agent reads
 
 The round-one independent review found that the credential-name predicate was inside the shared literal Git path validator.

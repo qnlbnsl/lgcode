@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react"
 import type { AgentId, Project } from "@lgcode/contracts"
 import { Alerts } from "../admin/alerts.tsx"
 import { NotificationPrompt } from "../admin/notification-prompt.tsx"
 import { Settings } from "../admin/settings.tsx"
 import { useMutationDisabled, useShellData } from "../data/ShellDataProvider.tsx"
+import { GitPage, createGitSession } from "../git/index.ts"
 import { NewProjectSession } from "../project/creation.ts"
 import { NewProjectDialog } from "../project/newProject.tsx"
 import { RepositoryRegistration } from "../project/registration.ts"
@@ -53,12 +54,16 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
 }) {
   const data = useShellData()
   const mutationDisabled = useMutationDisabled()
+  const [gitSession] = useState(createGitSession)
+  // One protected Git lifetime follows the authenticated Shell, including
+  // confirmed logout. Tab and inspected-worktree changes retain its drafts.
+  useLayoutEffect(() => () => gitSession.close(), [gitSession])
   const endOwner = useRef(onSessionExpired)
   const expireSession = useCallback(() => endOwner.current(), [])
   const [creation] = useState(() => new NewProjectSession(expireSession))
   const [registration] = useState(() => new RepositoryRegistration(expireSession))
   const projectTrigger = useRef<HTMLButtonElement>(null)
-  endOwner.current = () => { creation.dispose(); registration.dispose(); data.onSessionExpired() }
+  endOwner.current = () => { gitSession.close(); creation.dispose(); registration.dispose(); data.onSessionExpired() }
   useEffect(() => () => { creation.dispose(); registration.dispose() }, [creation, registration])
   const [href, setHref] = useState(() => location.href)
   const route = parseShellRoute(href)
@@ -265,6 +270,10 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
           : route.page === "task" ? <TaskPage route={route} />
           : route.page === "project" && route.tab === "settings" ? <ProjectSettingsPage route={route} />
           : route.page === "project" && (route.tab === "board" || route.tab === "tasks") ? <ProjectPage route={route} />
+          : route.page === "project" && route.tab === "git" && scope.repository && scope.assignedWorkspace && scope.inspectedWorkspace && data.navigation ? <GitPage
+            repository={scope.repository} projects={data.navigation.projects} teams={data.navigation.teams} workspaces={data.navigation.workspaces}
+            assignedWorkspaceId={scope.assignedWorkspace.worktreeId} inspectedWorkspaceId={scope.inspectedWorkspace.worktreeId}
+            onInspect={(workspaceId) => navigate({ ...route, workspaceId })} mutationDisabled={mutationDisabled} connection={data.connection} onSessionExpired={expireSession} session={gitSession} />
           : shellPending(route.page === "project" ? tabNames[route.tab] : "Conversation")}
       </section>
     </main>
