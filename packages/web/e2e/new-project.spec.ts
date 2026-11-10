@@ -130,6 +130,8 @@ test("New project has real unreserved placement, modal keyboard focus, literal t
 })
 
 test("Create persists the goal, real Git worktree and single lead at all eight Field/Dusk sizes, then opens each exact thread", async ({ page }, info) => {
+  // Issue 608: eight real project/worktree/lead creations need a journey-sized budget.
+  test.setTimeout(120_000)
   await fixture(page, (rig, _gate, runner) => Effect.gen(function* () {
     let combination = 0
     for (const width of [390, 768, 1440, 2560]) for (const scheme of ["light", "dark"] as const) {

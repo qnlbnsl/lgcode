@@ -10548,3 +10548,18 @@ The fixture had waited for runner delivery, which does not establish browser ack
 It now requires the preceding empty acknowledged draft and the real enabled Stop reply control before starting the next send fault.
 The original fault, four identical prompt frames, complete body and key, owner authority, eight-view matrix and lifecycle/session consequences remain unchanged.
 The exact blocked guard at the original keypress was not measured, and no production timing defect is claimed.
+
+
+## 608. The eight-project browser journey has too little time
+
+Found: 2026-11-10, while finishing the independently reviewed W08 correction.
+State: corrected under the manager disposition; the related browser file must pass before merge.
+
+The New project journey creates eight real projects, Git worktrees and leads, and opens every exact thread.
+Its default 30-second budget repeatedly expired after six or seven creations on unrelated commits.
+Earlier successful durations ranged from 17.4 to 26.9 seconds.
+The manager identified this as a tight test budget rather than a W08 regression.
+Only this test now uses a 120-second budget.
+Every creation, persistence, single-lead, branch and exact-thread assertion remains unchanged.
+The previous failed full and isolated failure remain recorded as failures.
+The manager requires the failed and related new-project browser file, without another full check or review round.
