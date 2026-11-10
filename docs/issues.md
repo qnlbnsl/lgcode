@@ -10391,3 +10391,13 @@ Unified fallback, paired row alignment, literal patch rendering and the single p
 Focused renderer controls cover both workspace and dialog consumers, and the existing eight-combination browser journey retains its original consequences and deadlines.
 Both original renderer controls failed against unchanged production because the two headings were absent.
 Candidate focused and full proof are recorded under the existing build loop.
+
+## Unallocated full-check failures during the W09 minor corrections
+
+The ordinary remote full check on commit `1b24026` passed typing and 7,678 unit tests, with two existing skips, but failed two browser cases.
+The Git lost-reply case retained the initial unconfirmed acknowledgment instead of publishing terminal uncertainty within its original five-second assertion.
+A later single-case execution with a temporary fixture observer passed, which does not explain the full-run failure.
+The new-project eight-size creation case reached its original 30-second case timeout while creating the eighth project.
+Neither failure has an established cause, and no deadline was increased.
+The complete full output and both original failure contexts remain in `.scratch/w09-evidence/minor-corrections/` in the W09 author worktree.
+The full-check requirement remains unmet, and issue numbers remain manager-owned.
