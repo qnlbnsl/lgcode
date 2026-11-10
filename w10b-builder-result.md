@@ -2,27 +2,41 @@
 
 The builder is Codex, gpt-6.1-sol, with high reasoning effort.
 The retained session is 01a1c1d2-f89b-7e22-b89e-f0e9e130435f.
-This is an independent implementation checkpoint, not unit acceptance.
 The accepted parent is b974da06b2c95317f206132bc0baeece3c0384a1.
-
-Setup reuses the accepted NewProjectDialog and NewProjectSession contracts.
-The project Setup, Mocks and repository Design components and isolated display service are implemented independently.
+This is an independent implementation checkpoint, not unit acceptance.
+Setup directly reuses the accepted NewProjectDialog and NewProjectSession contracts.
 Shell composition remains separate from this checkpoint.
-The display uses the owner-selected separate hostname and an opaque sandbox.
-The editor image remains lgcode-openpencil:w10b-cb71737-build1.
-The owner-approved launch adds NET_BIND_SERVICE immediately after dropping all capabilities.
-Every other confinement flag remains, and all temporary startup diagnostics were removed.
 
-The manager's source23 engine and native typing commands passed.
-All seven focused display-boundary tests passed.
-The native case opened the editor frame and found the actual owned container, then failed because the registered document tab did not appear.
-The CapAdd assertion occurs after that failure in the actual spec, so that assertion was not reached by this run.
-The actual outcome confirms owned-container cleanup.
-The extra unnamed Playwright error remains unattributed.
-Historical logs and owner rulings remain in the website-1 run folder.
+## The owner-approved editor sandbox correction
 
-The owner switched this work to the build loop.
-The builder now runs failed and related checks through run-remote-test on the remote personal computer.
-Commit hashes identify source, ordinary logs preserve actual results, and no further per-run manifests or collection receipts are produced.
-The registered-document import remains under active repair.
-No editor import, complete pixel proof, full-check pass or unit acceptance is claimed.
+Product commit e740c19 gives editor frames allow-scripts allow-same-origin in both the iframe attribute and the display content security policy.
+Recorded mocks retain their opaque sandbox.
+The editor retains only the separate display hostname's origin and storage.
+Owner cookies, owner application programming interface authority, frame ancestors, referrer policy, credential-omitting import, revocation and logout controls remain unchanged.
+The image stays lgcode-openpencil:w10b-cb71737-build1, with the approved NET_BIND_SERVICE capability and every other existing confinement flag.
+No OpenPencil patch, image build, pull or retag was applied.
+All temporary startup and boot-notice observations were removed from active source and the native case.
+
+## Actual remote results
+
+Confirmed live at product commit e740c19: engine, web and native-input typing passed through run-remote-test.
+All 34 related tests passed across engine display boundaries, engine project review and web project review.
+The final native case passed in 10.6 seconds.
+It proves recorded mock CSS, module and image delivery; the registered editor tab, component and canvas; credential-free modules and WebAssembly; a browser hash of the exact issued file; separate-origin owner isolation; the exact approved capability and container restrictions; revocation; logout; and awaited owned-container cleanup.
+The actual outcome records completed=true, ownedContainerNameKnown=true, ownedContainerAbsent=true and ownedContainersAbsent=true.
+A separate Docker listing for the approved image was empty.
+The screenshots include the actual desktop and phone editor views.
+OpenPencil reports one unavailable or substituted font, so exact font fidelity remains unproved.
+
+The original source23 and localStorage failures remain preserved.
+Four related native failures after this correction remain preserved too.
+The first exposed an unhandled Playwright response-body read; two subsequent runs retained the strict byte proof while diagnosing that unavailable observation; the fourth reached Docker's CAP_NET_BIND_SERVICE spelling.
+The final case verifies the actual issued file inside the browser with credentials omitted, and normalizes only Docker's optional CAP_ prefix while still requiring exactly one capability.
+The original document import, component, canvas and isolation assertions remain.
+No request is intercepted, replaced or fulfilled.
+The first native pass was followed by one screenshot timing correction to await the welcome dialog's actual closure; the final pass includes that correction.
+
+The ordinary logs, actual exits, final native case and useful screenshots are in website-1/w10b-document-import.
+The active native input remains .scratch/w10b-foundation-resume/display-tag601/display.spec.ts, with its existing configuration and entry files.
+No local test, direct Secure Shell command, new manifest, collection receipt or frozen request was produced.
+No full-check pass, completed Shell integration, push, merge or unit acceptance is claimed.

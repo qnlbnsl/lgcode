@@ -10433,7 +10433,9 @@ The existing `--pull=never`, non-root user, isolated network, folder mounts, res
 The native fixture uses the same tag and checks the actual generated container name.
 Its original display, import, pixel, isolation and cleanup assertions remain.
 Temporary static launcher diagnostics are retained separately and must not be committed.
-Status: product and fixture source prepared; new remote typing, focused and native proof are pending.
+Status: product and fixture corrected; independent remote typing and focused checks passed.
+The native follow-up below records the later startup failures and their disposition.
+The issue remains open pending unit review and integration.
 
 
 ### The later editor boot failure is separate from image presence
@@ -10447,4 +10449,13 @@ Recorded mocks keep their opaque sandbox.
 The editor keeps its separate display hostname, credential-omitting document import, owner-cookie exclusion, frame ancestors, referrer policy, revocation and logout controls.
 The temporary boot-notice read was removed before this correction's commit.
 No OpenPencil source patch or image rebuild is applied.
-The new focused and native outcomes will be recorded after the remote checks complete.
+At product commit e740c19, remote engine, web and native-input typing passed.
+All 34 tests across the display boundaries, project review and actual engine review files passed.
+The related native case first exposed an unhandled Playwright response-body read, then Docker's CAP_NET_BIND_SERVICE spelling.
+The case now proves file bytes with a credential-omitting browser read of the exact issued URL, while retaining the original import status, component and canvas checks.
+The capability assertion normalizes only the optional CAP_ prefix and still requires exactly the one approved capability.
+The final native run passed in 10.6 seconds, including actual modules, WebAssembly, registered file import, screenshots, owner isolation, logout and cleanup.
+Its outcome records completed=true and owned containers absent; a separate Docker listing was empty.
+The screenshots still show OpenPencil's font-unavailable-or-substituted warning.
+This proves the selected document renders, but does not establish exact font fidelity or whole-unit acceptance.
+All original failed logs remain in website-1/w10b-document-import, alongside the passing logs and screenshots.
