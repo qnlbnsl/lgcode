@@ -93,7 +93,7 @@ function AgentThread({ agentId, subject, onSessionExpired }: ThreadProps) {
     const terminal = envelopes.find((row) => row.sequence > attempt.sentSequence && "agentId" in row.event && row.event.agentId === agentId && (
       row.event._tag === "TurnEnded" || row.event._tag === "StateChanged" && row.event.state._tag !== "working"
       || ["AgentStopped", "AgentInterrupted", "AgentCrashed", "AgentReloadFailed"].includes(row.event._tag)
-      || (row.event._tag === "DeliveryReturned" || row.event._tag === "DeliveryRequeued") && sent?._tag === "DeliverySent" && row.event.deliveryId === sent.deliveryId))
+      || (row.event._tag === "DeliveryReturned" || row.event._tag === "DeliveryRequeued" || row.event._tag === "DeliveryHeld") && sent?._tag === "DeliverySent" && row.event.deliveryId === sent.deliveryId))
     if (terminal) conversation.entry.update({ cancelAttempt: undefined, cancelMessage: terminal.event._tag === "TurnEnded"
       ? terminal.event.stopped ? "Reply stopped." : "Reply ended." : "The reply is no longer active." })
   }, [state.loaded, state.items, conversation.entry, conversation.state.cancelAttempt, agentId])

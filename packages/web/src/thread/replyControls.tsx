@@ -13,7 +13,7 @@ export function activeReply(items: ReadonlyArray<ClientEnvelope>, agentId: Agent
     if (event._tag === "DeliverySent") current = { sequence: item.sequence, deliveryId: event.deliveryId }
     else if (event._tag === "StateChanged" && event.state._tag !== "working") current = undefined
     else if (["TurnEnded", "AgentStopped", "AgentInterrupted", "AgentCrashed", "AgentReloadFailed"].includes(event._tag)
-      || (event._tag === "DeliveryReturned" || event._tag === "DeliveryRequeued") && event.deliveryId === current?.deliveryId) current = undefined
+      || (event._tag === "DeliveryReturned" || event._tag === "DeliveryRequeued" || event._tag === "DeliveryHeld") && event.deliveryId === current?.deliveryId) current = undefined
   }
   return current
 }

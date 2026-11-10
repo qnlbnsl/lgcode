@@ -10459,3 +10459,24 @@ The browser journey adds loaded header, real member count, tab-row placement and
 Its original timeout, complete request bodies and keys, permission authority, both latest fixture corrections, exact read-mark equality, unread and full lifecycle and session tails remain intact.
 The original signed source and all passed and failed histories remain preserved.
 The changed source needs its own manager browser and full evidence and independent review.
+
+
+## 602. An accepted capacity hold left the conversation offering Stop reply
+
+Found: 2026-11-10, by the fresh nonauthor W08 whole-unit review on signed 11dfcea.
+The manager allocated this number and assigned the correction to the root lead.
+An accepted delivery's capacity hold records DeliveryHeld without DeliveryRequeued or TurnEnded.
+The engine becomes idle, but active-reply derivation and cancellation settlement omitted that same-delivery event.
+The owner saw Stop reply or its stale recovery instead of the normal Send action.
+
+The first original regression failed setup because its initial thread read omitted the required after cursor.
+That run is preserved and is not behavioral red evidence.
+The corrected original remote run failed both accepted-hold cases at the visible Stop assertion.
+Its unaccepted-requeue control passed.
+All three use the real handler, SQLite, committed history and a mounted production Thread.
+
+Both browser folds now retire only a matching agent and delivery when DeliveryHeld arrives.
+The existing cancellation identity guard prevents a late acknowledgement from restoring the retired attempt.
+The draft remains, the normal Send action returns, and a capacity hold does not claim Reply stopped.
+No engine capacity policy, authority, transport, timeout or session lifetime changes.
+Status: root correction prepared; candidate remote proof and fresh independent review remain pending.
