@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react"
-import type { AgentId } from "@lgcode/contracts"
+import type { AgentId, Project } from "@lgcode/contracts"
 import { Alerts } from "../admin/alerts.tsx"
 import { NotificationPrompt } from "../admin/notification-prompt.tsx"
 import { Settings } from "../admin/settings.tsx"
-import { useShellData } from "../data/ShellDataProvider.tsx"
+import { useMutationDisabled, useShellData } from "../data/ShellDataProvider.tsx"
+import { NewProjectSession } from "../project/creation.ts"
+import { NewProjectDialog } from "../project/newProject.tsx"
+import { RepositoryRegistration } from "../project/registration.ts"
+import { AddRepository } from "../project/addRepository.tsx"
 import { parseShellRoute, scopeKey, shellHref, type ShellRoute, type WorkspaceTab } from "../routes.ts"
 import { Machines } from "../admin/machines.tsx"
 import { Subscriptions } from "../admin/subscriptions.tsx"
@@ -48,6 +52,14 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
   readonly onSessionExpired: () => void; readonly onLogout: () => void; readonly logoutBusy: boolean; readonly message: string
 }) {
   const data = useShellData()
+  const mutationDisabled = useMutationDisabled()
+  const endOwner = useRef(onSessionExpired)
+  const expireSession = useCallback(() => endOwner.current(), [])
+  const [creation] = useState(() => new NewProjectSession(expireSession))
+  const [registration] = useState(() => new RepositoryRegistration(expireSession))
+  const projectTrigger = useRef<HTMLButtonElement>(null)
+  endOwner.current = () => { creation.dispose(); registration.dispose(); data.onSessionExpired() }
+  useEffect(() => () => { creation.dispose(); registration.dispose() }, [creation, registration])
   const [href, setHref] = useState(() => location.href)
   const route = parseShellRoute(href)
   const scope = selectedScope(route, data.navigation, data.snapshot)
@@ -114,6 +126,29 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
     setHref(location.href)
     setDrawer(false); setBell(false); setWorkspaces(false)
   }, [])
+  const openProject = useCallback(() => {
+    setQuick(false); setBell(false); setWorkspaces(false)
+    creation.open(`${location.pathname}${location.search}${location.hash}`, () => projectTrigger.current)
+  }, [creation])
+  const addRepository = useCallback(() => {
+    const state = creation.getSnapshot(), selected = state.draft.repository
+    const repository = selected?._tag === "existing" ? state.repositories.find((row) => row.repoId === selected.repoId) : undefined
+    registration.open(repository === undefined ? undefined : { repository })
+    navigate({ page: "service", service: "machines" })
+  }, [creation, registration, navigate])
+  const returnToProject = useCallback(() => {
+    registration.close()
+    const state = creation.getSnapshot()
+    if (!state.detour) return
+    const origin = parseShellRoute(state.origin)
+    navigate(origin.page === "invalid" ? { page: "home" } : origin, origin.page === "invalid" ? undefined : state.origin, false)
+    creation.returnFromMachines()
+  }, [creation, registration, navigate])
+  const repositoryRegistered = useCallback(() => { data.retry(); returnToProject() }, [data.retry, returnToProject])
+  const projectCreated = useCallback((project: Project) => {
+    creation.close(); data.retry()
+    navigate({ page: "thread", agentId: project.leadAgentId })
+  }, [creation, data.retry, navigate])
   const intercept = (event: MouseEvent) => {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey || !(event.target instanceof Element)) return
     const link = event.target.closest<HTMLAnchorElement>("a[href]")
@@ -207,17 +242,23 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
         return <a key={tab} role="tab" aria-selected={selected} tabIndex={selected ? 0 : -1} href={shellHref(projectRoute(tab))}>{tabNames[tab]}</a>
       })}</nav></OverflowRow>}
       {phone && inspectingControl && <div className="phone-context">{inspectingControl}</div>}
-      <NotificationPrompt onSessionExpired={onSessionExpired} />
+      <NotificationPrompt onSessionExpired={expireSession} />
       <section ref={content} className="view-body" id="view-body" tabIndex={-1} aria-label="Current view">
         {message && <p role="alert">{message}</p>}
         {route.page === "invalid" ? <p role="alert">This page address is invalid. <a href="/#/">Go Home</a></p>
           : unavailable !== undefined ? <p role="alert">{unavailable} <a href="/#/">Go Home</a></p>
-          : threadId !== undefined ? <Thread key={threadId} agentId={threadId} {...(route.page === "thread" && route.subject !== undefined ? { subject: route.subject } : {})} onSessionExpired={onSessionExpired} />
-          : route.page === "home" ? <HomePage route={route} />
-          : route.page === "service" && route.service === "alerts" ? <Alerts onSessionExpired={onSessionExpired} />
-          : route.page === "service" && route.service === "settings" ? <Settings onSessionExpired={onSessionExpired} />
-          : route.page === "service" && route.service === "machines" ? <Machines onSessionExpired={onSessionExpired} />
-          : route.page === "service" && route.service === "subscriptions" ? <Subscriptions onSessionExpired={onSessionExpired} />
+          : threadId !== undefined ? <Thread key={threadId} agentId={threadId} {...(route.page === "thread" && route.subject !== undefined ? { subject: route.subject } : {})} onSessionExpired={expireSession} />
+          : route.page === "home" ? <HomePage route={route} onNewProject={openProject} newProjectButtonRef={projectTrigger} />
+          : route.page === "service" && route.service === "alerts" ? <Alerts onSessionExpired={expireSession} />
+          : route.page === "service" && route.service === "settings" ? <Settings onSessionExpired={expireSession} />
+          : route.page === "service" && route.service === "machines" ? <>
+            <section className="review-page" aria-label="Repository registration">
+              <button type="button" disabled={mutationDisabled || logoutBusy} onClick={() => registration.open()}>Add repository</button>
+            </section>
+            <AddRepository registration={registration} disabled={mutationDisabled || logoutBusy} onRegistered={repositoryRegistered} onCancel={returnToProject} />
+            <Machines onSessionExpired={expireSession} />
+          </>
+          : route.page === "service" && route.service === "subscriptions" ? <Subscriptions onSessionExpired={expireSession} />
           : route.page === "repository" && route.tab === "design" ? <section className="pages"><RepositoryTabs route={route} />{shellPending("Design")}</section>
           : route.page === "repository" ? <RepositoryPage route={route} />
           : route.page === "sprint" ? <SprintPage route={route} />
@@ -227,6 +268,8 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
           : shellPending(route.page === "project" ? tabNames[route.tab] : "Conversation")}
       </section>
     </main>
+    <NewProjectDialog creation={creation} disabled={mutationDisabled || logoutBusy} onAddRepository={addRepository}
+      onSettings={() => { creation.close(); navigate({ page: "service", service: "settings" }) }} onCreated={projectCreated} />
     {quick && <QuickSwitcher close={closeQuick} navigate={navigate} />}
     {bell && <div className="modal-cover" onClick={closeBell}><div ref={bellRef} className="attention-menu" role="dialog" aria-modal="true" aria-label="Needs attention" tabIndex={-1} onClick={(event) => event.stopPropagation()}>
       {connection}<h2>Needs attention</h2>{!data.complete && <p role="status">Showing the last received requests. <button onClick={data.retry}>Retry</button></p>}

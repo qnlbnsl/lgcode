@@ -472,8 +472,9 @@ Requested on 2026-11-06 and represented in the browser mock.
   or board, preserving drafts and the requesting team's branch context.
 - Add Project chooses a machine through Run on before the project name.
   The preview shows that host's branch and folder. Offline hosts and hosts
-  without the repository cannot start work. Unchecking Start work tree uses
-  the main checkout on that machine. No host is silently substituted.
+  without the repository cannot start work. The owner approved a dedicated
+  worktree for every project. New project has no worktree checkbox and always
+  previews Branch and Folder. No host is silently substituted.
 - Machines uses compact tables for machine status, role, agent slots,
   project counts, start actions, and future project placement. Future
   placement does not relabel running work or imply that a project moved.

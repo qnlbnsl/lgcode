@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState, type Ref } from "react"
 import { stageLabel, type Project } from "@lgcode/contracts"
 import type { ShellRoute } from "../routes.ts"
 import { shellHref } from "../routes.ts"
@@ -37,7 +37,9 @@ export function ProjectTable({ projects, repositoryColumn = true }: { readonly p
     })}</tbody></table></div>
 }
 
-export function HomePage({ route, onNewProject }: { readonly route: ShellRoute; readonly onNewProject?: () => void }) {
+export function HomePage({ route, onNewProject, newProjectButtonRef }: {
+  readonly route: ShellRoute; readonly onNewProject?: () => void; readonly newProjectButtonRef?: Ref<HTMLButtonElement>
+}) {
   const data = useShellData()
   const [tab, setTab] = useState<HomeTab>(currentTab)
   const [search, setSearch] = useState("")
@@ -90,7 +92,7 @@ export function HomePage({ route, onNewProject }: { readonly route: ShellRoute; 
       tabIndex={tab === key ? 0 : -1} aria-selected={tab === key} onClick={() => chooseTab(key)}>
       <span className="tab-long">{label}</span><span className="tab-short">{short}</span>
       <small>{data.complete ? key === "projects" ? projects.length : key === "attention" ? active.length + failures.length : active.filter((row) => row.kind === (key === "questions" ? "question" : "permission")).length : "…"}</small>
-    </button>)}</nav>{onNewProject && <button onClick={onNewProject}>New project</button>}</div>
+    </button>)}</nav>{onNewProject && <button ref={newProjectButtonRef} aria-haspopup="dialog" onClick={onNewProject}>New project</button>}</div>
     <div className="home-toolbar"><label className="home-search-label"><span className="sr-only">Search Home</span><input aria-label="Search Home" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /></label>
       <button ref={filterButton} aria-expanded={filterOpen} aria-controls={`${instance}-filters`} onClick={() => setFilterOpen(!filterOpen)}>Filter{Object.values(filters).filter(Boolean).length ? ` (${Object.values(filters).filter(Boolean).length})` : ""}</button>
       {tab !== "projects" && <label className="home-sort">Sort<select value={newest ? "newest" : "oldest"} onChange={(event) => setNewest(event.target.value === "newest")}><option value="oldest">Oldest first</option><option value="newest">Newest first</option></select></label>}
