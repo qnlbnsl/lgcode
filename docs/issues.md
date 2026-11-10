@@ -10372,3 +10372,20 @@ The strict pre-effect grammar does not recognize these complete shapes, so they 
 The manager accepted the reviewed unit at Grade 8, with no blockers, majors or flags.
 The classifier stays conservative in this change.
 Any later widening must prove exact pre-effect refusal shapes without treating local partial effects as authentication failures.
+
+## 606. Previously inspected worktree summaries hide fresh row counts
+
+The independent W09 review found that cached working changes overrode later count reads for an uninspected worktree.
+After visiting two worktrees, changes in the first could remain displayed as a clean checkout while inspecting the second.
+A newer partial or unavailable result was also hidden by that older working view.
+The correction keeps working data authoritative only for the currently inspected row and uses the existing count generation for other rows.
+The focused control retains genuine Git reads beneath narrow partial, unavailable and held-reply boundaries, and checks that aborted generations cannot replace newer counts.
+Original-red and candidate proof are being recorded under the existing build loop.
+
+## 607. Split Git comparisons omit side headings
+
+The independent W09 review found that real split comparisons omitted the mock's Before and After headings and accessible side identity.
+The correction adds paired headings and labeled line groups in the shared comparison renderer.
+Unified fallback, paired row alignment, literal patch rendering and the single phone gutter remain required.
+Focused renderer controls cover both workspace and dialog consumers, and the existing eight-combination browser journey retains its original consequences and deadlines.
+Original-red and candidate proof are being recorded under the existing build loop.

@@ -96,6 +96,49 @@ async function mounted(f: Effect.Success<ReturnType<typeof setup>>, body: (conta
   finally { await act(async () => { root.unmount(); session.close() }); container.remove() }
 }
 
+it("minor606: refreshes a previously visited row with genuine, partial and unavailable counts and rejects its aborted generation", async () => {
+  await Effect.runPromise(provideBoard(rig, Effect.gen(function* () {
+    const f = yield* setup(), main = f.workspaces.find((row) => row.checkout === "main")!
+    let mode: "actual" | "partial" | "unavailable" | "hold" = "actual", release!: () => void, heldSignal: AbortSignal | undefined
+    const pending = new Promise<void>((resolve) => { release = resolve })
+    const changes = (payload: Parameters<Client["project.changes"]>[0]) => f.api["project.changes"](payload).pipe(Effect.flatMap((reply) => {
+      if (payload.worktreeId !== f.source.worktreeId) return Effect.succeed(reply)
+      if (mode === "partial") return Effect.succeed({ ...reply, result: { ...readResult(reply), truncated: true } })
+      if (mode === "unavailable") return Effect.fail({ _tag: "CommandError" as const, requestId: payload.requestId, reason: "Git: not_repository" })
+      if (mode === "hold") return Effect.tryPromise((signal) => { heldSignal = signal; return pending.then(() => reply) })
+      return Effect.succeed(reply)
+    }))
+    const api = { ...f.api, "project.changes": changes } as Client
+    try {
+      yield* Effect.promise(() => mounted({ ...f, api }, async (container, render, session) => {
+        const sourceKey = workspaceKey(f.repository.repoId, "local", f.source.worktreeId), mainKey = workspaceKey(f.repository.repoId, "local", main.worktreeId)
+        const status = (id: string) => container.querySelector(`[data-git-worktree="${id}"] .wt-status`)!.textContent
+        expect(session.get(sourceKey).data?.changes.items).toHaveLength(0)
+        await render({ inspectedWorkspaceId: main.worktreeId })
+        await wait(() => expect(session.get(mainKey).ready).toBe(true))
+        save(f.source.path, "after-visit.txt", "actual change after inspecting another worktree\n")
+        await click(container, "Refresh Git"); await wait(() => expect(status(f.source.worktreeId)).toBe("1 changes"))
+        expect(session.get(sourceKey).data?.changes.items).toHaveLength(0)
+        mode = "partial"
+        await click(container, "Refresh Git"); await wait(() => expect(status(f.source.worktreeId)).toBe("Partial change list"))
+        mode = "unavailable"
+        await click(container, "Refresh Git"); await wait(() => expect(status(f.source.worktreeId)).toBe("Unavailable"))
+        mode = "hold"
+        await click(container, "Refresh Git"); await wait(() => expect(heldSignal).toBeDefined())
+        save(f.source.path, "after-held-read.txt", "actual newer generation\n"); mode = "actual"
+        await click(container, "Refresh Git"); await wait(() => expect(status(f.source.worktreeId)).toBe("2 changes"))
+        expect(heldSignal!.aborted).toBe(true)
+        await act(async () => release())
+        expect(status(f.source.worktreeId)).toBe("2 changes")
+        save(main.path, "current-worktree.txt", "current inspected working data\n")
+        await click(container, "Refresh Git")
+        await wait(() => expect(session.get(mainKey).data?.changes.items).toHaveLength(1))
+        expect(status(main.worktreeId)).toBe("1 changes")
+      }))
+    } finally { release() }
+  })).pipe(Effect.orDie))
+})
+
 it("stages exact tab paths, refuses stale discard, preserves offline drafts, and commits through the authenticated controller", async () => {
   await Effect.runPromise(provideBoard(rig, Effect.gen(function* () {
     const f = yield* setup(); save(f.source.path, "tab\tfile.txt", "<script>literal</script>\n"); save(f.source.path, "file.txt", "working\n")
