@@ -16,8 +16,8 @@ type OwnerSetupProps = Omit<ComponentProps<typeof Setup>, "renderProject"> & {
 // The same accepted form stays mounted through Back. Shell keeps this setup
 // mount hidden during Machines/Settings detours and mounts no second dialog.
 export function OwnerSetup({ creation, disabled, onAddRepository, onSettings, onOpenLead, ...setup }: OwnerSetupProps) {
-  return <Setup {...setup} renderProject={(onCreated) => <FirstProject creation={creation}
-    {...(disabled === undefined ? {} : { disabled })} onAddRepository={onAddRepository} onSettings={onSettings} {...(onOpenLead === undefined ? {} : { onOpenLead })} onCreated={onCreated} />} />
+  return <Setup {...setup} {...(onOpenLead === undefined ? {} : { onOpenLead })} renderProject={(onCreated, checking) => <FirstProject creation={creation}
+    disabled={disabled || checking} onAddRepository={onAddRepository} onSettings={onSettings} {...(onOpenLead === undefined ? {} : { onOpenLead })} onCreated={onCreated} />} />
 }
 function FirstProject(props: {
   readonly creation: NewProjectSession; readonly disabled?: boolean

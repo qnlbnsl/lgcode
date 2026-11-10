@@ -497,6 +497,12 @@ test("mounted Mocks and repository Design expose actual immutable evidence, supp
 
 
 test("registered component View renders its own styles and image inertly, denies stale and foreign selections, and revokes the real session", async ({ page }, info) => {
+  // One serial journey builds the page and real worktree, registers evidence,
+  // opens/revokes component sessions, checks stale/foreign/private boundaries,
+  // then opens the active mock at two exact widths and verifies logout denial.
+  // The full reached mock opening after 30s; focused runs took 24-25s.
+  // Keep every assertion/action deadline unchanged within this journey budget.
+  test.setTimeout(60_000)
   await fixture(page, (rig) => Effect.gen(function* () {
     const view = projectView(yield* snapshot), project = Object.values(view.projects)[0]!, folder = view.workspaces[project.worktreeId]!.path
     const component = '<!doctype html><title>Registered component</title><link rel="stylesheet" href="style.css"><h1>Actual registered component</h1><img alt="Owned component mark" src="mark.svg"><button autofocus onclick="document.body.dataset.clicked=String(Number(document.body.dataset.clicked||0)+1)">Component action</button><script>document.body.dataset.loaded="yes";document.body.dataset.clicked="0";try{parent.document.body.dataset.escaped="yes"}catch{document.body.dataset.opaque="yes"}</script>'
@@ -581,7 +587,22 @@ test("registered component View renders its own styles and image inertly, denies
       await close.click()
       await page.goto(`${origin}/#/project/${project.projectId}/mocks`)
       const mock = page.getByRole("region", { name: "Recorded mock preview", exact: true })
+      // Issuance, navigation and script readiness are distinct boundaries.
+      // Keep the same default assertion deadline for each actual consequence.
+      issuedStatus = 0
+      let mockDocumentStatus = 0
+      const documentResponse = (response: import("@playwright/test").Response) => {
+        const url = new URL(response.url())
+        if (response.request().resourceType() === "document" && url.hostname === "localhost" && url.pathname === "/card") mockDocumentStatus = response.status()
+      }
+      page.on("response", documentResponse)
       await mock.getByRole("button", { name: "Open preview", exact: true }).click()
+      await expect.poll(() => issuedStatus).toBe(200)
+      await expect(mock.locator("iframe")).toBeVisible()
+      const mockUrl = await mock.locator("iframe").getAttribute("src")
+      await expect.poll(() => page.frames().some((child) => child.parentFrame() === page.mainFrame() && child.url() === mockUrl)).toBe(true)
+      await expect.poll(() => mockDocumentStatus).toBe(200)
+      page.off("response", documentResponse)
       const mockFrame = mock.frameLocator("iframe")
       await expect(mockFrame.locator("body")).toHaveAttribute("data-loaded", "yes")
       await page.getByRole("button", { name: "Desktop", exact: true }).click()
@@ -621,7 +642,12 @@ for (const axis of ["model", "effort"] as const) test(`first-run ${axis} refusal
       await form.getByLabel("Project name", { exact: true }).fill(`Recover ${axis}`)
       await form.getByRole("button", { name: "Create project", exact: true }).click()
       await expect(page.getByText("Setup completion is unconfirmed.", { exact: false })).toBeVisible()
-      await form.getByRole("button", { name: "Open lead conversation", exact: true }).click()
+      await page.reload()
+      await expect(page.getByRole("main", { name: "Set up LGcode", exact: true })).toBeVisible()
+      await expect(page.getByRole("button", { name: "Create project", exact: true })).toHaveCount(0)
+      await expect(page.getByRole("button", { name: "Retry completion", exact: true })).toBeVisible()
+      await expect(page.locator(".new-project form")).toHaveCount(0)
+      await page.getByRole("button", { name: "Open lead conversation", exact: true }).click()
       await expect(page.getByRole("region", { name: "Thread", exact: true })).toBeVisible()
       await expect(page.getByRole("article", { name: "Failed start", exact: true })).toContainText(axis === "model" ? "refused the model" : "refused the effort")
     })
@@ -662,5 +688,39 @@ for (const axis of ["model", "effort"] as const) test(`first-run ${axis} refusal
     expect(runner.callsOf("configure").at(-1)!.input.desired[axis]).toBe(axis === "model" ? "valid-model" : "low")
     const configured = events.filter((row) => row.event._tag === "AgentConfigurationApplied" && row.event.agentId === project.leadAgentId)
     expect(configured.at(-1)?.event).toMatchObject({ applied: { [axis]: axis === "model" ? "valid-model" : "low" } })
+  }), false)
+})
+
+
+test("pending Setup requires an explicit choice among multiple committed projects after reload and cannot create a replacement", async ({ page }) => {
+  await fixture(page, (_rig, _gate, runner) => Effect.gen(function* () {
+    runner.script("start", () => Effect.fail(new RunnerRejected({ reason: "controlled first-run refusal", startFailure: "model-refused" })))
+    const first = success(yield* call(owner, "project.create", { name: "First committed", goal: "", machineId: "local", repository: { _tag: "new", name: "first-committed" }, useWorktree: true }))
+    const second = success(yield* call(owner, "project.create", { name: "Second committed", goal: "", machineId: "local", repository: { _tag: "new", name: "second-committed" }, useWorktree: true }))
+    success(yield* call(owner, "project.setup.advance", { step: "found" }))
+    success(yield* call(owner, "project.setup.advance", { step: "project" }))
+    const before = projectView(yield* snapshot)
+    const project = before.projects[first.projectId]!
+    expect(project.projectId).not.toBe(second.projectId)
+    yield* Effect.promise(async () => {
+      await page.reload()
+      const recovery = page.getByRole("region", { name: "Existing first project", exact: true })
+      await expect(recovery).toContainText("Several projects exist")
+      await expect(page.locator(".new-project form")).toHaveCount(0)
+      await expect(page.getByRole("button", { name: "Open lead conversation", exact: true })).toHaveCount(0)
+      await expect(page.getByRole("button", { name: "Retry completion", exact: true })).toHaveCount(0)
+      await recovery.getByRole("button", { name: "Continue First committed", exact: true }).click()
+      await recovery.getByRole("button", { name: "Open lead conversation", exact: true }).click()
+      await expect(page.getByRole("article", { name: "Failed start", exact: true })).toBeVisible()
+      await expect(page).toHaveURL(new RegExp(`#\\/thread\\/${project.leadAgentId}$`))
+      await page.getByRole("button", { name: "Return to first project", exact: true }).click()
+      await expect(recovery.getByRole("heading", { name: "First committed", exact: true })).toBeVisible()
+      await expect(page.getByRole("button", { name: "Retry completion", exact: true })).toBeVisible()
+      await expect(page.locator(".new-project form")).toHaveCount(0)
+    })
+    const after = projectView(yield* snapshot)
+    expect(after.projects).toEqual(before.projects)
+    expect(after.setup.completedAt).toBeUndefined()
+    expect((yield* readLog).filter((row) => row.event._tag === "project.Created")).toHaveLength(2)
   }), false)
 })

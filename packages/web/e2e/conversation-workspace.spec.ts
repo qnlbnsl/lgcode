@@ -125,7 +125,11 @@ test("conversations retain drafts, real context, delivery and owner peek across 
           await page.getByRole("button", { name: "Stop reply", exact: true }).click()
           await expect.poll(() => runner.callsOf("cancel").length).toBe(1)
           await expect(page.getByText("Reply stopped.", { exact: true })).toBeVisible()
-          await input.fill("Next prompt survives cancellation"); await input.press("Enter")
+          await input.fill("Next prompt survives cancellation")
+          // Reply stopped can precede the Shell's coherent write admission.
+          // Preserve Enter submission once the actual Send control admits it.
+          await expect(page.getByRole("button", { name: "Send prompt", exact: true })).toBeEnabled()
+          await input.press("Enter")
           await expect.poll(() => runner.callsOf("prompt").filter((row) => row.input.agentId === worker.agentId).length).toBe(2)
           expect(runner.callsOf("stop")).toHaveLength(0)
           // Runner delivery can precede the browser's receipt and coherent

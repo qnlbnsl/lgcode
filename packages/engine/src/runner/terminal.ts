@@ -5,8 +5,8 @@ import * as Effect from "effect/Effect";
 import type { Translated } from "./translate.ts";
 
 // Source: claude-agent-acp 0.99.1 dist/v2/terminal.js:20-59,91-94 and
-// dist/v2/agent.js:242-270; codex-acp 2.5.0 dist/index.js:31808-31835,
-// 31974-32018,32693-32724. V2 sends base64 terminal updates BEFORE the
+// dist/v2/agent.js:242-270; codex-acp 2.6.0 dist/index.js:32277-32300,
+// 32443-32490,33977-33982,35995-36007. V2 sends base64 terminal updates BEFORE the
 // associated tool report; v1 puts decoded output/deltas and exits in _meta.
 // Correlation comes only from that report's terminal reference or info.
 // This is independent adapter-notification handling, not copied adapter code.

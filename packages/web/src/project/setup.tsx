@@ -8,12 +8,13 @@ import { advanceSetup, changeSetupSettings, completeSetup, readSetup, setupCompl
 import "./review.css"
 
 type Step = SetupState["step"]
-type SetupRead = { readonly setup: SetupState; readonly settings?: ProjectSettings; readonly discovery: typeof Discovery.Type }
+type SetupRead = { readonly setup: SetupState; readonly settings?: ProjectSettings; readonly discovery: typeof Discovery.Type; readonly projects: ReadonlyArray<Project> | undefined }
 
 // Mounted only inside the authenticated owner session. The supplied project
 // form remains mounted during Back so its single session-owned draft survives.
-export function Setup({ renderProject, onCompleted, onLogout, onSessionExpired }: {
-  readonly renderProject: (onCreated: (project: Project) => void) => ReactNode
+export function Setup({ renderProject, onOpenLead, onCompleted, onLogout, onSessionExpired }: {
+  readonly renderProject: (onCreated: (project: Project) => void, disabled: boolean) => ReactNode
+  readonly onOpenLead?: (project: Project) => void
   readonly onCompleted: (projectId?: ProjectId) => void; readonly onLogout: () => void
   readonly onSessionExpired: () => void
 }) {
@@ -49,9 +50,9 @@ export function Setup({ renderProject, onCompleted, onLogout, onSessionExpired }
   const go = async (step: Step) => {
     const order: Step[] = ["welcome", "found", "project"]
     if (read === undefined) return
-    if (order.indexOf(step) <= order.indexOf(read.setup.step)) { setPage(step); if (step === "project") setStartedForm(true); return }
+    if (order.indexOf(step) <= order.indexOf(read.setup.step)) { setPage(step); if (step === "project") { setStartedForm(true); setRead({ ...read, projects: undefined }); await refresh() }; return }
     const next = await api.run((client) => advanceSetup(client, step))
-    if (next !== undefined) { setRead({ ...read, setup: next }); setPage(step); if (step === "project") setStartedForm(true) }
+    if (next !== undefined) { setRead({ ...read, setup: next, projects: undefined }); setPage(step); if (step === "project") { setStartedForm(true); await refresh() } }
   }
   const saveSettings = async (change: Partial<ProjectSettings>) => {
     const saved = await api.run((client) => changeSetupSettings(client, change))
@@ -60,6 +61,7 @@ export function Setup({ renderProject, onCompleted, onLogout, onSessionExpired }
   }
   const created = async (projectId: ProjectId) => {
     const attempt = finish.current ?? { projectId, requestId: requestId() }
+    if (attempt.projectId !== projectId) return
     finish.current = attempt
     setCreatedProject(projectId)
     const outcome = await api.run((client) => Effect.gen(function* () {
@@ -76,6 +78,9 @@ export function Setup({ renderProject, onCompleted, onLogout, onSessionExpired }
   }
   const discovery = read?.discovery
   const usable = discovery?.state === "available" && discovery.readyDefaults !== undefined
+  const existing = read?.projects ?? []
+  const recovered = existing.find((project) => project.projectId === createdProject) ?? (existing.length === 1 ? existing[0] : undefined)
+  const completionId = createdProject ?? recovered?.projectId
   return <main className="review-page setup-page" aria-label="Set up LGcode"><header><p>Step {page === "welcome" ? 1 : page === "found" ? 2 : 3} of 3</p><button onClick={onLogout}>Log out</button></header>
     <h1 tabIndex={-1} ref={heading}>{page === "welcome" ? "LGcode" : page === "found" ? "Found on this computer" : "First project"}</h1>
     {api.message && <p role="alert">{api.message}</p>}{notice && <p role="status">{notice}</p>}
@@ -100,7 +105,13 @@ export function Setup({ renderProject, onCompleted, onLogout, onSessionExpired }
       {!usable && <p role="status">A project needs available discovery and configured lead defaults with local readiness evidence. Check again after configuring them.</p>}
       <footer><button disabled={api.busy} onClick={() => void go("welcome")}>Back</button><button disabled={api.busy || !usable} onClick={() => void go("project")}>Continue</button></footer>
     </>}
-    <div hidden={page !== "project"}>{startedForm && renderProject((project) => { void created(project.projectId) })}</div>
-    {page === "project" && <footer><button disabled={api.busy} onClick={() => void go("found")}>Back</button>{createdProject !== undefined && <button disabled={api.busy} onClick={() => void created(createdProject)}>Retry completion</button>}</footer>}
+    <div hidden={page !== "project"}>{startedForm && (existing.length === 0
+      ? renderProject((project) => { void created(project.projectId) }, api.busy || read?.projects === undefined)
+      : <section aria-label="Existing first project"><p>A project was already created. Continue with its existing lead before completing Setup.</p>
+        {existing.length > 1 && <><p>Several projects exist. Choose the project to continue; none has been selected automatically.</p>
+          {existing.map((project) => <button key={project.projectId} disabled={api.busy || finish.current !== undefined} onClick={() => setCreatedProject(project.projectId)}>Continue {visibleText(project.name)}</button>)}</>}
+        {recovered && <><h2>{visibleText(recovered.name)}</h2><button disabled={api.busy} onClick={() => onOpenLead?.(recovered)}>Open lead conversation</button></>}
+      </section>)}</div>
+    {page === "project" && <footer><button disabled={api.busy} onClick={() => void go("found")}>Back</button>{completionId !== undefined && <button disabled={api.busy} onClick={() => void created(completionId)}>Retry completion</button>}{read?.projects === undefined && <button disabled={api.busy} onClick={() => void refresh()}>Check existing projects</button>}</footer>}
   </main>
 }

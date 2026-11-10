@@ -192,10 +192,11 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
     creation.close(); navigate({ page: "service", service: "settings" })
   }, [creation, navigate, setupRequired])
   const openSetupLead = useCallback((project: Project) => {
-    if (creation.getSnapshot().project?.projectId !== project.projectId) return
+    if (creation.getSnapshot().project?.projectId !== project.projectId
+      && !data.navigation?.projects.some((row) => row.projectId === project.projectId && row.leadAgentId === project.leadAgentId)) return
     setSetupDetour(true)
     navigate({ page: "thread", agentId: project.leadAgentId })
-  }, [creation, navigate])
+  }, [creation, data.navigation, navigate])
   const setupCompleted = useCallback((completedId?: Project["projectId"]) => {
     const project = creation.getSnapshot().project
     creation.close(); setSetupRequired(false); setSetupDetour(false); data.retry()

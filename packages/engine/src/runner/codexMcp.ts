@@ -5,16 +5,16 @@ export const mcpScriptPath = fileURLToPath(new URL("../../../cli/src/bin.ts", im
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
-// Issue 236, owner option (b). codex-acp 2.5.0's createSessionConfig
+// Issue 236, owner option (b). codex-acp 2.6.0's createSessionConfig (dist/index.js:43391-43448)
 // replaces mcp_servers when ACP supplies servers, so this config requires
 // an empty ACP list on new, load and resume. Only this server is approved.
-// Codex 0.165.0 confirms `approve` returns false from
+// Codex 0.166.0 confirms `approve` returns false from
 // requires_mcp_tool_approval_for_mode:
-// https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/core/src/mcp_tool_call.rs#L2440-L2450
+// https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/core/src/mcp_tool_call.rs#L2447-L2458
 // create_env_for_mcp_server reads env_vars from std::env independently of
 // shell_environment_policy (including inherit=core), rather than embedding
 // token values in the configuration that codex-acp logs at startup:
-// https://github.com/openai/codex/blob/rust-v0.165.0/codex-rs/rmcp-client/src/utils.rs#L14-L56
+// https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/rmcp-client/src/utils.rs#L15-L57
 // These are configuration facts, not copied implementation code.
 export const withLGcodeMcp = (accountConfig: string | undefined): string => {
   const config: unknown = accountConfig === undefined ? {} : JSON.parse(accountConfig);

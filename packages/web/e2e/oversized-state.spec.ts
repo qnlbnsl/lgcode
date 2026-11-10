@@ -156,11 +156,11 @@ test("7.14 production state markers recover once over a 500-kbit/s link while li
           expect(reads[0]!.socket).not.toBe(stream.socket)
           await expect(page.locator(".home-view .home-request-row")).toHaveCount(2)
           await expect(page.locator(".topbar .attention-toggle")).toHaveAttribute("aria-label", "2 items need attention")
-          await expect.poll(() => replies.filter(({ frame }) => Array.isArray(frame.exit?.value?.agents)).at(-1)?.frame.exit.value.agents[0]?.groups.some((group: string) => group.startsWith("live-"))).toBe(true)
+          await expect.poll(() => replies.filter(({ frame }) => Array.isArray(frame.exit?.value?.agents)).at(-1)?.frame.exit.value.agents.find((agent: { agentId: string }) => agent.agentId === worker.agentId)?.groups.some((group: string) => group.startsWith("live-"))).toBe(true)
           const snapshot = replies.filter(({ frame }) => Array.isArray(frame.exit?.value?.requests)).at(-1)!.frame.exit.value
           expect(snapshot.requests.map((row: { id: string }) => row.id).sort()).toEqual(["large-request", "slow-request"])
           expect(snapshot.requests.every((row: { agentId: string; holder: { _tag: string } }) => row.agentId === worker.agentId && row.holder._tag === "owner")).toBe(true)
-          expect(snapshot.agents).toMatchObject([{ agentId: worker.agentId, name: "Large state worker", openPermissionRequests: 2 }])
+          expect(snapshot.agents.filter((agent: { agentId: string }) => agent.agentId === worker.agentId)).toMatchObject([{ agentId: worker.agentId, name: "Large state worker", openPermissionRequests: 2 }])
           expect(snapshot.requestsWithoutDisplay).toBe(0)
           console.info(`7.14 recovery: ${reply.bytes} encoded bytes, ${elapsed} ms at 500 kbit/s, one surviving read`)
           proxy!.throttle(undefined)

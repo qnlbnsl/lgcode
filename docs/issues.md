@@ -10831,6 +10831,32 @@ first project retains the original project and creation. Setup remains pending
 until configure/resume succeeds. Only an exact durable completion refusal
 permits a new completion key; ambiguous failures retain the original key.
 
+The continuing independent review reproduced a reload defect after that first
+project committed with a failed lead. Reload lost the in-memory created project,
+showed another editable creation form, and allowed a second project. Setup now
+reads the complete existing project collection under a stable engine sequence.
+One existing project exposes its same lead and completion controls. Multiple
+projects require an explicit choice; no latest-project assumption is made.
+Incomplete or failed reads cannot enable replacement creation. No private draft
+is persisted, and no new API, event or synthetic completion is introduced.
+The regression reloads both model and effort failures before real configure,
+resume and completion, and separately preserves ambiguous multiple-project state.
+
 ### W11 actual-provider selector boundary (unallocated)
 
 The real Codex adapter selector does not advertise the exact requested gpt-6.1-sol. The minimal owned-service probe confirmed that the request's configId belongs to that same selector and that the correctly shaped setting receives InvalidParams. It printed fixed booleans, without options, raw errors or credentials. This is an external provider/adapter configuration limit, not an established local runner bug. The requested model and provider remain unchanged. Actual-provider completion, private-login halt and restart receipt/rebuild proof remain incomplete. W11 merge is blocked pending manager disposition. The named W11 builder result retains the failed attempts and ordinary diagnostic log.
+
+The manager subsequently traced this historical blocker to the pinned
+codex-acp2.5.0 bundling Codex0.165.0. The appended manager disposition authorizes
+exactly codex-acp2.6.0 and its lockfile, which resolves Codex0.166.0, while keeping
+gpt-6.1-sol/high. Current adapter MCP/terminal internals and Codex0.166.0 approval
+and environment handling were rechecked. The existing issue236 configuration
+still applies; no shim, provider/model substitution or weaker choice check was
+added. Related tests and actual live outcomes remain in the W11 builder result.
+
+The authorized upgraded actual-provider web journey subsequently exited0 at the
+unchanged gpt-6.1-sol/high. It completed real tool/board handoff, exact answer
+replay, exact reply/file bytes, stop/resume, private-login failure and halted
+composer consequences, and service-restart receipt/rebuild checks. The original
+failed probes and same-copy overlap remain historical evidence. The final signed
+ordinary full and continuing independent review are separate requirements.

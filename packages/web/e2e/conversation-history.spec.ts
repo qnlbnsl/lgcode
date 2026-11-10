@@ -69,6 +69,7 @@ test("both owner clients retain first/later prompts, question answers, board del
         yield* Effect.promise(async () => {
           viewer = new ViewerSession(await connectViewer({ LGCODE_HOME: rig.stateFolder }), () => {})
           await viewer.start()
+          await viewer.select(worker.agentId)
           await page.setViewportSize({ width: 360, height: 800 })
           await page.goto(`http://127.0.0.1:${port}/`)
           await page.getByLabel("Password", { exact: true }).fill(password)

@@ -212,6 +212,8 @@ it("keeps a mounted project-form slot and its draft through Back, while durable 
   let step = "found"
   transport.client = {
     "project.setup": () => Effect.succeed({ setup: { step } }),
+    "client.sequence": () => Effect.succeed({ sequence: 1 }),
+    "project.read": () => Effect.succeed({ items: [] }),
     "project.settings": () => Effect.succeed({ settings: { workspaceFolder: "/actual/work", shell: "sh", displayName: "Explicit owner" } }),
     "project.setup.discover": () => Effect.succeed({ result: { state: "available", repositories: [], harnesses: [], truncated: false,
       readyDefaults: { harness: "claude", account: { _tag: "named", accountId: "actual-account" }, permission: "ask" }, ownerNameSuggestion: "Git suggestion" } }),
@@ -308,7 +310,7 @@ it("uses the accepted single creation controller and form through Setup Back and
     "project.creations": () => Effect.succeed({ items: [] }),
     "project.placement.preview": () => Effect.succeed({ result: { branch: "actual-branch", path: "/actual/worktree", checkout: "worktree", reserved: false } }),
     "project.create": (payload: { requestId: string; useWorktree: boolean }) => { created.push(payload); return Effect.succeed({ projectId: "actual-created" }) },
-    "project.read": () => Effect.succeed({ items: [{ projectId: "actual-created", name: "Owned draft", leadAgentId: "actual-lead", repoId: "repo", worktreeId: "actual-worktree", machineId: "local", goal: "Actual goal" }] }),
+    "project.read": () => Effect.succeed({ items: created.length === 0 ? [] : [{ projectId: "actual-created", name: "Owned draft", leadAgentId: "actual-lead", repoId: "repo", worktreeId: "actual-worktree", machineId: "local", goal: "Actual goal" }] }),
     "project.setup.complete": ({ projectId: id }: { projectId: string }) => { setup = { step: "project", completedAt: 123459, projectId: id }; return Effect.succeed({}) }
   }
   const creation = new NewProjectSession(() => {})
