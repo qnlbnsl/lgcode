@@ -46,10 +46,11 @@ Unchecked items below still require their complete integration proof.
       and the diff with line numbers. Unified and split views are drawn by the page.
       Give the reply a size limit.
 - [ ] Read a branch's commit history, and the files and diff of one commit.
-- [ ] Create a project's worktree when Start work tree is ticked, which is the
-      default. A safe form of the project name sets the branch and the folder, with a
-      numeric suffix on a collision. Unticked uses the main checkout. Report git
-      errors in a form the page can show.
+- [ ] Always create a dedicated worktree for each project. Remove the worktree
+      checkbox, and always preview Branch and Folder. A safe form of the project
+      name sets the branch and the folder, with a numeric suffix on a collision.
+      Keep the repository main checkout recorded for the owner’s review and approval.
+      Report git errors in a form the page can show.
 - [ ] Record which machine each repository and workspace is on.
 
 ### Git writes
@@ -73,7 +74,7 @@ git's failure in a form the page can show.
       type, folder and machine.
 - [ ] Refuse a second project with the same name in a repository, ignoring case.
 - [ ] New project starts the lead with the stored defaults, in the project's
-      worktree or main checkout, and opens its conversation.
+      dedicated worktree, and opens its conversation.
 - [ ] Store each project's preferred shell for its terminal sessions.
 - [ ] Choose each lead's name from a list. Agent's call.
 - [ ] Enforce exactly one lead per project.

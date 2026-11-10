@@ -1,5 +1,11 @@
 // Fixed public reasons contain no caller-controlled text or host error output.
 export const projectRefusalReasons = new Set([
+  "project state changed; refresh and retry",
+  "Git outcome is uncertain; retry the identical request",
+  "Git attempt metadata is unavailable",
+  "project placement cannot change before machine pairing",
+  "only a project lead or owner can change the stage",
+  "context reply exceeds the read budget",
   "context is unavailable to this caller",
   "context is unavailable to this conversation",
   "context project is archived",
@@ -20,6 +26,7 @@ export const projectRefusalReasons = new Set([
   "Git operation queue is full; retry shortly",
   "Git reply exceeds the read budget; select a smaller file or page",
   "only the confirmed local machine can start a project",
+  "projects require a dedicated worktree",
   "finish pending project creations before starting another",
   "configure the workspace folder before creating a project",
   "repository is unavailable",

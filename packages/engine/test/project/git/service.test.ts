@@ -152,8 +152,6 @@ describe("bounded Git service with real temporary repositories", () => {
     expect(review.commits.items.map((item) => item.title)).toEqual(["Two", "One"]);
     expect(review.files.items.map((item) => item.path)).toEqual(["file.txt"]);
     expect(review.diff.patch).toContain("+two");
-    expect(await reason(service.openReview(project.path, "main", "stale"))).toBe("stale_state");
-    expect(await reason(service.openReview(project.path, "main", head))).toBe("missing_remote");
     expect(git(repo, ["show", "HEAD:file.txt"])).toBe("start");
   });
 
@@ -321,8 +319,8 @@ describe("bounded Git service with real temporary repositories", () => {
             } finally { controller.abort(); }
             expect(await pending).toBe("interrupted");
           }
-          // The same instance's queue waits for subprocess cleanup, including
-          // after Effect has already delivered interruption to its caller.
+          // Observe the interrupted subprocess's actual cleanup before
+          // verifying the index and the ownership of its lock.
           await run(short.changes(folder));
           await expect(readFile(index + ".lock")).rejects.toMatchObject({ code: "ENOENT" });
           expect(await readFile(index)).toEqual(originalIndex);
@@ -421,7 +419,6 @@ describe("bounded Git service with real temporary repositories", () => {
     await save(repo, "local", "local\n"); commit(repo, "Local divergence");
     expect(await reason(service.push(repo))).toBe("push_rejected");
     expect(await reason(service.pull(repo))).toBe("pull_diverged");
-    expect(await reason(service.openReview(repo, "main", git(repo, ["rev-parse", "HEAD"])))).toBe("unsupported_provider");
   });
 
   it("reports missing remote/upstream prerequisites without invented successes or raw stderr", async () => {
@@ -498,3 +495,25 @@ describe("bounded Git service with real temporary repositories", () => {
     await expect(readFile(marker)).rejects.toMatchObject({ code: "ENOENT" });
   });
 });
+
+it("issue 585: gives real network Git its own longer bounded subprocess budget", async () => {
+  const remote = join(root, "network.git")
+  await mkdir(remote); git(remote, ["init", "--bare"])
+  git(repo, ["remote", "add", "origin", remote])
+  const bin = join(root, "network-bin"), marker = join(root, "network-entered")
+  await mkdir(bin)
+  const priorPath = process.env.PATH
+  await writeFile(join(bin, "git"), `#!${process.execPath}\nimport { spawnSync } from 'node:child_process';\nimport { writeFileSync } from 'node:fs';\nconst args=process.argv.slice(2);\nif(args.includes('fetch')) { writeFileSync(${JSON.stringify(marker)}, 'fetch'); await new Promise(r=>setTimeout(r, 700)); }\nconst result=spawnSync('/usr/bin/git',args,{stdio:'inherit'}); process.exit(result.status??1);\n`, { mode: 0o700 })
+  process.env.PATH = `${bin}:${priorPath}`
+  try {
+    const bounded = makeGitService({ workspaceFolder: root, timeoutMs: 500, networkTimeoutMs: 3000 })
+    await run(bounded.fetch(repo))
+    expect(await readFile(marker, "utf8")).toBe("fetch")
+    const tooShort = makeGitService({ workspaceFolder: root, timeoutMs: 500, networkTimeoutMs: 500 })
+    const failure = await Effect.runPromise(Effect.flip(tooShort.fetch(repo)))
+    expect(failure).toMatchObject({ reason: "timeout", uncertain: true })
+  } finally {
+    if (priorPath === undefined) delete process.env.PATH
+    else process.env.PATH = priorPath
+  }
+})

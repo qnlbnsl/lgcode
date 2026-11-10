@@ -225,3 +225,32 @@ it.live("multiple blockers prevent sprint completion, and bounded history keeps 
   expect((yield* readLog).filter((row) => row.event._tag === "project.TaskChanged" && row.event.taskId === taskId && row.event.state === "done")).toHaveLength(1)
   success(yield* call(f.leadCredential, "project.sprint.complete", complete))
 })).pipe(Effect.orDie))
+
+
+it.live("issue 577: another worker cannot link a task; task owner and project lead can", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
+  const f = yield* decisionSetup()
+  const leadTask = yield* createTask(f, { owner: f.leadId })
+  const before = (yield* readLog).filter((row) => row.event._tag === "QuestionAsked")
+  expect(failureOf(yield* call(f.workerCredential, "ask", { text: "Finish somebody else's task", taskId: leadTask }))?.reason).toBe("invalid question links")
+  expect((yield* readLog).filter((row) => row.event._tag === "QuestionAsked")).toEqual(before)
+  expect(yield* taskState(f.projectId, leadTask)).toBe("active")
+  const ownTask = yield* createTask(f)
+  for (const [credential, taskId] of [[f.workerCredential, ownTask], [f.leadCredential, leadTask]] as const) {
+    const question = success(yield* call(credential, "ask", { text: "Finish authorized task", taskId }))
+    success(yield* call(owner, "answer", { kind: "question", id: question.questionId, text: "Done" }))
+    expect(yield* taskState(f.projectId, taskId)).toBe("done")
+  }
+})).pipe(Effect.orDie))
+
+it.live("issue 577: an admitted linked question cannot finish a task reassigned before its answer", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
+  const f = yield* decisionSetup(), taskId = yield* createTask(f)
+  const question = success(yield* call(f.workerCredential, "ask", { text: "Choose", taskId }))
+  success(yield* call(f.leadCredential, "project.task.update", { projectId: f.projectId, taskId, owner: f.leadId }))
+  const before = yield* readLog
+  expect(failureOf(yield* call(f.leadCredential, "answer", { kind: "question", id: question.questionId, text: "Answer" }))?.reason).toBe("invalid question links")
+  expect((yield* readLog).slice(before.length).filter((row) => row.event._tag === "QuestionAnswered" || row.event._tag === "project.TaskChanged")).toEqual([])
+  expect((yield* snapshot).questions[question.questionId]?.status).toBe("open")
+  expect(yield* taskState(f.projectId, taskId)).not.toBe("done")
+})).pipe(Effect.orDie))

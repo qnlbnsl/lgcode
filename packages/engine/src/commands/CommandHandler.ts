@@ -18,8 +18,9 @@ import * as SqlClient from "effect/sql/SqlClient";
 
 import { followAvailability } from "../accounts/available.ts";
 import { sha256Hex } from "../identity/credential.ts";
+import { callerKey } from "../identity/caller.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
-import { EventLog, InvalidEvent, LogWriteFailed, callerKey, type SideRows } from "../log/EventLog.ts";
+import { EventLog, InvalidEvent, LogWriteFailed, type SideRows } from "../log/EventLog.ts";
 import { crashEvents } from "../recovery/crash.ts";
 import { Restart } from "../recovery/service.ts";
 import { Runner, RunnerEvent } from "../runner/Runner.ts";
@@ -36,8 +37,17 @@ import { checkPieceBatch, pieceNamespace } from "./pieceBatch.ts";
 import { SecretStore } from "./SecretStore.ts";
 import { loadFirstDefaults } from "./harnesses.ts";
 import { webSettingsCommitted } from "../client/settings.ts";
+import { gitPlanners } from "../project/gitCommands.ts";
+import { planGitOperation } from "./gitOperation.ts";
+import { prepareRegistration, registrationPlanners } from "../project/commands.ts";
+import { prepareDesignRecord } from "../project/design.ts";
+import { prepareMock } from "../project/mocks.ts";
+import { prepareContextFiles } from "../project/context.ts";
+import { promptPlanner } from "./planners.ts";
+import { postPlanner } from "../board/commands.ts";
+import { own, projectKey, projectView } from "../project/view.ts";
 import { prepareProjectLifecycle, projectLifecycleCommand } from "../project/lifecycle.ts";
-import { CommandRefused, freshRequest, readHarnesses, refused, type Input, type Runtime, type Snapshot } from "./internal.ts";
+import { CommandRefused, CommandUncertain, type Plan, type Planner, freshRequest, readHarnesses, refused, type Input, type Runtime, type Snapshot } from "./internal.ts";
 
 export { CommandRefused } from "./internal.ts";
 
@@ -164,7 +174,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
     // payload is not decoded yet, so only a string id picks a lane; a lane
     // for a bad id is harmless.
     const laneFor = (name: string, rawPayload: unknown): string | undefined => {
-      if (projectLifecycleCommand(name)) return "project-lifecycle";
+      if (projectLifecycleCommand(name) || name === "project.creation.abandon") return "project-lifecycle";
       if ((name !== "stop" && name !== "resume" && name !== "cancel-reply" && name !== "configure") || typeof rawPayload !== "object" || rawPayload === null) return undefined;
       const agentId = (rawPayload as { readonly agentId?: unknown }).agentId;
       return typeof agentId === "string" ? agentId : undefined;
@@ -249,17 +259,80 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
       Effect.mapError((error) => error instanceof CommandRefused || error instanceof LogWriteFailed ? error : refused()),
     );
 
-    return CommandHandler.of({
-      cache: (target) => Effect.gen(function* () {
+    const requestLane = <A, E, R>(credential: Credential, name: string, raw: unknown, operation: Effect.Effect<A, E, R>) => Effect.gen(function* () {
+      const actor = yield* resolveCredential(credential, name);
+      const id = typeof raw === "object" && raw !== null ? (raw as { requestId?: unknown }).requestId : undefined;
+      if (typeof id !== "string") return yield* operation;
+      return yield* withLane(log, JSON.stringify(["request", callerKey(actor), id]))(Effect.gen(function* () {
+        const pending = own(projectView(yield* views.snapshot).gitAttempts, projectKey(callerKey(actor), id));
+        if (pending !== undefined) {
+          const rpc = lists.commands.requests.get(name);
+          if (rpc === undefined || pending.command !== name) return yield* refused("request id reused");
+          const payload = yield* Effect.try({
+            try: () => Schema.decodeUnknownSync(Schema.toType(rpc.payloadSchema))(raw) as Record<string, unknown>,
+            catch: () => refused("request id reused"),
+          });
+          const { requestId: _requestId, ...body } = payload;
+          if (pending.bodyHash !== sha256Hex(canonical({ command: name, payload: body }))) return yield* refused("request id reused");
+        }
+        return yield* operation;
+      }));
+    }).pipe(Effect.provideService(SqlClient.SqlClient, sql));
+
+    type Step = <A, E, R>(effect: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
+    const executeMutation = (credential: Credential, name: string, rawPayload: unknown) => Effect.suspend(() => {
+      const prepare = (step: Step) => Effect.gen(function* () {
         if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
-        return yield* acceptCache(runtime, lists, target);
-      }),
-      input: (actor) => views.snapshot.pipe(Effect.map((snapshot) => ({ runtime, actor, snapshot }))),
-      execute: (credential, name, rawPayload) => Object.hasOwn(lists.reads, name) ? executeRead(credential, name, rawPayload)
-        : Effect.acquireUseRelease(preemptStart(credential, name, rawPayload), () => Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
-        if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
-        const step = isBlockingWait(name, rawPayload) ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : restore;
-        if (projectLifecycleCommand(name)) yield* step(Effect.gen(function* () {
+        let external: { readonly plan?: Plan; readonly finalize?: Planner; readonly failure?: CommandRefused | LogWriteFailed; readonly finished?: Event } | undefined;
+        if (Object.hasOwn(gitPlanners, name) || Object.hasOwn(registrationPlanners, name)
+          || ["project.design.record", "project.mocks.record", "project.mocks.approve"].includes(name)
+          || (name === "prompt" || name === "board.post") && typeof rawPayload === "object" && rawPayload !== null
+            && "context" in rawPayload && Array.isArray(rawPayload.context)
+            && rawPayload.context.some((ref: unknown) => typeof ref === "object" && ref !== null && "_tag" in ref && ref._tag === "file")) {
+          const prepareGit = Effect.gen(function* () {
+            const admitted = yield* log.transact(() => Effect.gen(function* () {
+              const actor = yield* resolveCredential(credential, name);
+              const rpc = lists.commands.requests.get(name);
+              if (rpc === undefined) return yield* refused();
+              const payload = yield* Effect.try({ try: () => Schema.decodeUnknownSync(Schema.toType(rpc.payloadSchema))(rawPayload) as Record<string, unknown>, catch: () => refused() });
+              const { requestId, ...body } = payload;
+              if (typeof requestId !== "string" || (yield* log.redactText(requestId)) !== requestId) return yield* refused();
+              const bodyHash = sha256Hex(canonical({ command: name, payload: body }));
+              const caller = callerKey(actor);
+              const receipts = yield* sql<{ body_hash: string }>`SELECT body_hash FROM receipts WHERE caller = ${caller} AND request_id = ${requestId}`;
+              if (receipts[0] !== undefined) {
+                if (receipts[0].body_hash !== bodyHash) return yield* refused("request id reused");
+                return undefined;
+              }
+              if (!lists.access[name]?.includes(actor._tag)) return yield* refused();
+              if (name.startsWith("board.") && lists.boardEnabled === false) return yield* refused("board disabled");
+              return { actor, payload, bodyHash, snapshot: yield* views.snapshot };
+            }));
+            if (admitted === undefined) return undefined;
+            if (Object.hasOwn(registrationPlanners, name)) return { finalize: yield* prepareRegistration(
+              { runtime, actor: admitted.actor, snapshot: admitted.snapshot }, name as keyof typeof registrationPlanners, admitted.payload) };
+            const input = { runtime, actor: admitted.actor, snapshot: admitted.snapshot };
+            if (name === "project.design.record") return { finalize: yield* prepareDesignRecord(input, admitted.payload) };
+            if (name === "project.mocks.record" || name === "project.mocks.approve") return { finalize: yield* prepareMock(input, name, admitted.payload) };
+            if (name === "prompt" || name === "board.post") {
+              const files = yield* prepareContextFiles(input, admitted.payload.context as import("@lgcode/contracts").ContextReference[] | undefined);
+              return { finalize: name === "prompt" ? promptPlanner(files) : postPlanner(files) };
+            }
+            return yield* planGitOperation({ runtime, actor: admitted.actor, snapshot: admitted.snapshot }, name, admitted.payload,
+              admitted.bodyHash, gitPlanners[name as keyof typeof gitPlanners]);
+          }).pipe(
+            Effect.catchTag("RequestIdReused", () => Effect.fail(refused("request id reused"))),
+            Effect.catchTag("SqlError", () => Effect.fail(new LogWriteFailed({ reason: "database read failed" }))),
+            Effect.result,
+          );
+          const result = yield* step(prepareGit);
+          if (result._tag === "Failure") {
+            if (result.failure instanceof CommandUncertain || result.failure._tag === "LogWriteFailed") return yield* result.failure;
+            external = { failure: result.failure };
+          } else external = result.success;
+        }
+        let finalizeLifecycle: Planner | undefined;
+        if (projectLifecycleCommand(name)) finalizeLifecycle = yield* step(Effect.gen(function* () {
           const actor = yield* resolveCredential(credential, name);
           const rpc = lists.commands.requests.get(name);
           if (actor._tag !== "owner" || rpc === undefined || !lists.access[name]?.includes(actor._tag)) return yield* refused();
@@ -272,9 +345,9 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
             if (receipts[0].body_hash !== bodyHash) return yield* refused("request id reused");
             return;
           }
-          yield* prepareProjectLifecycle({ runtime, actor, snapshot: yield* views.snapshot }, name, payload, bodyHash);
+          return yield* prepareProjectLifecycle({ runtime, actor, snapshot: yield* views.snapshot }, name, payload, bodyHash);
         }));
-        const outcome = yield* step(log.transact((append) => Effect.gen(function* () {
+        return yield* step(log.transact((append) => Effect.gen(function* () {
           // Invalid credentials never write an event or retrieve a receipt.
           const actor = yield* resolveCredential(credential, name);
           const rpc = lists.commands.requests.get(name);
@@ -328,7 +401,8 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           }
           const planned = yield* Effect.gen(function* () {
             if (!lists.access[name]?.includes(actor._tag)) return yield* refused();
-            const plan = yield* lists.planners[name]!({ runtime, actor, snapshot }, payload);
+            if (external?.failure !== undefined) return yield* external.failure;
+            const plan = external?.plan ?? (yield* (external?.finalize ?? finalizeLifecycle ?? lists.planners[name]!)({ runtime, actor, snapshot }, payload));
             const namespace = pieceNamespace(name);
             if (namespace !== undefined && !projectLifecycleCommand(name)) {
               if (plan.afterCommit !== undefined) return yield* refused();
@@ -340,7 +414,8 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           if (planned._tag === "Failure") {
             if (planned.failure._tag === "LogWriteFailed") return yield* planned.failure;
             const failure = planned.failure;
-            yield* append(actor, requestId, bodyHash, [{ _tag: "CommandRefused", command: name, reason: failure.reason }], {},
+            if (external?.plan !== undefined || failure instanceof CommandUncertain) return yield* new CommandUncertain({ reason: "Git outcome is uncertain; retry the identical request" });
+            yield* append(actor, requestId, bodyHash, [...(external?.finished === undefined ? [] : [external.finished]), { _tag: "CommandRefused", command: name, reason: failure.reason }], {},
               failure.reason === "no usable account" || projectLifecycleCommand(name) ? false : undefined);
             return { failure, afterCommit: undefined };
           }
@@ -353,19 +428,58 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
           if (written[0] === undefined) return yield* new LogWriteFailed({ reason: "receipt insert returned no result" });
           return { ...(yield* decodeReceipt(written[0].result_json)), afterCommit: plan.afterCommit };
         })));
+      });
+      const finish = (outcome: Effect.Success<ReturnType<typeof prepare>>, step: Step) => Effect.gen(function* () {
         if (outcome.failure !== undefined) return yield* outcome.failure;
         if (name === "client.web.settings.set") yield* webSettingsCommitted(views);
         const late = outcome.afterCommit === undefined ? undefined : yield* step(outcome.afterCommit);
         return late ?? outcome.reply!;
-      })).pipe(
-        (effect) => {
-          const lane = laneFor(name, rawPayload);
-          return lane === undefined ? effect : withLane(log, lane)(effect);
-        },
+      });
+      // Process commands keep request -> process ownership through their
+      // runner continuation. A blocking wait also retains its original atomic
+      // opening/cancellation registration. Other commands release the request
+      // after the durable outcome, before a start takes its new agent lane.
+      const complete = Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
+        const step: Step = isBlockingWait(name, rawPayload) ? (effect) => effect : restore;
+        const outcome = yield* prepare(step);
+        return yield* finish(outcome, step);
+      }));
+      const lane = laneFor(name, rawPayload);
+      const lifecycleCommand = projectLifecycleCommand(name) || name === "project.creation.abandon";
+      const processLane = lifecycleCommand ? undefined : lane;
+      const operation = processLane !== undefined
+        ? requestLane(credential, name, rawPayload, withLane(log, processLane)(complete))
+        : isBlockingWait(name, rawPayload)
+          ? requestLane(credential, name, rawPayload, complete)
+          : Effect.uninterruptibleMask((restore) => Effect.gen(function* () {
+            const outcome = yield* restore(requestLane(credential, name, rawPayload, Effect.uninterruptibleMask(prepare)));
+            return yield* finish(outcome, restore);
+          }));
+      const settled = Effect.acquireUseRelease(preemptStart(credential, name, rawPayload), () => operation.pipe(
         Effect.provideService(SqlClient.SqlClient, sql),
         Effect.catchTag("RequestIdReused", () => Effect.fail(refused("request id reused"))),
         Effect.catchTag("LogWriteFailed", (error) => Effect.fail(error instanceof InvalidEvent ? refused(error.reason) : error)),
         Effect.catchTag("SqlError", () => Effect.fail(new LogWriteFailed({ reason: "database read failed" }))),
-      ), (settle) => settle).pipe((operation) => projectLifecycleCommand(name) ? engineOwned(operation) : operation),
+      ), (settle) => settle);
+      // Lifecycle ownership precedes requests, and requests precede process
+      // lanes (including archive members). Runner/recovery paths take only
+      // process lanes and short writer transactions, never request lanes.
+      if (lifecycleCommand) {
+        const lifecycle = withLane(log, "project-lifecycle")(settled);
+        return projectLifecycleCommand(name) ? engineOwned(lifecycle) : lifecycle;
+      }
+      return Object.hasOwn(gitPlanners, name)
+        ? withLane(log, `git-operation:${typeof rawPayload === "object" && rawPayload !== null ? String((rawPayload as { worktreeId?: unknown }).worktreeId) : "invalid"}`)(settled)
+        : settled;
+    });
+
+    return CommandHandler.of({
+      cache: (target) => Effect.gen(function* () {
+        if (Option.isSome(recovery) && !(yield* recovery.value.ready)) return yield* refused("recovering");
+        return yield* acceptCache(runtime, lists, target);
+      }),
+      input: (actor) => views.snapshot.pipe(Effect.map((snapshot) => ({ runtime, actor, snapshot }))),
+      execute: (credential, name, rawPayload) => Object.hasOwn(lists.reads, name) ? executeRead(credential, name, rawPayload)
+        : executeMutation(credential, name, rawPayload),
     });
   }));

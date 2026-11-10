@@ -22,10 +22,24 @@ import { ancestryHeaders, authorization, socketUrl, upgradeStatus } from "../sup
 import { provideBoard } from "../board/wakeFixtures.ts"
 import { registerRebuildCheck } from "../support/rebuildCheck.ts"
 import { eventually } from "../support/routingRig.ts"
-import { call, success, failureOf, seedAccount, seedHarness, seedAgent, ownerCredential as owner, freshRequest, makeRig, removeRig, type Rig } from "../support/handlerRig.ts"
+import { readLog, call, success, failureOf, seedAccount, seedHarness, seedAgent, ownerCredential as owner, freshRequest, makeRig, removeRig, type Rig } from "../support/handlerRig.ts"
 
 let rig: Rig
 const git = (folder: string, ...args: string[]) => execFileSync("/usr/bin/git", ["-C", folder, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
+// Observe only the process boundary. Every operation still executes real Git.
+const observeMerges = () => {
+  const bin = join(rig.root, "observed-git"), calls = join(rig.root, "observed-merges")
+  mkdirSync(bin)
+  writeFileSync(join(bin, "git"), `#!${process.execPath}\nimport { appendFileSync } from 'node:fs';\nimport { spawnSync } from 'node:child_process';\nconst args=process.argv.slice(2);\nif(args.includes('merge')) appendFileSync(${JSON.stringify(calls)}, 'merge\\n');\nconst result=spawnSync('/usr/bin/git',args,{stdio:'inherit'});process.exit(result.status??1);\n`, { mode: 0o700 })
+  vi.stubEnv("PATH", `${bin}:${process.env.PATH}`)
+  return () => existsSync(calls) ? readFileSync(calls, "utf8").trim().split("\n").length : 0
+}
+const noGitReceipt = (requestId: string) => Effect.gen(function* () {
+  const sql = yield* SqlClient.SqlClient
+  expect(yield* sql`SELECT request_id FROM receipts WHERE request_id = ${requestId}`).toHaveLength(0)
+  expect(Object.values(projectView(yield* snapshot).gitAttempts).some((attempt) => attempt.requestId === requestId)).toBe(true)
+  expect((yield* readLog).filter((row) => row.requestId === requestId && ["CommandRefused", "project.MainReviewDecided", "project.GitFinished"].includes(row.event._tag))).toEqual([])
+})
 const save = (folder: string, path: string, content: string) => writeFileSync(join(folder, path), content)
 const commit = (folder: string, message: string) => { git(folder, "add", "--all"); git(folder, "commit", "-m", message); return git(folder, "rev-parse", "HEAD") }
 beforeEach(() => {
@@ -78,12 +92,12 @@ const refusal = (effect: Effect.Effect<any, any>) => effect.pipe(Effect.result, 
 
 it.live("traces every public operation to a real handler and preserves the exact durable event inventory", () => provideBoard(rig, Effect.gen(function* () {
   yield* registerRebuildCheck()
-  const reads = ["project.review.status", "project.repository.discover", "project.branches", "project.checkouts", "project.changes", "project.diff", "project.history", "project.commit.files", "project.git.state", "project.discard.plan", "project.review", "project.conflict", "project.review.open", "project.conflict.choose"]
+  const reads = ["project.review.status", "project.repository.discover", "project.branches", "project.checkouts", "project.changes", "project.diff", "project.history", "project.commit.files", "project.git.state", "project.discard.plan", "project.review", "project.conflict", "project.conflict.choose"]
   const writes = ["project.review.prepare", "project.review.approve", "project.review.report", "project.stage", "project.unstage", "project.stage.all", "project.unstage.all", "project.discard", "project.commit", "project.fetch", "project.pull", "project.push", "project.integrate", "project.conflict.resolve"]
   for (const name of reads) { expect(Object.hasOwn(engineLists.reads, name), name).toBe(true); expect(Object.hasOwn(engineLists.planners, name), name).toBe(false) }
   for (const name of writes) { expect(Object.hasOwn(engineLists.planners, name), name).toBe(true); expect(Object.hasOwn(engineLists.reads, name), name).toBe(false) }
   expect([...CommandsRpcGroup.requests.keys()].filter((name) => reads.includes(name) || writes.includes(name)).sort()).toEqual([...reads, ...writes].sort())
-  expect(projectEventTags).toEqual(["project.GitEvidenceReported", "project.MainReviewOpened", "project.MainReviewDecided", "project.SetupAdvanced", "project.SetupCompleted", "project.MockRecorded", "project.MockApproved", "project.DesignRecorded", "project.SettingsChanged", "project.RepositoryAdded", "project.RepositoryLocated", "project.WorktreeCreated", "project.Created", "project.CreationPlanned", "project.CreationClaimed", "project.CreationFinished", "project.GoalChanged", "project.ArchiveStarted", "project.Archived", "project.Restored", "project.Placed", "project.PreferencesChanged", "project.Renamed", "project.StageChanged", "project.TeamAdded", "project.SprintAdded", "project.SprintChanged", "project.SprintCompleted", "project.TaskAdded", "project.OwnerTaskNotificationPlanned", "project.TaskChanged", "project.TaskNoted"])
+  expect(projectEventTags).toEqual(["project.GitAttempted", "project.GitFinished", "project.GitEvidenceReported", "project.MainReviewOpened", "project.MainReviewDecided", "project.SetupAdvanced", "project.SetupCompleted", "project.MockRecorded", "project.MockApproved", "project.DesignRecorded", "project.SettingsChanged", "project.RepositoryAdded", "project.RepositoryLocated", "project.WorktreeCreated", "project.Created", "project.CreationPlanned", "project.CreationClaimed", "project.CreationFinished", "project.GoalChanged", "project.ArchiveStarted", "project.Archived", "project.Restored", "project.Placed", "project.PreferencesChanged", "project.Renamed", "project.StageChanged", "project.TeamAdded", "project.SprintAdded", "project.SprintChanged", "project.SprintCompleted", "project.TaskAdded", "project.OwnerTaskNotificationPlanned", "project.TaskChanged", "project.TaskNoted"])
 })).pipe(Effect.orDie))
 
 it.live("uses the real authenticated client to register, enumerate, stage, unstage, commit, read history and rename paths", () => provideBoard(rig, Effect.gen(function* () {
@@ -146,7 +160,7 @@ it.live("enforces own-project reads, refuses all agent Git writes and paths outs
   expect(own.data).toContain("Data from another agent ["); expect(own.data).toContain("agent text /tool")
   expect(yield* refusal(run(stranger, "project.changes", p))).toBe("project is unavailable to this caller")
   expect(yield* refusal(run(worker, "project.changes", { worktreeId: f.worktreeId }))).toBe("project is unavailable to this caller")
-  for (const name of ["project.stage", "project.unstage", "project.stage.all", "project.unstage.all", "project.discard", "project.commit", "project.fetch", "project.pull", "project.push", "project.integrate", "project.review.open", "project.conflict.choose", "project.conflict.resolve"]) {
+  for (const name of ["project.stage", "project.unstage", "project.stage.all", "project.unstage.all", "project.discard", "project.commit", "project.fetch", "project.pull", "project.push", "project.integrate", "project.conflict.choose", "project.conflict.resolve"]) {
     const raw = { ...p, path: "file.txt", message: "Denied", plan: { paths: [], fingerprint: "f" }, confirmed: true, destinationId: f.worktreeId, expectedHead: "abc", base: "main", selection: { path: "file.txt", fingerprint: "f", head: "abc", choices: [] }, hunk: 0, choice: "ours" }
     expect(yield* refusal(run(worker, name, raw)), name).toBe("command refused")
   }
@@ -192,7 +206,19 @@ it.live("refuses a dirty destination, merges the actual source into its project,
   expect(readFileSync(join(i.destination, "team.txt"), "utf8")).toBe("team change\n")
   save(i.destination, "file.txt", "ours\n"); commit(i.destination, "Project edit")
   save(i.source, "file.txt", "theirs\n"); const conflictingHead = commit(i.source, "Team edit")
-  expect(yield* refusal(run(api, "project.integrate", { ...merge, expectedHead: conflictingHead }))).toBe("Git: conflicts")
+  const requestId = freshRequest(), mergeCalls = observeMerges()
+  const conflicting = { ...merge, expectedHead: conflictingHead, requestId }
+  const beforeReview = projectView(yield* snapshot).gitReviews
+  expect(yield* refusal(run(api, "project.integrate", conflicting))).toBe("Git outcome is uncertain; retry the identical request")
+  const unresolved = readFileSync(join(i.destination, "file.txt"), "utf8")
+  expect(unresolved).toContain("<<<<<<<"); expect(unresolved).toContain("ours\n"); expect(unresolved).toContain("theirs\n")
+  expect(git(i.destination, "rev-parse", "MERGE_HEAD")).toBe(conflictingHead)
+  yield* noGitReceipt(requestId)
+  expect(yield* refusal(run(api, "project.integrate", conflicting))).toBe("Git outcome is uncertain; retry the identical request")
+  expect(mergeCalls()).toBe(1)
+  expect(readFileSync(join(i.destination, "file.txt"), "utf8")).toBe(unresolved)
+  expect(projectView(yield* snapshot).gitReviews).toEqual(beforeReview)
+  yield* noGitReceipt(requestId)
   const p = { worktreeId: i.destinationId }
   const conflict = resultOf(yield* run(api, "project.conflict", { ...p, path: "file.txt" }))
   expect(conflict).toMatchObject({ ours: "ours\n", base: "base\n", theirs: "theirs\n", choices: [null] })
@@ -206,6 +232,10 @@ it.live("refuses a dirty destination, merges the actual source into its project,
   expect(resultOf(yield* run(api, "project.changes", p)).items).toMatchObject([{ path: "file.txt", staged: false, conflict: false, unstaged: true }])
   yield* run(api, "project.stage.all", p); yield* run(api, "project.commit", { ...p, message: "Resolve team integration" })
   expect(resultOf(yield* run(api, "project.git.state", p)).mergeHead).toBe(null)
+  expect(git(i.destination, "merge-base", "--is-ancestor", conflictingHead, "HEAD")).toBe("")
+  expect(yield* refusal(run(api, "project.integrate", conflicting))).toBe("Git outcome is uncertain; retry the identical request")
+  expect(mergeCalls()).toBe(1)
+  yield* noGitReceipt(requestId)
   expect(resultOf(yield* run(api, "project.review", { ...p, base: "main" })).commits.items.length).toBeGreaterThan(1)
   // Even a registered project on main is never a direct integration target.
   const mainSource = join(rig.root, "main-team"); git(rig.work, "worktree", "add", "-b", "main-team", mainSource)
@@ -229,10 +259,9 @@ it.live("runs fetch, pull and push against a real local remote, keeping remote f
   yield* run(api, "project.pull", p)
   expect(git(rig.work, "rev-parse", "HEAD")).toBe(remoteHead)
   expect(readFileSync(join(rig.work, "remote.txt"), "utf8")).toBe("remote work\n")
-  expect(yield* refusal(run(api, "project.review.open", { ...p, base: "main", expectedHead: remoteHead }))).toBe("Git: unsupported_provider")
   git(rig.work, "remote", "set-url", "origin", "https://private-user:private-password@127.0.0.1:1/private.git")
   const reason = yield* refusal(run(api, "project.fetch", p))
-  expect(reason).toMatch(/^Git: (network_failed|git_failed)$/)
+  expect(reason).toBe("Git outcome is uncertain; retry the identical request")
   expect(reason).not.toMatch(/private-user|private-password|127|fatal|https/)
   expect(Buffer.byteLength(reason)).toBeLessThan(128)
   git(rig.work, "remote", "set-url", "origin", remote)
@@ -297,7 +326,16 @@ it.live("preserves conflict protocol choices when a short secret overlaps their 
   const f = yield* setup(); const { api } = yield* wire(); const i = yield* integration(api, f.repoId)
   save(i.destination, "file.txt", "ours\n"); commit(i.destination, "Project edit")
   save(i.source, "file.txt", "theirs\n"); const head = commit(i.source, "Team edit")
-  expect(yield* refusal(run(api, "project.integrate", { worktreeId: i.sourceId, destinationId: i.destinationId, expectedHead: head }))).toBe("Git: conflicts")
+  const mergeCalls = observeMerges(), requestId = freshRequest()
+  const request = { worktreeId: i.sourceId, destinationId: i.destinationId, expectedHead: head, requestId }
+  expect(yield* refusal(run(api, "project.integrate", request))).toBe("Git outcome is uncertain; retry the identical request")
+  const unresolved = readFileSync(join(i.destination, "file.txt"), "utf8")
+  expect(unresolved).toContain("<<<<<<<"); expect(unresolved).toContain("ours\n"); expect(unresolved).toContain("theirs\n")
+  yield* noGitReceipt(requestId)
+  expect(yield* refusal(run(api, "project.integrate", request))).toBe("Git outcome is uncertain; retry the identical request")
+  expect(mergeCalls()).toBe(1)
+  expect(readFileSync(join(i.destination, "file.txt"), "utf8")).toBe(unresolved)
+  yield* noGitReceipt(requestId)
   const p = { worktreeId: i.destinationId }
   const conflict = resultOf(yield* run(api, "project.conflict", { ...p, path: "file.txt" }))
   expect(conflict.ours).toBe("[REDACTED]\n")
@@ -306,4 +344,11 @@ it.live("preserves conflict protocol choices when a short secret overlaps their 
   expect(chosen.choices).toEqual(["ours"])
   yield* run(api, "project.conflict.resolve", { ...p, selection: chosen })
   expect(readFileSync(join(i.destination, "file.txt"), "utf8")).toBe("ours\n")
+  yield* run(api, "project.stage.all", p)
+  yield* run(api, "project.commit", { ...p, message: "Resolve using ours" })
+  expect(resultOf(yield* run(api, "project.git.state", p)).mergeHead).toBe(null)
+  expect(git(i.destination, "merge-base", "--is-ancestor", head, "HEAD")).toBe("")
+  expect(yield* refusal(run(api, "project.integrate", request))).toBe("Git outcome is uncertain; retry the identical request")
+  expect(mergeCalls()).toBe(1)
+  yield* noGitReceipt(requestId)
 }), ["ours", "conflict"]).pipe(Effect.orDie))

@@ -29,7 +29,7 @@ it.live("delivers owner approval over the real authenticated engine and ACP chil
     yield* Server.serve({ socketPath: rig.socket, ownerCredential: Redacted.make(bearer), debug: false })
     const api = yield* connect(rig.socket, bearer)
     yield* api["project.settings.set"]({ requestId: freshRequest(), settings: { workspaceFolder: rig.work, shell: "sh" } })
-    const created = yield* api["project.create"]({ requestId: freshRequest(), name: "Review", goal: "Review actual artifacts", machineId: "local", repository: { _tag: "new", name: "Review repository" }, useWorktree: false })
+    const created = yield* api["project.create"]({ requestId: freshRequest(), name: "Review", goal: "Review actual artifacts", machineId: "local", repository: { _tag: "new", name: "Review repository" }, useWorktree: true })
     const view = projectView(yield* snapshot), project = view.projects[created.projectId]!, workspace = view.workspaces[project.worktreeId]!
     const peer = yield* readEcho(echo, (value) => value.inbound.some((frame) => frame.method === "session/prompt"))
     const settled = yield* eventually(snapshot, (state) => state.agents[project.leadAgentId]?.state._tag === "idle")

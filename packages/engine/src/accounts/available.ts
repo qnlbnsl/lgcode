@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as PubSub from "effect/PubSub";
 
+import { projectPreventsRun } from "../project/access.ts";
 import { freshRequest, type Snapshot } from "../commands/internal.ts";
 import { EventLog } from "../log/EventLog.ts";
 import { Restart } from "../recovery/service.ts";
@@ -42,7 +43,7 @@ export const returnAgents = (snapshot: Snapshot, accountId: string, cause: Cause
   if (snapshot.accounts[accountId]?.status !== "available") return [];
   return Object.values(snapshot.agents).flatMap((agent): ReadonlyArray<Event> => {
     const state = agent.state;
-    if (agent.account !== accountId || state._tag !== "paused" || agent.session === undefined || skip.has(agent.agentId)
+    if (projectPreventsRun(snapshot, agent.agentId) || agent.account !== accountId || state._tag !== "paused" || agent.session === undefined || skip.has(agent.agentId)
       || (cause === "usage reset" && state.reason !== "limit")) return [];
     const { agentId } = agent;
     const id = freshDelivery();

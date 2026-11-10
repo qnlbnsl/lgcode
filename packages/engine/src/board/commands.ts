@@ -9,7 +9,7 @@ import * as Schema from "effect/Schema";
 import { agentReadReply, type ReadHandler, type ReadReply } from "../api/reads.ts";
 import { refused, type Input, type Payload, type PiecePlan } from "../commands/internal.ts";
 import { holderAbove } from "../routing/holders.ts";
-import { canReadContext, resolveContext } from "../project/context.ts";
+import { canReadContext, resolveContext, type ContextFiles } from "../project/context.ts";
 import { project } from "../routing/waits.ts";
 import { canAddMember, canClose, canManage, canOpenGroup, canPost, canRead, channelMembers, directGrant, own } from "./access.ts";
 import { boardStatus } from "./status.ts";
@@ -65,7 +65,7 @@ const members: Planner = (input, raw) => Effect.gen(function* () {
   return { ...withWakes(input, events, []), reply: () => ({ requestId: payload.requestId, memberCount }) };
 });
 
-const post: Planner = (input, raw) => Effect.gen(function* () {
+export const postPlanner = (files?: ContextFiles): Planner => (input, raw) => Effect.gen(function* () {
   const payload = raw as Payload<"board.post">;
   const author = authorOf(input);
   if (author === undefined) return yield* refused();
@@ -107,7 +107,7 @@ const post: Planner = (input, raw) => Effect.gen(function* () {
   const text = yield* input.runtime.log.redactText(payload.text.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, ""));
   if (!Schema.is(BoardPostText)(text)) return yield* refused("post too long once secrets are hidden");
   const postId = Schema.decodeUnknownSync(PostId)(randomUUID());
-  const context = yield* resolveContext(input, payload.context, channelMembers(state, channelId));
+  const context = yield* resolveContext(input, payload.context, channelMembers(state, channelId), files);
   const written: Event = { _tag: "board.PostWritten", postId, channelId, author, text, to, reply: payload.reply,
     ...(context === undefined ? {} : { context }),
     ...(payload.replyTo === undefined ? {} : { replyToPostId: payload.replyTo }) };
@@ -285,6 +285,6 @@ const status = (input: Input, raw: Record<string, unknown>): Effect.Effect<ReadR
   } };
 });
 
-export const boardPlanners = { "board.open": open, "board.members": members, "board.post": post,
+export const boardPlanners = { "board.open": open, "board.members": members, "board.post": postPlanner(),
   "board.close": close, "board.acknowledge": acknowledge, "board.flush": flush } satisfies Record<string, Planner>;
 export const boardReads = { "board.read": readPosts(false), "board.peek": readPosts(true), "board.channels": channels, "board.status": status } satisfies Record<string, ReadHandler>;

@@ -10012,3 +10012,134 @@ Desktop rows keep one line.
 Permanent tests cover the fields, filtering, stage labels, state changes, and plain-text names.
 The actual-engine browser matrix now includes both project tables at all four widths in both color modes.
 These changes await their own verification and independent review; earlier foundation passes do not prove the correction.
+
+## 575. A Git effect could be followed by a durable false refusal
+
+A merge or commit can finish before the outcome transaction fails.
+Git mutations now use a typed attempt in the existing event log, followed by a short outcome transaction.
+An attempt preserves the exact caller, request, body hash, workspace, and pre-effect Git identities without storing a raw message or payload.
+A prior unresolved attempt takes precedence over later failed admission.
+An uncertain outcome has no success or refusal receipt, and the normal writer failure latch remains mandatory.
+Main reconciliation requires the durable reviewed pair and proves that both reviewed heads are ancestors of the actual registered destination.
+A divergent reviewed source need not descend from the reviewed base.
+Commit reconciliation compares the frozen index tree, intended message supplied on retry, branch, and complete parent set, including a pending merge parent.
+The original equivalent-state failure remains preserved separately from actual post-merge SQL failure tests.
+The first bounded corrected run passed fast-forward and divergent post-effect failure controls.
+Further changes and complete validation remain pending in the builder result.
+
+## 576. A new project repository lacked a usable main destination
+
+An unborn main checkout cannot serve as the reviewed destination for a project's first commit.
+New project repository creation now writes an empty initial main commit and records its main workspace.
+The initial commit contains no user files.
+The owner approved requiring a dedicated worktree for every project on 2026-11-09.
+The dialog has no worktree checkbox and always previews Branch and Folder.
+Engine creation and preview refuse useWorktree=false before effects.
+Unfinished main-checkout intents remain readable and reserved, but cannot resume effects.
+Main remains recorded separately for owner review and approval.
+The original pre-decision full failure is preserved, and corrected-source verification and independent review remain pending.
+
+## 577. A linked question could finish another worker's task
+
+Linked question admission now requires the task owner or the project's lead.
+Completion checks that authority again against the current task owner and project membership.
+Holding or answering the question does not grant authority over its linked task.
+The first bounded corrected run passed another-worker refusal and own-task and lead controls.
+Cross-project, reassignment, and rebuild coverage are retained or extended in this unit.
+
+## 578. A failed creation had no way to release its durable reservation
+
+The owner-only project.creation.abandon command finishes a recorded creation intent without changing the filesystem.
+The command shares the lifecycle lane so abandonment cannot race an active creation.
+The typed client, command-line interface, and Model Context Protocol inventories include the command's access decision.
+The command adds no visible control to the mock.
+Interrupted-creation and replaced-folder safety checks remain required.
+
+## 579. A slow Git mutation could hold the global writer
+
+Git mutations now take a request lane, perform a short writer preflight, run Git under the existing runtime gate outside the writer, and record the outcome in a short transaction.
+The runtime gate remains the only Git queue.
+No Git gate holder acquires the SQL writer.
+The original 250 millisecond negative observation remains limited evidence.
+The corrected bounded regression passed an actual independent writer operation while a real Git merge child remained held at a controlled barrier.
+Registration, creation planning and final verification, Design recording, mock recording and approval, and file-context preparation now also observe Git outside the writer.
+Their final admissions rerun against current state instead of appending an old prepared event plan.
+Separate stale-binding, revision, access and recipient controls, and a queued-registration and creation barrier regression have been written for these additional paths.
+The unit 4 bounded run passed the queued-registration and creation barrier, including a positive independent writer completion while real Git remained held.
+It also passed 19 stale-state controls.
+Four new Design controls failed with a generic refusal.
+Two preserved narrow diagnostics traced that refusal to missing Design planner and read registrations in the handler maps, despite complete source maps, remote procedure declarations, and access entries.
+The eager maps captured an incomplete module cycle under the Design-first import graph.
+Both maps now initialize lazily once, retaining their exact contents and stable identities.
+The corrected bounded run passed all 23 observation controls and all five fresh child import orders, and recursive and root typing passed.
+The same run retained one architecture failure for two direct caller-encoder imports from the log module.
+The caller encoder now has one writer-free identity module used directly by all consumers.
+Git attempt writer orchestration now belongs to commands rather than the project piece.
+That boundary correction and the separately joined Machines and guidance consumers await their next exact-source affected proof.
+These results do not establish a universal runtime separation claim.
+
+The first full check exposed a same-request start/stop regression because the request lane covered runner setup and stop settlement.
+The handler now releases that lane before a non-process continuation, while process commands retain request-before-process ownership through cleanup.
+Lifecycle ownership comes first, and archive members are acquired after the request lane.
+The original five-second start oracle and Git uncertainty controls are unchanged.
+New overlap controls exercise both archive and stop ownership orders, with positive member-lane acquisition after a recorded stop attempt.
+These source corrections await their exact bounded verification.
+
+## 580. Placement could claim an unsupported workspace move
+
+A project.place request that changes its workspace or machine now refuses until machine pairing exists.
+The Machines page now displays the assigned checkout without offering another checkout as an available move.
+It explains that changing placement requires unavailable machine pairing.
+Its source was joined onto the independently accepted foundation cb049eae before editing.
+Static installation and login guidance now lives in one typed page module, with the existing visible text preserved.
+The discovery contract and engine return runtime facts instead of static page guidance.
+These joined frontend and guidance changes still require their own exact-source verification and independent review.
+
+## 581. Recording mocks could bypass stage authority
+
+A mocks command that changes the project stage now uses the same lead-or-owner authority as an explicit stage change.
+A member can still record a revision that leaves the stage unchanged.
+Owner approval retains its existing authority.
+
+## 582. Context search bounded its result but not its complete reply
+
+Context search retains its exact 64 kibibyte result limit and truthful truncation flag.
+It now checks the complete owner or member reply, including the request identity and member data wrapper, against 256 kibibytes.
+An oversized wrapper receives a fixed safe refusal without changing read marks.
+
+## 583. Creation used independent and stacked Git queues
+
+Creation now uses the runtime's shared Git service through its existing gate.
+The private queue inside each Git service has been removed.
+Both prospective placement observations and final checkout verification run before their short admission transactions.
+The final creation admission rechecks its durable intent, settings, registered placements, reservations, collisions and current lead before planning the launch.
+Creation filesystem witnesses remain because interrupted mkdir and replaced-folder ownership must still be proven before adopting an existing folder.
+Abandonment releases only the durable reservation and never removes a witness, checkout, branch, or user file.
+
+## 584. Restart could resume a member of an unfinished archive
+
+Restart now attempts to finish durable archive intents before it considers reloading agents.
+An archive that cannot finish remains visibly unfinished.
+Paused and interrupted agents whose project is archiving or archived are excluded from automatic reload and account recovery.
+The reload input check also enforces this rule.
+
+## 585. Network Git shared the short read subprocess timeout
+
+Explicit fetch, pull, and push now use a separate bounded network subprocess timeout.
+Local read subprocess limits remain short.
+Cancellation still reaps the child process group and never deletes a lock without proving ownership.
+A possible mutation followed by timeout remains uncertain under issue 575.
+
+## 586. Credential filenames were filtered inconsistently
+
+Repository artifacts, context references, and explicit or aggregate project diffs now use the shared repository artifact path predicate.
+Credential names are refused before patch bytes are read.
+Containment, symlink, nested-repository, redaction, and complete reply limits remain enforced.
+Real confined safe-file and owner/member refusal controls are required before delivery.
+
+## 587. Repository configuration runs with the owner's Unix authority
+
+LGcode is a local program for one owner.
+An owner-controlled repository can configure Git content filters or merge drivers that run as that same Unix user.
+The current security boundary accepts that repository-configuration scope.
+This unit documents the limit and does not claim to sandbox owner-controlled Git configuration or introduce a different threat model.

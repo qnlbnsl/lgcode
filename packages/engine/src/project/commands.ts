@@ -61,33 +61,36 @@ const settingsSet: PiecePlanner = (input, raw) => Effect.gen(function* () {
   return ack(p.requestId, [{ _tag: "project.SettingsChanged", settings: { workspaceFolder, shell: yield* cleanName(input, p.settings.shell), ...(lead === undefined ? {} : { lead }),
     ...(p.settings.displayName !== undefined ? { displayName: yield* cleanName(input, p.settings.displayName) } : projectView(input.snapshot).settings?.displayName === undefined ? {} : { displayName: projectView(input.snapshot).settings!.displayName! }) } }])
 })
-const repositoryAdd: PiecePlanner = (input, raw) => Effect.gen(function* () {
+type Checkout = Effect.Success<ReturnType<typeof inspectCheckout>>
+type CheckoutReader = (input: Input, path: string) => Effect.Effect<Checkout, ReturnType<typeof refused>>
+const unobservedCheckout: CheckoutReader = () => Effect.fail(refused("project state changed; refresh and retry"))
+const repositoryAdd = (inspect: CheckoutReader = unobservedCheckout): PiecePlanner => (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.repository.add">
   yield* localMachine(p.machineId); yield* safePath(input, p.path)
-  const checkout = yield* inspectCheckout(input, p.path)
+  const checkout = yield* inspect(input, p.path)
   if (Object.values(projectView(input.snapshot).repositories).some((repo) => repo.path === checkout.path)) return yield* refused("repository is already registered")
   const repoId = fresh(RepositoryId)
   return { events: [{ _tag: "project.RepositoryAdded", repoId, name: yield* cleanName(input, p.name), path: checkout.path },
     { _tag: "project.RepositoryLocated", repoId, machineId: p.machineId, path: checkout.path }], reply: () => ({ requestId: p.requestId, repoId }) }
 })
-const repositoryLocate: PiecePlanner = (input, raw) => Effect.gen(function* () {
+const repositoryLocate = (inspect: CheckoutReader = unobservedCheckout): PiecePlanner => (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.repository.locate">
   yield* localMachine(p.machineId); yield* safePath(input, p.path)
   const repo = own(projectView(input.snapshot).repositories, p.repoId)
   if (repo === undefined) return yield* refused("repository not found")
-  const registered = yield* inspectCheckout(input, repo.path)
-  const located = yield* inspectCheckout(input, p.path)
+  const registered = yield* inspect(input, repo.path)
+  const located = yield* inspect(input, p.path)
   if (registered.common !== located.common) return yield* refused("checkout belongs to a different repository")
   return ack(p.requestId, [{ _tag: "project.RepositoryLocated", repoId: p.repoId, machineId: p.machineId, path: located.path }])
 })
-const workspaceRegister: PiecePlanner = (input, raw) => Effect.gen(function* () {
+const workspaceRegister = (inspect: CheckoutReader = unobservedCheckout): PiecePlanner => (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.workspace.register">
   yield* localMachine(p.machineId); yield* safePath(input, p.path)
   const view = projectView(input.snapshot)
   const location = own(view.locations, projectKey(p.repoId, p.machineId))
   if (location === undefined) return yield* refused("repository location not found")
-  const repo = yield* inspectCheckout(input, location.path)
-  const checkout = yield* inspectCheckout(input, p.path)
+  const repo = yield* inspect(input, location.path)
+  const checkout = yield* inspect(input, p.path)
   if (checkout.common !== repo.common || checkout.branch !== p.branch || checkout.checkout !== p.checkout) return yield* refused("checkout does not match the repository, branch and type")
   if (Object.values(view.workspaces).some((row) => row.machineId === p.machineId && row.path === checkout.path)) return yield* refused("workspace is already registered")
   if (p.parentId !== undefined) {
@@ -97,6 +100,35 @@ const workspaceRegister: PiecePlanner = (input, raw) => Effect.gen(function* () 
   const worktreeId = fresh(WorkspaceId)
   return { events: [{ _tag: "project.WorktreeCreated", worktreeId, repoId: p.repoId, machineId: p.machineId, branch: p.branch,
     path: checkout.path, checkout: p.checkout, ...(p.parentId === undefined ? {} : { parentId: p.parentId }) }], reply: () => ({ requestId: p.requestId, worktreeId }) }
+})
+export const registrationPlanners = { "project.repository.add": repositoryAdd(), "project.repository.locate": repositoryLocate(),
+  "project.workspace.register": workspaceRegister() } satisfies Record<string, PiecePlanner>
+
+// Only checkout facts cross the writer boundary. The original admissions run
+// again against the current snapshot, including fresh names and collisions.
+export const prepareRegistration = (input: Input, name: keyof typeof registrationPlanners, raw: Record<string, unknown>) => Effect.gen(function* () {
+  const observed = projectView(input.snapshot), path = raw.path as string
+  yield* localMachine(raw.machineId as string); yield* safePath(input, path)
+  const repoId = raw.repoId as string, machineId = raw.machineId as string
+  const repository = own(observed.repositories, repoId), location = own(observed.locations, projectKey(repoId, machineId))
+  if (name === "project.repository.locate" && repository === undefined) return yield* refused("repository not found")
+  const relatedPath = name === "project.repository.locate" ? repository?.path : name === "project.workspace.register" ? location?.path : undefined
+  if (name !== "project.repository.add" && relatedPath === undefined) return yield* refused("repository location not found")
+  const related = relatedPath === undefined ? undefined : yield* inspectCheckout(input, relatedPath)
+  const checkout = yield* inspectCheckout(input, path)
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+  const inspect: CheckoutReader = (current, requestedPath) => Effect.gen(function* () {
+    const view = projectView(current.snapshot)
+    yield* safePath(current, requestedPath)
+    if (current.actor._tag !== "owner" || !same(view.settings, observed.settings)
+      || name !== "project.repository.add" && (!same(repository, own(view.repositories, repoId))
+        || !same(location, own(view.locations, projectKey(repoId, machineId))))
+      || raw.parentId !== undefined && !same(own(observed.workspaces, raw.parentId as string), own(view.workspaces, raw.parentId as string))) return yield* refused("project state changed; refresh and retry")
+    if (requestedPath === path) return checkout
+    if (requestedPath === relatedPath && related !== undefined) return related
+    return yield* refused("project state changed; refresh and retry")
+  })
+  return name === "project.repository.add" ? repositoryAdd(inspect) : name === "project.repository.locate" ? repositoryLocate(inspect) : workspaceRegister(inspect)
 })
 const rename: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.rename">; const project = yield* requireProject(input, p.projectId)
@@ -108,6 +140,7 @@ const place: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.place">; const project = yield* requireProject(input, p.projectId)
   const workspace = own(projectView(input.snapshot).workspaces, p.worktreeId)
   if (workspace?.repoId !== project.repoId) return yield* refused("workspace belongs to a different repository")
+  if (p.worktreeId !== project.worktreeId || workspace.machineId !== project.machineId) return yield* refused("project placement cannot change before machine pairing")
   if (Object.values(input.snapshot.agents).some((agent) => member(input, p.projectId, agent.agentId)
     && !["stopped", "crashed"].includes(agent.state._tag))) return yield* refused("stop the project's agents before changing placement")
   return ack(p.requestId, [{ _tag: "project.Placed", projectId: p.projectId, worktreeId: p.worktreeId, machineId: workspace.machineId }])
@@ -293,12 +326,19 @@ const taskHistory: ReadHandler = (input, raw) => Effect.gen(function* () {
   return yield* page(input, raw, decisionHistory(input.snapshot, task).map((row, index) => [String(index), row] as const), true)
 })
 export const projectPlanners = {
-  "project.settings.set": settingsSet, "project.repository.add": repositoryAdd, "project.repository.locate": repositoryLocate,
-  "project.workspace.register": workspaceRegister, "project.rename": rename, "project.place": place,
+  "project.settings.set": settingsSet, "project.repository.add": repositoryAdd(), "project.repository.locate": repositoryLocate(),
+  "project.workspace.register": workspaceRegister(), "project.rename": rename, "project.place": place,
   "project.goal.set": goalSet, "project.restore": restore, "project.preferences.set": preferencesSet, "project.stage.set": stageSet, "project.team.create": teamCreate,
   "project.sprint.create": sprintCreate, "project.sprint.update": sprintUpdate, "project.sprint.complete": sprintComplete,
   "project.task.create": taskCreate, "project.task.update": taskUpdate, "project.task.note": taskNote
 } satisfies Record<string, PiecePlanner>
+const abandonCreation: PiecePlanner = (input, raw) => Effect.gen(function* () {
+  if (input.actor._tag !== "owner") return yield* refused()
+  const p = raw as Payload<"project.creation.abandon">
+  if (own(projectView(input.snapshot).creations, p.creationRequestId) === undefined) return yield* refused("project creation intent is unavailable")
+  return ack(p.requestId, [{ _tag: "project.CreationFinished", creationRequestId: p.creationRequestId }])
+})
+export const creationPlanners = { "project.creation.abandon": abandonCreation }
 const creations: ReadHandler = (input, raw) => page(input, raw, Object.entries(projectView(input.snapshot).creations))
 export const projectReads = { "project.requests": projectRequests, "project.creations": creations, "project.settings": settings, "project.repositories": repositories, "project.workspaces": workspaces,
   "project.read": read, "project.task.history": taskHistory, "project.context.search": searchContext } satisfies Record<string, ReadHandler>

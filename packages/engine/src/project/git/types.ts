@@ -1,6 +1,6 @@
 import type * as Effect from "effect/Effect";
 import * as Data from "effect/Data";
-import type { Caller } from "@lgcode/contracts";
+import type { Caller, GitMutationIdentity } from "@lgcode/contracts";
 
 export type GitFailureReason =
   | "invalid_path" | "not_repository" | "invalid_ref" | "output_limit" | "timeout" | "cancelled"
@@ -11,7 +11,7 @@ export type GitFailureReason =
   | "unsupported_conflict" | "incomplete_choices" | "owner_required" | "unsupported_review";
 
 // Neither subprocess output nor rejected paths are attached to a failure.
-export class GitFailure extends Data.TaggedError("GitFailure")<{ readonly reason: GitFailureReason }> {}
+export class GitFailure extends Data.TaggedError("GitFailure")<{ readonly reason: GitFailureReason; readonly uncertain?: boolean }> {}
 export type GitOperation<A> = Effect.Effect<A, GitFailure>;
 export interface Bounded<A> { readonly items: ReadonlyArray<A>; readonly truncated: boolean }
 export interface Repository { readonly path: string; readonly name: string; readonly commonDirectory: string }
@@ -46,6 +46,8 @@ export interface Review {
 }
 export interface DiscardPlan { readonly fingerprint: string; readonly paths: ReadonlyArray<string> }
 export interface GitService {
+  mutationIdentity(folder: string): GitOperation<GitMutationIdentity>;
+  reconcileCommit(folder: string, before: GitMutationIdentity, message: string): GitOperation<string | null>;
   readonly contextFiles: (folder: string, query: string) => GitOperation<Bounded<string>>;
   readonly contextFile: (folder: string, path: string) => GitOperation<void>;
   discover(): GitOperation<Bounded<Repository>>;
@@ -75,8 +77,7 @@ export interface GitService {
   // A distinct execution boundary, never a bypass on mergeTeam. The engine
   // supplies the authenticated caller, not a field from the command payload.
   approveMain(source: string, destination: string, reviewed: Pick<Review, "head" | "baseHead" | "branch" | "base">,
-    caller: Caller | undefined, confirmed: boolean): GitOperation<string>;
-  openReview(folder: string, base: string, expectedHead: string): GitOperation<{ readonly head: string; readonly url: string }>;
+    caller: Caller | undefined, confirmed: boolean, reconcileOnly?: boolean): GitOperation<string>;
   conflict(folder: string, path: string): GitOperation<Conflict>;
   choose(folder: string, selection: Conflict, hunk: number, choice: ConflictChoice): GitOperation<Conflict>;
   resolve(folder: string, selection: Conflict): GitOperation<void>;

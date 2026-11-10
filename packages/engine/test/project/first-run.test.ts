@@ -12,7 +12,7 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts"
 import { makeFakeRunner } from "../support/fakeRunner.ts"
 import { ancestryHeaders, connect, upgradeStatus } from "../support/socketClient.ts"
 import { snapshot } from "../support/routingRig.ts"
-import { call, freshRequest, harnessSettings, makeFakeSecrets, makeRig, ownerCredential as owner, provideRig, readLog, removeRig, success, type Rig } from "../support/handlerRig.ts"
+import { call, failureOf, freshRequest, harnessSettings, makeFakeSecrets, makeRig, ownerCredential as owner, provideRig, readLog, removeRig, success, type Rig } from "../support/handlerRig.ts"
 
 let rig: Rig
 const git = (folder: string, ...args: string[]) => execFileSync("git", ["-C", folder, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
@@ -51,6 +51,7 @@ it.live("persists authenticated monotonic progress and positive completion after
     const scan = (yield* api["project.setup.discover"]({ requestId: freshRequest() })).result
     expect(scan.state).toBe("available"); expect(scan.repositories.map((row) => row.path)).toContain(rig.work)
     expect(scan.ownerNameSuggestion).toBe("Actual Git Owner")
+    expect(scan.harnesses.map((row) => Object.keys(row).sort())).toEqual(scan.harnesses.map(() => ["accounts", "configured", "harness", "installed"]))
     expect(scan.readyDefaults).toMatchObject({ harness: "claude", account: { _tag: "named", accountId: "ready" } })
     expect(scan.harnesses.find((row) => row.harness === "claude")?.accounts).toEqual([{ accountId: "ready", state: "local-credential", remoteAuthentication: "not-checked" }])
     expect(yield* readLog).toEqual(scanBefore); expect(files(rig.work)).toEqual(beforeFiles); expect(files(rig.home)).toEqual(beforeHomes)
@@ -60,10 +61,23 @@ it.live("persists authenticated monotonic progress and positive completion after
     yield* api["project.settings.set"]({ requestId: freshRequest(), settings: { workspaceFolder: rig.work, shell: "bash", lead: scan.readyDefaults!, displayName: "Edited Owner" } })
     yield* api["project.settings.set"]({ requestId: freshRequest(), settings: { workspaceFolder: rig.work, shell: "zsh", lead: scan.readyDefaults! } })
     expect((yield* api["project.settings"]({ requestId: freshRequest() })).settings?.displayName).toBe("Edited Owner")
-    const create = { requestId: freshRequest(), name: "First project", goal: "A real first plan", machineId: "local", repository: { _tag: "new" as const, name: "Created" }, useWorktree: false }
+    const create = { requestId: freshRequest(), name: "First project", goal: "A real first plan", machineId: "local", repository: { _tag: "new" as const, name: "Created" }, useWorktree: true }
+    const beforeCreate = yield* readLog, beforeCreateFiles = files(rig.work)
+    const refusals = [
+      yield* api["project.placement.preview"]({ ...create, requestId: freshRequest(), useWorktree: false }).pipe(Effect.result),
+      yield* api["project.create"]({ ...create, requestId: freshRequest(), useWorktree: false }).pipe(Effect.result),
+    ]
+    for (const refused of refusals) {
+      expect(refused._tag === "Failure" && refused.failure.reason).toBe("projects require a dedicated worktree")
+    }
+    expect(yield* readLog).toEqual(beforeCreate); expect(files(rig.work)).toEqual(beforeCreateFiles)
+    expect(runner.callsOf("start")).toHaveLength(0)
     const created = yield* api["project.create"](create)
     expect(yield* api["project.create"](create)).toEqual(created)
     expect(runner.callsOf("start")).toHaveLength(1)
+    const placement = projectView(yield* snapshot), project = placement.projects[created.projectId]!, workspace = placement.workspaces[project.worktreeId]!
+    expect(workspace).toMatchObject({ checkout: "worktree", branch: "first-project", path: join(rig.work, "created/.worktrees/first-project") })
+    expect(runner.callsOf("start")[0]?.input.folder).toBe(workspace.path)
     const finish = { requestId: freshRequest(), projectId: created.projectId }
     yield* api["project.setup.complete"](finish); yield* api["project.setup.complete"](finish)
     expect((yield* api["project.setup.complete"]({ ...finish, requestId: freshRequest() }).pipe(Effect.result))._tag).toBe("Failure")
@@ -130,8 +144,8 @@ it.live("previews actual branch and folder collisions without reservation, files
     const preview = success(yield* call(owner, "project.placement.preview", request)).result
     expect(preview).toEqual({ repositoryPath: rig.work, path: join(rig.work, ".worktrees/console-3"), branch: "console-3", checkout: "worktree", reserved: false })
     expect(files(rig.work)).toEqual(before); expect(yield* readLog).toEqual(log); expect(runner.callsOf("start")).toHaveLength(0)
-    const main = success(yield* call(owner, "project.placement.preview", { ...request, useWorktree: false })).result
-    expect(main).toMatchObject({ path: rig.work, branch: "main", checkout: "main", reserved: false })
+    expect(failureOf(yield* call(owner, "project.placement.preview", { ...request, useWorktree: false }))?.reason).toBe("projects require a dedicated worktree")
+    expect(files(rig.work)).toEqual(before); expect(yield* readLog).toEqual(log); expect(runner.callsOf("start")).toHaveLength(0)
     mkdirSync(preview.path)
     const later = success(yield* call(owner, "project.placement.preview", { ...request, requestId: freshRequest() })).result
     expect(later.branch).toBe("console-4")

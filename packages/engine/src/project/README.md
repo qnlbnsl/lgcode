@@ -69,7 +69,7 @@ The workspace commands take `worktreeId`. They are `project.changes`,
 `project.stage`, `project.unstage`, `project.stage.all`, `project.unstage.all`,
 `project.discard.plan`, `project.discard`, `project.commit`, `project.fetch`,
 `project.pull`, `project.push`, `project.integrate`, `project.review`,
-`project.review.open`, `project.conflict`, `project.conflict.choose`, and
+`project.conflict`, `project.conflict.choose`, and
 `project.conflict.resolve`. The contracts define every request and reply.
 The command-line interface accepts their spaced and dotted names, with the
 same payload supplied as `--input` JavaScript Object Notation (JSON).
@@ -88,7 +88,7 @@ Each active service operation retains its own time budget. A request can call
 several service operations. The gate is released when the active request finishes.
 This can defer cancellation of an active read until those operations finish.
 A queued request whose workspace setting changed refuses and asks for refresh.
-The service's own finite queue and process deadlines remain intact.
+The service has no second queue. Its process deadlines remain intact.
 
 Every display string passes the production redactor. Fixed conflict segment
 kinds, hunk choices, and the review result kind retain their protocol meaning.
@@ -101,8 +101,8 @@ Integration requires a registered team source and its project destination.
 The service refuses a dirty source or destination and direct integration into
 `main` or `master`. Conflict choices carry a fingerprint and choices, without
 client-supplied write content. The service reconstructs current canonical hunks.
-`project.review.open` returns a verified GitHub compare URL with `kind: compare`
-and `opened: false`. It does not create a pull request or claim provider approval.
+The visible owner review dialog uses local comparison data.
+The unused external compare-link route has been removed.
 
 ## Explicit owner review and merge to main or master
 
@@ -164,17 +164,22 @@ A saved named account is never silently replaced by another account.
 The owner calls `project.create` with a stable request identity, a name, a goal,
 `machineId: "local"`, and either an existing repository identity or a new repository name.
 Only the confirmed local machine is implemented.
-`useWorktree` defaults to true.
+Every project has its own dedicated worktree.
+`useWorktree: false` is refused, including by the preview read.
 New repositories live beneath the configured workspace folder.
 Worktrees live beneath the repository's `.worktrees` directory.
 Names collide case-insensitively within one repository and machine.
 Branch and directory collisions receive a numeric suffix.
-An unchecked worktree option uses the main checkout and its current named branch.
-An unborn repository remains unborn; creation does not invent a commit.
+There is no main-checkout project option.
+New repositories receive an empty initial main commit containing no user files.
+The main checkout stays recorded separately for owner review and approval.
+Unfinished historical main-checkout intents stay readable and reserved, but cannot resume effects.
+The owner can explicitly abandon them without changing their files.
 
 `project.placement.preview` accepts the same placement input as `project.create`.
 It calls the same authoritative selector against the current repository and filesystem.
 It returns the observed repository folder, checkout folder, branch, and checkout type.
+The page always previews Branch and Folder.
 It returns `reserved: false` because creation must check the placement again.
 It creates no intent, directory, branch, receipt, account login, or lead.
 
@@ -339,3 +344,34 @@ The revision must belong to the project's repository.
 Recording and approving the mock both recheck all required Design evidence against that exact revision.
 An omitted Design identity stays absent.
 The page must never derive a design file path from a repository or component display name.
+
+## Git attempts and uncertain outcomes
+
+Git mutations use the existing event log for a bounded attempt before possible effects.
+The attempt binds the caller, request, canonical body hash, operation, workspace, and pre-effect Git identities.
+It stores no raw payload or commit message.
+The request lane covers a short writer preflight, Git under the runtime gate outside the writer, and a short final outcome transaction.
+A possible effect followed by failure returns a fixed uncertain error without a success or refusal receipt.
+An identical retry never clears that attempt merely because the current state appears unchanged.
+Main approval can reconcile both reviewed ancestors in the actual registered destination.
+Commit reconciliation checks the frozen tree, branch, intended retry message, and all expected parents, including a pending merge parent.
+Other unresolved operation attempts remain pending because their exact prior result cannot yet be proven.
+The normal writer failure latch still requires recovery before writes or receipt replay.
+
+Registration and project creation observe checkouts outside the writer too.
+Creation retains its durable intent and filesystem ownership witnesses.
+Its final checkout verification and main-branch read precede the final transaction.
+That transaction checks the current intent, settings, placements, reservations and name collisions before running the current lead and launch admission.
+
+Design, mocks and file-context commands prepare bounded physical observations outside the writer.
+They do not retain an admitted event plan.
+Their final planners rerun current authority, revision, placement and collision checks before using those observations.
+Prompt and board admissions still resolve current holders, recipients, channel access, quotas, replies and task references in the writer.
+An observation is usable only with its unchanged settings root and registered repository, location, workspace and parent bindings.
+Artifact fingerprints describe the bytes observed during preparation.
+They do not promise that a file remains unchanged after that observation.
+Later artifact reads continue to compare actual bytes with the recorded fingerprint.
+
+The owner can use `project.creation.abandon` to release a pending creation reservation.
+Abandonment takes the lifecycle lane and records only `project.CreationFinished`.
+It leaves the repository, checkout, branches, exclusions, witnesses, files, and modes untouched.

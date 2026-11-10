@@ -13,7 +13,7 @@ import { previewProjectPlacement } from "../project/lifecycle.ts";
 import { mockPlanners, mockReads } from "../project/mocks.ts";
 import { setupPlanners, setupReads } from "../project/setup.ts";
 import { designPlanners, designReads } from "../project/design.ts";
-import { projectPlanners, projectReads } from "../project/commands.ts";
+import { creationPlanners, projectPlanners, projectReads } from "../project/commands.ts";
 import { snapshotFor as projectSnapshotFor } from "../project/snapshot.ts";
 import { boardPlanners, boardReads } from "../board/commands.ts";
 import { boardReactor } from "../board/reactor.ts";
@@ -61,6 +61,8 @@ export interface EngineLists {
 }
 const absent = () => undefined;
 let reactors: EngineLists["reactors"] | undefined;
+let plannerTable: EngineLists["planners"] | undefined;
+let readTable: EngineLists["reads"] | undefined;
 export const engineLists: EngineLists = {
   commandGroups, eventGroups, commands: CommandsRpcGroup, event: Event, envelope: EventEnvelope,
   reach, sourceRules, holdUnsettled, requestHeld, secretKeep: { client: carrierKeep, board: () => [], roles: () => [], project: () => [] },
@@ -69,8 +71,10 @@ export const engineLists: EngineLists = {
     "roles.standing-rules": [],
   }, secretCommands: ["accounts set-secret", "client.alerts.carrier.set-token"],
   access: commandAccess,
-  planners: { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners, ...projectPlanners, ...gitPlanners, ...mockPlanners, ...setupPlanners, ...designPlanners },
-  reads: { ...reads, ...alertReads, ...boardReads, ...projectReads, ...gitReads, ...mockReads, ...setupReads, ...designReads, "project.placement.preview": previewProjectPlacement },
+  // Build these tables on first use after the cyclic modules initialize.
+  // Cache the complete maps so every consumer keeps the same registrations.
+  get planners() { return plannerTable ??= { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners, ...projectPlanners, ...creationPlanners, ...gitPlanners, ...mockPlanners, ...setupPlanners, ...designPlanners }; },
+  get reads() { return readTable ??= { ...reads, ...alertReads, ...boardReads, ...projectReads, ...gitReads, ...mockReads, ...setupReads, ...designReads, "project.placement.preview": previewProjectPlacement }; },
   // The tables and reactors import engine services in this same module graph.
   // Resolve their values when used, after module initialization has completed.
   get views() { return pieceViews; },

@@ -20,10 +20,12 @@ export const ProjectName = Schema.String.check(Schema.isMinLength(1), Schema.isM
 export const ProjectPath = Schema.String.check(Schema.isMinLength(1), Schema.isMaxCodePoints(4096))
 // Repository artifacts never expand homes, follow URLs, or address credentials.
 // Filesystem reads must additionally verify the registered checkout and real path.
+export const isRepositoryCredentialPath = (value: string) => value.split("/").some((part) =>
+  [".codex", ".claude", ".gemini", ".aws", ".ssh", ".env", "auth.json", ".credentials.json", "oauth_creds.json"].includes(part.toLowerCase())
+  || part.toLowerCase().startsWith(".env."))
 export const isRepositoryArtifactPath = (value: string) => value.length <= 4096 && !/[\\\x00-\x1f\x7f%]/.test(value)
-  && !value.startsWith("/") && value.split("/").every((part) => part !== "" && part !== "." && part !== ".."
-    && ![".git", ".codex", ".claude", ".gemini", ".aws", ".ssh", ".env", "auth.json", ".credentials.json", "oauth_creds.json"].includes(part.toLowerCase())
-    && !part.toLowerCase().startsWith(".env."))
+  && !value.startsWith("/") && !isRepositoryCredentialPath(value)
+  && value.split("/").every((part) => part !== "" && part !== "." && part !== ".." && part.toLowerCase() !== ".git")
 export const ProjectStage = Schema.Literals(["design", "plan", "build", "review", "handover"])
 export const SprintPhase = Schema.Literals(["Define", "Design", "Plan", "Build", "Verify", "Review", "Hand over"])
 export const TaskState = Schema.Literals(["queue", "active", "review", "blocked", "done"])

@@ -36,7 +36,7 @@ const bundle = () => ({
     { entity: "Project", name: "count", type: "number", description: "Change count", sourceId: "schema", screens: ["home"] }],
   components: [{ componentId: "button", name: "Button", sourceId: "components", provenance: "draft", reference: "draft-button.tsx", fingerprint: hash("export const Button = 1\n"), screens: ["home"] }]
 })
-const setup = () => Effect.gen(function* () {
+const setup = (stage: "design" | "plan" = "design") => Effect.gen(function* () {
   yield* registerRebuildCheck(); yield* seedAccount(); yield* seedHarness()
   const lead = yield* seedAgent({ id: "mock-lead" }), child = yield* seedAgent({ id: "designer", parent: "mock-lead" }), stranger = yield* seedAgent({ id: "stranger" })
   success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "sh" } }))
@@ -44,7 +44,9 @@ const setup = () => Effect.gen(function* () {
   // A historical project uses the accepted typed event path, without adding a
   // production record-only creation command. Live lifecycle is tested separately.
   yield* appendSetup([eventOf({ _tag: "project.WorktreeCreated", worktreeId: "workspace", repoId, machineId: "local", branch: "main", path: rig.work, checkout: "main" }),
-    eventOf({ _tag: "project.Created", projectId: "project", name: "Mocks", goal: "Review actual artifacts", repoId, worktreeId: "workspace", leadAgentId: lead.agentId, machineId: "local" })])
+    eventOf({ _tag: "project.Created", projectId: "project", name: "Mocks", goal: "Review actual artifacts", repoId, worktreeId: "workspace", leadAgentId: lead.agentId, machineId: "local" }),
+    // Existing designer journeys start in a lead-authorized design stage.
+    eventOf({ _tag: "project.StageChanged", projectId: "project", stage })])
   writeFileSync(join(rig.work, "screen.html"), "<h1>Actual screen</h1>")
   writeFileSync(join(rig.work, "schema.json"), JSON.stringify({ Project: { name: "string", count: "string" } }))
   writeFileSync(join(rig.work, "components.json"), JSON.stringify({ components: ["Button"] }))
@@ -462,7 +464,7 @@ it.live("returns explicit unavailable artifacts and comparisons; refuses symlink
 })))
 
 it.live("starts without Design when screens are absent and derives distinct stage labels from real team areas", () => provideBoard(rig, Effect.gen(function* () {
-  const f = yield* setup()
+  const f = yield* setup("plan")
   expect(projectView(yield* snapshot).projects.project?.stage).toBe("plan")
   expect(failureOf(yield* call(owner, "project.stage.set", { projectId: "project", stage: "design" }))).toBeDefined()
   const first = success(yield* call(owner, "project.team.create", { projectId: "project", name: "Ignored stage label", stage: "build", area: "API", worktreeId: "workspace" }))
@@ -717,3 +719,19 @@ for (const actor of ["owner", "member"] as const) for (const page of ["empty", "
     if (outcome._tag === "Success") expect(bytes).toBeLessThanOrEqual(256 * 1024)
   })))
 }
+
+it.live("issue 581: only the lead or owner can change stage through a mock revision", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup("plan"), child = agentCredential(f.child.token), lead = agentCredential(f.lead.token)
+  const request = { projectId: "project", bundle: bundle() }
+  expect(failureOf(yield* call(child, "project.mocks.record", request))?.reason).toBe("only a project lead or owner can change the stage")
+  expect(projectView(yield* snapshot).projects.project?.stage).toBe("plan")
+  expect(Object.values(projectView(yield* snapshot).mockRevisions)).toHaveLength(0)
+  const first = success(yield* call(lead, "project.mocks.record", request))
+  expect(projectView(yield* snapshot).projects.project?.stage).toBe("design")
+  const second = success(yield* call(child, "project.mocks.record", { ...request, expectedRevision: first.revisionId }))
+  const empty = { sources: [], screens: [], scenarios: [], draftedFields: [], components: [] }
+  expect(failureOf(yield* call(child, "project.mocks.record", { projectId: "project", expectedRevision: second.revisionId, bundle: empty }))?.reason).toBe("only a project lead or owner can change the stage")
+  expect(projectView(yield* snapshot).projects.project?.stage).toBe("design")
+  success(yield* call(owner, "project.mocks.record", { projectId: "project", expectedRevision: second.revisionId, bundle: empty }))
+  expect(projectView(yield* snapshot).projects.project?.stage).toBe("plan")
+})))

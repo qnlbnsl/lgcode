@@ -1,10 +1,11 @@
 import * as Schema from "effect/Schema"
-import { ProjectId, RepositoryId, TaskId, TeamId, WorkspaceId } from "./schema.ts"
+import { isRepositoryCredentialPath, ProjectId, RepositoryId, TaskId, TeamId, WorkspaceId } from "./schema.ts"
 
 // Identities only. Labels are display data from a read, never send authority.
 export const ContextPath = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4096),
   Schema.isPattern(/^(?!\/)(?!.*\\)(?!.*[\x00-\x1f\x7f])[^/]+(?:\/[^/]+)*$/),
-  Schema.makeFilter((path) => !path.split("/").some((part) => part === "." || part === ".." || part.toLowerCase() === ".git")))
+  Schema.makeFilter((path) => !isRepositoryCredentialPath(path)
+    && !path.split("/").some((part) => part === "." || part === ".." || part.toLowerCase() === ".git")))
 export const ContextReference = Schema.Union([
   Schema.TaggedStruct("task", { projectId: ProjectId, taskId: TaskId }),
   Schema.TaggedStruct("file", { projectId: ProjectId, repoId: RepositoryId, worktreeId: WorkspaceId, path: ContextPath })

@@ -1,3 +1,4 @@
+import { isRepositoryCredentialPath } from "@lgcode/contracts";
 import { constants } from "node:fs";
 import { lstat, open, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -63,7 +64,7 @@ export const checkedMetadata = async (root: string, folder: string): Promise<str
 // No pathspec syntax, parent traversal, Git metadata, symlink component, or
 // nested checkout is accepted. Deleted leaf paths are valid for add/restore.
 export const filePath = async (folder: string, path: string): Promise<string> => {
-  if (!cleanText(path) || isAbsolute(path) || path.includes("\\")) return refuse();
+  if (!cleanText(path) || isAbsolute(path) || path.includes("\\") || isRepositoryCredentialPath(path)) return refuse();
   const parts = path.split("/");
   if (parts.some((part) => part === "" || part === "." || part === ".." || part.toLowerCase() === ".git")) return refuse();
   let current = folder;

@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect"
 import * as Semaphore from "effect/Semaphore"
-import { type Runtime, type Input, refused } from "../commands/internal.ts"
+import { type Runtime, type Input, refused, CommandUncertain } from "../commands/internal.ts"
 import type { Workspace } from "@lgcode/contracts"
 import { agentReadReply } from "../api/reads.ts"
 import { canReadProject } from "./access.ts"
@@ -28,7 +28,7 @@ export const withGit = <A, E, R>(input: Input, body: (git: GitService) => Effect
     return yield* Effect.uninterruptible(body(state.service!))
   })), () => Effect.sync(() => { state.queued-- }))
 })
-export const gitCall = <A>(effect: GitOperation<A>) => effect.pipe(Effect.mapError((error) => refused(`Git: ${error.reason}`)))
+export const gitCall = <A>(effect: GitOperation<A>) => effect.pipe(Effect.mapError((error) => error.uncertain ? new CommandUncertain({ reason: "Git outcome is uncertain; retry the identical request" }) : refused(`Git: ${error.reason}`)))
 export const localMachine = (id: string) => id === "local" ? Effect.void : Effect.fail(refused("only the local machine can register a checkout before machine pairing"))
 export const safePath = (input: Input, path: string) => Effect.gen(function* () {
   if ((yield* input.runtime.log.redactText(path)) !== path) return yield* refused("a path cannot contain a registered secret")
@@ -41,7 +41,7 @@ export const repositoryPath = (input: Input, id: string) => Effect.gen(function*
   yield* safePath(input, repository.path); yield* safePath(input, location.path)
   return { repository, location }
 })
-export const workspacePath = (input: Input, raw: Record<string, unknown>, git: GitService) => Effect.gen(function* () {
+export const workspaceReference = (input: Input, raw: Record<string, unknown>) => Effect.gen(function* () {
   const view = projectView(input.snapshot)
   const workspace = own(view.workspaces, raw.worktreeId as string)
   if (workspace === undefined) return yield* refused("registered workspace not found")
@@ -54,8 +54,10 @@ export const workspacePath = (input: Input, raw: Record<string, unknown>, git: G
       return yield* refused("project is unavailable to this caller")
     }
   }
-  return yield* checkedWorkspace(input, workspace, git)
+  return workspace
 })
+export const workspacePath = (input: Input, raw: Record<string, unknown>, git: GitService) => workspaceReference(input, raw).pipe(
+  Effect.flatMap((workspace) => checkedWorkspace(input, workspace, git)))
 const checkedWorkspace = (input: Input, workspace: Workspace, git: GitService) => Effect.gen(function* () {
   yield* localMachine(workspace.machineId)
   yield* safePath(input, workspace.path)
@@ -70,14 +72,39 @@ const checkedWorkspace = (input: Input, workspace: Workspace, git: GitService) =
 })
 // Repository Design is shared within one repository. Agents must identify an
 // actual project in that repository; normal project Git reads remain stricter.
-export const designWorkspacePath = (input: Input, raw: { repoId: string; worktreeId: string; projectId?: string }, git: GitService) => Effect.gen(function* () {
+export const designWorkspaceReference = (input: Input, raw: { repoId: string; worktreeId: string; projectId?: string }) => Effect.gen(function* () {
   const view = projectView(input.snapshot), workspace = own(view.workspaces, raw.worktreeId)
   if (workspace?.repoId !== raw.repoId) return yield* refused("registered design workspace is unavailable")
   if (input.actor._tag !== "owner" || raw.projectId !== undefined) {
     const project = raw.projectId === undefined ? undefined : own(view.projects, raw.projectId)
     if (project?.repoId !== raw.repoId || !canReadProject(input.snapshot, input.actor, project.projectId)) return yield* refused("repository design is unavailable to this caller")
   }
-  return yield* checkedWorkspace(input, workspace, git)
+  return workspace
+})
+export const designWorkspacePath = (input: Input, raw: { repoId: string; worktreeId: string; projectId?: string }, git: GitService) => designWorkspaceReference(input, raw).pipe(
+  Effect.flatMap((workspace) => checkedWorkspace(input, workspace, git)))
+
+// A request-local byte observation is usable only with its exact registered
+// placement. Authority and project/team attachment are resolved anew above.
+export const checkObservedWorkspace = (observed: Input, current: Input, workspace: Workspace, projectId?: string) => Effect.gen(function* () {
+  const before = projectView(observed.snapshot), now = projectView(current.snapshot)
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+  const placement = (view: typeof now) => {
+    const project = projectId === undefined ? undefined : own(view.projects, projectId)
+    return project === undefined ? undefined : { repoId: project.repoId, worktreeId: project.worktreeId, machineId: project.machineId,
+      teams: Object.values(view.teams).filter((row) => row.projectId === projectId && row.worktreeId === workspace.worktreeId)
+        .map((row) => ({ teamId: row.teamId, worktreeId: row.worktreeId })) }
+  }
+  if (!same(before.settings, now.settings) || !same(workspace, own(now.workspaces, workspace.worktreeId))
+    || !same(placement(before), placement(now))
+    || !same(own(before.repositories, workspace.repoId), own(now.repositories, workspace.repoId))
+    || !same(Object.values(before.locations).filter((row) => row.repoId === workspace.repoId && row.machineId === "local"),
+      Object.values(now.locations).filter((row) => row.repoId === workspace.repoId && row.machineId === "local"))
+    || workspace.parentId !== undefined && !same(own(before.workspaces, workspace.parentId), own(now.workspaces, workspace.parentId))) {
+    return yield* refused("project state changed; refresh and retry")
+  }
+  yield* safePath(current, workspace.path)
+  yield* repositoryPath(current, workspace.repoId)
 })
 // No identifier exemption applies to Git text. Paths, authors, patches, hunk
 // sides, ref names and URLs all pass through the production text redactor.

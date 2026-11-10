@@ -1,4 +1,4 @@
-import { questionLinks, linkedTask } from "../project/decisions.ts";
+import { questionLinks, linkedTask, canChangeLinkedTask } from "../project/decisions.ts";
 import { own, projectView } from "../project/view.ts";
 import { senderOf } from "../routing/envelope.ts";
 import { randomUUID } from "node:crypto";
@@ -31,7 +31,7 @@ export const answerQuestion = (
   if (row === undefined || row.status !== "open" || !mayActForHolder(snapshot, actor, row.holder)) return Effect.fail(refused());
   const task = linkedTask(snapshot, row);
   if (row.projectId !== undefined && row.taskId !== undefined && (task === undefined
-    || own(projectView(snapshot).agentProjects, row.agentId) !== row.projectId)) return Effect.fail(refused("invalid question links"));
+    || own(projectView(snapshot).agentProjects, row.agentId) !== row.projectId || !canChangeLinkedTask(snapshot, row.agentId, task))) return Effect.fail(refused("invalid question links"));
   const deliveryId = freshDelivery();
   return Effect.succeed({ events: [{
     _tag: "QuestionAnswered", agentId: row.agentId, questionId: payload.id, answeredBy: actor, text: payload.text, deliveryId,

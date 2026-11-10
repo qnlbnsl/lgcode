@@ -2,7 +2,7 @@ import * as Clock from "effect/Clock"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { GitEvidence, GitMainReview, type GitEvidenceSet, type Event } from "@lgcode/contracts"
-import { type Input, type Payload, type PiecePlanner, refused } from "../commands/internal.ts"
+import { type Input, type Payload, type PiecePlanner, refused, CommandUncertain } from "../commands/internal.ts"
 import { type ReadHandler } from "../api/reads.ts"
 import { canReadProject } from "./access.ts"
 import { own, projectKey, projectView } from "./view.ts"
@@ -46,25 +46,29 @@ const identity = (input: Input, values: ReadonlyArray<string>) => Effect.gen(fun
   for (const value of values) if ((yield* input.runtime.log.redactText(value)) !== value) return yield* refused("review identity contains a registered secret")
 })
 
-const report: PiecePlanner = (input, raw) => withGit(input, (git) => Effect.gen(function* () {
+const report: PiecePlanner = (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.review.report">
-  const { project, source } = yield* scope(input, raw, git)
+  const { project, source } = yield* withGit(input, (git) => scope(input, raw, git))
   if (input.actor._tag !== "owner" && (input.actor._tag !== "agent" || input.actor.agentId !== p.threadAgentId)) return yield* refused("review report requires the caller's project thread")
   if (!(yield* validThread(input, project.projectId, p.threadAgentId, p.threadSequence))) return yield* refused("review report requires an existing project thread item")
-  if ((yield* gitCall(git.state(source.path))).head !== p.head) return yield* refused("Git: stale_state")
+  yield* withGit(input, (git) => Effect.gen(function* () {
+    if ((yield* gitCall(git.state(source.path))).head !== p.head) return yield* refused("Git: stale_state")
+  }))
   yield* identity(input, [p.head])
   const value = Schema.decodeUnknownSync(GitEvidence)({ reportId: p.requestId, projectId: project.projectId, worktreeId: source.worktreeId,
     head: p.head, kind: p.kind, status: p.status, summary: p.summary, threadAgentId: p.threadAgentId, threadSequence: p.threadSequence,
     reportedBy: input.actor, provenance: "reported", recordedAt: yield* Clock.currentTimeMillis })
   return { events: [{ _tag: "project.GitEvidenceReported", report: value }], reply: () => ({ requestId: p.requestId }) }
-}))
+})
 const prepare: PiecePlanner = (input, raw) => Effect.gen(function* () {
   yield* owner(input)
-  return yield* withGit(input, (git) => Effect.gen(function* () {
-    const p = raw as Payload<"project.review.prepare">
+  const p = raw as Payload<"project.review.prepare">
+  const { project, source, target, comparison } = yield* withGit(input, (git) => Effect.gen(function* () {
     const { project, source } = yield* scope(input, raw, git)
     const target = yield* destination(input, raw, git, project.repoId)
     const comparison = yield* gitCall(git.reviewMain(source.path, target.path))
+    return { project, source, target, comparison }
+  }))
     yield* identity(input, [comparison.head, comparison.baseHead, comparison.branch, comparison.base])
     const review = Schema.decodeUnknownSync(GitMainReview)({ reviewId: p.requestId, projectId: project.projectId,
       worktreeId: source.worktreeId, destinationId: target.worktreeId, head: comparison.head, baseHead: comparison.baseHead,
@@ -74,25 +78,30 @@ const prepare: PiecePlanner = (input, raw) => Effect.gen(function* () {
     // review. A partial/oversized reply cannot produce an approvable ticket.
     const reply = yield* gitReply(input, p.requestId, { review, comparison })
     return { events: [{ _tag: "project.MainReviewOpened" as const, review }], reply: () => reply }
-  }))
 })
-const approve: PiecePlanner = (input, raw) => Effect.gen(function* () {
+export const admitMainReview = (input: Input, raw: Record<string, unknown>) => Effect.gen(function* () {
   yield* owner(input)
   const p = raw as Payload<"project.review.approve">
   if (p.confirmed !== true) return yield* refused("Git: confirmation_required")
   const review = own(projectView(input.snapshot).gitReviews, p.worktreeId)
   if (review === undefined || review.reviewId !== p.reviewId || review.projectId !== p.projectId || review.outcome !== "open"
     || review.head !== p.expectedHead || review.baseHead !== p.expectedBaseHead) return yield* refused("main review is unavailable; prepare a new review")
+  return review
+})
+const approve: PiecePlanner = (input, raw) => Effect.gen(function* () {
+  const p = raw as Payload<"project.review.approve">
+  const review = yield* admitMainReview(input, raw)
   return yield* withGit(input, (git) => Effect.gen(function* () {
     const { project, source } = yield* scope(input, raw, git)
     const target = yield* destination(input, { ...raw, destinationId: review.destinationId }, git, project.repoId)
     // Evidence is recorded data. Both choices explicitly authorize this
     // reviewed pair; no test result or reviewer verdict is a merge policy.
-    const result = yield* git.approveMain(source.path, target.path, review, input.actor, p.confirmed).pipe(Effect.result)
+    const result = yield* git.approveMain(source.path, target.path, review, input.actor, p.confirmed, input.gitRetry === true).pipe(Effect.result)
+    if (result._tag === "Failure" && result.failure.uncertain) return yield* new CommandUncertain({ reason: "Git outcome is uncertain; retry the identical request" })
     const decided: GitMainReview = { ...review, decision: p.decision, decidedAt: (yield* Clock.currentTimeMillis) as GitMainReview["decidedAt"],
       outcome: result._tag === "Success" ? "merged" : "refused", mergeHead: result._tag === "Success" ? result.success : null,
       reason: result._tag === "Failure" ? result.failure.reason : null }
-    const reply = yield* gitReply(input, p.requestId, decided)
+    const reply = yield* gitReply(input, p.requestId, decided).pipe(Effect.mapError((error) => result._tag === "Success" ? new CommandUncertain({ reason: "Git outcome is uncertain; retry the identical request" }) : error))
     return { events: [{ _tag: "project.MainReviewDecided", review: decided }] as Event[], reply: () => reply }
   }))
 })
@@ -102,8 +111,8 @@ const status: ReadHandler = (input, raw) => Effect.gen(function* () {
     const state = yield* gitCall(git.state(source.path))
     return { project, source, head: state.head ?? "" }
   }))
-  // Commands own the SQL transaction before waiting for Git. Release the Git
-  // gate before reading thread evidence, retaining the exact head observed.
+  // Release the Git gate before reading SQL thread evidence, retaining the
+  // exact head observed and avoiding an inverted gate/transaction dependency.
   const review = own(projectView(input.snapshot).gitReviews, source.worktreeId)
   return { reply: yield* gitReply(input, raw.requestId, { review: review?.projectId === project.projectId ? review : null,
     evidence: yield* evidenceFor(input, project.projectId, source.worktreeId, head) }, true) }

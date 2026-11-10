@@ -56,6 +56,8 @@ export const eventStructure: RedactionStructure = { taggedFields: {
       scenarios: { elements: { fields: { scenarioId: identity } } }, draftedFields: draftFields, reviewedComparisons: mockComparisons,
       components: { elements: { fields: { componentId: identity, sourceId: identity, fingerprint: identity, screens: { elements: identity } } } } } } },
   "project.MockApproved": { projectId: identity, approvalId: identity, revisionId: identity, leadAgentId: identity, worklist: mockWorklist },
+  "project.GitAttempted": { attempt: { fields: { requestId: identity, bodyHash: identity, caller: actor, command: identity, worktreeId: identity } } },
+  "project.GitFinished": { caller: actor, operationRequestId: identity },
   "project.GitEvidenceReported": { report: gitReport },
   "project.MainReviewOpened": { review: gitReview },
   "project.MainReviewDecided": { review: gitReview },

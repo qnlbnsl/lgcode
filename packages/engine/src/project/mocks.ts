@@ -4,12 +4,12 @@ import { fieldStructure, eventStructure, type RedactionStructure } from "../log/
 import * as Effect from "effect/Effect"
 import { agentReadReply, type ReadHandler } from "../api/reads.ts"
 import { refused, type Input, type Payload, type PiecePlanner } from "../commands/internal.ts"
-import { canReadProject } from "./access.ts"
+import { canLeadProject, canReadProject } from "./access.ts"
 import { own, projectKey, projectView } from "./view.ts"
 import { sourceArtifact, componentArtifact, validateSource, validScreenRoute } from "./artifacts.ts"
 import { mockApprovalSource } from "./mockReach.ts"
-import { safePath } from "./gitApi.ts"
-import { verifyDesignEvidence } from "./design.ts"
+import { safePath, workspaceReference, checkObservedWorkspace } from "./gitApi.ts"
+import { prepareDesignEvidence } from "./design.ts"
 
 const requireMember = (input: Input, projectId: string) => {
   const project = own(projectView(input.snapshot).projects, projectId)
@@ -53,7 +53,12 @@ const cleanBundle = (input: Input, bundle: typeof MockBundle.Type) => Effect.gen
   if (!Schema.is(MockBundle)(cleaned)) return yield* refused("mock record exceeds the data budget after redaction")
   return cleaned
 })
-const record: PiecePlanner = (input, raw) => Effect.gen(function* () {
+type MockObservation = {
+  readonly design: (input: Input, design: import("@lgcode/contracts").RepositoryDesign) => Effect.Effect<void, ReturnType<typeof refused>>
+  readonly source: (input: Input, source: typeof MockSource.Type) => Effect.Effect<{ fingerprint: string }, ReturnType<typeof refused>>
+  readonly component: (input: Input, source: typeof MockSource.Type, component: typeof MockBundle.Type.components[number]) => Effect.Effect<void, ReturnType<typeof refused>>
+}
+const record = (observation?: MockObservation): PiecePlanner => (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.mocks.record">, project = yield* requireMember(input, p.projectId), view = projectView(input.snapshot)
   if (input.actor._tag !== "owner" && input.actor._tag !== "agent") return yield* refused()
   // A different caller has no receipt for this request, but cannot reuse its revision.
@@ -76,14 +81,16 @@ const record: PiecePlanner = (input, raw) => Effect.gen(function* () {
   if (b.designRevision !== undefined) {
     const design = own(view.designs, projectKey(project.repoId, b.designRevision))
     if (design === undefined) return yield* refused("design revision is not registered in this repository")
-    yield* verifyDesignEvidence(input, design, p.projectId)
+    if (observation === undefined) return yield* refused("project state changed; refresh and retry")
+    yield* observation.design(input, design)
   }
   const artifacts: Array<{ sourceId: typeof MockSource.Type.sourceId; fingerprint: string }> = []
   for (const source of b.sources) {
     yield* validateSource(input, source)
     // Membership and checkout identity must be valid even for an absent file.
     // Only the bounded file's unavailability can be retained as unavailable.
-    const available = yield* sourceArtifact(input, p.projectId, source).pipe(Effect.result)
+    if (observation === undefined) return yield* refused("project state changed; refresh and retry")
+    const available = yield* observation.source(input, source).pipe(Effect.result)
     if (available._tag === "Success") {
       artifacts.push({ sourceId: source.sourceId, fingerprint: available.success.fingerprint })
     }
@@ -107,16 +114,19 @@ const record: PiecePlanner = (input, raw) => Effect.gen(function* () {
     if (source?.kind !== "components" || component.screens?.some((id) => !b.screens.some((screen) => screen.screenId === id))) return yield* refused("invalid mock component reference")
     const old = previous?.bundle.components.find((row) => row.componentId === component.componentId)
     if (old?.provenance === "draft" && component.provenance === "shared" && old.reference === component.reference) return yield* refused("shared component requires an evidenced repository reference change")
-    yield* componentArtifact(input, p.projectId, source, component)
+    if (observation === undefined) return yield* refused("project state changed; refresh and retry")
+    yield* observation.component(input, source, component)
   }
   const candidate: MockRevision = { projectId: p.projectId, revisionId: p.requestId, bundle: b, author: input.actor, artifacts, comparisons, at: Number.MAX_SAFE_INTEGER }
   if (!readable(candidate, { projectId: p.projectId, approvalId: p.requestId, revisionId: p.requestId, leadAgentId: project.leadAgentId, worklist: worklistFor(candidate), at: Number.MAX_SAFE_INTEGER })) return yield* refused("mock record exceeds the read budget")
+  if ((b.screens.length > 0 && project.stage !== "design" || b.screens.length === 0 && project.stage === "design")
+    && !canLeadProject(input.snapshot, input.actor, project)) return yield* refused("only a project lead or owner can change the stage")
   const events: Event[] = [{ _tag: "project.MockRecorded", projectId: p.projectId, revisionId: p.requestId, bundle: b, author: input.actor, artifacts, comparisons }]
   if (b.screens.length > 0 && project.stage !== "design") events.push({ _tag: "project.StageChanged", projectId: p.projectId, stage: "design" })
   if (b.screens.length === 0 && project.stage === "design") events.push({ _tag: "project.StageChanged", projectId: p.projectId, stage: "plan" })
   return { events, reply: () => ({ requestId: p.requestId, revisionId: p.requestId }) }
 })
-const approve: PiecePlanner = (input, raw) => Effect.gen(function* () {
+const approve = (observation?: MockObservation): PiecePlanner => (input, raw) => Effect.gen(function* () {
   const p = raw as Payload<"project.mocks.approve">, project = yield* requireMember(input, p.projectId), view = projectView(input.snapshot)
   if (input.actor._tag !== "owner") return yield* refused()
   const revision = own(view.mockRevisions, projectKey(p.projectId, p.revisionId))
@@ -127,19 +137,72 @@ const approve: PiecePlanner = (input, raw) => Effect.gen(function* () {
   if (b.designRevision !== undefined) {
     const design = own(view.designs, projectKey(project.repoId, b.designRevision))
     if (design === undefined) return yield* refused("design revision is not registered in this repository")
-    yield* verifyDesignEvidence(input, design, p.projectId)
+    if (observation === undefined) return yield* refused("project state changed; refresh and retry")
+    yield* observation.design(input, design)
   }
   for (const source of b.sources) {
-    const actual = yield* sourceArtifact(input, p.projectId, source)
+    if (observation === undefined) return yield* refused("project state changed; refresh and retry")
+    const actual = yield* observation.source(input, source)
     if (revision.artifacts.find((row) => row.sourceId === source.sourceId)?.fingerprint !== actual.fingerprint) return yield* refused("mock artifact changed; record a new revision")
   }
-  for (const component of b.components) yield* componentArtifact(input, p.projectId, b.sources.find((row) => row.sourceId === component.sourceId)!, component)
+  for (const component of b.components) {
+    if (observation === undefined) return yield* refused("project state changed; refresh and retry")
+    yield* observation.component(input, b.sources.find((row) => row.sourceId === component.sourceId)!, component)
+  }
   const worklist = worklistFor(revision)
   if (!readable(revision, { projectId: p.projectId, approvalId: p.requestId, revisionId: p.revisionId, leadAgentId: project.leadAgentId, worklist, at: Number.MAX_SAFE_INTEGER })) return yield* refused("mock approval exceeds the read budget")
   return { events: [{ _tag: "project.MockApproved", projectId: p.projectId, approvalId: p.requestId, revisionId: p.revisionId, leadAgentId: project.leadAgentId, worklist },
     { _tag: "project.StageChanged", projectId: p.projectId, stage: "plan" }], deliveries: [{ target: project.leadAgentId,
       sourceId: mockApprovalSource(p.projectId, p.requestId, p.revisionId),
       body: `The owner approved mock revision ${p.revisionId} for project ${p.projectId}. Continue the default build loop in Plan. Read this exact project.mocks.read revision and its implementation worklist. Do not assume draft components or schema changes are already implemented.\n${JSON.stringify(worklist)}` }], reply: () => ({ requestId: p.requestId }) }
+})
+export const prepareMock = (observed: Input, name: "project.mocks.record" | "project.mocks.approve", raw: Record<string, unknown>) => Effect.gen(function* () {
+  const projectId = raw.projectId as string, membership = yield* requireMember(observed, projectId).pipe(Effect.result), view = projectView(observed.snapshot)
+  if (membership._tag === "Failure") return name === "project.mocks.record" ? record() : approve()
+  const project = membership.success
+  const bundle = name === "project.mocks.record" ? (raw as Payload<"project.mocks.record">).bundle
+    : own(view.mockRevisions, projectKey(projectId, raw.revisionId as string))?.bundle
+  if (bundle === undefined) return approve()
+  const design = bundle.designRevision === undefined ? undefined : own(view.designs, projectKey(project.repoId, bundle.designRevision))
+  const checkDesign = design === undefined ? undefined : yield* prepareDesignEvidence(observed, design, projectId)
+  const sources = yield* Effect.forEach(bundle.sources, (source) => Effect.gen(function* () {
+    const result = yield* Effect.gen(function* () {
+      yield* validateSource(observed, source)
+      return yield* sourceArtifact(observed, projectId, source).pipe(Effect.map((actual) => ({ fingerprint: actual.fingerprint })))
+    }).pipe(Effect.result)
+    return { source, result }
+  }))
+  const components = yield* Effect.forEach(bundle.components, (component) => Effect.gen(function* () {
+    const source = bundle.sources.find((row) => row.sourceId === component.sourceId)
+    const result = source === undefined ? undefined : yield* componentArtifact(observed, projectId, source, component).pipe(Effect.result)
+    return { component, result }
+  }))
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+  const checkSource = (current: Input, source: typeof MockSource.Type) => Effect.gen(function* () {
+    yield* validateSource(current, source)
+    yield* workspaceReference(current, { projectId, worktreeId: source.worktreeId })
+    const workspace = own(view.workspaces, source.worktreeId)
+    if (workspace === undefined) return yield* refused("registered workspace not found")
+    yield* checkObservedWorkspace(observed, current, workspace, projectId)
+    const actual = sources.find((row) => same(row.source, source))
+    if (actual === undefined) return yield* refused("project state changed; refresh and retry")
+    return actual.result
+  })
+  const observation: MockObservation = {
+    design: (current, actual) => checkDesign === undefined ? Effect.fail(refused("project state changed; refresh and retry")) : checkDesign(current, actual),
+    source: (current, source) => Effect.gen(function* () {
+      const result = yield* checkSource(current, source)
+      return result._tag === "Success" ? result.success : yield* result.failure
+    }),
+    component: (current, source, component) => Effect.gen(function* () {
+      yield* checkSource(current, source)
+      yield* safePath(current, component.reference)
+      const actual = components.find((row) => same(row.component, component))
+      if (actual?.result === undefined) return yield* refused("project state changed; refresh and retry")
+      if (actual.result._tag === "Failure") return yield* actual.result.failure
+    }),
+  }
+  return name === "project.mocks.record" ? record(observation) : approve(observation)
 })
 const wrap = (input: Input, requestId: unknown, value: Record<string, unknown>) => input.actor._tag === "agent" ? agentReadReply(requestId, value) : value
 const read: ReadHandler = (input, raw) => Effect.gen(function* () {
@@ -175,5 +238,5 @@ const artifact: ReadHandler = (input, raw) => Effect.gen(function* () {
   if (Buffer.byteLength(JSON.stringify(reply)) > 256 * 1024) return yield* refused("mock artifact reply exceeds the read budget")
   return { reply }
 })
-export const mockPlanners = { "project.mocks.record": record, "project.mocks.approve": approve }
+export const mockPlanners = { "project.mocks.record": record(), "project.mocks.approve": approve() }
 export const mockReads = { "project.mocks.read": read, "project.mocks.artifact": artifact }

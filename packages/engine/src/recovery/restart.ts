@@ -1,3 +1,6 @@
+import { projectPreventsRun } from "../project/access.ts";
+import { prepareProjectLifecycle, archiveProject } from "../project/lifecycle.ts";
+import { projectView } from "../project/view.ts";
 import { collectSecrets } from "../accounts/collectSecrets.ts";
 // Pattern: T3 Code packages/effect-acp/src/client.ts (`loadSession`, line 91;
 // MIT licence; the copy here is third_party/t3code/effect-acp/src/client.ts)
@@ -143,7 +146,7 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
   const reloadInterrupted = (agentId: AgentId) => withLane(log, agentId)(Effect.gen(function* () {
     const snapshot = yield* views.snapshot;
     const agent = snapshot.agents[agentId];
-    if (agent?.state._tag !== "interrupted") return false;
+    if (projectPreventsRun(snapshot, agentId) || agent?.state._tag !== "interrupted") return false;
     const previous = agent.state.previous;
     const fresh = previous === "starting" && (agent.session === undefined || agent.reloadable !== true);
     if (!fresh && (agent.session === undefined || agent.reloadable !== true || !canReload)) return false;
@@ -174,7 +177,7 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
   const reloadPaused = (agentId: AgentId, accountId: string, cause: AvailableCause) => withLane(log, agentId)(Effect.gen(function* () {
     const snapshot = yield* views.snapshot;
     const agent = snapshot.agents[agentId];
-    if (agent === undefined || agent.state._tag !== "paused" || !returnable(agent, accountId, cause)
+    if (projectPreventsRun(snapshot, agentId) || agent === undefined || agent.state._tag !== "paused" || !returnable(agent, accountId, cause)
       || snapshot.accounts[accountId]?.status !== "available") return false;
     const midTurn = agent.state.midTurn;
     const failed = (): ReadonlyArray<Event> => [{ _tag: "AgentReloadFailed", agentId, reason: "agent reload failed" }];
@@ -276,6 +279,19 @@ export const layer = (options: RestartOptions) => Layer.effect(Restart, Effect.g
     yield* sweep;
     yield* interrupt;
     yield* collectSecrets(yield* views.snapshot, log.lists);
+    for (const project of Object.values(projectView(yield* views.snapshot).projects)) {
+      if (!project.archiving || project.archivedAt !== undefined) continue;
+      const result = yield* Effect.gen(function* () {
+        const payload = { requestId: freshRequest(), projectId: project.projectId };
+        yield* prepareProjectLifecycle({ runtime, actor: owner, snapshot: yield* views.snapshot }, "project.archive", payload, "restart archive");
+        const plan = yield* archiveProject({ runtime, actor: owner, snapshot: yield* views.snapshot }, payload);
+        yield* write(plan.events);
+      }).pipe(Effect.result);
+      if (result._tag === "Failure") {
+        if (result.failure._tag === "LogWriteFailed") return yield* result.failure;
+        yield* Effect.logWarning("project archive is unfinished because an agent could not stop");
+      }
+    }
     const recovered = new Set<string>();
     for (const agent of Object.values((yield* views.snapshot).agents)) {
       if (agent.state._tag === "interrupted" && (yield* reloadInterrupted(agent.agentId))) recovered.add(agent.agentId);

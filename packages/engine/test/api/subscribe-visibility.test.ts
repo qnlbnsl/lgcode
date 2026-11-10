@@ -62,6 +62,12 @@ const samples: Record<string, (a: string, n: string) => Record<string, unknown>>
   "project.MockApproved": () => ({ projectId: "project-one", approvalId: "mock-approval", revisionId: "mock-revision", leadAgentId: "agent-self",
     worklist: { screens: [], drafts: [], schemaChanges: [], draftedFields: [] } }),
   "project.GitEvidenceReported": () => ({ report: gitReportSample }),
+  "project.GitAttempted": (_a, n) => ({ attempt: {
+    requestId: n.replace("project.GitAttempted", "git-operation"), bodyHash: "a".repeat(64), caller: owner,
+    command: "project.commit", worktreeId: "project-workspace",
+    before: { head: "b".repeat(40), branch: "project-work", tree: "c".repeat(40), mergeHead: "d".repeat(40) },
+  } }),
+  "project.GitFinished": (_a, n) => ({ caller: owner, operationRequestId: n.replace("project.GitFinished", "git-operation") }),
   "project.MainReviewOpened": () => ({ review: gitReviewSample }),
   "project.MainReviewDecided": () => ({ review: { ...gitReviewSample, decision: "approve_without_evidence", outcome: "refused", reason: "stale_state", decidedAt: 2000 } }),
   "project.SettingsChanged": () => ({ settings: { workspaceFolder: "/tmp", shell: "zsh" } }),

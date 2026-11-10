@@ -5,7 +5,7 @@ import { agentReadReply, type ReadHandler } from "../api/reads.ts"
 import { refused, type Input, type Payload } from "../commands/internal.ts"
 import { canReadProject } from "./access.ts"
 import { own, projectKey, projectView } from "./view.ts"
-import { gitCall, safePath, withGit, workspacePath } from "./gitApi.ts"
+import { gitCall, safePath, withGit, workspacePath, workspaceReference, checkObservedWorkspace } from "./gitApi.ts"
 
 // References confer no access. This also guards reads and future board members.
 export const canReadContext = (snapshot: Input["snapshot"], caller: Caller, refs: ReadonlyArray<ContextReference> = []) =>
@@ -17,10 +17,34 @@ const identity = (input: Input, ref: ContextReference) => Effect.gen(function* (
   }
 })
 
+export type ContextFiles = (input: Input, ref: Extract<ContextReference, { _tag: "file" }>) => Effect.Effect<void, ReturnType<typeof refused>>
+// Only the physical file probes run before the writer. The returned closure
+// checks exact bindings; resolveContext still admits current participants/tasks.
+export const prepareContextFiles = (observed: Input, refs: ReadonlyArray<ContextReference> | undefined) => Effect.gen(function* () {
+  const files = yield* Effect.forEach((refs ?? []).filter((ref) => ref._tag === "file"), (ref) => Effect.gen(function* () {
+    yield* identity(observed, ref)
+    const result = yield* withGit(observed, (git) => Effect.gen(function* () {
+      const workspace = yield* workspacePath(observed, ref, git)
+      if (workspace.repoId !== ref.repoId) return yield* refused("context repository does not match the project")
+      yield* gitCall(git.contextFile(workspace.path, ref.path))
+      return workspace
+    })).pipe(Effect.result)
+    return { ref, result }
+  }))
+  const check: ContextFiles = (current, ref) => Effect.gen(function* () {
+    yield* workspaceReference(current, ref)
+    const file = files.find((file) => JSON.stringify(file.ref) === JSON.stringify(ref))
+    if (file === undefined) return yield* refused("project state changed; refresh and retry")
+    if (file.result._tag === "Failure") return yield* file.result.failure
+    yield* checkObservedWorkspace(observed, current, file.result.success, ref.projectId)
+  })
+  return check
+})
+
 // Call under the command writer's permit. An old receipt is returned before
 // admission, so an unchanged retry never regenerates text or reference IDs.
 export const resolveContext = (input: Input, refs: ReadonlyArray<ContextReference> | undefined,
-  recipients: ReadonlyArray<Caller>) => Effect.gen(function* () {
+  recipients: ReadonlyArray<Caller>, files?: ContextFiles) => Effect.gen(function* () {
   if (refs === undefined || refs.length === 0) return undefined
   if (!Schema.is(ContextReferences)(refs) || input.actor._tag !== "owner" && input.actor._tag !== "agent") return yield* refused("context is unavailable to this caller")
   const view = projectView(input.snapshot)
@@ -36,13 +60,11 @@ export const resolveContext = (input: Input, refs: ReadonlyArray<ContextReferenc
       if (task === undefined) return yield* refused("context task is unavailable")
       selected.push({ _tag: "task", projectId: project.projectId, taskId: task.taskId })
     } else {
-      const file = yield* withGit(input, (git) => Effect.gen(function* () {
-        const workspace = yield* workspacePath(input, ref, git)
-        if (workspace.repoId !== ref.repoId || ref.repoId !== project.repoId) return yield* refused("context repository does not match the project")
-        yield* gitCall(git.contextFile(workspace.path, ref.path))
-        return { _tag: "file" as const, projectId: project.projectId, repoId: workspace.repoId, worktreeId: workspace.worktreeId, path: ref.path }
-      }))
-      selected.push(file)
+      const workspace = yield* workspaceReference(input, ref)
+      if (workspace.repoId !== ref.repoId || ref.repoId !== project.repoId) return yield* refused("context repository does not match the project")
+      if (files === undefined) return yield* refused("project state changed; refresh and retry")
+      yield* files(input, ref)
+      selected.push({ _tag: "file", projectId: project.projectId, repoId: workspace.repoId, worktreeId: workspace.worktreeId, path: ref.path })
     }
   }
   return selected
@@ -92,5 +114,7 @@ export const searchContext: ReadHandler = (input, raw) => Effect.gen(function* (
     }
   }))
   const reply = { requestId: p.requestId, result }
-  return { reply: input.actor._tag === "agent" ? agentReadReply(p.requestId, reply) : reply }
+  const wrapped = input.actor._tag === "agent" ? agentReadReply(p.requestId, reply) : reply
+  if (Buffer.byteLength(JSON.stringify(wrapped)) > 256 * 1024) return yield* refused("context reply exceeds the read budget")
+  return { reply: wrapped }
 })

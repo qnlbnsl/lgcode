@@ -5,7 +5,7 @@ export const own = <T>(rows: Readonly<Record<string, T>>, id: string): T | undef
 export const projectKey = (projectId: string, id: string) => JSON.stringify([projectId, id])
 export const projectView = (snapshot: Snapshot): ProjectView => snapshot.project as ProjectView
 const empty = <T>(): Readonly<Record<string, T>> => Object.create(null)
-export const emptyProject = (): ProjectView => ({ gitEvidence: empty(), gitReviews: empty(), taskNotifications: empty(), setup: { step: "welcome" }, mockRevisions: empty(), mockHeads: empty(), mockApprovals: empty(), designs: empty(), designHeads: empty(), creations: empty(), repositories: empty(), locations: empty(), workspaces: empty(), projects: empty(), teams: empty(), sprints: empty(), tasks: empty(), agentProjects: empty(), parents: empty() })
+export const emptyProject = (): ProjectView => ({ gitAttempts: empty(), gitEvidence: empty(), gitReviews: empty(), taskNotifications: empty(), setup: { step: "welcome" }, mockRevisions: empty(), mockHeads: empty(), mockApprovals: empty(), designs: empty(), designHeads: empty(), creations: empty(), repositories: empty(), locations: empty(), workspaces: empty(), projects: empty(), teams: empty(), sprints: empty(), tasks: empty(), agentProjects: empty(), parents: empty() })
 const change = <T>(rows: Readonly<Record<string, T>>, id: string, f: (row: T) => T) => {
   const row = own(rows, id)
   return row === undefined ? rows : { ...rows, [id]: f(row) }
@@ -16,6 +16,13 @@ export const projectAfter = (view: ProjectView, event: Event, sequence: number, 
   const at = occurredAt as TaskHistoryEntry["at"]
   const seq = sequence as TaskHistoryEntry["sequence"]
   switch (event._tag) {
+    case "project.GitAttempted": return { ...view, gitAttempts: { ...view.gitAttempts,
+      [projectKey(event.attempt.caller._tag === "owner" ? "owner" : `agent:${event.attempt.caller.agentId}`, event.attempt.requestId)]: event.attempt } }
+    case "project.GitFinished": {
+      const key = projectKey(event.caller._tag === "owner" ? "owner" : `agent:${event.caller.agentId}`, event.operationRequestId)
+      const { [key]: _finished, ...gitAttempts } = view.gitAttempts
+      return { ...view, gitAttempts }
+    }
     case "project.DesignRecorded": {
       const { _tag, ...record } = event
       return { ...view, designs: { ...view.designs, [projectKey(event.design.repoId, event.revisionId)]: { ...record, at } },

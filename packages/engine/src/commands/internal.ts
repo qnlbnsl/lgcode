@@ -22,6 +22,8 @@ export type Snapshot = Effect.Success<Context.Service.Shape<typeof Views>["snaps
 export type Agent = Snapshot["agents"][string];
 
 export class CommandRefused extends Data.TaggedError("CommandRefused")<{ readonly reason: string }> {}
+// This is a transport failure, never a durable refusal receipt.
+export class CommandUncertain extends CommandRefused {}
 export const refused = (reason = "command refused") => new CommandRefused({ reason });
 
 export interface Runtime {
@@ -38,6 +40,8 @@ export interface Runtime {
   readonly harnessDefaults?: Effect.Effect<ReadonlyArray<HarnessSettings>>;
 }
 export interface Input {
+  /** Internal retry context from a durable Git attempt; never a client field. */
+  readonly gitRetry?: true;
   readonly runtime: Runtime;
   readonly actor: Caller;
   readonly snapshot: Snapshot;

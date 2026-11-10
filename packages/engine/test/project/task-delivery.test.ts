@@ -43,7 +43,7 @@ for (const lostReply of [false, true]) it.live(`owner task reaches the actual pr
       yield* api["project.settings.set"]({ requestId: freshRequest(), settings: { workspaceFolder: rig.work, shell: "sh",
         lead: { harness: harness.id, account: { _tag: "named", accountId }, permission: "ask" } } })
       return yield* api["project.create"]({ requestId: freshRequest(), name, goal: "Plan", machineId: "local",
-        repository: { _tag: "new", name: name + " repository" }, useWorktree: false })
+        repository: { _tag: "new", name: name + " repository" }, useWorktree: true })
     })
     const project = yield* create("First", account.id), other = yield* create("Second", otherAccount.id)
     const row = projectView(yield* snapshot).projects[project.projectId]!, otherRow = projectView(yield* snapshot).projects[other.projectId]!

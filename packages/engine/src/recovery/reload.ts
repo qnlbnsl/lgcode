@@ -19,6 +19,7 @@ import { RunnerRejected, type Runner, type SessionInfo } from "../runner/Runner.
 import {
   freshRequest, readHarnesses, refused, type Agent, type CommandRefused, type Runtime, type Snapshot,
 } from "../commands/internal.ts";
+import { projectPreventsRun } from "../project/access.ts";
 import { carryOnText } from "../accounts/available.ts";
 import { replayedDelivery, userRuns } from "./replay.ts";
 
@@ -36,6 +37,7 @@ const RESTART_CARRY_ON = "The engine restarted. Carry on with what you were doin
 export const spawnInput = (
   runtime: Runtime, snapshot: Snapshot, agent: Agent, token: Redacted.Redacted<string>, operation: "resume" | "reload",
 ): Effect.Effect<Spawn, CommandRefused | LogWriteFailed> => Effect.gen(function* () {
+  if (projectPreventsRun(snapshot, agent.agentId)) return yield* refused("project archive is unfinished because an agent could not stop");
   const parent = agent.parent._tag === "agent" ? snapshot.agents[agent.parent.agentId] : undefined;
   if (agent.parent._tag === "agent" && parent === undefined) return yield* refused();
   const grant = yield* checkFolder({ ...runtime, caller: agent.parent,

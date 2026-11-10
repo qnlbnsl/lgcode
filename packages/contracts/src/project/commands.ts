@@ -50,6 +50,7 @@ export const ProjectRpcGroup = RpcGroup.make(
   Rpc.make("placement.preview", { payload: createPayload, success: Schema.Struct({ ...request, result: Schema.Struct({
     repositoryPath: Repository.fields.path, path: Workspace.fields.path, branch: ProjectName, checkout: Schema.Literals(["main", "worktree"]),
     reserved: Schema.Literal(false) }) }), error: Refused }),
+  Rpc.make("creation.abandon", { payload: { ...request, creationRequestId: RequestId }, success: Ack, error: Refused }),
   Rpc.make("creations", { payload: { ...request, ...paging }, success: page(ProjectCreation), error: Refused }),
   Rpc.make("goal.set", { payload: { ...project, goal: ProjectText }, success: Ack, error: Refused }),
   Rpc.make("archive", { payload: project, success: Ack, error: Refused }),
@@ -81,7 +82,7 @@ export const projectAccess = {
   "project.settings": owner, "project.settings.set": owner, "project.repository.add": owner, "project.repository.locate": owner,
   "project.repositories": owner, "project.workspace.register": owner, "project.workspaces": owner, "project.create": owner,
   "project.rename": owner, "project.place": owner, "project.preferences.set": owner,
-  "project.creations": owner, "project.goal.set": owner, "project.archive": owner, "project.restore": owner,
+  "project.creation.abandon": owner, "project.creations": owner, "project.goal.set": owner, "project.archive": owner, "project.restore": owner,
   "project.requests": member, "project.stage.set": member, "project.read": member, "project.team.create": member,
   "project.sprint.create": member, "project.sprint.update": member, "project.sprint.complete": member,
   "project.task.create": member, "project.task.update": member, "project.task.note": member, "project.task.history": member
