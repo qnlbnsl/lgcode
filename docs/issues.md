@@ -10779,3 +10779,18 @@ The full remains exit 1, and the isolated rerun remains exit 0.
 This does not establish a cause or close the timing issue.
 If it recurs in the merged full, the manager requires an earlier acknowledgement or a wait on the correct event rather than a longer deadline.
 The original logs and failure contexts remain in the W09 author result.
+
+
+## 610. The merged shell constrained the Git workspace width
+
+Found: 2026-11-10, in the manager's full check of merged 2b482a2.
+The general shell section rule had higher specificity than the Git workspace override.
+It applied a 1,200-pixel maximum width and automatic margins to the Git layout.
+The existing Git layout browser assertion failed on the computed maximum width.
+The general rule now excludes both the conversation and the Git workspace.
+No Git layout assertion, deadline or other style rule changes.
+The failed merged full remains recorded as exit 1, with all 525 unit files and 37 other browser cases passing.
+The lead runs the complete Git browser file after this correction.
+The manager owns the subsequent merged full and service check.
+The requested complete Git browser file passed remotely, with all 11 cases passing in 3.3 minutes and wrapper exit 0.
+The existing layout assertion passed without an assertion or deadline change.
