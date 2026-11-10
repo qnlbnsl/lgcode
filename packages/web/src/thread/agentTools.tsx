@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { AccountId, AgentChoices, AgentConfiguration, AgentId, ContextUsage, HarnessId } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
 import { requestId, withClient } from "./client.ts"
+import { beforeRequest, durableRefusal } from "./requestOutcome.ts"
 
 import { visibleText } from "./text.tsx"
 
@@ -70,15 +71,30 @@ function AgentConfigurationTools({ agentId, sequence, disabled, account }: Agent
     const attempt = recover ? entry.state.configurationAttempt : { requestId: requestId(), [axis]: value }
     if (attempt === undefined) return
     const payload = { requestId: attempt.requestId, agentId, ...(attempt.model === undefined ? {} : { model: attempt.model }), ...(attempt.effort === undefined ? {} : { effort: attempt.effort }) }
-    entry.update({ configurationAttempt: { ...payload, status: "sending" }, configurationMessage: "" })
+    let after = recover ? entry.state.configurationAttempt?.after : undefined
+    entry.update({ configurationAttempt: { ...payload, after, status: "sending" }, configurationMessage: "" })
+    const current = () => !session.controller.signal.aborted && entry.state.configurationAttempt?.requestId === payload.requestId
+    const failed = async () => {
+      if (!current()) return
+      const reason = await durableRefusal("configure", payload.requestId, after, session.controller.signal)
+      if (!current()) return
+      entry.update(reason === undefined
+        ? { configurationAttempt: { ...payload, after, status: "uncertain" }, configurationMessage: "Could not confirm the configuration." }
+        : { configurationAttempt: undefined, configurationMessage: `The engine refused this configuration: ${reason}. Choose another setting.` })
+    }
     try {
+      if (!recover) {
+        after = await beforeRequest(session.controller.signal)
+        if (!current()) return
+        entry.update({ configurationAttempt: { ...payload, after, status: "sending" } })
+      }
       const result = await withClient((client) => Effect.result(client.configure(payload)), session.controller.signal)
-      if (session.controller.signal.aborted) return
+      if (!current()) return
       if (result._tag === "Failure") {
-        entry.update({ configurationAttempt: { ...payload, status: "uncertain" }, configurationMessage: "Could not confirm the configuration." })
+        await failed()
       } else entry.update({ configurationAttempt: undefined, configurationMessage: "Selection recorded. Applied settings follow engine acknowledgement." })
     } catch {
-      if (!session.controller.signal.aborted) entry.update({ configurationAttempt: { ...payload, status: "uncertain" }, configurationMessage: "Could not confirm the configuration." })
+      await failed()
     } finally { if (!session.controller.signal.aborted) setRefresh((value) => value + 1) }
   }
   return <div className="agent-tools" aria-label="Agent configuration" ref={tools} onBlur={(event) => {

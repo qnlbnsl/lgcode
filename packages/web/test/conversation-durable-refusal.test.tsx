@@ -7,10 +7,10 @@ import { expect, it, vi } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as SqlClient from "effect/sql/SqlClient"
-import { ProjectId, type AgentChoices } from "@lgcode/contracts"
+import { ProjectId, type AgentChoices, type AgentId, type ChannelId, type TeamId } from "@lgcode/contracts"
 import { CommandHandler } from "../../engine/src/commands/CommandHandler.ts"
-import { provideBoard } from "../../engine/test/board/wakeFixtures.ts"
-import { appendSetup, call, eventOf, freshRequest, makeRig, ownerCredential, readLog, removeRig, seedAccount, seedAgent, seedHarness, success } from "../../engine/test/support/handlerRig.ts"
+import { provideBoard, seedBoard } from "../../engine/test/board/wakeFixtures.ts"
+import { agentCredential, appendSetup, call, eventOf, freshRequest, makeRig, ownerCredential, readLog, removeRig, seedAccount, seedAgent, seedHarness, success } from "../../engine/test/support/handlerRig.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 import { ShellDataProvider, useConversation } from "../src/data/ShellDataProvider.tsx"
 import { AgentTools } from "../src/thread/agentTools.tsx"
@@ -145,5 +145,72 @@ it.each(["prompt", "board.post", "model", "effort"] as const)("605 retires only 
     if (dialog) Object.defineProperty(HTMLDialogElement.prototype, "showModal", dialog)
     else Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal")
     vi.restoreAllMocks(); vi.unstubAllEnvs(); removeRig(rig)
+  }
+}, 20_000)
+
+it.each(["prompt", "board.post", "configure"] as const)("605 preserves a committed %s through lost reply, real invalid credential and exact receipt recovery", async (command) => {
+  const rig = makeRig()
+  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.spyOn(document, "hidden", "get").mockReturnValue(false)
+  const container = document.createElement("div"); document.body.append(container)
+  const root = createRoot(container)
+  try {
+    await Effect.runPromise(provideBoard(rig, (runner) => Effect.gen(function* () {
+      yield* registerRebuildCheck(); yield* seedBoard()
+      runner.script("choices", () => Effect.succeed(allChoices))
+      const handler = yield* CommandHandler
+      const sql = yield* SqlClient.SqlClient
+      const sent: Array<Record<string, unknown>> = []
+      const denied: string[] = []
+      transport.client = new Proxy({}, { get: (_target, name) => (payload: Record<string, unknown>) => {
+        if (name === command) sent.push(payload)
+        const attempt = name === command ? sent.length : 0
+        return handler.execute(attempt === 2 ? agentCredential("invalid-fixture-credential") : ownerCredential, String(name), payload).pipe(
+          Effect.tapError((error) => Effect.sync(() => { if (attempt === 2) denied.push(error.reason) })),
+          Effect.mapError(() => ({ _tag: "CommandError" as const, requestId: payload.requestId, reason: "command refused" })),
+          Effect.flatMap((result) => attempt === 1 ? Effect.fail({ _tag: "ClientError" as const, reason: "reply lost after commit" }) : Effect.succeed(result)),
+        )
+      } })
+      const agentId = "worker" as AgentId
+      const identity = command === "board.post" ? { _tag: "team" as const, projectId: "project" as ProjectId, teamId: "team" as TeamId, channelId: "room" as ChannelId }
+        : { _tag: "agent" as const, agentId }
+      const screen = <><Probe identity={identity} /><Composer identity={identity} recipient="Worker" tools={command === "configure" ? <AgentTools agentId={agentId} disabled={false} /> : undefined} /></>
+      yield* Effect.promise(async () => {
+        await act(async () => root.render(<ShellDataProvider onSessionExpired={() => {}}>{screen}</ShellDataProvider>))
+        await type(container, "Exactly one original effect.")
+        if (command === "configure") {
+          await eventually(() => expect(container.querySelector<HTMLButtonElement>('[aria-label="Model"]')?.disabled).toBe(false))
+          await tap(container, "Model"); await tap(container, "corrected-model")
+        } else await act(async () => container.querySelector("form")!.requestSubmit())
+        await eventually(() => expect(command === "configure" ? entry.state.configurationAttempt?.status : entry.state.status).toBe("uncertain"))
+      })
+      const original = sent[0]!
+      const before = yield* readLog
+      const receipt = yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE caller = 'owner' AND request_id = ${String(original.requestId)}`
+      expect(receipt).toHaveLength(1)
+      expect(before.filter((row) => row.requestId === original.requestId && row.event._tag === "CommandRefused")).toHaveLength(0)
+      yield* Effect.promise(async () => {
+        await type(container, "Later unsent draft.")
+        await act(async () => root.render(<ShellDataProvider onSessionExpired={() => {}}><p>Other route</p></ShellDataProvider>))
+        await act(async () => root.render(<ShellDataProvider onSessionExpired={() => {}}>{screen}</ShellDataProvider>))
+        await tap(container, command === "configure" ? "Recover configuration" : "Recover original send")
+        await eventually(() => expect(command === "configure" ? entry.state.configurationAttempt?.status : entry.state.status).toBe("uncertain"))
+        expect(denied).toEqual(["invalid credential"])
+        expect(sent).toEqual([original, original])
+        expect(command === "configure" ? entry.state.configurationAttempt?.after : entry.state.attemptAfter).toBeLessThan(before.at(-1)!.sequence)
+        if (command !== "configure") { await act(async () => container.querySelector("form")!.requestSubmit()); expect(sent).toHaveLength(2) }
+        await tap(container, command === "configure" ? "Recover configuration" : "Recover original send")
+        await eventually(() => expect(command === "configure" ? entry.state.configurationMessage : entry.state.message).toContain(command === "configure" ? "Selection recorded" : command === "prompt" ? "Prompt sent." : "Message posted."))
+        expect(sent).toEqual([original, original, original])
+        expect(entry.state.draft).toBe("Later unsent draft.")
+      })
+      const final = yield* readLog
+      expect(final.filter((row) => row.requestId === original.requestId)).toEqual(before.filter((row) => row.requestId === original.requestId))
+      const effectTag = command === "configure" ? "AgentConfigurationChosen" : command === "prompt" ? "DeliveryQueued" : "board.PostWritten"
+      expect(final.filter((row) => row.requestId === original.requestId && row.event._tag === effectTag)).toHaveLength(1)
+      expect(yield* sql<{ result_json: string }>`SELECT result_json FROM receipts WHERE caller = 'owner' AND request_id = ${String(original.requestId)}`).toEqual(receipt)
+    })))
+  } finally {
+    await act(async () => root.unmount()); container.remove(); vi.restoreAllMocks(); vi.unstubAllEnvs(); removeRig(rig)
   }
 }, 20_000)

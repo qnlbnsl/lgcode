@@ -4,6 +4,7 @@ import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { ContextReferences } from "@lgcode/contracts"
 import { requestId, withClient } from "./client.ts"
+import { beforeRequest, durableRefusal } from "./requestOutcome.ts"
 import { ContextPicker } from "./contextPicker.tsx"
 import { conversationKey, referenceKey, type ContextScope, type ConversationIdentity, type SendPayload } from "./conversationState.tsx"
 import { visibleText } from "./text.tsx"
@@ -47,20 +48,35 @@ function ConversationComposer({ identity, recipient, scope, disabled = false, ha
     const payload: SendPayload = original ?? { requestId: requestId(), text: draft,
       ...(context.length === 0 ? {} : { context }), ...(identity._tag === "agent" ? { agentId: identity.agentId }
         : { channelId: identity.channelId, to: [], reply: "none" }) }
-    entry.update({ draft, attempt: payload, status: "sending", message: "" })
+    let after = original === undefined ? undefined : entry.state.attemptAfter
+    entry.update({ draft, attempt: payload, attemptAfter: after, status: "sending", message: "" })
+    const current = () => !session.controller.signal.aborted && entry.state.attempt?.requestId === payload.requestId
+    const failed = async () => {
+      if (!current()) return
+      const reason = await durableRefusal("agentId" in payload ? "prompt" : "board.post", payload.requestId, after, session.controller.signal)
+      if (!current()) return
+      entry.update(reason === undefined
+        ? { status: "uncertain", message: "Could not confirm this message. Recover the original send before sending another." }
+        : { attempt: undefined, attemptAfter: undefined, status: "ready", message: `The engine refused this message: ${reason}. Your draft and context are kept.` })
+    }
     try {
+      if (original === undefined) {
+        after = await beforeRequest(session.controller.signal)
+        if (!current()) return
+        entry.update({ attemptAfter: after })
+      }
       const result = await withClient((client) => Effect.result("agentId" in payload
         ? client.prompt(payload).pipe(Effect.asVoid) : client["board.post"](payload).pipe(Effect.asVoid)), session.controller.signal)
-      if (session.controller.signal.aborted) return
+      if (!current()) return
       if (result._tag === "Failure") {
-        entry.update({ status: "uncertain", message: "Could not confirm this message. Recover the original send before sending another." })
+        await failed()
         return
       }
       const sameContext = JSON.stringify(entry.state.context.map((item) => item.reference)) === JSON.stringify(payload.context ?? [])
-      entry.update({ attempt: undefined, status: "ready", message: "agentId" in payload ? "Prompt sent." : "Message posted.",
+      entry.update({ attempt: undefined, attemptAfter: undefined, status: "ready", message: "agentId" in payload ? "Prompt sent." : "Message posted.",
         ...(entry.state.draft === payload.text && sameContext ? { draft: "", context: [] } : {}) })
     } catch {
-      if (!session.controller.signal.aborted) entry.update({ status: "uncertain", message: "Could not confirm this message. Recover the original send before sending another." })
+      await failed()
     }
   }
   const submit = (event: FormEvent) => { event.preventDefault(); void send() }

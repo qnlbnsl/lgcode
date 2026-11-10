@@ -10525,4 +10525,11 @@ The original controls use the real handler and SQLite for a disappearing selecte
 They require the old key to keep its refusal after repair and a corrected explicit request to use a new key.
 Only positive durable refusal evidence for the exact owner, command and request may retire an attempt.
 Missing, unavailable, incomplete or unrelated evidence must preserve the complete original request.
-Status: original consequential proof prepared; correction and remote proof are pending.
+The original remote run on d453837 exited 1 with all four behavioral controls failing.
+Each reached its real durable receipt and proved that repair did not change replay before failing at the locked control.
+The correction captures a bounded pre-command sequence in the existing conversation attempt.
+A shared read checks at most 64 subsequent events within two seconds and requires the exact owner, command, request and returned sequence.
+Only that positive refusal retires the attempt, preserving the current draft and references.
+Missing or unavailable evidence retains the frozen body and key through navigation and later admission failures.
+Late evidence cannot restore a disposed owner session.
+Status: correction prepared; affected remote proof and the final full check remain pending.

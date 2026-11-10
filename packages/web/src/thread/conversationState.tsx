@@ -26,8 +26,9 @@ export interface ConversationState {
   readonly context: ReadonlyArray<SelectedContext>
   readonly status: "ready" | "sending" | "uncertain"
   readonly attempt?: SendPayload | undefined
+  readonly attemptAfter?: EventSequence | undefined
   readonly message: string
-  readonly configurationAttempt?: { readonly requestId: RequestId; readonly model?: string; readonly effort?: string; readonly status: "sending" | "uncertain" } | undefined
+  readonly configurationAttempt?: { readonly requestId: RequestId; readonly model?: string; readonly effort?: string; readonly after?: EventSequence | undefined; readonly status: "sending" | "uncertain" } | undefined
   readonly configurationMessage?: string | undefined
   readonly cancelAttempt?: { readonly requestId: RequestId; readonly sentSequence: number; readonly status: "sending" | "uncertain" | "waiting" } | undefined
   readonly cancelMessage?: string | undefined
