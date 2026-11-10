@@ -10380,7 +10380,8 @@ After visiting two worktrees, changes in the first could remain displayed as a c
 A newer partial or unavailable result was also hidden by that older working view.
 The correction keeps working data authoritative only for the currently inspected row and uses the existing count generation for other rows.
 The focused control retains genuine Git reads beneath narrow partial, unavailable and held-reply boundaries, and checks that aborted generations cannot replace newer counts.
-Original-red and candidate proof are being recorded under the existing build loop.
+The original focused control failed against unchanged production with a genuine new file still displayed as zero changes.
+Candidate focused and full proof are recorded under the existing build loop.
 
 ## 607. Split Git comparisons omit side headings
 
@@ -10388,4 +10389,5 @@ The independent W09 review found that real split comparisons omitted the mock's 
 The correction adds paired headings and labeled line groups in the shared comparison renderer.
 Unified fallback, paired row alignment, literal patch rendering and the single phone gutter remain required.
 Focused renderer controls cover both workspace and dialog consumers, and the existing eight-combination browser journey retains its original consequences and deadlines.
-Original-red and candidate proof are being recorded under the existing build loop.
+Both original renderer controls failed against unchanged production because the two headings were absent.
+Candidate focused and full proof are recorded under the existing build loop.

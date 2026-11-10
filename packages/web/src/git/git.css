@@ -103,6 +103,7 @@
 .diff-line.filler { background: var(--color-selected, #eeece6); }
 .diff-hunk { color: var(--git-muted, #596d5f); padding: 4px 10px; background: var(--color-selected, #eeece6); overflow-wrap: anywhere; }
 .split-diff { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.split-diff > h3 { margin: 0; padding: 4px 10px; font-size: 12px; font-weight: 650; color: var(--git-muted, #596d5f); border-bottom: 1px solid var(--git-line, #ccd8cb); }
 .split-diff .diff-hunk { grid-column: 1 / -1; }
 .split-diff .diff-line { grid-template-columns: 40px minmax(0, 1fr); border-right: 1px solid var(--git-line); }
 .git-patch-metadata { padding: 4px 10px; }

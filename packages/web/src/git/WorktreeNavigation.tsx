@@ -42,7 +42,9 @@ export function WorktreeNavigation({ repository, projects, teams, workspaces, in
   return <nav className={`worktree-navigation${folded ? " is-rail" : ""}`} aria-label="Repository worktrees"><header className="worktree-head"><h2>Worktrees</h2>
     <button id="worktree-fold" onClick={toggle} aria-expanded={!folded} aria-label={folded ? "Show the worktree list" : "Fold the worktree list"}>{folded ? "›" : "‹"}</button></header>
     <div className="worktree-rows">{ordered.map((row) => {
-      const data = session.get(workspaceKey(repository.repoId, row.machineId, row.worktreeId)).data
+      // Uninspected rows use this refresh's count results, never a working
+      // view retained from an earlier visit to that checkout.
+      const data = row.worktreeId === inspected ? session.get(workspaceKey(repository.repoId, row.machineId, row.worktreeId)).data : undefined
       const changes = data?.changes
       const conflicts = changes?.items.filter((change) => change.conflict).length
       const status = row.machineId !== "local" ? "Machine Git unavailable" : !changes ? counts.get(row.worktreeId) ?? "Inspect for changes" : changes.truncated ? "Partial change list" : conflicts ? `${conflicts} conflicts` : `${changes.items.length} changes`

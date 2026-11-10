@@ -125,6 +125,9 @@ test("Git: four widths, both themes and modes, scroll ownership, phone gutters, 
           - workspace.querySelector(".git-resize")!.getBoundingClientRect().width)
         if (mode === "Split" && availableDiffWidth >= 900) {
           await expect(split.first()).toBeVisible()
+          await expect(split.first().getByRole("heading", { level: 3 })).toHaveText(["Before", "After"])
+          await expect(split.first().locator(":scope > .diff-line").first()).toHaveAttribute("aria-label", /^Before (?:line \d+|empty line)$/)
+          await expect(split.first().locator(":scope > .diff-line").nth(1)).toHaveAttribute("aria-label", /^After (?:line \d+|empty line)$/)
           expect(await page.locator(".diff-content").evaluate((element) => element.getBoundingClientRect().width)).toBeGreaterThanOrEqual(900)
           expect(await split.first().evaluate((element) => {
             const cells = [...element.querySelectorAll<HTMLElement>(":scope > .diff-line")]
@@ -132,6 +135,7 @@ test("Git: four widths, both themes and modes, scroll ownership, phone gutters, 
           })).toBe(true)
         } else {
           await expect(page.locator(".unified-diff").first()).toBeVisible()
+          await expect(page.locator(".split-diff > h3")).toHaveCount(0)
           if (mode === "Split") await expect(page.locator("#split-note")).toContainText("Showing unified.")
         }
       }
