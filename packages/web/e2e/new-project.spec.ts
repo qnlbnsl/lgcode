@@ -639,7 +639,8 @@ for (const axis of ["model", "effort"] as const) test(`first-run ${axis} refusal
     runner.script("start", (input) => Effect.succeed(sessionFor(input.agentId)))
     // Resume drains the original project kickoff through the real dispatcher.
     // Only its external provider turn end is controlled.
-    runner.script("prompt", (input) => runner.emit({ _tag: "turnEnded", agentId: input.agentId, incarnation: input.incarnation }))
+    const sql = yield* SqlClient.SqlClient
+    runner.script("prompt", (input) => runner.emit({ _tag: "turnEnded", agentId: input.agentId, incarnation: input.incarnation }).pipe(Effect.provideService(SqlClient.SqlClient, sql)))
     yield* Effect.promise(async () => {
       await page.getByRole("button", { name: "Resume agent", exact: true }).click()
       await expect(page.getByRole("status", { name: "Agent activity", exact: true })).toHaveText("Idle")
