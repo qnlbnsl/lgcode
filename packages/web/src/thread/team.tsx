@@ -1,4 +1,4 @@
-import { useConversation } from "../data/ShellDataProvider.tsx"
+import { useConversation, useShellData } from "../data/ShellDataProvider.tsx"
 import { useEffect, useState } from "react"
 import type { BoardPost, ChannelId, ProjectId, TeamId } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
@@ -8,6 +8,8 @@ import { BoundedText } from "./boundedText.tsx"
 import { useConversationReading } from "./reading.tsx"
 import { conversationKey, type ContextScope } from "./conversationState.tsx"
 import { visibleText } from "./text.tsx"
+import { teamAgents } from "../shell/model.ts"
+import { Icon } from "../shell/Icon.tsx"
 
 interface TeamConversationProps {
   readonly projectId: ProjectId; readonly teamId: TeamId; readonly channelId: ChannelId; readonly name: string
@@ -19,6 +21,10 @@ export function TeamConversation(props: TeamConversationProps) {
 function TeamMessages({ projectId, teamId, channelId, name, scope, disabled, onSessionExpired, sequence }: TeamConversationProps) {
   const identity = { _tag: "team" as const, projectId, teamId, channelId }
   const conversation = useConversation(identity)
+  const { navigation, snapshot } = useShellData()
+  const team = navigation?.teams.find((row) => row.projectId === projectId && row.teamId === teamId && row.channelId === channelId)
+  const members = team === undefined || snapshot === undefined ? undefined : teamAgents(team, snapshot).filter((agent) =>
+    navigation?.agents.some((row) => row.agentId === agent.agentId && row.projectId === projectId)).length
   const [posts, setPosts] = useState<ReadonlyArray<BoardPost>>([])
   const [loaded, setLoaded] = useState(false)
   const [available, setAvailable] = useState(false)
@@ -62,8 +68,9 @@ function TeamMessages({ projectId, teamId, channelId, name, scope, disabled, onS
     return () => { controller.abort(); clearInterval(timer); document.removeEventListener("visibilitychange", visible) }
   }, [projectId, teamId, channelId, sequence, generation])
   return <section className="conversation" aria-label="Team conversation">
-    <header className="conversation-heading"><h2>{visibleText(name)}</h2><span role="status">{available ? "Live" : loaded ? "Reconnecting" : "Loading…"}</span>
-      <button onClick={() => setGeneration((value) => value + 1)}>Refresh conversation</button></header>
+    <header className="conversation-heading"><h2>{visibleText(name)}</h2><span>{members === undefined ? "Membership unavailable" : `${members} agent${members === 1 ? "" : "s"}`}</span>
+      <span className="visually-hidden" role="status" aria-label="Team conversation connection">{available ? "Live" : loaded ? "Reconnecting" : "Loading…"}</span>
+      <button className="icon-button" aria-label="Refresh conversation" title="Refresh conversation" onClick={() => setGeneration((value) => value + 1)}><Icon name="refresh" /></button></header>
     <div className="conversation-turns" ref={reading.scroller} onScroll={reading.onScroll} tabIndex={0} aria-label="Team messages">
       {!loaded && <p>{available ? "Loading messages…" : "Messages are unavailable until the channel read succeeds."}</p>}
       {loaded && posts.length === 0 && <p>No messages yet.</p>}

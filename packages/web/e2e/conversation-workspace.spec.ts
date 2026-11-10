@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process"
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
-import type { ClientRequest } from "@lgcode/contracts"
+import type { ClientRequest, ClientSnapshot } from "@lgcode/contracts"
 import { build } from "vite"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -247,6 +247,11 @@ test("conversations retain drafts, real context, delivery and owner peek across 
           await page.getByRole("button", { name: "Latest messages", exact: true }).click()
           await expect.poll(() => messages.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight)).toBeLessThanOrEqual(24)
         })
+        const paritySnapshot: ClientSnapshot = success(yield* call(ownerCredential, "client.snapshot", {}))
+        const parityWorker = paritySnapshot.agents.find((row) => row.agentId === worker.agentId)!
+        const parityMembers = paritySnapshot.agents.filter((row) => row.groups.includes(team.group)
+          && paritySnapshot.project?.agents.some((member) => member.agentId === row.agentId && member.projectId === projectId)).length
+        expect(parityMembers).toBe(1)
         yield* Effect.promise(async () => {
           await navigate(teamHref)
           const teamInput = page.getByRole("textbox", { name: "Message Build team", exact: true })
@@ -261,11 +266,55 @@ test("conversations retain drafts, real context, delivery and owner peek across 
             await page.emulateMedia({ colorScheme: theme }); await page.setViewportSize({ width, height: 1000 })
             await expect(page.locator("html")).toHaveAttribute("data-theme", theme)
             await navigate(teamHref); await expect(page.getByLabel("Team conversation", { exact: true })).toBeVisible()
+            await expect(page.getByLabel("Team messages", { exact: true })).toContainText("Actual team direction")
+            const teamHeading = page.getByLabel("Team conversation", { exact: true }).locator(".conversation-heading")
+            await expect(teamHeading).toHaveCSS("height", "32px")
+            await expect(teamHeading).toContainText("Build team")
+            await expect(teamHeading).toContainText(`${parityMembers} agent`)
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
             await page.screenshot({ path: testInfo.outputPath(`team-${theme}-${width}.png`) })
             await navigate(`/#/thread/${worker.agentId}`); await expect(page.getByRole("textbox", { name: "Message Conversation worker", exact: true })).toHaveValue("Newer unsent draft")
+            const agentHeading = page.getByLabel("Thread", { exact: true }).locator(".conversation-heading")
+            await expect(agentHeading).toHaveCSS("height", "32px")
+            await expect(agentHeading).toContainText(parityWorker.name)
+            await expect(agentHeading.locator(".conversation-role")).toHaveText(parityWorker.role)
+            await expect(agentHeading.getByLabel("Agent activity", { exact: true })).toHaveText(parityWorker.displayedState)
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
             await page.screenshot({ path: testInfo.outputPath(`agent-${theme}-${width}.png`) })
+            await navigate(`/#/project/${projectId}/board`)
+            const panel = page.getByLabel("Lead conversation", { exact: true })
+            const toggle = page.getByRole("button", { name: "Conversation with Conversation worker", exact: true })
+            const tabRow = page.locator(".workspace-tab-row")
+            await expect(tabRow.getByRole("button", { name: "Conversation with Conversation worker", exact: true })).toBeVisible()
+            const tabsBox = await tabRow.locator(".workspace-tabs").boundingBox()
+            const toggleBox = await toggle.boundingBox()
+            expect(tabsBox).not.toBeNull(); expect(toggleBox).not.toBeNull()
+            expect(Math.abs((tabsBox!.y + tabsBox!.height / 2) - (toggleBox!.y + toggleBox!.height / 2))).toBeLessThanOrEqual(1)
+            expect(toggleBox!.x).toBeGreaterThanOrEqual(tabsBox!.x + tabsBox!.width)
+            if (width <= 1100) {
+              await expect(panel).toBeHidden(); await toggle.click()
+              await expect(panel).toHaveAttribute("aria-modal", "true")
+              await expect(panel.getByRole("button", { name: "Close the thread", exact: true })).toBeVisible()
+              expect(await panel.evaluate((node) => node.contains(document.activeElement))).toBe(true)
+            } else {
+              await expect(panel).toBeVisible()
+              await expect(panel.getByRole("button", { name: "Close the thread", exact: true })).toHaveCount(0)
+              await toggle.click(); await expect(panel).toBeHidden()
+              await toggle.click(); await expect(panel).toBeVisible()
+            }
+            await expect(panel.getByRole("link", { name: "Open conversation in full", exact: true })).toHaveCount(0)
+            await expect(panel.getByRole("textbox", { name: "Message Conversation worker", exact: true })).toHaveValue("Newer unsent draft")
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+            await page.screenshot({ path: testInfo.outputPath(`dock-${theme}-${width}.png`) })
+            if (width <= 1100) {
+              await panel.getByRole("button", { name: "Close the thread", exact: true }).click()
+              await expect(panel).toBeHidden(); await expect(toggle).toBeFocused()
+              await toggle.click(); await expect(panel).toBeVisible()
+              await page.keyboard.press("Escape"); await expect(panel).toBeHidden(); await expect(toggle).toBeFocused()
+            }
+            await page.getByRole("tab", { name: "Chat", exact: true }).click()
+            await expect(page).toHaveURL(new RegExp(`/thread/${worker.agentId}$`))
+            await expect(page.getByRole("textbox", { name: "Message Conversation worker", exact: true })).toHaveValue("Newer unsent draft")
           }
           await page.setViewportSize({ width: 2560, height: 1000 }); await navigate(`/#/project/${projectId}/board`)
           await expect(page.getByLabel("Lead conversation", { exact: true }).getByRole("textbox", { name: "Message Conversation worker", exact: true })).toHaveValue("Newer unsent draft")

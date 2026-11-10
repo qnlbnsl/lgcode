@@ -3,9 +3,10 @@ import { AgentTools } from "./agentTools.tsx"
 import { activeReply, ReplyControls } from "./replyControls.tsx"
 import { BoundedText } from "./boundedText.tsx"
 import { useConversationReading } from "./reading.tsx"
-import { selectedScope } from "../shell/model.ts"
+import { projectAgentIds, selectedScope, teamAgents } from "../shell/model.ts"
 
 import { startFailureText } from "@lgcode/contracts/startFailure"
+import { displayedState } from "@lgcode/contracts"
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { ClientEnvelope } from "@lgcode/client/browser"
 import type { AgentId, Oversized } from "@lgcode/contracts"
@@ -61,7 +62,7 @@ function AgentThread({ agentId, subject, onSessionExpired }: ThreadProps) {
   const watcher = useRef<ReturnType<typeof watchThread> | undefined>(undefined)
   const expired = useRef(onSessionExpired)
   const shellDisabled = useMutationDisabled()
-  const { requestSources, navigation } = useShellData()
+  const { requestSources, navigation, snapshot: shellSnapshot, requests } = useShellData()
   const conversation = useConversation({ _tag: "agent", agentId })
   const root = useRef<HTMLElement>(null)
   const focusedSubject = useRef<string | undefined>(undefined)
@@ -101,6 +102,16 @@ function AgentThread({ agentId, subject, onSessionExpired }: ThreadProps) {
     : agent?.state._tag === "crashed" ? "This agent crashed. Resume to continue." : undefined
   const waiting = state.snapshot?.requests.filter((row) => row.agentId === agentId).length ?? 0
   const questions = state.snapshot?.questions.filter((row) => row.agentId === agentId).length ?? 0
+  const projectMembers = scope.project === undefined ? undefined : projectAgentIds(scope.project, navigation)
+  const members = scope.team === undefined ? [] : teamAgents(scope.team, shellSnapshot).filter((row) => projectMembers?.has(row.agentId))
+  const leadMembers = scope.project?.leadAgentId === agentId ? projectMembers
+    : scope.team && (agent?.role === "lead" || members.some((row) => row.parent._tag === "agent" && row.parent.agentId === agentId))
+      ? new Set(members.map((row) => row.agentId)) : undefined
+  const teamRequests = leadMembers === undefined || requests === undefined ? undefined
+    : requests.filter((row) => row.status === "open" && leadMembers.has(row.agentId)).length
+  const activity = agent === undefined ? "Loading…" : agent.startFailure !== undefined ? `Failed to start: ${startFailureText(agent.startFailure)}`
+    : teamRequests && (agent.state._tag === "idle" || agent.state._tag === "working")
+      ? `Waiting on ${teamRequests} request${teamRequests === 1 ? "" : "s"}` : displayedState(agent)
   useEffect(() => {
     if (subject === undefined) { focusedSubject.current = undefined; return }
     if (!state.loaded || focusedSubject.current === subject) return
@@ -113,7 +124,9 @@ function AgentThread({ agentId, subject, onSessionExpired }: ThreadProps) {
     if (target) { target.focus(); target.scrollIntoView?.({ block: "nearest" }); focusedSubject.current = subject }
   }, [subject, state.loaded, state.items])
   return <MutationProvider value={shellDisabled || state.connection !== "Live"}><section ref={root} aria-label="Thread" className="conversation">
-    <header className="conversation-heading"><h2>{visibleText(agent?.name ?? agentId)}</h2><span role="status">{state.connection}</span></header>
+    <header className="conversation-heading"><h2>{visibleText(agent?.name ?? agentId)}</h2>{agent && <span className="conversation-role">{visibleText(agent.role)}</span>}
+      <span role="status" aria-label="Agent activity">{activity}</span>
+      <span className="visually-hidden" role="status" aria-label="Thread connection">{state.connection}</span></header>
     <div className="conversation-turns" ref={reading.scroller} onScroll={reading.onScroll} tabIndex={0} aria-label="Conversation messages">
     <AlertSubjects agentId={agentId} {...(subject === undefined ? {} : { subject })}
       {...(state.snapshot === undefined ? {} : { sequence: state.snapshot.sequence })} />
@@ -143,7 +156,7 @@ function AgentThread({ agentId, subject, onSessionExpired }: ThreadProps) {
     })()}</div>)}
     </div>
     {reading.away && <button className="conversation-latest" onClick={reading.latest}>Latest messages</button>}
-    {(waiting > 0 || questions > 0 || agent?.state._tag === "working") && <p className="conversation-busy" role="status">{waiting > 0 ? `Waiting on ${waiting} approval${waiting === 1 ? "" : "s"}` : questions > 0 ? `Waiting on ${questions} answer${questions === 1 ? "" : "s"}` : "Working on your message"}</p>}
+    {(waiting > 0 || questions > 0 || teamRequests || agent?.state._tag === "working") ? <p className="conversation-busy" role="status">{teamRequests ? activity : waiting > 0 ? `Waiting on ${waiting} approval${waiting === 1 ? "" : "s"}` : questions > 0 ? `Waiting on ${questions} answer${questions === 1 ? "" : "s"}` : "Working on your message"}</p> : null}
     {agent && <div className="lifecycle-controls"><Lifecycle agent={agent} signal={controller.signal} /></div>}
     {state.loaded && <Composer identity={{ _tag: "agent", agentId }} recipient={agent?.name ?? agentId} disabled={disabled}
       {...(halted === undefined ? {} : { halt: halted })} {...(contextScope ? { scope: contextScope } : {})}

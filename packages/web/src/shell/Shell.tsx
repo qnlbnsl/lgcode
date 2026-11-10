@@ -277,7 +277,7 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
         <button className="icon-button attention-toggle" aria-label={`${data.complete ? attention.length : "Unknown number of"} items need attention`} aria-haspopup="dialog" aria-expanded={bell} onClick={() => setBell(true)}><Icon name="bell" />
           {phone && <span className={`bell-dot dot${data.connection === "Live" ? "" : " wait"}`} />}{attention.length > 0 && <small className="attention-number">{attention.length}</small>}</button>
       </header>
-      {projectId !== undefined && <OverflowRow inert={dockModal}><nav role="tablist" aria-label="Workspace tabs" onKeyDown={(event) => {
+      {projectId !== undefined && <div className="workspace-tab-row" {...(dockModal ? { inert: true } : {})}><OverflowRow><nav role="tablist" aria-label="Workspace tabs" onKeyDown={(event) => {
         if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return
         const tabs = [...event.currentTarget.querySelectorAll<HTMLAnchorElement>('[role="tab"]')]
         const current = tabs.indexOf(document.activeElement as HTMLAnchorElement)
@@ -285,10 +285,12 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
         event.preventDefault(); tabs[next]?.click(); tabs[next]?.focus()
       }}>{(["board", "chat", "terminal", "git", "settings", ...(scope.team ? ["tasks" as const] : [])] as const).map((tab) => {
         const selected = route.page === "thread" ? tab === "chat" : route.page === "project" ? route.tab === tab : tab === "board"
-        return <a key={tab} role="tab" aria-selected={selected} tabIndex={selected ? 0 : -1} href={shellHref(projectRoute(tab))}>{tabNames[tab]}</a>
-      })}</nav></OverflowRow>}
+        const target = tab === "chat" && dockEligible && scope.team === undefined && dockAgentId !== undefined ? { page: "thread" as const, agentId: dockAgentId } : projectRoute(tab)
+        return <a key={tab} role="tab" aria-selected={selected} tabIndex={selected ? 0 : -1} href={shellHref(target)}>{tabNames[tab]}</a>
+      })}</nav></OverflowRow>
       {dockEligible && <button className="conversation-toggle" ref={dockTrigger} aria-label={`Conversation with ${visibleText(dockName)}`}
-        {...(dockModal ? { inert: true } : {})} aria-controls="conversation-dock" aria-expanded={showDock} onClick={toggleDock}>{visibleText(dockName)} · Chat</button>}
+        aria-controls="conversation-dock" aria-expanded={showDock} onClick={toggleDock}>{visibleText(dockName)}</button>}
+      </div>}
       {phone && inspectingControl && <div className="phone-context" {...(dockModal ? { inert: true } : {})}>{inspectingControl}</div>}
       <div {...(dockModal ? { inert: true } : {})}><NotificationPrompt onSessionExpired={expireSession} /></div>
       <div className="workspace-surface">
@@ -328,9 +330,8 @@ export function Shell({ onSessionExpired, onLogout, logoutBusy, message }: {
           }} onPointerDown={(event) => { if (event.button !== 0) return; event.preventDefault(); dockResize.current = { pointer: event.pointerId, x: event.clientX, width: dockWidth }; event.currentTarget.setPointerCapture(event.pointerId) }}
           onPointerMove={(event) => { if (dockResize.current?.pointer === event.pointerId) resizeDock(dockResize.current.width + dockResize.current.x - event.clientX) }}
           onPointerUp={() => { dockResize.current = undefined }} onPointerCancel={() => { dockResize.current = undefined }} onLostPointerCapture={() => { dockResize.current = undefined }} />
-        <header className="conversation-dock-heading"><span>{scope.team ? "Team chat" : dockAgentId === scope.project?.leadAgentId ? "Project lead" : "Agent conversation"}</span>
-          <a href={scope.team ? shellHref({ page: "project", projectId: scope.team.projectId, teamId: scope.team.teamId, tab: "chat" }) : shellHref({ page: "thread", agentId: dockAgentId! })}>Open conversation in full</a>
-          <button onClick={closeDock} aria-label="Close the thread">×</button></header>
+        {dockCompact && <header className="conversation-dock-heading"><span>{scope.team ? "Team chat" : dockAgentId === scope.project?.leadAgentId ? "Project lead" : "Agent conversation"}</span>
+          <button className="icon-button" onClick={closeDock} aria-label="Close the thread"><Icon name="x" /></button></header>}
         {showDock && (scope.team ? teamConversation : dockAgentId ? <Thread agentId={dockAgentId} onSessionExpired={expireSession} /> : <p>The project lead is unavailable.</p>)}
       </aside>}
       </div>

@@ -262,7 +262,7 @@ it("keeps keyboard focus on workspace tabs and preserves query context on direct
     board.focus()
     board.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }))
   })
-  expect(location.hash).toBe('#/project/p/chat')
+  expect(location.hash).toBe('#/thread/lead')
   expect(document.activeElement?.textContent).toBe('Chat')
   const link = document.createElement('a'); link.href = '/#/service/machines?project=p'; container.querySelector('.view-body')!.append(link)
   await act(async () => link.click())

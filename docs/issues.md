@@ -10432,3 +10432,30 @@ The complete failed runs, original source pins, reached screenshots and correcti
 The W08 work is now composed onto accepted flow b974da06 without relabelling that old-pin pass as proof of this composition.
 A new exact ordinary full and fresh independent whole-unit review remain outstanding.
 The reviewer must explicitly check both browser fixture corrections and every prior authority and recovery edit.
+
+## Conversation visible parity correction after the signed author handoff
+
+Found: 2026-11-10, in the fresh independent review of signed f4605ad59246088b33b459a0dfb512c198456746.
+The agent header showed connection state but omitted the actual role and activity.
+The lead summary counted only the selected agent's requests.
+Team Chat omitted its actual member count.
+The panel toggle occupied an extra row, and the desktop panel added close and full-view controls.
+The manager requires all four visible findings to be corrected within this conversation delivery.
+No owner exception or new issue number is claimed.
+
+Five new mounted application controls failed on the untouched original production source.
+The raw result and exact inputs remain sealed separately from the signed source's passing full.
+The correction reads actual roster roles and lifecycle state, existing project and team membership, and existing complete request rows.
+A lead's own team requests and the owner's attention remain separate counts.
+The existing owner-only attention filter is unchanged.
+The team count follows current roster membership and the selected project and team.
+Owner board peek remains non-consuming.
+
+The header occupies one 32-pixel line.
+The existing tab row holds the sole desktop panel toggle, and Chat opens the current conversation in full.
+Only the compact drawer keeps Close, with its existing focus containment, Escape and opener restoration.
+The new controls retain their exact original assertions for the candidate proof.
+The browser journey adds loaded header, real member count, tab-row placement and panel controls across all eight size and theme combinations.
+Its original timeout, complete request bodies and keys, permission authority, both latest fixture corrections, exact read-mark equality, unread and full lifecycle and session tails remain intact.
+The original signed source and all passed and failed histories remain preserved.
+The changed source needs its own manager browser and full evidence and independent review.

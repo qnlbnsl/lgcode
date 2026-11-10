@@ -1,8 +1,10 @@
 .view-body:has(> .conversation) { padding: 0; overflow: hidden; }
 .view-body > .conversation, .conversation { display: flex; flex-direction: column; min-width: 0; min-height: 0; height: 100%; max-width: 860px; margin-inline: auto; position: relative; }
-.conversation-heading { flex: none; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-6); min-width: 0; }
-.conversation-heading h2 { font-size: var(--text-lg); overflow-wrap: anywhere; margin-right: auto; }
-.conversation-heading > span { font-size: var(--text-sm); color: var(--color-muted); }
+.conversation-heading { flex: none; display: flex; align-items: center; gap: var(--space-2); height: 32px; min-width: 0; padding: 0 var(--space-6); white-space: nowrap; }
+.conversation-heading h2 { flex: 0 1 auto; max-width: 40%; min-width: 0; font-size: var(--text-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-heading > span:not(.visually-hidden) { min-width: 0; font-size: var(--text-md); color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; }
+.conversation-heading .conversation-role::before, .conversation-heading [aria-label="Agent activity"]::before { content: '·'; margin-right: var(--space-2); }
+.conversation-heading > button { flex: none; margin-left: auto; min-height: 28px; height: 28px; }
 .conversation-turns { flex: 1; min-height: 0; overflow: auto; overflow-anchor: none; padding: var(--space-4) var(--space-6); scroll-padding: var(--space-4); overscroll-behavior: contain; }
 .view-body > .conversation article, .conversation article { border: 0; padding: 0; margin: 0 0 var(--space-7); border-radius: 0; }
 .conversation article h3 { font-size: var(--text-md); margin-bottom: var(--space-2); }
@@ -78,11 +80,13 @@
 
 .workspace-surface { display: flex; flex: 1; min-width: 0; min-height: 0; position: relative; }
 .workspace-surface > .view-body { flex: 1; }
-.conversation-toggle { align-self: flex-end; flex: none; margin: var(--space-1) var(--space-4); font-size: var(--text-sm); }
+.workspace-tab-row { display: flex; align-items: center; gap: var(--space-3); flex: none; min-width: 0; border-bottom: 1px solid var(--color-line); }
+.workspace-tab-row > .workspace-tabs { flex: 1; min-width: 0; border-bottom: 0; }
+.conversation-toggle { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: var(--space-4); font-size: var(--text-sm); }
 .conversation-dock { position: relative; display: flex; flex-direction: column; flex: 0 0 var(--lead-width, 360px); width: var(--lead-width, 360px); min-width: 320px; max-width: 600px; min-height: 0; border-left: 1px solid var(--color-line); background: var(--color-bg); }
 .conversation-dock > .conversation { width: 100%; flex: 1; }
 .conversation-dock-heading { display: flex; flex: none; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-line); font-size: var(--text-sm); }
-.conversation-dock-heading > a { margin-left: auto; }
+.conversation-dock-heading > button { margin-left: auto; }
 .conversation-dock .conversation-heading, .conversation-dock .conversation-turns { padding-inline: var(--space-3); }
 .conversation-dock .conversation-composer { padding-inline: var(--space-2); }
 .conversation-resize { left: -4px; right: auto; }
