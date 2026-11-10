@@ -37,6 +37,26 @@ where the code lives in LGcode, and where the licence text is.
   Each icon and where it is used are listed in third_party/lucide/README.md.
   Licence text: third_party/lucide/LICENSE.
 
+- OpenPencil (https://github.com/open-pencil/open-pencil)
+  Copyright (c) 2026 Danila Poyarkov and OpenPencil contributors. MIT License.
+  Pinned source: cb717376a6252b0387f95d1e8bf33a0b196eb9bf.
+  In LGcode: the licence and browser-distribution integration attribution in
+  third_party/open-pencil/. The pinned local editor image contains the
+  upstream browser distribution, its licence and generated dependency notices.
+  The exact successful build and retained raw evidence are in BUILD.md.
+  No launched editor, accepted service or shipped distribution is claimed.
+  Copied source files, changes and build-receipt requirements are listed in
+  third_party/open-pencil/README.md. Licence text: third_party/open-pencil/LICENSE.
+
+- parse5 (https://github.com/inikulin/parse5), version 8.1.0
+  Copyright (c) 2013-2019 Ivan Nikulin. MIT License.
+  Engine dependency used through its public HTML parser and source locations.
+  Its entities 9.0.0 dependency (https://github.com/fb55/entities) is
+  Copyright (c) Felix Böhm, BSD 2-Clause licence.
+  No implementation source is copied into LGcode's own source tree.
+  Attribution: third_party/parse5/README.md.
+  Licence texts: third_party/parse5/LICENSE and third_party/parse5/entities.LICENSE.
+
 LGcode is also inspired by Herdr Synapse
 (https://github.com/vitalysim/herdr-synapse), Copyright 2026 Vitaly
 Simonovich, Apache License 2.0. No Synapse code has been copied into LGcode.

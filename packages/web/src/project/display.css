@@ -1,0 +1,2 @@
+.review-display { min-width: 0; max-width: 100%; }
+.review-display-frame { display: block; width: 100%; height: clamp(24rem, 65vh, 56rem); border: 1px solid var(--color-line); background: var(--color-surface); }

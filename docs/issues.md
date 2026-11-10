@@ -10339,3 +10339,99 @@ The strict pre-effect grammar does not recognize these complete shapes, so they 
 The manager accepted the reviewed unit at Grade 8, with no blockers, majors or flags.
 The classifier stays conservative in this change.
 Any later widening must prove exact pre-effect refusal shapes without treating local partial effects as authentication failures.
+
+## 573. Repository registration discarded uncertain typed failures
+
+Found: 2026-11-09, during W07B's source review of W10B's independent registration controller.
+The manager allocated this number and approved the bounded author correction.
+
+The controller treated every typed `CommandError` as a conclusive admission refusal.
+The public application programming interface also uses that error for database failures.
+The original authenticated controls reproduced add and locate requests losing their frozen identity at controlled boundaries before append and after actual commit.
+The original web logout control also showed that the typed-error path skipped the session probe and retained the private draft.
+The original source archive, unchanged-source manifest, observations, and normal exit 1 remain under `.proof/w10b/recovery-red-1*`.
+Two additional failed assertions in that run expected `Git: not_repository` for a folder outside the configured root.
+The actual fixed admission reason was `Git: invalid_path`.
+The corrected controls preserve the same no-registration and editable-retry assertions with that actual reason.
+
+The author correction keeps database, generic, and unknown failures uncertain.
+Only exact proved pre-registration admission reasons release the frozen request.
+Every failed operation now probes the session, including a typed refusal.
+An actual unauthorized session response disposes the private state and invokes expiry.
+The constructor and public controller and content exports remain unchanged.
+Corrected add and locate controls require the same request through Cancel and retry, one actual registration effect, editable recovery after conclusive refusal, and disposal after actual web logout.
+The first bounded remote proof passed recursive and root typing and stopped at two pre-append recovery fixture assertions.
+Those assertions expected the deliberately latched writer to recover in the same service.
+The corrected fixtures retain the same controller, complete body, and request while the writer remains latched, then close the actual services and run normal restart recovery before retrying.
+They assert a new authenticated client and the unchanged controller and payload.
+The ten actual-engine controls and nine controlled presentation regressions then passed locally with one worker.
+The restart helper names its empty host process reader and signal control; it does not kill actual host processes.
+No production writer, receipt, database row, or view was repaired or weakened.
+Status: bounded correction proof passed; independent review remains pending.
+
+## Recorded mock companions lost their private folder scope in the unfinished display unit
+
+Found: 2026-11-10, during the bounded actual opaque-frame prerequisite.
+This correction belongs to the unfinished W10B display unit.
+No separate issue number has been allocated.
+
+The document carried its private session identity in its query.
+Its root-relative stylesheet and image had neither that identity nor a usable referrer.
+They reached the unchanged no-editor fallback and returned empty 503 responses.
+The module request failed without an observed response status.
+Its exact failure mechanism remains unproved.
+The original failed native run and the later passive diagnostic remain preserved.
+
+The bounded author correction scopes direct stylesheet, script and image addresses
+in the delivered HTML to the same issued private session.
+Root-relative and ordinary relative addresses resolve against the actual selected route.
+The recorded source and companion files remain unchanged.
+The engine still verifies the recorded fingerprint before making that delivery representation.
+The parser adds no owner API authority, cookie, origin or folder access.
+The opaque sandbox and Content Security Policy remain unchanged.
+
+Nested root-relative addresses in stylesheets or modules remain unsupported.
+This correction is not general rendering acceptance.
+Actual module execution, orange pixels, decoded images, editor import and isolation
+still need the separately authorized browser proof.
+Status: engine typing and all 27 focused controls passed; native retry is held.
+
+## 574. Incomplete mock history cleared an uncertain approval
+
+Found: 2026-11-09, during W10B's author review of approval recovery.
+The manager allocated this number and approved the smallest helper correction.
+
+An incomplete paged history read returned the same stale outcome as a conclusively superseded revision.
+The Mocks page therefore discarded its session-owned uncertain approval request.
+The original controlled document object model regression showed the recovery action disappearing after an incomplete read.
+Its unchanged source, original log, and normal exit 1 remain under `.proof/w10b/recovery-red-1*`.
+
+The helper now keeps incomplete history uncertain.
+The exact request and revision stay available through navigation and later retry.
+The regression requires incomplete history to issue no replacement approval command and preserves the original request for successful recovery.
+The correction adds no history contract, parser, owner authority, or synthetic approval.
+The exact corrected source remained frozen throughout bounded remote proof 1.
+That run passed recursive and root typing, then stopped at two unrelated pre-append registration recovery controls.
+The document object model command was consequently unexecuted.
+This entry was appended after the remote run exited, as an explicitly recorded document-only delta.
+The later local controlled presentation run passed all nine regressions, including incomplete history, navigation, and recovery with the original request.
+Status: bounded correction proof passed; independent review remains pending.
+
+## 601. The editor image config reference was unavailable in the containerd store
+
+Found: 2026-11-10, during manager preparation for the W10B native display proof.
+The manager allocated this number.
+The approved image was present under its transferred name and tag on the remote personal computer.
+The engine's config-digest reference returned `No such image`.
+The original remote typing failure, later passing typing and Docker inspection records remain preserved separately.
+
+The owner ruled that every host finds the editor by `lgcode-openpencil:w10b-cb71737-build1`.
+The engine now inspects that local tag on every launch and requires Linux on AMD64.
+No digest lookup or equality decides image presence.
+A missing image is refused without building, pulling, retagging or choosing a fallback.
+The existing `--pull=never`, non-root user, isolated network, folder mounts, resource limits, socket deadline and owned-name cleanup remain.
+The native fixture uses the same tag and checks the actual generated container name.
+Its original display, import, pixel, isolation and cleanup assertions remain.
+Temporary static launcher diagnostics are retained separately and must not be committed.
+Status: product and fixture source prepared; new remote typing, focused and native proof are pending.
+
