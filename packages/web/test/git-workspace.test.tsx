@@ -140,6 +140,47 @@ it("minor606: refreshes a previously visited row with genuine, partial and unava
   })).pipe(Effect.orDie))
 })
 
+it("refresh priority: keeps auxiliary counts behind the inspected coherent refresh without blocking fresh mutations", async () => {
+  await Effect.runPromise(provideBoard(rig, Effect.gen(function* () {
+    const f = yield* setup(), main = f.workspaces.find((row) => row.checkout === "main")!
+    let refreshing = false, holdPrimary = true, primaryHeld = false, auxiliaryStarted = 0
+    let releasePrimary!: () => void, releaseAuxiliary!: () => void
+    const primary = new Promise<void>((resolve) => { releasePrimary = resolve }), auxiliary = new Promise<void>((resolve) => { releaseAuxiliary = resolve })
+    type StateReply = Effect.Success<ReturnType<Client["project.git.state"]>>
+    type ChangesReply = Effect.Success<ReturnType<Client["project.changes"]>>
+    const state = (payload: Parameters<Client["project.git.state"]>[0]) => f.api["project.git.state"](payload).pipe(Effect.flatMap((reply): Effect.Effect<StateReply, unknown> => {
+      if (refreshing && payload.worktreeId === f.source.worktreeId && holdPrimary) {
+        holdPrimary = false; primaryHeld = true
+        return Effect.promise(() => primary.then(() => reply))
+      }
+      return Effect.succeed(reply)
+    }))
+    const changes = (payload: Parameters<Client["project.changes"]>[0]) => {
+      if (refreshing && payload.worktreeId === main.worktreeId) auxiliaryStarted++
+      return f.api["project.changes"](payload).pipe(Effect.flatMap((reply): Effect.Effect<ChangesReply, unknown> =>
+        refreshing && payload.worktreeId === main.worktreeId ? Effect.promise(() => auxiliary.then(() => reply)) : Effect.succeed(reply)))
+    }
+    try {
+      yield* Effect.promise(() => mounted({ ...f, api: { ...f.api, "project.git.state": state, "project.changes": changes } as Client }, async (container, _render, session) => {
+        const key = workspaceKey(f.repository.repoId, "local", f.source.worktreeId)
+        const mainStatus = () => container.querySelector(`[data-git-worktree="${main.worktreeId}"] .wt-status`)!.textContent
+        await wait(() => expect(mainStatus()).toBe("0 changes"))
+        save(f.source.path, "fresh-working.txt", "actual new working bytes\n"); refreshing = true
+        await click(container, "Refresh Git"); await wait(() => expect(primaryHeld).toBe(true))
+        expect(session.get(key).ready).toBe(false); expect(button(container, "Stage all").disabled).toBe(true)
+        expect(mainStatus()).toBe("Checking changes…"); expect(auxiliaryStarted).toBe(0)
+        await act(async () => releasePrimary())
+        await wait(() => expect(session.get(key).ready).toBe(true))
+        await wait(() => expect(auxiliaryStarted).toBe(1))
+        expect(session.get(key).data?.changes.items.map((row) => row.path)).toEqual(["fresh-working.txt"])
+        expect(button(container, "Stage all").disabled).toBe(false)
+        expect(mainStatus()).toBe("Checking changes…")
+        await act(async () => releaseAuxiliary()); await wait(() => expect(mainStatus()).toBe("0 changes"))
+      }))
+    } finally { releasePrimary(); releaseAuxiliary() }
+  })).pipe(Effect.orDie))
+})
+
 it("stages exact tab paths, refuses stale discard, preserves offline drafts, and commits through the authenticated controller", async () => {
   await Effect.runPromise(provideBoard(rig, Effect.gen(function* () {
     const f = yield* setup(); save(f.source.path, "tab\tfile.txt", "<script>literal</script>\n"); save(f.source.path, "file.txt", "working\n")
