@@ -32,6 +32,9 @@ const commit = (folder: string, title: string) => { git(folder, "add", "--all");
 interface Fixture { readonly base: string; readonly source: Workspace; readonly project: Project; readonly repository: Repository; readonly root: string }
 async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture) => void, body: (f: Fixture) => Promise<void>, options: { readonly loseCommitReply?: boolean; readonly reportedFailure?: boolean } = {}) {
   const rig = makeRig(), previous = process.env.LGCODE_HOME
+  // TEMP-OBSERVE: bounded fixed command names and completion timestamps only; no arguments or replies.
+  const observed: { command: string; phase: string; ms: number }[] = [], began = performance.now()
+  const observe = (command: string, phase: string) => { if (options.loseCommitReply && observed.length < 200 && ["project.commit", "project.git.state", "project.changes", "project.diff"].includes(command)) observed.push({ command, phase, ms: performance.now() - began }) }
   process.env.LGCODE_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url"), staticRoot = join(rig.root, "page"), port = await unusedPort()
   try {
@@ -76,15 +79,22 @@ async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture
       const real = buildServices(rig, engineLists).pipe(Layer.provide(dependencies))
       const services = Layer.effect(CommandHandler, Effect.gen(function* () {
         const handler = yield* CommandHandler; let lose = true
-        return { ...handler, execute: (credential, name, payload) => handler.execute(credential, name, payload).pipe(Effect.flatMap((reply) => {
-          if (options.loseCommitReply && name === "project.commit" && lose) { lose = false; return Effect.fail(new LogWriteFailed({ reason: "database read failed" })) }
-          return Effect.succeed(reply)
-        })) }
+        // TEMP-OBSERVE: retain the registered handler and all existing awaits, arguments and fault injection.
+        return { ...handler, execute: (credential, name, payload) => {
+          observe(name, "entry")
+          return handler.execute(credential, name, payload).pipe(Effect.flatMap((reply) => {
+            observe(name, "handler-success")
+            if (options.loseCommitReply && name === "project.commit" && lose) { lose = false; return Effect.fail(new LogWriteFailed({ reason: "database read failed" })) }
+            return Effect.succeed(reply)
+          }), Effect.onExit((exit) => Effect.sync(() => observe(name, exit._tag === "Success" ? "exit-success" : "exit-failure"))))
+        } }
       })).pipe(Layer.provideMerge(real))
       yield* Effect.scoped(run).pipe(Effect.provide(services), Effect.provide(runner.layer))
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped)
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
   } finally {
+    // TEMP-OBSERVE: preserve observations on both original assertion failure and success without protected data.
+    if (options.loseCommitReply) await test.info().attach("recovery-command-boundaries", { body: JSON.stringify(observed), contentType: "application/json" })
     if (previous === undefined) delete process.env.LGCODE_HOME; else process.env.LGCODE_HOME = previous
     removeRig(rig)
   }
