@@ -157,7 +157,8 @@ sync_copy() {
   # dependencies and test output from being deleted on the other computer.
   git -C "$top" ls-files -z --others --ignored --exclude-standard --directory |
     tr '\0' '\n' | sed 's|^|/|' |
-    rsync -a --delete --filter=':- .gitignore' --exclude=/.git --exclude-from=- \
+    rsync -a --delete --include=.env.example --exclude=.env --exclude='.env.*' \
+      --filter=':- .gitignore' --exclude=/.git --exclude-from=- \
       -e "ssh ${ssh_opts[*]}" "$top/" "$target:$dir/"
 }
 

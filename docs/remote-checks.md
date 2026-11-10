@@ -39,6 +39,15 @@ Each working tree gets its own copy, named after its folder, under
 `~/Work/lgcode` on the other computer.
 The exit status is the remote command's.
 
+`remote-run` also syncs first, so it replaces edits made only in the remote
+copy before running the command.
+Its entire `CMD` runs as one Bash command string on the other computer.
+Quote compound commands when invoking Make, for example
+`make remote-run CMD='pnpm -r typecheck && pnpm exec tsc --noEmit'`.
+The `&&` chain runs remotely, and a failure stops its later command.
+Run `python3 scripts/test-remote.py` to check command quoting and copy
+exclusions locally without SSH.
+
 ## Settings
 
 Set these on the `make` command line:
@@ -76,6 +85,8 @@ computer. Both are fixed, and a remote `pnpm check` must exit 0.
 
 Only files that Git would see are copied: tracked files, and new files that
 no ignore rule covers.
+Files named `.env` or `.env.*` are excluded even if tracked by Git.
+The template `.env.example` is kept.
 Rules in `.git/info/exclude` count, so `.scratch`, `.worktrees`, `.foundry`
 and the Herdr Synapse state stay on this computer.
 The test setup already removes the harnesses' credential variables before any

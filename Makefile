@@ -26,6 +26,8 @@ export LGCODE_REMOTE_SPARE_CPUS := $(REMOTE_SPARE_CPUS)
 export LGCODE_REMOTE_MEMORY := $(REMOTE_MEMORY)
 
 REMOTE := scripts/remote.sh
+# Preserve shell syntax as data until bash runs it on the remote computer.
+export LGCODE_REMOTE_COMMAND := $(value CMD)
 
 .PHONY: remote-doctor remote-sync remote-install remote-check remote-test remote-browser remote-run remote-clean
 
@@ -48,8 +50,8 @@ remote-browser:
 	@$(REMOTE) browser
 
 remote-run:
-	@test -n '$(CMD)' || { echo 'remote-run needs CMD="..."' >&2; exit 2; }
-	@$(REMOTE) run $(CMD)
+	@test -n "$$LGCODE_REMOTE_COMMAND" || { echo 'remote-run needs CMD="..."' >&2; exit 2; }
+	@$(REMOTE) run bash -c "$$LGCODE_REMOTE_COMMAND"
 
 remote-clean:
 	@$(REMOTE) clean

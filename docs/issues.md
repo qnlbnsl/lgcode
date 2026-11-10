@@ -10057,3 +10057,17 @@ The original browser containment assertion remains, with a forward-wrap conseque
 The focused test covers both directions and changed disabled or hidden endpoints.
 The diagnostic source and failed selector attempt are preserved separately.
 This correction awaits its own bounded verification; the previous full remains failed.
+
+## 599. Compound remote-run commands could execute their tail locally
+
+Found: 2026-11-10, during the manager's W08 original/candidate proof.
+State: corrected in the remote tooling; local transport controls pass.
+
+Make interpolated CMD into its recipe as unquoted shell source.
+An operator such as && or a semicolon could split the invocation, leaving later commands on the local computer.
+The first affected W08 result is withdrawn, and the replacement logs print the actual remote host and tested source hash after sync.
+Make now exports the literal command value and passes it as one quoted Bash command argument to the remote script.
+The remote-run target still syncs first, which replaces changes made only in the remote copy.
+The documentation now states that order explicitly.
+Local controls exercise compound commands, quotes, newlines, shell expansion, failure propagation and remote-only output using a local stand-in for SSH.
+They also verify that tracked and untracked .env files are excluded while .env.example remains eligible for copying.
