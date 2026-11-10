@@ -3,12 +3,49 @@ import { chmod, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import * as Effect from "effect/Effect";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerRebuildCheck } from "../../support/rebuildCheck.ts";
-import { gitProcess } from "../../../src/project/git/process.ts";
+import { gitProcess, processFailure } from "../../../src/project/git/process.ts";
+import * as gitProcesses from "../../../src/project/git/process.ts";
 import { makeGitService, type GitOperation, type GitService } from "../../../src/project/git/index.ts";
 
 registerRebuildCheck({ noLog: true });
+
+it.each([
+  { name: "modern no-connection suffix", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to 127.0.0.1 port 1 after 0 ms: Could not connect to server\n", truncated: false, expected: true },
+  { name: "failed-connect suffix without port detail", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to fixture.invalid: Could not connect to server\n", truncated: false, expected: true },
+  { name: "legacy no-connection suffix", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Could not connect to server\n", truncated: false, expected: true },
+  { name: "generic lost transport", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': outcome transport lost\n", truncated: false, expected: false },
+  { name: "connection reset", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Recv failure: Connection reset by peer\n", truncated: false, expected: false },
+  { name: "timeout", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Operation timed out\n", truncated: false, expected: false },
+  { name: "failed-connect disconnect without refusal suffix", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to fixture.invalid: connection disconnected; outcome unknown\n", truncated: false, expected: false },
+  { name: "failed-connect reset without refusal suffix", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to fixture.invalid: Recv failure: Connection reset by peer\n", truncated: false, expected: false },
+  { name: "failed-connect timeout without refusal suffix", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to fixture.invalid: Operation timed out\n", truncated: false, expected: false },
+  { name: "missing completed exit", code: -1, stderr: "Connection refused\n", truncated: false, expected: false },
+  { name: "truncated legacy diagnostic", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Could not connect to server\n", truncated: true, expected: false },
+  { name: "truncated failed-connect diagnostic without port detail", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to fixture.invalid: Could not connect to server\n", truncated: true, expected: false },
+  { name: "zero exit", code: 0, stderr: "fatal: unable to access 'https://fixture.invalid/': Could not connect to server\n", truncated: false, expected: false },
+  { name: "phrase only inside remote URL", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/: Could not connect to server': outcome transport lost\n", truncated: false, expected: false },
+  { name: "failed-connect phrase only inside remote URL", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/: Failed to connect to fixture.invalid: Could not connect to server': outcome transport lost\n", truncated: false, expected: false },
+  { name: "trailing space after fixed diagnostic", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Could not connect to server \n", truncated: false, expected: false },
+  { name: "phrase without network mapping", code: 128, stderr: "Could not connect to server\n", truncated: false, expected: false },
+  { name: "generic diagnostic continues after phrase", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Could not connect to server; previous outcome unknown\n", truncated: false, expected: false },
+  { name: "failed-connect diagnostic continues after phrase", code: 128, stderr: "fatal: unable to access 'https://fixture.invalid/': Failed to connect to fixture.invalid: Could not connect to server; previous outcome unknown\n", truncated: false, expected: false },
+])("issue 590: completed refusal evidence and unknown transport remain distinct: $name", ({ code, stderr, truncated, expected }) => {
+  const failure = processFailure({ code, stderr, stdout: "", truncated }, "fetch");
+  expect(failure.determinate === true).toBe(expected);
+});
+
+for (const network of [undefined, "fetch", "pull", "push"] as const) it(`issue 595: local permission text is not authentication or determinate in ${network ?? "local"}`, () => {
+  const failure = processFailure({ code: 1, stdout: "", stderr: "error: unable to create file dir/new.txt: Permission denied\n", truncated: false }, network);
+  expect(failure.reason).toBe("git_failed"); expect(failure.determinate).toBeUndefined();
+});
+it("issue 595: a rejected reference is not a rejected push outside push", () => {
+  const reply = { code: 1, stdout: "", stderr: " ! [rejected] blocked -> origin/blocked (non-fast-forward)\n", truncated: false };
+  expect(processFailure(reply, "fetch").determinate).toBeUndefined();
+  expect(processFailure(reply).determinate).toBeUndefined();
+  expect(processFailure(reply, "push")).toMatchObject({ reason: "push_rejected", determinate: true });
+});
 
 let root: string, repo: string, service: GitService;
 const run = <A>(operation: GitOperation<A>) => Effect.runPromise(operation);
@@ -41,6 +78,73 @@ beforeEach(async () => {
 afterEach(async () => { await rm(root, { recursive: true, force: true }); });
 
 describe("bounded Git service with real temporary repositories", () => {
+  for (const mode of ["merge", "pull"] as const) it(`issue 595: real partial ${mode} permission failure remains uncertain`, async () => {
+    await mkdir(join(repo, "dir"));
+    await save(repo, "dir/existing.txt", "keep directory tracked\n");
+    await save(repo, "a.txt", "before a\n"); await save(repo, "z.txt", "before z\n");
+    const before = commit(repo, "Permission base");
+    const destination = await worktree("Permission destination"), source = await worktree("Permission source");
+    await save(source.path, "a.txt", "after a\n"); await save(source.path, "z.txt", "after z\n");
+    await save(source.path, "dir/new.txt", "cannot create this\n"); const next = commit(source.path, "Permission incoming");
+    if (mode === "pull") {
+      const remote = join(root, "permission-remote.git"); git(root, ["init", "--bare", remote]);
+      git(repo, ["remote", "add", "origin", remote]);
+      git(repo, ["push", "origin", `${before}:refs/heads/incoming`]);
+      git(destination.path, ["fetch", "origin"]);
+      git(destination.path, ["branch", "--set-upstream-to=origin/incoming"]);
+      git(repo, ["push", "origin", `${next}:refs/heads/incoming`]);
+    }
+    const observed = vi.spyOn(gitProcesses, "processFailure");
+    await chmod(join(destination.path, "dir"), 0o555);
+    try {
+      const failed = await Effect.runPromise(Effect.flip(mode === "merge"
+        ? service.mergeTeam(source.path, destination.path, next) : service.pull(destination.path)));
+      expect(failed).toMatchObject({ reason: "git_failed", uncertain: true });
+      expect(observed.mock.calls.some(([reply]) => reply.code > 0 && /Permission denied/i.test(reply.stderr))).toBe(true);
+      expect(await readFile(join(destination.path, "a.txt"), "utf8")).toBe("after a\n");
+      expect(await readFile(join(destination.path, "z.txt"), "utf8")).toBe("after z\n");
+      expect(git(destination.path, ["rev-parse", "HEAD"])).toBe(before);
+      expect((await run(service.state(destination.path))).mergeHead).toBe(null);
+      if (mode === "pull") expect(git(destination.path, ["rev-parse", "origin/incoming"])).toBe(next);
+    } finally { await chmod(join(destination.path, "dir"), 0o755); observed.mockRestore(); }
+  });
+
+  it("issue 595: real fetch may update one reference before rejecting another", async () => {
+    const before = git(repo, ["rev-parse", "HEAD"]), publisher = join(root, "independent-publisher");
+    git(root, ["clone", "--no-hardlinks", repo, publisher]); configure(publisher);
+    const remote = join(root, "mixed-ref-remote.git"); git(root, ["init", "--bare", remote]);
+    git(repo, ["remote", "add", "origin", remote]);
+    git(repo, ["config", "remote.origin.fetch", "refs/heads/good:refs/remotes/origin/good"]);
+    git(repo, ["config", "--add", "remote.origin.fetch", "refs/heads/blocked:refs/heads/fetch-blocked"]);
+    await save(publisher, "one", "first\n"); const rejected = commit(publisher, "First published");
+    git(publisher, ["push", remote, `${before}:refs/heads/good`, `${rejected}:refs/heads/blocked`]);
+    await run(service.fetch(repo));
+    await save(publisher, "two", "second\n"); const next = commit(publisher, "Second published");
+    git(publisher, ["push", remote, `${next}:refs/heads/good`, `+${before}:refs/heads/blocked`]);
+    // Publication has a different common repository. The blocked destination
+    // is an unchecked-out local head, whose rewind needs an explicit force.
+    expect(git(repo, ["rev-parse", "origin/good"])).toBe(before);
+    expect(git(repo, ["rev-parse", "fetch-blocked"])).toBe(rejected);
+    expect(git(repo, ["rev-parse", "HEAD"])).toBe(before);
+    const observed = vi.spyOn(gitProcesses, "processFailure");
+    try {
+      const result = await Effect.runPromise(Effect.result(service.fetch(repo)));
+      expect(result._tag).toBe("Failure");
+      if (result._tag !== "Failure") throw new Error("Expected a completed mixed-reference fetch refusal");
+      const failed = result.failure;
+      expect(failed.uncertain).toBe(true); expect(failed.reason).not.toBe("push_rejected");
+      expect(failed.reason).not.toBe("authentication_required");
+      const replies = observed.mock.calls.filter(([, phase]) => phase === "fetch");
+      expect(replies.length).toBe(1);
+      const reply = replies[0]?.[0];
+      expect(reply?.code ?? 0).toBeGreaterThan(0); expect(reply?.truncated).toBe(false);
+      expect(/\[rejected\]/.test(reply?.stderr ?? "")).toBe(true);
+      expect(git(repo, ["rev-parse", "origin/good"])).toBe(next);
+      expect(git(repo, ["rev-parse", "fetch-blocked"])).toBe(rejected);
+      expect(git(repo, ["rev-parse", "HEAD"])).toBe(before);
+    } finally { observed.mockRestore(); }
+  });
+
   it("discovers and registers repositories and creates unborn main repositories", async () => {
     const empty = await run(service.createRepository("New garden"));
     expect(await run(service.state(empty.path))).toMatchObject({ head: null, branch: "main", ahead: 0, behind: 0 });
@@ -140,6 +244,81 @@ describe("bounded Git service with real temporary repositories", () => {
     expect((await run(service.commitFiles(repo, initial.head))).items.map((item) => item.path)).toContain("file.txt");
   });
 
+  for (const agentRead of [false, true]) for (const state of ["committed", "unborn", "unborn index"] as const) {
+    it(`issue 588: completes 71 literal aggregate files without per-file HEAD or status in ${state}, agent=${agentRead}`, async () => {
+      const folder = state === "committed" ? repo : (await run(service.createRepository("Aggregate unborn"))).path;
+      const paths = ["--help", ":(glob)*", "tab\tname.txt", ...Array.from({ length: 68 }, (_, index) => `new-${index}.txt`)];
+      for (const [index, path] of paths.entries()) await save(folder, path, `aggregate sentinel ${index}\n`);
+      if (agentRead) await save(folder, ".env.private", "excluded aggregate sentinel\n");
+      if (state === "unborn index") await run(service.stageAll(folder));
+      const original = git(folder, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]);
+      // Observe calls to the real process implementation; no result or runner
+      // is replaced, and no production diagnostic hook is installed.
+      const observed = vi.spyOn(gitProcesses, "gitProcess");
+      try {
+        const result = await run(service.diff(folder, { agentRead }));
+        expect(result).toMatchObject({ additions: 71, deletions: 0, binary: false, truncated: false });
+        expect(result.patch.match(/^diff --git /gm)).toHaveLength(71);
+        expect(result.patch).not.toContain("excluded aggregate sentinel");
+        expect(result.patch).not.toContain(".env.private");
+        for (const index of paths.keys()) expect(result.patch).toContain(`+aggregate sentinel ${index}\n`);
+        const calls = observed.mock.calls.map(([, args]) => args);
+        expect(calls.filter((args) => args[0] === "rev-parse" && args.at(-1) === "HEAD")).toHaveLength(1);
+        expect(calls.filter((args) => args[0] === "status")).toHaveLength(1);
+        for (const flag of ["--patch", "--numstat"]) {
+          const patches = calls.filter((args) => args.includes("--no-index") && args.includes(flag));
+          expect(patches).toHaveLength(71);
+          expect(patches.map((args) => args.slice(-2))).toEqual(expect.arrayContaining(paths.map((path) => ["/dev/null", join(folder, path)])));
+        }
+        expect(git(folder, ["status", "--porcelain=v1", "-z", "--untracked-files=all"])).toBe(original);
+      } finally { observed.mockRestore(); }
+    });
+  }
+
+  it("issue 588: retains aggregate binary flags and complete text statistics", async () => {
+    await save(repo, "binary", "\0\x01\x02");
+    await save(repo, "literal", "one\ntwo\n");
+    expect(await run(service.diff(repo))).toMatchObject({ additions: 2, deletions: 0, binary: true, truncated: false });
+  });
+
+  it("issue 588: retains aggregate patch, entry and process output bounds", async () => {
+    await save(repo, "a-first", "complete line\n".repeat(200));
+    await save(repo, "z-last", "later file\n");
+    const bounded = await run(makeGitService({ workspaceFolder: root, maxDiffBytes: 80 }).diff(repo));
+    expect(bounded).toMatchObject({ additions: 200, deletions: 0, binary: false, truncated: true });
+    expect(Buffer.byteLength(bounded.patch)).toBeLessThanOrEqual(80);
+    expect(bounded.patch).not.toContain("later file");
+    expect(await reason(makeGitService({ workspaceFolder: root, maxEntries: 1 }).diff(repo))).toBe("output_limit");
+    expect(await reason(makeGitService({ workspaceFolder: root, maxOutputBytes: 8 }).diff(repo))).toBe("output_limit");
+  });
+
+  it("issue 588: refuses aggregate symlink paths", async () => {
+    const outside = join(root, "outside-secret");
+    await writeFile(outside, "outside content stays private\n");
+    await symlink(outside, join(repo, "link"));
+    expect(await reason(service.diff(repo))).toBe("invalid_path");
+    expect(await readFile(outside, "utf8")).toBe("outside content stays private\n");
+  });
+
+  it("issue 598: an agent review marks omitted bounded files in its patch", async () => {
+    git(repo, ["branch", "review-base"]);
+    await save(repo, "a-first", "first review bytes\n");
+    await save(repo, "b-second", "second review bytes\n");
+    await save(repo, ".env.private", "excluded review bytes\n");
+    commit(repo, "Review list bound");
+    const bounded = makeGitService({ workspaceFolder: root, maxEntries: 1 });
+    const review = await run(bounded.review(repo, "review-base", true));
+    expect(review.files).toMatchObject({ items: [{ path: "a-first" }], truncated: true });
+    expect(review.diff.truncated).toBe(true);
+    expect(review.diff.patch).toContain("first review bytes");
+    expect(review.diff.patch).not.toContain("second review bytes");
+    expect(JSON.stringify(review)).not.toMatch(/excluded review bytes|\.env\.private/);
+    const owner = await run(bounded.review(repo, "review-base"));
+    expect(owner.files.truncated).toBe(true);
+    expect(owner.diff.truncated).toBe(false);
+    expect(owner.diff.patch).toContain("second review bytes");
+  });
+
   it("returns the earliest pending commit date from actual history and binds review evidence to HEAD", async () => {
     const project = await worktree("Project");
     await save(project.path, "file.txt", "one\n");
@@ -152,8 +331,6 @@ describe("bounded Git service with real temporary repositories", () => {
     expect(review.commits.items.map((item) => item.title)).toEqual(["Two", "One"]);
     expect(review.files.items.map((item) => item.path)).toEqual(["file.txt"]);
     expect(review.diff.patch).toContain("+two");
-    expect(await reason(service.openReview(project.path, "main", "stale"))).toBe("stale_state");
-    expect(await reason(service.openReview(project.path, "main", head))).toBe("missing_remote");
     expect(git(repo, ["show", "HEAD:file.txt"])).toBe("start");
   });
 
@@ -321,8 +498,8 @@ describe("bounded Git service with real temporary repositories", () => {
             } finally { controller.abort(); }
             expect(await pending).toBe("interrupted");
           }
-          // The same instance's queue waits for subprocess cleanup, including
-          // after Effect has already delivered interruption to its caller.
+          // Observe the interrupted subprocess's actual cleanup before
+          // verifying the index and the ownership of its lock.
           await run(short.changes(folder));
           await expect(readFile(index + ".lock")).rejects.toMatchObject({ code: "ENOENT" });
           expect(await readFile(index)).toEqual(originalIndex);
@@ -421,7 +598,6 @@ describe("bounded Git service with real temporary repositories", () => {
     await save(repo, "local", "local\n"); commit(repo, "Local divergence");
     expect(await reason(service.push(repo))).toBe("push_rejected");
     expect(await reason(service.pull(repo))).toBe("pull_diverged");
-    expect(await reason(service.openReview(repo, "main", git(repo, ["rev-parse", "HEAD"])))).toBe("unsupported_provider");
   });
 
   it("reports missing remote/upstream prerequisites without invented successes or raw stderr", async () => {
@@ -498,3 +674,25 @@ describe("bounded Git service with real temporary repositories", () => {
     await expect(readFile(marker)).rejects.toMatchObject({ code: "ENOENT" });
   });
 });
+
+it("issue 585: gives real network Git its own longer bounded subprocess budget", async () => {
+  const remote = join(root, "network.git")
+  await mkdir(remote); git(remote, ["init", "--bare"])
+  git(repo, ["remote", "add", "origin", remote])
+  const bin = join(root, "network-bin"), marker = join(root, "network-entered")
+  await mkdir(bin)
+  const priorPath = process.env.PATH
+  await writeFile(join(bin, "git"), `#!${process.execPath}\nimport { spawnSync } from 'node:child_process';\nimport { writeFileSync } from 'node:fs';\nconst args=process.argv.slice(2);\nif(args.includes('fetch')) { writeFileSync(${JSON.stringify(marker)}, 'fetch'); await new Promise(r=>setTimeout(r, 700)); }\nconst result=spawnSync('/usr/bin/git',args,{stdio:'inherit'}); process.exit(result.status??1);\n`, { mode: 0o700 })
+  process.env.PATH = `${bin}:${priorPath}`
+  try {
+    const bounded = makeGitService({ workspaceFolder: root, timeoutMs: 500, networkTimeoutMs: 3000 })
+    await run(bounded.fetch(repo))
+    expect(await readFile(marker, "utf8")).toBe("fetch")
+    const tooShort = makeGitService({ workspaceFolder: root, timeoutMs: 500, networkTimeoutMs: 500 })
+    const failure = await Effect.runPromise(Effect.flip(tooShort.fetch(repo)))
+    expect(failure).toMatchObject({ reason: "timeout", uncertain: true })
+  } finally {
+    if (priorPath === undefined) delete process.env.PATH
+    else process.env.PATH = priorPath
+  }
+})

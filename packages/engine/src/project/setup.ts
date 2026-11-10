@@ -33,20 +33,12 @@ export const ownerNameSuggestion = (input: Input) => Effect.tryPromise({ try: ()
 }), catch: () => refused("discovery unavailable; retry or change the workspace folder") }).pipe(
   Effect.flatMap((value) => value === undefined ? Effect.succeed(undefined) : input.runtime.log.redactText(value)),
   Effect.catch(() => Effect.succeed(undefined)))
-// These links point to the adapter/provider's own installation documentation.
-// They are guidance only. Scanning never runs installation or login commands.
-const guidance = {
-  claude: { documentation: "https://github.com/agentclientprotocol/claude-agent-acp", guidance: "LGcode supplies the Claude ACP adapter. Configure its executable, then sign in to Claude separately or configure your Anthropic API key." },
-  codex: { documentation: "https://github.com/agentclientprotocol/codex-acp", guidance: "LGcode supplies the Codex ACP adapter. Configure its executable and sign in using the account's effective Codex home, or configure your OpenAI API key." },
-  gemini: { documentation: "https://geminicli.com/docs/get-started/installation/", guidance: "Install Gemini CLI, make gemini available on the service PATH, then sign in separately or configure your Gemini API key." },
-  cursor: { documentation: "https://cursor.com/docs/cli/overview", guidance: "Install Cursor CLI, make agent available on the service PATH, then sign in separately or configure your Cursor API key." }
-} as const
 const discover: ReadHandler = (input, raw) => Effect.gen(function* () {
   const configured = yield* readHarnesses(input.runtime)
   const detected = yield* localHarnessDefaults(process.env.PATH ?? "").pipe(Effect.provide(NodeServices.layer))
   const harnesses: Array<typeof Discovery.Type.harnesses[number]> = []
   let truncated = false
-  for (const [id, instructions] of Object.entries(guidance)) {
+  for (const id of ["claude", "codex", "gemini", "cursor"] as const) {
     const saved = configured.find((row) => row.id === id), harness = saved ?? detected.harnesses.find((row) => row.id === id)
     const installed = harness !== undefined && (yield* adapterInstalled(harness))
     const accounts: Array<typeof Discovery.Type.harnesses[number]["accounts"][number]> = []
@@ -54,7 +46,7 @@ const discover: ReadHandler = (input, raw) => Effect.gen(function* () {
     truncated ||= rows.length > 64
     for (const account of rows.slice(0, 64)) accounts.push({ accountId: account.id,
       state: !installed ? "missing-executable" : !account.enabled || harness === undefined ? "unavailable" : yield* accountReadiness(input, harness, account), remoteAuthentication: "not-checked" })
-    harnesses.push({ harness: id, installed, configured: saved !== undefined, ...instructions, accounts })
+    harnesses.push({ harness: id, installed, configured: saved !== undefined, accounts })
   }
   const found = yield* withGit(input, (git) => gitCall(git.discover())).pipe(Effect.result)
   const defaults = yield* leadDefaults(input, projectView(input.snapshot).settings?.lead).pipe(Effect.result)

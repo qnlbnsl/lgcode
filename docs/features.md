@@ -327,11 +327,12 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   Add Project creates a named project under a known repository and opens
   its lead conversation. A new project has no sprints or teams until its
   plan is shaped. Existing projects never reopen repository setup.
-- **Project worktrees by default** (agreed, 2026-11-06; mocked).
-  Add Project has Start work tree checked beneath the project name. A safe
-  version of the name determines its branch and worktree folder. Numeric
-  suffixes resolve existing names. Unchecking uses that repository’s main
-  checkout. The dialog previews the branch and location before submission.
+- **Dedicated project worktrees** (updated by the owner, 2026-11-09).
+  Every project has its own worktree. Add Project has no worktree checkbox.
+  A safe version of the name determines its branch and worktree folder.
+  Numeric suffixes resolve existing names. The dialog always previews Branch
+  and Folder before submission. The repository main checkout remains recorded
+  for the owner’s review and approval.
 - **Workspace settings** (agreed, 2026-11-06; mocked). A Settings tab beside
   Board, Chat, Terminal, and Git shows the assigned repository, branch,
   checkout type, folder, and machine. It stores a project-specific terminal

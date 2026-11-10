@@ -10,7 +10,7 @@ import { cacheAction } from "../roles/sheepdog/rules/cache.ts";
 import { resolveSettings, roleSettings } from "../roles/sheepdog/settings.ts";
 import { actionRequestId } from "../roles/sheepdog/requests.ts";
 import { withWaitChecks } from "../routing/waits.ts";
-import { callerKey } from "../log/EventLog.ts";
+import { callerKey } from "../identity/caller.ts";
 import { checkPieceBatch } from "./pieceBatch.ts";
 import { refused, type Runtime, type Snapshot } from "./internal.ts";
 

@@ -36,7 +36,7 @@ const fixture = async (page: Page, body: (rig: Rig, gate: ReplyGate, runner: Eff
   process.env.HOME = rig.home; process.env.LGCODE_HOME = rig.stateFolder
   const gate: ReplyGate = { hold: false }
   try {
-    git(rig.work, "init", "-b", "trunk")
+    git(rig.work, "init", "-b", "main")
     git(rig.work, "-c", "user.name=Test", "-c", "user.email=test@example.test", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "Initial")
     const staticRoot = join(rig.root, "page")
     await build({ configFile: false, root: new URL("..", import.meta.url).pathname, logLevel: "silent", build: { outDir: staticRoot } })

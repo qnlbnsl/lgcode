@@ -46,7 +46,8 @@ The future React composer consumes this surface separately.
 ## The public local Git commands
 
 The project piece keeps the existing repository, location, workspace, project,
-team, sprint, and task records. Git reads do not create stored Git events.
+team, sprint, and task records. A successful Git state refresh can finish pending
+attempt records without performing a Git mutation.
 Git mutations have ordinary command receipts. Repeating a committed request
 identifier returns its original receipt, without repeating the Git mutation.
 
@@ -69,7 +70,7 @@ The workspace commands take `worktreeId`. They are `project.changes`,
 `project.stage`, `project.unstage`, `project.stage.all`, `project.unstage.all`,
 `project.discard.plan`, `project.discard`, `project.commit`, `project.fetch`,
 `project.pull`, `project.push`, `project.integrate`, `project.review`,
-`project.review.open`, `project.conflict`, `project.conflict.choose`, and
+`project.conflict`, `project.conflict.choose`, and
 `project.conflict.resolve`. The contracts define every request and reply.
 The command-line interface accepts their spaced and dotted names, with the
 same payload supplied as `--input` JavaScript Object Notation (JSON).
@@ -88,7 +89,7 @@ Each active service operation retains its own time budget. A request can call
 several service operations. The gate is released when the active request finishes.
 This can defer cancellation of an active read until those operations finish.
 A queued request whose workspace setting changed refuses and asks for refresh.
-The service's own finite queue and process deadlines remain intact.
+The service has no second queue. Its process deadlines remain intact.
 
 Every display string passes the production redactor. Fixed conflict segment
 kinds, hunk choices, and the review result kind retain their protocol meaning.
@@ -101,8 +102,8 @@ Integration requires a registered team source and its project destination.
 The service refuses a dirty source or destination and direct integration into
 `main` or `master`. Conflict choices carry a fingerprint and choices, without
 client-supplied write content. The service reconstructs current canonical hunks.
-`project.review.open` returns a verified GitHub compare URL with `kind: compare`
-and `opened: false`. It does not create a pull request or claim provider approval.
+The visible owner review dialog uses local comparison data.
+The unused external compare-link route has been removed.
 
 ## Explicit owner review and merge to main or master
 
@@ -136,8 +137,8 @@ The original `project.integrate` and `mergeTeam` main/master refusal remains.
 
 The approval reply has an explicit `outcome` of `merged` or `refused`, with a
 fixed safe `reason` on refusal. A refusal is not a successful merge. The log and
-receipt retain the reviewed heads, decision, and outcome. Retry an uncertain
-attempt with the identical payload and request identity. A changed body refuses.
+receipt retain the reviewed heads, decision, and outcome. An unknown outcome
+asks the owner to refresh Git state. A changed body refuses.
 A known refusal consumes that review; obtain a new review and approve explicitly
 after correcting the cause. Conflicted destination bytes and merge state remain
 inspectable through the existing Git operations.
@@ -164,17 +165,22 @@ A saved named account is never silently replaced by another account.
 The owner calls `project.create` with a stable request identity, a name, a goal,
 `machineId: "local"`, and either an existing repository identity or a new repository name.
 Only the confirmed local machine is implemented.
-`useWorktree` defaults to true.
+Every project has its own dedicated worktree.
+`useWorktree: false` is refused, including by the preview read.
 New repositories live beneath the configured workspace folder.
 Worktrees live beneath the repository's `.worktrees` directory.
 Names collide case-insensitively within one repository and machine.
 Branch and directory collisions receive a numeric suffix.
-An unchecked worktree option uses the main checkout and its current named branch.
-An unborn repository remains unborn; creation does not invent a commit.
+There is no main-checkout project option.
+New repositories receive an empty initial main commit containing no user files.
+The main checkout stays recorded separately for owner review and approval.
+Unfinished historical main-checkout intents stay readable and reserved, but cannot resume effects.
+The owner can explicitly abandon them without changing their files.
 
 `project.placement.preview` accepts the same placement input as `project.create`.
 It calls the same authoritative selector against the current repository and filesystem.
 It returns the observed repository folder, checkout folder, branch, and checkout type.
+The page always previews Branch and Folder.
 It returns `reserved: false` because creation must check the placement again.
 It creates no intent, directory, branch, receipt, account login, or lead.
 
@@ -339,3 +345,50 @@ The revision must belong to the project's repository.
 Recording and approving the mock both recheck all required Design evidence against that exact revision.
 An omitted Design identity stays absent.
 The page must never derive a design file path from a repository or component display name.
+
+## Git attempts and uncertain outcomes
+
+Git mutations use the existing event log for a bounded attempt before possible effects.
+The attempt binds the caller, request, canonical body hash, operation, workspace, and pre-effect Git identities.
+It stores no raw payload or commit message.
+The request lane covers a short writer preflight, Git under the runtime gate outside the writer, and a short final outcome transaction.
+A Git-proven conflict, rejected push, diverged pull or remote refusal retains its fixed reason and durable refused outcome.
+Only explicit network commands can classify fixed remote-refusal diagnostics; a local permission or mixed-reference failure after possible effects stays uncertain.
+A conflict requires both MERGE_HEAD and actual unmerged entries.
+A genuinely unknown possible effect returns “Git outcome is uncertain; refresh Git state” without a success or refusal receipt.
+An identical retry never clears that attempt merely because the current state appears unchanged.
+Prior attempts return uncertainty without re-executing commit or approval, including before a refresh.
+A new owner approval request can use actual containment of both reviewed ancestors in the registered destination, without another merge.
+Only a project.git.state read that observes a pending attempt takes the workspace operation lane before reading Git and finishing attempts in short current-binding transactions.
+An ordinary state read does not take that lane or settle attempts that started after its initial check.
+The existing GitFinished event records terminal uncertainty in the ordinary envelope receipt, preserving the original caller, request and body hash after clearing the pending attempt.
+For fresh determinate conflicts, rejected push, diverged pull and refused-remote outcomes, its optional fixed refusal enum preserves the known reason across receipt replay and registered-secret collisions.
+Arbitrary CommandRefused reason text remains redacted.
+Identical retries still return uncertainty after rebuild, and changed bodies or commands refuse; cleanup never makes an old mutation executable again.
+Failed or stale reads leave attempts unchanged.
+The same command-layer finalizer serves direct and authenticated transport reads; an agent read grants no Git mutation authority.
+The normal writer failure latch still requires recovery before writes or receipt replay.
+
+Registration and project creation observe checkouts outside the writer too.
+Creation retains its durable intent and filesystem ownership witnesses.
+Its final checkout verification and main-branch read precede the final transaction.
+That transaction checks the current intent, settings, placements, reservations and name collisions before running the current lead and launch admission.
+
+Design, mocks and file-context commands prepare bounded physical observations outside the writer.
+They do not retain an admitted event plan.
+Their final planners rerun current authority, revision, placement and collision checks before using those observations.
+Prompt and board admissions still resolve current holders, recipients, channel access, quotas, replies and task references in the writer.
+An observation is usable only with its unchanged settings root and registered repository, location, workspace and parent bindings.
+Artifact fingerprints describe the bytes observed during preparation.
+They do not promise that a file remains unchanged after that observation.
+Later artifact reads continue to compare actual bytes with the recorded fingerprint.
+
+The owner can use `project.creation.abandon` to release a pending creation reservation.
+Abandonment takes the lifecycle lane and records only `project.CreationFinished`.
+It leaves the repository, checkout, branches, exclusions, witnesses, files, and modes untouched.
+
+
+The fixed correctable creation refusal for a main checkout outside main or master is “check out main or master in the main repository checkout before creating a project”.
+Creation checks this before effects, including saved intent retries, and never records a feature branch as its main review destination.
+Only a current-admitted initial branch refusal with no creation intent receives a terminal refusal receipt; unavailable accounts and unfinished intents retain their existing retry behavior.
+The later New project consumer joins this fixed reason directly; unknown creation errors retain their frozen request handling.

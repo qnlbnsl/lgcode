@@ -44,6 +44,15 @@ export const GitMainReview = Schema.Struct({ reviewId: RequestId, projectId: Pro
   decision: Schema.NullOr(GitApprovalDecision), outcome: Schema.Literals(["open", "merged", "refused"]),
   mergeHead: nullable, reason: nullable, decidedAt: Schema.NullOr(EpochMilliseconds) })
 export type GitMainReview = typeof GitMainReview.Type
+// Durable evidence of an admitted operation, before external Git can change.
+// A pending attempt is not a receipt or a claim that the mutation succeeded.
+export const GitMutationIdentity = Schema.Struct({ head: nullable, branch: nullable, tree: nullable, mergeHead: nullable })
+export type GitMutationIdentity = typeof GitMutationIdentity.Type
+export const GitAttempt = Schema.Struct({ requestId: RequestId, bodyHash: Schema.NonEmptyString,
+  caller: Schema.Union([Schema.TaggedStruct("owner", {}), Schema.TaggedStruct("agent", { agentId: AgentId })]),
+  command: ProjectName, worktreeId: WorkspaceId, before: GitMutationIdentity,
+  destination: Schema.optionalKey(GitMutationIdentity) })
+export type GitAttempt = typeof GitAttempt.Type
 const request = { requestId: RequestId }
 const workspace = { ...request, worktreeId: WorkspaceId, projectId: Schema.optionalKey(ProjectId) }
 const repository = { ...request, repoId: RepositoryId }
@@ -72,7 +81,6 @@ export const ProjectGitRpcGroup = RpcGroup.make(
   Rpc.make("push", { payload: workspace, success: ack, error }),
   Rpc.make("integrate", { payload: { ...workspace, destinationId: WorkspaceId, expectedHead: ProjectName }, success: reply(Schema.Struct({ head: text })), error }),
   Rpc.make("review", { payload: { ...workspace, base: ProjectName }, success: readReply(GitReview), error }),
-  Rpc.make("review.open", { payload: { ...workspace, base: ProjectName, expectedHead: ProjectName }, success: reply(Schema.Struct({ head: text, url: text, kind: Schema.Literal("compare"), opened: Schema.Literal(false) })), error }),
   Rpc.make("review.report", { payload: { ...workspace, projectId: ProjectId, head: ProjectName, kind: GitEvidenceKind,
     status: GitEvidenceStatus, summary: ProjectText, threadAgentId: AgentId, threadSequence: EventSequence }, success: ack, error }),
   Rpc.make("review.prepare", { payload: { ...workspace, projectId: ProjectId, destinationId: WorkspaceId },
@@ -93,6 +101,6 @@ export const projectGitAccess = {
   "project.changes": member, "project.diff": member, "project.history": member, "project.commit.files": member, "project.git.state": member,
   "project.stage": owner, "project.unstage": owner, "project.stage.all": owner, "project.unstage.all": owner, "project.discard.plan": owner, "project.discard": owner,
   "project.commit": owner, "project.fetch": owner, "project.pull": owner, "project.push": owner, "project.integrate": owner, "project.review": member,
-  "project.review.open": owner, "project.conflict": member, "project.conflict.choose": owner, "project.conflict.resolve": owner,
+  "project.conflict": member, "project.conflict.choose": owner, "project.conflict.resolve": owner,
   "project.review.report": member, "project.review.prepare": owner, "project.review.status": member, "project.review.approve": owner
 } satisfies Record<import("effect/rpc/Rpc").Tag<RpcGroup.Rpcs<typeof ProjectGitRpcGroup>>, ReadonlyArray<import("../commands.ts").CallerKind>>

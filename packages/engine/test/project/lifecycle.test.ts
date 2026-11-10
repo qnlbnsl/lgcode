@@ -96,7 +96,7 @@ it.live("creates through the authenticated API, launches saved defaults, inherit
   }))
 })
 
-it.live("creates an unborn new repository and a real orphan worktree without inventing a commit", () => {
+it.live("issue 576: creates an empty main commit and recorded main destination before the project worktree", () => {
   const harness = harnessFor("cursor", writeFakeAdapter(rig))
   const echo = echoFile(rig), account = accountFor(harness.id, { turns: [] }, echo, { CURSOR_API_KEY: "secret:project-test" }, "ready")
   const unready = accountFor(harness.id, { turns: [] }, echoFile(rig), {}, "a-unready")
@@ -108,7 +108,21 @@ it.live("creates an unborn new repository and a real orphan worktree without inv
     const view = projectView(yield* snapshot), row = view.projects[result.projectId]!, workspace = view.workspaces[row.worktreeId]!
     expect(workspace.path).toBe(join(rig.work, "new-product/.worktrees/fresh"))
     expect(git(workspace.path, "branch", "--show-current")).toBe("fresh")
-    expect(() => git(workspace.path, "rev-parse", "--verify", "HEAD")).toThrow()
+    const repository = view.repositories[row.repoId]!
+    const main = Object.values(view.workspaces).find((item) => item.repoId === row.repoId && item.checkout === "main")!
+    expect(main).toMatchObject({ path: repository.path, branch: "main", machineId: "local" })
+    expect(main.worktreeId).not.toBe(workspace.worktreeId)
+    const initial = git(repository.path, "rev-parse", "HEAD")
+    expect(git(workspace.path, "rev-parse", "HEAD")).toBe(initial)
+    expect(git(repository.path, "ls-tree", "-r", initial)).toBe("")
+    writeFileSync(join(workspace.path, "product.txt"), "Lead-authored product\n")
+    git(workspace.path, "add", "product.txt")
+    git(workspace.path, "-c", "user.name=Test", "-c", "user.email=test@example.test", "-c", "commit.gpgsign=false", "commit", "-m", "First product work")
+    expect(git(repository.path, "rev-parse", "HEAD")).toBe(initial)
+    const prepared = success(yield* call(ownerCredential, "project.review.prepare", { projectId: row.projectId, worktreeId: row.worktreeId, destinationId: main.worktreeId })).result.review
+    const decided = success(yield* call(ownerCredential, "project.review.approve", { projectId: row.projectId, worktreeId: row.worktreeId, reviewId: prepared.reviewId, expectedHead: prepared.head, expectedBaseHead: prepared.baseHead, confirmed: true, decision: "approve_without_evidence" })).result
+    expect(decided.outcome).toBe("merged")
+    expect(readFileSync(join(repository.path, "product.txt"), "utf8")).toBe("Lead-authored product\n")
     expect(yield* agentRow(row.leadAgentId)).toMatchObject({ harness: harness.id, account: account.id })
     success(yield* call(ownerCredential, "project.archive", { projectId: row.projectId }))
   }))
@@ -128,7 +142,7 @@ it.live("stops the actual process when session recording fails after a committed
     })) }) }, () => Effect.gen(function* () {
     yield* registerRebuildCheck()
     success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.work, shell: "sh" } }))
-    const request = { requestId: freshRequest(), name: "Fresh", goal: "Plan", machineId: "local", repository: { _tag: "new", name: "Fresh repo" }, useWorktree: false }
+    const request = { requestId: freshRequest(), name: "Fresh", goal: "Plan", machineId: "local", repository: { _tag: "new", name: "Fresh repo" }, useWorktree: true }
     expect(failureOf(yield* call(ownerCredential, "project.create", request))?._tag).toBe("LogWriteFailed")
     const peer = yield* readEcho(echo)
     expect(alive(peer.pid)).toBe(false)
@@ -150,7 +164,7 @@ it.live("keeps one visible lead and closes a real adapter rejected during setup"
   return withEngine(rig, { harness, accounts: [account], secrets: { "secret:project-test": "synthetic-project-credential-1234" } }, () => Effect.gen(function* () {
     yield* registerRebuildCheck()
     success(yield* call(ownerCredential, "project.settings.set", { settings: { workspaceFolder: rig.work, shell: "sh" } }))
-    const request = { requestId: freshRequest(), name: "Fresh", goal: "Plan", machineId: "local", repository: { _tag: "new", name: "Fresh repo" }, useWorktree: false }
+    const request = { requestId: freshRequest(), name: "Fresh", goal: "Plan", machineId: "local", repository: { _tag: "new", name: "Fresh repo" }, useWorktree: true }
     const result = success(yield* call(ownerCredential, "project.create", request))
     const row = projectView(yield* snapshot).projects[result.projectId]!
     const peer = yield* readEcho(echo)

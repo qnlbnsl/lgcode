@@ -48,7 +48,7 @@ export type SetupState = typeof SetupState.Type
 export const DiscoveryAccount = Schema.Struct({ accountId: Schema.NonEmptyString,
   state: Schema.Literals(["missing-executable", "signed-out", "local-credential", "unavailable"]), remoteAuthentication: Schema.Literal("not-checked") })
 export const DiscoveryHarness = Schema.Struct({ harness: Schema.NonEmptyString, installed: Schema.Boolean, configured: Schema.Boolean,
-  guidance: ProjectText, documentation: ProjectPath, accounts: array(DiscoveryAccount) })
+  accounts: array(DiscoveryAccount) })
 export const Discovery = Schema.Struct({ state: Schema.Literals(["available", "unavailable"]), reason: Schema.optionalKey(Schema.Literal("discovery unavailable; retry or change the workspace folder")),
   repositories: array(Schema.Struct({ name: ProjectName, path: ProjectPath })), truncated: Schema.Boolean,
   harnesses: array(DiscoveryHarness), readyDefaults: Schema.optionalKey(ProjectLeadDefaults), ownerNameSuggestion: Schema.optionalKey(ProjectName) })

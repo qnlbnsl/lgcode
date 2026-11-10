@@ -3,12 +3,12 @@ import { DeliveryId, describeContext } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { agentText, envelope, senderOf } from "../routing/envelope.ts";
-import { resolveContext } from "../project/context.ts";
+import { resolveContext, type ContextFiles } from "../project/context.ts";
 import type { Input, Payload } from "./internal.ts";
 
-export const prompt = (input: Input, payload: Payload<"prompt">) => Effect.gen(function* () {
+export const prompt = (input: Input, payload: Payload<"prompt">, files?: ContextFiles) => Effect.gen(function* () {
   const { actor } = input;
-  const context = yield* resolveContext(input, payload.context, [{ _tag: "agent", agentId: payload.agentId }]);
+  const context = yield* resolveContext(input, payload.context, [{ _tag: "agent", agentId: payload.agentId }], files);
   const id = Schema.decodeUnknownSync(DeliveryId)(randomUUID());
   return { events: [{ _tag: "DeliveryQueued" as const, delivery: {
     id, target: payload.agentId, sender: senderOf(actor), content: { _tag: "prompt" as const,

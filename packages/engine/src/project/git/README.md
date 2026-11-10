@@ -29,7 +29,7 @@ replies. Agent text must remain plain text in the page.
 | `planDiscard`, `discard` | Obtain a file list and fingerprint, then supply that plan with `confirmed: true`. Only unstaged changes are discarded. Conflicts are excluded, and the staged index is preserved. Edits invalidate confirmation. |
 | `fetch`, `pull`, `push` | Synchronize through `origin`. Pull requires an upstream and a clean destination, and only fast-forwards. Push sets the branch's upstream. Fixed failures report missing prerequisites, divergence and recoverable remote errors. |
 | `mergeTeam` | Merge a clean source checkout into a clean destination in the same repository. Supply the reviewed source head. A destination on `main` or `master` always refuses. A failed merge can leave real conflicts for resolution. |
-| `review`, `openReview` | Read evidence against a local base branch, keyed to both heads. Opening review returns a real GitHub compare URL after checking the published branch head. It creates no approval, provider report or merge. Missing remote, provider and publication prerequisites are explicit failures. |
+| `review` | Read evidence against a local base branch, keyed to both heads. It creates no approval, provider report, or merge. |
 | `reviewMain`, `approveMain` | Read a complete bounded comparison between registered project and base checkouts. The separate approval method requires the engine-supplied authenticated owner and explicit confirmation, revalidates both reviewed heads and branch identities, and merges the reviewed object into main or master. It refuses incomplete or binary review data, dirty worktrees, and an active merge. It never changes `mergeTeam`'s base refusal. |
 | `conflict`, `choose`, `resolve` | Read real index stages and canonical three-way text hunks, choose each hunk, and resolve after rechecking the file and index fingerprint. Both keeps ours, then theirs. Each line retains its newline. Resolution clears the unmerged index entries and leaves the result unstaged for review. Client-supplied segments are never used as write content. |
 
@@ -49,8 +49,8 @@ Every list has at most 200 items. Structured output that exceeds its process
 limit fails rather than being parsed in part. Bulk mutations refuse a file
 list larger than the limit. Limits can be lowered by trusted configuration.
 
-A command has a 10-second timeout. Each complete operation has a 60-second
-budget. On timeout, interruption or an output limit, the runner sends the Unix
+A local command has a 10-second timeout. Each complete local operation has a 60-second
+budget. Explicit fetch, pull, and push subprocesses have a 90-second timeout within a 120-second operation budget. On timeout, interruption or an output limit, the runner sends the Unix
 process group SIGTERM, the termination signal, so Git can roll back its own
 locks. It allows at most 250 milliseconds for cleanup before SIGKILL, the
 unconditional kill signal. It also kills remaining group members when the
@@ -111,3 +111,9 @@ refuses absent, agent, service, and piece callers. A payload flag never replaces
 the owner credential. The API documents receipt retries and the concrete crash
 boundary between external Git effects and the database. Remote-machine routing
 remains separate work.
+
+Agent-visible Git file reads use the same credential-name predicate as artifacts and context.
+Aggregate agent reads omit excluded files; owner Git operations retain the ordinary literal path rules.
+Literal Git path syntax remains separate, so ordinary tab-bearing filenames retain their supported behavior.
+Owner-controlled Git configuration can run content filters or merge drivers as the same Unix user.
+The current local-owner security boundary accepts that scope; this service does not claim to sandbox repository configuration.

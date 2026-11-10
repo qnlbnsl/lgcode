@@ -4,7 +4,7 @@ import { dirname, join } from "node:path"
 import type { CreationFolderIdentity, ProjectCreation } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
 import { refused } from "../commands/internal.ts"
-import { makeGitService } from "./git/index.ts"
+import type { GitService } from "./git/index.ts"
 import { directory, smallFile } from "./git/paths.ts"
 import { gitProcess, processFailure } from "./git/process.ts"
 
@@ -72,14 +72,23 @@ export const ensureRepository = (plan: ProjectCreation) => creationIo(async (sig
     if (!plan.newRepository || (await readdir(plan.repository.path)).length !== 0) throw new Error()
     await creationGit(plan.repository.path, ["init", "--initial-branch=main", "--", plan.repository.path], signal)
   }
+  if (plan.newRepository) {
+    const head = await gitProcess(plan.repository.path, ["rev-parse", "--verify", "--quiet", "HEAD"], { bytes: 4096, timeoutMs: 5000 }, signal)
+    if (head.code === 1) {
+      // Bootstrap only an empty tree. A retry may find owner-staged bytes;
+      // those must never be folded into the initialization commit.
+      const tree = await creationGit(plan.repository.path, ["mktree"], signal)
+      const commit = await creationGit(plan.repository.path, ["-c", "user.name=LGcode", "-c", "user.email=lgcode@localhost", "commit-tree", tree, "-m", "Initialize LGcode repository"], signal)
+      await creationGit(plan.repository.path, ["update-ref", "refs/heads/main", commit, ""], signal)
+    } else if (head.code !== 0) throw processFailure(head)
+  }
 })
 export const ensureWorktreeParent = (plan: ProjectCreation) => creationIo(async () => {
   const path = dirname(plan.workspace.path)
   if (!await exists(path)) await mkdir(path, { mode: 0o700 })
   if (await directory(plan.workspaceFolder, path) !== path || (await lstat(path)).isSymbolicLink()) throw new Error()
 })
-export const ensureWorktree = (plan: ProjectCreation) => Effect.gen(function* () {
-  const service = makeGitService({ workspaceFolder: plan.workspaceFolder })
+export const ensureWorktree = (plan: ProjectCreation, service: GitService) => Effect.gen(function* () {
   const repository = yield* service.register(plan.repository.path).pipe(Effect.mapError(() => refused("repository is unavailable")))
   if (dirname(repository.commonDirectory) !== plan.repository.path) return yield* refused("main repository checkout is required")
   if (plan.workspace.checkout === "main") return
@@ -107,14 +116,13 @@ export const ensureWorktree = (plan: ProjectCreation) => Effect.gen(function* ()
       "--", plan.workspace.path, ...(head.code === 1 ? [] : [head.stdout.trim()])], signal)
   })
 })
-export const verifyCreation = (plan: ProjectCreation) => Effect.gen(function* () {
+export const verifyCreation = (plan: ProjectCreation, service: GitService) => Effect.gen(function* () {
   if (plan.repositoryIdentity === undefined) return yield* refused("repository is unavailable")
   yield* verifyFolder(plan.workspaceFolder, plan.repository.path, plan.repositoryIdentity)
   if (plan.workspace.checkout === "worktree") {
     if (plan.folderIdentity === undefined) return yield* refused("repository is unavailable")
     yield* verifyFolder(plan.workspaceFolder, plan.workspace.path, plan.folderIdentity)
   }
-  const service = makeGitService({ workspaceFolder: plan.workspaceFolder })
   const repo = yield* service.register(plan.repository.path).pipe(Effect.mapError(() => refused("repository is unavailable")))
   const checkout = yield* service.register(plan.workspace.path).pipe(Effect.mapError(() => refused("repository is unavailable")))
   const state = yield* service.state(checkout.path).pipe(Effect.mapError(() => refused("repository is unavailable")))

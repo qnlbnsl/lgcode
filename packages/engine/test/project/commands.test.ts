@@ -57,6 +57,8 @@ it.live("roundtrips every project event and receipt identity while keeping works
       } },
     { _tag: "project.MockApproved", projectId, approvalId: `approval-${marker}`, revisionId: `revision-${marker}`, leadAgentId,
       worklist: { screens: [`screen-${marker}`], drafts: [`component-${marker}`], schemaChanges: [{ sourceId: `source-${marker}`, field: text, change: "add", description: text }], draftedFields: [{ name: text, type: text, description: text, sourceId: `source-${marker}`, screens: [`screen-${marker}`] }] } },
+    { _tag: "project.GitAttempted", attempt: { requestId: `git-${marker}`, bodyHash: `hash-${marker}`, caller: { _tag: "agent", agentId: leadAgentId }, command: "project.commit", worktreeId, before: { head: text, branch: text, tree: text, mergeHead: null } } },
+    { _tag: "project.GitFinished", caller: { _tag: "agent", agentId: leadAgentId }, operationRequestId: `git-${marker}` },
     { _tag: "project.GitEvidenceReported", report: { ...gitReportSample, summary: text } },
     { _tag: "project.MainReviewOpened", review: { ...gitReviewSample, branch: text } },
     { _tag: "project.MainReviewDecided", review: { ...gitReviewSample, branch: text, decision: "approve_without_evidence", outcome: "refused", reason: text, decidedAt: 2000 } },
@@ -180,7 +182,7 @@ it.live("uses real handlers for ownership, project inheritance, team groups, and
 it.live("refuses duplicate project names and invalid repository, workspace, sprint, and task links", () => provideBoard(rig, Effect.gen(function* () {
   const f = yield* foundation()
   yield* launchSettings()
-  const create = { name: "CONSOLE", goal: "", repository: { _tag: "existing", repoId: f.repoId }, machineId: "local", useWorktree: false }
+  const create = { name: "CONSOLE", goal: "", repository: { _tag: "existing", repoId: f.repoId }, machineId: "local", useWorktree: true }
   expect(failureOf(yield* call(owner, "project.create", create))?.reason).toContain("name already exists")
   expect(failureOf(yield* call(owner, "project.create", { ...create, name: "Other", repository: { _tag: "existing", repoId: "missing" } }))).toBeDefined()
   expect(failureOf(yield* call(owner, "project.create", { ...create, name: "Other", machineId: "missing" }))).toBeDefined()
@@ -256,7 +258,7 @@ it.live("serves project commands through the authenticated typed client API with
   expect((yield* Effect.promise(() => upgradeStatus(socket, ancestryHeaders()))).status).toBe(401)
   const api = yield* connect(socket, bearer)
   yield* launchSettings()
-  const payload = { requestId: freshRequest(), name: "Wire project", goal: "A real API record", repository: { _tag: "existing" as const, repoId: f.repoId }, useWorktree: false, machineId: "local" }
+  const payload = { requestId: freshRequest(), name: "Wire project", goal: "A real API record", repository: { _tag: "existing" as const, repoId: f.repoId }, useWorktree: true, machineId: "local" }
   const created = yield* api["project.create"](payload)
   const invalidCursor = yield* api["project.read"]({ requestId: freshRequest(), projectId: created.projectId, collection: "projects", after: "missing" }).pipe(Effect.result)
   expect(invalidCursor._tag === "Failure" && invalidCursor.failure.reason).toBe("invalid cursor")
@@ -444,4 +446,18 @@ it.live("bounds filtered and exhausted pages for every project helper consumer a
     expect(denied._tag === "Failure" && denied.failure.reason).toBe("command refused")
   }
   expect(yield* pageDurability).toEqual(before)
+})).pipe(Effect.orDie))
+
+it.live("issue 580: even stopped projects cannot claim a different workspace before machine pairing", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* foundation()
+  success(yield* call(owner, "stop", { agentId: "worker" }))
+  success(yield* call(owner, "stop", { agentId: "sibling" }))
+  success(yield* call(owner, "stop", { agentId: "lead" }))
+  const path = join(rig.root, "other-checkout")
+  git(rig.work, "worktree", "add", "-b", "other", path)
+  const alternate = success(yield* call(owner, "project.workspace.register", { repoId: f.repoId, path, branch: "other", machineId: "local", checkout: "worktree" })).worktreeId
+  const before = projectView(yield* snapshot)
+  expect(failureOf(yield* call(owner, "project.place", { projectId: f.projectId, worktreeId: alternate }))?.reason).toBe("project placement cannot change before machine pairing")
+  expect(projectView(yield* snapshot)).toEqual(before)
+  success(yield* call(owner, "project.place", { projectId: f.projectId, worktreeId: f.worktreeId }))
 })).pipe(Effect.orDie))

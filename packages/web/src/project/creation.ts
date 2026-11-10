@@ -40,7 +40,8 @@ const initial = (): CreationState => ({ draft: { name: "", goal: "", machineId: 
 const correctable = new Set(["project name already exists in this repository", "name is invalid after redaction",
   "only the confirmed local machine can start a project", "configure the workspace folder before creating a project",
   "no ready signed-in lead account is available", "invalid lead defaults", "repository location not found",
-  "repository is unavailable", "main repository checkout is required", "main repository checkout needs a named branch",
+  "repository is unavailable", "main repository checkout is required",
+  "check out main or master in the main repository checkout before creating a project",
   "a path cannot contain a registered secret"])
 
 // These are the real paged RPC replies. No partial page establishes absence.

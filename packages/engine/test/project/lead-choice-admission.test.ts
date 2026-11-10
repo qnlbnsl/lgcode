@@ -35,7 +35,7 @@ const setup = () => Effect.gen(function* () {
   success(yield* call(owner, "accounts", { operation: "add", account: { id: "ready", harness: "cursor", enabled: true } }))
   success(yield* call(owner, "accounts set-secret", { accountId: "ready", name: "CURSOR_API_KEY", nonce: freshRequest(), value: Redacted.make("synthetic-choice-admission-credential") }))
   return { requestId: freshRequest(), name: "Choice admission", goal: "Use valid launch choices", machineId: "local",
-    repository: { _tag: "new", name: "Choice repo" }, useWorktree: false }
+    repository: { _tag: "new", name: "Choice repo" }, useWorktree: true }
 })
 const noCreation = (runner: FakeRunner) => Effect.gen(function* () {
   const view = projectView(yield* snapshot)

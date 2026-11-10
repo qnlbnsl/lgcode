@@ -207,30 +207,30 @@ it("confirms archive, retains an unfinished archive identity, and restores witho
   expect(restore).toHaveBeenCalledTimes(1)
 })
 
-it("keeps placement disabled while the project has active agents", async () => {
+it.each(["working", "stopped"] as const)("keeps placement and retry disabled with pairing tooltips and no request for %s agents", async (state) => {
   history.replaceState(null, "", "/#/service/machines?project=project")
   const data = baseData()
-  mock.data = { ...data, navigation: { ...data.navigation!, agents: [{ agentId: "lead", projectId: "project", status: "Working" }] },
-    snapshot: { ...snapshot, agents: [{ agentId: "lead", state: { _tag: "working" }, capacityHeld: true }] } }
+  mock.data = { ...data, navigation: { ...data.navigation!, agents: [{ agentId: "lead", projectId: "project", status: state }] },
+    snapshot: { ...snapshot, agents: [{ agentId: "lead", state: { _tag: state }, capacityHeld: state === "working" }] } }
   const place = vi.fn(ack)
   mock.client = { "project.place": place }
   const { element } = await render(<Machines onSessionExpired={vi.fn()} />)
-  expect(element.querySelector<HTMLSelectElement>("select")!.disabled).toBe(true)
-  expect(element.textContent).toContain("Stop the project’s agents first")
-  expect(element.textContent).toContain("1 held")
-  expect(place).not.toHaveBeenCalled()
-})
-
-it("focuses a stopped project's placement and uses the exact local workspace identity", async () => {
-  history.replaceState(null, "", "/#/service/machines?project=project")
-  const place = vi.fn((_payload: unknown) => ack())
-  mock.client = { "project.place": place }
-  const { element } = await render(<Machines onSessionExpired={vi.fn()} />)
+  expect(document.activeElement).toBe(element.querySelector("tr[data-placement=project]"))
   const select = element.querySelector<HTMLSelectElement>("select")!
-  expect(document.activeElement).toBe(select)
-  await act(async () => { select.value = "inspected"; select.dispatchEvent(new Event("change", { bubbles: true })) })
-  expect(place).toHaveBeenCalledWith(expect.objectContaining({ projectId: "project", worktreeId: "inspected" }))
-  expect((mock.data as ShellData).retry).toHaveBeenCalledTimes(1)
+  const retry = button(element, "Retry same placement")!
+  expect(select.disabled).toBe(true)
+  expect(retry.disabled).toBe(true)
+  for (const control of [select, retry]) expect(control.title).toBe("Moving a project to another machine waits for machine pairing.")
+  await act(async () => {
+    select.dispatchEvent(new Event("change", { bubbles: true }))
+    retry.click()
+    retry.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+  })
+  expect(element.textContent).toContain("/repo/.worktrees/field")
+  expect(element.textContent).not.toContain("/repo/.worktrees/other")
+  expect(element.textContent).toContain("requires machine pairing, which is not available yet")
+  expect(element.textContent).toContain(`${state === "working" ? 1 : 0} held`)
+  expect(place).not.toHaveBeenCalled()
 })
 
 it("permanently dismisses the waiting-request offer only after an acknowledged command", async () => {

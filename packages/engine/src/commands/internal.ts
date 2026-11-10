@@ -22,6 +22,8 @@ export type Snapshot = Effect.Success<Context.Service.Shape<typeof Views>["snaps
 export type Agent = Snapshot["agents"][string];
 
 export class CommandRefused extends Data.TaggedError("CommandRefused")<{ readonly reason: string }> {}
+// This is a transport failure, never a durable refusal receipt.
+export class CommandUncertain extends CommandRefused {}
 export const refused = (reason = "command refused") => new CommandRefused({ reason });
 
 export interface Runtime {

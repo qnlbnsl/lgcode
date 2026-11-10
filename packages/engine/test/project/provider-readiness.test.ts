@@ -36,7 +36,7 @@ const setup = () => Effect.gen(function* () {
   success(yield* call(owner, "project.settings.set", { settings: { workspaceFolder: rig.root, shell: "zsh" } }))
   const repoId = success(yield* call(owner, "project.repository.add", { name: "Product", path: rig.work, machineId: "local" })).repoId
   return { requestId: freshRequest(), name: "Credential admission", goal: "Choose a ready provider", machineId: "local",
-    repository: { _tag: "existing", repoId }, useWorktree: false }
+    repository: { _tag: "existing", repoId }, useWorktree: true }
 })
 const selected = (runner: FakeRunner, provider: string, id: string) => Effect.gen(function* () {
   expect(runner.callsOf("start")).toHaveLength(1)

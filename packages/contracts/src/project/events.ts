@@ -1,11 +1,15 @@
 import * as Schema from "effect/Schema"
-import { GitEvidence, GitMainReview } from "./git.ts"
+import { GitAttempt, GitEvidence, GitMainReview } from "./git.ts"
 import { CreationFolderIdentity, OwnerTaskNotification, Project, ProjectCreation, ProjectId, ProjectName, ProjectSettings, ProjectStage, ProjectText, Repository, RepositoryLocation, Sprint, SprintId, Task, TaskId, TaskState, Team, Workspace } from "./schema.ts"
 
 import { ProjectMockEvent } from "./mocks.ts"
 import { ProjectDesignEvent } from "./design.ts"
 
 export const ProjectEvent = Schema.Union([
+  Schema.TaggedStruct("project.GitAttempted", { attempt: GitAttempt }),
+  Schema.TaggedStruct("project.GitFinished", { caller: GitAttempt.fields.caller, operationRequestId: GitAttempt.fields.requestId,
+    outcome: Schema.optionalKey(Schema.Literal("uncertain")),
+    refusal: Schema.optionalKey(Schema.Literals(["conflicts", "push_rejected", "pull_diverged", "network_failed", "authentication_required"])) }),
   Schema.TaggedStruct("project.GitEvidenceReported", { report: GitEvidence }),
   Schema.TaggedStruct("project.MainReviewOpened", { review: GitMainReview }),
   Schema.TaggedStruct("project.MainReviewDecided", { review: GitMainReview }),

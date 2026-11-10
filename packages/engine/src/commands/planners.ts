@@ -34,9 +34,12 @@ const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan
   if (commandOutcome(agent.state._tag, name) === "refused") return yield* refused();
   return yield* plan(input, payload);
 });
+export const promptPlanner = (files?: import("../project/context.ts").ContextFiles): Planner => targeted("prompt", (input, payload) => prompt(input, payload as Payload<"prompt">, files));
 export const planners = {
-  "project.create": createProject,
-  "project.archive": archiveProject,
+  // Lifecycle can be the first import in this cyclic service graph. Resolve
+  // its const planners at invocation, after module initialization completes.
+  "project.create": (input, payload) => createProject(input, payload),
+  "project.archive": (input, payload) => archiveProject(input, payload),
   "client.web.settings.set": setWebSettings,
   "roles.role-file.set": (input, payload) => setRoleFile(input, payload as Payload<"roles.role-file.set">),
   // Their implementation units replace these refusals; each declared command
@@ -47,7 +50,7 @@ export const planners = {
   release: (input, payload) => release(input, payload as Payload<"release">),
   configure: (input, payload) => configure(input, payload as Payload<"configure">),
   start: (input, payload) => start(input, payload as Payload<"start">),
-  prompt: targeted("prompt", (input, payload) => prompt(input, payload as Payload<"prompt">)),
+  prompt: promptPlanner(),
   answer: (input, payload) => answer(input, payload as Payload<"answer">),
   "pass-up": (input, payload) => passUp(input, payload as Payload<"pass-up">),
   ask: (input, payload) => ask(input, payload as Payload<"ask">),

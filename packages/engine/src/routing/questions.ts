@@ -1,5 +1,4 @@
-import { questionLinks, linkedTask } from "../project/decisions.ts";
-import { own, projectView } from "../project/view.ts";
+import { questionLinks, linkedTask, canChangeLinkedTask } from "../project/decisions.ts";
 import { senderOf } from "../routing/envelope.ts";
 import { randomUUID } from "node:crypto";
 import { QuestionId } from "@lgcode/contracts";
@@ -30,12 +29,11 @@ export const answerQuestion = (
   const row = snapshot.questions[payload.id];
   if (row === undefined || row.status !== "open" || !mayActForHolder(snapshot, actor, row.holder)) return Effect.fail(refused());
   const task = linkedTask(snapshot, row);
-  if (row.projectId !== undefined && row.taskId !== undefined && (task === undefined
-    || own(projectView(snapshot).agentProjects, row.agentId) !== row.projectId)) return Effect.fail(refused("invalid question links"));
+  const mayFinishTask = task !== undefined && canChangeLinkedTask(snapshot, row.agentId, task);
   const deliveryId = freshDelivery();
   return Effect.succeed({ events: [{
     _tag: "QuestionAnswered", agentId: row.agentId, questionId: payload.id, answeredBy: actor, text: payload.text, deliveryId,
-  }, ...(task === undefined || task.state === "done" ? [] : [{ _tag: "project.TaskChanged" as const,
+  }, ...(!mayFinishTask || task.state === "done" ? [] : [{ _tag: "project.TaskChanged" as const,
     projectId: task.projectId, taskId: task.taskId, state: "done" as const, note: "Linked question answered" }]), ...withdrawQueued(snapshot, row.deliveryId), {
     _tag: "DeliveryQueued", delivery: {
       id: deliveryId, target: row.agentId, sender: senderOf(actor), source: { _tag: "question", id: payload.id },

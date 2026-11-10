@@ -225,3 +225,46 @@ it.live("multiple blockers prevent sprint completion, and bounded history keeps 
   expect((yield* readLog).filter((row) => row.event._tag === "project.TaskChanged" && row.event.taskId === taskId && row.event.state === "done")).toHaveLength(1)
   success(yield* call(f.leadCredential, "project.sprint.complete", complete))
 })).pipe(Effect.orDie))
+
+
+it.live("issue 577: another worker cannot link a task; task owner and project lead can", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
+  const f = yield* decisionSetup()
+  const leadTask = yield* createTask(f, { owner: f.leadId })
+  const before = (yield* readLog).filter((row) => row.event._tag === "QuestionAsked")
+  expect(failureOf(yield* call(f.workerCredential, "ask", { text: "Finish somebody else's task", taskId: leadTask }))?.reason).toBe("invalid question links")
+  expect((yield* readLog).filter((row) => row.event._tag === "QuestionAsked")).toEqual(before)
+  expect(yield* taskState(f.projectId, leadTask)).toBe("active")
+  const ownTask = yield* createTask(f)
+  for (const [credential, taskId] of [[f.workerCredential, ownTask], [f.leadCredential, leadTask]] as const) {
+    const question = success(yield* call(credential, "ask", { text: "Finish authorized task", taskId }))
+    success(yield* call(owner, "answer", { kind: "question", id: question.questionId, text: "Done" }))
+    expect(yield* taskState(f.projectId, taskId)).toBe("done")
+  }
+})).pipe(Effect.orDie))
+
+it.live("issue 592: a reassigned linked task receives the answer without unauthorized completion or a stuck blocker", () => provideBoard(rig, Effect.gen(function* () {
+  yield* registerRebuildCheck()
+  const f = yield* decisionSetup(), taskId = yield* createTask(f)
+  const question = success(yield* call(f.workerCredential, "ask", { text: "Choose", taskId }))
+  success(yield* call(f.leadCredential, "project.task.update", { projectId: f.projectId, taskId, owner: f.leadId }))
+  expect(yield* taskState(f.projectId, taskId)).toBe("blocked")
+  const request = { requestId: freshRequest(), kind: "question", id: question.questionId, text: "Answer answer-secret-value" }
+  expect(failureOf(yield* call(f.workerCredential, "answer", request))).toBeDefined()
+  const before = yield* readLog
+  const result = success(yield* call(f.leadCredential, "answer", request))
+  expect(success(yield* call(f.leadCredential, "answer", request))).toEqual(result)
+  const written = (yield* readLog).slice(before.length)
+  expect(written.filter((row) => row.event._tag === "QuestionAnswered")).toHaveLength(1)
+  expect(written.filter((row) => row.event._tag === "project.TaskChanged")).toEqual([])
+  expect(JSON.stringify(written)).not.toContain("answer-secret-value")
+  const state = yield* snapshot
+  expect(state.questions[question.questionId]).toMatchObject({ status: "answered", answer: "Answer [REDACTED]" })
+  expect(projectView(state).tasks[projectKey(f.projectId, taskId)]).toMatchObject({ owner: f.leadId, state: "active" })
+  expect(yield* taskState(f.projectId, taskId)).toBe("active")
+  const history = success(yield* call(owner, "project.task.history", { projectId: f.projectId, taskId })).items
+  expect(history.find((row: any) => row.title === "Question answered")).toMatchObject({ state: "active" })
+  expect((yield* readLog).filter((row) => row.requestId === request.requestId && row.event._tag === "QuestionAnswered")).toHaveLength(1)
+  const sql = yield* SqlClient.SqlClient
+  expect(yield* sql`SELECT request_id FROM receipts WHERE caller = ${`agent:${f.leadId}`} AND request_id = ${request.requestId}`).toHaveLength(1)
+}), ["answer-secret-value"]).pipe(Effect.orDie))

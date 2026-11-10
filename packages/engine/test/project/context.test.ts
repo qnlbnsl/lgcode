@@ -309,3 +309,36 @@ for (const actor of ["owner", "member"] as const) {
     }), ["context-secret-value"]).pipe(Effect.orDie))
   }
 }
+
+for (const actor of ["owner", "member"] as const) it.live(`issue 582: bounds the complete ${actor} context search reply`, () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup(), api = actor === "owner" ? f.api : f.member
+  const payload = { projectId: f.projectId, worktreeId: f.worktreeId, query: "" }
+  const before = yield* readLog
+  const result = yield* run(api, "project.context.search", payload)
+  expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThanOrEqual(256 * 1024)
+  expect(yield* refuse(run(api, "project.context.search", { ...payload, requestId: '"'.repeat(140_000) }))).toBe("context reply exceeds the read budget")
+  expect(yield* readLog).toEqual(before)
+}), ["context-secret-value"]).pipe(Effect.orDie))
+
+it.live("issue 586/589: confines context files for both callers while only agent Git reads exclude credential names", () => provideBoard(rig, Effect.gen(function* () {
+  const f = yield* setup()
+  for (const path of [".env", ".env.production", "auth.json", ".credentials.json", "oauth_creds.json", ".ssh/config", ".aws/credentials", ".codex/config.toml"]) {
+    mkdirSync(dirname(join(rig.work, path)), { recursive: true })
+    writeFileSync(join(rig.work, path), "Synthetic credential-shaped file\n")
+    expect(Schema.is(ContextPath)(path)).toBe(false)
+    for (const api of [f.api, f.member]) {
+      const found = yield* run(api, "project.context.search", { projectId: f.projectId, worktreeId: f.worktreeId, query: path, scope: "files" })
+      expect(JSON.stringify(found)).not.toContain(`"path":"${path}"`)
+      const reply = yield* run(api, "project.diff", { projectId: f.projectId, worktreeId: f.worktreeId, path }).pipe(Effect.result)
+      expect(reply._tag).toBe(api === f.member ? "Failure" : "Success")
+    }
+  }
+  writeFileSync(join(rig.work, "file.txt"), "Confined safe diff\n")
+  for (const api of [f.api, f.member]) {
+    const reply = yield* run(api, "project.diff", { projectId: f.projectId, worktreeId: f.worktreeId, path: "file.txt" })
+    expect(JSON.stringify(reply)).toContain("Confined safe diff")
+    const aggregate = yield* run(api, "project.diff", { projectId: f.projectId, worktreeId: f.worktreeId })
+    expect(JSON.stringify(aggregate)).toContain("Confined safe diff")
+    if (api === f.member) expect(JSON.stringify(aggregate)).not.toContain("Synthetic credential-shaped file")
+  }
+}), ["context-secret-value"]).pipe(Effect.orDie))

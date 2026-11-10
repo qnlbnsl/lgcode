@@ -10071,3 +10071,271 @@ The remote-run target still syncs first, which replaces changes made only in the
 The documentation now states that order explicitly.
 Local controls exercise compound commands, quotes, newlines, shell expansion, failure propagation and remote-only output using a local stand-in for SSH.
 They also verify that tracked and untracked .env files are excluded while .env.example remains eligible for copying.
+
+## 575. A Git effect could be followed by a durable false refusal
+
+A merge or commit can finish before the outcome transaction fails.
+Git mutations now use a typed attempt in the existing event log, followed by a short outcome transaction.
+An attempt preserves the exact caller, request, body hash, workspace, and pre-effect Git identities without storing a raw message or payload.
+A prior unresolved attempt takes precedence over later failed admission.
+An uncertain outcome has no success or refusal receipt, and the normal writer failure latch remains mandatory.
+The original signed correction reconciled the durable reviewed pair only when both reviewed heads were ancestors of the actual registered destination.
+A divergent reviewed source need not descend from the reviewed base.
+Its commit reconciliation compared the frozen index tree, intended retry message, branch, and complete parent set, including a pending merge parent.
+Issue 596 retires these retry branches in favor of terminal uncertainty; a fresh owner approval keeps the actual two-ancestor containment proof.
+The original equivalent-state failure remains preserved separately from actual post-merge SQL failure tests.
+The first bounded corrected run passed fast-forward and divergent post-effect failure controls.
+The signed 75f48a8 source passed its actual full check: 7,532 tests, two skips, 500 files, and 20 browser tests, with recursive and root typing and credits passed.
+The independent round-one review remains Grade 6, with no blockers, three majors, four minors, and no flags.
+Issue 590 records the subsequent reply and cleanup correction, whose signed 27e38c85 source passed its full check.
+The Grade 7 review remains preserved; current corrections in issues 595–598 await independent re-check.
+
+## 576. A new project repository lacked a usable main destination
+
+An unborn main checkout cannot serve as the reviewed destination for a project's first commit.
+New project repository creation now writes an empty initial main commit and records its main workspace.
+The initial commit contains no user files.
+The owner approved requiring a dedicated worktree for every project on 2026-11-09.
+The dialog has no worktree checkbox and always previews Branch and Folder.
+Engine creation and preview refuse useWorktree=false before effects.
+Unfinished main-checkout intents remain readable and reserved, but cannot resume effects.
+Main remains recorded separately for owner review and approval.
+The original pre-decision full failure is preserved.
+The dedicated-worktree engine correction passed the 328-case affected run and the full check on signed 75f48a8.
+The original dialog author owns its checkbox-removal overlay at composition.
+The independent review found the existing-checkout branch gap recorded in issue 591; acceptance remains pending.
+
+## 577. A linked question could finish another worker's task
+
+Linked question admission now requires the task owner or the project's lead.
+Completion checks that authority again against the current task owner and project membership.
+Holding or answering the question does not grant authority over its linked task.
+The first bounded corrected run passed another-worker refusal and own-task and lead controls.
+Cross-project, reassignment, and rebuild coverage are retained or extended in this unit.
+
+## 578. A failed creation had no way to release its durable reservation
+
+The owner-only project.creation.abandon command finishes a recorded creation intent without changing the filesystem.
+The command shares the lifecycle lane so abandonment cannot race an active creation.
+The typed client, command-line interface, and Model Context Protocol inventories include the command's access decision.
+The command adds no visible control to the mock.
+Interrupted-creation and replaced-folder safety checks remain required.
+
+## 579. A slow Git mutation could hold the global writer
+
+Git mutations now take a request lane, perform a short writer preflight, run Git under the existing runtime gate outside the writer, and record the outcome in a short transaction.
+The runtime gate remains the only Git queue.
+No Git gate holder acquires the SQL writer.
+The original 250 millisecond negative observation remains limited evidence.
+The corrected bounded regression passed an actual independent writer operation while a real Git merge child remained held at a controlled barrier.
+Registration, creation planning and final verification, Design recording, mock recording and approval, and file-context preparation now also observe Git outside the writer.
+Their final admissions rerun against current state instead of appending an old prepared event plan.
+Separate stale-binding, revision, access and recipient controls, and a queued-registration and creation barrier regression have been written for these additional paths.
+The unit 4 bounded run passed the queued-registration and creation barrier, including a positive independent writer completion while real Git remained held.
+It also passed 19 stale-state controls.
+Four new Design controls failed with a generic refusal.
+Two preserved narrow diagnostics traced that refusal to missing Design planner and read registrations in the handler maps, despite complete source maps, remote procedure declarations, and access entries.
+The eager maps captured an incomplete module cycle under the Design-first import graph.
+Both maps now initialize lazily once, retaining their exact contents and stable identities.
+The corrected bounded run passed all 23 observation controls and all five fresh child import orders, and recursive and root typing passed.
+The same run retained one architecture failure for two direct caller-encoder imports from the log module.
+The caller encoder now has one writer-free identity module used directly by all consumers.
+Git attempt writer orchestration now belongs to commands rather than the project piece.
+The boundary correction and joined current Machines and guidance contracts passed the 147-case affected run and full verification on signed 75f48a8.
+Future W10B guidance rendering was not joined and remains unproved.
+These results do not establish a universal runtime separation claim.
+
+The first full check exposed a same-request start/stop regression because the request lane covered runner setup and stop settlement.
+The handler now releases that lane before a non-process continuation, while process commands retain request-before-process ownership through cleanup.
+Lifecycle ownership comes first, and archive members are acquired after the request lane.
+The original five-second start oracle and Git uncertainty controls are unchanged.
+New overlap controls exercise both archive and stop ownership orders, with positive member-lane acquisition after a recorded stop attempt.
+The lane correction passed the 328-case affected run, including all eight original start/setup cases and both overlap controls.
+The subsequent full check passed on signed 75f48a8.
+Independent round-one review found no lock-order defect; correction-unit acceptance remains pending.
+
+## 580. Placement could claim an unsupported workspace move
+
+A project.place request that changes its workspace or machine now refuses until machine pairing exists.
+The Machines page now displays the assigned checkout without offering another checkout as an available move.
+It explains that changing placement requires unavailable machine pairing.
+Its source was joined onto the independently accepted foundation cb049eae before editing.
+Static installation and login guidance now lives in one typed page module, with the existing visible text preserved.
+The discovery contract and engine return runtime facts instead of static page guidance.
+The current frontend and guidance contracts passed their affected checks and the full check on signed 75f48a8.
+The owner subsequently required disabled placement and retry controls with pairing hover advice, so this correction restores those controls without request handlers.
+The new control source still needs its own verification and independent re-review.
+The static helper remains for W10B; later rendering is not claimed.
+
+## 581. Recording mocks could bypass stage authority
+
+A mocks command that changes the project stage now uses the same lead-or-owner authority as an explicit stage change.
+A member can still record a revision that leaves the stage unchanged.
+Owner approval retains its existing authority.
+
+## 582. Context search bounded its result but not its complete reply
+
+Context search retains its exact 64 kibibyte result limit and truthful truncation flag.
+It now checks the complete owner or member reply, including the request identity and member data wrapper, against 256 kibibytes.
+An oversized wrapper receives a fixed safe refusal without changing read marks.
+
+## 583. Creation used independent and stacked Git queues
+
+Creation now uses the runtime's shared Git service through its existing gate.
+The private queue inside each Git service has been removed.
+Both prospective placement observations and final checkout verification run before their short admission transactions.
+The final creation admission rechecks its durable intent, settings, registered placements, reservations, collisions and current lead before planning the launch.
+Creation filesystem witnesses remain because interrupted mkdir and replaced-folder ownership must still be proven before adopting an existing folder.
+Abandonment releases only the durable reservation and never removes a witness, checkout, branch, or user file.
+
+## 584. Restart could resume a member of an unfinished archive
+
+Restart now attempts to finish durable archive intents before it considers reloading agents.
+An archive that cannot finish remains visibly unfinished.
+Paused and interrupted agents whose project is archiving or archived are excluded from automatic reload and account recovery.
+The reload input check also enforces this rule.
+
+## 585. Network Git shared the short read subprocess timeout
+
+Explicit fetch, pull, and push now use a separate bounded network subprocess timeout.
+Local read subprocess limits remain short.
+Cancellation still reaps the child process group and never deletes a lock without proving ownership.
+A possible mutation followed by timeout remains uncertain under issue 575.
+
+## 586. Credential filenames were filtered inconsistently
+
+The original correction shared the credential-name predicate across repository artifacts, context references, and Git paths.
+Independent review found that applying it to every Git path also blocked owner mutations and whole-result reads; issue 589 records that correction.
+Containment, symlink, nested-repository, redaction, and complete reply limits remain enforced.
+Real confined safe-file and owner/member refusal controls are required before delivery.
+
+## 587. Repository configuration runs with the owner's Unix authority
+
+LGcode is a local program for one owner.
+An owner-controlled repository can configure Git content filters or merge drivers that run as that same Unix user.
+The current security boundary accepts that repository-configuration scope.
+This unit documents the limit and does not claim to sandbox owner-controlled Git configuration or introduce a different threat model.
+
+
+## 588. Aggregate untracked patches repeated full status scans
+
+The original Git author isolated a recursive aggregate diff call that repeated HEAD and status reads for every untracked file.
+The manager supplied that paused author's exact two-file patch for the shared correction in this unit.
+Both owner and filtered agent aggregates now reuse one complete status snapshot and one HEAD observation, then use the same bounded direct no-index patch per admitted untracked file.
+Literal paths, binary flags, full text statistics, byte and entry bounds, symlink checks and agent exclusions remain consequential in the adopted real process-count controls.
+This is one canonical correction, shared with issue 598; its new proof and independent re-check remain pending.
+
+## 589. Credential-name exclusion blocked owner Git operations and whole agent reads
+
+The round-one independent review found that the credential-name predicate was inside the shared literal Git path validator.
+Owner stage, unstage and discard operations consequently refused ordinary tracked credential-shaped filenames.
+Aggregate diffs also failed instead of omitting excluded agent-visible files.
+The correction keeps ordinary owner literal path rules and applies the shared predicate before actual agent-visible file and patch reads.
+Agent working, staged, committed and review aggregates omit excluded entries, including renames with an excluded side.
+Context and artifact exclusions, containment, symlink checks, redaction and reply budgets remain.
+Consequential owner mutation and agent read controls passed on that signed source.
+The full check on signed 27e38c85, exact source 6b6cd964, passed recursive/root typing, 7,565 tests across 500 files with two skips, all 20 browser cases, and credits.
+The original Grade 6 and later Grade 7 reviews remain preserved; the current whole-unit correction and independent re-check remain pending.
+
+## 590. Git failures lost known reasons and uncertain attempts accumulated
+
+The original attempt marker treated every failure after a subprocess started as uncertain.
+The reply asked for an identical retry even when no positive reconciliation was supported.
+The correction preserves fixed conflicts, rejected push, diverged pull and refused-remote reasons only when actual Git evidence establishes them.
+Those determinate outcomes have ordinary durable refusals or explicit refused review outcomes and replay without another mutation.
+Timeout, cancellation and lost outcome transport remain unknown.
+Issue 595 records the later review finding that the initial determinate classifier was too broad after local partial effects; its correction is not credited to the prior full pass.
+The fixed unknown reply is “Git outcome is uncertain; refresh Git state”.
+A successful actual Git state read with a pending attempt holds the workspace operation lane before observing Git, then takes each original request lane before a short writer transaction.
+Ordinary reads without a pending attempt keep only the shared Git gate, as issue 597 requires.
+Current workspace, root, placement and caller access are checked again before cleanup.
+The existing GitFinished event carries an optional uncertain outcome, and the existing receipt preserves the original caller, request and body hash.
+Its bounded optional refusal enum preserves the five known Git outcome codes across replay while ordinary refusal prose stays redacted.
+The old request remains terminal uncertainty after cleanup and restart; it cannot execute again or claim success or refusal.
+A failed or stale read leaves the attempt unchanged, and a live mutation cannot be closed by a queued refresh.
+The project piece remains free of writer orchestration, and no Git gate is acquired under the writer.
+The original crash, ancestry, writer-latch and open-review controls remain, with new cleanup, binding and authority controls written.
+The full check on signed 27e38c85, exact source 6b6cd964, passed recursive/root typing, 7,565 tests across 500 files with two skips, all 20 browser cases, and credits.
+The original Grade 6 and later Grade 7 reviews remain preserved; the current whole-unit correction and independent re-check remain pending.
+
+## 591. Existing repository creation could persist a feature branch as main
+
+Creation previously recorded the main checkout's current branch without requiring main or master.
+The review route then refused that permanent destination even after an external branch switch.
+Creation and preview now require main or master before a new intent or filesystem effect, and saved intents are checked before resumed effects.
+Final main-state observation also refuses a non-main destination.
+The exact actionable pre-effect reason is “check out main or master in the main repository checkout before creating a project”.
+An initial branch refusal enters current final admission and receives a terminal receipt only while no intent exists; unfinished-intent and unavailable-account retries keep their existing policy.
+The New project controller's original author will consume this fixed reason directly at composition; no peer controller is edited here.
+First-main initialization, dedicated worktrees, intent ownership, receipt identity and owner review remain.
+The full check on signed 27e38c85, exact source 6b6cd964, passed recursive/root typing, 7,565 tests across 500 files with two skips, all 20 browser cases, and credits.
+The original Grade 6 and later Grade 7 reviews remain preserved; the current whole-unit correction and independent re-check remain pending.
+
+## 592. Task reassignment left a valid linked question permanently open
+
+An answer previously refused when the original asker no longer had authority over the linked task.
+The new task owner then remained blocked by that open question.
+A valid holder answer now closes the question and delivers its redacted answer normally.
+Only the TaskChanged completion event is omitted when the original asker lacks current task authority.
+The task's projected state and answer history preserve that distinction.
+Holder checks, atomic delivery, terminal receipt and authorized task completion remain.
+The full check on signed 27e38c85, exact source 6b6cd964, passed recursive/root typing, 7,565 tests across 500 files with two skips, all 20 browser cases, and credits.
+The original Grade 6 and later Grade 7 reviews remain preserved; the current whole-unit correction and independent re-check remain pending.
+
+## 593. Git process-wrapper tests are sensitive to host load
+
+The independent Opus round-one review observed eight default five-second timeouts in main-review.test.ts at a load near 39 on 38 processors.
+All 31 cases passed when the reviewer separately used a 60-second timeout.
+That is attributed reviewer evidence, not a builder rerun or a passing result at the original timeout.
+The wrappers start a Node.js process for each Git call.
+This unit records the sensitivity without increasing timeouts, rewriting wrappers broadly or running a loaded local full.
+Original failures, original timeouts and the lightly loaded remote full proof remain preserved.
+
+
+## 595. Broad failure text marked partial Git effects as determinate
+
+The Grade 7 re-review found that local permission errors and mixed-reference fetch failures could acquire a known refusal after Git had changed files or references.
+Local process failures now remain conservative and never map permission text to authentication_required.
+Only explicit fetch, pull and push boundaries can classify constrained remote refusal evidence; push rejection is specific to push, and pull divergence uses its exact terminal diagnostic.
+Conflict admission still requires both MERGE_HEAD and actual unmerged entries.
+Real partial fast-forward merge, pull permission, mixed-reference fetch and main-approval controls retain actual changed bytes/references and uncertainty without a durable refusal or successful review decision.
+Implementation and controls are written; new proof and independent re-check remain pending.
+
+## 596. Refresh made the old reconciliation branches mostly unreachable
+
+The state refresh policy clears attempts into terminal uncertainty, so commit and approval reconciliation on identical retry added a parallel policy that the page rarely reached.
+Those retry reconciliation branches are retired.
+An old attempt returns uncertainty before and after refresh, while exact caller, command and body reservations survive rebuild.
+A new owner approval request still uses the existing actual two-ancestor containment proof without another Git merge.
+The read comment now documents terminal uncertainty receipts.
+The actual post-Git SQL failure, writer latch, parent/ancestry and open-review controls remain, with expectations updated to this simpler policy.
+New proof and independent re-check remain pending.
+
+## 597. Ordinary Git state reads unnecessarily queued for mutation lanes
+
+The state-read cleanup originally acquired a workspace operation lane even when no pending attempt existed.
+It now observes current authority and workspace identity, then takes that lane only if the current workspace has a pending attempt.
+The ordinary path retains the shared runtime Git gate and does not clean up attempts that started after its check.
+The pending path retains current binding/access admission, original request lanes and short writer settlement after Git observations.
+A positive ordinary-read overlap and the existing real held-Git pending-refresh controls cover the two paths without changing deadlines.
+New proof and independent re-check remain pending.
+
+## 598. Filtered review patches omitted bounded files without marking truncation
+
+An agent review selected paths from its bounded file list but did not mark the resulting patch truncated when that list omitted files.
+Its diff now reports truncation whenever the filtered file list is truncated, while owner aggregate range behavior remains.
+Its aggregate working-read cost is the same status-rescan defect as issue 588 and uses that one supplied canonical correction.
+New bounded review and adopted literal-path/process-count/binary/size/symlink controls preserve credential filtering and reply limits.
+New proof and independent re-check remain pending.
+
+## 600. Common remote authentication refusals conservatively remain uncertain
+
+Found: 2026-11-10, in the independent Opus check of the whole flow-fix unit.
+State: open, accepted as a minor safe-side limitation.
+
+A common SSH public-key refusal includes multiple diagnostic lines.
+An HTTPS server can also prefix its authentication refusal with a server message.
+The strict pre-effect grammar does not recognize these complete shapes, so they report terminal uncertainty rather than authentication_required.
+The manager accepted the reviewed unit at Grade 8, with no blockers, majors or flags.
+The classifier stays conservative in this change.
+Any later widening must prove exact pre-effect refusal shapes without treating local partial effects as authentication failures.

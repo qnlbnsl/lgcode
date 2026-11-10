@@ -50,7 +50,8 @@ visibility and snapshot section.
 ### The records
 
 A project has an id, a repository, a name, a goal, a lead agent, an assigned branch,
-a folder, a checkout type of worktree or main, a machine and a preferred shell. A name
+a dedicated worktree folder, a machine and a preferred shell. The repository main
+checkout is recorded separately as the owner’s review destination. A name
 is unique within its repository, ignoring case.
 
 A team has an id, a project and a name. Its agents are the agents that carry the group
@@ -124,9 +125,12 @@ A small engine service runs git on the machine that holds the workspace. It retu
 Every reply has a size limit, and a large diff says it was cut. These are reads, so
 nothing is stored.
 
-`project.create` makes the worktree when Start work tree is ticked. A safe form of the
-name becomes the branch and the folder `<repository>/.worktrees/<name>`, and a collision
-adds a number. Git's failures reach the page in a fixed form that the owner can act on.
+`project.create` always makes a dedicated worktree for the project. There is no worktree
+checkbox. The dialog always previews Branch and Folder. A safe form of the name becomes
+the branch and the folder `<repository>/.worktrees/<name>`, and a collision adds a number.
+The lead never works in the main checkout. The repository main checkout remains recorded
+for the owner’s review and approval. Git's failures reach the page in a fixed form that
+the owner can act on.
 
 This reverses the engine design's line that git worktrees stay out of the engine. The
 owner's mock now asks for it.

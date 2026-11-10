@@ -25,6 +25,7 @@ import * as RpcSerialization from "effect/rpc/RpcSerialization";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import { CommandHandler } from "../commands/CommandHandler.ts";
+import { refreshGitState } from "../commands/gitOperation.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
 import { EventLog } from "../log/EventLog.ts";
 import { checkPieceBatch, pieceNamespace } from "../commands/pieceBatch.ts";
@@ -198,7 +199,8 @@ export const application = (options: ApplicationOptions) => Effect.gen(function*
       if (RpcSchema.isStreamSchema(rpc.successSchema)) return Stream.unwrap(prepare.pipe(Effect.map((input) =>
         read(input, payload) as Stream.Stream<unknown, unknown, Services>
       ))).pipe(Stream.mapError((error) => readError(payload.requestId, error, name)), Stream.provideService(EventLog, boundedLog));
-      return prepare.pipe(Effect.flatMap((input) => read(input, payload) as Effect.Effect<import("./reads.ts").ReadReply, unknown, Services>),
+      const invoke = (input: import("../commands/internal.ts").Input) => read(input, payload) as Effect.Effect<import("./reads.ts").ReadReply, unknown, Services>;
+      return prepare.pipe(Effect.flatMap((input) => name === "project.git.state" ? refreshGitState(input, payload, invoke) : invoke(input)),
         Effect.flatMap((result) => Effect.gen(function* () {
           const marks = result.marks ?? [];
           if (marks.length > 0 || (result.deliveries?.length ?? 0) > 0 || Object.keys(result.sideRows ?? {}).length > 0) {

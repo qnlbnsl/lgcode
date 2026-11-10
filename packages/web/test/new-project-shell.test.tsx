@@ -79,7 +79,7 @@ const mountedJourney = async (body: (journey: Journey) => Promise<void>, wrap?: 
   document.body.append(container)
   const root = createRoot(container)
   try {
-    execFileSync("git", ["-C", rig.work, "init", "-b", "trunk"], { stdio: "ignore" })
+    execFileSync("git", ["-C", rig.work, "init", "-b", "main"], { stdio: "ignore" })
     execFileSync("git", ["-C", rig.work, "-c", "user.name=Test", "-c", "user.email=test@example.test", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "Initial"], { stdio: "ignore" })
     const runner = await Effect.runPromise(makeFakeRunner())
     await Effect.runPromise(provideRig(rig, { runner, secrets: makeFakeSecrets() }, Effect.gen(function* () {
