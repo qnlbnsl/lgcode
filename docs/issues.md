@@ -10249,6 +10249,9 @@ The separate real aggregate regressions retain the untracked-file and process-co
 The corrected layout case passed its eight viewport and theme combinations remotely with the original assertions and deadlines.
 All nine selected real aggregate regressions also passed remotely, including the six 71-file owner and agent cases.
 These results do not retrospectively establish the cause of the full15 failure.
+The complete remote check then passed all 7,675 unit tests and all 37 browser cases, with two unit tests skipped.
+The temporary browser observer, assertion reporter and explicit aggregate probe were subsequently removed from delivery under the owner's observability rule.
+Their original source and artifacts remain in the retained investigation evidence.
 
 ## 589. Credential-name exclusion blocked owner Git operations and whole agent reads
 

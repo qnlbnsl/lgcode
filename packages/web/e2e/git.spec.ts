@@ -21,7 +21,6 @@ import { unusedPort } from "../../engine/test/support/browserWeb.ts"
 import { makeFakeRunner } from "../../engine/test/support/fakeRunner.ts"
 import { appendSetup, call, eventOf, freshRequest, harnessSettings, makeFakeSecrets, makeRig, ownerCredential, removeRig, seedAccount, seedAgent, success } from "../../engine/test/support/handlerRig.ts"
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
-import { observeGit } from "./git-observation.ts"
 test.describe.configure({ timeout: 120_000 })
 
 // Build the production web root, authenticate through App, and navigate the
@@ -32,10 +31,6 @@ const save = (folder: string, name: string, text: string) => writeFileSync(join(
 const commit = (folder: string, title: string) => { git(folder, "add", "--all"); git(folder, "commit", "-m", title); return git(folder, "rev-parse", "HEAD") }
 interface Fixture { readonly base: string; readonly source: Workspace; readonly project: Project; readonly repository: Repository; readonly root: string }
 async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture) => void, body: (f: Fixture) => Promise<void>, options: { readonly loseCommitReply?: boolean; readonly reportedFailure?: boolean } = {}) {
-  const observation = observeGit(page, test.info().outputPath("git-observations.json"))
-  await observation.installDomObservation()
-  const lists = observation.registeredReads(engineLists)
-  observation.boundary("fixture-start")
   const rig = makeRig(), previous = process.env.LGCODE_HOME
   process.env.LGCODE_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url"), staticRoot = join(rig.root, "page"), port = await unusedPort()
@@ -55,14 +50,14 @@ async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture
         const created = success(yield* call(ownerCredential, "project.create", { name: "Browser work", goal: "Prove the owned Git component", machineId: "local", repository: { _tag: "existing", repoId: added.repoId }, useWorktree: true }))
         const view = projectView(yield* (yield* Views).snapshot), project = view.projects[created.projectId]!, source = view.workspaces[project.worktreeId]!, repository = view.repositories[added.repoId]!
         const fixture: Fixture = { base: rig.work, source, project, repository, root: rig.root }
-        prepare(fixture); observation.boundary("fixture-prepared")
+        prepare(fixture)
         if (options.reportedFailure) {
           const member = yield* seedAgent({ id: "browser-reviewer", parent: project.leadAgentId, folder: source.path })
           const [thread] = yield* appendSetup([eventOf({ _tag: "ThreadItem", agentId: member.agentId, itemId: "browser-report", content: { _tag: "text", text: "Reported browser review" }, replay: false })])
           for (const kind of ["tests", "review"] as const) success(yield* call(ownerCredential, "project.review.report", { projectId: project.projectId, worktreeId: source.worktreeId,
             head: git(source.path, "rev-parse", "HEAD"), kind, status: "failed", summary: "Reported failure <script>literal</script>", threadAgentId: member.agentId, threadSequence: thread!.sequence }))
         }
-        yield* serve({ password: Redacted.make(password), staticRoot, lists, settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
+        yield* serve({ password: Redacted.make(password), staticRoot, lists: engineLists, settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
         yield* Effect.promise(async () => {
           const route = `http://127.0.0.1:${port}/#/project/${encodeURIComponent(project.projectId)}/git`
           await page.goto(route)
@@ -73,30 +68,25 @@ async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture
           await expect(page.locator("#view-body > .git-workspace")).toHaveCount(1)
           await expect(page.getByRole("region", { name: "Git", exact: true })).toBeVisible()
           await expect(page.getByRole("button", { name: "Refresh Git", exact: true })).toBeEnabled()
-          observation.boundary("body-start")
-          let bodySucceeded = false
-          try { await body(fixture); bodySucceeded = true }
-          finally { observation.boundary("body-end", bodySucceeded ? "Success" : "Failure") }
+          await body(fixture)
         })
       })
       const redactor = makeRedactor({ secrets: () => [Redacted.make("synthetic-browser-git-key")], tokenHashes: () => new Set() })
       const dependencies = Layer.mergeAll(runner.layer, secrets.layer, redactor.layer)
-      const real = buildServices(rig, lists).pipe(Layer.provide(dependencies))
+      const real = buildServices(rig, engineLists).pipe(Layer.provide(dependencies))
       const services = Layer.effect(CommandHandler, Effect.gen(function* () {
         const handler = yield* CommandHandler; let lose = true
-        return { ...handler, execute: (credential, name, payload) => observation.command(name, payload, handler.execute(credential, name, payload)).pipe(Effect.flatMap((reply) => {
+        return { ...handler, execute: (credential, name, payload) => handler.execute(credential, name, payload).pipe(Effect.flatMap((reply) => {
           if (options.loseCommitReply && name === "project.commit" && lose) { lose = false; return Effect.fail(new LogWriteFailed({ reason: "database read failed" })) }
           return Effect.succeed(reply)
         })) }
       })).pipe(Layer.provideMerge(real))
-      yield* Effect.scoped(run.pipe(Effect.onExit((exit) => Effect.sync(() => observation.boundary("fixture-scope-closing", exit._tag)))))
-        .pipe(Effect.onExit((exit) => Effect.sync(() => observation.boundary("fixture-scope-closed", exit._tag))), Effect.provide(services), Effect.provide(runner.layer))
+      yield* Effect.scoped(run).pipe(Effect.provide(services), Effect.provide(runner.layer))
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped)
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
   } finally {
-    observation.boundary("rig-cleanup-start")
-    try { if (previous === undefined) delete process.env.LGCODE_HOME; else process.env.LGCODE_HOME = previous; removeRig(rig) }
-    finally { observation.boundary("rig-cleanup-end"); observation.finish() }
+    if (previous === undefined) delete process.env.LGCODE_HOME; else process.env.LGCODE_HOME = previous
+    removeRig(rig)
   }
 }
 const refresh = async (page: Page) => { await page.getByRole("button", { name: "Refresh Git", exact: true }).click(); await expect(page.getByRole("button", { name: "Refresh Git", exact: true })).toBeEnabled() }
