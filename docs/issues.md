@@ -10513,3 +10513,16 @@ Its short-label control passed.
 Titles and paths now use the existing full reader, and the collapsed summary uses the same bounded preview without interactive descendants.
 The original stored strings, status, input, output and diff are unchanged.
 Status: correction prepared; affected remote proof is next.
+
+## 605. Durable conversation refusals kept recovery locked forever
+
+Found: 2026-11-10, by the independent review of signed 9a9d2f1.
+The manager allocated this number to the original conversation author.
+Issues 603 and 604 are closed by that review, and their changes remain.
+Composer and AgentTools retain every failed request as uncertain.
+A planner refusal has a durable receipt, so replaying that same request cannot succeed even after the cause is repaired.
+The original controls use the real handler and SQLite for a disappearing selected file and changed advertised model and effort choices.
+They require the old key to keep its refusal after repair and a corrected explicit request to use a new key.
+Only positive durable refusal evidence for the exact owner, command and request may retire an attempt.
+Missing, unavailable, incomplete or unrelated evidence must preserve the complete original request.
+Status: original consequential proof prepared; correction and remote proof are pending.
