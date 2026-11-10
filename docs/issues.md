@@ -10493,7 +10493,10 @@ The new original controls mount the production Thread with the actual command ha
 The adapter and browser transport are controlled explicitly.
 They retain a draft from the real starting state, require reachable advertised choices and configuration recovery after refusal, and resume through the real lifecycle handler.
 They also require the same configuration body and request key after a lost committed reply, one durable choice, applied evidence and no prompt while halted.
-Status: original remote proof pending; production remains unchanged.
+The original remote run on 4fd8cd2 failed both refusal controls at the hidden tools assertion.
+Composer now hides the message input, context additions and send action while keeping its single existing configuration tools mounted and reachable.
+The message and recovery send guards still refuse a halted submission.
+Status: correction prepared; affected remote proof is next.
 
 ## 604. Activity titles and paths bypassed the bounded reader
 
@@ -10505,4 +10508,8 @@ The input, output and diff already use the bounded reader, but their labels do n
 The new original controls store contract-valid long labels through the actual SQLite log and mount the production Thread.
 They require bounded collapsed and expanded output, exact full reading and copying, unchanged stored evidence, inert markup and no interactive reader inside a summary.
 Short labels, actual tool status and complete input, output and diff readers remain consequential controls.
-Status: original remote proof pending; production remains unchanged.
+The original remote run on 4fd8cd2 failed with a 40,055-character collapsed summary and a 40,906-character ordinary path.
+Its short-label control passed.
+Titles and paths now use the existing full reader, and the collapsed summary uses the same bounded preview without interactive descendants.
+The original stored strings, status, input, output and diff are unchanged.
+Status: correction prepared; affected remote proof is next.

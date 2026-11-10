@@ -1,13 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { DataText, visibleText } from "./text.tsx"
 
+export const textPreview = (text: string) => text.split("\n", 13).slice(0, 12).join("\n").slice(0, 16_384)
+
 // Bound the ordinary conversation surface. Full text is mounted only by an
 // explicit action and stays a single plain block for browser Find and Copy.
 export function BoundedText({ text, label = "Message" }: { readonly text: string; readonly label?: string }) {
   const [full, setFull] = useState(false)
   const [copied, setCopied] = useState("")
   // Bound single-line output too: twelve lines alone can still mount megabytes.
-  const preview = text.split("\n", 13).slice(0, 12).join("\n").slice(0, 16_384)
+  const preview = textPreview(text)
   const truncated = preview.length < text.length
   const copy = async () => {
     try { await navigator.clipboard.writeText(text); setCopied("Copied.") }

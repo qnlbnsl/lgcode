@@ -78,7 +78,8 @@ function ConversationComposer({ identity, recipient, scope, disabled = false, ha
   }
   return <div className="conversation-composer">
     {halt !== undefined && <p role="status">{visibleText(halt)}{state.draft && " Your draft is kept."}</p>}
-    <form hidden={halt !== undefined} aria-label={identity._tag === "agent" ? "Prompt agent" : "Message team"} onSubmit={submit}>
+    <form aria-label={identity._tag === "agent" ? "Prompt agent" : "Message team"} onSubmit={submit}>
+      <div hidden={halt !== undefined}>
       <label className="visually-hidden" htmlFor={`${hint}-input`}>Message {visibleText(recipient)}</label>
       <textarea ref={field} id={`${hint}-input`} name="prompt" aria-label={`Message ${visibleText(recipient)}`}
         aria-describedby={hint} placeholder={`Message ${visibleText(recipient)}…`} value={state.draft}
@@ -87,15 +88,16 @@ function ConversationComposer({ identity, recipient, scope, disabled = false, ha
       {state.context.length > 0 && <ul className="composer-context" aria-label="Selected context">{state.context.map((item) => <li key={referenceKey(item.reference)}>
         <span>{visibleText(item.label)}</span><button type="button" aria-label={`Remove ${visibleText(item.label)}`} onClick={() => entry.update({ context: entry.state.context.filter((row) => referenceKey(row.reference) !== referenceKey(item.reference)) })}>×</button>
       </li>)}</ul>}
-      <div className="composer-tools"><button type="button" aria-label="Add context" title="Add context" onClick={() => setPicker({})}><span aria-hidden="true">＋</span><span className="add-context-label"> Add context</span></button>{tools}
-        {action ?? <button aria-label={identity._tag === "agent" ? "Send prompt" : "Send message"}
+      </div>
+      <div className="composer-tools"><button hidden={halt !== undefined} type="button" aria-label="Add context" title="Add context" onClick={() => setPicker({})}><span aria-hidden="true">＋</span><span className="add-context-label"> Add context</span></button>{tools}
+        <div hidden={halt !== undefined}>{action ?? <button aria-label={identity._tag === "agent" ? "Send prompt" : "Send message"}
           title={disabled ? "Sending is unavailable until the conversation reconnects." : state.status === "uncertain" ? "Recover the original send first." : "Send (Enter)"} type="submit"
-          disabled={disabled || halt !== undefined || state.status !== "ready" || !state.draft.trim()}>{state.status === "sending" ? "Sending…" : "Send"}</button>}
+          disabled={disabled || halt !== undefined || state.status !== "ready" || !state.draft.trim()}>{state.status === "sending" ? "Sending…" : "Send"}</button>}</div>
       </div>
     </form>
     <p id={hint} className="visually-hidden">Enter sends · Shift+Enter adds a line</p>
     {state.message && <p role="status">{state.message}</p>}
-    {state.status === "uncertain" && <button disabled={disabled} onClick={() => { if (entry.state.attempt) void send(entry.state.attempt) }}>Recover original send</button>}
+    {state.status === "uncertain" && <button disabled={disabled || halt !== undefined} onClick={() => { if (entry.state.attempt) void send(entry.state.attempt) }}>Recover original send</button>}
     {picker !== undefined && <ContextPicker {...(scope === undefined ? {} : { scope })} selected={state.context} close={() => setPicker(undefined)}
       apply={(items) => {
         const draft = entry.state.draft
