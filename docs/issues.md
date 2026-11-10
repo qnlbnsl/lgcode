@@ -10860,3 +10860,15 @@ replay, exact reply/file bytes, stop/resume, private-login failure and halted
 composer consequences, and service-restart receipt/rebuild checks. The original
 failed probes and same-copy overlap remain historical evidence. The final signed
 ordinary full and continuing independent review are separate requirements.
+
+The signed W11 full on 79cd51d passed all 525 unit files and 42 browser cases,
+but the serial eight-size Mocks/Design journey reached its overall 30-second
+limit at the enabled second approval button, after the matrix and stale refusal.
+Its approved overall budget is now 60 seconds for page/worktree setup, sixteen
+captures, stale refusal, actual approval and reload. Individual deadlines and
+all behavioral assertions remain unchanged. The failed/related pair passed
+in 20.7 seconds. The other full failure recurred at issue 609's original Git
+terminal-uncertainty assertion. The unchanged isolated case passed with bounded
+temporary handler timing observations; those observations do not explain the
+full failure. Issue 609 remains open and its cause unproved. The Git source,
+assertion and deadlines are unchanged, and temporary observations were removed.
