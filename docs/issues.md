@@ -10230,6 +10230,39 @@ Both owner and filtered agent aggregates now reuse one complete status snapshot 
 Literal paths, binary flags, full text statistics, byte and entry bounds, symlink checks and agent exclusions remain consequential in the adopted real process-count controls.
 This is one canonical correction, shared with issue 598; its new proof and independent re-check remain pending.
 
+The original Git author's sealed diagnostic recorded 71 recursive entries and 302 actual Git child calls.
+Its original five-second assertion failed with 55 child calls unsettled.
+The observed gate wait was 0.027 milliseconds, with no competing admission during that execution.
+Call-to-spawn intervals and child wall intervals remain separate evidence, without a CPU, network or load cause claim.
+The original narrower three-path preparation and all its proof remain archived in that author's retained worktree.
+The author's later accepted-source join supersedes those engine paths with the canonical implementation and regressions from b974da0.
+The original browser failures remain failed; the accepted flow proofs do not prove the subsequently joined Git page.
+
+The joined page's later full12 passed its unit checks and failed three browser cases.
+Its aggregate returned complete data near the original assertion boundary, without a proved allocation between gate waiting and child work.
+The page also withheld received sync counts behind final working identity checks and invalidated coherent data after read-only review preparation.
+Shared projection completeness restarted Git reads even while the connection remained live.
+Seven consequential mounted controls failed on that original page; a lost preparation reply remained uncertain in the eighth passing compatibility control.
+The scoped UI correction separates received counts from mutation readiness, preserves read continuity with explicit reconnect recovery, and retains review readiness only for an exact matching coherent generation.
+The candidate's two mounted files passed all 50 controls, and web typing and credits passed.
+The canonical aggregate engine implementation is unchanged.
+The later full15 passed 7,675 unit tests and 36 browser cases, but the layout case again missed its five-second 71-file assertion.
+Its second aggregate delivered complete data and the observer later counted 71 wrappers; the assertion deadline was not recorded, so that trace does not establish the cause.
+The unchanged selected run16 passed and remains inconclusive about that failure.
+The layout fixture now indexes its same 71 real files before opening the page, leaving file contents, layout assertions, commit count and deadlines unchanged.
+The separate real aggregate regressions retain the untracked-file and process-count coverage.
+The corrected layout case passed its eight viewport and theme combinations remotely with the original assertions and deadlines.
+All nine selected real aggregate regressions also passed remotely, including the six 71-file owner and agent cases.
+These results do not retrospectively establish the cause of the full15 failure.
+The complete remote check then passed all 7,675 unit tests and all 37 browser cases, with two unit tests skipped.
+The temporary browser observer, assertion reporter and explicit aggregate probe were subsequently removed from delivery under the owner's observability rule.
+Their original source and artifacts remain in the retained investigation evidence.
+The observer-free related browser run passed ten cases and failed the final push count assertion.
+One diagnostic execution and three bounded repetitions passed, so those observations do not establish the cause of that failure.
+The browser now requires the visible push acknowledgment separately before its existing fresh outgoing-count assertion.
+Both assertions retain the default five-second timeout, and the case retains its original 120-second timeout.
+All temporary observations were removed again before delivery.
+
 ## 589. Credential-name exclusion blocked owner Git operations and whole agent reads
 
 The round-one independent review found that the credential-name predicate was inside the shared literal Git path validator.
@@ -10693,3 +10726,56 @@ It now obtains and revalidates its caller through webCaller before each engine i
 The pure display-boundary and markup tests also omitted their required rebuild declarations.
 Both now register noLog=true because neither opens an event log.
 The original full log and direct exit remain preserved in website-1/w10b-document-import.
+
+## 606. Previously inspected worktree summaries hide fresh row counts
+
+The independent W09 review found that cached working changes overrode later count reads for an uninspected worktree.
+After visiting two worktrees, changes in the first could remain displayed as a clean checkout while inspecting the second.
+A newer partial or unavailable result was also hidden by that older working view.
+The correction keeps working data authoritative only for the currently inspected row and uses the existing count generation for other rows.
+The focused control retains genuine Git reads beneath narrow partial, unavailable and held-reply boundaries, and checks that aborted generations cannot replace newer counts.
+The original focused control failed against unchanged production with a genuine new file still displayed as zero changes.
+Candidate focused and full proof are recorded under the existing build loop.
+
+## 607. Split Git comparisons omit side headings
+
+The independent W09 review found that real split comparisons omitted the mock's Before and After headings and accessible side identity.
+The correction adds paired headings and labeled line groups in the shared comparison renderer.
+Unified fallback, paired row alignment, literal patch rendering and the single phone gutter remain required.
+Focused renderer controls cover both workspace and dialog consumers, and the existing eight-combination browser journey retains its original consequences and deadlines.
+Both original renderer controls failed against unchanged production because the two headings were absent.
+Candidate focused and full proof are recorded under the existing build loop.
+
+## Unallocated full-check failures during the W09 minor corrections
+
+The ordinary remote full check on commit `1b24026` passed typing and 7,678 unit tests, with two existing skips, but failed two browser cases.
+The Git lost-reply case retained the initial unconfirmed acknowledgment instead of publishing terminal uncertainty within its original five-second assertion.
+A later single-case execution with a temporary fixture observer passed, which does not explain the full-run failure.
+The new-project eight-size creation case reached its original 30-second case timeout while creating the eighth project.
+Neither failure has an established cause, and no deadline was increased.
+The complete full output and both original failure contexts remain in `.scratch/w09-evidence/minor-corrections/` in the W09 author worktree.
+The full-check requirement remains unmet, and issue numbers remain manager-owned.
+
+The later full on `8c50353` passed typing and all unit tests but failed three Git browser publication assertions and the same project-creation case.
+A bounded registered-handler and wire observation reproduced the lost-reply failure without changing its original oracle.
+Its five-second assertion began before the typed commit failure arrived, and the final coherent identity read was still pending when the assertion failed.
+An auxiliary checkout count read also entered the shared runtime Git gate before the inspected state read.
+The UI now defers those auxiliary summaries until the inspected coherent working refresh publishes, while keeping current count generations and their cancellation guards.
+A consequential mounted control failed against the original production ordering because an auxiliary read started while the inspected refresh was held.
+The original browser assertions and deadlines remain unchanged, and this observation does not establish a load, network or universal latency cause.
+The manager owns the separate new-project disposition; that case is not repeated to chase a pass.
+
+
+## 609. The Git lost-reply assertion is timing-sensitive in a full browser run
+
+Found: 2026-11-10, while finishing the independently reviewed W09 correction.
+State: open, reserved by the manager; no correction is applied in this merge.
+
+The full check on signed d71de21 passed typing, 507 unit files and 36 browser cases.
+The lost-reply assertion at git.spec.ts:269 still saw the initial unconfirmed acknowledgement within its unchanged five-second budget.
+The unchanged isolated case then passed in 11.1 seconds, including 9.8 seconds in the case.
+The manager accepted the combined gate under the build-loop rules and authorized the merge.
+The full remains exit 1, and the isolated rerun remains exit 0.
+This does not establish a cause or close the timing issue.
+If it recurs in the merged full, the manager requires an earlier acknowledgement or a wait on the correct event rather than a longer deadline.
+The original logs and failure contexts remain in the W09 author result.
