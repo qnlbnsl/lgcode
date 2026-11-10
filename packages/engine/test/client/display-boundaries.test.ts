@@ -31,8 +31,10 @@ it("requires an explicit different HTTPS hostname and exposes no owner cookie, A
   }
   for (const port of [0, 65536, 1.5]) expect(() => displayConfiguration("https://lgcode.example", "https://design.example", port)).toThrow()
   const config = configuration(), headers = displayHeaders(config, "editor")
-  expect(headers["content-security-policy"]).toContain("sandbox allow-scripts;")
-  expect(headers["content-security-policy"]).not.toContain("allow-same-origin")
+  expect(headers["content-security-policy"]).toContain("sandbox allow-scripts allow-same-origin;")
+  const mockHeaders = displayHeaders(config, "mock")
+  expect(mockHeaders["content-security-policy"]).toContain("sandbox allow-scripts;")
+  expect(mockHeaders["content-security-policy"]).not.toContain("allow-same-origin")
   expect(headers["content-security-policy"]).toContain("frame-ancestors https://lgcode.example")
   expect(headers).not.toHaveProperty("access-control-allow-credentials")
   expect(headers).not.toHaveProperty("set-cookie")

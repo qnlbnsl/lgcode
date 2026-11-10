@@ -10435,3 +10435,16 @@ Its original display, import, pixel, isolation and cleanup assertions remain.
 Temporary static launcher diagnostics are retained separately and must not be committed.
 Status: product and fixture source prepared; new remote typing, focused and native proof are pending.
 
+
+### The later editor boot failure is separate from image presence
+
+The source23 and direct remote native cases started the named editor image and opened its frame.
+The registered document assertion failed before the capability assertion ran.
+The approved temporary boot-notice read then measured a localStorage SecurityError in the opaque sandbox.
+The original failures, cleanup outcomes and temporary observation remain preserved in website-1/w10b-document-import.
+On 2026-11-10, the owner approved adding allow-same-origin to the editor iframe and its content security policy sandbox directive.
+Recorded mocks keep their opaque sandbox.
+The editor keeps its separate display hostname, credential-omitting document import, owner-cookie exclusion, frame ancestors, referrer policy, revocation and logout controls.
+The temporary boot-notice read was removed before this correction's commit.
+No OpenPencil source patch or image rebuild is applied.
+The new focused and native outcomes will be recorded after the remote checks complete.

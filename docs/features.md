@@ -593,6 +593,10 @@ The full design is in
   policy permits frames from that hostname only. The engine starts and manages
   OpenPencil with access to only the project's design folder. No separate one-file
   capability is built. This decision does not add an editor save pipeline.
+  On 2026-11-10, the owner approved `allow-same-origin` for the editor frame
+  in addition to `allow-scripts`, so OpenPencil can use its display hostname
+  storage. Recorded mocks retain an opaque origin. The editor receives no
+  owner cookie or owner origin authority.
 
 ## Open questions
 

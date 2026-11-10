@@ -18,15 +18,15 @@ export const configuredDisplay = (settings: WebSettings, ownerPort: number) => {
   return displayConfiguration(owner, settings.display.publicAddress, settings.display.port)
 }
 export const displayHeaders = (configuration: DisplayConfiguration, kind: "mock" | "editor") => ({
-  "content-security-policy": ["default-src 'none'", "sandbox allow-scripts", `frame-ancestors ${configuration.ownerOrigin}`,
+  "content-security-policy": ["default-src 'none'", kind === "editor" ? "sandbox allow-scripts allow-same-origin" : "sandbox allow-scripts", `frame-ancestors ${configuration.ownerOrigin}`,
     "base-uri 'none'", "form-action 'none'", "object-src 'none'", "frame-src 'none'",
     `script-src 'unsafe-inline' ${configuration.displayOrigin}${kind === "editor" ? " 'wasm-unsafe-eval'" : ""}`,
     `style-src 'unsafe-inline' ${configuration.displayOrigin}`, `img-src data: blob: ${configuration.displayOrigin}`,
     `font-src ${configuration.displayOrigin}`, `connect-src ${kind === "editor" ? configuration.displayOrigin : "'none'"}`,
     `worker-src ${kind === "editor" ? "blob:" : "'none'"}`].join("; "),
   "cache-control": "no-store", "referrer-policy": "same-origin", "x-content-type-options": "nosniff",
-  // Sandboxed module, WASM and file reads have an opaque Origin. No credentials
-  // are accepted by this listener and no owner endpoint has this CORS policy.
+  // Mock module reads have an opaque Origin; the editor retains only its
+  // separate display origin. Neither may supply credentials to this listener.
   "access-control-allow-origin": "*", "cross-origin-resource-policy": "cross-origin",
   "permissions-policy": "camera=(), microphone=(), geolocation=(), clipboard-read=(), clipboard-write=()"
 })

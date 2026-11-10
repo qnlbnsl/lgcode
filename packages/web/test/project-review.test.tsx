@@ -44,20 +44,23 @@ afterEach(async () => {
   vi.unstubAllGlobals(); transport.client = undefined
 })
 
-it("embeds only an actual owner endpoint frame with the opaque sandbox and closes that exact identity", async () => {
+it.each([
+  { selection: { _tag: "editor", repoId: "repo" as never } as const, sandbox: "allow-scripts allow-same-origin" },
+  { selection: { _tag: "mock", projectId, revisionId, screenId: "home" } as const, sandbox: "allow-scripts" }
+])("embeds only an actual owner endpoint frame with $sandbox and closes that exact identity", async ({ selection, sandbox }) => {
   const calls: Array<{ path: string; body: unknown; credentials: unknown }> = []
   const frame = { id: "controlled-owner-frame", url: "https://display.example/recorded?private=controlled", displayOrigin: "https://display.example", expiresAt: Date.now() + 60_000 }
   vi.stubGlobal("fetch", async (path: string, options: RequestInit) => {
     calls.push({ path, body: JSON.parse(String(options.body)), credentials: options.credentials })
     return path.endsWith("/open") ? new Response(JSON.stringify(frame), { status: 200 }) : new Response(null, { status: 204 })
   })
-  const { container, root } = await mount(<IsolatedDisplay title="Controlled preview" action="Open preview" selection={{ _tag: "editor", repoId: "repo" as never }} onSessionExpired={() => {}} />)
+  const { container, root } = await mount(<IsolatedDisplay title="Controlled preview" action="Open preview" selection={selection} onSessionExpired={() => {}} />)
   expect(container.querySelector("iframe")).toBeNull()
   await click(container, "Open preview")
   const iframe = container.querySelector("iframe")!
-  expect(iframe.getAttribute("sandbox")).toBe("allow-scripts")
+  expect(iframe.getAttribute("sandbox")).toBe(sandbox)
   expect(iframe.getAttribute("src") === frame.url).toBe(true)
-  expect(calls[0]).toEqual({ path: "/api/display/open", body: { _tag: "editor", repoId: "repo" }, credentials: "same-origin" })
+  expect(calls[0]).toEqual({ path: "/api/display/open", body: selection, credentials: "same-origin" })
   await act(async () => { iframe.dispatchEvent(new Event("load")) })
   expect(container.textContent).not.toMatch(/ready|rendered|imported/i)
   await act(async () => { root.render(<p>Another page</p>) })

@@ -87,7 +87,7 @@ function DisplayContent({ selection, title, action, disabled = false, onSessionE
       <p role="status">{busy ? "Updating display…" : "No display is open."}</p>
       <button disabled={busy || disabled || selection === undefined || unclosed} onClick={() => void open()}>{action}</button>
     </> : <>
-      <iframe className="review-display-frame" title={title} src={frame.url} sandbox="allow-scripts" referrerPolicy="same-origin" />
+      <iframe className="review-display-frame" title={title} src={frame.url} sandbox={selection?._tag === "editor" ? "allow-scripts allow-same-origin" : "allow-scripts"} referrerPolicy="same-origin" />
       <button disabled={busy} onClick={() => void close()}>Close display</button>
     </>}
     {unclosed && <button disabled={busy} onClick={() => void close()}>Retry closing display</button>}
