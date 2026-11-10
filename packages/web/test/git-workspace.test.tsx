@@ -101,7 +101,8 @@ it("minor606: refreshes a previously visited row with genuine, partial and unava
     const f = yield* setup(), main = f.workspaces.find((row) => row.checkout === "main")!
     let mode: "actual" | "partial" | "unavailable" | "hold" = "actual", release!: () => void, heldSignal: AbortSignal | undefined
     const pending = new Promise<void>((resolve) => { release = resolve })
-    const changes = (payload: Parameters<Client["project.changes"]>[0]) => f.api["project.changes"](payload).pipe(Effect.flatMap((reply): Effect.Effect<typeof reply, unknown> => {
+    type ChangesReply = Effect.Success<ReturnType<Client["project.changes"]>>
+    const changes = (payload: Parameters<Client["project.changes"]>[0]) => f.api["project.changes"](payload).pipe(Effect.flatMap((reply): Effect.Effect<ChangesReply, unknown> => {
       if (payload.worktreeId !== f.source.worktreeId) return Effect.succeed(reply)
       if (mode === "partial") return Effect.succeed({ ...reply, result: { ...readResult(reply), truncated: true } })
       if (mode === "unavailable") return Effect.fail({ _tag: "CommandError" as const, requestId: payload.requestId, reason: "Git: not_repository" })
