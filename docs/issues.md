@@ -10480,3 +10480,29 @@ The existing cancellation identity guard prevents a late acknowledgement from re
 The draft remains, the normal Send action returns, and a capacity hold does not claim Reply stopped.
 No engine capacity policy, authority, transport, timeout or session lifetime changes.
 Status: root correction prepared; candidate remote proof and fresh independent review remain pending.
+
+## 603. A refused start hid the model and effort remedy
+
+Found: 2026-11-10, in the fresh independent review of signed 89c5acd.
+The manager allocated this number to the original conversation author.
+Composer hides its complete form while the agent is halted.
+That form contains the sole AgentTools instance, so the owner cannot change a refused model or effort or recover an uncertain configuration command.
+Resume alone can repeat the refused selection.
+
+The new original controls mount the production Thread with the actual command handlers and SQLite log.
+The adapter and browser transport are controlled explicitly.
+They retain a draft from the real starting state, require reachable advertised choices and configuration recovery after refusal, and resume through the real lifecycle handler.
+They also require the same configuration body and request key after a lost committed reply, one durable choice, applied evidence and no prompt while halted.
+Status: original remote proof pending; production remains unchanged.
+
+## 604. Activity titles and paths bypassed the bounded reader
+
+Found: 2026-11-10, in the fresh independent review of signed 89c5acd.
+The manager allocated this number to the original conversation author.
+The collapsed tool summary, expanded tool title and file-change path render complete provider strings on the ordinary conversation surface.
+The input, output and diff already use the bounded reader, but their labels do not.
+
+The new original controls store contract-valid long labels through the actual SQLite log and mount the production Thread.
+They require bounded collapsed and expanded output, exact full reading and copying, unchanged stored evidence, inert markup and no interactive reader inside a summary.
+Short labels, actual tool status and complete input, output and diff readers remain consequential controls.
+Status: original remote proof pending; production remains unchanged.
