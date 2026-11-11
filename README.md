@@ -14,8 +14,8 @@ LGcode ships a default workflow that people can override.
 
 > [!WARNING]
 > LGcode is under development. The engine, authenticated client API, message
-> board and foundry supervision code are merged. Development is frozen from
-> 2026-11-07 until the website mocks are ready. The findings of two of the
+> board and foundry supervision code are merged. The owner lifted the development
+> freeze on 2026-11-08 for the website build. The findings of two of the
 > three foundation reviews are not yet checked against this code. Standing
 > permission rules remain unbuilt, pending the owner's harness recordings.
 > Real-account and physical phone checks remain separate owner-run work. This

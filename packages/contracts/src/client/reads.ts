@@ -1,3 +1,7 @@
+import { IdentityRow } from "../requests.ts"
+export { ClientRequest, RequestDisplay } from "../requests.ts"
+import { ProjectSnapshot } from "../project/commands.ts"
+import { AgentConfiguration } from "../agentConfiguration.ts"
 import { StartFailure } from "../startFailure.ts"
 import * as Schema from "effect/Schema"
 import { Actor, EventEnvelope, PermissionOption, SessionReference } from "../events.ts"
@@ -30,20 +34,12 @@ export const RosterEntry = Schema.Struct({
   openPermissionRequests: Count, openQuestionsAsked: Count,
   harness: HarnessId, account: AccountId,
   model: Schema.optionalKey(Schema.NonEmptyString), effort: Schema.optionalKey(Schema.NonEmptyString),
+  configuration: Schema.optionalKey(AgentConfiguration),
   permission: PermissionLevel, folder: Schema.String,
   session: Schema.optionalKey(SessionReference), startedAt: EpochMilliseconds
 })
 export type RosterEntry = typeof RosterEntry.Type
 
-const RowDisplay = Schema.Struct({
-  preview: Schema.String, options: Schema.Array(PermissionOption), optionCount: Count,
-  settingsWrite: Schema.optionalKey(Schema.Boolean), toolKind: Schema.optionalKey(Schema.Literals(["read", "edit", "delete", "move", "search", "execute", "think", "fetch", "switch_mode", "other", "unknown"])),
-  bytes: Count
-})
-const IdentityRow = Schema.Struct({
-  id: Schema.NonEmptyString, agentId: AgentId, holder: Actor, sourceSequence: EventSequence,
-  display: Schema.optionalKey(RowDisplay)
-})
 export const ClientSnapshot = Schema.Struct({
   sequence: EventSequence,
   agents: Schema.Array(Schema.Struct({
@@ -63,7 +59,7 @@ export const ClientSnapshot = Schema.Struct({
     waits: Schema.Array(Schema.Struct({ agentId: AgentId, waitId: WaitId }))
   })),
   // Each later piece defines its bounded, per-caller section in its own contracts.
-  client: Schema.optionalKey(Schema.Unknown), board: Schema.optionalKey(Schema.Unknown), roles: Schema.optionalKey(Schema.Unknown),
+  project: Schema.optionalKey(ProjectSnapshot), client: Schema.optionalKey(Schema.Unknown), board: Schema.optionalKey(Schema.Unknown), roles: Schema.optionalKey(Schema.Unknown),
   failedSections: Schema.optionalKey(Schema.Array(Schema.String))
 })
 export type ClientSnapshot = typeof ClientSnapshot.Type

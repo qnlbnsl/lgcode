@@ -125,7 +125,7 @@ describe("access table", () => {
   const expected = {
     "board.open": ["owner", "agent"], "board.members": ["owner", "agent"],
     "board.post": ["owner", "agent", "service"], "board.close": ["owner", "agent", "service"],
-    "board.acknowledge": ["owner", "agent"], "board.read": ["owner", "agent"],
+    "board.acknowledge": ["owner", "agent"], "board.read": ["owner", "agent"], "board.peek": ["owner"],
     "board.channels": ["owner", "agent"], "board.status": ["owner", "agent", "service"],
     "board.flush": ["owner", "service"],
   };
@@ -133,7 +133,7 @@ describe("access table", () => {
     expect(exported<Record<string, unknown>>("boardAccess")[name]).toEqual(kinds);
     expect((Contracts.commandAccess as Record<string, unknown>)[name]).toEqual(kinds);
   });
-  it("1.4 all nine commands are in the served group, with no unprefixed or extra board commands", () => {
+  it("1.4 all ten commands are in the served group, with no unprefixed or extra board commands", () => {
     const group = exported<{ requests: ReadonlyMap<string, unknown> }>("BoardRpcGroup");
     expect([...group.requests.keys()].sort()).toEqual([...commandNames].sort());
     for (const name of commandNames) expect(Contracts.ServiceRpcGroup.requests.has(name)).toBe(true);

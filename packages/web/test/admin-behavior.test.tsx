@@ -2,9 +2,9 @@ import { act, StrictMode } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
-import * as Stream from "effect/Stream"
 import { afterEach, expect, it, vi } from "vitest"
 import { App } from "../src/index.ts"
+import { adminShellClient } from "./admin-shell-client.ts"
 
 const browser = vi.hoisted(() => ({ client: undefined as unknown }))
 vi.mock("@lgcode/client/browser", async () => {
@@ -21,8 +21,7 @@ const initialAlerts = () => ({
 })
 const initialWeb = { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false, serverState: "running" }
 const baseClient = () => ({
-  "client.snapshot": () => Effect.succeed({ sequence: 7, agents: [], requests: [], questions: [] }),
-  "client.subscribe": () => Stream.never,
+  ...adminShellClient(),
   "client.alerts.settings": () => Effect.succeed(initialAlerts()),
   "client.web.settings": () => Effect.succeed(initialWeb)
 })
@@ -61,7 +60,7 @@ it("follows alert page cursors and refreshes without retaining removed rows", as
   const list = vi.fn().mockReturnValueOnce(Effect.succeed({ items: [row("first")], next: 12 }))
     .mockReturnValueOnce(Effect.succeed({ items: [row("second")] }))
     .mockReturnValueOnce(Effect.succeed({ items: [] }))
-  browser.client = { ...baseClient(), "client.alerts.list": list }
+  browser.client = { ...baseClient(), "client.alerts.list": (payload: { limit: number }) => payload.limit === 200 ? Effect.succeed({ items: [] }) : list(payload) }
   const container = await render("/alerts")
   await eventually(() => expect(container.textContent).toContain("first"))
   const more = () => Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Load more alerts")
@@ -70,7 +69,7 @@ it("follows alert page cursors and refreshes without retaining removed rows", as
   expect(container.textContent).toContain("first")
   expect(list.mock.calls[1]![0]).toEqual(expect.objectContaining({ after: 12, limit: 100 }))
   expect(more()).toBeUndefined()
-  await act(async () => { container.querySelector<HTMLButtonElement>('section[aria-label="Alerts"] button')!.click() })
+  await act(async () => { container.querySelector<HTMLButtonElement>('section[aria-label="Phone notifications"] button')!.click() })
   await eventually(() => expect(container.textContent).toContain("No alerts."))
   expect(container.textContent).not.toContain("first")
 })
@@ -160,10 +159,15 @@ it("sends all web settings, including proxy and enable controls", async () => {
   input("heartbeatSeconds").value = "40"
   input("proxyMode").checked = true
   input("publicAddress").value = "https://lgcode.example"
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", { configurable: true,
+    value: function (this: HTMLDialogElement) { this.setAttribute("open", "") } })
   await submit(container, "Web server settings")
+  expect(set).not.toHaveBeenCalled()
+  await act(async () => { Array.from(container.querySelectorAll<HTMLButtonElement>("dialog button")).find((button) => button.textContent === "Turn off")!.click() })
   expect(set).toHaveBeenCalledWith(expect.objectContaining({ settings: {
     enabled: false, port: 8899, heartbeatSeconds: 40, proxyMode: true, publicAddress: "https://lgcode.example"
   } }))
+  Reflect.deleteProperty(HTMLDialogElement.prototype, "showModal")
 })
 
 it("returns an expired settings session to login without displaying server error text", async () => {
@@ -173,13 +177,13 @@ it("returns an expired settings session to login without displaying server error
   fetch.mockResolvedValue(new Response(null, { status: 401 }))
   // The first operation may already have probed while rendering. Retry with
   // the now-expired session to exercise the refusal from the page entry point.
-  if (container.querySelector('[aria-label="Settings"]')) {
-    await eventually(() => expect(container.querySelector<HTMLButtonElement>('section[aria-label="Settings"] button')!.disabled).toBe(false))
-    await act(async () => { container.querySelector<HTMLButtonElement>('section[aria-label="Settings"] button')!.click() })
+  if (container.querySelector('[aria-label="Service settings"]')) {
+    await eventually(() => expect(container.querySelector<HTMLButtonElement>('section[aria-label="Service settings"] button')!.disabled).toBe(false))
+    await act(async () => { container.querySelector<HTMLButtonElement>('section[aria-label="Service settings"] button')!.click() })
   }
   await eventually(() => expect(container.querySelector('form[aria-label="Log in"]')).not.toBeNull())
   expect(container.textContent).not.toContain("private server data")
-  expect(container.querySelector('[aria-label="Settings"]')).toBeNull()
+  expect(container.querySelector('[aria-label="Service settings"]')).toBeNull()
 })
 
 it.each([
@@ -194,7 +198,8 @@ it.each([
     active.add(id)
     return Effect.never.pipe(Effect.ensuring(Effect.sync(() => { active.delete(id); closed.push(id) })))
   })
-  browser.client = { ...baseClient(), [page === "alerts" ? "client.alerts.list" : "client.alerts.settings"]: read }
+  browser.client = { ...baseClient(), [page === "alerts" ? "client.alerts.list" : "client.alerts.settings"]:
+    (payload: { limit?: number }) => page === "alerts" && payload.limit === 200 ? Effect.succeed({ items: [] }) : read() }
   const container = await render(`/${page}`, strict)
   await eventually(() => expect(active.size).toBe(1))
   const current = [...active][0]!
@@ -204,8 +209,8 @@ it.each([
     expect(closed.length).toBeGreaterThan(0)
   } else expect(closed).toEqual([])
   const before = closed.length
-  await act(async () => { Array.from(container.querySelectorAll("a")).find((link) => link.textContent === "Situation")!.click() })
-  await eventually(() => expect(container.querySelector('[aria-label="Situation"]')).not.toBeNull())
+  await act(async () => { Array.from(container.querySelectorAll("a")).find((link) => link.textContent?.trim() === "Home")!.click() })
+  await eventually(() => expect(container.querySelector('[aria-label="Home"]')).not.toBeNull())
   await eventually(() => expect(closed).toContain(current))
   expect(closed).toHaveLength(before + 1)
   expect(active.size).toBe(0)

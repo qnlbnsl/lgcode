@@ -1,3 +1,6 @@
+import { QuestionMetadataFields } from "./questions.ts"
+import { ChoiceId } from "./agentConfiguration.ts"
+import { ContextReferences } from "./project/context.ts"
 import * as Schema from "effect/Schema"
 import * as Rpc from "effect/rpc/Rpc"
 import * as RpcGroup from "effect/rpc/RpcGroup"
@@ -8,10 +11,11 @@ import { HarnessSettings, RunMode } from "./harnesses.ts"
 import { AccountId, AgentId, DeliveryId, EventSequence, HarnessId, PermissionRequestId, QuestionId, RequestId, WaitId } from "./ids.ts"
 import { AlertRpcGroup, ClientRpcGroup, clientCommandAccess } from "./client/commands.ts"
 import { PermissionLevel } from "./permission.ts"
+import { ProjectRpcGroup, projectAccess } from "./project/commands.ts"
 import { RolesRpcGroup, rolesAccess } from "./roles/commands.ts"
 
 export const engineCommandNames = [
-  "start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "release", "compact", "group",
+  "start", "configure", "prompt", "answer", "pass-up", "ask", "wait", "cancel-reply", "stop", "resume", "release", "compact", "group",
   "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "subscribe", "debug.compare-views"
 ] as const
 // Compatibility for clients that still import the original engine inventory.
@@ -51,8 +55,8 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
         Schema.TaggedStruct("named", { accountId: AccountId }),
         Schema.TaggedStruct("any", {})
       ]),
-      model: Schema.optionalKey(Schema.NonEmptyString),
-      effort: Schema.optionalKey(Schema.NonEmptyString),
+      model: Schema.optionalKey(ChoiceId),
+      effort: Schema.optionalKey(ChoiceId),
       permission: PermissionLevel,
       folder: Schema.String.check(Schema.isPattern(/^\/.*$/)),
       runMode: Schema.optionalKey(RunMode),
@@ -61,8 +65,12 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
     },
     success: Schema.Struct({ ...request, agentId: AgentId }), error: Refused
   }),
+  Rpc.make("configure", {
+    payload: { ...target, model: Schema.optionalKey(ChoiceId), effort: Schema.optionalKey(ChoiceId) },
+    success: Ack, error: Refused
+  }),
   Rpc.make("prompt", {
-    payload: { ...target, text: Schema.String },
+    payload: { ...target, text: Schema.String, context: Schema.optionalKey(ContextReferences) },
     success: Schema.Struct({ ...request, deliveryId: DeliveryId }), error: Refused
   }),
   Rpc.make("answer", {
@@ -74,7 +82,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
   }),
   Rpc.make("pass-up", { payload: { ...request, subject: Subject }, success: Ack, error: Refused }),
   Rpc.make("ask", {
-    payload: { ...request, text: Schema.String },
+    payload: { ...request, text: Schema.String, ...QuestionMetadataFields },
     success: Schema.Struct({ ...request, questionId: QuestionId }), error: Refused
   }),
   Rpc.make("wait", {
@@ -88,6 +96,7 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
     }), error: Refused
   }),
   Rpc.make("release", { payload: { ...target, expectedHoldSequence: Schema.optionalKey(EventSequence) }, success: Ack, error: Refused }),
+  Rpc.make("cancel-reply", { payload: target, success: Ack, error: Refused }),
   Rpc.make("stop", { payload: target, success: Ack, error: Refused }),
   Rpc.make("resume", {
     payload: { ...target, fresh: Schema.optionalKey(Schema.Boolean) }, success: Ack, error: Refused
@@ -137,33 +146,37 @@ export const EngineCommandsRpcGroup = RpcGroup.make(
 
 // Later pieces merge their prefixed groups here, in namespace order.
 export const WebRpcGroup = ClientRpcGroup.omit(
-  "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence",
+  "client.snapshot", "client.roster", "client.thread", "client.subscribe", "client.event", "client.sequence", "client.requests", "client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss", "client.agent.configuration", "client.agent.context",
   "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set",
   "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token"
 )
-export const ClientReadsRpcGroup = ClientRpcGroup.omit("client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", "client.web.settings", "client.web.settings.set")
+export const ClientReadsRpcGroup = ClientRpcGroup.omit("client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dismiss", "client.alerts.list", "client.alerts.dismiss", "client.alerts.settings", "client.alerts.settings.set", "client.alerts.carrier.set", "client.alerts.carrier.set-token", "client.alerts.carrier.clear-token", "client.web.settings", "client.web.settings.set")
 const InstalledClientRpcGroup = ClientReadsRpcGroup.merge(AlertRpcGroup).merge(WebRpcGroup)
-export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(InstalledClientRpcGroup).merge(BoardRpcGroup).merge(RolesRpcGroup)
+export const CommandsRpcGroup = EngineCommandsRpcGroup.merge(InstalledClientRpcGroup).merge(BoardRpcGroup).merge(RolesRpcGroup).merge(ProjectRpcGroup)
 export const ServiceRpcGroup = CommandsRpcGroup.omit("debug.compare-views")
 
 // A new command requires an access decision at the composition point.
 export const commandAccess = {
   "client.web.settings": ["owner"], "client.web.settings.set": ["owner"],
+  "client.alerts.retry": ["owner"], "client.alerts.test": ["owner"], "client.alerts.prompt.dismiss": ["owner"],
   "client.alerts.list": ["owner"], "client.alerts.dismiss": ["owner"],
   "client.alerts.settings": ["owner"], "client.alerts.settings.set": ["owner"],
   "client.alerts.carrier.set": ["owner"], "client.alerts.carrier.set-token": ["owner"],
   "client.alerts.carrier.clear-token": ["owner"],
   ...boardAccess,
   ...rolesAccess,
-  start: ["owner", "agent"], prompt: ["owner", "agent", "service"], answer: ["owner", "agent"],
+  ...projectAccess,
+  configure: ["owner"], start: ["owner", "agent"], prompt: ["owner", "agent", "service"], answer: ["owner", "agent"],
   "pass-up": ["owner", "agent"], ask: ["owner", "agent"], wait: ["owner", "agent"],
   release: ["owner", "agent", "service"],
-  stop: ["owner", "agent"], resume: ["owner", "agent", "service"], compact: ["owner", "agent", "service"], group: ["owner", "agent"],
+  "cancel-reply": ["owner", "agent"], stop: ["owner", "agent"], resume: ["owner", "agent", "service"], compact: ["owner", "agent", "service"], group: ["owner", "agent"],
   accounts: ["owner"], "accounts set-secret": ["owner"], "accounts mark-available": ["owner"],
   harnesses: ["owner"], subscribe: ["owner", "agent", "service"], "debug.compare-views": ["owner"],
+  "client.agent.configuration": ["owner"], "client.agent.context": ["owner"],
   "client.snapshot": clientCommandAccess["client.snapshot"], "client.roster": clientCommandAccess["client.roster"],
   "client.thread": clientCommandAccess["client.thread"], "client.subscribe": clientCommandAccess["client.subscribe"],
+  "client.requests": clientCommandAccess["client.requests"],
   "client.event": clientCommandAccess["client.event"], "client.sequence": clientCommandAccess["client.sequence"]
 } satisfies Record<Rpc.Tag<RpcGroup.Rpcs<typeof CommandsRpcGroup>>, ReadonlyArray<CallerKind>>
 export const ownerOnlyCommands = [...CommandsRpcGroup.requests.keys()].filter((name) => !(commandAccess[name as keyof typeof commandAccess] as ReadonlyArray<CallerKind>).includes("agent"))
-export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }, { namespace: "client", group: InstalledClientRpcGroup }, { namespace: "board", group: BoardRpcGroup }, { namespace: "roles", group: RolesRpcGroup }] as const
+export const commandGroups = [{ namespace: "engine", group: EngineCommandsRpcGroup }, { namespace: "client", group: InstalledClientRpcGroup }, { namespace: "board", group: BoardRpcGroup }, { namespace: "roles", group: RolesRpcGroup }, { namespace: "project", group: ProjectRpcGroup }] as const

@@ -1,3 +1,4 @@
+import { projectVisibility } from "./project/events.ts"
 import { clientEventVisibility } from "./client/events.ts"
 import type { Event } from "./events.ts"
 import { boardVisibility } from "./board/events.ts"
@@ -6,6 +7,7 @@ import { rolesVisibility } from "./roles/visibility.ts"
 export type VisibilityClass = "agent-scoped" | "owner-only" | "piece-decided"
 export const eventVisibility = {
   ...boardVisibility,
+  ...projectVisibility,
   ...clientEventVisibility,
   ...rolesVisibility,
   AgentStarted: "agent-scoped",
@@ -16,6 +18,10 @@ export const eventVisibility = {
   TurnStarted: "agent-scoped",
   TurnEnded: "agent-scoped",
   StateChanged: "agent-scoped",
+  AgentConfigurationObserved: "owner-only",
+  AgentConfigurationChosen: "owner-only",
+  AgentConfigurationApplied: "owner-only",
+  AgentConfigurationRefused: "owner-only",
   ModeChanged: "agent-scoped",
   ModeRefused: "agent-scoped",
   PermissionRequested: "agent-scoped",

@@ -4,5 +4,5 @@ export const replySentence = "Across the quiet valley, a small river carries fal
 
 export async function assertReply(messages: Locator, before: number, text: string) {
   await expect(messages).toHaveCount(before + 1);
-  await expect(messages.nth(before)).toHaveText(`Agent data${text}`);
+  await expect(messages.nth(before)).toHaveText(text);
 }

@@ -14,10 +14,10 @@ export interface SettledInput {
 export type HoldCondition = (state: SettledInput, agentId: string, pieceView: unknown) => boolean
 const never = () => false
 export const holdUnsettled = {
-  client: never, board: (state, id, view) => holdsUnsettled(id, view as BoardView, state.deliveries), roles: never
+  client: never, board: (state, id, view) => holdsUnsettled(id, view as BoardView, state.deliveries), roles: never, project: never
 } satisfies Record<PieceNamespace, HoldCondition>
 export const requestHeld = {
-  client: never, board: (_state, id, view) => holdsIncoming(id, view as BoardView), roles: never
+  client: never, board: (_state, id, view) => holdsIncoming(id, view as BoardView), roles: never, project: never
 } satisfies Record<PieceNamespace, HoldCondition>
 export const holds = (state: SettledInput, id: string): boolean =>
   [...Object.values(state.requests), ...Object.values(state.questions)].some((row) => row.status === "open" && row.holder._tag === "agent" && row.holder.agentId === id)

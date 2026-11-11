@@ -8,6 +8,7 @@ import { join } from "node:path";
 
 import { expect, it } from "@effect/vitest";
 import { Event, eventVisibility, type EventEnvelope } from "@lgcode/contracts";
+import { gitReportSample, gitReviewSample } from "../../../contracts/test/gitReviewFixtures.ts";
 import { rolesSamples } from "../../../contracts/test/roles/fixtures.ts";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -52,9 +53,59 @@ const parents: Record<string, string> = { "agent-child": "agent-self", "agent-gr
 const samples: Record<string, (a: string, n: string) => Record<string, unknown>> = {
   ...Object.fromEntries(boardEvents.map(({ _tag, ...payload }) => [_tag, () => payload])),
   ...rolesSamples,
+  "project.SetupAdvanced": () => ({ step: "found" }),
+  "project.DesignRecorded": () => ({ projectId: "project-one", revisionId: "design-revision", author: { _tag: "owner" }, fileFingerprint: "a".repeat(64),
+    design: { repoId: "project-repo", worktreeId: "workspace", file: "design/actual.fig", components: [] } }),
+  "project.SetupCompleted": () => ({ projectId: "project-one" }),
+  "project.MockRecorded": () => ({ projectId: "project-one", revisionId: "mock-revision", author: { _tag: "owner" }, artifacts: [], comparisons: [],
+    bundle: { sources: [], screens: [], scenarios: [], draftedFields: [], components: [] } }),
+  "project.MockApproved": () => ({ projectId: "project-one", approvalId: "mock-approval", revisionId: "mock-revision", leadAgentId: "agent-self",
+    worklist: { screens: [], drafts: [], schemaChanges: [], draftedFields: [] } }),
+  "project.GitEvidenceReported": () => ({ report: gitReportSample }),
+  "project.GitAttempted": (_a, n) => ({ attempt: {
+    requestId: n.replace("project.GitAttempted", "git-operation"), bodyHash: "a".repeat(64), caller: owner,
+    command: "project.commit", worktreeId: "project-workspace",
+    before: { head: "b".repeat(40), branch: "project-work", tree: "c".repeat(40), mergeHead: "d".repeat(40) },
+  } }),
+  "project.GitFinished": (_a, n) => ({ caller: owner, operationRequestId: n.replace("project.GitFinished", "git-operation") }),
+  "project.MainReviewOpened": () => ({ review: gitReviewSample }),
+  "project.MainReviewDecided": () => ({ review: { ...gitReviewSample, decision: "approve_without_evidence", outcome: "refused", reason: "stale_state", decidedAt: 2000 } }),
+  "project.SettingsChanged": () => ({ settings: { workspaceFolder: "/tmp", shell: "zsh" } }),
+  "project.RepositoryAdded": () => ({ repoId: "project-repo", name: "Repository", path: "/tmp" }),
+  "project.RepositoryLocated": () => ({ repoId: "project-repo", machineId: "local", path: "/tmp" }),
+  "project.WorktreeCreated": () => ({ worktreeId: "project-workspace", repoId: "project-repo", machineId: "local", branch: "main", path: "/tmp", checkout: "main" }),
+  "project.Created": () => ({ projectId: "project-one", repoId: "project-repo", name: "Project", goal: "Exercise event privacy", leadAgentId: "agent-self", worktreeId: "project-workspace", machineId: "local" }),
+  "project.CreationPlanned": () => ({ creation: { requestId: "project-creation", bodyHash: "a".repeat(64), projectId: "project-one",
+    repository: { repoId: "project-repo", name: "Repository", path: "/tmp" },
+    workspace: { worktreeId: "project-workspace", repoId: "project-repo", machineId: "local", branch: "main", path: "/tmp", checkout: "main" },
+    workspaceFolder: "/tmp", newRepository: false, name: "Project", goal: "Exercise event privacy", shell: "zsh", leadName: "Sage",
+    lead: { harness: "first", account: { _tag: "named", accountId: "primary" }, permission: "ask" },
+    repositoryIdentity: { device: "1", inode: "2" } } }),
+  "project.CreationClaimed": () => ({ creationRequestId: "project-creation", kind: "folder", identity: { device: "1", inode: "3" } }),
+  "project.CreationFinished": () => ({ creationRequestId: "project-creation" }),
+  "project.GoalChanged": () => ({ projectId: "project-one", goal: "Exercise updated goal privacy" }),
+  "project.ArchiveStarted": () => ({ projectId: "project-one" }),
+  "project.Archived": () => ({ projectId: "project-one" }),
+  "project.Restored": () => ({ projectId: "project-one" }),
+  "project.Placed": () => ({ projectId: "project-one", worktreeId: "project-workspace", machineId: "local" }),
+  "project.PreferencesChanged": () => ({ projectId: "project-one", shell: "zsh" }),
+  "project.Renamed": () => ({ projectId: "project-one", name: "Renamed project" }),
+  "project.StageChanged": () => ({ projectId: "project-one", stage: "build" }),
+  "project.TeamAdded": () => ({ projectId: "project-one", teamId: "project-team", name: "Team", worktreeId: "project-workspace" }),
+  "project.SprintAdded": () => ({ projectId: "project-one", sprintId: "project-sprint", label: "SP-01", name: "Sprint", goal: "Exercise privacy", phase: "Build", owner: "agent-self", needs: [] }),
+  "project.SprintChanged": () => ({ projectId: "project-one", sprintId: "project-sprint", phase: "Review" }),
+  "project.SprintCompleted": () => ({ projectId: "project-one", sprintId: "project-sprint", completion: "verified", evidence: "Visibility checks passed" }),
+  "project.TaskAdded": () => ({ projectId: "project-one", taskId: "project-task", title: "Task", owner: "agent-self", teamId: "project-team", sprintId: "project-sprint", state: "queue", worktreeId: "project-workspace" }),
+  "project.TaskChanged": () => ({ projectId: "project-one", taskId: "project-task", state: "active" }),
+  "project.OwnerTaskNotificationPlanned": () => ({ notificationId: "owner-task-notice", projectId: "project-one", taskId: "project-task", targetAgentId: "agent-self" }),
+  "project.TaskNoted": () => ({ projectId: "project-one", taskId: "project-task", title: "Note", detail: "Private project history" }),
   AgentStarted: (a) => ({ agentId: a, name: `n-${a}`, role: "worker", groups: [], parent: parents[a] === undefined ? owner : { _tag: "agent", agentId: parents[a] }, harness: "first", account: "primary", permission: "ask", folder: "/tmp", runMode: "acp" }),
   AgentStartFailed: (a) => ({ agentId: a, reason: "agent start failed" }),
   SessionOpened: (a, n) => ({ agentId: a, session: { _tag: "acp", sessionId: `s-${n}` }, protocolVersion: 2, reloadable: true }),
+  AgentConfigurationChosen: (a, n) => ({ agentId: a, revision: `config-${n}`, desired: { model: "large", effort: "high" } }),
+  AgentConfigurationObserved: (a) => ({ agentId: a, applied: { model: "small", effort: "low" } }),
+  AgentConfigurationApplied: (a, n) => ({ agentId: a, revision: `config-${n}`, applied: { model: "large", effort: "high" } }),
+  AgentConfigurationRefused: (a, n) => ({ agentId: a, revision: `config-${n}`, applied: { model: "small" }, status: "refused", reason: "adapter-refused" }),
   PromptSent: (a, n) => ({ agentId: a, deliveryId: `d-${n}`, sender: owner, text: "Prompt text." }),
   ThreadItem: (a, n) => ({ agentId: a, itemId: `i-${n}`, content: { _tag: "text", text: "Thread text." }, replay: false }),
   TurnStarted: (a) => ({ agentId: a }),
@@ -93,6 +144,7 @@ const samples: Record<string, (a: string, n: string) => Record<string, unknown>>
   AccountAvailable: () => ({ accountId: "primary", cause: "owner cleared" }),
   HarnessChanged: () => ({ harness }),
   CommandRefused: () => ({ command: "start", reason: "refused" }),
+  "client.AlertPromptDismissed": () => ({}),
   "client.AlertBaseline": () => ({ position: 0 }),
   "client.AlertRaised": (a, n) => ({ alertId: `alert-${n}`, alertKey: `permission:${n}`, kind: "approval", agentId: a, subject: { _tag: "permission", id: `p-${n}` }, title: "Permission needs your approval", sourceSequence: 0 }),
   "client.AlertDelivered": (_a, n) => ({ alertId: `alert-${n}`, carrier: "ntfy", generation: 0, attempt: 1 }),
@@ -168,7 +220,7 @@ it("7.3 the samples cover every event type in the contracts' union (breaks when 
   expect(Object.keys(samples).sort()).toEqual(tags);
   for (const tag of tags) {
     expect(() => sample(tag, "agent-x", "check")).not.toThrow();
-    if (tag.startsWith("client.")) expect(eventVisibility[tag as keyof typeof eventVisibility]).toBe("owner-only");
+    if (tag.startsWith("client.") || tag.startsWith("project.")) expect(eventVisibility[tag as keyof typeof eventVisibility]).toBe("owner-only");
   }
 });
 

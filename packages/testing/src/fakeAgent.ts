@@ -25,7 +25,10 @@ type DiagnosticStep =
 type StepDiagnostic = DiagnosticStep extends infer D ? D extends { type: infer T } ? Omit<D, "type"> & { step: T } : never : never
 type Step = DiagnosticStep | StepDiagnostic
   | { step: "text"; text: string }
+  | { step: "report_configuration" }
   | { step: "plan"; entries: AcpSchema.PlanEntry[] }
+  // Issue 556: acknowledge queued notifications before a later direct raw frame.
+  | { step: "notification_barrier" }
   | { step: "tool_call"; toolCallId: string; title: string; kind: AcpSchema.ToolKind; status: AcpSchema.ToolCallStatus; output: string }
   | { step: "file_change"; toolCallId: string; path: string; operation: string; patch: string }
   | { step: "permission"; toolCallId: string; title: string; name?: string; options: AcpSchema.PermissionOption[]; kind?: AcpSchema.ToolCallUpdate["kind"]; rawInput?: AcpSchema.ToolCallUpdate["rawInput"]; locations?: Array<{ path: string }>; _meta?: AcpSchema.ToolCallUpdate["_meta"] }
@@ -69,6 +72,8 @@ interface Script {
   configOptions?: AcpSchema.SessionConfigOption[]
   // Unit 6a: refuse set_config_option for an unknown option or a value the option does not list.
   strictConfigOptions?: boolean
+  // Controlled ACP configuration responses for engine integration tests.
+  configuration?: { gate?: string; entered?: string; refuseValues?: string[]; ignoreValues?: string[]; optionsByModel?: Record<string, AcpSchema.SessionConfigOption[]> }
   // Repeat emits separate replay chunks without exceeding the operating system's per-variable limit.
   history?: Array<{ role: "user" | "agent"; text: string; repeat?: number }>
   turns: Step[][]
@@ -250,18 +255,25 @@ const program = Effect.gen(function*() {
     }
     return { configOptions: options }
   }))
-  yield* agent.handleSetSessionConfigOption((request) => Effect.suspend(() => {
+  yield* agent.handleSetSessionConfigOption((request) => Effect.gen(function*() {
+    if (request.configId !== "mode" && script.configuration?.gate !== undefined) {
+      if (script.configuration.entered !== undefined) writeFileSync(script.configuration.entered, "entered")
+      yield* awaitGate(script.configuration.gate)
+    }
+    if (script.configuration?.refuseValues?.includes(String(request.value))) return yield* AcpRequestError.invalidParams("Configuration refused")
     const session = sessions.get(request.sessionId)
-    if (!session) return Effect.fail(AcpRequestError.invalidParams("Unknown session"))
+    if (!session) return yield* AcpRequestError.invalidParams("Unknown session")
     if (script.strictConfigOptions === true) {
       const option = session.options.find((candidate) => candidate.configId === request.configId) as { options?: Array<{ value?: unknown }> } | undefined
       if (option === undefined || (Array.isArray(option.options) && !option.options.some((choice) => choice.value === request.value))) {
-        return Effect.fail(AcpRequestError.invalidParams("Unknown configuration value"))
+        return yield* AcpRequestError.invalidParams("Unknown configuration value")
       }
     }
+    if (script.configuration?.ignoreValues?.includes(String(request.value))) return { configOptions: session.options }
+    if (request.configId === "model" && script.configuration?.optionsByModel?.[String(request.value)] !== undefined) session.options = structuredClone(script.configuration.optionsByModel[String(request.value)]!)
     session.options = session.options.map((option) => option.configId === request.configId
       ? { ...option, currentValue: request.value } as AcpSchema.SessionConfigOption : option)
-    return Effect.succeed({ configOptions: session.options })
+    return { configOptions: session.options }
   }))
   yield* agent.handleCancel((request) => {
     const cancel = sessions.get(request.sessionId)?.cancel
@@ -289,7 +301,19 @@ const program = Effect.gen(function*() {
         if ("type" in step) continue
         switch (step.step) {
           case "text": yield* text(step.text); break
+          case "report_configuration": yield* text(`configuration:${JSON.stringify({ pid: process.pid, options: session.options })}`); break
           case "plan": yield* update({ sessionUpdate: "plan_update", plan: { type: "items", planId: "script-plan", entries: step.entries } }); break
+          case "notification_barrier": {
+            // This unknown extension request shares the notification writer's FIFO.
+            // Its expected refusal arrives only after the peer's awaited handlers
+            // have processed earlier frames. It emits no text or idle/plan update,
+            // so the runner's streaming-redactor carry remains held.
+            yield* agent.raw.request("_lgcode_test_notification_barrier", {}).pipe(
+              Effect.flatMap(() => Effect.fail(AcpRequestError.internalError("Expected notification barrier refusal"))),
+              Effect.catchTags({ AcpRequestError: (error) => error.code === -32601 ? Effect.void : Effect.fail(error) })
+            )
+            break
+          }
           case "tool_call": yield* update({ sessionUpdate: "tool_call_update", toolCallId: step.toolCallId, title: step.title, kind: step.kind, status: step.status, content: [{ type: "content", content: { type: "text", text: step.output } }] }); break
           case "file_change": yield* update({ sessionUpdate: "tool_call_update", toolCallId: step.toolCallId, content: [{ type: "diff", changes: [{ operation: step.operation, path: step.path }], patch: { format: "git_patch", text: step.patch } }] } as AcpSchema.SessionNotification["update"]); break
           case "permission": {

@@ -1,7 +1,9 @@
+import type { AgentChoice, AgentConfiguration } from "@lgcode/contracts";
+import { configurationMatches } from "../runner/choices.ts";
 import { safeStartFailure, type StartFailure } from "@lgcode/contracts/startFailure";
 import {
   EventSequence as EventSequenceSchema, eventEffect,
-  type Account, type Actor, type Caller, type PermissionAction, type AgentId, type Delivery, type Event, type EventEnvelope, type EventSequence, type LifecycleState,
+  type ProjectRequestLink, type QuestionMetadata, type Account, type Actor, type Caller, type PermissionAction, type AgentId, type Delivery, type Event, type EventEnvelope, type EventSequence, type LifecycleState,
   pieceNamespaces, EngineEvent, type PieceNamespace, type PermissionOption, type SessionReference, type WaitMember,
 } from "@lgcode/contracts";
 import * as Schema from "effect/Schema";
@@ -21,6 +23,7 @@ interface AgentRow {
   readonly account: string;
   readonly model?: string;
   readonly effort?: string;
+  readonly configuration?: AgentConfiguration;
   readonly permission: string;
   readonly mode?: string;
   readonly folder: string;
@@ -36,7 +39,14 @@ interface AgentRow {
   readonly capacityHeld: boolean;
 }
 
-interface RequestRow {
+interface RequestTimes {
+  readonly sourceSequence: EventSequence;
+  readonly openedAt: EventEnvelope["occurredAt"];
+  readonly closedSequence?: EventSequence;
+  readonly answeredAt?: EventEnvelope["occurredAt"];
+}
+
+interface RequestRow extends RequestTimes, ProjectRequestLink {
   readonly action?: PermissionAction;
   readonly permissionRequestId: string;
   readonly agentId: AgentId;
@@ -52,7 +62,7 @@ interface RequestRow {
   readonly reason?: string;
 }
 
-interface QuestionRow {
+interface QuestionRow extends RequestTimes, QuestionMetadata {
   readonly questionId: string;
   readonly agentId: AgentId;
   readonly status: "open" | "answered";
@@ -93,6 +103,7 @@ export interface State {
   readonly client: unknown;
   readonly board: unknown;
   readonly roles: unknown;
+  readonly project: unknown;
   readonly sequence: EventSequence;
   readonly agents: Readonly<Record<string, AgentRow>>;
   readonly threads: Readonly<Record<string, ReadonlyArray<EventEnvelope>>>;
@@ -117,6 +128,7 @@ export const emptyViews = (views: Readonly<Record<PieceNamespace, PieceView>> = 
   client: guardPiece("views", "client", () => views.client.empty(), undefined),
   board: guardPiece("views", "board", () => views.board.empty(), undefined),
   roles: guardPiece("views", "roles", () => views.roles.empty(), undefined),
+  project: guardPiece("views", "project", () => views.project.empty(), undefined),
   sequence: zero, agents: keyed(), threads: keyed(), requests: keyed(), questions: keyed(), waits: keyed(),
   deliveries: keyed(), accounts: keyed(),
 });
@@ -178,6 +190,9 @@ const withoutReason = (row: DeliveryRow): DeliveryRow => {
   return rest;
 };
 
+const desiredOf = (row: AgentRow): AgentChoice => row.configuration?.desired ?? {
+  ...(row.model === undefined ? {} : { model: row.model }), ...(row.effort === undefined ? {} : { effort: row.effort }),
+};
 const agentsAfter = (state: State, event: Event): State["agents"] => {
   switch (event._tag) {
     case "AgentStarted": return put(state.agents, event.agentId, {
@@ -187,10 +202,35 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
       ...(event.effort === undefined ? {} : { effort: event.effort }),
       permission: event.permission, folder: event.folder, runMode: event.runMode, state: { _tag: "starting" },
       compacting: false, capacityHeld: false,
+      configuration: { desired: { ...(event.model === undefined ? {} : { model: event.model }), ...(event.effort === undefined ? {} : { effort: event.effort }) }, status: "pending" },
     });
     case "SessionOpened": return change(state.agents, event.agentId, (row) => ({
       ...row, state: nextState(row.state, event), startFailure: undefined, session: event.session,
       protocolVersion: event.protocolVersion, reloadable: event.reloadable,
+      configuration: {
+        ...(row.configuration?.revision === undefined ? {} : { revision: row.configuration.revision }), desired: desiredOf(row),
+        ...(event.configuration === undefined ? {} : { applied: event.configuration }),
+        // An old session event cannot prove a requested model or effort.
+        // With no requested axes there is no outstanding configuration work.
+        status: configurationMatches(row.harness, desiredOf(row), event.configuration ?? {}) ? "applied" : "pending",
+      },
+    }));
+    case "AgentConfigurationChosen": return change(state.agents, event.agentId, (row) => ({
+      ...row, ...event.desired, configuration: { revision: event.revision, desired: event.desired, status: "pending",
+        ...(row.configuration?.applied === undefined ? {} : { applied: row.configuration.applied }) },
+    }));
+    case "AgentConfigurationObserved": return change(state.agents, event.agentId, (row) => {
+      const configuration = row.configuration ?? { desired: desiredOf(row), status: "pending" as const };
+      const matches = configurationMatches(row.harness, configuration.desired, event.applied);
+      return { ...row, configuration: { ...configuration, applied: event.applied,
+        status: configuration.status === "applied" && !matches ? "pending" : configuration.status } };
+    });
+    case "AgentConfigurationApplied": return change(state.agents, event.agentId, (row) => event.revision !== row.configuration?.revision ? row : ({
+      ...row, configuration: { ...row.configuration!, desired: desiredOf(row), applied: event.applied, status: "applied" },
+    }));
+    case "AgentConfigurationRefused": return change(state.agents, event.agentId, (row) => event.revision !== row.configuration?.revision ? row : ({
+      ...row, configuration: { desired: desiredOf(row), ...(event.revision === undefined ? {} : { revision: event.revision }),
+        ...(event.applied === undefined ? {} : { applied: event.applied }), status: event.status, reason: event.reason },
     }));
     case "AgentGrouped": return change(state.agents, event.agentId, (row) => ({ ...row, groups: event.groups }));
     case "ModeChanged": return change(state.agents, event.agentId, (row) => ({
@@ -218,7 +258,10 @@ const agentsAfter = (state: State, event: Event): State["agents"] => {
       const capacityHeld = event._tag === "DeliveryHeld" ? true
         : event._tag === "DeliveryReleased" || event._tag === "AgentStopped" || event._tag === "AgentCrashed" ? false : row.capacityHeld;
       return next === row.state && compacting === row.compacting && capacityHeld === row.capacityHeld
-        ? row : { ...row, state: next, compacting, capacityHeld };
+        && !["AgentStopped", "AgentCrashed", "AgentInterrupted", "AgentReloadFailed"].includes(event._tag)
+        ? row : { ...row, state: next, compacting, capacityHeld,
+          ...(["AgentStopped", "AgentCrashed", "AgentInterrupted", "AgentReloadFailed"].includes(event._tag)
+            ? { configuration: { ...(row.configuration?.revision === undefined ? {} : { revision: row.configuration.revision }), desired: desiredOf(row), status: "pending" as const } } : {}) };
     });
     default: return state.agents;
   }
@@ -231,38 +274,44 @@ export const permissionAction = (event: PermissionAction): PermissionAction => O
     return value === undefined ? [] : [[key, value]];
   }),
 );
-const requestsAfter = (state: State, event: Event): State["requests"] => {
+const requestsAfter = (state: State, { event, sequence, occurredAt }: EventEnvelope): State["requests"] => {
   switch (event._tag) {
     case "PermissionRequested": return put(state.requests, event.permissionRequestId, {
       permissionRequestId: event.permissionRequestId, agentId: event.agentId, status: "open", holder: event.holder,
+      sourceSequence: sequence, openedAt: occurredAt,
       deliveryId: event.deliveryId, toolCallId: event.toolCallId, description: event.description,
       options: event.options, settingsWrite: event.settingsWrite,
+      ...(event.projectId === undefined ? {} : { projectId: event.projectId }),
+      ...(event.taskId === undefined ? {} : { taskId: event.taskId }),
+      ...(event.sprintId === undefined ? {} : { sprintId: event.sprintId }),
       ...(Object.keys(permissionAction(event)).length === 0 ? {} : { action: permissionAction(event) }),
     });
     case "PermissionMoved": return change(state.requests, event.permissionRequestId, (row) => ({
       ...row, holder: event.to, deliveryId: event.deliveryId,
     }));
     case "PermissionAnswered": return change(state.requests, event.permissionRequestId, (row) => ({
-      ...withoutAction(row), status: "answered", answer: event.answer, answeredBy: event.answeredBy,
+      ...withoutAction(row), status: "answered", closedSequence: sequence, answeredAt: occurredAt, answer: event.answer, answeredBy: event.answeredBy,
     }));
     case "PermissionCancelled": return change(state.requests, event.permissionRequestId, (row) => ({
-      ...withoutAction(row), status: "cancelled", reason: event.reason,
+      ...withoutAction(row), status: "cancelled", closedSequence: sequence, answeredAt: occurredAt, reason: event.reason,
     }));
     default: return state.requests;
   }
 };
 
-const questionsAfter = (state: State, event: Event): State["questions"] => {
+const questionsAfter = (state: State, { event, sequence, occurredAt }: EventEnvelope): State["questions"] => {
   switch (event._tag) {
     case "QuestionAsked": return put(state.questions, event.questionId, {
       questionId: event.questionId, agentId: event.agentId, status: "open", holder: event.holder,
-      deliveryId: event.deliveryId, text: event.text,
+      deliveryId: event.deliveryId, text: event.text, sourceSequence: sequence, openedAt: occurredAt,
+      ...Object.fromEntries(["title", "recommendation", "proposedAnswer", "projectId", "taskId", "sprintId"]
+        .flatMap((key) => event[key as keyof typeof event] === undefined ? [] : [[key, event[key as keyof typeof event]]])),
     });
     case "QuestionMoved": return change(state.questions, event.questionId, (row) => ({
       ...row, holder: event.to, deliveryId: event.deliveryId,
     }));
     case "QuestionAnswered": return change(state.questions, event.questionId, (row) => ({
-      ...row, status: "answered", answer: event.text, answeredBy: event.answeredBy, answerDeliveryId: event.deliveryId,
+      ...row, status: "answered", closedSequence: sequence, answeredAt: occurredAt, answer: event.text, answeredBy: event.answeredBy, answerDeliveryId: event.deliveryId,
     }));
     default: return state.questions;
   }
@@ -348,9 +397,9 @@ const accountsAfter = (state: State, event: Event): State["accounts"] => {
 export const applyWith = (state: State, envelope: EventEnvelope, views: Readonly<Record<PieceNamespace, PieceView>> = pieceViews): State => {
   const event = envelope.event;
   const owner = threadAgent(event);
-  const pieces = { client: state.client, board: state.board, roles: state.roles };
+  const pieces = { client: state.client, board: state.board, roles: state.roles, project: state.project };
   for (const namespace of pieceNamespaces) {
-    pieces[namespace] = guardPiece("views", namespace, () => views[namespace].reduce(state[namespace], event, envelope.sequence), state[namespace]);
+    pieces[namespace] = guardPiece("views", namespace, () => views[namespace].reduce(state[namespace], event, envelope.sequence, envelope.occurredAt), state[namespace]);
   }
   const next: State = {
     ...pieces,
@@ -359,8 +408,8 @@ export const applyWith = (state: State, envelope: EventEnvelope, views: Readonly
     threads: owner === undefined
       ? state.threads
       : put(state.threads, owner, [...(lookup(state.threads, owner) ?? []), envelope]),
-    requests: requestsAfter(state, event),
-    questions: questionsAfter(state, event),
+    requests: requestsAfter(state, envelope),
+    questions: questionsAfter(state, envelope),
     waits: waitsAfter(state, envelope),
     deliveries: deliveriesAfter(state, event),
     accounts: accountsAfter(state, event),

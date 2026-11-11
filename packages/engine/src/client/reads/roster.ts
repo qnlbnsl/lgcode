@@ -14,6 +14,7 @@ export const roster = (caller: Caller, view: Snapshot): ReadonlyArray<RosterEntr
       state: row.state, displayedState: displayedState({ state: row.state, openPermissionRequests, openQuestionsAsked }),
       openPermissionRequests, openQuestionsAsked, harness: row.harness, account: row.account,
       ...(row.model === undefined ? {} : { model: row.model }), ...(row.effort === undefined ? {} : { effort: row.effort }),
+      ...(caller._tag === "owner" && row.configuration !== undefined ? { configuration: row.configuration } : {}),
       permission: row.permission, folder: row.folder, ...(row.session === undefined ? {} : { session: row.session }), startedAt: start?.occurredAt ?? 0,
     } as RosterEntry;
   });

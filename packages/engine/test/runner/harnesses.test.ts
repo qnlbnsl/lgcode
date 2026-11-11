@@ -207,10 +207,10 @@ live("the engine's real bin folder holds the two pinned adapters, found as absol
     assert.deepEqual(result.missing.map((entry) => entry.id), ["gemini", "cursor"])
   }))
 
-it("the engine package pins the two adapters to exact versions (breaks if a range such as ^ or ~ replaces 0.99.1 or 2.5.0, so an install can change the adapter; row 18)", async () => {
+it("the engine package pins the two adapters to exact versions (breaks if a range such as ^ or ~ replaces 0.99.1 or 2.6.0, so an install can change the adapter; row 18)", async () => {
   const manifest = JSON.parse(
     await readFile(fileURLToPath(new URL("../../package.json", import.meta.url)), "utf8")
   ) as { dependencies: Record<string, string> }
   assert.equal(manifest.dependencies["@agentclientprotocol/claude-agent-acp"], "0.99.1")
-  assert.equal(manifest.dependencies["@agentclientprotocol/codex-acp"], "2.5.0")
+  assert.equal(manifest.dependencies["@agentclientprotocol/codex-acp"], "2.6.0")
 })

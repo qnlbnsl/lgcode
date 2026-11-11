@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { eventEffect, pieceNamespaces, type Caller, type Event, type EventSequence, type PieceNamespace } from "@lgcode/contracts";
+import { eventEffect, pieceNamespaces, projectTeamGroup, type Caller, type Event, type EventSequence, type PieceNamespace } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
+import { own, projectView, projectKey } from "../project/view.ts";
 import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { EventLog } from "../log/EventLog.ts";
 import { Restart } from "../recovery/service.ts";
@@ -23,7 +24,22 @@ export const pieceNamespace = (name: string): PieceNamespace | undefined =>
 // Every piece writer calls these checks under the log's writer permit.
 export const checkPieceBatch = (namespace: PieceNamespace, snapshot: Snapshot, batch: PieceBatch, caller: Caller | undefined, lists: EngineLists) => Effect.gen(function* () {
   if (Object.keys(batch.sideRows ?? {}).some((table) => !table.startsWith(`${namespace}_`))) return yield* refused();
-  if (batch.events.some((event) => !event._tag.startsWith(`${namespace}.`) && event._tag !== "DeliveryWithdrawn")) return yield* refused();
+  // A project team and its group channel are one atomic record operation.
+  // This exception permits only the matching channel, never arbitrary board writes.
+  const teamChannel = (event: Event): boolean => {
+    if (namespace !== "project" || event._tag !== "board.ChannelOpened" || event.kind !== "group") return false;
+    const team = batch.events.find((row) => row._tag === "project.TeamAdded" && row.channelId === event.channelId);
+    if (team?._tag !== "project.TeamAdded") return false;
+    const project = own(projectView(snapshot).projects, team.projectId);
+    const expected = projectTeamGroup(team.projectId, team.teamId);
+    return project !== undefined && team.group === expected && event.group === expected
+      && event.anchorAgentId === project.leadAgentId && event.manager?._tag === "agent" && event.manager.agentId === project.leadAgentId
+      && event.opener._tag === "agent" && event.opener.agentId === project.leadAgentId && event.members.length === 0
+      && own(projectView(snapshot).teams, projectKey(team.projectId, team.teamId)) === undefined
+      && !Object.hasOwn((snapshot.board as import("@lgcode/contracts").BoardView).channels, event.channelId)
+      && (caller?._tag === "owner" || caller?._tag === "agent" && caller.agentId === project.leadAgentId);
+  };
+  if (batch.events.some((event) => !event._tag.startsWith(`${namespace}.`) && event._tag !== "DeliveryWithdrawn" && !teamChannel(event))) return yield* refused();
   const events: Array<Event> = [];
   let state = snapshot;
   for (const event of batch.events) {
@@ -41,7 +57,9 @@ export const checkPieceBatch = (namespace: PieceNamespace, snapshot: Snapshot, b
     const target = state.agents[request.target];
     if (target === undefined || eventEffect(target.state._tag, event._tag) === "invalid") return yield* refused();
     const delivery = event.delivery;
-    if (delivery.source?._tag !== "piece" || !canReach({ ...(caller === undefined ? {} : { caller }), target: delivery.target, deliveryId: delivery.id, source: delivery.source, snapshot: state }, lists)) return yield* refused();
+    if (delivery.source?._tag !== "piece" || request.context !== undefined && namespace !== "board"
+      || !canReach({ ...(caller === undefined ? {} : { caller }), ...(request.context === undefined ? {} : { context: request.context }),
+        target: delivery.target, deliveryId: delivery.id, source: delivery.source, snapshot: state }, lists)) return yield* refused();
     events.push(event);
     state = project(state, [event], lists);
   }

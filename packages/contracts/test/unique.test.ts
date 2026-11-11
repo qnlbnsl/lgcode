@@ -19,7 +19,7 @@ it("board 1.8 every real board declaration is registered once in the full API wi
 });
 
 const engineNames = [
-  "start", "prompt", "answer", "pass-up", "ask", "wait", "stop", "resume", "release", "compact", "group",
+  "start", "configure", "prompt", "answer", "pass-up", "ask", "wait", "cancel-reply", "stop", "resume", "release", "compact", "group",
   "accounts", "accounts set-secret", "accounts mark-available", "harnesses", "subscribe", "debug.compare-views",
 ];
 // Walk member declarations, rather than toTaggedUnion().cases, which has
@@ -51,15 +51,16 @@ it("1a E1 preserves the engine inventory independently of later piece commands",
   expect((Contracts as unknown as { engineCommandNames: unknown }).engineCommandNames).toEqual(engineNames);
 });
 
-it("FR-052 E1 composes declarations and merged request blocks in engine, client, board, roles order", async () => {
+it("FR-052 E1 composes declarations and merged request blocks in engine, client, board, roles, project order", async () => {
   const lists = await loadLists();
-  const order = ["engine", "client", "board", "roles"];
+  const order = ["engine", "client", "board", "roles", "project"];
   expect(Contracts.commandGroups.map(({ namespace }) => namespace)).toEqual(order);
   expect(lists.commandGroups.map(({ namespace }) => namespace)).toEqual(order);
   const blockOrder = (names: ReadonlyArray<string>) => names.map((name) => {
     if (name.startsWith("client.")) return "client";
     if (name.startsWith("board.")) return "board";
     if (name.startsWith("roles.")) return "roles";
+    if (name.startsWith("project.")) return "project";
     return "engine";
   }).filter((namespace, index, all) => index === 0 || namespace !== all[index - 1]);
   expect(blockOrder([...Contracts.CommandsRpcGroup.requests.keys()])).toEqual(order);

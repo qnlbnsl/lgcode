@@ -19,6 +19,10 @@ const expectedEngineTags = [
   "AgentStarted",
   "AgentStartFailed",
   "SessionOpened",
+  "AgentConfigurationObserved",
+  "AgentConfigurationChosen",
+  "AgentConfigurationApplied",
+  "AgentConfigurationRefused",
   "PromptSent",
   "ThreadItem",
   "TurnStarted",
@@ -63,7 +67,7 @@ const expectedEngineTags = [
 // Keep the expected list independent of the production event-tag inventory.
 const expectedClientTags = [
   "client.AlertBaseline", "client.AlertRaised", "client.AlertDelivered", "client.AlertDeliveryFailed",
-  "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
+  "client.AlertPromptDismissed", "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
   "client.AlertCarrierTokenSet", "client.AlertCarrierTokenCleared", "client.WebSettingsChanged",
   "client.WebServerDown", "client.WebServerUp"
 ]
@@ -84,7 +88,15 @@ const expectedRolesTags = [
   "roles.CapacityRetried", "roles.CrashAdmitted", "roles.CrashRetried", "roles.GaveUp",
   "roles.RoleAdviceBroken", "roles.CacheFlushed", "roles.CompactRequested", "roles.StallEnded"
 ]
-const expectedTags = [...expectedEngineTags, ...expectedBoardTags, ...expectedClientTags, ...expectedRolesTags]
+const expectedProjectTags = [
+  "project.SetupAdvanced", "project.SetupCompleted", "project.MockRecorded", "project.MockApproved", "project.DesignRecorded",
+  "project.GitAttempted", "project.GitFinished", "project.GitEvidenceReported", "project.MainReviewOpened", "project.MainReviewDecided",
+  "project.CreationPlanned", "project.CreationClaimed", "project.CreationFinished", "project.GoalChanged", "project.ArchiveStarted", "project.Archived", "project.Restored",
+  "project.SettingsChanged", "project.RepositoryAdded", "project.RepositoryLocated", "project.WorktreeCreated",
+  "project.Created", "project.Placed", "project.PreferencesChanged", "project.Renamed", "project.StageChanged", "project.TeamAdded",
+  "project.SprintAdded", "project.SprintChanged", "project.SprintCompleted", "project.TaskAdded", "project.TaskChanged", "project.TaskNoted", "project.OwnerTaskNotificationPlanned"
+]
+const expectedTags = [...expectedEngineTags, ...expectedBoardTags, ...expectedClientTags, ...expectedRolesTags, ...expectedProjectTags]
 
 const tagOf = (member: { readonly ast: SchemaAST.AST }): string => {
   const ast = member.ast
@@ -129,7 +141,7 @@ describe("event tags", () => {
     expect([...tags].sort()).toEqual([...expectedEngineTags].sort())
   })
 
-  it("contains exactly the engine, board, client and roles events, each once", () => {
+  it("contains exactly the engine, board, client, roles and project events, each once", () => {
     const tags = members.map(tagOf)
     expect(tags).toHaveLength(expectedTags.length)
     expect(new Set(tags).size, "duplicate tags").toBe(tags.length)

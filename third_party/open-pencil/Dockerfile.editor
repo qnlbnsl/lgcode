@@ -1,0 +1,65 @@
+# LGcode's original build preparation. This recipe has not been executed.
+# The source context is the separately verified, unchanged cb717376 archive.
+FROM docker.io/oven/bun@sha256:3f23864d3e8c923975c61971cabe67ee3d5a728f1e25a559256b95af719a3478 AS bun
+FROM mcr.microsoft.com/playwright@sha256:bc6ab0d6d44ff4826e4cb8c1e6d801e185bfc42bb0753f8e2a30efc70db054c7 AS build
+COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
+RUN ln -s /usr/local/bin/bun /usr/local/bin/bunx
+ENV PATH=/root/.cargo/bin:$PATH \
+    CARGO_BUILD_JOBS=4 \
+    RAYON_NUM_THREADS=4 \
+    RUSTUP_IO_THREADS=4 \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    VITE_OPENPENCIL_CLOUD=off \
+    VITE_OPENPENCIL_FEEDBACK=off
+# The build grant must expressly include these external dependency downloads.
+# The versioned rustup bootstrap is checked against its official checksum; the
+# fetched checksum and actual executable hash remain build-receipt inputs.
+RUN apt-get update && apt-get install --yes --no-install-recommends build-essential curl ca-certificates \
+    && dpkg-query -W > /tmp/build-os-packages.txt \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl --fail --location --proto '=https' --tlsv1.2 --max-time 120 \
+      https://static.rust-lang.org/rustup/archive/1.28.2/x86_64-unknown-linux-gnu/rustup-init -o /tmp/rustup-init \
+    && curl --fail --location --proto '=https' --tlsv1.2 --max-time 120 \
+      https://static.rust-lang.org/rustup/archive/1.28.2/x86_64-unknown-linux-gnu/rustup-init.sha256 -o /tmp/rustup-init.sha256 \
+    && read expected remainder < /tmp/rustup-init.sha256 \
+    && printf '%s  /tmp/rustup-init\n' "$expected" | sha256sum --check - \
+    && sha256sum /tmp/rustup-init > /tmp/rustup-bootstrap.sha256 \
+    && chmod 0755 /tmp/rustup-init \
+    && /tmp/rustup-init -y --profile minimal --default-toolchain none \
+    && rustup toolchain install 1.98.1 --profile minimal --component clippy --component rustfmt --target wasm32-unknown-unknown
+COPY --from=provenance /source-file-manifest.json /tmp/pinned-source-file-manifest.json
+WORKDIR /src
+COPY . /src
+RUN printf '%s  bun.lock\n%s  Cargo.lock\n%s  LICENSE\n' \
+      463f8d35a926e9230ab832c248f250934f6b2e01924fd1e0ba74483c399077f0 \
+      d9ee81a697a889e0aa0009f2ae33ca8af9542660a7ebf30c0a7da4e32f457229 \
+      38ac54d3b48ccb6b3c0044b37bec1d75c21c3dc38b34a5a8c52a3cea34ba514b \
+      > /tmp/upstream-inputs.sha256 \
+    && sha256sum --check /tmp/upstream-inputs.sha256 \
+    && test "$(bun --version)" = 1.4.4 \
+    && bun install --frozen-lockfile --ignore-scripts
+# This is upstream's public-package build graph. It compiles packages; it does
+# not start their Cloud, automation or development services.
+RUN bun run build:packages && sha256sum --check /tmp/upstream-inputs.sha256
+# Vite generates brand assets and the demo. Demo generation launches the exact
+# locked Playwright Chromium with a container-local temporary loopback server.
+# This requires an explicit build-time browser grant, separate from frame proof.
+RUN bunx vite build && sha256sum --check /tmp/upstream-inputs.sha256 \
+    && test -s dist/THIRD-PARTY-NOTICES.md \
+    && mkdir -p /tmp/editor-provenance \
+    && cp LICENSE /tmp/editor-provenance/OpenPencil-LICENSE \
+    && cp /tmp/pinned-source-file-manifest.json /tmp/editor-provenance/source-file-manifest.json \
+    && mkdir -p /tmp/editor-provenance/font-licences \
+    && cp packages/core/assets/*-OFL.txt /tmp/editor-provenance/font-licences/ \
+    && cp /tmp/upstream-inputs.sha256 /tmp/rustup-bootstrap.sha256 /tmp/rustup-init.sha256 /tmp/build-os-packages.txt /tmp/editor-provenance/ \
+    && bun --version > /tmp/editor-provenance/bun-version.txt \
+    && rustc --version > /tmp/editor-provenance/rustc-version.txt \
+    && find dist -type f -print0 | sort -z | xargs -0 sha256sum > /tmp/editor-provenance/distribution.sha256 \
+    && printf '%s\n' '{"upstream":"https://github.com/open-pencil/open-pencil","commit":"cb717376a6252b0387f95d1e8bf33a0b196eb9bf","archiveSha256":"6d60622e247159718c73df9f539e6757802daed5966bcb81c475ebe34bb78a24","runtimeProof":false}' > /tmp/editor-provenance/source.json
+FROM docker.io/library/caddy@sha256:d8c17a862962def15cde69863a3a463f25a2664942eafd7bdbf050e9c3116b83
+COPY --from=build /src/dist /srv/editor
+COPY --from=build /tmp/editor-provenance /usr/share/lgcode-editor-provenance
+LABEL org.opencontainers.image.source="https://github.com/open-pencil/open-pencil" \
+      org.opencontainers.image.revision="cb717376a6252b0387f95d1e8bf33a0b196eb9bf"
+# The engine supplies its already written confined Caddy configuration on stdin.
+# This image is not launched or exposed by the build recipe.

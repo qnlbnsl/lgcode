@@ -1,3 +1,4 @@
+import { configure } from "./configuration.ts";
 import { startFailureText } from "@lgcode/contracts/startFailure";
 import { commandOutcome } from "@lgcode/contracts";
 import * as Effect from "effect/Effect";
@@ -13,12 +14,14 @@ import { harnesses } from "./harnesses.ts";
 import { prompt } from "./prompt.ts";
 import { resume } from "./resume.ts";
 import { start } from "./start.ts";
+import { cancelReply } from "./cancelReply.ts";
 import { stop } from "./stop.ts";
 import { refused, type Payload, type Planner, type PlannerTable } from "./internal.ts";
 import { setWebSettings } from "../client/settings.ts";
 import { setRoleFile } from "../roles/roleFile.ts";
 import { setSettings, snooze } from "../roles/sheepdog/settings.ts";
 import { record } from "../roles/sheepdog/record.ts";
+import { archiveProject, createProject } from "../project/lifecycle.ts";
 
 const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan: Planner): Planner => (input, payload) => Effect.gen(function* () {
   const { actor, snapshot } = input;
@@ -31,7 +34,12 @@ const targeted = (name: "prompt" | "stop" | "resume" | "compact" | "group", plan
   if (commandOutcome(agent.state._tag, name) === "refused") return yield* refused();
   return yield* plan(input, payload);
 });
+export const promptPlanner = (files?: import("../project/context.ts").ContextFiles): Planner => targeted("prompt", (input, payload) => prompt(input, payload as Payload<"prompt">, files));
 export const planners = {
+  // Lifecycle can be the first import in this cyclic service graph. Resolve
+  // its const planners at invocation, after module initialization completes.
+  "project.create": (input, payload) => createProject(input, payload),
+  "project.archive": (input, payload) => archiveProject(input, payload),
   "client.web.settings.set": setWebSettings,
   "roles.role-file.set": (input, payload) => setRoleFile(input, payload as Payload<"roles.role-file.set">),
   // Their implementation units replace these refusals; each declared command
@@ -40,13 +48,15 @@ export const planners = {
   "roles.snooze": (input, payload) => snooze(input, payload as Payload<"roles.snooze">),
   "roles.record": (input, payload) => record(input, payload as Payload<"roles.record">),
   release: (input, payload) => release(input, payload as Payload<"release">),
+  configure: (input, payload) => configure(input, payload as Payload<"configure">),
   start: (input, payload) => start(input, payload as Payload<"start">),
-  prompt: targeted("prompt", (input, payload) => Effect.succeed(prompt(input, payload as Payload<"prompt">))),
+  prompt: promptPlanner(),
   answer: (input, payload) => answer(input, payload as Payload<"answer">),
   "pass-up": (input, payload) => passUp(input, payload as Payload<"pass-up">),
   ask: (input, payload) => ask(input, payload as Payload<"ask">),
   wait: (input, payload) => wait(input, payload as Payload<"wait">),
   compact: targeted("compact", (input, payload) => Effect.succeed(compact(input, payload as Payload<"compact">))),
+  "cancel-reply": (input, payload) => cancelReply(input, payload as Payload<"cancel-reply">),
   stop: targeted("stop", (input, payload) => Effect.succeed(stop(input, input.snapshot.agents[payload.agentId as string]!))),
   resume: targeted("resume", (input, payload) => resume(input, input.snapshot.agents[payload.agentId as string]!, payload as Payload<"resume">)),
   group: targeted("group", (input, payload) => Effect.succeed(group(input.snapshot.agents[payload.agentId as string]!, payload as Payload<"group">))),

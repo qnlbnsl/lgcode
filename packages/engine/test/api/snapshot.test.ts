@@ -34,6 +34,7 @@ it("1.7 snapshot reads one views value and every section receives that exact val
     client: (_caller: Caller, view: View) => { sectionInputs.push(view); return { records: [{ id: "one", text: "", sequence: view.sequence }] }; },
     board: (_caller: Caller, view: View) => { sectionInputs.push(view); return { sequence: view.sequence }; },
     roles: (_caller: Caller, view: View) => { sectionInputs.push(view); return { sequence: view.sequence }; },
+    project: (_caller: Caller, view: View) => { sectionInputs.push(view); return { sequence: view.sequence }; },
   } };
   const reply = await Effect.runPromise(snapshot(owner, lists).pipe(Effect.provideService(Views, {
     snapshot: Effect.sync(() => (++reads === 1 ? first : second)), applyCommitted: () => Effect.void,
@@ -43,7 +44,7 @@ it("1.7 snapshot reads one views value and every section receives that exact val
   expect(reply.client).toEqual({ records: [{ id: "one", text: "", sequence: 11 }] });
   expect(reply.board).toEqual({ sequence: 11 });
   expect(reply.roles).toEqual({ sequence: 11 });
-  expect(sectionInputs).toHaveLength(3);
+  expect(sectionInputs).toHaveLength(4);
   expect(sectionInputs.every((view) => view === first)).toBe(true);
 });
 
@@ -59,7 +60,7 @@ it("1.7 a section may be included for the owner and omitted for an agent", async
   expect(Object.hasOwn(await run({ _tag: "agent", agentId: "agent-a" }), "client")).toBe(false);
 });
 
-it("1.22 default snapshots include the installed roles summary for the owner and omit it for agents", async () => {
+it("1.22 default snapshots include notification settings and the roles summary for the owner and omit them for agents", async () => {
   registerRebuildCheck({ noLog: true });
   const snapshot = await loadSnapshot();
   const lists = await loadLists();
@@ -67,7 +68,7 @@ it("1.22 default snapshots include the installed roles summary for the owner and
     snapshot: Effect.succeed(emptyViews()), applyCommitted: () => Effect.void,
   })) as Effect.Effect<SnapshotReply, unknown, never>);
   const reply = await run(owner);
-  expect(Object.hasOwn(reply, "client")).toBe(false);
+  expect(reply.client).toEqual({ pushPromptDismissed: false });
   expect(reply.board).toMatchObject({ disabled: false, holdsUnsettled: [], holdsIncoming: [], ownerHeld: [] });
   expect(reply.roles).toEqual({
     roleFile: null, settings: {}, matters: { items: [], truncated: false },

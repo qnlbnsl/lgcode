@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { callerKey } from "../identity/caller.ts";
 
 import {
   EventEnvelope, type Caller, type AgentId, type BootId, type Event, type RequestId,
@@ -105,18 +106,6 @@ const failureReason = (error: SqlError): string => {
     case "ConstraintError": return "database write failed: constraint";
     case "LockTimeoutError": return "database write failed: busy";
     default: return "database write failed";
-  }
-};
-
-// The caller as stored in `events.caller` and `receipts.caller`. It is built
-// field by field so the text does not depend on property order or on extra
-// runtime properties.
-export const callerKey = (actor: Caller): string => {
-  switch (actor._tag) {
-    case "owner": return "owner";
-    case "agent": return `agent:${actor.agentId}`;
-    case "service": return `service:${actor.service}`;
-    case "piece": return `piece:${actor.namespace}`;
   }
 };
 
@@ -234,7 +223,7 @@ export const makeLayer = (lists: EngineLists = engineLists) => Layer.effect(Even
     if (Array.isArray(value)) return yield* Effect.forEach(value, (item) => redactReceipt(item, structure?.elements));
     if (typeof value === "object" && value !== null) {
       const entries = yield* Effect.forEach(Object.entries(value), ([key, item]) => Effect.gen(function* () {
-        return [key, yield* redactReceipt(item, fieldStructure(structure, key))] as const;
+        return [key, yield* redactReceipt(item, fieldStructure(structure, key, "_tag" in value ? value._tag : undefined))] as const;
       }));
       return Object.fromEntries(entries);
     }

@@ -8,6 +8,13 @@ import type * as RpcGroup from "effect/rpc/RpcGroup";
 import type { PlannerTable, Snapshot } from "../commands/internal.ts";
 import { planners } from "../commands/planners.ts";
 import { reads, type ReadHandler } from "../api/reads.ts";
+import { gitPlanners, gitReads } from "../project/gitCommands.ts";
+import { previewProjectPlacement } from "../project/lifecycle.ts";
+import { mockPlanners, mockReads } from "../project/mocks.ts";
+import { setupPlanners, setupReads } from "../project/setup.ts";
+import { designPlanners, designReads } from "../project/design.ts";
+import { creationPlanners, projectPlanners, projectReads } from "../project/commands.ts";
+import { snapshotFor as projectSnapshotFor } from "../project/snapshot.ts";
 import { boardPlanners, boardReads } from "../board/commands.ts";
 import { boardReactor } from "../board/reactor.ts";
 import { snapshotFor as boardSnapshotFor } from "../board/snapshot.ts";
@@ -17,6 +24,7 @@ import { snapshotFor as rolesSnapshotFor } from "../roles/snapshot.ts";
 import { openMatters as rolesOpenMatters, alertSource as rolesAlertSource } from "../roles/openMatters.ts";
 import { sheepdogLoop } from "../roles/sheepdog/loop.ts";
 
+import { clientView } from "../client/alerts/view.ts";
 import { alertDelivery } from "../client/alerts/delivery.ts";
 import { carrierKeep, carrierPlanners } from "../client/alerts/token.ts";
 import { alertReactor, type AlertSourceResult, type PieceAlertSourceRequest } from "../client/alerts/reactor.ts";
@@ -53,21 +61,26 @@ export interface EngineLists {
 }
 const absent = () => undefined;
 let reactors: EngineLists["reactors"] | undefined;
+let plannerTable: EngineLists["planners"] | undefined;
+let readTable: EngineLists["reads"] | undefined;
 export const engineLists: EngineLists = {
   commandGroups, eventGroups, commands: CommandsRpcGroup, event: Event, envelope: EventEnvelope,
-  reach, sourceRules, holdUnsettled, requestHeld, secretKeep: { client: carrierKeep, board: () => [], roles: () => [] },
+  reach, sourceRules, holdUnsettled, requestHeld, secretKeep: { client: carrierKeep, board: () => [], roles: () => [], project: () => [] },
   services: {
     "roles.sheepdog": ["subscribe", "client.event", "prompt", "compact", "resume", "release", "roles.record", "board.post", "board.flush", "board.status"],
     "roles.standing-rules": [],
   }, secretCommands: ["accounts set-secret", "client.alerts.carrier.set-token"],
   access: commandAccess,
-  planners: { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners },
-  reads: { ...reads, ...alertReads, ...boardReads },
+  // Build these tables on first use after the cyclic modules initialize.
+  // Cache the complete maps so every consumer keeps the same registrations.
+  get planners() { return plannerTable ??= { ...planners, ...alertPlanners, ...carrierPlanners, ...boardPlanners, ...projectPlanners, ...creationPlanners, ...gitPlanners, ...mockPlanners, ...setupPlanners, ...designPlanners }; },
+  get reads() { return readTable ??= { ...reads, ...alertReads, ...boardReads, ...projectReads, ...gitReads, ...mockReads, ...setupReads, ...designReads, "project.placement.preview": previewProjectPlacement }; },
   // The tables and reactors import engine services in this same module graph.
   // Resolve their values when used, after module initialization has completed.
   get views() { return pieceViews; },
-  migrations: { client: [], board: [], roles: [] }, visibility: eventVisibility, pieceVisibility: {},
-  snapshotSections: { client: absent, board: boardSnapshotFor, roles: rolesSnapshotFor },
+  migrations: { client: [], board: [], roles: [], project: [] }, visibility: eventVisibility, pieceVisibility: {},
+  snapshotSections: { client: (caller, view) => caller._tag === "owner"
+    ? { pushPromptDismissed: clientView(view.client).pushPromptDismissed } : undefined, board: boardSnapshotFor, roles: rolesSnapshotFor, project: projectSnapshotFor },
   alertSources: { client: absent, board: boardAlertSource, roles: rolesAlertSource },
   openMatters: { client: () => [], board: boardOpenMatters, roles: rolesOpenMatters },
   get reactors() { return reactors ??= {

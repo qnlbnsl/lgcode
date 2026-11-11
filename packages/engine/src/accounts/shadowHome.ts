@@ -45,12 +45,12 @@ const decodeInstance = Schema.decodeUnknownOption(ProviderInstanceId);
 // explicit home. The account's own `homePath` is the shared home the layout
 // is built on; without one, an explicit CODEX_HOME is. No path or cause leaves
 // this function.
-export const withCodexHome = (
+const codexLayout = (
   input: {
     readonly stateFolder: string; readonly home: string; readonly accountId: string;
     readonly variables: Readonly<Record<string, string>>; readonly homePath?: string;
   },
-): Effect.Effect<Record<string, string>, ShadowHomeFailed, FileSystem.FileSystem | Path.Path> => Effect.gen(function* () {
+) => Effect.gen(function* () {
   const instance = decodeInstance(input.accountId);
   if (instance._tag === "None") return yield* Effect.fail(new ShadowHomeFailed());
   const layout = yield* resolveManagedCodexHomeLayout(input.stateFolder, instance.value, {
@@ -59,6 +59,20 @@ export const withCodexHome = (
   const confined = layout.mode !== "authOverlay" || layout.effectiveHomePath === undefined
     || (yield* insideState(input.stateFolder, layout.effectiveHomePath));
   if (!confined) return yield* Effect.fail(new ShadowHomeFailed());
+  return layout;
+}).pipe(
+  Effect.provideService(HomeDirectory, input.home),
+  Effect.catch(() => Effect.fail(new ShadowHomeFailed())),
+);
+
+type HomeInput = Parameters<typeof codexLayout>[0];
+// Discovery and launch resolve exactly the same effective private home. Only
+// launch materializes it; observing an absent home must leave it absent.
+export const resolveCodexHome = (input: HomeInput) => codexLayout(input).pipe(Effect.map((layout) =>
+  layout.effectiveHomePath === undefined ? { ...input.variables } : { ...input.variables, CODEX_HOME: layout.effectiveHomePath }));
+
+export const withCodexHome = (input: HomeInput): Effect.Effect<Record<string, string>, ShadowHomeFailed, FileSystem.FileSystem | Path.Path> => Effect.gen(function* () {
+  const layout = yield* codexLayout(input);
   yield* materializeCodexShadowHome(layout);
   if (layout.mode === "authOverlay" && layout.effectiveHomePath !== undefined && !(yield* insideState(input.stateFolder, layout.effectiveHomePath))) {
     return yield* Effect.fail(new ShadowHomeFailed());

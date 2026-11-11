@@ -19,18 +19,20 @@ export interface ClientView {
   readonly generation: number;
   readonly token?: { readonly origin: string; readonly carrierGeneration: string } | undefined;
   readonly retiredTokens: readonly string[];
-  readonly delivery: Readonly<Record<string, AlertDelivery & { readonly failureSequence?: number }>>;
+  readonly delivery: Readonly<Record<string, AlertDelivery & { readonly sequence: number; readonly failureSequence?: number }>>;
   readonly webSettings: WebSettings;
   readonly webDown: boolean;
+  readonly pushPromptDismissed: boolean;
 }
 export const emptyClientView = (): ClientView => ({
   alerts: Object.create(null), push: { ...alertPushDefaults }, carrier: { _tag: "none" },
-  tokenSet: false, generation: 0, retiredTokens: [], delivery: Object.create(null), webSettings: { ...defaultWebSettings }, webDown: false,
+  pushPromptDismissed: false, tokenSet: false, generation: 0, retiredTokens: [], delivery: Object.create(null), webSettings: { ...defaultWebSettings }, webDown: false,
 });
 export const clientView = (value: unknown): ClientView => value as ClientView;
 const reduce = (view: ClientView, event: Event, sequence: number): ClientView => {
   let next = view;
   switch (event._tag) {
+    case "client.AlertPromptDismissed": return { ...view, pushPromptDismissed: true };
     case "client.AlertBaseline":
       return { ...view, position: Math.max(view.position ?? 0, event.position) };
     case "client.AlertRaised":
@@ -57,12 +59,12 @@ const reduce = (view: ClientView, event: Event, sequence: number): ClientView =>
     case "client.AlertDeliveryFailed":
       if (event.generation !== view.generation) return view;
       return { ...view, delivery: { ...view.delivery, [event.alertId]: {
-        generation: event.generation, attempt: event.attempt,
+        sequence, generation: event.generation, attempt: event.attempt,
         ...(event._tag === "client.AlertDeliveryFailed" ? {
           status: "failed", failureSequence: sequence, final: event.final === true,
           // Historical events allow arbitrary strings. Only fixed diagnostics
           // belong in owner reads, never raw carrier responses or credentials.
-          reason: event.reason === "token missing" ? "token missing" : "carrier delivery failed",
+          reason: event.reason === "token missing" || event.reason === "service missing" ? event.reason : "carrier delivery failed",
         } : { status: "delivered" }),
       } } };
     case "client.WebSettingsChanged": return { ...view, webSettings: event.settings,

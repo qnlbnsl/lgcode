@@ -1,4 +1,4 @@
-import { connect } from "@lgcode/client/browser"
+import { connect, type ClientEnvelope } from "@lgcode/client/browser"
 import { displayedState, type ClientSnapshot, type EventSequence, type RequestId } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
@@ -8,6 +8,7 @@ interface Observer {
   readonly onSnapshot: (snapshot: ClientSnapshot) => void
   readonly onConnection: (state: ConnectionState) => void
   readonly onSessionExpired: () => void
+  readonly onEnvelope?: (envelope: ClientEnvelope) => void
 }
 const requestId = () => crypto.randomUUID() as RequestId
 
@@ -18,7 +19,7 @@ const refreshTags = new Set([
   "AgentStarted", "AgentStartFailed", "SessionOpened", "AgentGrouped", "ModeChanged",
   "TurnStarted", "TurnEnded", "AgentCrashed", "AgentInterrupted", "AgentStopped", "AgentReloadFailed",
   "DeliverySent", "DeliveryHeld", "DeliveryReleased", "PermissionRequested", "PermissionAnswered",
-  "PermissionCancelled", "PermissionMoved", "QuestionAsked", "QuestionAnswered", "QuestionMoved"
+  "PermissionCancelled", "PermissionMoved", "QuestionAsked", "QuestionAnswered", "QuestionMoved", "board.PostWritten"
 ])
 
 export async function watchSituation(observer: Observer, signal: AbortSignal): Promise<void> {
@@ -53,6 +54,9 @@ export async function watchSituation(observer: Observer, signal: AbortSignal): P
         yield* client["client.subscribe"]({ requestId: requestId(), after }).pipe(Stream.runForEach((item) => Effect.gen(function* () {
           if (item.sequence <= after) return
           if ("event" in item) {
+            // Reuse the client's actual recovered source before the snapshot
+            // exposes its request row to Home, the bell or a later thread.
+            if (!signal.aborted) observer.onEnvelope?.(item)
             if (item.event._tag === "StateChanged" && current !== undefined) {
               const event = item.event
               publish({ ...current, sequence: item.sequence, agents: current.agents.map((agent) => {
@@ -60,9 +64,11 @@ export async function watchSituation(observer: Observer, signal: AbortSignal): P
                 const updated = { ...agent, state: event.state }
                 return { ...updated, displayedState: displayedState(updated) }
               }) })
-            } else if (refreshTags.has(item.event._tag)) {
+            } else if (refreshTags.has(item.event._tag) || item.event._tag.startsWith("project.") || item.event._tag.startsWith("client.Alert")) {
               yield* refresh(item.sequence)
             }
+          } else if (item._tag === "client.Oversized" && (refreshTags.has(item.tag) || item.tag.startsWith("project.") || item.tag.startsWith("client.Alert"))) {
+            yield* refresh(item.sequence)
           }
           // Checkpoints, unknown events and content-only markers also advance
           // the cursor. State markers are recovered by the browser client.

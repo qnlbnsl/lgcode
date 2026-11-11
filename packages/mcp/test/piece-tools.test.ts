@@ -22,8 +22,11 @@ it("1a E2 tools derive new agent-callable piece commands but exclude streams and
   const loading = import("../src/tools.ts");
   await expect(loading, "The MCP consumer must accept the caller-kind table").resolves.toHaveProperty("toolNames");
   const tools = await loading;
+  expect(Contracts.CommandsRpcGroup.requests.has("project.creation.abandon")).toBe(true);
+  expect(Contracts.commandAccess["project.creation.abandon"]).toEqual(["owner"]);
+  expect(tools.toolNames).not.toContain("project.creation.abandon");
   expect([...tools.toolNames].sort()).toEqual([
     "answer", "ask", "board.acknowledge", "board.channels", "board.close", "board.members",
-    "board.open", "board.post", "board.read", "board.status", "client.event", "client.read", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
+    "board.open", "board.post", "board.read", "board.status", "cancel-reply", "client.event", "client.read", "client.roster", "client.snapshot", "client.thread", "compact", "group", "pass-up", "project.changes", "project.commit.files", "project.conflict", "project.context.search", "project.design.read", "project.design.record", "project.diff", "project.git.state", "project.history", "project.mocks.artifact", "project.mocks.read", "project.mocks.record", "project.read", "project.requests", "project.review", "project.review.report", "project.review.status", "project.sprint.complete", "project.sprint.create", "project.sprint.update", "project.stage.set", "project.task.create", "project.task.history", "project.task.note", "project.task.update", "project.team.create", "prompt", "release", "resume", "roles.handoff", "roles.orient", "start", "stop", "wait",
   ]);
 });

@@ -3,6 +3,7 @@ import type { BoardAddressee, BoardAuthor, ReplyMode } from "@lgcode/contracts/b
 import type { BoardPostView, BoardView } from "@lgcode/contracts/board/view";
 import type { Snapshot } from "../commands/internal.ts";
 import { holderAbove } from "../routing/holders.ts";
+import { canReadContext } from "../project/context.ts";
 
 export interface PostAccess {
   readonly channelId: string;
@@ -176,7 +177,7 @@ export const canCarryPost = (snapshot: Snapshot, target: string, postId: string)
   const post = own(board(snapshot).posts, postId);
   const agent = own(snapshot.agents, target);
   if (post === undefined || agent === undefined || !member(snapshot, post.channelId, { _tag: "agent", agentId: agent.agentId })
-    || !channelReach(snapshot, post.channelId)) return false;
+    || !channelReach(snapshot, post.channelId) || !canReadContext(snapshot, { _tag: "agent", agentId: agent.agentId }, post.context)) return false;
   const addressee = post.to.find((to) => to._tag === "agent" && to.agentId === target);
   return post.reply === "none" || addressee === undefined || ceilingAllows(snapshot, post.author, addressee);
 };
@@ -186,5 +187,6 @@ export const canCarryCompletion = (snapshot: Snapshot, target: string, postId: s
   const post = own(board(snapshot).posts, postId);
   const agent = own(snapshot.agents, target);
   return post !== undefined && agent !== undefined
-    && member(snapshot, post.channelId, { _tag: "agent", agentId: agent.agentId }) && channelReach(snapshot, post.channelId);
+    && member(snapshot, post.channelId, { _tag: "agent", agentId: agent.agentId }) && channelReach(snapshot, post.channelId)
+    && post.replies.every((id) => canReadContext(snapshot, { _tag: "agent", agentId: agent.agentId }, own(board(snapshot).posts, id)?.context));
 };

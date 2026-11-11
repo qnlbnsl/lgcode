@@ -18,7 +18,8 @@ const seed = (id: string, role = "worker:builder", parent?: string) => Effect.ge
   const token = mintAgentToken();
   yield* appendSetup([
     start(id, { role, parent: parent === undefined ? owner : { _tag: "agent", agentId: parent } }),
-    event({ _tag: "SessionOpened", agentId: id, session: { _tag: "acp", sessionId: `session-${id}` }, protocolVersion: 2, reloadable: true }),
+    event({ _tag: "SessionOpened", agentId: id, session: { _tag: "acp", sessionId: `session-${id}` }, protocolVersion: 2, reloadable: true,
+      configuration: { model: "test-model", effort: "high" } }),
   ], { agentTokens: [{ agentId: agentIdOf(id), tokenHash: token.tokenHash, revokedAt: null }] });
   return Redacted.value(token.token);
 });

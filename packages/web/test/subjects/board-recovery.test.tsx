@@ -34,7 +34,7 @@ it.each(["/#/thread/worker-1", "/#/thread/worker-1?subject=board:post-42"])("res
   expect(read).toHaveBeenCalledWith(expect.objectContaining({ post: "post-42" }))
 })
 
-it("keeps a refused draft and reuses its request id when the owner retries", async () => {
+it("keeps an unconfirmed draft and reuses its request id when the owner recovers", async () => {
   const reply = vi.fn().mockReturnValueOnce(Effect.fail({ reason: "board disabled" }))
     .mockReturnValue(Effect.succeed({ postId: "answer-1" }))
   const container = await mountThread([], {
@@ -46,7 +46,7 @@ it("keeps a refused draft and reuses its request id when the owner retries", asy
   await click(container, "Send reply")
   expect(container.textContent).toContain("board disabled")
   expect(field.value).toBe("Keep my answer.")
-  await click(container, "Send reply")
+  await click(container, "Recover original reply")
   expect(reply).toHaveBeenCalledTimes(2)
   expect(reply.mock.calls[1]![0].requestId).toBe(reply.mock.calls[0]![0].requestId)
 })

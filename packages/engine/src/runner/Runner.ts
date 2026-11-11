@@ -1,6 +1,6 @@
 import {
-  AgentId, DeliveryId, EpochMilliseconds, ThreadContent, PermissionActionFields, PermissionOption, PermissionRequestId, TurnUsage,
-  type Account, type Delivery, type HarnessSettings, type PermissionLevel, type SessionReference,
+  AgentChoice, AgentId, DeliveryId, EpochMilliseconds, ThreadContent, PermissionActionFields, PermissionOption, PermissionRequestId, TurnUsage,
+  type AgentChoices, type AgentConfiguration, type ContextUsage, type Account, type Delivery, type HarnessSettings, type PermissionLevel, type SessionReference,
 } from "@lgcode/contracts";
 import * as Context from "effect/Context";
 import * as Data from "effect/Data";
@@ -16,6 +16,7 @@ import type { StartFailure } from "@lgcode/contracts/startFailure";
 export class RunnerRejected extends Data.TaggedError("RunnerRejected")<{
   readonly reason: string;
   readonly startFailure?: StartFailure;
+  readonly configurationUncertain?: boolean;
 }> {}
 
 export interface RunnerCapabilities {
@@ -35,6 +36,7 @@ export interface SessionInfo {
   readonly session: SessionReference;
   readonly protocolVersion: number;
   readonly reloadable: boolean;
+  readonly configuration?: AgentChoice;
   // Present on a load; absent on a start, which replays nothing.
   readonly replay?: ReadonlyArray<ReplayItem>;
 }
@@ -72,6 +74,7 @@ export const RunnerEvent = Schema.Union([
   Schema.TaggedStruct("turnEnded", {
     agentId: AgentId, incarnation: Schema.NonEmptyString, deliveryId: DeliveryId,
     sentSequence: Schema.Int.check(Schema.isGreaterThan(0)),
+    stopped: Schema.optionalKey(Schema.Boolean),
     usage: Schema.optionalKey(TurnUsage),
   }),
   Schema.TaggedStruct("deliveryUpdate", {
@@ -87,6 +90,7 @@ export const RunnerEvent = Schema.Union([
     itemId: Schema.optionalKey(Schema.NonEmptyString),
     content: Schema.optionalKey(ThreadContent),
   }),
+  Schema.TaggedStruct("configurationReported", { agentId: AgentId, incarnation: Schema.NonEmptyString, applied: AgentChoice }),
   Schema.TaggedStruct("modeReported", {
     agentId: AgentId, incarnation: Schema.NonEmptyString, mode: Schema.String,
     level: Schema.optionalKey(Schema.Literals(["read-only", "ask", "edit", "full"])),
@@ -131,7 +135,10 @@ export class Runner extends Context.Service<Runner, {
   readonly start: (input: Spawn) => Effect.Effect<SessionInfo, RunnerRejected>;
   readonly load: (input: Spawn & { readonly session: SessionReference }) => Effect.Effect<SessionInfo, RunnerRejected>;
   readonly prompt: (input: { readonly agentId: AgentId; readonly incarnation: string; readonly delivery: Delivery; readonly sentSequence: number }) => Effect.Effect<void, RunnerRejected>;
-  readonly cancel: (input: { readonly agentId: AgentId }) => Effect.Effect<void, RunnerRejected>;
+  readonly choices: (input: { readonly agentId: AgentId; readonly incarnation: string }) => Effect.Effect<AgentChoices, RunnerRejected>;
+  readonly context: (input: { readonly agentId: AgentId; readonly incarnation: string }) => Effect.Effect<ContextUsage, RunnerRejected>;
+  readonly configure: (input: { readonly agentId: AgentId; readonly incarnation: string; readonly desired: AgentChoice }) => Effect.Effect<Pick<AgentConfiguration, "applied" | "status" | "reason">, RunnerRejected>;
+  readonly cancel: (input: { readonly agentId: AgentId; readonly deliveryId?: DeliveryId; readonly sentSequence?: number }) => Effect.Effect<void, RunnerRejected>;
   readonly answerPermission: (input: { readonly agentId: AgentId; readonly requestId: string; readonly optionId: string }) => Effect.Effect<void, RunnerRejected>;
   readonly setMode: (input: { readonly agentId: AgentId; readonly permission: PermissionLevel }) => Effect.Effect<void, RunnerRejected>;
   readonly compact: (input: { readonly agentId: AgentId; readonly incarnation: string; readonly delivery: Delivery; readonly sentSequence: number }) => Effect.Effect<void, RunnerRejected>;

@@ -19,6 +19,7 @@ import { RunnerRejected, type Runner, type SessionInfo } from "../runner/Runner.
 import {
   freshRequest, readHarnesses, refused, type Agent, type CommandRefused, type Runtime, type Snapshot,
 } from "../commands/internal.ts";
+import { projectPreventsRun } from "../project/access.ts";
 import { carryOnText } from "../accounts/available.ts";
 import { replayedDelivery, userRuns } from "./replay.ts";
 
@@ -36,6 +37,7 @@ const RESTART_CARRY_ON = "The engine restarted. Carry on with what you were doin
 export const spawnInput = (
   runtime: Runtime, snapshot: Snapshot, agent: Agent, token: Redacted.Redacted<string>, operation: "resume" | "reload",
 ): Effect.Effect<Spawn, CommandRefused | LogWriteFailed> => Effect.gen(function* () {
+  if (projectPreventsRun(snapshot, agent.agentId)) return yield* refused("project archive is unfinished because an agent could not stop");
   const parent = agent.parent._tag === "agent" ? snapshot.agents[agent.parent.agentId] : undefined;
   if (agent.parent._tag === "agent" && parent === undefined) return yield* refused();
   const grant = yield* checkFolder({ ...runtime, caller: agent.parent,
@@ -46,9 +48,17 @@ export const spawnInput = (
   const harness = (yield* readHarnesses(runtime)).find((settings) => settings.id === agent.harness);
   const account = snapshot.accounts[agent.account];
   if (harness === undefined || account === undefined) return yield* refused();
-  return { agentId: agent.agentId, token, folder, grant, harness, account,
-    permission: Schema.decodeUnknownSync(PermissionLevel)(agent.permission),
+  // An owner choice can use that session's advertised values, which can be
+  // wider than the optional configured launch lists. Open the
+  // replacement session first and report its actual settings. The existing
+  // configuration/send lane then revalidates and acknowledges the durable
+  // desired choice before releasing work. Unchanged initial settings retain
+  // the runner's recorded-list admission and older-protocol start calls.
+  const launchChoice = agent.configuration?.revision === undefined ? {
     ...(agent.model === undefined ? {} : { model: agent.model }), ...(agent.effort === undefined ? {} : { effort: agent.effort }),
+  } : {};
+  return { agentId: agent.agentId, token, folder, grant, harness, account,
+    permission: Schema.decodeUnknownSync(PermissionLevel)(agent.permission), ...launchChoice,
   };
 });
 
@@ -90,7 +100,7 @@ export const reloadedEvents = (
   return [
     ...(agent.state._tag === "starting" ? [] : [{ _tag: "StateChanged" as const, agentId, state: { _tag: "starting" as const } }]),
     // Named fields only: the replayed text never reaches the log (row 51).
-    { _tag: "SessionOpened", agentId, session: session.session, protocolVersion: session.protocolVersion, reloadable: session.reloadable },
+    { _tag: "SessionOpened", agentId, session: session.session, protocolVersion: session.protocolVersion, reloadable: session.reloadable, ...(session.configuration === undefined ? {} : { configuration: session.configuration }) },
     ...found.map((row): Event => ({ _tag: "DeliveryAccepted", agentId, deliveryId: row.id })),
     ...unaccepted.map((row): Event => ({ _tag: "DeliveryRequeued", agentId, deliveryId: row.id, reason: "agent interrupted" })),
     ...(carry ? [{ _tag: "DeliveryQueued" as const, delivery: {

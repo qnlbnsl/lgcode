@@ -1,3 +1,4 @@
+import { projectRefusalReasons } from "../project/errors.ts";
 // Connection assembly pattern: T3 Code apps/server/src/ws.ts, lines
 // 3293-3330, 3360-3367 and 3374-3385 (MIT licence). No source code is copied.
 import { timingSafeEqual } from "node:crypto";
@@ -24,6 +25,7 @@ import * as RpcSerialization from "effect/rpc/RpcSerialization";
 import * as SqlClient from "effect/sql/SqlClient";
 
 import { CommandHandler } from "../commands/CommandHandler.ts";
+import { refreshGitState } from "../commands/gitOperation.ts";
 import { verifyAgentToken } from "../identity/tokens.ts";
 import { EventLog } from "../log/EventLog.ts";
 import { checkPieceBatch, pieceNamespace } from "../commands/pieceBatch.ts";
@@ -41,6 +43,7 @@ type Handlers = { readonly [R in RpcGroup.Rpcs<typeof CommandsRpcGroup> as R["_t
 const refused = (status: number, text: string) => HttpServerResponse.text(text, { status });
 const reasons = new Set([
   "command refused", "cannot reload", "no usable account", "invalid credential",
+  "notification changed; refresh before retrying",
   "request id reused", "recovering", "board disabled", "database read failed", "database write failed",
   "database write failed: busy", "database write failed: disk full", "database write failed: constraint",
 ]);
@@ -48,14 +51,15 @@ const commandError = (requestId: unknown, reason = "command refused", command?: 
   // The role-file planner redacts its schema path and uses fixed reason text.
   // Preserve that owner's validation error without exposing other failures.
   _tag: "CommandError" as const, requestId, reason: reasons.has(reason)
+    || (command?.startsWith("project.") === true && projectRefusalReasons.has(reason))
     || (command === "roles.role-file.set" && reason.startsWith("role file error: "))
     || (command === "roles.settings.set" && reason.startsWith("roles settings error: ")) ? reason : "command refused",
 });
 // Authentication refusals already carry a fixed public reason. Preserve it
 // across a generic read wrapper without returning arbitrary failure content.
-const readError = (requestId: unknown, error: unknown) => commandError(requestId,
+const readError = (requestId: unknown, error: unknown, command: string) => commandError(requestId,
   typeof error === "object" && error !== null && "reason" in error && typeof error.reason === "string"
-    ? error.reason : "command refused");
+    ? error.reason : "command refused", command);
 
 // This listener can be opened before migrations or recovery. Its only
 // initial response, including to an unauthenticated upgrade, is recovering.
@@ -194,8 +198,9 @@ export const application = (options: ApplicationOptions) => Effect.gen(function*
       })));
       if (RpcSchema.isStreamSchema(rpc.successSchema)) return Stream.unwrap(prepare.pipe(Effect.map((input) =>
         read(input, payload) as Stream.Stream<unknown, unknown, Services>
-      ))).pipe(Stream.mapError((error) => readError(payload.requestId, error)), Stream.provideService(EventLog, boundedLog));
-      return prepare.pipe(Effect.flatMap((input) => read(input, payload) as Effect.Effect<import("./reads.ts").ReadReply, unknown, Services>),
+      ))).pipe(Stream.mapError((error) => readError(payload.requestId, error, name)), Stream.provideService(EventLog, boundedLog));
+      const invoke = (input: import("../commands/internal.ts").Input) => read(input, payload) as Effect.Effect<import("./reads.ts").ReadReply, unknown, Services>;
+      return prepare.pipe(Effect.flatMap((input) => name === "project.git.state" ? refreshGitState(input, payload, invoke) : invoke(input)),
         Effect.flatMap((result) => Effect.gen(function* () {
           const marks = result.marks ?? [];
           if (marks.length > 0 || (result.deliveries?.length ?? 0) > 0 || Object.keys(result.sideRows ?? {}).length > 0) {
@@ -208,7 +213,7 @@ export const application = (options: ApplicationOptions) => Effect.gen(function*
             }));
           }
           return result.reply;
-        })), Effect.mapError((error) => readError(payload.requestId, error)));
+        })), Effect.mapError((error) => readError(payload.requestId, error, name)));
     }])) as unknown as Handlers));
     yield* RpcServer.make(group).pipe(Effect.provide(handlers), Effect.provideService(RpcServer.Protocol, boundedProtocol), Effect.forkScoped);
     return yield* Effect.raceFirst(httpEffect, Deferred.await(invalidated).pipe(Effect.as(HttpServerResponse.empty())));

@@ -15,13 +15,14 @@
   },
   "dependencies": {
     "@agentclientprotocol/claude-agent-acp": "0.99.1",
-    "@agentclientprotocol/codex-acp": "2.5.0",
+    "@agentclientprotocol/codex-acp": "2.6.0",
     "@effect/platform-node": "catalog:",
     "@lgcode/contracts": "workspace:*",
     "@lgcode/t3-effect-acp": "workspace:*",
     "@lgcode/t3-node-sqlite": "workspace:*",
     "@lgcode/t3-provider-instance": "workspace:*",
     "effect": "catalog:",
+    "parse5": "8.1.0",
     "ws": "catalog:"
   },
   "devDependencies": {

@@ -261,9 +261,9 @@ describe("packages/engine/package.json adapter pins (criterion 1.7, decisions ro
     expect(manifest.dependencies?.["@agentclientprotocol/claude-agent-acp"]).toBe("0.99.1");
   });
 
-  it("pins @agentclientprotocol/codex-acp to exactly 2.5.0 (breaks if it floats, with ^ or ~ or in the wrong dependency group)", () => {
-    expect(raw).toContain('"@agentclientprotocol/codex-acp": "2.5.0"');
-    expect(manifest.dependencies?.["@agentclientprotocol/codex-acp"]).toBe("2.5.0");
+  it("pins @agentclientprotocol/codex-acp to exactly 2.6.0 (breaks if it floats, with ^ or ~ or in the wrong dependency group)", () => {
+    expect(raw).toContain('"@agentclientprotocol/codex-acp": "2.6.0"');
+    expect(manifest.dependencies?.["@agentclientprotocol/codex-acp"]).toBe("2.6.0");
   });
 });
 

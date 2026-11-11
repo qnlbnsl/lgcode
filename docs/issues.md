@@ -235,7 +235,6 @@ payload logging is enabled only by its exact test flag after the real
 temporary-folder check. Malformed adapter frames still produce a fixed
 diagnostic.
 
-
 ## 14. Copied environment helpers default to the whole process environment
 
 Found: 2026-11-01, in the unit 2 security read.
@@ -710,7 +709,6 @@ What changed in unit 7a: the service enables write-ahead logging before
 opening the Effect SQLite layer and builds that layer with `readerWorker:
 true`.
 
-
 ## 40. The `events.caller` column comment does not match what the log stores
 
 Found: 2026-11-01, while writing the unit 4b tests.
@@ -746,7 +744,6 @@ subscription backlog reaches 2,048 events, checked every ten milliseconds. It
 also disconnects a stream whose chunk remains unacknowledged for five seconds,
 including a stalled replay on a quiet log. The transport never drops an event
 to keep a connection alive.
-
 
 ## 42. Invalid subscription cursors could silently skip catch-up
 
@@ -1327,7 +1324,6 @@ Why it matters: a parent waiting on a child whose start failed is not woken at o
 What should happen: unit 6a writes these follow-ups through `EventLog.transact` with the views snapshot and `withWaitChecks`, like the other runner events.
 What changed in fix round 1: `start.ts` and `resume.ts` now write these follow-ups through `EventLog.transact`, with the views snapshot and `withWaitChecks`, so a waiter on that agent is resolved in the same append as the failure.
 
-
 ## 79. Nine earlier tests assumed a delivery to an idle agent stays queued
 
 Found: 2026-11-01, while building unit 5d.
@@ -1711,6 +1707,24 @@ Why it matters: without the rule, only the folder rule, the permission ceiling
 and the approval routing guard the state folder and the settings files (rows
 61, 65 and 72). `SECURITY.md` lists these harnesses.
 
+## 105. The runner's classified pause reply cannot carry a usage reset time
+
+Found: 2026-11-01, while writing unit 6b's account tests.
+State: fixed in unit 6b (`resetAt` is optional on the pause outcome and is written to `AccountOutOfUsage` and the paused state); the classification producer stays with unit 6c.
+
+What happens: the `promptReply` pause outcome in
+`packages/engine/src/runner/Runner.ts` carries only `reason` and `error`.
+The account and lifecycle event contracts already carry `resetAt`, but no
+reset time can reach their writer through this runner event.
+What should happen: add optional `resetAt` in epoch milliseconds to the
+pause outcome, preserve it through validation, and record it in
+`AccountOutOfUsage` and the paused state. The account timer must use the
+logged deadline after restart. The fake runner's test-only outcome now
+accepts that field so the tests can specify the missing seam.
+Why it matters: decisions 28, 52 and 53 require the account to return at its
+reported wall-clock reset time, including when that time passed during
+downtime. Classification itself remains unit 6c's work.
+
 ## 110. The replay test for the cursor transcript expects success, which unit 6c changes
 
 Found: 2026-11-01, by the unit 6c test writer, while writing criterion 6.9.
@@ -1804,6 +1818,76 @@ What should happen: the builder follows the reading in the unit 6c result
 owner states otherwise. The unit 6c tests do not cover this case.
 Why it matters: a second notice to a blocked parent would be delivered after
 its wait call returns and repeat what the call already told it.
+
+## 115. A pause before the session opens is not handled
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: fixed in unit 6d for the return path (`recovery/restart.ts`).
+
+What happens: row 53 says a pause before the session opens keeps no session, and when it clears the engine opens the session and then sends the first prompt. The start path (`commands/start.ts`) writes the agent, spawns, and records the session in one flow. A provider limit reported before `SessionOpened` has no pause path, and no frozen test covers it.
+What should happen: a start that is paused before its session opens keeps no session reference, and the account return opens the session first and then sends the first prompt.
+Why it matters: without it, such an agent stays stopped instead of waiting for its account. The change needs the start path restructured, which is larger than unit 6b's scope.
+
+What changed in unit 6d: when an account returns, a paused agent that has
+no session is started, not loaded, and its first queued prompt is sent after
+the session opens. Frozen test A06 covers it after a restart. The start
+command's own handling of a sign-out while starting is unchanged.
+
+## 116. A crash between an "account available" commit and the return write leaves agents paused
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: fixed in unit 6d (`recovery/restart.ts`, step 8).
+
+What happens: the agents on an account return to idle in a second transaction, written by `accounts/available.ts` after it sees the committed `AccountAvailable`. If the service stops between the two commits, the account is available and its agents stay paused. Nothing re-runs the return at startup.
+What should happen: startup recovery runs the return once for every available account that still has paused agents. The return is idempotent, so a second run writes nothing.
+Why it matters: those agents would never resume without an owner `accounts mark-available` call, which the owner cannot know to make.
+
+What changed in unit 6d: restart step 8 reads the latest `AccountAvailable`
+cause of each available account and runs the return for every account that
+still has returnable paused agents. A paused agent whose process is gone is
+reloaded, or started if it had no session. A second run writes nothing.
+
+## 117. The timer and the persistent secret store are not wired into a running service
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: fixed in units 6d and 7a.
+
+What happens: `packages/engine/src/index.ts` exports nothing, so `startAccountTimers` (`accounts/timers.ts`) and the persistent secret store layer (`accounts/SecretStore.ts`) are called only from tests. The `AcpRunner` layer also now needs `FileSystem` and `Path` services for the Codex shadow home.
+What should happen: the assembly starts `startAccountTimers` inside the service scope, provides the persistent `SecretStore` layer over the state folder, and provides the Node file system and path services.
+Why it matters: without the timer an out-of-usage account returns only by owner action, against rows 28 and 53.
+
+What changed in unit 6d: `Restart.recover` starts `startAccountTimers` at
+restart step 8, inside the scope `recover` runs in. Unit 7a must not start
+the timers a second time. It must still provide the persistent `SecretStore`
+layer and the Node file system and path services.
+
+What changed in unit 7a: the service provides the persistent secret store, the
+Node platform services, and the redactor before constructing the runner and
+the restart layer. It calls `Restart.recover` once and lets recovery start the
+account timers.
+
+## 118. A classified pause drops the provider's error text
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: open; no change planned until the owner asks.
+
+What happens: the `promptReply` pause outcome carries an `error` string, but the pause path writes only the fixed reasons ("account needs sign-in", "account is out of usage, no reset time known") so that no provider text reaches the log, a view or a reply.
+What should happen: if a diagnostic is wanted, unit 6c classifies and redacts it before it is stored, and the owner decides where it is shown.
+Why it matters: an owner sees that an account is paused but not what the provider said, which makes odd limit messages harder to diagnose.
+
+## 119. Unreferenced secrets are never collected
+
+Found: 2026-11-01, by engine-u6bb, building unit 6b.
+State: fixed in unit 6d (`recovery/restart.ts`, `accounts/SecretStore.ts`).
+
+What happens: `accounts/SecretStore.ts` stores a value before the account event that references it commits. A failed commit, or a replaced secret, leaves a value in `secrets.json` that no account event refers to.
+What should happen: startup recovery lists the secret references still used in the account views and removes the others from `secrets.json`.
+Why it matters: an unused credential stays on disk (mode 0600) longer than the owner expects.
+
+What changed in unit 6d: during restart, recovery collects every account's
+secret reference and every `secret:` environment value, and calls the
+store's `retainOnly`. The persistent store rewrites `secrets.json` only when
+something is removed, under its write lock.
 
 ## 120. The leftover-process reader does not support macOS yet
 
@@ -1911,6 +1995,15 @@ queued before the watermark. It still rejects other runner calls and keeps
 the subject-event and open-request assertions. No builder edit to the test
 was made.
 
+## 125. Fix-round test F1 assumed a sign-out pauses only the agent that reports it
+
+Found: 2026-11-01, by engine-u6bb, running the full suite for unit 6b.
+State: fixed in unit 6b by engine-lead's ruling.
+
+What happens: `routing/fix-round-one.test.ts` F1 "inherited grandchild" paused a child with the reason `signed-out` and then expected its idle caller, on the same account, to still run `wait`. Rows 28 and 53, and the frozen 6b test T1, make a sign-out pause every agent on the account, so the caller was paused and its `wait` was refused.
+What should happen: the test pauses the child with `out-of-usage` and no reset time, which pauses only that child and keeps the intent of the test (a wait on a paused member).
+Why it matters: two frozen tests disagreed, and the suite could not pass until one changed.
+
 ## 126. A detached helper could prevent the adapter's crash from being recorded
 
 Found: 2026-11-01, in unit 6c's focused review, finding F-1.
@@ -2005,104 +2098,6 @@ form. The fake agent's `out_of_usage` step already supplies `data.resetsAt`,
 but no recorded fixture holds a reset time yet, as recorded in the brief.
 Why it matters: account recovery cannot schedule a usage reset from a
 classified pause that lost its reset time.
-
-## 105. The runner's classified pause reply cannot carry a usage reset time
-
-Found: 2026-11-01, while writing unit 6b's account tests.
-State: fixed in unit 6b (`resetAt` is optional on the pause outcome and is written to `AccountOutOfUsage` and the paused state); the classification producer stays with unit 6c.
-
-What happens: the `promptReply` pause outcome in
-`packages/engine/src/runner/Runner.ts` carries only `reason` and `error`.
-The account and lifecycle event contracts already carry `resetAt`, but no
-reset time can reach their writer through this runner event.
-What should happen: add optional `resetAt` in epoch milliseconds to the
-pause outcome, preserve it through validation, and record it in
-`AccountOutOfUsage` and the paused state. The account timer must use the
-logged deadline after restart. The fake runner's test-only outcome now
-accepts that field so the tests can specify the missing seam.
-Why it matters: decisions 28, 52 and 53 require the account to return at its
-reported wall-clock reset time, including when that time passed during
-downtime. Classification itself remains unit 6c's work.
-
-## 115. A pause before the session opens is not handled
-
-Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: fixed in unit 6d for the return path (`recovery/restart.ts`).
-
-What happens: row 53 says a pause before the session opens keeps no session, and when it clears the engine opens the session and then sends the first prompt. The start path (`commands/start.ts`) writes the agent, spawns, and records the session in one flow. A provider limit reported before `SessionOpened` has no pause path, and no frozen test covers it.
-What should happen: a start that is paused before its session opens keeps no session reference, and the account return opens the session first and then sends the first prompt.
-Why it matters: without it, such an agent stays stopped instead of waiting for its account. The change needs the start path restructured, which is larger than unit 6b's scope.
-
-What changed in unit 6d: when an account returns, a paused agent that has
-no session is started, not loaded, and its first queued prompt is sent after
-the session opens. Frozen test A06 covers it after a restart. The start
-command's own handling of a sign-out while starting is unchanged.
-
-## 116. A crash between an "account available" commit and the return write leaves agents paused
-
-Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: fixed in unit 6d (`recovery/restart.ts`, step 8).
-
-What happens: the agents on an account return to idle in a second transaction, written by `accounts/available.ts` after it sees the committed `AccountAvailable`. If the service stops between the two commits, the account is available and its agents stay paused. Nothing re-runs the return at startup.
-What should happen: startup recovery runs the return once for every available account that still has paused agents. The return is idempotent, so a second run writes nothing.
-Why it matters: those agents would never resume without an owner `accounts mark-available` call, which the owner cannot know to make.
-
-What changed in unit 6d: restart step 8 reads the latest `AccountAvailable`
-cause of each available account and runs the return for every account that
-still has returnable paused agents. A paused agent whose process is gone is
-reloaded, or started if it had no session. A second run writes nothing.
-
-## 117. The timer and the persistent secret store are not wired into a running service
-
-Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: fixed in units 6d and 7a.
-
-What happens: `packages/engine/src/index.ts` exports nothing, so `startAccountTimers` (`accounts/timers.ts`) and the persistent secret store layer (`accounts/SecretStore.ts`) are called only from tests. The `AcpRunner` layer also now needs `FileSystem` and `Path` services for the Codex shadow home.
-What should happen: the assembly starts `startAccountTimers` inside the service scope, provides the persistent `SecretStore` layer over the state folder, and provides the Node file system and path services.
-Why it matters: without the timer an out-of-usage account returns only by owner action, against rows 28 and 53.
-
-What changed in unit 6d: `Restart.recover` starts `startAccountTimers` at
-restart step 8, inside the scope `recover` runs in. Unit 7a must not start
-the timers a second time. It must still provide the persistent `SecretStore`
-layer and the Node file system and path services.
-
-What changed in unit 7a: the service provides the persistent secret store, the
-Node platform services, and the redactor before constructing the runner and
-the restart layer. It calls `Restart.recover` once and lets recovery start the
-account timers.
-
-
-## 118. A classified pause drops the provider's error text
-
-Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: open; no change planned until the owner asks.
-
-What happens: the `promptReply` pause outcome carries an `error` string, but the pause path writes only the fixed reasons ("account needs sign-in", "account is out of usage, no reset time known") so that no provider text reaches the log, a view or a reply.
-What should happen: if a diagnostic is wanted, unit 6c classifies and redacts it before it is stored, and the owner decides where it is shown.
-Why it matters: an owner sees that an account is paused but not what the provider said, which makes odd limit messages harder to diagnose.
-
-## 119. Unreferenced secrets are never collected
-
-Found: 2026-11-01, by engine-u6bb, building unit 6b.
-State: fixed in unit 6d (`recovery/restart.ts`, `accounts/SecretStore.ts`).
-
-What happens: `accounts/SecretStore.ts` stores a value before the account event that references it commits. A failed commit, or a replaced secret, leaves a value in `secrets.json` that no account event refers to.
-What should happen: startup recovery lists the secret references still used in the account views and removes the others from `secrets.json`.
-Why it matters: an unused credential stays on disk (mode 0600) longer than the owner expects.
-
-What changed in unit 6d: during restart, recovery collects every account's
-secret reference and every `secret:` environment value, and calls the
-store's `retainOnly`. The persistent store rewrites `secrets.json` only when
-something is removed, under its write lock.
-
-## 125. Fix-round test F1 assumed a sign-out pauses only the agent that reports it
-
-Found: 2026-11-01, by engine-u6bb, running the full suite for unit 6b.
-State: fixed in unit 6b by engine-lead's ruling.
-
-What happens: `routing/fix-round-one.test.ts` F1 "inherited grandchild" paused a child with the reason `signed-out` and then expected its idle caller, on the same account, to still run `wait`. Rows 28 and 53, and the frozen 6b test T1, make a sign-out pause every agent on the account, so the caller was paused and its `wait` was refused.
-What should happen: the test pauses the child with `out-of-usage` and no reset time, which pauses only that child and keeps the intent of the test (a wait on a paused member).
-Why it matters: two frozen tests disagreed, and the suite could not pass until one changed.
 
 ## 131. A carry-on delivery was returned as failed instead of reaching the agent
 
@@ -2247,7 +2242,6 @@ identifier, start time, user identifier, and executable immediately after
 spawning. The service removes records of dead or replaced identities after
 recovery has swept them. Live identities remain available to the ancestry
 guard. The unsupported macOS reader remains issue 120.
-
 
 ## 154. The replay scan waits a fixed number of yields for the handler
 
@@ -2403,7 +2397,6 @@ What changed in unit 7a: adapter spawns record their process identity in the
 operational table before speaking the Agent Client Protocol. The upgrade guard
 verifies that each row still matches a live process before comparing the
 caller's claimed ancestry and group.
-
 
 ## 166. Frozen service fixtures did not reach the behaviours they asserted
 
@@ -5111,7 +5104,6 @@ The re-review labels the finding MAJOR.
 Why it matters: a matching login-folder configuration can fail after
 persisting its secret and leave later account commands refused.
 
-
 ## 270. Every terminal chunk persisted another whole retained snapshot
 
 Found: 2026-11-03, in the focused review of issue 242, finding B.
@@ -5177,7 +5169,6 @@ starvation cases and the unpublished-status flush.
 The logger regression in `terminal-lifecycle-round-7.test.ts` verifies one
 warning in each of two overflowing turns and checks that it contains no
 output text.
-
 
 ## 272. Codex's ask mode can refuse a write without requesting permission
 
@@ -6397,7 +6388,6 @@ token while durable retries continue. Regression tests exercise the writer,
 read, public schema, rebuild, restart, recovery, generation changes, clear,
 page rendering and command-line output. No live carrier or phone was used.
 
-
 ## 384. An integrated alert test still expects the earlier delivery projection
 
 Found: 2026-11-04, by the full merge check combining foundation review repairs FR-013 and FR-017.
@@ -6439,7 +6429,6 @@ activity and refuses a continuation after the lead loses management rights.
 
 Why it matters: A long worker history must remain recoverable without widening
 sequence ranges across unrelated events or refusing the summary.
-
 
 ## 386. The board-alert browser test uses an ambiguous reply locator
 
@@ -6684,7 +6673,6 @@ Validation: The cache tests failed first with missing action records. Temporary
 mutations test the shortened crash window, an ignored crash, and duplicate
 logical effects. No live harness recordings or owner phone are required for
 these local deterministic regressions.
-
 
 ## 401. Recovery completion used identities superseded by other foundation repairs
 
@@ -7117,7 +7105,6 @@ notifications.
 Blocked notifications and failed or truncated snapshot sections retain
 their existing behavior.
 
-
 ## 427. An idle reload suppresses a completed board response
 
 Found: 2026-11-05, while extending the recovery checkpoints for FR-112.
@@ -7291,7 +7278,6 @@ What happened: The source crash fixture had no active client follower. The basel
 What changed: A child now parks the real follower after it reads the source envelope and before appending its reaction. A second child parks after all baseline rows are staged on the transaction's writer connection and before commit. The parent kills each child with the SIGKILL signal.
 
 Validation: The parent verifies the durable source and absent reaction, or complete absence of baseline rows after rollback. Two reopens require one recovered alert or one complete baseline, stable alert identifiers, and progress on later sources. Temporary lost-source and split-baseline faults are rejected. The handled-write-failure and recovery-gate scenarios remain.
-
 
 ## 440. Two new alert regressions selected different baseline threads
 
@@ -8456,7 +8442,6 @@ Why it matters: Context, authority, and recovery behavior must stay
 consistent across navigation. Durable browser regressions cover these
 cases, and cold browser probes rechecked all six fixes.
 
-
 ## 507. Responsive resizing erased unsaved settings in the mock
 
 Found: 2026-11-06, while running the operational regressions.
@@ -8468,7 +8453,6 @@ What changed: The lead-panel breakpoint redraws only the board. Other views
 use their responsive styles without rebuilding their inputs.
 Why it matters: Changing window size must preserve unsaved workspace and
 service settings. A browser regression reproduces the original failure.
-
 
 ## 508. Repeated prototype disclaimers cluttered the working interface
 
@@ -8482,7 +8466,6 @@ accessible labels, save confirmations, and generated replies were cleaned up.
 Prototype boundaries remain in the design documentation.
 Why it matters: The owner is evaluating the app’s interaction and layout.
 Repeated reminders distract from the work being represented.
-
 
 ## 509. The workspace layout and navigation need a consistent scope model
 
@@ -8738,6 +8721,17 @@ State: worked around for now. The cause remains.
 
 The manager removed the `node_modules` folders from the 31 finished adjudicator seats, which brought the folder down to 56 percent of its file limit. The folders of the other finished seats remain. The Foundry should give seats a shared read-only copy, or remove a seat's temporary folder when the seat retires. The main disk is also at 96 percent.
 
+## 522. Building the mock's first run exposed two faults in it
+
+Found: 2026-11-07, while adding a first run to the mock on the branch `area/web-mock`.
+State: both are fixed on that branch.
+
+- The page could not start with no projects, because it read the first project while it loaded.
+  A real service starts with none, so the mock had no way to show its first minutes.
+- A new project's lead always ran on Claude Code, and the New project form offered no choice. A
+  person signed in only to Codex would have got a lead on an account that does not work. The form
+  now offers the signed-in harnesses, and it hides the choice when there is one.
+
 ## 523. The LGcode rename does not migrate existing state or environment variables
 
 Found: 2026-11-08, while renaming Sheprd to LGcode.
@@ -8760,17 +8754,6 @@ State: open.
 
 In the first `pnpm live-check` run on the rename branch, the `sandbox-mcp` step failed with "codex: not attempted; exact ask tool calls=0". The Codex agent, GPT-6 Luna at low effort, made no call to the `lgcode` ask tool, so the probe had nothing to judge. The Claude agent's call succeeded in the same run. A second run passed the step for both agents, with the same code, so the failure depends on whether the model chooses to call the tool. The step should give the agent a second prompt, or run on a model that follows the instruction reliably, before it reports a failure.
 
-## 522. Building the mock's first run exposed two faults in it
-
-Found: 2026-11-07, while adding a first run to the mock on the branch `area/web-mock`.
-State: both are fixed on that branch.
-
-- The page could not start with no projects, because it read the first project while it loaded.
-  A real service starts with none, so the mock had no way to show its first minutes.
-- A new project's lead always ran on Claude Code, and the New project form offered no choice. A
-  person signed in only to Codex would have got a lead on an account that does not work. The form
-  now offers the signed-in harnesses, and it hides the choice when there is one.
-
 ## 525. OpenPencil's command-line tool guesses the width of Inter Medium and SemiBold text
 
 Found: 2026-11-08, while building the Reverse Fig skill on the branch `area/reverse-fig`.
@@ -8783,3 +8766,2125 @@ State: worked around in the skill; the cause is in OpenPencil 0.16.0, not in LGc
   nodes ask for "Semi Bold".
 - The skill gives each label the size the browser measured, plus one pixel. It should drop that
   step once OpenPencil measures every bundled weight, and someone could report the fault upstream.
+
+## 526. A live check inside the Codex seat gave a misleading build baseline
+
+Found: 2026-11-08, during the website-1 baseline on `area/website`.
+State: understood; step-gate live checks are run by the manager.
+
+The baseline is 19 passing stages out of 23.
+The manager ran `pnpm live-check` from the manager shell on a clean detached
+checkout of `8b6bcf4` and reported that result on 2026-11-08.
+Its failed stages were `removed-variables`, `always-allow`, and `token-scan`.
+Recording was skipped because earlier stages failed.
+The `state-read`, `permission-kinds`, and `reload` stages passed in that run.
+
+The website lead's earlier run inside its Codex seat passed 16 stages out of 23
+at the same application code.
+That run additionally failed `state-read`, `permission-kinds`, and `reload`.
+Several Claude probes did not attempt the exact requested command.
+The manager identified the Codex-seat execution context as the difference.
+The 16-of-23 run is retained as execution-context evidence, not the build baseline.
+
+The ordinary check passed all 457 test files and all 18 browser cases.
+The real web check passed all ten reported stages.
+The `sandbox-mcp` stage passed in the lead's run.
+The final scan of events, replies, and output passed in that run.
+The token exposure remains covered by the owner's earlier deferral in issue 240.
+
+From this point, the manager runs `pnpm live-check` at each build-step gate.
+The website seats continue to run `pnpm check` and `pnpm live-check:web`.
+The gate report must name the commit and attribute the broader live result to the manager.
+The run evidence is recorded in `.scratch/foundry-runs/website-1/run.md` in the main checkout.
+The lead's private live run is `/tmp/lgcode-live-KULrQh`.
+
+## 527. Piece reducers could not use persisted event times for task history
+
+Found: 2026-11-08, while building the project foundation.
+State: fixed in the project foundation unit.
+
+The piece reducer table passed an event and a sequence, but omitted the event's persisted time.
+A task timeline built with the current clock would change when the log was replayed.
+The table now passes the envelope's time as a fourth argument.
+The project fold uses that time for task creation, changes, notes, and sprint completion.
+The handler tests compare the live views with a complete log rebuild after every journey.
+
+## 528. Git reads and conflict completion needed real-repository edge-case checks
+
+Found: 2026-11-08, while building the website's bounded Git service.
+State: fixed in the Git service, with focused tests against temporary repositories.
+
+A reversed Git history limited to one commit returns the newest selected commit,
+so it cannot establish when the oldest pending commit arrived. The service reads
+bounded committer dates from the actual unmerged history and selects the earliest.
+An ours-only conflict resolution can leave no staged file difference while a merge
+still needs its final commit. The service exposes the merge head and permits that
+commit once the unmerged index entries are cleared. Generated linked checkouts can
+also appear as untracked changes in their parent when no ignore rule exists. The
+service adds a local exclusion for its `.worktrees/` folder without editing a
+tracked ignore file. A newly created repository also needs Git's orphan-worktree support before its first commit. The service creates a real
+unborn project branch in that case, and represents its missing head as null.
+Real-repository tests cover these cases.
+
+The inline conflict resolver currently refuses binary, add/delete, symlink and
+submodule conflicts. Those cases require the terminal workflow. The service also
+refuses symbolic-link file operations, and public review links currently support
+GitHub's standard remote forms only. The command integration must apply the
+production redactor to every service reply before delivery through the client
+application programming interface.
+
+## 529. Reply cancellation failures were reported as storage failures
+
+Found: 2026-11-08, while building the website's reply cancellation command.
+State: fixed in the website worker's change before handoff.
+
+The first implementation mapped a runner refusal after the command committed to
+`LogWriteFailed`. A reply can finish between the command's state check and the
+runner call, so that refusal does not establish a database failure. The shared
+post-commit effect type now permits `CommandRefused`, and cancellation uses that
+recoverable error. Tests cover a runner refusal and a naturally ending reply.
+Both tests verify that the writer accepts a later command and sends the next
+queued prompt.
+
+## 530. Phone notification actions and prompt dismissal lacked engine support
+
+Found on 2026-11-08 while implementing the website's notification actions.
+The engine had no owner command to retry a displayed failed notification.
+It had no command to send a real test notification through the configured service.
+It did not remember the owner's choice to decline the first waiting request's
+phone notification offer.
+Its alert read exposed the attempt number but omitted the delivery time.
+
+Fixed in website unit W05a.
+The retry validates the alert identity, carrier generation, and displayed attempt.
+It shares a delivery lane with the background worker and records the actual result.
+The test command returns the transport result without creating an alert or storing a response.
+The client piece replays `client.AlertPromptDismissed` into its settings and owner snapshot.
+Alert reads obtain the latest attempt time from the event log.
+
+## 531. Composer choices and context usage lacked a live runner contract
+
+Found: 2026-11-08, during the website composer engine assignment.
+State: fixed on `unit/website-w05c`, pending independent verification.
+
+The engine configured a model and effort only when opening a session.
+There was no owner command to change the next turn on the same running agent.
+The existing per-turn token totals did not establish the size of the context window.
+The session-opening configuration helper also treated a successful response as an acknowledgement without checking its selected value.
+The shared start path now validates identifiers against the same bounded composer contract, including configured defaults.
+
+The change adds durable desired and applied settings, with explicit pending, refused, unsupported, and unavailable states.
+The dispatcher holds the existing agent lane through configuration acknowledgement and the next prompt or compaction write.
+A refused change retains queued owner work until the owner corrects the choice.
+A timed-out or disconnected configuration call leaves the live process uncertain.
+That process holds queued work until an explicit owner stop and resume opens a new incarnation.
+A stopped agent retains its desired settings for its next real retry.
+A fresh or reloaded process supplies its own acknowledgement.
+Configuration revision identities are registered at their event schema position in the redaction structure.
+An issue-340 regression preserves secret-colliding revisions through the real writer and receipts while prose and free-text records remain redacted.
+The owner can read bounded configured or negotiated choices, with optional redacted labels.
+Cursor's existing `auto` start setting keeps its advertised `default[]` protocol identity through the next turn and later effort-only changes.
+Only a live harness occupancy report with compatible used-token and window counts supplies a percentage.
+The ratio is divided before multiplication so valid safe-integer counts cannot round above 100 percent.
+A model change or reload invalidates old context evidence.
+
+The controlled Agent Client Protocol subprocess tests also exposed an execution-environment limit.
+Inside this Codex filesystem sandbox, an existing runner test's child exited before initialization.
+The same existing test passed outside the sandbox.
+The focused subprocess proofs therefore run outside that sandbox, with one worker.
+No product permission rule was weakened.
+
+## 532. The piece failure log test can miss its diagnostic
+
+Found: 2026-11-08, during the website worker's full repository check.
+State: both ownership gaps are fixed and independently verified.
+
+The `FR-042 protocol=false` case in
+`packages/engine/test/pieces/piece-failure-log.test.ts` expected one safe
+diagnostic and received none during a full suite run. The same three-test
+file passed when run alone, without a source change. The failed full run is
+in `/tmp/w03-check.log`, and the isolated pass is in
+`/tmp/w03-piece-failure.log`. The assertion remains unchanged.
+
+The combined website integration check at `b038490` later missed the same
+diagnostic in the `protocol=true` case. Its actual exit was 1. The unchanged
+file then passed alone again.
+
+The service drain removed a whole pending batch before writing its entries.
+Interruption after one write could discard the rest of that removed batch.
+A deterministic regression interrupts the actual drain fiber after its first
+entry. It expected three diagnostics and captured one before the correction.
+The drain now completes each removed batch before observing interruption.
+Its idle wait remains interruptible. All four diagnostic tests pass locally.
+The original exact count, throttling, and secrecy assertions remain intact.
+The forced interruption establishes this production defect. It does not
+establish the exact scheduling of the earlier zero-entry failures.
+The initial batch correction alone did not complete verification.
+
+A later complete Git check at `253ef5b` still captured zero entries in the
+original `protocol=false` case with the batch mask present.
+A separate controlled scheduler probe established a second ownership gap.
+A fork cancelled before its first evaluation never installs its `ensuring`
+finalizer. The probe retained all three pending entries and logged none.
+The parent scope now registers a final flush before scheduling the follower.
+The batch mask and the running follower's finalizer remain in place.
+Each drain removes its own snapshot once, so final flushes do not duplicate it.
+The same controlled delayed-child probe now passes and flushes all three
+entries before the child evaluates. Independent repeated-interruption and
+fresh-service lifecycle probes also pass.
+
+The corrected project and Git heads each passed their fresh complete checks.
+The final combined head `c4dfaf0` then passed an independent complete check.
+It passed 468 files, 6,417 tests, and all 18 browser cases, with two existing skips.
+TypeScript and copied-code credits checks also passed.
+The independent review approved that exact head with no findings.
+Its report is `.scratch/foundry-runs/website-1/w00f-verifier-1-result.md`.
+These results do not establish the exact timing of the earlier zero-entry failures.
+
+## 533. Git rename counts and interrupted staging needed recovery corrections
+
+Found: 2026-11-08, by the independent website Git service verifier at commit
+`55d23a6`, then reproduced through the public service in the correction seat.
+State: fixed for normal Git signal cleanup, with real-repository regression tests.
+
+The numeric diff parser treated tab-bearing rename paths as count rows.
+An unchanged rename could report additions and deletions taken from its name.
+The parser now follows Git's null-delimited record grammar and consumes both
+rename or copy paths before reading the next count row.
+Tests cover both tab-bearing paths, ordinary records, mixed binary and text
+records, commit diffs, truncation and missing final newlines.
+
+A timed-out staging process previously received the unconditional kill signal.
+Git could not remove its index lock, so a legitimate retry returned `busy`.
+The runner now sends the termination signal first and allows 250 milliseconds
+for Git's own lock rollback before forcing process-group termination.
+It preserves the original failure reason throughout that grace.
+Git resolves the actual per-worktree metadata and cleans only locks it acquired.
+The service never guesses lock ownership or unlinks index locks itself.
+Tests cover single and bulk staging, timeout and cancellation, main and linked
+checkouts, unchanged index contents, successful retry, pre-existing locks,
+another live Git operation's lock and a descendant ignoring termination.
+
+The correction tests also found that staging an already staged rename passed
+its removed old pathname to Git, causing a pathspec failure.
+Staging now updates the destination of an indexed rename or copy.
+Unstaging still resets both paths.
+Single-file and bulk regression assertions cover this case.
+
+A forced kill can still leave a lock when Git cannot run its cleanup within
+the grace period, and that lock requires terminal inspection.
+No cross-process atomic cleanup or Windows recovery guarantee is claimed.
+The local filesystem race limitation in issue 49 still applies.
+
+## 534. Project identities, read refusals, and initial settings failed at the persistence or wire boundary
+
+Found: 2026-11-08, by the independent verifier of the project foundation at `0335bda`.
+State: fixed in the first correction to the project foundation.
+
+Finding F01 was an integrity bug in the production redactor.
+The planner validated a project's lead, but the writer treated the new identity fields as text.
+A registered secret that overlapped a lead identifier changed that reference before persistence.
+The original lead then lost project membership and authorization.
+This is the project integration instance of issue 340.
+The correction adds schema-position rules for repository, workspace, project, team, sprint, task, parent, and lead references.
+Sprint dependencies and sprint and task owners also preserve their typed identities.
+Event tags select these rules, so a workspace's display owner remains redacted text.
+Mutation receipt identities and nested event envelopes use the same boundary rules.
+Production-writer tests check every project event with a nonempty synthetic registered secret.
+They inspect stored events, returned envelopes, receipt replies, retries, and deterministic rebuilds.
+A real-handler journey also checks the original lead's access and the original worker's task updates.
+Unrelated prose, workspace owner text, and arbitrary nested identity-shaped text remain redacted.
+
+Finding F02 hid fixed project refusal reasons on authenticated reads.
+The read wrapper omitted the command name required by the existing explicit reason allowlist.
+The correction passes that name through both ordinary and streaming read errors.
+Socket tests check an invalid cursor, a missing project reference, and a successful subsequent read.
+They also check that arbitrary failures and project-only reasons on other commands remain generic.
+
+Finding F03 made the first project settings read fail response encoding.
+The handler returned an own `settings` property with an undefined value.
+The Effect 4 `optionalKey` contract permits an absent property instead.
+The correction omits the property until settings exist.
+A fresh authenticated socket test reads the empty state before any save, saves settings, and reads them again.
+The same journey compares the live settings with a complete event-log rebuild.
+This proof does not implement or verify the later first-run page.
+
+## 535. Idle configuration dispatch entered the writer without queued work
+
+Found: 2026-11-08, during the website composer engine full check.
+State: correction written on `unit/website-w05c`, pending verification.
+
+The configuration dispatcher now admits an idle agent even when it has no queued delivery.
+This lets a pending owner choice apply before another prompt arrives.
+After configuration, the dispatcher entered the delivery writer without rechecking the queue.
+The baseline returned before entering the writer when no delivery was ready.
+A latched write failure rejects even an empty transaction.
+An idle dispatch could therefore emit an extra fixed delivery failure diagnostic during the runner-event append-refusal test.
+That test reported four captured lines where its exact assertion requires three.
+Asynchronous scheduling exposes the extra diagnostic, but the empty transaction is a new configuration-path regression.
+
+The correction rechecks the ready queue after configuration while retaining the same agent lane.
+It returns before entering the delivery writer when there is no work to reserve.
+The diagnostic count, fixed-message, redaction, defect-isolation, and recovery assertions remain exact.
+The orient tests also had a local running-session fixture without an applied configuration report.
+That fixture now includes the model and effort it claims the harness opened with.
+The assertions that reads do not write events remain unchanged.
+The read-only fixture audit found no other unreported direct test with a missing session configuration acknowledgement.
+Historical projection fixtures continue to represent unknown applied configuration honestly.
+
+A temporary diagnostic reproduced the pre-correction failure with the exact assertions retained.
+Its captured order was three `runner event dropped: processing failed` messages followed by `delivery dispatch failed`.
+The orient cases gained six `AgentConfigurationApplied` events each, changing sequences 21 to 27 and 15 to 21.
+An isolated baseline-dispatcher control passed the same three assertions with only the three runner-event messages and unchanged sequences.
+The corrected dispatcher and acknowledged orient fixtures also passed those three assertions.
+Their captured messages and unchanged sequences matched the baseline control.
+The temporary diagnostic instrumentation was removed after the comparison.
+
+## 536. Closing a pending Node socket could raise an uncaught exception
+
+Found: 2026-11-08, during the corrected foundations' fresh complete checks.
+State: fixed and independently verified at the combined foundation head.
+
+The Git check at `30584ef` reported two uncaught close-before-connect errors.
+The project check at `b1978e5` later passed all 6275 assertions but exited 1
+because the same exception was uncaught. The browser stage did not run.
+The retained logs are `/tmp/w02f1-verifier-1/pnpm-check.log` and
+`/tmp/w01f1-verifier-1-pnpm-check-b1978e5-exit1.log`.
+
+Independent controlled handshakes established a real cleanup defect.
+Cancelling or timing out before open caused each child process to exit 1.
+Effect removed its reader error listener before releasing the socket.
+Node's ws transport then emitted its close-before-connect error asynchronously.
+HTTP refusal and post-open close controls exited normally.
+This establishes the pending-handshake defect, not every original suite trigger.
+
+The Node socket acquisition now owns release through `Socket.fromWebSocket`.
+An explicit pre-open close retains its error ownership through the close event.
+Active reader errors retain their ordinary typed failure path.
+The production Node client and shared engine fixtures use that same acquisition.
+The existing socket validation and authenticated handshake headers are preserved.
+The fix does not install a process-wide error handler or discard suite errors.
+New child-process regressions cover cancellation, timeout, HTTP refusal and
+post-open close. All four pass locally, along with the diagnostic drain tests.
+Client and engine type checks pass. The targeted recovery and browser-boundary
+batch passes all 32 tests in five files. An independent five-mode probe also
+passes and retains a typed SocketReadError for an active malformed frame.
+The corrected project and Git heads each passed their fresh complete checks.
+The final combined head `c4dfaf0` passed its independent complete check.
+That run passed 6,417 tests and all 18 browser cases, with no unhandled errors.
+The independent review approved the exact combined head with no findings.
+Its report is `.scratch/foundry-runs/website-1/w00f-verifier-1-result.md`.
+The passing checks do not identify every earlier socket exception's trigger.
+
+## 537. Negotiated model and effort choices could prevent retry and reload
+
+Found: 2026-11-08, by the independent website composer verifier at `4914fe3`.
+State: corrected locally on `unit/website-w05cf1`, pending independent review.
+
+The owner could select an advertised model or effort absent from a nonempty configured list.
+The live adapter acknowledged that choice, and an actual prompt used it.
+The agent reducer also copied the desired value into the agent's launch fields.
+Both loaded resume and fresh resume passed those fields into the runner's configured-list admission check.
+That check rejected the replacement process before negotiation.
+The agent remained interrupted, with its desired configuration pending.
+Engine reload used the same input builder.
+
+Retry and reload now distinguish an owner's durable choice revision from unchanged initial launch settings.
+A replacement session opens without passing that revision's desired values as initial launch arguments.
+The session records only its actual reported configuration.
+The existing configuration lane then validates the desired identifiers against the new advertisement.
+It waits for acknowledgement before sending queued work.
+A missing value, missing selector, or unacknowledged setter retains an honest refusal and holds the queue.
+The owner can correct a supported choice on the replacement process.
+The correction does not change global harness settings or initial-start admission.
+Unchanged initial settings retain the older protocol's existing start calls.
+Cursor retains its exact advertised `default[]` identity for the existing `auto` launch alias.
+
+The permanent reload refusal control also exposed a related recovery reservation problem.
+Recovery can mark an agent working before its first recovered delivery is sent.
+If configuration refuses that send, a later owner correction previously could not release the unsent queue.
+Dispatch now recognizes that same unsent recovery reservation for an agent with an owner choice revision.
+The lane, logged-send, account, capacity, and incarnation guards still govern the actual send.
+An existing recovery assertion also caught a changed context reason after deferred configuration.
+A replacement process with no occupancy report now retains `not-reported` during reconciliation.
+Configuration changes still invalidate any earlier occupancy evidence.
+
+The new regression uses the real command handler and controlled Agent Client Protocol children.
+It covers both axes across loaded resume, fresh resume, and service reload.
+Nonempty configured lists exclude the negotiated choices in every case.
+Wire gates prove that no prompt is sent before acknowledgement.
+Actual child reports prove the selected settings and replacement process identity.
+The negative controls remove support from the new advertisement without making the adapter reject arbitrary setter values.
+They prove refusal, preserved queued work, and release on the same process after an owner correction.
+Additional fresh-session controls cover missing selectors, missing acknowledgement, and Cursor's alias.
+The existing recovery and initial invalid-choice assertions remain intact.
+All four model and effort retry cases were reproduced red with the original production files restored temporarily.
+The independent verifier's original files and logs remain unchanged.
+
+## 538. New project could not recover repository, worktree, and lead creation
+
+Found: 2026-11-08, while implementing the real New project journey.
+State: corrected in the W04B implementation; independent review remains required.
+
+The temporary public command recorded an existing lead and checkout.
+It could not own or recover the filesystem and process effects required by New project.
+A Git operation can succeed before the final project record is written.
+Caller cancellation can also arrive after the lead and receipt commit, before launch starts.
+Returning an error proves neither rollback nor the absence of a process.
+
+Creation now persists one bounded intent before creating a repository or worktree.
+The intent fixes the request hash, project identity, paths, branch, and selected defaults.
+There are at most 64 unfinished creation intents.
+A filesystem witness bridges directory creation and its durable device and inode claim.
+Git runs only after that claim commits.
+Recovery verifies the claimed directory and the actual repository and branch.
+It never adopts an unrelated empty directory or a replaced claimed directory.
+Only the exact owned witness file is removed after its claim commits.
+Other paths and existing Git exclusion entries are never removed.
+The owner can inspect unfinished operations through the bounded `project.creations` read.
+Retrying the original request completes the same operation.
+A changed body under that request identity is refused.
+The final append records the project, lead, and ordinary receipt together.
+Normal engine restart recovery restarts that recorded lead identity when needed.
+
+Project creation and archive orchestration belong to the engine's lifetime scope.
+Disconnecting a caller cannot strand a committed lead before its start hook runs.
+The writer's transaction commits the receipt before publication, which cannot fail.
+A typed database write failure latches the writer until service recovery.
+The receipt decode and reply read happen inside the transaction before its commit.
+A test-only failure injected outside a successful transaction therefore represents a
+lost service result, rather than a production typed failure that allows more writes.
+A same-service cancellation probe gates the actual committed result before launch.
+After cancelling that caller, the engine launches the same lead exactly once.
+A retry returns the original project without another worktree or lead.
+A later session-recording failure stops the actual controlled adapter process.
+Its recorded project remains visible for ordinary service recovery.
+
+Archive records its in-progress state before stopping every project member.
+That state prevents child starts and resumes while stops are being confirmed.
+A failed stop leaves the archive unfinished and retryable.
+Only confirmed stops permit the archived timestamp to commit.
+Questions remain open, and permissions follow the ordinary stop cancellation rules.
+Restore preserves the setup and lead identity without starting another process.
+
+The local filesystem race limitation in issue 49 still applies.
+An interruption between mkdir and its witness write leaves an ambiguous planned path.
+That path stays visible in the recovery read and requires owner inspection.
+Recovery refuses it without deleting or adopting it.
+Partial Git metadata that cannot be verified also requires owner inspection.
+There is no automatic destructive cleanup or cross-process atomic filesystem claim.
+
+## 539. Redacting conflict protocol values could invalidate Git replies
+
+Found: 2026-11-08, while wiring the public Git commands.
+State: corrected in this change. Independent review remains pending.
+
+The initial integration redacted every returned string as display text.
+A registered short secret such as `conflict` changed the segment discriminator.
+The authenticated response then failed its typed encoding contract.
+A secret such as `ours` could also change a selected hunk's control value.
+The original Git service did not have a public reply path and is unchanged.
+
+The correction preserves fixed segment kinds and choices at their protocol
+positions, while redacting paths, file contents, hunk sides, authors, subjects,
+branch names, and review evidence through the production text redactor.
+Choosing a hunk is an owner-only read of a draft, without a stored Git event.
+Resolution still regenerates canonical content from the actual index stages.
+A verified compare link is also an owner-only read and never claims to create
+an actual pull request.
+
+The real authenticated client regression registers short synthetic secrets,
+reads a real merge conflict, chooses its `ours` side, and resolves the file.
+It checks that display content is redacted and that protocol values remain valid.
+A negative control with those protocol protections removed fails with the
+actual response-encoding error.
+A separate negative control removes the queue gate and proves that concurrent
+calls can overlap after a workspace-setting change.
+Restoring the gate prevents that overlap without changing Git service signatures.
+The focused checks, complete-check result, and exact source identity are recorded
+in the worker result when the assigned check actually finishes.
+
+## 540. The reservation cancellation test could cancel before its fake peer started the turn
+
+Found: 2026-11-08, during the first complete project lifecycle check.
+State: the test synchronizes with the actual second child turn; independent review remains required.
+
+The complete check exited 1 at 2026-11-09T05:16:12.611869+00:00.
+The protocol 2 case in `packages/engine/test/runner/cancel-reservation.test.ts`
+received only the first reservation's `promptReply` and `turnEnded` events.
+It never received the stopped terminal event for reservation 42.
+That failure remains preserved in `/tmp/w04b-full-check-1.log`.
+An isolated pass of the unchanged test did not explain the failure.
+
+The production runner returns from prompt after writing its frame to the child pipe.
+That acknowledgement does not establish that the child has started its prompt handler.
+The protocol transport queues prompt requests for its server handler.
+It processes cancel notifications directly from its input reader.
+The fake agent installs a cancel signal only when its prompt handler starts.
+It discards a cancellation received before that signal exists.
+The changed `withEngine` log-wrapper branch was not on this test's path.
+The test uses the unchanged `withAcpRunner` helper.
+
+A controlled real-runner probe paused the child while the second prompt and
+current cancel reached its pipe, then resumed the child.
+Observation-only instrumentation in a temporary copy of the fake agent recorded
+cancel with no installed signal, followed by the second prompt handler installing it.
+The wire still contained prompt 1, prompt 2, and exactly one cancel, in that order.
+The original stale-cancel rejection and zero-frame assertions passed.
+The terminal wait then failed with the same missing-event report as the full run.
+The only terminal event belonged to sent sequence 17.
+A control waited for the actual second handler before sending current cancel.
+It passed the original assertions with sent sequence 42, `stopped: true`,
+and exactly one cancel frame.
+The full run did not record the child's internal scheduling.
+The probe proves this failure mechanism without reconstructing that unrecorded schedule.
+
+The permanent test now emits a unique plan marker from the second child turn.
+It waits for that actual runner delivery update before exercising either cancellation.
+The marker follows installation of the child's cancel signal.
+It is not a timer, a fabricated runner event, or a relaxed terminal assertion.
+The original reservation identities, stale-cancel failure, zero stale-cancel frames,
+stopped terminal event, and exact one-current-cancel count remain unchanged.
+The production runner, protocol transport, and shared fake agent are unchanged.
+Temporary repository probes are removed after their evidence is retained in
+`/tmp/w04b-cancel-order/`.
+
+## 541. The combined planner inventory retained a single-unit count
+
+Found: 2026-11-08, during independent configuration integration review.
+State: corrected in the isolated combined candidate. Combined verification remains pending.
+
+The configuration unit and the reply-cancellation unit each added a top-level planner.
+Each unit passed with sixteen top-level planners on its own foundation.
+Their automatic test-file merge retained sixteen after both commands were composed.
+The independent nineteen-file focused run at 20e22b2 failed its exact count assertion.
+It passed the other 771 tests, including both reservation protocols.
+The failed log remains at /tmp/w05c-integration-verifier-1/focused.log.
+
+The fixture now expects seventeen top-level planners.
+Its exact public command equality, disjoint handler ownership, read inventory, and access assertions remain unchanged.
+No production command, authorization rule, timeout, or assertion was removed.
+The corrected candidate requires a new signed pin and complete verification.
+
+## 542. Project creation admitted credentials for another provider
+
+The independent public-command probe configured an executable Claude adapter.
+Its account had no Claude login and held only an OpenAI application programming interface key.
+A separate Cursor account had its own supported key.
+Project creation selected Claude because the lead readiness check accepted any account variable ending in `API_KEY` or `AUTH_TOKEN`.
+The same check treated arbitrary redaction leaves from login files as authentication evidence.
+Those leaves intentionally include unfamiliar metadata strings to prevent credential disclosure.
+They do not establish a provider login.
+
+The correction uses the established per-harness key mapping and the effective spawn environment.
+It recognizes only provider credential fields in the existing bounded login-file reader.
+The reader still registers all its original redaction leaves and refuses unreadable stores.
+Codex shadow homes, account homes, secret resolution, and private client-secret exclusion remain in place.
+Unknown custom harness variables cannot establish local readiness.
+These checks establish local credential presence, not successful remote authentication or provider usage.
+
+Permanent public-command tests exercise the original wrong-provider failure and ready-Cursor control.
+They prove supported provider keys, resolved account secrets, file-backed account selection, effective homes, and private Codex logins.
+They also prove refusal of unavailable named accounts, arbitrary login metadata, unknown custom harness variables, and inherited keys excluded from the child environment.
+The existing lifecycle tests use a supported Cursor fixture while preserving their assertions.
+The independent original probe and its failure and control artifacts remain unchanged.
+
+## 543. Project creation admitted a searchable directory as an adapter
+
+The independent public-command probe configured a Claude adapter path that was a directory.
+The Claude account had its own supported credential, and a later Cursor adapter was usable.
+The local readiness check tested only executable access.
+That check also succeeds for a searchable directory, so project creation selected the unusable Claude adapter.
+The real executable control correctly selected Claude in the normal order.
+
+The project-local correction requires a regular file before checking executable access.
+The file check follows symbolic links, preserving legitimate linked executable adapters.
+Missing, inaccessible, non-executable, and non-file candidates remain unavailable.
+The normal runner and public harness settings policy are unchanged.
+Local readiness still does not promise successful remote provider authentication.
+
+Permanent public-command regressions reach the real project planner and writer in isolated repositories and homes.
+They prove directory fallback, normal executable order, and linked executable admission.
+They also prove refusal of non-executable files, missing paths, linked directories, and dangling links.
+Saved unavailable account and harness choices refuse before recording a creation intent or lead.
+All existing provider credential cases and lifecycle assertions remain intact.
+The independent original directory and executable artifacts remain unchanged.
+
+## 544. Project lead choices could freeze creation after Git effects
+
+Found: 2026-11-09, during independent lifecycle, Git and configuration composition review at `63bab1c`.
+
+Project settings admitted model and effort strings through the historical project-name schema.
+The integrated normal start command rejects control characters in these protocol choices.
+An invalid saved model could therefore pass settings and creation planning.
+The engine recorded a creation intent and initialized its real repository before normal start refused.
+No lead or project was created, and the intent retained the invalid model.
+Correcting settings did not change that frozen intent on a retry of the same request.
+The independent valid-model control created one project and cleared its intent.
+Effective harness defaults could also exceed the intent's stored-choice length limit.
+That failure surfaced only when the intent event was encoded.
+
+Settings admission now applies the existing normal-start choice validator.
+Creation validates both effective choices before recording an intent or touching its Git paths.
+It checks the stored-choice schema, normal-start protocol rules and unchanged redaction.
+The validation covers saved choices, historical settings and inherited harness defaults.
+The historical event schema remains readable for replay.
+The engine does not replace an already committed intent's selected defaults or delete its paths.
+
+Permanent public-handler regressions cover model and effort, empty and matching configured lists, control characters and both length boundaries.
+They assert the absence of an intent, repository, lead and project after refusal.
+After a valid correction, the same previously refused creation request succeeds once.
+A repeated request returns its original project without another launch.
+Historical invalid settings remain decodable and pass the real rebuild check.
+The original independent bad/control artifacts and interrupted full checks remain preserved.
+
+
+## 546. The composer had no typed task and file context references
+
+Found: 2026-11-09, during the website preparation at `bc783b2`.
+The manager allocated this issue to engine unit W03D.
+
+The golden Add context and at-sign search controls select tasks and workspace files.
+The accepted prompt and board-post contracts carried only text.
+They could not preserve a selected entity through delivery, retry, or replay.
+The mock's labels were not an engine search or an authorization check.
+
+The engine now searches actual readable project tasks and registered local workspace files.
+A shared resolver in `packages/engine/src/project/context.ts` admits typed references.
+It checks the authenticated sender and the conversation recipients.
+File admission reuses the registered repository, common-directory, branch, and path checks.
+References contain canonical identities, rather than caller-supplied display labels.
+No file contents are read or stored by this surface.
+Delivery descriptions remain inside an untrusted-data envelope.
+The existing request receipt preserves the original selected identities on an unchanged retry.
+Old commands and events without context remain valid.
+
+React controls remain outside this change.
+
+## 556. The terminal stop fixture could place its barrier before the message
+
+Found: 2026-11-09, in the first W03D full check at `bc783b2`.
+The manager allocated this issue after the exact-source ordering diagnostic.
+
+The held-message stop test mixed queued Agent Client Protocol version 2 notifications with direct raw stdout frames.
+The fake agent's plan and text steps returned after queue admission, before the separate writer sent them.
+Its raw command marker could therefore overtake the plan and message.
+The original failed trace observed the command marker before the plan and no held message after stop.
+A later passing file run did not clear that failed full check.
+
+The controlled probe used the actual protocol and client from this source.
+A blocked message handler also blocked the later notification handler in the same input-reader fiber.
+A held outgoing writer reproduced the direct marker overtaking queued plan and message notifications.
+This proved the fixture's ordering defect.
+It did not prove a production message loss after the message had buffered.
+
+The fake agent now offers a test-only notification barrier.
+It sends an unknown extension request through the same outgoing queue and awaits the expected method-not-found response.
+The peer reaches that request only after its earlier awaited notification handlers finish.
+The fixture uses one barrier after its plan and another after its tail, before writing the raw command marker.
+The request emits no content, plan, or idle update that could flush the held carry.
+The test verifies both acknowledgements and that the tail remains absent before stop.
+It retains the original assertions that stop emits the tail but does not store it, and keeps the original timeout.
+Production drain and stop behavior are unchanged.
+The original unmodified failed full trace and both original diagnostic artifacts remain preserved in the W03D evidence.
+
+## 547. Joined delivery history hides released entries
+
+Found: 2026-11-09, during conversation preparation and lead source review at `bc783b2`.
+State: historical finding not reproduced with the accepted event contract at `056a69c`.
+
+The preparation observed that the delivery-history renderer accepts `DeliveryReleased` as a delivery event.
+It observed that the joined filter omits that event from the states shown under a queued delivery.
+It inferred that matching-source suppression would hide the standalone release too.
+That last inference did not account for the actual release event shape.
+The W08 implementation rechecked the complete accepted contract and release command.
+`DeliveryReleased` contains `agentId` and an optional `holdSequence`, and has no `deliveryId`.
+The joined-history suppression requires `deliveryId`, so a valid release remains visible as a separate agent state.
+The original claimed disappearing release relied on a field that this event does not carry.
+
+No production correction is needed for that historical claim.
+`packages/web/test/delivery-release.test.tsx` decodes actual event shapes and covers a source and release together, a release before its source is loaded, and the visible state after history hydration.
+The release keeps its agent and hold identity without inventing a delivery identity or duplicating source content.
+Focused component verification is recorded in the W08 author evidence.
+It does not establish browser execution.
+
+## 554. Empty project request pages skipped the complete reply budget
+
+Found: 2026-11-09, during independent project request review at `2616fb5`.
+
+The `project.requests` read checked its encoded reply size only while adding rows.
+An empty project, a filter with no matches, or an exhausted cursor skipped that check.
+A valid request identifier containing 140,000 quotation marks produced a 280,027-byte owner success reply.
+The same identifier produced an 840,165-byte lead success reply because the agent data envelope adds another encoding layer.
+Both exceeded the 256 kibibyte complete success reply budget.
+
+The read now measures the actual final wrapped success reply before returning it.
+An oversized reply refuses without truncating an identifier or changing the shared request identifier schema.
+The existing row budget, pagination, caller checks and owner answer authority remain in place.
+
+Authenticated socket and direct-handler regressions cover the original owner and lead identifiers.
+They also cover ordinary empty replies, escaped identifiers within budget, kind and status filters, and an exhausted cursor.
+A separate control proves that an identifier can fit the owner reply while exceeding the lead envelope budget.
+The inherited populated-page test continues to check every row, page progress and complete encoded sizes.
+The reads preserve the durable log, and the real rebuild check remains enabled.
+The original independent failed probes and logs are retained unchanged.
+
+## 557. Empty project pages and the client request index bypassed their reply budgets
+
+Found: 2026-11-09, during the website engine review at `4c657279`.
+
+The generic project page helper checked complete encoded replies only when adding a row.
+The owner-only `client.requests` index had the same gap.
+An empty collection, a filter with no matches, or an exhausted valid cursor skipped that check.
+A valid request identity containing 140,000 quotation marks produced a 280,027-byte owner project reply.
+The recorded project lead received an 840,165-byte reply after the agent data envelope was encoded.
+Both replies exceeded the project's 262,144-byte limit.
+An empty client request reply with 270,000 quotation marks occupied 540,040 bytes.
+That reply exceeded the index's distinct 524,288-byte limit.
+
+Each helper now measures its final complete success reply before returning it.
+The project helper includes the actual agent data envelope in that measurement.
+The existing limits, row boundaries, cursor rules, request identities, and refusal text remain unchanged.
+The client request index remains owner-only.
+Refusal returns before any event, receipt, or read mark is written.
+
+Authenticated handler and socket regressions preserve the original failed payloads.
+They cover ordinary empty replies, filtered empty replies, exhausted pages, permitted project members, and owner-only catalogs.
+They also retain populated pagination, access refusals, stored metadata, and deterministic rebuild assertions.
+The separate `project.requests` correction tracked as issue 554 is outside this change.
+## 548. Discovery could materialize private Codex shadow homes
+
+Found: 2026-11-09, by reading the accepted project-readiness dependency during first-run preparation.
+The manager allocated this number for the read-only discovery correction.
+
+The accepted readiness helper called `withCodexHome` to resolve the account's effective environment.
+That helper also called `materializeCodexShadowHome` before returning the environment.
+The materializer can create private home directories and maintain shared-home links.
+Reusing that launch helper while scanning would contradict the first-run promise that discovery only looked.
+
+The correction separates read-only layout and confinement resolution from explicit launch materialization.
+`resolveCodexHome` and `withCodexHome` share the same layout resolver.
+Discovery and project readiness use the read-only function.
+The real runner retains the materializing function and its post-materialization confinement check.
+Provider-specific credential recognition, effective environment expansion, executable-file checks, account ordering, and private account separation remain shared with project launch.
+No setup-only authentication policy was added.
+
+The first-run public API proof compares actual repository and home files before and after discovery.
+It checks that an absent private shadow home remains absent and that no agent or sample account was created.
+It distinguishes a missing executable, signed-out state, unavailable credential evidence, and a recognized local credential.
+Every discovery account explicitly reports remote authentication as not checked.
+The inherited provider-readiness and real Codex launch fixtures retain their assertions.
+Local credential presence does not promise a successful remote handshake or provider usage.
+
+## 549. Draft field identity conflated different entities
+
+Found: 2026-11-09, during the first-run and mocks implementation review.
+The manager allocated this number after the real public-handler counterexample failed.
+
+The draft bundle checked uniqueness using only each field's name.
+A bundle containing both `EntityA.name` and `EntityB.name` therefore refused as a duplicate.
+The golden field identity consists of the entity and field together.
+The correction compares a structured pair of entity and field name.
+A real public-handler regression records both fields and preserves both through approval.
+The original failing source and log remain in `/tmp/w05b-proof/schema-counterexamples-red-1-*` and its `.log` file.
+Re-executing the exact original source after the contract removal refuses its legacy empty `schemaChanges` input at admission.
+That result is preserved separately and is not called a passing field-identity probe.
+The permanent positive control uses the supported contract and retains the same two entity-qualified fields and approval assertion.
+
+## 550. Approval silently dropped accepted declared schema changes
+
+Found: 2026-11-09, during the first-run and mocks implementation review.
+The manager allocated this number after the real public-handler counterexample failed.
+
+The experimental bundle accepted a separate `schemaChanges` array.
+Approval derived its worklist only from field comparisons.
+A declared removal could therefore be accepted in a revision and disappear from the approved worklist and handoff.
+The original public-handler probe recorded a removal of `Project.name` and then observed an empty approved schema worklist.
+Its exact failing source and log remain preserved with the issue 549 counterexample artifacts.
+
+The correction removes declared schema changes from the supported input contract.
+Approval supports additions and type changes derived from the actual registered schema comparison.
+Declared removals are unsupported.
+The removed `bundle.schemaChanges` key has an explicit forbidden-key schema guard.
+The guard is necessary because ordinary public excess-property decoding otherwise strips unknown keys.
+A separate observation reuses the original removal payload and checks refusal before a mock revision or approval is recorded.
+The permanent regression also checks that the refused input changes no event log state.
+A valid bundle without the removed input still records and approves normally.
+An admission refusal is not reported as a passing approval-handoff probe.
+The unchanged-payload observation is retained as `/tmp/w05b-proof/schema-original-removal-admission.json`.
+It records `Failure`, the fixed refusal reason, and no added events, revisions, or approvals.
+
+## 551. Repository Design lacked a registered design-file identity and read
+
+Found: 2026-11-09, during the Mocks and Design page preparation join.
+The manager allocated this number for the bounded engine metadata correction.
+
+The pending mock sources named screens, data, tokens, and component indexes.
+They did not identify the repository Design file or expose a repository Design read.
+The page would otherwise have had to invent a filename or reuse an unrelated component path.
+
+`project.design.record` now records an immutable registration revision with explicit repository, workspace, and design-file identities.
+The normal authenticated owner or an agent in the project can register actual bounded evidence.
+The command verifies the registered checkout, branch, repository common directory, file confinement, and fingerprints.
+`project.design.read` returns the selected registration revision and current bounded artifact availability.
+Repository members must identify their own project in that repository.
+An absent registration is explicit.
+Changed, redirected, oversized, missing, and unreadable artifacts remain unavailable while retaining the registered identity.
+Tokens come from the registered bounded token document.
+Shared components retain their actual references and byte evidence.
+A mock bundle can bind one exact Design revision in its repository.
+The engine rechecks that evidence before mock approval.
+No filename is inferred, and no editor, preview, URL fetch, or design-to-code process is started.
+
+## 552. Mock scenarios lacked identities and concrete screen routes
+
+Found: 2026-11-09, during the Mocks page preparation join.
+The manager allocated this number for the typed scenario correction.
+
+The pending scenario record carried a display name and a screen reference.
+It did not retain a scenario identity or a concrete screen/scenario route binding.
+A client would otherwise have had to guess a query value or substitute a display label into a route template.
+
+Scenarios now have distinct typed identities.
+Each screen records its base route and one explicit concrete route for every registered scenario identity.
+Admission requires unique scenario identities, total route bindings, and valid references in the same mock revision.
+It refuses duplicate, missing, unknown, redirected, or placeholder routes.
+Public reads retain the scenario identities and exact recorded bindings.
+The route metadata does not claim that a preview server is running or that a scenario has executed.
+The later page owns isolated preview display and actual server availability integration.
+
+Owner decision, 2026-11-09: Item 2 of the website simplification shortlist
+supersedes the total-binding requirement described above.
+Each screen retains its base route and only its supplied supported scenario routes.
+An empty supported list is valid even when the revision declares scenarios.
+Scenario identities and bindings remain unique, and each binding must name a
+declared scenario and a concrete internal route.
+Existing revisions and their stored bytes are not migrated.
+This is an approved product simplification, not a new defect.
+The historical finding and its original proof remain unchanged.
+
+## 553. Another caller could replace an immutable mock or Design revision
+
+Found: 2026-11-09, during the final bounded engine review.
+The manager allocated this number after both authenticated public-handler probes failed.
+
+Command receipts are scoped by caller and request identity.
+Mock revisions are scoped by project and revision identity.
+Design revisions are scoped by repository and revision identity.
+Both record planners used the request identity as the revision identity without checking whether that revision row already existed.
+A designer could record revision R, then an owner with no receipt for R could submit changed real artifact metadata using R and expected revision R.
+Both commands succeeded and replaced the row's author and content under the supposedly immutable identity.
+This defect was independent of same-caller receipt idempotence.
+
+Both planners now refuse an existing revision key before constructing another recorded event.
+The guard covers all retained revisions, including a revision behind the current head.
+The ordinary command transaction serializes the check with the append.
+An identical retry by the original caller still returns its existing durable receipt.
+A fresh request identity can still create a new revision against the current expected head.
+The public regressions retain the original attack requests and successful controls.
+They assert exact refusal events and unchanged revision author, content, and approvals.
+A separate approved-revision regression also retains the exact linked Design, approval, stage, and delivery state.
+Every case compares the live views with a deterministic rebuild from the persisted event log.
+
+The original failed source remains `/tmp/w05b-proof/revision-collisions-original-red.test.ts`.
+Its source archive, source manifests, load record, and log remain under `/tmp/w05b-proof/revision-collisions-red-1-*` and its `.log` file.
+The original Design and mock observations remain the distinct `design-revision-collision-red-observation.json` and `mock-revision-collision-red-observation.json` files in that directory.
+The correction does not rewrite those red artifacts or reinterpret their original successful attacks as refusals.
+The separate `revision-collisions-original-after-correction-1` observation reruns both original probe bodies and assertions.
+Only their evidence-output filenames change, so the original observation files remain untouched.
+Both original public attack constructions now refuse, preserve the original row, replay the designer's receipt, and permit the fresh-identity positive control.
+The observer's exact derivation is recorded in `/tmp/w05b-proof/revision-collisions-observer-derivation.json`.
+
+## 558. The Design token-document path admitted raw secret probes
+
+Found: 2026-11-09, during the first explicitly granted full check of W05b.
+The manager allocated this number and approved a bounded correction after the actual command exit.
+
+`DesignRegistration.tokensPath` used the general nonempty `ProjectPath` string schema.
+The unchanged secret non-admission oracle classifies TOKEN-containing property names and tests each property schema with raw secret probes.
+The path schema admitted every original raw probe.
+The registration occurs in events, subscription replies, thread replies, the Design record payload, and the Design read reply.
+The first full check therefore failed seven existing oracle cases at that one property.
+The engine's later JSON-file check did not satisfy contract admission.
+This is a contract defect, not a sandbox failure.
+
+The correction admits only a confined relative JSON-file path for `tokensPath`.
+Contract admission and engine artifact reads share the existing repository artifact path predicate.
+Traversal, absolute paths, control characters, encoded paths, and credential-directory or credential-file references remain forbidden.
+No secret oracle, assertion, probe, or name rule changes.
+No test allowlist or exemption is introduced.
+Regressions check the original raw probes, invalid paths, valid JSON-file paths, and an absent optional path.
+The authenticated public handler also refuses invalid input before an event or project-view change, then records and reads an actual valid token document.
+The redaction fixture uses a real JSON-file path shape while retaining its original identity and prose-redaction assertions.
+
+The original eight full-check failures remain in `/tmp/w05b-proof/full-1.log` with exit 1.
+The original source manifest, patch, archive, modes, symlinks, load samples, process evidence, and original proof artifacts remain unchanged.
+The seven exact failed schema paths are recorded in `/tmp/w05b-proof/full-1-failure-paths.json`.
+A corrected focused pass cannot retroactively change that first full-check result.
+
+## 559. The exact empty project snapshot fixture omitted owner-only setup
+
+Found: 2026-11-09, during the first explicitly granted full check of W05b.
+The manager allocated this number and approved the exact fixture correction after command exit.
+
+The default-piece test expected the old empty owner project snapshot without setup.
+The implementation now supplies durable Welcome setup only to the owner.
+The test also expected the agent snapshot to equal the owner snapshot.
+That equality no longer expresses the owner-only setup boundary.
+
+The owner expectation now contains the exact base snapshot and Welcome setup.
+The agent expectation remains the exact base snapshot and explicitly has no setup field.
+Every namespace refusal, hold, request, secret, and compile-time assertion remains intact.
+No production delivery authority changes.
+The original failing assertion and actual snapshot diff remain preserved in the first full-check log.
+
+## 560. Empty mock pages bypassed the final wrapped reply budget
+
+Found: 2026-11-09, during the bounded review after the first full check.
+The manager allocated this number before the independently gated public proof.
+
+`project.mocks.read` measured candidate rows inside its pagination loop.
+An empty project or a cursor after its last revision skipped that loop.
+The final reply still echoed an unrestricted request identity.
+A quote-heavy identity expanded during JSON serialization and expanded again inside an agent's data envelope.
+Authenticated owner and project-member socket probes reproduced both empty and exhausted pages.
+The owner replies were 280,027 bytes, and the member replies were 840,165 bytes.
+All four exceeded the documented 262,144-byte limit.
+Ordinary controls returned empty pages within the limit, without added events or project changes.
+
+The read now measures its actual final wrapped reply before returning it.
+An oversized final reply refuses with the fixed internal reason `mock reply exceeds the read budget`.
+The socket retains its existing exact public `CommandError` with reason `command refused`.
+The existing row pagination, cursor, authorization, and request-identity schemas remain intact.
+Permanent regressions retain both caller identities, both empty-result paths, normal controls, and the original byte-budget assertion.
+They additionally require strict refusal for the original oversized requests and unchanged events and project state.
+
+The original four failed public probes and observations remain under `/tmp/w05b-proof/mocks-read-budget-original-red-1*` and `mocks-read-budget-*-original-observation.json`.
+The exact original probe source remains `mocks-read-budget-original-red.test.ts` in that directory.
+The separate corrected observer changes only the evidence-output filenames and preserves the original request constructions, controls, and assertions.
+The original evidence is not rewritten as a passing run.
+The first affected run after correction passed 1,582 tests and failed four added assertions that expected the internal reason at the socket.
+The unchanged socket error mapper correctly returned the fixed public refusal instead.
+The permanent tests now assert that exact public object and independently verify the internal budget reason through the authenticated command handler.
+The failed affected log and unchanged source archive remain under `/tmp/w05b-proof/affected-558-559-560-1*`.
+
+## 545. Main review had no explicit owner approval and merge path
+
+Found: 2026-11-09, during the Git page preparation at `ca1d492`.
+The manager reserved this issue number and the owner authorized its bounded engine follow-up at `bc783b2`.
+
+The golden review shows tests, the reviewer result and its genuine thread, commits, and every available file diff.
+It allows an explicit Approve without evidence choice.
+The accepted `project.review.open` only verified a published source head and returned a compare URL.
+Its `kind: compare` and `opened: false` did not create a pull request or record approval.
+The original team integration correctly refused main and master.
+There was no durable head-bound test or review reporting surface and no owner approval route.
+
+The bounded correction adds a separate authenticated review preparation, evidence report, status, and explicit owner approval path.
+Preparation records both reviewed heads without approving or merging.
+Reported evidence carries the actual workspace and head, authenticated reporter, recorded time, and a validated existing project thread item.
+It is labeled reported evidence rather than engine-executed proof.
+Old-head reports remain stale, and missing or failed evidence does not impose a mandatory passing-test or reviewer policy.
+The owner may explicitly approve without evidence.
+
+Only the owner credential may approve and merge into main or master.
+The service checks the actual authenticated caller again at execution.
+It revalidates both reviewed heads, registered relationships, exact common directory, branches, clean worktrees, and merge-in-progress state.
+It merges the reviewed commit identity rather than a substituted branch.
+Agents remain refused, and the original integration refusal is unchanged.
+Binary or incomplete review data refuses honestly.
+The event log and normal receipts preserve the exact reviewed heads, explicit owner decision, and merged or refused outcome.
+An identical retry returns its original outcome instead of merging twice.
+A corrected attempt after refusal requires a new review and explicit owner approval.
+
+External Git effects and the SQLite receipt are not one crash-atomic transaction.
+A service crash after Git changed the checkout but before the outcome committed can leave an uncertain result.
+The old destination-head precondition refuses a repeated execution when that head changed.
+The owner must inspect the actual refs, bytes, and merge state before preparing another review.
+A failed merge can leave real conflicts in the destination, which remain inspectable through the existing conflict API.
+The engine never removes another process's locks or silently aborts the merge.
+Same-Unix-user edits remain within the accepted limitation in SECURITY.md.
+
+The permanent tests exercise authenticated public commands and real temporary repositories for both base names, evidence provenance and staleness, head and dirty-state refusals, authority denial, conflict recovery, production redaction, and receipt replay.
+The test artifacts and builder result record their actual execution separately.
+React, terminal support, and the rest of the five-step website scope remain separate work.
+
+## 555. Owner approval could record a merge without the reviewed commit
+
+The independent review of issue 545 found that `branch.main.mergeOptions=--squash` made an authenticated owner approval return a durable `merged` outcome while main still pointed to its old head.
+The reviewed commit was absent from main's ancestry, and the feature bytes were only staged.
+A successful Git exit did not prove the promised merge.
+The same execution path supports master.
+
+The correction overrides the destination branch's merge options for this invocation and explicitly selects a normal committed merge with fast-forward support and the standard strategy.
+It merges the exact reviewed commit object.
+Before returning success, it reads the actual destination head and verifies that the reviewed object is its ancestor.
+An already-contained reviewed commit remains a valid no-op.
+An absent ancestry or failed verification produces a refused outcome, without aborting or resetting the checkout.
+The original owner checks, both reviewed-head checks, clean-worktree guards, agent integration refusal, queue, and finite subprocess ownership remain in place.
+Git effects and the database receipt remain separate failure boundaries.
+
+Permanent regressions cover both base names, squash and uncommitted merge defaults, fast-forward and divergent merges, contained commits, receipt retries, authority denial, and zero-exit outcomes without reviewed ancestry.
+The original independent failure and its passing divergent and database-failure controls remain preserved in the run evidence.
+The builder report records executed checks separately from this implementation description.
+
+## 561. The launcher test assumed no system Node.js 26
+
+Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
+State: fixed.
+
+The launcher test "exits 1 with an install hint when NVM_DIR holds no Node.js" ran the launcher with only `HOME` and `NVM_DIR` set.
+The launcher's shell then used its default search path.
+Arch Linux has a system Node.js 26 at `/usr/bin/node`, and the launcher correctly used it, so the test saw exit 0.
+The test now gives the launcher an empty search-path folder.
+The launcher itself was right and is unchanged.
+
+## 562. Two engine crash tests raced the roles sheepdog
+
+Found: 2026-11-09, on the owner's Arch Linux computer through `make remote-check`.
+State: fixed.
+
+The acceptance test "1 crash" checks the engine's own rule that nothing restarts a crashed agent.
+The client test "6.2 a failed reload keeps a crash alert open until successful idle" checks the crash alert's life.
+Both run with the roles sheepdog on, and the sheepdog resumes a crashed agent by design.
+On the build server, the sheepdog acted after the checks had finished, so both tests passed.
+On the faster computer, it resumed the agent first.
+The agent then crashed a second time and the owner was told twice, or the resumed session closed the crash alert early.
+Both tests now turn the sheepdog off, because each checks an engine rule rather than the sheepdog.
+Other tests may have the same hidden dependence on a slow computer.
+
+## 563. Context search counted item bytes without the complete result
+
+Found: 2026-11-09, during independent verification of signed `3dd4d20`.
+The manager allocated the correction to W03DF1.
+
+The documented 65,536-byte budget applies to the complete context search result.
+Admission counted only the encoded item array.
+An authenticated search over 91 actual schema-valid Git files returned a 65,529-byte item array inside a 65,557-byte result, with `truncated: false`.
+The request identifier was an ordinary universally unique identifier.
+The verifier's original probe, inputs, observation, failed log, and metadata remain unchanged.
+Earlier escaped-request-identifier probes measured larger outer replies, rather than a breach of this result-only budget.
+The earlier invalid task-title and import attempts remain historical test failures.
+
+Admission now counts the complete encoded result, including its field names and truncation flag.
+It reserves the longer `false` encoding even when truncation has already occurred.
+The byte budget excludes the reply's request identifier and the agent envelope.
+Authenticated owner and member regressions exercise real files at the original overflow and the nearest overflowing and fitting encoded results.
+They check canonical bounded prefixes, truthful truncation, smaller limits, ordinary under-budget results, empty results, and foreign-project refusal.
+The filenames include multibyte text and quotation marks, so the assertions count encoded bytes.
+The existing project access, candidate and result counts, Git read bounds, redaction, and plain-text delivery rules remain unchanged.
+
+## 567. The context refusal fixture assumes no setup deliveries
+
+The merged context refusal test expected an entirely empty delivery map after its setup created owner tasks.
+The accepted task-creation path now queues legitimate lead notices during that setup.
+The combined proof passed package and root typing and failed this stale fixture assertion with three legitimate task-notification deliveries.
+The fixture now compares the complete delivery map before and after every refused context request, including raw decoder cases.
+All existing refusal, secret-redaction and deterministic rebuild assertions remain.
+The production context and owner-task delivery paths are unchanged.
+Status: corrected in the website composition; combined proof and independent review are required.
+## 564. An area-less first team stranded later teams at the same stage
+
+Found: 2026-11-09, in independent source review and the builder's actual authenticated public reproduction on signed `ce7a816`.
+The manager allocated this number and approved the bounded correction.
+
+The first Build team without an area was admitted.
+A second Build team with area Web in a real registered child worktree was then refused because its peer lacked an area.
+The refusal event stated `teams at the same stage require distinct areas`.
+The public contract permits an omitted area, and there is no team-edit recovery path.
+
+The correction removes only the peer-area admission rule.
+Stage and area remain optional.
+Stage-derived names, case-insensitive unique names, workspace validation, groups, channels and receipt semantics remain intact.
+Permanent authenticated socket regressions cover an area-less team before and after an area-labelled peer.
+They verify real registered worktrees, both successful team channels, identical receipt replay, changed-body refusal, and duplicate-name refusal on a separate unclaimed worktree.
+A further ordinary control retains a custom name with no stage or area.
+
+The original five-probe source, exact red observation, source archive and normal exit 1 log remain unchanged under `/tmp/w05b-postreview-proof`.
+The separately derived corrected observer retains the original team success expectation.
+No team-edit machinery is added.
+
+## 565. Mock artifact reads bypassed the final wrapped reply budget
+
+Found: 2026-11-09, in independent source review and the builder's actual authenticated public reproduction on signed `ce7a816`.
+The manager allocated this number and approved the bounded correction.
+
+`project.mocks.artifact` bounded its repository file but did not measure its final reply.
+An unrestricted quote-heavy request identity expanded during serialization and again inside the member data envelope.
+The actual owner available and unavailable replies were 280,157 and 280,080 bytes.
+The actual member available and unavailable replies were 840,307 and 840,226 bytes.
+All four exceeded the documented 262,144-byte limit.
+Ordinary small-request controls passed, and all reads preserved the exact event log, receipt rows and complete views.
+
+The correction measures the actual final wrapped artifact reply before returning it.
+An oversized reply refuses with the internal reason `mock artifact reply exceeds the read budget`.
+The existing public socket refusal remains `CommandError` with reason `command refused`.
+Permanent socket regressions cover both caller identities, real available files, absent registered files, ordinary controls, the original oversized payload and unchanged read state.
+They retain the original byte-budget assertion and additionally require strict public refusal.
+
+The original four complete requests, replies and observations remain unchanged under `/tmp/w05b-postreview-proof`.
+The original log remains a normal exit 1 with five failed probes, including issue 564.
+A separate corrected observer changes only output destinations and adds strict outcome assertions; its exact derivation is preserved separately.
+This correction does not change mock, schema or Design metadata contracts.
+
+## 566. Reading review evidence could deadlock an owner approval
+
+The independent review of issues 545 and 555 found a lock-order inversion.
+The review status reader held the Git gate while validating a recorded thread through the shared Structured Query Language (SQL) connection.
+A concurrent owner approval held that connection inside its writer transaction while waiting for the Git gate.
+Both authenticated calls then remained pending after the active Git child finished.
+The matched case without recorded evidence completed because it needed no thread query.
+
+The status reader now completes its authorized project and checkout inspection under the Git gate and releases that gate before querying thread evidence.
+It evaluates the evidence against the exact source head observed during that inspection and the same authorized snapshot.
+The project, workspace, repository, branch, thread membership, redaction, and reply-budget checks remain in place.
+Command transactions and active Git child ownership are unchanged.
+The other Git read handlers do not query the SQL connection while holding the Git gate.
+
+The permanent regression overlaps actual authenticated status and approval calls with recorded thread evidence and a matched no-evidence control.
+It establishes an actual Git child barrier and observes entry after SQL begins its transaction.
+Both calls must finish, and the approved destination must contain the reviewed commit and expected bytes.
+The test also checks the durable decision and receipt, identical retry, and a rebuild from the event log.
+Original failed probes and their historical invalid-barrier attempts remain preserved separately.
+The builder report records actual red and green execution boundaries.
+
+## Website plan documentation correction, 2026-11-09
+
+The independent review of the owner-approved simpler website plan found that the first proposed issue-recording paragraph could exempt in-unit problems from this list.
+The proposal had not been applied.
+The correction retains the requirement to record problems here in the same change.
+The manager allocates new issue numbers for defects found outside the unit being changed.
+An in-unit correction updates its existing issue documentation and result without allocating a separate number.
+The original rejected proposal and Grade 8 review remain preserved in the website run records.
+The corrected paragraph received a separate independent review.
+
+## 568. Request and Add task retry caches retained text across owner sessions
+
+Found: 2026-11-09, while composing the replacement website.
+State: fixed in the composed website source, awaiting its full verification and review.
+
+Unconfirmed request answers and Add task commands survive page navigation so that a retry keeps its original command identity.
+The module caches also survived logout within the same document.
+A later owner login could therefore receive the previous session's command text or submission lock.
+
+`clearRequestAttempts()` in `packages/web/src/thread/requestAttempt.ts` removes all cached entries, wipes their command data, and invalidates captured entries so that a late response cannot restore them.
+`clearAddTaskAttempts()` in `packages/web/src/pages/AddTask.tsx` removes pending task payloads and advances the session generation so that an old receipt cannot affect a later session.
+The composed `packages/web/src/app.tsx` calls both functions in `sessionExpired`, after a confirmed logout response or an already expired session response, and in its App unmount cleanup.
+An unsuccessful logout does not discard the current session's recovery identity.
+
+Both caches exist only in module memory.
+A document reload creates new empty caches.
+Neither cache writes to local storage, session storage, or IndexedDB, and this correction does not claim to purge persistent browser storage.
+It does not delete authoritative requests, change their holder or open-state logic, or erase answers already accepted by the engine.
+
+Focused tests cover retained failed and sending attempts, navigation within the same session, clearing before a new mount, and late completion isolation.
+The actual composed App also has the integrator's logout and relogin regression.
+Browser execution and the composed full verification remain separate gates.
+
+## 569. The mounted project composition test cannot observe its answer textarea on the owner's computer
+
+Found: 2026-11-09, during the composed website builder's first and second remote full checks.
+State: corrected in the composed test fixture, awaiting a newly granted full check and independent review.
+
+The original `packages/web/test/project-composition.test.tsx` fails at assertion 54 because its answer textarea is absent.
+The first full passed 7,084 tests and failed two tests.
+The second full passed 7,085 tests and failed this test alone after the separate alert section selector was corrected.
+Both commands stopped before browser execution.
+The original project composition test passed an instrumentation-free local focused run without changing its assertions or default timeout.
+The different results do not establish a host-load or timeout cause.
+
+A bounded observational copy reproduced the missing textarea on the owner's computer with one test worker and the same fourteen processors used by the full check.
+The actual request read returned an open question held by the owner, with `canAnswer` set to true.
+The actual source-event read returned the matching question, agent, sequence and proposed answer.
+On that failed run, the source reply arrived after the click's React `act` boundary ended, while `vi.waitFor` was running inside a single awaited `act`.
+Every subsequent poll still observed the full-request loading message and no textarea.
+The successful local observational run received the source reply inside the click's `act` and had the textarea at its next boundary.
+
+Controlled local and remote comparisons established the test's asynchronous React observation and commit boundary.
+They held only the actual source-event reply until after the click's `act` finished and released it during observation.
+The original helper failed with that held reply on both computers.
+The corrected helper passed both the natural-response and held-response cases on both computers, retaining every original behavioral assertion and the default timeout.
+The original natural-response control also failed on the owner's computer and passed locally.
+Both comparison commands retained their actual nonzero exits because their original-helper cases failed.
+
+The integrator's narrow fixture overlay runs `vi.waitFor` outside `act` and finishes an `act` during each polling attempt before checking the unchanged assertion.
+The corrected original test then passed its instrumentation-free local focused run.
+The original W07 author source and hash remain preserved separately from this W06 correction.
+No timeout, assertion or production component changed.
+The exact source, file modes, symbolic links, font target files and collected author artifacts remained unchanged.
+The failed full logs, original focused result and raw local and remote diagnostic observations are preserved separately.
+A newly granted exact-source full check, actual browser execution and independent whole-composition review remain required.
+
+## 570. Replacement navigation and service regions invalidated old browser entry selectors
+
+Found: 2026-11-09, in the fourth composed website verification.
+State: fixture correction prepared, awaiting focused checks and a newly authorized full verification.
+
+The original browser cases for conversation history and phone thread answering searched for a visible standalone agent link at a width of 360 pixels while navigation was closed.
+The replacement shell keeps its closed phone navigation inert.
+The agent links also include their displayed state in their accessible name.
+The original Alerts and Settings layout cases waited for regions named Alerts and Settings.
+The actual service regions are named Phone notifications and Service settings.
+All four original browser failures and their complete contexts remain preserved.
+
+The two agent cases now open the actual navigation with its existing helper and click the named agent inside the Projects navigation.
+The two service cases now select the actual named regions.
+The legacy service URLs, real navigation actions, history, delivery, answer, refresh, recovery, storage, and phone overflow assertions remain unchanged.
+No timeout is increased.
+These are W06 fixture corrections, and they do not change W10 service presentation.
+
+## 571. Native browser offline did not immediately disable shared mutations
+
+Found: 2026-11-09, in the fourth composed website verification.
+State: correction prepared, awaiting focused checks and a newly authorized full verification.
+
+The foundation browser case switched its actual browser context offline while a thread remained mounted.
+Send prompt remained enabled and failed the unchanged assertion.
+The shared mutation guard observed the snapshot watcher's connection and completed reads, but it did not observe the browser's native offline signal.
+No host-load or transport-timeout cause is claimed.
+
+The shared data provider now disables mutations on the native offline event and aborts retired watcher and projection reads through their existing scopes.
+It retains the visible view and mounted prompt draft.
+A native online event starts a new authenticated watcher generation.
+Write readiness requires that generation's actual snapshot and coherent paged collections, including the final sequence check.
+The native online event alone cannot enable writes.
+The original browser offline, draft-retention, recovery, and viewport/theme assertions remain unchanged.
+A mounted App regression exercises native offline and online while its transport streams remain live and its recovery collections are held pending.
+
+A later passive observation of the unchanged Conversation journey confirmed another recovery gap in this provider.
+The shell published snapshot revision 18, and its next authoritative request page was already at revision 19.
+The exact revision guard correctly rejected that collection, but a quiet stream supplied no later snapshot and the failed read scheduled no recovery.
+The original full failures, natural journey failure, and complete passive observation remain preserved.
+This is an in-unit coherent-recovery correction under issue 571, with no new issue number.
+
+A nonaborted collection failure now requests a fresh snapshot by restarting the existing shared watcher generation after a backoff.
+The delay starts at 250 milliseconds and increases to at most 5 seconds, and coherent success resets it.
+Previous complete reads and the mounted draft remain visible, while writes stay disabled until the new snapshot and every exact revision check agree.
+Abort, snapshot replacement, native offline, session expiry, confirmed logout, and unmount cancel the old recovery scope.
+An old scope cannot restart a later owner session.
+Deterministic mounted App regressions cover the quiet revision mismatch, held final coherence, bounded backoff, replacement, offline recovery, and session teardown without parallel shared watchers.
+The original browser journey and every assertion and timeout remain unchanged; a new browser proof is still required.
+
+## 572. Request consumers repeated an already recovered immutable source read
+
+Found: 2026-11-09, in the fourth composed website verification.
+State: correction prepared, awaiting focused checks and a newly authorized full verification.
+
+The oversized-state browser case recorded two client.event requests for the same request sequence on distinct sockets.
+The unchanged oracle requires exactly one source recovery.
+The browser client already yielded the actual recovered request envelope to the shared watcher.
+The watcher discarded that immutable source, and permission summaries, expanded request details, and later independent thread hydration owned separate source reads.
+The original failed proof and its complete context remain preserved.
+
+The owner-session data provider now owns one reader for immutable request sources.
+The shared watcher seeds the actual full request envelope before publishing the snapshot that exposes its request row.
+The shared request components and the independent thread's request hydration use that reader and share pending source reads.
+Their sequence, event kind, request identity, and agent checks remain in place.
+An identity rejection discards that cached source so that a later read can retry.
+Failed reads do not become usable cached data.
+The reader supplies no request projection and decides no holder, status, or permission to answer.
+Those decisions still use the authoritative engine data and existing request components.
+
+Only PermissionRequested and QuestionAsked envelopes are retained.
+Retention is limited to 64 sources and 8 mebibytes, with older sources evicted when necessary.
+A source larger than the byte limit is delivered whole to its caller but is not retained.
+At most 64 source reads can be pending, and an excess read receives a retryable failure.
+Unrelated conversation events are never retained by this reader.
+Provider unmount, confirmed logout, and session expiry close the reader, clear its captured sources, abort pending reads, and prevent late completion from restoring the old session's data.
+A fresh document also starts with empty memory.
+No persistent browser storage or accepted engine/client protocol implementation is changed.
+
+The RequestList and page-fixtures changes are explicitly W06 overlays on preserved W07 originals.
+The required data-context addition in admin-controls is a W06 test-input overlay on the preserved W10 original.
+The original author reports and artifacts remain separate from integration proof.
+The browser read-count, uncertainty, slow-link, live-event, socket-survival, and answer assertions remain unchanged.
+All eight viewport/theme combinations remain in the browser source.
+
+## React foundation in-unit review: project tables dropped visible fields
+
+The independent review of `a413986` reproduced four symptoms in the shared project table.
+Home and the repository page omitted the project's Stage.
+Home placed the repository below the project name instead of in a separate Repository column.
+A project with a failed agent said “Failed start” instead of “Needs attention”.
+The original independent control passed, and all four new parity assertions failed.
+This is a correction inside the foundation unit, so the manager's in-unit numbering rule assigns no separate issue number.
+
+The shared table now reads the existing typed stage and its common label.
+Home includes the Repository column, while the repository page filters its projects and omits that redundant column.
+Failed members and open owner-held requests use the attention status, with archived and archiving states taking precedence.
+The phone retains its two-line layout, with the status first on the second line.
+Desktop rows keep one line.
+Permanent tests cover the fields, filtering, stage labels, state changes, and plain-text names.
+The actual-engine browser matrix now includes both project tables at all four widths in both color modes.
+These changes await their own verification and independent review; earlier foundation passes do not prove the correction.
+
+## New project in-unit integration: focus after returning from Machines
+
+Found: 2026-11-09, while joining the authored form to the accepted React foundation.
+State: the mounted regression and the native browser case passed in the first joined full run.
+
+Home unmounts when Add repository opens Machines.
+Retaining its original button would restore focus to a detached element after registration or Cancel returned to Home.
+The owner-scoped creation session now resolves the current Home button when the native dialog closes.
+The Machines return retains the original route, draft, and frozen creation request.
+The mounted regression checks that Escape focuses the replacement Home button.
+The separate native browser case passed its focus assertion in that run.
+The full run failed at the distinct lost-reply fixture described below.
+
+## New project in-unit follow-on: dedicated worktrees and the lost-reply fixture
+
+The owner released F2, issue576, after the first joined full run.
+Every project now requests its own worktree, and the form no longer offers a checkbox.
+The original New project author owns this controller and form overlay.
+The flow-fix author owns the separate engine refusal of main-checkout requests.
+No pending engine correction is imported here.
+
+The first joined full passed every unit case and failed one browser assertion.
+Its lost-reply fixture expected manual uncertainty after terminating sockets once while leaving the listener available.
+The collected document instead showed the actual project lead's live thread and original goal.
+The existing client retries transport failures with the same request, so a single close permits automatic receipt recovery.
+The failed run did not retain its wire-frame count, and the exact replay is not claimed as measured evidence.
+The revised fixture separates a single-close automatic control from a disabled-listener case that exhausts normal transport retries before manual recovery.
+The original five-second uncertainty assertion, failure and frozen source remain preserved.
+Both new cases retain exact-body, one-receipt, one-project and one-lead assertions.
+Both cases passed the bounded proof and the later ordinary full's browser phase.
+The later full failed at the separate keyboard boundary described below.
+
+## New project in-unit follow-on: native modal keyboard boundary
+
+The second joined full failed when Shift+Tab from Close moved focus outside the dialog.
+The preserved passive diagnostic reproduced it with stable dialog and control identities.
+The dialog stayed open and modal, while the active element became BODY and the document lost focus.
+The recorded controls stayed enabled, so those observations support native boundary departure rather than a readiness change or remount.
+The dialog now handles only Tab at its current visible, enabled endpoints in both directions.
+Native initial focus, Escape, and opener restoration remain in place.
+The original browser containment assertion remains, with a forward-wrap consequence added.
+The focused test covers both directions and changed disabled or hidden endpoints.
+The diagnostic source and failed selector attempt are preserved separately.
+This correction awaits its own bounded verification; the previous full remains failed.
+
+## 599. Compound remote-run commands could execute their tail locally
+
+Found: 2026-11-10, during the manager's W08 original/candidate proof.
+State: corrected in the remote tooling; local transport controls pass.
+
+Make interpolated CMD into its recipe as unquoted shell source.
+An operator such as && or a semicolon could split the invocation, leaving later commands on the local computer.
+The first affected W08 result is withdrawn, and the replacement logs print the actual remote host and tested source hash after sync.
+Make now exports the literal command value and passes it as one quoted Bash command argument to the remote script.
+The remote-run target still syncs first, which replaces changes made only in the remote copy.
+The documentation now states that order explicitly.
+Local controls exercise compound commands, quotes, newlines, shell expansion, failure propagation and remote-only output using a local stand-in for SSH.
+They also verify that tracked and untracked .env files are excluded while .env.example remains eligible for copying.
+
+## 575. A Git effect could be followed by a durable false refusal
+
+A merge or commit can finish before the outcome transaction fails.
+Git mutations now use a typed attempt in the existing event log, followed by a short outcome transaction.
+An attempt preserves the exact caller, request, body hash, workspace, and pre-effect Git identities without storing a raw message or payload.
+A prior unresolved attempt takes precedence over later failed admission.
+An uncertain outcome has no success or refusal receipt, and the normal writer failure latch remains mandatory.
+The original signed correction reconciled the durable reviewed pair only when both reviewed heads were ancestors of the actual registered destination.
+A divergent reviewed source need not descend from the reviewed base.
+Its commit reconciliation compared the frozen index tree, intended retry message, branch, and complete parent set, including a pending merge parent.
+Issue 596 retires these retry branches in favor of terminal uncertainty; a fresh owner approval keeps the actual two-ancestor containment proof.
+The original equivalent-state failure remains preserved separately from actual post-merge SQL failure tests.
+The first bounded corrected run passed fast-forward and divergent post-effect failure controls.
+The signed 75f48a8 source passed its actual full check: 7,532 tests, two skips, 500 files, and 20 browser tests, with recursive and root typing and credits passed.
+The independent round-one review remains Grade 6, with no blockers, three majors, four minors, and no flags.
+Issue 590 records the subsequent reply and cleanup correction, whose signed 27e38c85 source passed its full check.
+The Grade 7 review remains preserved; current corrections in issues 595–598 await independent re-check.
+
+## 576. A new project repository lacked a usable main destination
+
+An unborn main checkout cannot serve as the reviewed destination for a project's first commit.
+New project repository creation now writes an empty initial main commit and records its main workspace.
+The initial commit contains no user files.
+The owner approved requiring a dedicated worktree for every project on 2026-11-09.
+The dialog has no worktree checkbox and always previews Branch and Folder.
+Engine creation and preview refuse useWorktree=false before effects.
+Unfinished main-checkout intents remain readable and reserved, but cannot resume effects.
+Main remains recorded separately for owner review and approval.
+The original pre-decision full failure is preserved.
+The dedicated-worktree engine correction passed the 328-case affected run and the full check on signed 75f48a8.
+The original dialog author owns its checkbox-removal overlay at composition.
+The independent review found the existing-checkout branch gap recorded in issue 591; acceptance remains pending.
+
+## 577. A linked question could finish another worker's task
+
+Linked question admission now requires the task owner or the project's lead.
+Completion checks that authority again against the current task owner and project membership.
+Holding or answering the question does not grant authority over its linked task.
+The first bounded corrected run passed another-worker refusal and own-task and lead controls.
+Cross-project, reassignment, and rebuild coverage are retained or extended in this unit.
+
+## 578. A failed creation had no way to release its durable reservation
+
+The owner-only project.creation.abandon command finishes a recorded creation intent without changing the filesystem.
+The command shares the lifecycle lane so abandonment cannot race an active creation.
+The typed client, command-line interface, and Model Context Protocol inventories include the command's access decision.
+The command adds no visible control to the mock.
+Interrupted-creation and replaced-folder safety checks remain required.
+
+## 579. A slow Git mutation could hold the global writer
+
+Git mutations now take a request lane, perform a short writer preflight, run Git under the existing runtime gate outside the writer, and record the outcome in a short transaction.
+The runtime gate remains the only Git queue.
+No Git gate holder acquires the SQL writer.
+The original 250 millisecond negative observation remains limited evidence.
+The corrected bounded regression passed an actual independent writer operation while a real Git merge child remained held at a controlled barrier.
+Registration, creation planning and final verification, Design recording, mock recording and approval, and file-context preparation now also observe Git outside the writer.
+Their final admissions rerun against current state instead of appending an old prepared event plan.
+Separate stale-binding, revision, access and recipient controls, and a queued-registration and creation barrier regression have been written for these additional paths.
+The unit 4 bounded run passed the queued-registration and creation barrier, including a positive independent writer completion while real Git remained held.
+It also passed 19 stale-state controls.
+Four new Design controls failed with a generic refusal.
+Two preserved narrow diagnostics traced that refusal to missing Design planner and read registrations in the handler maps, despite complete source maps, remote procedure declarations, and access entries.
+The eager maps captured an incomplete module cycle under the Design-first import graph.
+Both maps now initialize lazily once, retaining their exact contents and stable identities.
+The corrected bounded run passed all 23 observation controls and all five fresh child import orders, and recursive and root typing passed.
+The same run retained one architecture failure for two direct caller-encoder imports from the log module.
+The caller encoder now has one writer-free identity module used directly by all consumers.
+Git attempt writer orchestration now belongs to commands rather than the project piece.
+The boundary correction and joined current Machines and guidance contracts passed the 147-case affected run and full verification on signed 75f48a8.
+Future W10B guidance rendering was not joined and remains unproved.
+These results do not establish a universal runtime separation claim.
+
+The first full check exposed a same-request start/stop regression because the request lane covered runner setup and stop settlement.
+The handler now releases that lane before a non-process continuation, while process commands retain request-before-process ownership through cleanup.
+Lifecycle ownership comes first, and archive members are acquired after the request lane.
+The original five-second start oracle and Git uncertainty controls are unchanged.
+New overlap controls exercise both archive and stop ownership orders, with positive member-lane acquisition after a recorded stop attempt.
+The lane correction passed the 328-case affected run, including all eight original start/setup cases and both overlap controls.
+The subsequent full check passed on signed 75f48a8.
+Independent round-one review found no lock-order defect; correction-unit acceptance remains pending.
+
+## 580. Placement could claim an unsupported workspace move
+
+A project.place request that changes its workspace or machine now refuses until machine pairing exists.
+The Machines page now displays the assigned checkout without offering another checkout as an available move.
+It explains that changing placement requires unavailable machine pairing.
+Its source was joined onto the independently accepted foundation cb049eae before editing.
+Static installation and login guidance now lives in one typed page module, with the existing visible text preserved.
+The discovery contract and engine return runtime facts instead of static page guidance.
+The current frontend and guidance contracts passed their affected checks and the full check on signed 75f48a8.
+The owner subsequently required disabled placement and retry controls with pairing hover advice, so this correction restores those controls without request handlers.
+The new control source still needs its own verification and independent re-review.
+The static helper remains for W10B; later rendering is not claimed.
+
+## 581. Recording mocks could bypass stage authority
+
+A mocks command that changes the project stage now uses the same lead-or-owner authority as an explicit stage change.
+A member can still record a revision that leaves the stage unchanged.
+Owner approval retains its existing authority.
+
+## 582. Context search bounded its result but not its complete reply
+
+Context search retains its exact 64 kibibyte result limit and truthful truncation flag.
+It now checks the complete owner or member reply, including the request identity and member data wrapper, against 256 kibibytes.
+An oversized wrapper receives a fixed safe refusal without changing read marks.
+
+## 583. Creation used independent and stacked Git queues
+
+Creation now uses the runtime's shared Git service through its existing gate.
+The private queue inside each Git service has been removed.
+Both prospective placement observations and final checkout verification run before their short admission transactions.
+The final creation admission rechecks its durable intent, settings, registered placements, reservations, collisions and current lead before planning the launch.
+Creation filesystem witnesses remain because interrupted mkdir and replaced-folder ownership must still be proven before adopting an existing folder.
+Abandonment releases only the durable reservation and never removes a witness, checkout, branch, or user file.
+
+## 584. Restart could resume a member of an unfinished archive
+
+Restart now attempts to finish durable archive intents before it considers reloading agents.
+An archive that cannot finish remains visibly unfinished.
+Paused and interrupted agents whose project is archiving or archived are excluded from automatic reload and account recovery.
+The reload input check also enforces this rule.
+
+## 585. Network Git shared the short read subprocess timeout
+
+Explicit fetch, pull, and push now use a separate bounded network subprocess timeout.
+Local read subprocess limits remain short.
+Cancellation still reaps the child process group and never deletes a lock without proving ownership.
+A possible mutation followed by timeout remains uncertain under issue 575.
+
+## 586. Credential filenames were filtered inconsistently
+
+The original correction shared the credential-name predicate across repository artifacts, context references, and Git paths.
+Independent review found that applying it to every Git path also blocked owner mutations and whole-result reads; issue 589 records that correction.
+Containment, symlink, nested-repository, redaction, and complete reply limits remain enforced.
+Real confined safe-file and owner/member refusal controls are required before delivery.
+
+## 587. Repository configuration runs with the owner's Unix authority
+
+LGcode is a local program for one owner.
+An owner-controlled repository can configure Git content filters or merge drivers that run as that same Unix user.
+The current security boundary accepts that repository-configuration scope.
+This unit documents the limit and does not claim to sandbox owner-controlled Git configuration or introduce a different threat model.
+
+
+## 588. Aggregate untracked patches repeated full status scans
+
+The original Git author isolated a recursive aggregate diff call that repeated HEAD and status reads for every untracked file.
+The manager supplied that paused author's exact two-file patch for the shared correction in this unit.
+Both owner and filtered agent aggregates now reuse one complete status snapshot and one HEAD observation, then use the same bounded direct no-index patch per admitted untracked file.
+Literal paths, binary flags, full text statistics, byte and entry bounds, symlink checks and agent exclusions remain consequential in the adopted real process-count controls.
+This is one canonical correction, shared with issue 598; its new proof and independent re-check remain pending.
+
+The original Git author's sealed diagnostic recorded 71 recursive entries and 302 actual Git child calls.
+Its original five-second assertion failed with 55 child calls unsettled.
+The observed gate wait was 0.027 milliseconds, with no competing admission during that execution.
+Call-to-spawn intervals and child wall intervals remain separate evidence, without a CPU, network or load cause claim.
+The original narrower three-path preparation and all its proof remain archived in that author's retained worktree.
+The author's later accepted-source join supersedes those engine paths with the canonical implementation and regressions from b974da0.
+The original browser failures remain failed; the accepted flow proofs do not prove the subsequently joined Git page.
+
+The joined page's later full12 passed its unit checks and failed three browser cases.
+Its aggregate returned complete data near the original assertion boundary, without a proved allocation between gate waiting and child work.
+The page also withheld received sync counts behind final working identity checks and invalidated coherent data after read-only review preparation.
+Shared projection completeness restarted Git reads even while the connection remained live.
+Seven consequential mounted controls failed on that original page; a lost preparation reply remained uncertain in the eighth passing compatibility control.
+The scoped UI correction separates received counts from mutation readiness, preserves read continuity with explicit reconnect recovery, and retains review readiness only for an exact matching coherent generation.
+The candidate's two mounted files passed all 50 controls, and web typing and credits passed.
+The canonical aggregate engine implementation is unchanged.
+The later full15 passed 7,675 unit tests and 36 browser cases, but the layout case again missed its five-second 71-file assertion.
+Its second aggregate delivered complete data and the observer later counted 71 wrappers; the assertion deadline was not recorded, so that trace does not establish the cause.
+The unchanged selected run16 passed and remains inconclusive about that failure.
+The layout fixture now indexes its same 71 real files before opening the page, leaving file contents, layout assertions, commit count and deadlines unchanged.
+The separate real aggregate regressions retain the untracked-file and process-count coverage.
+The corrected layout case passed its eight viewport and theme combinations remotely with the original assertions and deadlines.
+All nine selected real aggregate regressions also passed remotely, including the six 71-file owner and agent cases.
+These results do not retrospectively establish the cause of the full15 failure.
+The complete remote check then passed all 7,675 unit tests and all 37 browser cases, with two unit tests skipped.
+The temporary browser observer, assertion reporter and explicit aggregate probe were subsequently removed from delivery under the owner's observability rule.
+Their original source and artifacts remain in the retained investigation evidence.
+The observer-free related browser run passed ten cases and failed the final push count assertion.
+One diagnostic execution and three bounded repetitions passed, so those observations do not establish the cause of that failure.
+The browser now requires the visible push acknowledgment separately before its existing fresh outgoing-count assertion.
+Both assertions retain the default five-second timeout, and the case retains its original 120-second timeout.
+All temporary observations were removed again before delivery.
+
+## 589. Credential-name exclusion blocked owner Git operations and whole agent reads
+
+The round-one independent review found that the credential-name predicate was inside the shared literal Git path validator.
+Owner stage, unstage and discard operations consequently refused ordinary tracked credential-shaped filenames.
+Aggregate diffs also failed instead of omitting excluded agent-visible files.
+The correction keeps ordinary owner literal path rules and applies the shared predicate before actual agent-visible file and patch reads.
+Agent working, staged, committed and review aggregates omit excluded entries, including renames with an excluded side.
+Context and artifact exclusions, containment, symlink checks, redaction and reply budgets remain.
+Consequential owner mutation and agent read controls passed on that signed source.
+The full check on signed 27e38c85, exact source 6b6cd964, passed recursive/root typing, 7,565 tests across 500 files with two skips, all 20 browser cases, and credits.
+The original Grade 6 and later Grade 7 reviews remain preserved; the current whole-unit correction and independent re-check remain pending.
+
+## 590. Git failures lost known reasons and uncertain attempts accumulated
+
+The original attempt marker treated every failure after a subprocess started as uncertain.
+The reply asked for an identical retry even when no positive reconciliation was supported.
+The correction preserves fixed conflicts, rejected push, diverged pull and refused-remote reasons only when actual Git evidence establishes them.
+Those determinate outcomes have ordinary durable refusals or explicit refused review outcomes and replay without another mutation.
+Timeout, cancellation and lost outcome transport remain unknown.
+Issue 595 records the later review finding that the initial determinate classifier was too broad after local partial effects; its correction is not credited to the prior full pass.
+The fixed unknown reply is “Git outcome is uncertain; refresh Git state”.
+A successful actual Git state read with a pending attempt holds the workspace operation lane before observing Git, then takes each original request lane before a short writer transaction.
+Ordinary reads without a pending attempt keep only the shared Git gate, as issue 597 requires.
+Current workspace, root, placement and caller access are checked again before cleanup.
+The existing GitFinished event carries an optional uncertain outcome, and the existing receipt preserves the original caller, request and body hash.
+Its bounded optional refusal enum preserves the five known Git outcome codes across replay while ordinary refusal prose stays redacted.
+The old request remains terminal uncertainty after cleanup and restart; it cannot execute again or claim success or refusal.
+A failed or stale read leaves the attempt unchanged, and a live mutation cannot be closed by a queued refresh.
+The project piece remains free of writer orchestration, and no Git gate is acquired under the writer.
+The original crash, ancestry, writer-latch and open-review controls remain, with new cleanup, binding and authority controls written.
+The full check on signed 27e38c85, exact source 6b6cd964, passed recursive/root typing, 7,565 tests across 500 files with two skips, all 20 browser cases, and credits.
+The original Grade 6 and later Grade 7 reviews remain preserved; the current whole-unit correction and independent re-check remain pending.
+
+## 591. Existing repository creation could persist a feature branch as main
+
+Creation previously recorded the main checkout's current branch without requiring main or master.
+The review route then refused that permanent destination even after an external branch switch.
+Creation and preview now require main or master before a new intent or filesystem effect, and saved intents are checked before resumed effects.
+Final main-state observation also refuses a non-main destination.
+The exact actionable pre-effect reason is “check out main or master in the main repository checkout before creating a project”.
+An initial branch refusal enters current final admission and receives a terminal receipt only while no intent exists; unfinished-intent and unavailable-account retries keep their existing policy.
+The New project controller's original author will consume this fixed reason directly at composition; no peer controller is edited here.
+First-main initialization, dedicated worktrees, intent ownership, receipt identity and owner review remain.
+The full check on signed 27e38c85, exact source 6b6cd964, passed recursive/root typing, 7,565 tests across 500 files with two skips, all 20 browser cases, and credits.
+The original Grade 6 and later Grade 7 reviews remain preserved; the current whole-unit correction and independent re-check remain pending.
+
+## 592. Task reassignment left a valid linked question permanently open
+
+An answer previously refused when the original asker no longer had authority over the linked task.
+The new task owner then remained blocked by that open question.
+A valid holder answer now closes the question and delivers its redacted answer normally.
+Only the TaskChanged completion event is omitted when the original asker lacks current task authority.
+The task's projected state and answer history preserve that distinction.
+Holder checks, atomic delivery, terminal receipt and authorized task completion remain.
+The full check on signed 27e38c85, exact source 6b6cd964, passed recursive/root typing, 7,565 tests across 500 files with two skips, all 20 browser cases, and credits.
+The original Grade 6 and later Grade 7 reviews remain preserved; the current whole-unit correction and independent re-check remain pending.
+
+## 593. Git process-wrapper tests are sensitive to host load
+
+The independent Opus round-one review observed eight default five-second timeouts in main-review.test.ts at a load near 39 on 38 processors.
+All 31 cases passed when the reviewer separately used a 60-second timeout.
+That is attributed reviewer evidence, not a builder rerun or a passing result at the original timeout.
+The wrappers start a Node.js process for each Git call.
+This unit records the sensitivity without increasing timeouts, rewriting wrappers broadly or running a loaded local full.
+Original failures, original timeouts and the lightly loaded remote full proof remain preserved.
+
+
+## 595. Broad failure text marked partial Git effects as determinate
+
+The Grade 7 re-review found that local permission errors and mixed-reference fetch failures could acquire a known refusal after Git had changed files or references.
+Local process failures now remain conservative and never map permission text to authentication_required.
+Only explicit fetch, pull and push boundaries can classify constrained remote refusal evidence; push rejection is specific to push, and pull divergence uses its exact terminal diagnostic.
+Conflict admission still requires both MERGE_HEAD and actual unmerged entries.
+Real partial fast-forward merge, pull permission, mixed-reference fetch and main-approval controls retain actual changed bytes/references and uncertainty without a durable refusal or successful review decision.
+Implementation and controls are written; new proof and independent re-check remain pending.
+
+## 596. Refresh made the old reconciliation branches mostly unreachable
+
+The state refresh policy clears attempts into terminal uncertainty, so commit and approval reconciliation on identical retry added a parallel policy that the page rarely reached.
+Those retry reconciliation branches are retired.
+An old attempt returns uncertainty before and after refresh, while exact caller, command and body reservations survive rebuild.
+A new owner approval request still uses the existing actual two-ancestor containment proof without another Git merge.
+The read comment now documents terminal uncertainty receipts.
+The actual post-Git SQL failure, writer latch, parent/ancestry and open-review controls remain, with expectations updated to this simpler policy.
+New proof and independent re-check remain pending.
+
+## 597. Ordinary Git state reads unnecessarily queued for mutation lanes
+
+The state-read cleanup originally acquired a workspace operation lane even when no pending attempt existed.
+It now observes current authority and workspace identity, then takes that lane only if the current workspace has a pending attempt.
+The ordinary path retains the shared runtime Git gate and does not clean up attempts that started after its check.
+The pending path retains current binding/access admission, original request lanes and short writer settlement after Git observations.
+A positive ordinary-read overlap and the existing real held-Git pending-refresh controls cover the two paths without changing deadlines.
+New proof and independent re-check remain pending.
+
+## 598. Filtered review patches omitted bounded files without marking truncation
+
+An agent review selected paths from its bounded file list but did not mark the resulting patch truncated when that list omitted files.
+Its diff now reports truncation whenever the filtered file list is truncated, while owner aggregate range behavior remains.
+Its aggregate working-read cost is the same status-rescan defect as issue 588 and uses that one supplied canonical correction.
+New bounded review and adopted literal-path/process-count/binary/size/symlink controls preserve credential filtering and reply limits.
+New proof and independent re-check remain pending.
+
+## 600. Common remote authentication refusals conservatively remain uncertain
+
+Found: 2026-11-10, in the independent Opus check of the whole flow-fix unit.
+State: open, accepted as a minor safe-side limitation.
+
+A common SSH public-key refusal includes multiple diagnostic lines.
+An HTTPS server can also prefix its authentication refusal with a server message.
+The strict pre-effect grammar does not recognize these complete shapes, so they report terminal uncertainty rather than authentication_required.
+The manager accepted the reviewed unit at Grade 8, with no blockers, majors or flags.
+The classifier stays conservative in this change.
+Any later widening must prove exact pre-effect refusal shapes without treating local partial effects as authentication failures.
+
+## 594. Board subject retries could replace a committed reply after an uncertain outcome
+
+Found: 2026-11-10, by the W08 conversation author and the root's recovery review.
+State: The correction has local actual-handler proof and passed the second ordinary full's unit stage. The full failed three other browser cases. Browser acceptance remains outstanding.
+
+The Board subject discarded its request identifier on every typed command error.
+Editing the reply also replaced its request before the original outcome was known.
+Navigation discarded the local attempt.
+A database failure or a later admission error can follow a committed first transport attempt.
+Those errors do not establish that the original reply was refused.
+
+The existing authenticated owner-session conversation registry now retains the complete reply body, target, addressees, and request identifier.
+An uncertain reply has an explicit recovery action that sends that same payload through navigation and draft edits.
+A bounded authenticated event read can establish a durable refusal for the exact owner, command, and request.
+An unavailable read or a later admission error leaves the original attempt frozen.
+Success, a confirmed durable refusal, or owner-session disposal retires the attempt.
+Explicit Read post, access checks, subject focus, and plain-text rendering remain in place.
+
+Two controls failed against the original Board subject.
+The actual CommandHandler, database, receipt, and board-event regressions now cover a lost committed reply, an edited draft, navigation, and a later admission error.
+They verify one stored reply, the unchanged receipt, and no duplicate delivery.
+The same proof covers a receipted planner refusal followed by a corrected new attempt, logout, expiry, and late completion.
+The external harness and browser session transport in these local tests remain controlled fixtures.
+
+## Conversation in-unit follow-on: cancellation outlived its conditional action
+
+Found: 2026-11-10, in the second ordinary conversation full verification.
+State: The original mounted Thread failed three settlement controls. The correction has focused local proof and awaits a newly authorized full verification.
+
+The Stop reply action mounted only while an actual delivery was active.
+Its settlement effect disappeared when terminal evidence removed that action.
+The worker became idle, but the conversation still said that it was waiting for the turn to end.
+The mounted Thread now owns settlement throughout its loaded history lifetime.
+A stop acknowledgement alone still does not establish that a reply stopped.
+Only actual terminal evidence for that agent after the original delivery settles the attempt.
+Incomplete history retains the original attempt, and a late acknowledgement cannot restore a settled attempt.
+The mounted regression covers stopped and normally ended turns, a later actual prompt and cancellation, navigation, unrelated terminal evidence, and active and idle offline controls without writes or draft loss.
+The former standalone action settlement test moved into this mounted production Thread proof.
+This is a correction inside the conversation unit, with no separate issue number under the manager's rule.
+
+The same failed browser run found two fixture steps that expected Send while an actual turn still owned Stop reply.
+The history fixture now completes the addressed member's actual Board read and reply before ending that turn.
+It retains the original Board delivery, complete outgoing source, receipt, viewer, reopen, and reconnect assertions.
+The foundation fixture ends its historical current reservation through the real runner event path.
+It checks both active Stop reply and idle Send prompt during an actual transport outage, including the complete draft and absence of mutation frames or runner writes.
+Neither fixture adds another Send control, submits through Enter to evade an active control, or extends a timeout.
+These browser fixture changes have type proof but have not yet executed in a newly authorized browser run.
+
+## Conversation in-unit follow-on: a committed team post did not invalidate the shell snapshot
+
+Found: 2026-11-10, after the first bounded conversation-workspace browser journey.
+State: The authorized one-tag correction is prepared. The consequential authenticated socket control awaits execution where a Unix socket can listen.
+
+The browser journey committed an actual owner Board post, but its original five-second assertion did not find the new message.
+The failed run did not measure the poll phase, read duration, visibility, or rendering schedule.
+Those timing details remain unproved.
+Reading the complete event path established a separate concrete gap.
+The existing shell watcher received Board post events but advanced its cursor without refreshing its snapshot.
+The team conversation therefore had no immediate event-driven invalidation through Shell's snapshot sequence.
+
+The existing watcher now includes only `board.PostWritten` in its refresh tags.
+It reuses the actual minimum-sequence snapshot read, provider, coherent recovery, Shell sequence prop, and owner `board.peek` read.
+The existing poll, timeouts, authorization, owner lifetimes, and oversized-event predicate are unchanged.
+Root explicitly authorized this accepted foundation file as an overlay within the conversation unit.
+No separate issue number is allocated.
+
+The new mounted App, provider, Shell, and team control uses the real authenticated socket, handler, SQLite writer, and committed event stream.
+It holds only the team reader's fallback poll and records the actual event, minimum snapshot, owner peek, and rendered post.
+It checks the saved older anchor, offset, and Latest action with explicitly simulated layout.
+It also compares actual member read marks, acknowledgements, and durable events before and after owner viewing.
+The first local attempt failed at socket listen with `EPERM`, before reaching a behavioral assertion.
+That environment failure is preserved and is not an original behavioral red.
+The original and candidate inputs are preserved for separate execution authority.
+The original browser journey, later oracles, and timeouts remain unchanged.
+
+## Conversation proof update after the accepted flow join
+
+The manager's corrected actual-stream original run failed the new-post assertion, and its candidate run passed with the same test and only the watcher tag changed.
+The actual after-sync watcher hashes are preserved in the selected original-run-3.log and candidate-run-2.log.
+The earlier first two reported original runs are withdrawn histories and are not behavioral results.
+The manager's third complete workspace journey passed once on content b25415e2, full identity 34978da4, parent 6c4657a.
+It retained the original timeout and all full-input, receipt, authority, anchor, unread, lifecycle and owner-session disposal assertions.
+The two intervening fixture corrections opened actual phone navigation before the unchanged exact logout action and named the same worker in its member-status read while checking the returned identity.
+The complete failed runs, original source pins, reached screenshots and correction deltas remain sealed.
+The W08 work is now composed onto accepted flow b974da06 without relabelling that old-pin pass as proof of this composition.
+A new exact ordinary full and fresh independent whole-unit review remain outstanding.
+The reviewer must explicitly check both browser fixture corrections and every prior authority and recovery edit.
+
+## Conversation visible parity correction after the signed author handoff
+
+Found: 2026-11-10, in the fresh independent review of signed f4605ad59246088b33b459a0dfb512c198456746.
+The agent header showed connection state but omitted the actual role and activity.
+The lead summary counted only the selected agent's requests.
+Team Chat omitted its actual member count.
+The panel toggle occupied an extra row, and the desktop panel added close and full-view controls.
+The manager requires all four visible findings to be corrected within this conversation delivery.
+No owner exception or new issue number is claimed.
+
+Five new mounted application controls failed on the untouched original production source.
+The raw result and exact inputs remain sealed separately from the signed source's passing full.
+The correction reads actual roster roles and lifecycle state, existing project and team membership, and existing complete request rows.
+A lead's own team requests and the owner's attention remain separate counts.
+The existing owner-only attention filter is unchanged.
+The team count follows current roster membership and the selected project and team.
+Owner board peek remains non-consuming.
+
+The header occupies one 32-pixel line.
+The existing tab row holds the sole desktop panel toggle, and Chat opens the current conversation in full.
+Only the compact drawer keeps Close, with its existing focus containment, Escape and opener restoration.
+The new controls retain their exact original assertions for the candidate proof.
+The browser journey adds loaded header, real member count, tab-row placement and panel controls across all eight size and theme combinations.
+Its original timeout, complete request bodies and keys, permission authority, both latest fixture corrections, exact read-mark equality, unread and full lifecycle and session tails remain intact.
+The original signed source and all passed and failed histories remain preserved.
+The changed source needs its own manager browser and full evidence and independent review.
+
+
+## 602. An accepted capacity hold left the conversation offering Stop reply
+
+Found: 2026-11-10, by the fresh nonauthor W08 whole-unit review on signed 11dfcea.
+The manager allocated this number and assigned the correction to the root lead.
+An accepted delivery's capacity hold records DeliveryHeld without DeliveryRequeued or TurnEnded.
+The engine becomes idle, but active-reply derivation and cancellation settlement omitted that same-delivery event.
+The owner saw Stop reply or its stale recovery instead of the normal Send action.
+
+The first original regression failed setup because its initial thread read omitted the required after cursor.
+That run is preserved and is not behavioral red evidence.
+The corrected original remote run failed both accepted-hold cases at the visible Stop assertion.
+Its unaccepted-requeue control passed.
+All three use the real handler, SQLite, committed history and a mounted production Thread.
+
+Both browser folds now retire only a matching agent and delivery when DeliveryHeld arrives.
+The existing cancellation identity guard prevents a late acknowledgement from restoring the retired attempt.
+The draft remains, the normal Send action returns, and a capacity hold does not claim Reply stopped.
+No engine capacity policy, authority, transport, timeout or session lifetime changes.
+Status: root correction prepared; candidate remote proof and fresh independent review remain pending.
+
+## 603. A refused start hid the model and effort remedy
+
+Found: 2026-11-10, in the fresh independent review of signed 89c5acd.
+The manager allocated this number to the original conversation author.
+Composer hides its complete form while the agent is halted.
+That form contains the sole AgentTools instance, so the owner cannot change a refused model or effort or recover an uncertain configuration command.
+Resume alone can repeat the refused selection.
+
+The new original controls mount the production Thread with the actual command handlers and SQLite log.
+The adapter and browser transport are controlled explicitly.
+They retain a draft from the real starting state, require reachable advertised choices and configuration recovery after refusal, and resume through the real lifecycle handler.
+They also require the same configuration body and request key after a lost committed reply, one durable choice, applied evidence and no prompt while halted.
+The original remote run on 4fd8cd2 failed both refusal controls at the hidden tools assertion.
+Composer now hides the message input, context additions and send action while keeping its single existing configuration tools mounted and reachable.
+The message and recovery send guards still refuse a halted submission.
+Status: correction prepared; affected remote proof is next.
+
+## 604. Activity titles and paths bypassed the bounded reader
+
+Found: 2026-11-10, in the fresh independent review of signed 89c5acd.
+The manager allocated this number to the original conversation author.
+The collapsed tool summary, expanded tool title and file-change path render complete provider strings on the ordinary conversation surface.
+The input, output and diff already use the bounded reader, but their labels do not.
+
+The new original controls store contract-valid long labels through the actual SQLite log and mount the production Thread.
+They require bounded collapsed and expanded output, exact full reading and copying, unchanged stored evidence, inert markup and no interactive reader inside a summary.
+Short labels, actual tool status and complete input, output and diff readers remain consequential controls.
+The original remote run on 4fd8cd2 failed with a 40,055-character collapsed summary and a 40,906-character ordinary path.
+Its short-label control passed.
+Titles and paths now use the existing full reader, and the collapsed summary uses the same bounded preview without interactive descendants.
+The original stored strings, status, input, output and diff are unchanged.
+Status: correction prepared; affected remote proof is next.
+
+## 605. Durable conversation refusals kept recovery locked forever
+
+Found: 2026-11-10, by the independent review of signed 9a9d2f1.
+The manager allocated this number to the original conversation author.
+Issues 603 and 604 are closed by that review, and their changes remain.
+Composer and AgentTools retain every failed request as uncertain.
+A planner refusal has a durable receipt, so replaying that same request cannot succeed even after the cause is repaired.
+The original controls use the real handler and SQLite for a disappearing selected file and changed advertised model and effort choices.
+They require the old key to keep its refusal after repair and a corrected explicit request to use a new key.
+Only positive durable refusal evidence for the exact owner, command and request may retire an attempt.
+Missing, unavailable, incomplete or unrelated evidence must preserve the complete original request.
+The original remote run on d453837 exited 1 with all four behavioral controls failing.
+Each reached its real durable receipt and proved that repair did not change replay before failing at the locked control.
+The correction captures a bounded pre-command sequence in the existing conversation attempt.
+A shared read checks at most 64 subsequent events within two seconds and requires the exact owner, command, request and returned sequence.
+Only that positive refusal retires the attempt, preserving the current draft and references.
+Missing or unavailable evidence retains the frozen body and key through navigation and later admission failures.
+Late evidence cannot restore a disposed owner session.
+The candidate remote run on 4e4ddbc passed 92 cases in nine affected files, including all four original controls.
+Real lost-committed-reply controls also preserve each prompt, team post and configuration through a later actual invalid-credential refusal and exact receipt recovery, with one effect.
+Mounted evidence controls retain immutable requests for missing anchors, unrelated callers, commands and keys, stale sequences, incomplete or unavailable reads and evidence beyond the 64-event bound.
+Navigation retains later edits, while logout and expiry discard protected state and ignore late evidence.
+Web typing and copied-code credits passed on the same candidate.
+The combined remote command exited 129 only at the final Git whitespace check because the remote source copy excludes its Git metadata.
+The local read-only Git whitespace check passed.
+Status: corrected; the author result records the final full-check outcome and lead handoff.
+
+The first correction full on 8c9eeb4 passed 516 files and 7,715 tests, with two skips, but its browser suite exited 1 with 26 passes.
+The conversation journey had not observed the intended lost prompt reply at its five-second assertion.
+Its captured page retained the next draft alongside the preceding successful send acknowledgement.
+The fixture had waited for runner delivery, which does not establish browser acknowledgement or coherent write admission.
+It now requires the preceding empty acknowledged draft and the real enabled Stop reply control before starting the next send fault.
+The original fault, four identical prompt frames, complete body and key, owner authority, eight-view matrix and lifecycle/session consequences remain unchanged.
+The exact blocked guard at the original keypress was not measured, and no production timing defect is claimed.
+
+
+## 608. The eight-project browser journey has too little time
+
+Found: 2026-11-10, while finishing the independently reviewed W08 correction.
+State: corrected under the manager disposition; the related browser file must pass before merge.
+
+The New project journey creates eight real projects, Git worktrees and leads, and opens every exact thread.
+Its default 30-second budget repeatedly expired after six or seven creations on unrelated commits.
+Earlier successful durations ranged from 17.4 to 26.9 seconds.
+The manager identified this as a tight test budget rather than a W08 regression.
+Only this test now uses a 120-second budget.
+Every creation, persistence, single-lead, branch and exact-thread assertion remains unchanged.
+The previous failed full and isolated failure remain recorded as failures.
+The manager requires the failed and related new-project browser file, without another full check or review round.
+
+## 573. Repository registration discarded uncertain typed failures
+
+Found: 2026-11-09, during W07B's source review of W10B's independent registration controller.
+The manager allocated this number and approved the bounded author correction.
+
+The controller treated every typed `CommandError` as a conclusive admission refusal.
+The public application programming interface also uses that error for database failures.
+The original authenticated controls reproduced add and locate requests losing their frozen identity at controlled boundaries before append and after actual commit.
+The original web logout control also showed that the typed-error path skipped the session probe and retained the private draft.
+The original source archive, unchanged-source manifest, observations, and normal exit 1 remain under `.proof/w10b/recovery-red-1*`.
+Two additional failed assertions in that run expected `Git: not_repository` for a folder outside the configured root.
+The actual fixed admission reason was `Git: invalid_path`.
+The corrected controls preserve the same no-registration and editable-retry assertions with that actual reason.
+
+The author correction keeps database, generic, and unknown failures uncertain.
+Only exact proved pre-registration admission reasons release the frozen request.
+Every failed operation now probes the session, including a typed refusal.
+An actual unauthorized session response disposes the private state and invokes expiry.
+The constructor and public controller and content exports remain unchanged.
+Corrected add and locate controls require the same request through Cancel and retry, one actual registration effect, editable recovery after conclusive refusal, and disposal after actual web logout.
+The first bounded remote proof passed recursive and root typing and stopped at two pre-append recovery fixture assertions.
+Those assertions expected the deliberately latched writer to recover in the same service.
+The corrected fixtures retain the same controller, complete body, and request while the writer remains latched, then close the actual services and run normal restart recovery before retrying.
+They assert a new authenticated client and the unchanged controller and payload.
+The ten actual-engine controls and nine controlled presentation regressions then passed locally with one worker.
+The restart helper names its empty host process reader and signal control; it does not kill actual host processes.
+No production writer, receipt, database row, or view was repaired or weakened.
+Status: bounded correction proof passed; independent review remains pending.
+
+## Recorded mock companions lost their private folder scope in the unfinished display unit
+
+Found: 2026-11-10, during the bounded actual opaque-frame prerequisite.
+This correction belongs to the unfinished W10B display unit.
+No separate issue number has been allocated.
+
+The document carried its private session identity in its query.
+Its root-relative stylesheet and image had neither that identity nor a usable referrer.
+They reached the unchanged no-editor fallback and returned empty 503 responses.
+The module request failed without an observed response status.
+Its exact failure mechanism remains unproved.
+The original failed native run and the later passive diagnostic remain preserved.
+
+The bounded author correction scopes direct stylesheet, script and image addresses
+in the delivered HTML to the same issued private session.
+Root-relative and ordinary relative addresses resolve against the actual selected route.
+The recorded source and companion files remain unchanged.
+The engine still verifies the recorded fingerprint before making that delivery representation.
+The parser adds no owner API authority, cookie, origin or folder access.
+The opaque sandbox and Content Security Policy remain unchanged.
+
+Nested root-relative addresses in stylesheets or modules remain unsupported.
+This correction is not general rendering acceptance.
+Actual module execution, orange pixels, decoded images, editor import and isolation
+still need the separately authorized browser proof.
+Status: engine typing and all 27 focused controls passed; native retry is held.
+
+## 574. Incomplete mock history cleared an uncertain approval
+
+Found: 2026-11-09, during W10B's author review of approval recovery.
+The manager allocated this number and approved the smallest helper correction.
+
+An incomplete paged history read returned the same stale outcome as a conclusively superseded revision.
+The Mocks page therefore discarded its session-owned uncertain approval request.
+The original controlled document object model regression showed the recovery action disappearing after an incomplete read.
+Its unchanged source, original log, and normal exit 1 remain under `.proof/w10b/recovery-red-1*`.
+
+The helper now keeps incomplete history uncertain.
+The exact request and revision stay available through navigation and later retry.
+The regression requires incomplete history to issue no replacement approval command and preserves the original request for successful recovery.
+The correction adds no history contract, parser, owner authority, or synthetic approval.
+The exact corrected source remained frozen throughout bounded remote proof 1.
+That run passed recursive and root typing, then stopped at two unrelated pre-append registration recovery controls.
+The document object model command was consequently unexecuted.
+This entry was appended after the remote run exited, as an explicitly recorded document-only delta.
+The later local controlled presentation run passed all nine regressions, including incomplete history, navigation, and recovery with the original request.
+Status: bounded correction proof passed; independent review remains pending.
+
+## 601. The editor image config reference was unavailable in the containerd store
+
+Found: 2026-11-10, during manager preparation for the W10B native display proof.
+The manager allocated this number.
+The approved image was present under its transferred name and tag on the remote personal computer.
+The engine's config-digest reference returned `No such image`.
+The original remote typing failure, later passing typing and Docker inspection records remain preserved separately.
+
+The owner ruled that every host finds the editor by `lgcode-openpencil:w10b-cb71737-build1`.
+The engine now inspects that local tag on every launch and requires Linux on AMD64.
+No digest lookup or equality decides image presence.
+A missing image is refused without building, pulling, retagging or choosing a fallback.
+The existing `--pull=never`, non-root user, isolated network, folder mounts, resource limits, socket deadline and owned-name cleanup remain.
+The native fixture uses the same tag and checks the actual generated container name.
+Its original display, import, pixel, isolation and cleanup assertions remain.
+Temporary static launcher diagnostics are retained separately and must not be committed.
+Status: product and fixture corrected; independent remote typing and focused checks passed.
+The native follow-up below records the later startup failures and their disposition.
+The issue remains open pending unit review and integration.
+
+
+### The later editor boot failure is separate from image presence
+
+The source23 and direct remote native cases started the named editor image and opened its frame.
+The registered document assertion failed before the capability assertion ran.
+The approved temporary boot-notice read then measured a localStorage SecurityError in the opaque sandbox.
+The original failures, cleanup outcomes and temporary observation remain preserved in website-1/w10b-document-import.
+On 2026-11-10, the owner approved adding allow-same-origin to the editor iframe and its content security policy sandbox directive.
+Recorded mocks keep their opaque sandbox.
+The editor keeps its separate display hostname, credential-omitting document import, owner-cookie exclusion, frame ancestors, referrer policy, revocation and logout controls.
+The temporary boot-notice read was removed before this correction's commit.
+No OpenPencil source patch or image rebuild is applied.
+At product commit e740c19, remote engine, web and native-input typing passed.
+All 34 tests across the display boundaries, project review and actual engine review files passed.
+The related native case first exposed an unhandled Playwright response-body read, then Docker's CAP_NET_BIND_SERVICE spelling.
+The case now proves file bytes with a credential-omitting browser read of the exact issued URL, while retaining the original import status, component and canvas checks.
+The capability assertion normalizes only the optional CAP_ prefix and still requires exactly the one approved capability.
+The final native run passed in 10.6 seconds, including actual modules, WebAssembly, registered file import, screenshots, owner isolation, logout and cleanup.
+Its outcome records completed=true and owned containers absent; a separate Docker listing was empty.
+The screenshots still show OpenPencil's font-unavailable-or-substituted warning.
+This proves the selected document renders, but does not establish exact font fidelity or whole-unit acceptance.
+All original failed logs remain in website-1/w10b-document-import, alongside the passing logs and screenshots.
+
+### The first ordinary full check found two missed repository guards
+
+The full remote check of 720077d returned 1 after typechecking passed.
+Vitest reported 7,650 passing tests, two skipped tests and two failing guards; browser and credit stages did not run.
+The display input callback constructed an owner credential outside webCaller.
+It now obtains and revalidates its caller through webCaller before each engine input read.
+The pure display-boundary and markup tests also omitted their required rebuild declarations.
+Both now register noLog=true because neither opens an event log.
+The original full log and direct exit remain preserved in website-1/w10b-document-import.
+
+## 606. Previously inspected worktree summaries hide fresh row counts
+
+The independent W09 review found that cached working changes overrode later count reads for an uninspected worktree.
+After visiting two worktrees, changes in the first could remain displayed as a clean checkout while inspecting the second.
+A newer partial or unavailable result was also hidden by that older working view.
+The correction keeps working data authoritative only for the currently inspected row and uses the existing count generation for other rows.
+The focused control retains genuine Git reads beneath narrow partial, unavailable and held-reply boundaries, and checks that aborted generations cannot replace newer counts.
+The original focused control failed against unchanged production with a genuine new file still displayed as zero changes.
+Candidate focused and full proof are recorded under the existing build loop.
+
+## 607. Split Git comparisons omit side headings
+
+The independent W09 review found that real split comparisons omitted the mock's Before and After headings and accessible side identity.
+The correction adds paired headings and labeled line groups in the shared comparison renderer.
+Unified fallback, paired row alignment, literal patch rendering and the single phone gutter remain required.
+Focused renderer controls cover both workspace and dialog consumers, and the existing eight-combination browser journey retains its original consequences and deadlines.
+Both original renderer controls failed against unchanged production because the two headings were absent.
+Candidate focused and full proof are recorded under the existing build loop.
+
+## Unallocated full-check failures during the W09 minor corrections
+
+The ordinary remote full check on commit `1b24026` passed typing and 7,678 unit tests, with two existing skips, but failed two browser cases.
+The Git lost-reply case retained the initial unconfirmed acknowledgment instead of publishing terminal uncertainty within its original five-second assertion.
+A later single-case execution with a temporary fixture observer passed, which does not explain the full-run failure.
+The new-project eight-size creation case reached its original 30-second case timeout while creating the eighth project.
+Neither failure has an established cause, and no deadline was increased.
+The complete full output and both original failure contexts remain in `.scratch/w09-evidence/minor-corrections/` in the W09 author worktree.
+The full-check requirement remains unmet, and issue numbers remain manager-owned.
+
+The later full on `8c50353` passed typing and all unit tests but failed three Git browser publication assertions and the same project-creation case.
+A bounded registered-handler and wire observation reproduced the lost-reply failure without changing its original oracle.
+Its five-second assertion began before the typed commit failure arrived, and the final coherent identity read was still pending when the assertion failed.
+An auxiliary checkout count read also entered the shared runtime Git gate before the inspected state read.
+The UI now defers those auxiliary summaries until the inspected coherent working refresh publishes, while keeping current count generations and their cancellation guards.
+A consequential mounted control failed against the original production ordering because an auxiliary read started while the inspected refresh was held.
+The original browser assertions and deadlines remain unchanged, and this observation does not establish a load, network or universal latency cause.
+The manager owns the separate new-project disposition; that case is not repeated to chase a pass.
+
+
+## 609. The Git lost-reply assertion is timing-sensitive in a full browser run
+
+Found: 2026-11-10, while finishing the independently reviewed W09 correction.
+State: open, reserved by the manager; no correction is applied in this merge.
+
+The full check on signed d71de21 passed typing, 507 unit files and 36 browser cases.
+The lost-reply assertion at git.spec.ts:269 still saw the initial unconfirmed acknowledgement within its unchanged five-second budget.
+The unchanged isolated case then passed in 11.1 seconds, including 9.8 seconds in the case.
+The manager accepted the combined gate under the build-loop rules and authorized the merge.
+The full remains exit 1, and the isolated rerun remains exit 0.
+This does not establish a cause or close the timing issue.
+If it recurs in the merged full, the manager requires an earlier acknowledgement or a wait on the correct event rather than a longer deadline.
+
+It recurred in the final merged full on 4f9ae0a, at git.spec.ts:271.
+The alert still showed the initial unconfirmed acknowledgement after five seconds.
+The unchanged case passed on its own in 10.0 seconds.
+The fix stays as stated above: wait on the correct event, not a longer deadline.
+It is the next unit on area/website after the master merge.
+The original logs and failure contexts remain in the W09 author result.
+
+
+## 610. The merged shell constrained the Git workspace width
+
+Found: 2026-11-10, in the manager's full check of merged 2b482a2.
+The general shell section rule had higher specificity than the Git workspace override.
+It applied a 1,200-pixel maximum width and automatic margins to the Git layout.
+The existing Git layout browser assertion failed on the computed maximum width.
+The general rule now excludes both the conversation and the Git workspace.
+No Git layout assertion, deadline or other style rule changes.
+The failed merged full remains recorded as exit 1, with all 525 unit files and 37 other browser cases passing.
+The lead runs the complete Git browser file after this correction.
+The manager owns the subsequent merged full and service check.
+The requested complete Git browser file passed remotely, with all 11 cases passing in 3.3 minutes and wrapper exit 0.
+The existing layout assertion passed without an assertion or deadline change.
+
+
+## W11 integration corrections without a new issue allocation
+
+Found: 2026-11-10, while checking the accepted website against the original browser reference.
+
+The accepted Shell did not mount the delivered first-run Setup, Mocks, or repository Design pages.
+The integration now uses the original author exports and the authenticated owner's existing controller lifetimes.
+Setup requires positive durable completion, and project stages omit Design when the complete mock history has no screens.
+Historical browser fixtures explicitly complete setup without bypassing the genuine first-run journey.
+
+A complete mock revision history with no approval did not prove that a generic typed CommandError was a durable refusal.
+A real writer-boundary control reproduced retirement of the original approval identity before append.
+Approval now keeps its exact body and key across ambiguous failures and navigation.
+It retires that attempt only after success, conclusively stale revision evidence, or a durable owner CommandRefused event for that exact approval.
+The real before-append and after-commit controls recover one approval after runtime restart.
+
+Repository Design's evidence table and editor did not provide live component View previews.
+The existing isolated display path now selects a registered repository revision and component identity.
+It reuses the current owner issuance, opaque sandbox, session revocation, fingerprint, path and private-data checks.
+Component previews are inert while the owner can still open and close them.
+Unsupported source formats explicitly remain unavailable.
+The original mock and editor retain their existing interaction policies.
+
+The historical live reply assertion expected a literal Agent data prefix that the current plain-text export no longer renders.
+The correction preserves the complete exact sentence and exactly one new reply block.
+The W11 builder result records the actual live failures, ordinary full overlap, later corrections and their validation separately.
+
+The actual-provider first-run journey also established a created lead with
+`model-refused` and an exact durable `project.setup.complete` prerequisite
+refusal. The inline Open lead conversation button previously retried Setup
+completion, so the owner could not reach the existing model/effort remedy.
+It now opens that same lead's existing Thread as a Setup detour. Return to
+first project retains the original project and creation. Setup remains pending
+until configure/resume succeeds. Only an exact durable completion refusal
+permits a new completion key; ambiguous failures retain the original key.
+
+The continuing independent review reproduced a reload defect after that first
+project committed with a failed lead. Reload lost the in-memory created project,
+showed another editable creation form, and allowed a second project. Setup now
+reads the complete existing project collection under a stable engine sequence.
+One existing project exposes its same lead and completion controls. Multiple
+projects require an explicit choice; no latest-project assumption is made.
+Incomplete or failed reads cannot enable replacement creation. No private draft
+is persisted, and no new API, event or synthetic completion is introduced.
+The regression reloads both model and effort failures before real configure,
+resume and completion, and separately preserves ambiguous multiple-project state.
+
+### W11 actual-provider selector boundary (unallocated)
+
+The real Codex adapter selector does not advertise the exact requested gpt-6.1-sol. The minimal owned-service probe confirmed that the request's configId belongs to that same selector and that the correctly shaped setting receives InvalidParams. It printed fixed booleans, without options, raw errors or credentials. This is an external provider/adapter configuration limit, not an established local runner bug. The requested model and provider remain unchanged. Actual-provider completion, private-login halt and restart receipt/rebuild proof remain incomplete. W11 merge is blocked pending manager disposition. The named W11 builder result retains the failed attempts and ordinary diagnostic log.
+
+The manager subsequently traced this historical blocker to the pinned
+codex-acp2.5.0 bundling Codex0.165.0. The appended manager disposition authorizes
+exactly codex-acp2.6.0 and its lockfile, which resolves Codex0.166.0, while keeping
+gpt-6.1-sol/high. Current adapter MCP/terminal internals and Codex0.166.0 approval
+and environment handling were rechecked. The existing issue236 configuration
+still applies; no shim, provider/model substitution or weaker choice check was
+added. Related tests and actual live outcomes remain in the W11 builder result.
+
+The authorized upgraded actual-provider web journey subsequently exited0 at the
+unchanged gpt-6.1-sol/high. It completed real tool/board handoff, exact answer
+replay, exact reply/file bytes, stop/resume, private-login failure and halted
+composer consequences, and service-restart receipt/rebuild checks. The original
+failed probes and same-copy overlap remain historical evidence. The final signed
+ordinary full and continuing independent review are separate requirements.
+
+The signed W11 full on 79cd51d passed all 525 unit files and 42 browser cases,
+but the serial eight-size Mocks/Design journey reached its overall 30-second
+limit at the enabled second approval button, after the matrix and stale refusal.
+Its approved overall budget is now 60 seconds for page/worktree setup, sixteen
+captures, stale refusal, actual approval and reload. Individual deadlines and
+all behavioral assertions remain unchanged. The failed/related pair passed
+in 20.7 seconds. The other full failure recurred at issue 609's original Git
+terminal-uncertainty assertion. The unchanged isolated case passed with bounded
+temporary handler timing observations; those observations do not explain the
+full failure. Issue 609 remains open and its cause unproved. The Git source,
+assertion and deadlines are unchanged, and temporary observations were removed.
+
+## 611. The mock preview issuance observation failed in the W11 full
+
+Open: on signed 5e12347, new-project.spec.ts:605 observed status 0 instead of 200 within five seconds in full4. The unchanged uninstrumented case and credits then passed. The cause remains unproved. The manager accepted that combined gate without changing the assertion or deadline.
+
+The same registered component journey failed again in the final merged full on 4f9ae0a, at a different assertion.
+At new-project.spec.ts:626, the preview frame's body never received data-loaded="yes" within five seconds.
+The unchanged case passed on its own in 24.6 seconds.
+Both failures are in the mock and component preview path under a full parallel browser run.
+The cause remains unproved.

@@ -1,4 +1,8 @@
+import { ProjectRequestLinkFields, QuestionMetadataFields } from "./questions.ts"
+import { DeliveryContextReferences } from "./project/context.ts"
+import { AgentChoice, ConfigurationReason } from "./agentConfiguration.ts"
 import * as Schema from "effect/Schema"
+import { ProjectEvent } from "./project/events.ts"
 import { BoardEvent } from "./board/events.ts"
 import { ClientEvent } from "./client/events.ts"
 import { Account } from "./accounts.ts"
@@ -17,13 +21,13 @@ export type Actor = typeof Actor.Type
 export const Caller = Schema.Union([
   Actor,
   Schema.TaggedStruct("service", { service: Schema.NonEmptyString, rule: Schema.optionalKey(Schema.NonEmptyString) }),
-  Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles"]) })
+  Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles", "project"]) })
 ])
 export type Caller = typeof Caller.Type
 export const Sender = Schema.Union([
   Actor,
   Schema.TaggedStruct("service", { service: Schema.NonEmptyString }),
-  Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles"]) })
+  Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles", "project"]) })
 ])
 export type Sender = typeof Sender.Type
 
@@ -48,7 +52,7 @@ export const Delivery = Schema.Struct({
   target: AgentId,
   sender: Sender,
   content: Schema.Union([
-    Schema.TaggedStruct("prompt", { text: Schema.String }),
+    Schema.TaggedStruct("prompt", { text: Schema.String, context: Schema.optionalKey(DeliveryContextReferences) }),
     Schema.TaggedStruct("compact", {}),
     Schema.TaggedStruct("carry-on", { text: Schema.String })
   ]),
@@ -64,7 +68,7 @@ export const Delivery = Schema.Struct({
     Schema.TaggedStruct("permission", { id: PermissionRequestId }),
     Schema.TaggedStruct("question", { id: QuestionId }),
     Schema.TaggedStruct("wait", { id: WaitId }),
-    Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles"]), id: Schema.NonEmptyString })
+    Schema.TaggedStruct("piece", { namespace: Schema.Literals(["client", "board", "roles", "project"]), id: Schema.NonEmptyString })
   ]))
 })
 export type Delivery = typeof Delivery.Type
@@ -167,19 +171,27 @@ export const EngineEvent = Schema.Union([
     session: SessionReference,
     protocolVersion: Schema.Int.check(Schema.isGreaterThanOrEqualTo(1)),
     process: Schema.optionalKey(ProcessIdentity),
-    reloadable: Schema.Boolean
+    reloadable: Schema.Boolean,
+    configuration: Schema.optionalKey(AgentChoice)
   }),
-  Schema.TaggedStruct("PromptSent", { ...delivery, sender: Sender, text: Schema.String }),
+  Schema.TaggedStruct("AgentConfigurationChosen", { ...agent, revision: RequestId, desired: AgentChoice }),
+  Schema.TaggedStruct("AgentConfigurationObserved", { ...agent, applied: AgentChoice }),
+  Schema.TaggedStruct("AgentConfigurationApplied", { ...agent, revision: Schema.optionalKey(RequestId), applied: AgentChoice }),
+  Schema.TaggedStruct("AgentConfigurationRefused", {
+    ...agent, revision: Schema.optionalKey(RequestId), applied: Schema.optionalKey(AgentChoice),
+    status: Schema.Literals(["refused", "unsupported", "unavailable"]), reason: ConfigurationReason
+  }),
+  Schema.TaggedStruct("PromptSent", { ...delivery, sender: Sender, text: Schema.String, context: Schema.optionalKey(DeliveryContextReferences) }),
   Schema.TaggedStruct("ThreadItem", {
     ...agent, itemId: Schema.NonEmptyString, content: ThreadContent, replay: Schema.Boolean
   }),
   Schema.TaggedStruct("TurnStarted", { ...agent }),
-  Schema.TaggedStruct("TurnEnded", { ...agent, compact: Schema.Boolean, usage: Schema.optionalKey(TurnUsage) }),
+  Schema.TaggedStruct("TurnEnded", { ...agent, compact: Schema.Boolean, stopped: Schema.optionalKey(Schema.Boolean), usage: Schema.optionalKey(TurnUsage) }),
   Schema.TaggedStruct("StateChanged", { ...agent, state: LifecycleState }),
   Schema.TaggedStruct("ModeChanged", { ...agent, mode: Schema.String, level: PermissionLevel }),
   Schema.TaggedStruct("ModeRefused", { ...agent, mode: Schema.String, ceiling: PermissionLevel, reason: Schema.String }),
   Schema.TaggedStruct("PermissionRequested", {
-    ...permission,
+    ...permission, ...ProjectRequestLinkFields,
     holder: Actor,
     deliveryId: DeliveryId,
     toolCallId: Schema.NonEmptyString,
@@ -198,7 +210,7 @@ export const EngineEvent = Schema.Union([
   }),
   Schema.TaggedStruct("PermissionMoved", { ...permission, from: Actor, to: Actor, deliveryId: DeliveryId }),
   Schema.TaggedStruct("PermissionCancelled", { ...permission, reason: Schema.String }),
-  Schema.TaggedStruct("QuestionAsked", { ...question, holder: Actor, deliveryId: DeliveryId, text: Schema.String }),
+  Schema.TaggedStruct("QuestionAsked", { ...question, holder: Actor, deliveryId: DeliveryId, text: Schema.String, ...QuestionMetadataFields }),
   Schema.TaggedStruct("QuestionAnswered", { ...question, answeredBy: Actor, text: Schema.String, deliveryId: DeliveryId }),
   Schema.TaggedStruct("QuestionMoved", { ...question, from: Actor, to: Actor, deliveryId: DeliveryId }),
   Schema.TaggedStruct("OwnerNeeded", {
@@ -243,8 +255,8 @@ export const EngineEvent = Schema.Union([
 // Later pieces merge their event unions here, in namespace order.
 // Keep each member type while avoiding Effect's tuple-recursion limit as the
 // shared event list grows. Engine-only field schemas are exported directly.
-const eventMembers: ReadonlyArray<typeof EngineEvent.members[number] | typeof BoardEvent.members[number] | typeof ClientEvent.members[number] | typeof RolesEvent.members[number]> = [
-  ...EngineEvent.members, ...BoardEvent.members, ...ClientEvent.members, ...RolesEvent.members
+const eventMembers: ReadonlyArray<typeof EngineEvent.members[number] | typeof BoardEvent.members[number] | typeof ClientEvent.members[number] | typeof RolesEvent.members[number] | typeof ProjectEvent.members[number]> = [
+  ...EngineEvent.members, ...BoardEvent.members, ...ClientEvent.members, ...RolesEvent.members, ...ProjectEvent.members
 ]
 export const Event = Schema.Union(eventMembers)
 export type Event = typeof Event.Type
@@ -264,5 +276,6 @@ export const eventGroups = [
   { namespace: "engine", events: EngineEvent },
   { namespace: "board", events: BoardEvent },
   { namespace: "client", events: ClientEvent },
-  { namespace: "roles", events: RolesEvent }
+  { namespace: "roles", events: RolesEvent },
+  { namespace: "project", events: ProjectEvent }
 ] as const

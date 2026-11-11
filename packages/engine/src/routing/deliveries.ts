@@ -1,3 +1,4 @@
+import { applyPendingConfiguration } from "../commands/configuration.ts";
 import { cacheDeliveryCurrent } from "../commands/cache.ts";
 import * as Clock from "effect/Clock";
 import { carryOnText } from "../accounts/available.ts";
@@ -19,7 +20,7 @@ import { Restart } from "../recovery/service.ts";
 import { Runner, type RunnerEvent } from "../runner/Runner.ts";
 import { Views } from "../views/Views.ts";
 import { envelope } from "./envelope.ts";
-import { freshDelivery, moveHeld, passAtTurnEnd } from "./holders.ts";
+import { withdrawQueued, freshDelivery, moveHeld, passAtTurnEnd } from "./holders.ts";
 import { withLane } from "./lanes.ts";
 import { project, withWaitChecks } from "./waits.ts";
 
@@ -119,7 +120,7 @@ export const targetGone = (snapshot: Snapshot, agentId: AgentId, cause: "stopped
 
 // The delivery that started the agent's current turn: the last one sent
 // since the previous turn end. None while the agent is not working.
-const currentSend = (snapshot: Snapshot, agentId: string) => {
+export const currentSend = (snapshot: Snapshot, agentId: string) => {
   if (snapshot.agents[agentId]?.state._tag !== "working") return undefined;
   const thread = snapshot.threads[agentId] ?? [];
   const sent = thread.slice(thread.findLastIndex((row) => row.event._tag === "TurnEnded") + 1)
@@ -136,7 +137,13 @@ export const turnEnded = (snapshot: Snapshot, event: Extract<RunnerEvent, { _tag
   const sent = currentSend(snapshot, agentId);
   if (sent?.event.deliveryId !== deliveryId || sent.sequence !== event.sentSequence) return [];
   const compact = snapshot.deliveries[deliveryId]?.content._tag === "compact";
-  return [{ _tag: "TurnEnded", agentId, compact,
+  const cancelled: Event[] = event.stopped ? Object.values(snapshot.requests)
+    .filter((row) => row.agentId === agentId && row.status === "open")
+    .flatMap((row): Event[] => [{ _tag: "PermissionCancelled", agentId,
+      permissionRequestId: row.permissionRequestId as import("@lgcode/contracts").PermissionRequestId, reason: "reply stopped" },
+      ...withdrawQueued(snapshot, row.deliveryId)]) : [];
+  return [...cancelled, { _tag: "TurnEnded", agentId, compact,
+    ...(event.stopped ? { stopped: true } : {}),
     ...(event.usage === undefined ? {} : { usage: event.usage }),
   }, ...passAtTurnEnd(snapshot, agentId)];
 };
@@ -282,8 +289,9 @@ export const promptReply = (
 // Recovery step 10 and row 66 (`recovered`): an agent that a reload left
 // working, with a re-sent delivery or a carry-on at the head of its queue,
 // sends that head once. It counts as sent once any delivery was sent after
-// the reload's "working". `laneHeld` is for a caller that already holds the
-// agent's lane, such as `resume`.
+// the reload's "working". A later owner configuration can release that same
+// unsent head after a configuration refusal. `laneHeld` is for a caller that
+// already holds the agent's lane, such as `resume`.
 export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?: boolean; readonly laneHeld?: boolean; readonly lists?: EngineLists } = {}) => Effect.gen(function* () {
   const log = yield* EventLog;
   const views = yield* Views;
@@ -302,11 +310,22 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
     const agent = snapshot.agents[agentId];
     const state = agent?.state._tag;
     return agent !== undefined && !agent.capacityHeld && snapshot.accounts[agent.account]?.status !== "needs-sign-in"
-      && (state === "idle" || (options.recovered === true && state === "working" && reloaded(snapshot)))
+      // A refused configuration can defer recovery's first send until a later
+      // owner choice. Keep that unsent recovery reservation usable then, while
+      // the logged-send and incarnation checks still exclude an active turn.
+      && (state === "idle" || ((options.recovered === true || agent.configuration?.revision !== undefined)
+        && state === "working" && reloaded(snapshot)))
       ? nextQueued(snapshot, agentId) : undefined;
   };
-  if (ready(yield* views.snapshot) === undefined) return;
+  const candidate = (yield* views.snapshot).agents[agentId];
+  if (ready(yield* views.snapshot) === undefined && candidate?.state._tag !== "idle") return;
   yield* (options.laneHeld === true ? <A, E, R>(effect: Effect.Effect<A, E, R>) => effect : withLane(log, agentId))(Effect.gen(function* () {
+    const current = (yield* views.snapshot).agents[agentId];
+    if (current === undefined || (current.state._tag !== "idle" && ready(yield* views.snapshot) === undefined)) return;
+    if (!(yield* applyPendingConfiguration(agentId))) return;
+    // An idle configuration can finish without any delivery to reserve.
+    // An empty queue must not enter a writer that may have latched a failure.
+    if (ready(yield* views.snapshot) === undefined) return;
     const reserved = yield* log.transact((append) => Effect.gen(function* () {
       let snapshot = yield* views.snapshot;
       let row = ready(snapshot);
@@ -315,7 +334,9 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
         if (cacheCurrent && row.source?._tag !== "piece") break;
         const queued = snapshot.threads[agentId]?.find((envelope) => envelope.event._tag === "DeliveryQueued" && envelope.event.delivery.id === row!.id);
         const caller = queued?.caller;
-        if (cacheCurrent && row.source?._tag === "piece" && canReach({ ...(caller === undefined || caller._tag === "piece" ? {} : { caller }), target: agentId, deliveryId: row.id, source: row.source, snapshot }, lists)) break;
+        if (cacheCurrent && row.source?._tag === "piece" && canReach({ ...(caller === undefined || caller._tag === "piece" ? {} : { caller }),
+          ...(row.content._tag === "prompt" && row.content.context !== undefined ? { context: row.content.context } : {}),
+          target: agentId, deliveryId: row.id, source: row.source, snapshot }, lists)) break;
         const events = withWaitChecks(snapshot, [{ _tag: "DeliveryWithdrawn", agentId, deliveryId: row.id, reason: cacheCurrent ? "delivery no longer reachable" : "automatic cache action obsolete" }], lists);
         yield* append(owner, freshRequest(), randomUUID(), events, {});
         snapshot = project(snapshot, events, lists);
@@ -333,6 +354,7 @@ export const dispatchQueued = (agentId: AgentId, options: { readonly recovered?:
         { _tag: "DeliverySent", agentId, deliveryId: row.id, method: decodeRunMode(snapshot.agents[agentId]!.runMode) },
         ...(row.content._tag === "compact" ? [] : [{
           _tag: "PromptSent" as const, agentId, deliveryId: row.id, sender: row.sender, text: row.content.text,
+          ...(row.content._tag === "prompt" && row.content.context !== undefined ? { context: row.content.context } : {}),
         }]),
       ], {});
       return { incarnation, delivery: asDelivery(row), sentSequence: sent[0]!.sequence };
@@ -358,6 +380,8 @@ const readyAfter = (envelope: EventEnvelope): ReadonlyArray<AgentId> => {
   switch (event._tag) {
     case "DeliveryQueued": return [event.delivery.target];
     case "SessionOpened":
+    case "AgentConfigurationObserved":
+    case "AgentConfigurationChosen":
     case "TurnEnded":
     case "DeliveryReturned":
     case "DeliveryRequeued":

@@ -20,6 +20,31 @@ export interface CredentialSource {
   readonly read: Effect.Effect<ReadonlyArray<Redacted.Redacted<string>>, CredentialSourceUnreadable>;
 }
 
+interface LocalCredentialSource extends CredentialSource {
+  // Recognized credential fields only. Redaction leaves deliberately include
+  // arbitrary strings and cannot establish even local sign-in readiness.
+  readonly hasCredential: Effect.Effect<boolean, CredentialSourceUnreadable>;
+}
+
+const record = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+const nonempty = (value: unknown): boolean => typeof value === "string" && value.trim().length > 0;
+const hasCredential = (harnessId: string, document: unknown): boolean => {
+  const store = record(document);
+  switch (harnessId) {
+    case "codex": {
+      const tokens = record(store.tokens);
+      return nonempty(store.OPENAI_API_KEY) || nonempty(tokens.access_token) || nonempty(tokens.refresh_token);
+    }
+    case "claude": {
+      const oauth = record(store.claudeAiOauth);
+      return nonempty(oauth.accessToken) || nonempty(oauth.refreshToken);
+    }
+    case "gemini": return nonempty(store.access_token) || nonempty(store.refresh_token);
+    default: return false;
+  }
+};
+
 // A login store is a few kilobytes. A larger file is not one, so it is
 // refused rather than parsed on every redaction.
 const largestStore = 1024 * 1024;
@@ -91,9 +116,10 @@ interface Snapshot {
   readonly identity: string;
   readonly leaves: ReadonlyArray<Redacted.Redacted<string>>;
   readonly failed: boolean;
+  readonly hasCredential: boolean;
 }
 
-const missing: Snapshot = { identity: "missing", leaves: [], failed: false };
+const missing: Snapshot = { identity: "missing", leaves: [], failed: false, hasCredential: false };
 
 const identityOf = (stats: BigIntStats): string =>
   `${stats.dev}:${stats.ino}:${stats.size}:${stats.mtimeNs}:${stats.ctimeNs}`;
@@ -105,61 +131,65 @@ const identityOf = (stats: BigIntStats): string =>
 // fails. The file is opened without blocking and checked again through its
 // descriptor, so a store swapped for a pipe between the two checks is refused
 // rather than waited on.
-const readStore = (path: string, previous: Snapshot | undefined): Snapshot => {
+const readStore = (path: string, previous: Snapshot | undefined, harnessId: string): Snapshot => {
   let stats: BigIntStats;
   try {
     stats = statSync(path, { bigint: true });
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return missing;
-    return { identity: "unstattable", leaves: [], failed: true };
+    return { identity: "unstattable", leaves: [], failed: true, hasCredential: false };
   }
   const identity = identityOf(stats);
   if (previous !== undefined && previous.identity === identity) return previous;
-  if (!stats.isFile() || stats.size > BigInt(largestStore)) return { identity, leaves: [], failed: true };
+  if (!stats.isFile() || stats.size > BigInt(largestStore)) return { identity, leaves: [], failed: true, hasCredential: false };
   try {
     const descriptor = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK | constants.O_NOCTTY);
     try {
       const opened = fstatSync(descriptor, { bigint: true });
-      if (!opened.isFile() || opened.size > BigInt(largestStore)) return { identity, leaves: [], failed: true };
+      if (!opened.isFile() || opened.size > BigInt(largestStore)) return { identity, leaves: [], failed: true, hasCredential: false };
       const buffer = Buffer.alloc(largestStore + 1);
       let length = 0;
       for (;;) {
         const count = readSync(descriptor, buffer, length, buffer.length - length, null);
         if (count === 0) break;
         length += count;
-        if (length > largestStore) return { identity, leaves: [], failed: true };
+        if (length > largestStore) return { identity, leaves: [], failed: true, hasCredential: false };
       }
       const text = new TextDecoder("utf-8", { fatal: true }).decode(buffer.subarray(0, length));
-      const found = secretLeaves(JSON.parse(text));
-      if (found.length > mostLeaves) return { identity, leaves: [], failed: true };
-      return { identity: identityOf(opened), leaves: found.map((leaf) => Redacted.make(leaf)), failed: false };
+      const document: unknown = JSON.parse(text);
+      const found = secretLeaves(document);
+      if (found.length > mostLeaves) return { identity, leaves: [], failed: true, hasCredential: false };
+      return { identity: identityOf(opened), leaves: found.map((leaf) => Redacted.make(leaf)), failed: false,
+        hasCredential: hasCredential(harnessId, document) };
     } finally {
       closeSync(descriptor);
     }
   } catch {
-    return { identity, leaves: [], failed: true };
+    return { identity, leaves: [], failed: true, hasCredential: false };
   }
 };
 
 // A source over fixed store paths. Each path keeps its last snapshot, so a
 // read costs one `stat` per store while nothing changed. `read` is
 // synchronous inside, so the redactor's registry can run it per redaction.
-const fileSource = (paths: ReadonlyArray<string>): CredentialSource => {
+const fileSource = (paths: ReadonlyArray<string>, harnessId: string): LocalCredentialSource => {
   const snapshots = new Map<string, Snapshot>();
+  const read = Effect.suspend(() => {
+    const stores: Array<Snapshot> = [];
+    let failed = false;
+    for (const path of paths) {
+      if (!isAbsolute(path)) { failed = true; continue; }
+      const snapshot = readStore(path, snapshots.get(path), harnessId);
+      snapshots.set(path, snapshot);
+      if (snapshot.failed) failed = true;
+      else stores.push(snapshot);
+    }
+    return failed ? Effect.fail(new CredentialSourceUnreadable()) : Effect.succeed(stores);
+  });
   return {
     paths,
-    read: Effect.suspend(() => {
-      const leaves: Array<Redacted.Redacted<string>> = [];
-      let failed = false;
-      for (const path of paths) {
-        if (!isAbsolute(path)) { failed = true; continue; }
-        const snapshot = readStore(path, snapshots.get(path));
-        snapshots.set(path, snapshot);
-        if (snapshot.failed) failed = true;
-        else leaves.push(...snapshot.leaves);
-      }
-      return failed ? Effect.fail(new CredentialSourceUnreadable()) : Effect.succeed(leaves);
-    }),
+    read: read.pipe(Effect.map((stores) => stores.flatMap((store) => store.leaves))),
+    hasCredential: read.pipe(Effect.map((stores) => stores.some((store) => store.hasCredential))),
   };
 };
 
@@ -195,17 +225,17 @@ export const credentialSourceFor = (input: {
   readonly harnessId: string;
   readonly home: string;
   readonly variables: Readonly<Record<string, string>>;
-}): CredentialSource => {
+}): LocalCredentialSource => {
   switch (input.harnessId) {
     case "codex":
-      return fileSource([join(directory(input.variables.CODEX_HOME, join(input.home, ".codex")), "auth.json")]);
+      return fileSource([join(directory(input.variables.CODEX_HOME, join(input.home, ".codex")), "auth.json")], input.harnessId);
     case "claude":
-      return fileSource([join(directory(input.variables.CLAUDE_CONFIG_DIR, join(input.home, ".claude")), ".credentials.json")]);
+      return fileSource([join(directory(input.variables.CLAUDE_CONFIG_DIR, join(input.home, ".claude")), ".credentials.json")], input.harnessId);
     case "gemini":
       return fileSource([join(input.variables.GEMINI_CLI_HOME !== undefined && input.variables.GEMINI_CLI_HOME !== ""
-        ? input.variables.GEMINI_CLI_HOME : input.home, ".gemini", "oauth_creds.json")]);
+        ? input.variables.GEMINI_CLI_HOME : input.home, ".gemini", "oauth_creds.json")], input.harnessId);
     default:
-      return fileSource([]);
+      return fileSource([], input.harnessId);
   }
 };
 

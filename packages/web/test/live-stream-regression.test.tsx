@@ -50,13 +50,13 @@ it("shows one prompt with its source and queue, send and acceptance states", asy
   for (const text of ["Owner", "Queued", "Sent", "Accepted"]) expect(prompt.textContent).toContain(text)
 })
 
-it("puts stopped agents and failed starts in their own lane with a safe reason", async () => {
+it("shows stopped agents and failed starts separately from ordinary requests with a safe reason", async () => {
   const snapshot = { sequence: 1, agents: [{ agentId: "worker-1", name: "Worker one", role: "worker", harness: "codex", groups: [],
     state: { _tag: "stopped" }, openPermissionRequests: 0, openQuestionsAsked: 0, startFailure: "not-signed-in" }], requests: [], questions: [] }
   const container = await mountThread([], { "client.snapshot": () => Effect.succeed(snapshot), "client.subscribe": () => Stream.never }, "/")
-  expect(container.querySelector('[aria-label="Stopped"]')?.textContent).toContain("Worker one")
-  expect(container.querySelector('[aria-label="Stopped"]')?.textContent).toContain("Not signed in")
-  expect(container.querySelector('[aria-label="Idle"]')?.textContent).not.toContain("Worker one")
+  expect(container.querySelector('.failed-start-list')?.textContent).toContain("Worker one")
+  expect(container.querySelector('.failed-start-list')?.textContent).toContain("Not signed in")
+  expect(container.querySelector('.agent-link small')?.textContent).toBe("Stopped")
 })
 
 it("shows a failed start in its thread and prompts explain why it failed", async () => {

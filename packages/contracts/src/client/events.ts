@@ -5,7 +5,7 @@ import { WebSettings } from "./settings.ts"
 
 export const clientEventTags = [
   "client.AlertBaseline", "client.AlertRaised", "client.AlertDelivered", "client.AlertDeliveryFailed",
-  "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
+  "client.AlertPromptDismissed", "client.AlertCleared", "client.AlertSettingsChanged", "client.AlertCarrierChanged",
   "client.AlertCarrierTokenSet", "client.AlertCarrierTokenCleared", "client.WebSettingsChanged",
   "client.WebServerDown", "client.WebServerUp"
 ] as const
@@ -14,6 +14,7 @@ const attempt = {
   attempt: Schema.Int.check(Schema.isGreaterThan(0))
 }
 export const ClientEvent = Schema.Union([
+  Schema.TaggedStruct("client.AlertPromptDismissed", {}),
   Schema.TaggedStruct("client.AlertBaseline", { position: EventSequence }),
   Schema.TaggedStruct("client.AlertRaised", {
     alertId: AlertId, alertKey: AlertKey, kind: AlertKind,

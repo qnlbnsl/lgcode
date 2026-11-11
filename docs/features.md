@@ -248,6 +248,12 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   | `mcp` | `dog` |
 - **Filtered live updates** (idea). A subscription for phones that is filtered by agent and by event kind, with checkpoints that keep the cursor moving.
 - **One password login** (built). The service reads the password from the environment variable `LGCODE_WEB_PASSWORD`, and the dashboard asks for it. One person uses LGcode, and a logged-in session is the owner. This replaces the device pairing entry above (client API rows 184 to 188).
+- **Owner phone notification actions** (built, 2026-11-08). The owner can
+  retry a failed notification through the configured service and send a real test
+  notification. Retry validates the displayed generation and attempt, and records
+  the next result and its time. A test creates no alert and stores no carrier
+  response. Declining the first waiting request's phone notification offer is
+  remembered across service restarts.
 - **Phone alerts through one sender** (built). Phone alerts go through one sender interface, `AlertSender`, with ntfy as the first carrier. A later carrier, such as Expo's push service for the phone app, slots in behind it (client API row 83).
 - **Mobile login** (later). Starts by looking at what Home Assistant does.
 - **VS Code extension** (later). One of the last things, along with the mobile app, by the owner's answer of 2026-11-03.
@@ -321,11 +327,12 @@ only notices when an agent has strayed and nudges it back, or tells its lead.
   Add Project creates a named project under a known repository and opens
   its lead conversation. A new project has no sprints or teams until its
   plan is shaped. Existing projects never reopen repository setup.
-- **Project worktrees by default** (agreed, 2026-11-06; mocked).
-  Add Project has Start work tree checked beneath the project name. A safe
-  version of the name determines its branch and worktree folder. Numeric
-  suffixes resolve existing names. Unchecking uses that repository’s main
-  checkout. The dialog previews the branch and location before submission.
+- **Dedicated project worktrees** (updated by the owner, 2026-11-09).
+  Every project has its own worktree. Add Project has no worktree checkbox.
+  A safe version of the name determines its branch and worktree folder.
+  Numeric suffixes resolve existing names. The dialog always previews Branch
+  and Folder before submission. The repository main checkout remains recorded
+  for the owner’s review and approval.
 - **Workspace settings** (agreed, 2026-11-06; mocked). A Settings tab beside
   Board, Chat, Terminal, and Git shows the assigned repository, branch,
   checkout type, folder, and machine. It stores a project-specific terminal
@@ -466,8 +473,9 @@ Requested on 2026-11-06 and represented in the browser mock.
   or board, preserving drafts and the requesting team's branch context.
 - Add Project chooses a machine through Run on before the project name.
   The preview shows that host's branch and folder. Offline hosts and hosts
-  without the repository cannot start work. Unchecking Start work tree uses
-  the main checkout on that machine. No host is silently substituted.
+  without the repository cannot start work. The owner approved a dedicated
+  worktree for every project. New project has no worktree checkbox and always
+  previews Branch and Folder. No host is silently substituted.
 - Machines uses compact tables for machine status, role, agent slots,
   project counts, start actions, and future project placement. Future
   placement does not relabel running work or imply that a project moved.
@@ -534,10 +542,17 @@ The full design is in
 - **Mocks made by the Design team** (requested by the owner, 2026-11-07; not
   designed). A project with user interface work gets a Mocks tab. The mocks use
   the project's real components and realistic, invented data, as Ananke's mocks
-  did. While designing, the team keeps a draft of the data schema the screens
-  need and reconciles it with the real schema. When the mocks are approved, new
+  did. While designing, the team records the fields the screens need and supplies
+  reviewed comparisons with the real schema, as approved by the owner on 2026-11-09.
+  The engine does not infer an application schema from mock data files.
+  Fields without a supplied review remain unavailable. When the mocks are approved, new
   components move into the real component folder, and wiring them to real data
   becomes the Build team's tasks.
+  The owner approved supported scenario routes on 2026-11-09, in item 2 of the
+  website simplification shortlist. Each screen keeps its base route and only
+  the concrete routes supplied for its supported declared scenario identities.
+  The supported list may be empty. The engine does not invent missing routes
+  or infer bindings from scenario names. Existing revisions remain unchanged.
 - **A Reverse Fig skill** (requested by the owner, 2026-11-07; not designed).
   When someone connects a project that already has an interface, the skill
   turns its existing components and screens into a `.fig` file, so the design
@@ -570,9 +585,25 @@ The full design is in
   website, go to Ananke's mocks, and see every one of them there. The owner is
   adding this to the website mock first.
 
+- **Recorded mock previews and OpenPencil** (decided by the owner,
+  2026-11-09; implementation pending). The engine renders a project's recorded
+  mocks itself instead of starting a separate mock web server. The screen preview
+  and OpenPencil stay in sandboxed frames. Both frames use one hostname other than
+  LGcode's, so the owner's cookie never reaches them. The page's content security
+  policy permits frames from that hostname only. The engine starts and manages
+  OpenPencil with access to only the project's design folder. No separate one-file
+  capability is built. This decision does not add an editor save pipeline.
+  On 2026-11-10, the owner approved `allow-same-origin` for the editor frame
+  in addition to `allow-scripts`, so OpenPencil can use its display hostname
+  storage. Recorded mocks retain an opaque origin. The editor receives no
+  owner cookie or owner origin authority.
+
 ## Open questions
 
 - Which licence should LGcode use?
+- Should LGcode be renamed LGTM code? The owner raised the name on
+  2026-11-09 and asked for it to be kept as a to-do. Nothing is renamed until
+  the owner decides.
 
 ## Decided
 
@@ -638,5 +669,8 @@ The full design is in
 
 `pnpm live-check:web` exercises a private engine with a real Codex agent and
 Chromium. It verifies streamed replies, prompts, command permission answers,
-reload, stop, resume and safe startup failures. It remains separate from
+reload, stop, resume and safe startup failures. It also creates a real project
+and worktree through first-run setup, has its actual lead create a linked
+sprint, task and question with supported tools, answers from the board, and
+checks the durable result and exact receipt again after service restart. It remains separate from
 `pnpm check` because it consumes the signed-in account's allowance.

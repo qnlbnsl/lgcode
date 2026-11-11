@@ -1,3 +1,5 @@
+import { completedSetup } from "./support/completedSetup.ts"
+import { openNavigation } from "./support/navigation.ts"
 import { assertPhoneWidth } from "./support/phoneWidth.ts"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
@@ -35,6 +37,7 @@ test("the production thread opens from a roster link, prompts, displays full per
         yield* registerRebuildCheck()
         yield* seedHarness()
         yield* seedAccount()
+        yield* completedSetup()
         yield* serve({ password: Redacted.make(password), staticRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
         const worker = success(yield* call(ownerCredential, "start", startPayload(rig, { name: "ThreadWorker" })))
@@ -43,11 +46,12 @@ test("the production thread opens from a roster link, prompts, displays full per
           await page.goto(`http://127.0.0.1:${port}/`)
           await page.getByLabel("Password", { exact: true }).fill(password)
           await page.getByRole("button", { name: "Log in", exact: true }).click()
-          await page.getByRole("link", { name: "ThreadWorker", exact: true }).click()
-          await expect(page.getByRole("heading", { name: "Thread: ThreadWorker", exact: true })).toBeVisible()
+          await openNavigation(page)
+          await page.getByRole("navigation", { name: "Projects", exact: true }).locator(".agent-link").filter({ hasText: "ThreadWorker" }).click()
+          await expect(page.getByRole("heading", { name: "ThreadWorker", exact: true })).toBeVisible()
           await page.reload()
-          await expect(page.getByRole("heading", { name: "Thread: ThreadWorker", exact: true })).toBeVisible()
-          await page.getByRole("textbox", { name: "Prompt agent", exact: true }).fill("Inspect the current file.")
+          await expect(page.getByRole("heading", { name: "ThreadWorker", exact: true })).toBeVisible()
+          await page.getByRole("form", { name: "Prompt agent", exact: true }).getByRole("textbox").fill("Inspect the current file.")
           await page.getByRole("button", { name: "Send prompt", exact: true }).click()
           await expect(page.getByRole("status").filter({ hasText: "Prompt sent." })).toBeVisible()
           await expect.poll(() => runner.callsOf("prompt").length).toBe(1)
@@ -81,6 +85,7 @@ test("the production thread opens from a roster link, prompts, displays full per
           expect(runner.callsOf("answerPermission")[0]!.input).toMatchObject({ requestId: "browser-permission", optionId: "once" })
           expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0)
           expect(await page.evaluate(async () => (await indexedDB.databases()).length)).toBe(0)
+          await openNavigation(page)
           await page.getByRole("button", { name: "Log out", exact: true }).click()
           await expect(page.getByRole("form", { name: "Log in" })).toBeVisible()
           await expect(page.getByRole("region", { name: "Thread", exact: true })).toHaveCount(0)

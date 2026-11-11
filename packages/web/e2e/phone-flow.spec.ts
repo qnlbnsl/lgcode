@@ -1,3 +1,4 @@
+import { completedSetup } from "./support/completedSetup.ts"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
@@ -44,6 +45,7 @@ test("11.1 phone flow: catches a missing alert link, login, permission answer, a
         yield* registerRebuildCheck()
         yield* seedHarness()
         yield* seedAccount()
+        yield* completedSetup()
         yield* serve({ password: Redacted.make(password), staticRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: true, publicAddress: origin } })
         yield* configure(ntfy.origin)
@@ -91,7 +93,7 @@ test("11.1 phone flow: catches a missing alert link, login, permission answer, a
           await page.goto(origin)
           await page.getByLabel("Password", { exact: true }).fill(password)
           await page.getByRole("button", { name: "Log in", exact: true }).click()
-          await expect(page.getByLabel("Situation", { exact: true })).toBeVisible()
+          await expect(page.getByRole("region", { name: "Home", exact: true })).toBeVisible()
           expect(await page.evaluate(() => ({ secure: isSecureContext, uuid: typeof crypto.randomUUID })))
             .toEqual({ secure: true, uuid: "function" })
           expect((await page.context().cookies(origin)).some((cookie) => cookie.secure && cookie.httpOnly && cookie.sameSite === "Strict")).toBe(true)
@@ -101,7 +103,7 @@ test("11.1 phone flow: catches a missing alert link, login, permission answer, a
           expect(await page.evaluate((previous) => previous === window.document, documentHandle),
             "the hash link must keep the logged-in document").toBe(true)
           await documentHandle.dispose()
-          await expect(page.getByRole("heading", { name: "Thread: PhoneWorker", exact: true })).toBeVisible()
+          await expect(page.getByRole("heading", { name: "PhoneWorker", exact: true })).toBeVisible()
           const requestPanel = page.getByRole("region", { name: "Permission request", exact: true })
           await expect(requestPanel).toContainText("printf phone-flow")
           await requestPanel.getByRole("button", { name: "Allow once", exact: true }).click()
@@ -117,7 +119,7 @@ test("11.1 phone flow: catches a missing alert link, login, permission answer, a
           // agent's output, without resending the permission answer.
           const readback = await page.reload()
           expect(readback?.status()).toBe(200)
-          await expect(page.getByRole("heading", { name: "Thread: PhoneWorker", exact: true })).toBeVisible()
+          await expect(page.getByRole("heading", { name: "PhoneWorker", exact: true })).toBeVisible()
           await expect(page.getByRole("article", { name: "Permission answer", exact: true })).toContainText("Allow once")
           await expect(page.getByRole("article", { name: "Agent message", exact: true })).toContainText(releasedText)
           await expect(requestPanel).toContainText("This request is closed or held elsewhere.")

@@ -1,0 +1,20 @@
+.new-project { color: var(--color-text, #1c2923); background: var(--color-surface, #f8faf6); width: min(520px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); overflow: auto; border: 1px solid var(--color-line, #bdc9bd); border-radius: 8px; padding: 24px; box-sizing: border-box; overflow-wrap: anywhere; }
+.new-project::backdrop { background: rgb(0 0 0 / .4); }
+.new-project form, .new-project fieldset { display: flex; flex-direction: column; min-width: 0; gap: 8px; }
+.new-project fieldset { border: 0; margin: 8px 0; padding: 0; }
+.new-project header, .new-project footer { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.new-project header h2 { margin: 0; flex: 1; }
+.new-project p { line-height: 1.65; margin: 4px 0 12px; }
+.new-project input, .new-project select, .new-project textarea { box-sizing: border-box; width: 100%; min-width: 0; font: inherit; color: inherit; background: var(--color-bg, #fff); border: 1px solid var(--color-line, #bdc9bd); border-radius: 4px; padding: 10px 12px; }
+.new-project label { margin-top: 8px; }
+.new-project button { min-height: 40px; }
+.new-project :focus-visible { outline: 2px solid var(--color-focus, #377958); outline-offset: 3px; }
+.new-project-preview { padding: 12px 0; }
+.new-project-preview dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 16px; margin: 0 0 12px; }
+.new-project-preview dd { margin: 0; min-width: 0; }
+.new-project code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.new-project .inline-link { display: inline; border: 0; background: transparent; color: inherit; text-decoration: underline; padding: 0; }
+.new-project footer { border-top: 1px solid var(--color-line, #bdc9bd); padding-top: 16px; margin-top: 12px; justify-content: flex-end; }
+.new-project footer button { white-space: normal; }
+@media (max-width: 700px) { .new-project { padding: 20px; } .new-project input, .new-project textarea, .new-project select { font-size: 16px; } }
+@media (prefers-reduced-motion: reduce) { .new-project, .new-project * { animation: none; transition: none; scroll-behavior: auto; } }

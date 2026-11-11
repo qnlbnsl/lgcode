@@ -43,7 +43,7 @@ it.each([false, true])("7.4 recovers state separately from content placeholders 
   ]), "client.snapshot": snapshot, "client.event": event })
   expect(container.querySelectorAll('article[aria-label="Large thread item"]')).toHaveLength(withContent ? 1 : 0)
   expect(container.querySelectorAll('button[aria-label="Load full thread item"]')).toHaveLength(withContent ? 1 : 0)
-  expect(container.querySelector("h2")?.textContent).toContain("Worker one recovered")
+  expect(container.querySelector('section[aria-label="Thread"] h2')?.textContent).toContain("Worker one recovered")
   expect(event).not.toHaveBeenCalled()
-  expect(snapshot).toHaveBeenCalledTimes(3) // initial, history reconciliation, then live state-marker recovery
+  expect(snapshot).toHaveBeenCalledTimes(4) // independent shell read, initial thread anchor, history reconciliation, live state-marker recovery
 })

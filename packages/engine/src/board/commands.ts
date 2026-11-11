@@ -9,6 +9,7 @@ import * as Schema from "effect/Schema";
 import { agentReadReply, type ReadHandler, type ReadReply } from "../api/reads.ts";
 import { refused, type Input, type Payload, type PiecePlan } from "../commands/internal.ts";
 import { holderAbove } from "../routing/holders.ts";
+import { canReadContext, resolveContext, type ContextFiles } from "../project/context.ts";
 import { project } from "../routing/waits.ts";
 import { canAddMember, canClose, canManage, canOpenGroup, canPost, canRead, channelMembers, directGrant, own } from "./access.ts";
 import { boardStatus } from "./status.ts";
@@ -64,7 +65,7 @@ const members: Planner = (input, raw) => Effect.gen(function* () {
   return { ...withWakes(input, events, []), reply: () => ({ requestId: payload.requestId, memberCount }) };
 });
 
-const post: Planner = (input, raw) => Effect.gen(function* () {
+export const postPlanner = (files?: ContextFiles): Planner => (input, raw) => Effect.gen(function* () {
   const payload = raw as Payload<"board.post">;
   const author = authorOf(input);
   if (author === undefined) return yield* refused();
@@ -106,7 +107,9 @@ const post: Planner = (input, raw) => Effect.gen(function* () {
   const text = yield* input.runtime.log.redactText(payload.text.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, ""));
   if (!Schema.is(BoardPostText)(text)) return yield* refused("post too long once secrets are hidden");
   const postId = Schema.decodeUnknownSync(PostId)(randomUUID());
+  const context = yield* resolveContext(input, payload.context, channelMembers(state, channelId), files);
   const written: Event = { _tag: "board.PostWritten", postId, channelId, author, text, to, reply: payload.reply,
+    ...(context === undefined ? {} : { context }),
     ...(payload.replyTo === undefined ? {} : { replyToPostId: payload.replyTo }) };
   events.push(written);
   state = project(input.snapshot, events, input.runtime.lists);
@@ -194,10 +197,11 @@ const channels: ReadHandler = (input, payload) => input.runtime.lists?.boardEnab
   })), payload, (channel) => channel.channelId, undefined, Object.keys(boardView(input.snapshot).channels),
 ) });
 
-const read: ReadHandler = (input, payload) => Effect.gen(function* () {
+const readPosts = (peek: boolean): ReadHandler => (input, payload) => Effect.gen(function* () {
   if (input.runtime.lists?.boardEnabled === false) return yield* refused("board disabled");
   const { snapshot, actor } = input;
   if (actor._tag !== "owner" && actor._tag !== "agent") return yield* refused();
+  if (peek && actor._tag !== "owner") return yield* refused();
   const board = boardView(snapshot);
   const referenced = typeof payload.post === "string" ? own(board.posts, payload.post)
     : typeof payload.repliesTo === "string" ? own(board.posts, payload.repliesTo) : undefined;
@@ -205,7 +209,7 @@ const read: ReadHandler = (input, payload) => Effect.gen(function* () {
     && (referenced === undefined || !canRead(snapshot, actor, referenced.channelId))) return yield* refused();
   if (typeof payload.channelId === "string" && !canRead(snapshot, actor, payload.channelId)) return yield* refused();
   const ordered = Object.values(board.posts).sort((a, b) => a.sequence - b.sequence);
-  const posts = ordered.filter((post) => canRead(snapshot, actor, post.channelId)
+  const posts = ordered.filter((post) => canRead(snapshot, actor, post.channelId) && canReadContext(snapshot, actor, post.context)
     && (payload.channelId === undefined || post.channelId === payload.channelId)
     && (payload.post === undefined || post.postId === payload.post)
     && (payload.repliesTo === undefined || post.replyTo === payload.repliesTo)
@@ -215,6 +219,7 @@ const read: ReadHandler = (input, payload) => Effect.gen(function* () {
       && (own(post.dispositions, readerKey(actor)) === undefined || own(post.dispositions, readerKey(actor)) === "no-answer"))))
     .sort((a, b) => a.sequence - b.sequence);
   const items = posts.map((post) => ({ postId: post.postId, channelId: post.channelId, author: post.author,
+    ...(post.context === undefined ? {} : { context: post.context }),
     text: post.text, to: post.to, reply: post.reply, sequence: post.sequence, status: post.status,
     dispositions: postDispositions(post), acknowledged: post.acknowledged,
     ...(post.replyTo === undefined ? {} : { replyTo: post.replyTo }),
@@ -232,7 +237,7 @@ const read: ReadHandler = (input, payload) => Effect.gen(function* () {
     byChannel.set(post.channelId, ids);
   }
   const marks: Event[] = [...byChannel].map(([channelId, postIds]) => ({ _tag: "board.Read", channelId, reader: actor, postIds }));
-  return { reply, marks };
+  return { reply, marks: peek ? [] : marks };
 });
 
 const status = (input: Input, raw: Record<string, unknown>): Effect.Effect<ReadReply, ReturnType<typeof refused>> => Effect.gen(function* () {
@@ -280,6 +285,6 @@ const status = (input: Input, raw: Record<string, unknown>): Effect.Effect<ReadR
   } };
 });
 
-export const boardPlanners = { "board.open": open, "board.members": members, "board.post": post,
+export const boardPlanners = { "board.open": open, "board.members": members, "board.post": postPlanner(),
   "board.close": close, "board.acknowledge": acknowledge, "board.flush": flush } satisfies Record<string, Planner>;
-export const boardReads = { "board.read": read, "board.channels": channels, "board.status": status } satisfies Record<string, ReadHandler>;
+export const boardReads = { "board.read": readPosts(false), "board.peek": readPosts(true), "board.channels": channels, "board.status": status } satisfies Record<string, ReadHandler>;

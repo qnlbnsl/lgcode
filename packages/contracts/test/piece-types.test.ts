@@ -31,7 +31,7 @@ it("1.5/1.22 tables reject missing visibility and namespace entries, and a piece
       import { engineLists } from ${JSON.stringify(lists)};
       import type { PiecePlan, Plan } from ${JSON.stringify(join(root, "packages/engine/src/commands/internal.ts"))};
       type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2) ? true : false;
-      const exactNamespaces: Equal<PieceNamespace, "client" | "board" | "roles"> = true;
+      const exactNamespaces: Equal<PieceNamespace, "client" | "board" | "roles" | "project"> = true;
       const complete = engineLists.snapshotSections;
       const { roles, ...missingSection } = complete;
       // @ts-expect-error Every namespace needs its own refusing entry.
@@ -51,6 +51,10 @@ it("1.5/1.22 tables reject missing visibility and namespace entries, and a piece
       const make = <A,>(value: A) => importEffect.succeed(value);
       const validRegistration: Registered = { "client.fixture": () => make(valid) };
       const engineRegistration: Registered = { stop: () => make({ events: [], afterCommit: importEffect.void }) };
+      const projectLifecycleRegistration: Registered = { "project.create": () => make({ events: [], afterCommit: importEffect.void }) };
+      // @ts-expect-error Ordinary project commands remain piece planners.
+      const badProjectHook: Registered = { "project.goal.set": () => make({ events: [], afterCommit: importEffect.void }) };
+      void [projectLifecycleRegistration, badProjectHook];
       const missingReply = { events: [] };
       const widerHook = { events: [], reply: () => ({}), afterCommit: importEffect.void };
       const broad: Plan = { events: [], reply: () => ({}) };

@@ -91,7 +91,8 @@ it("3.1 an agent snapshot contains identities but omits displays, accounts, aler
   for (const row of reply.agents) for (const key of ["reloadable", "capacityHeld"]) expect(row).not.toHaveProperty(key);
   for (const row of [...reply.requests, ...reply.questions]) {
     expect(row).not.toHaveProperty("display");
-    expect(Object.keys(row).sort()).toEqual(["agentId", "holder", "id", "sourceSequence"]);
+    expect(Object.keys(row).sort()).toEqual(["agentId", "holder", "id", "openedAt", "sourceSequence"]);
+    expect(row.openedAt).toEqual(expect.any(Number));
   }
 })));
 

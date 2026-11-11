@@ -94,7 +94,7 @@ it("FR-038 cancels a content read when leaving the thread and ignores late compl
   await act(async () => { load.click(); load.click() })
   expect(read).toHaveBeenCalledTimes(1)
   expect(load.disabled).toBe(true)
-  await act(async () => { container.querySelector<HTMLAnchorElement>('nav[aria-label="Pages"] a[href="/"]')!.click() })
+  await act(async () => { container.querySelector<HTMLAnchorElement>('nav[aria-label="Pages"] a[aria-label="Home"]')!.click() })
   expect(finalized).toHaveBeenCalledTimes(1)
   await act(async () => { release({ envelope: item(3, { _tag: "ThreadItem", itemId: "late", content: { _tag: "text", text: "late content" } }) }) })
   expect(container.querySelector('[aria-label="Thread"]')).toBeNull()

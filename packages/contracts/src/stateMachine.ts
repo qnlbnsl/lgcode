@@ -1,4 +1,5 @@
 import * as Schema from "effect/Schema"
+import { projectEventTags } from "./project/events.ts"
 import { boardEventTags } from "./board/events.ts"
 import { clientEventTags } from "./client/events.ts"
 import type { Event } from "./events.ts"
@@ -83,6 +84,7 @@ export const keepInEveryState = <const T extends ReadonlyArray<string>>(tags: T)
 // Explicit keys make every new event require a decision for all seven states.
 const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
   ...keepInEveryState(boardEventTags),
+  ...keepInEveryState(projectEventTags),
   ...keepInEveryState(clientEventTags),
   ...keepInEveryState(rolesEventTags),
   AgentStarted: allStates("invalid"),
@@ -93,6 +95,10 @@ const eventTable: Record<Event["_tag"], Record<StateName, EventEffect>> = {
   TurnStarted: { ...allStates("invalid"), working: "keep" },
   TurnEnded: { ...allStates("invalid"), working: "idle" },
   StateChanged: allStates("transition"),
+  AgentConfigurationObserved: allStates("keep"),
+  AgentConfigurationChosen: allStates("keep"),
+  AgentConfigurationApplied: allStates("keep"),
+  AgentConfigurationRefused: allStates("keep"),
   ModeChanged: allStates("keep"),
   ModeRefused: allStates("keep"),
   PermissionRequested: allStates("keep"),

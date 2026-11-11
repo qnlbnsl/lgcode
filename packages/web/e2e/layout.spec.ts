@@ -1,3 +1,4 @@
+import { completedSetup } from "./support/completedSetup.ts"
 import { assertPhoneWidth } from "./support/phoneWidth.ts"
 import { randomBytes } from "node:crypto"
 import { join } from "node:path"
@@ -22,10 +23,10 @@ import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 // Each page reports its own outcome even if another page's layout regresses.
 for (const [name, path, ready] of [
   ["Login", "/", "Log in"],
-  ["Situation", "/", "Situation"],
+  ["Home", "/", "Home"],
   ["Thread", "/#/thread/phone-worker", "Thread"],
-  ["Alerts", "/?page=alerts", "Alerts"],
-  ["Settings", "/?page=settings", "Settings"],
+  ["Alerts", "/?page=alerts", "Phone notifications"],
+  ["Settings", "/?page=settings", "Service settings"],
 ] as const) test(`7.3 production width: ${name} fits 360 pixels`, async ({ page }) => {
   const rig = makeRig()
   const previousHome = process.env.LGCODE_HOME
@@ -43,6 +44,7 @@ for (const [name, path, ready] of [
         yield* seedHarness()
         yield* seedAccount()
         const worker = yield* seedAgent({ id: "phone-worker", state: "working" })
+        yield* completedSetup()
         yield* serve({ password: Redacted.make(password), staticRoot, lists: engineLists,
           settings: { enabled: true, port, heartbeatSeconds: 25, proxyMode: false } })
         success(yield* call(agentCredential(worker.token), "ask", { text: "Which branch should I use?" }))
@@ -53,13 +55,13 @@ for (const [name, path, ready] of [
           if (name !== "Login") {
             await page.getByLabel("Password", { exact: true }).fill(password)
             await page.getByRole("button", { name: "Log in", exact: true }).click()
-            await expect(page.getByRole("navigation", { name: "Pages" })).toBeVisible()
-            await expect(page.getByLabel(ready, { exact: true })).toBeVisible()
-            if (name === "Situation") await expect(page.getByLabel("Situation", { exact: true })).toContainText("name-phone-worker")
+            await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeVisible()
+            await expect(page.getByRole("region", { name: ready, exact: true })).toBeVisible()
+            if (name === "Home") await expect(page.locator(".home-view .home-request-row")).toContainText("name-phone-worker")
             if (name === "Thread") await expect(page.getByRole("region", { name: "Question", exact: true })).toContainText("Which branch should I use?")
             if (name === "Alerts") await expect(async () => {
               await page.getByRole("button", { name: "Refresh alerts" }).click()
-              await expect(page.getByLabel("Alerts", { exact: true })).toContainText("A question needs your answer")
+              await expect(page.getByRole("region", { name: "Phone notifications", exact: true })).toContainText("A question needs your answer")
             }).toPass()
             if (name === "Settings") await expect(page.getByRole("form", { name: "Web server settings", exact: true })).toBeVisible()
           }

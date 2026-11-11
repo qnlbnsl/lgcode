@@ -6,6 +6,7 @@ import { refused } from "../commands/internal.ts";
 import { subscribe } from "../log/subscribe.ts";
 import { compareViews } from "../views/compare.ts";
 import { visibleTo } from "./visibility.ts";
+import { retryNotification, testNotification } from "../commands/notifications.ts";
 import { readWebSettings } from "../client/settings.ts";
 import { clientReads } from "../client/reads/index.ts";
 import { getRoleFile } from "../roles/roleFile.ts";
@@ -20,6 +21,8 @@ export type ReadHandler = (input: Input, payload: Record<string, unknown>) =>
   Effect.Effect<ReadReply, any, any> | Stream.Stream<ClientStreamItem, any, any>;
 export const reads = {
   ...clientReads,
+  "client.alerts.test": testNotification,
+  "client.alerts.retry": retryNotification,
   "client.web.settings": readWebSettings,
   "roles.role-file.get": getRoleFile,
   "roles.orient": orient,

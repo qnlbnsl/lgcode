@@ -22,6 +22,8 @@ export type Snapshot = Effect.Success<Context.Service.Shape<typeof Views>["snaps
 export type Agent = Snapshot["agents"][string];
 
 export class CommandRefused extends Data.TaggedError("CommandRefused")<{ readonly reason: string }> {}
+// This is a transport failure, never a durable refusal receipt.
+export class CommandUncertain extends CommandRefused {}
 export const refused = (reason = "command refused") => new CommandRefused({ reason });
 
 export interface Runtime {
@@ -48,7 +50,7 @@ export interface Plan {
   readonly sideRows?: SideRows;
   readonly reply?: (batch: ReadonlyArray<EventEnvelope>) => Record<string, unknown>;
   // Runs after the commit. A blocking command returns its final reply here.
-  readonly afterCommit?: Effect.Effect<void | Record<string, unknown>, LogWriteFailed>;
+  readonly afterCommit?: Effect.Effect<void | Record<string, unknown>, CommandRefused | LogWriteFailed>;
 }
 
 // Piece planners cannot run engine hooks or omit their committed-batch reply.
@@ -59,7 +61,12 @@ export type PiecePlan = Omit<Plan, "afterCommit" | "reply"> & {
 
 export type Planner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<Plan, CommandRefused | LogWriteFailed>;
 export type PiecePlanner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<PiecePlan, CommandRefused | LogWriteFailed>;
-export type PlannerTable = Readonly<Record<string, Planner> & Record<`${import("@lgcode/contracts").PieceNamespace}.${string}`, PiecePlanner>>;
+// Piece registrations still declare PiecePlanner at their source tables.
+// Two engine-owned project lifecycle commands also compose engine plans.
+type ProjectCommand = keyof typeof import("@lgcode/contracts").projectAccess;
+export type PlannerTable = Readonly<Record<string, Planner>
+  & Record<`${Exclude<import("@lgcode/contracts").PieceNamespace, "project">}.${string}`, PiecePlanner>
+  & Partial<Record<Exclude<ProjectCommand, "project.create" | "project.archive">, PiecePlanner>>>;
 
 export const freshRequest = () => Schema.decodeUnknownSync(RequestId)(randomUUID());
 export const readHarnesses = (runtime: Runtime): Effect.Effect<ReadonlyArray<HarnessSettings>, LogWriteFailed> =>

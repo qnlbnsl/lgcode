@@ -30,7 +30,7 @@ const fixedMessage = (message: unknown): boolean => {
   return new Set(ids).size === ids.length && ids.every((id, index) => index === 0 || order.indexOf(id) > order.indexOf(ids[index - 1]!));
 };
 
-const pieceNamespaces = new Set(["client", "board", "roles"]);
+const pieceNamespaces = new Set(["client", "board", "roles", "project"]);
 const pieceTables = new Set(["views", "snapshotSections", "pieceVisibility", "reach", "holdUnsettled", "requestHeld", "sourceRules", "secretKeep", "alertSources", "openMatters"]);
 const errorClasses = new Set(["TypeError", "RangeError", "SyntaxError", "ReferenceError", "Error", "Unknown"]);
 const pieceAnnotations = (message: unknown, value: unknown) => {

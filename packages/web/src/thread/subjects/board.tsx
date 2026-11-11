@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { boardAlertTitles, type BoardAuthor, type BoardPost, type PostId } from "@lgcode/contracts"
+import { boardAlertTitles, Caller, type BoardAuthor, type BoardPost, type PostId } from "@lgcode/contracts"
 import * as Effect from "effect/Effect"
+import * as Schema from "effect/Schema"
 import { requestId, withClient } from "../client.ts"
 import { DataText, visibleText } from "../text.tsx"
 import type { SubjectProps } from "./index.tsx"
+import { useConversation, useMutationDisabled } from "../../data/ShellDataProvider.tsx"
 
 const authorLabel = (author: BoardAuthor) => author._tag === "agent" ? `agent ${author.agentId}`
   : author._tag === "service" ? `service ${author.service}` : "owner"
@@ -11,23 +13,28 @@ const reason = (error: unknown, fallback: string) => typeof error === "object" &
   && "reason" in error && typeof error.reason === "string" ? visibleText(error.reason) : fallback
 
 export function Board({ id, alertKind }: SubjectProps) {
+  const disabled = useMutationDisabled()
   const [post, setPost] = useState<BoardPost>()
   const [answer, setAnswer] = useState<BoardPost>()
   const [busy, setBusy] = useState(false)
-  const [sent, setSent] = useState(false)
   const [message, setMessage] = useState("")
   const controller = useRef<AbortController | undefined>(undefined)
   const locked = useRef(false)
-  const attempt = useRef<{ text: string; requestId: ReturnType<typeof requestId> } | undefined>(undefined)
+  const { state, entry, session } = useConversation({ _tag: "board", postId: id as PostId })
+  const field = useRef<HTMLTextAreaElement>(null)
+  const sending = state.boardAttempt?.status === "sending"
+  const sent = state.boardReplyId !== undefined
   useEffect(() => {
     const action = new AbortController()
     controller.current = action
-    return () => action.abort()
+    return () => { action.abort(); if (field.current) field.current.value = "" }
   }, [])
+
+  useEffect(() => { const node = field.current; return () => { if (node) node.value = "" } }, [post?.postId, sent])
 
   const read = async () => {
     const signal = controller.current?.signal
-    if (signal === undefined || signal.aborted || locked.current || !id) return
+    if (signal === undefined || signal.aborted || locked.current || !id || disabled) return
     locked.current = true
     setBusy(true)
     setMessage("")
@@ -44,60 +51,74 @@ export function Board({ id, alertKind }: SubjectProps) {
     finally { if (!signal.aborted) { locked.current = false; setBusy(false) } }
   }
 
-  const reply = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-    const signal = controller.current?.signal
-    if (signal === undefined || signal.aborted || locked.current || sent || post?.status !== "open") return
-    const field = event.currentTarget.elements.namedItem("reply") as HTMLTextAreaElement
-    const text = field.value
-    if (!text.trim()) return
-    locked.current = true
-    setBusy(true)
-    setMessage("")
-    // Keep the same key when retrying an unconfirmed reply with unchanged text.
-    if (attempt.current?.text !== text) attempt.current = { text, requestId: requestId() }
-    const payload = { ...attempt.current!, channelId: post.channelId, replyTo: post.postId,
-      to: post.author._tag === "agent" ? [post.author] : [], reply: "none" as const }
+  // Error strings can arrive after the client's internal retries. Only an
+  // immutable refusal event for this owner and exact request retires a key.
+  const refusedOutcome = async (attempt: NonNullable<typeof state.boardAttempt>) => {
+    if (attempt.after === undefined) return undefined
     try {
-      const result = await withClient((client) => Effect.result(client["board.post"](payload)), signal)
-      if (signal.aborted) return
+      return await withClient((client) => Effect.gen(function* () {
+        const head = yield* client["client.sequence"]({ requestId: requestId() })
+        // This bounded positive check never interprets a missing event as a
+        // refusal. A busy log or unavailable read leaves recovery frozen.
+        for (let sequence = attempt.after! + 1; sequence <= Math.min(head.sequence, attempt.after! + 64); sequence++) {
+          const row = yield* client["client.event"]({ requestId: requestId(), sequence: sequence as typeof head.sequence })
+          if ("envelope" in row && row.envelope.requestId === attempt.payload.requestId && Schema.is(Caller)(row.envelope.caller) && row.envelope.caller._tag === "owner"
+            && row.envelope.event._tag === "CommandRefused" && row.envelope.event.command === "board.post") return row.envelope.event.reason
+        }
+        return undefined
+      }), AbortSignal.any([session.controller.signal, AbortSignal.timeout(2000)]))
+    } catch { return undefined }
+  }
+  const reply = async (form?: HTMLFormElement) => {
+    if (disabled || session.controller.signal.aborted || entry.state.boardAttempt?.status === "sending" || entry.state.boardReplyId !== undefined) return
+    const previous = entry.state.boardAttempt
+    if (form !== undefined && previous !== undefined) return
+    const text = form === undefined ? entry.state.draft : (form.elements.namedItem("reply") as HTMLTextAreaElement).value
+    if (!previous && (post?.status !== "open" || !text.trim())) return
+    let attempt: NonNullable<typeof state.boardAttempt> = previous ?? { payload: { requestId: requestId(), text, channelId: post!.channelId,
+      replyTo: post!.postId, to: post!.author._tag === "agent" ? [post!.author] : [], reply: "none" }, status: "sending" }
+    entry.update({ ...(form === undefined ? {} : { draft: text }), boardAttempt: { ...attempt, status: "sending" }, boardMessage: "" })
+    try {
+      const result = await withClient((client) => Effect.gen(function* () {
+        if (attempt.after === undefined) {
+          const before = yield* client["client.sequence"]({ requestId: requestId() })
+          attempt = { ...attempt, after: before.sequence }
+          entry.update({ boardAttempt: { ...attempt, status: "sending" } })
+        }
+        return yield* Effect.result(client["board.post"](attempt.payload))
+      }), session.controller.signal)
+      if (session.controller.signal.aborted) return
       if (result._tag === "Failure") {
-        // A server refusal ends this attempt, even when its receipt is final.
-        // A deliberate send after correction gets a new key and keeps the draft.
-        // Transport failures leave the outcome uncertain and must reuse the key.
-        if (result.failure._tag === "CommandError") attempt.current = undefined
-        setMessage(reason(result.failure, "Could not confirm the reply. You can retry the same text."))
+        const refusal = await refusedOutcome(attempt)
+        if (session.controller.signal.aborted) return
+        entry.update(refusal === undefined ? { boardAttempt: { ...attempt, status: "uncertain" }, boardMessage: `Could not confirm the reply. ${reason(result.failure, "Recover the original reply before sending another.")}` }
+          : { boardAttempt: undefined, boardMessage: `The engine refused this reply: ${visibleText(refusal)}. Your draft is kept.` })
         return
       }
-      setSent(true)
-      field.value = ""
-      attempt.current = undefined
-      setMessage("Reply sent.")
-      // A confirmed write is never retried because its follow-up read failed.
-      // Render the stored reply, including the engine's redaction, rather than
-      // substituting the submitted text for the server's result.
+      entry.update({ boardAttempt: undefined, boardReplyId: result.success.postId, boardMessage: "Reply sent.",
+        ...(entry.state.draft === attempt.payload.text ? { draft: "" } : {}) })
+      // Read stored, redacted data after the confirmed write. These reads
+      // cannot turn an acknowledged reply back into a sendable attempt.
       const refreshed = await withClient((client) => Effect.gen(function* () {
-        const parent = yield* Effect.result(client["board.read"]({ requestId: requestId(), post: post.postId }))
+        const parent = yield* Effect.result(client["board.read"]({ requestId: requestId(), post: attempt.payload.replyTo }))
         const response = yield* Effect.result(client["board.read"]({ requestId: requestId(), post: result.success.postId }))
         return { parent, response }
-      }), signal)
-      if (signal.aborted) return
+      }), session.controller.signal)
+      if (session.controller.signal.aborted || controller.current?.signal.aborted) return
       if (refreshed.parent._tag === "Success" && "items" in refreshed.parent.success) {
-        const item = refreshed.parent.success.items.find((row) => row.postId === post.postId)
+        const item = refreshed.parent.success.items.find((row) => row.postId === attempt.payload.replyTo)
         if (item !== undefined) setPost(item)
       }
-      if (refreshed.response._tag === "Success" && "items" in refreshed.response.success) {
-        setAnswer(refreshed.response.success.items.find((row) => row.postId === result.success.postId))
-      }
+      if (refreshed.response._tag === "Success" && "items" in refreshed.response.success) setAnswer(refreshed.response.success.items.find((row) => row.postId === result.success.postId))
     } catch {
-      if (!signal.aborted) setMessage("Could not confirm the current state. Read the post again before retrying.")
-    } finally { if (!signal.aborted) { locked.current = false; setBusy(false) } }
+      if (!session.controller.signal.aborted && entry.state.boardReplyId === undefined) entry.update({ boardAttempt: { ...attempt, status: "uncertain" }, boardMessage: "Could not confirm the reply. Recover the original reply before sending another." })
+    }
   }
 
   return <section aria-label="Board post">
     <h4>Board post</h4>
     <p>{boardAlertTitles[alertKind === "board.no-answer" ? "board.no-answer" : "board.post"]}</p>
-    <button aria-label="Read post" disabled={busy || !id} onClick={() => { void read() }}>{busy ? "Working…" : "Read post"}</button>
+    <button aria-label="Read post" disabled={busy || sending || !id || disabled} onClick={() => { void read() }}>{busy ? "Working…" : "Read post"}</button>
     {post !== undefined && <>
       <p>Author: {visibleText(authorLabel(post.author))}</p>
       <p>Post: {visibleText(post.postId)}</p>
@@ -107,12 +128,15 @@ export function Board({ id, alertKind }: SubjectProps) {
       {post.dispositions.map((row, index) => <p key={index}>
         {visibleText(authorLabel(row.addressee))}: {row.disposition === "no-answer" ? "no answer" : row.disposition}
       </p>)}
-      {post.status === "open" && !sent && <form aria-label="Reply to post" onSubmit={(event) => { void reply(event) }}>
-        <label>Reply<textarea name="reply" aria-label="Reply" required disabled={busy} /></label>
-        <button type="submit" disabled={busy}>Send reply</button>
+      {post.status === "open" && !sent && <form aria-label="Reply to post" onSubmit={(event) => { event.preventDefault(); void reply(event.currentTarget) }}>
+        <label>Reply<textarea ref={field} name="reply" aria-label="Reply" required disabled={busy || sending} value={state.draft} onInput={(event) => entry.update({ draft: event.currentTarget.value })} onChange={(event) => entry.update({ draft: event.currentTarget.value })} /></label>
+        <button type="submit" disabled={busy || disabled || state.boardAttempt !== undefined}>Send reply</button>
       </form>}
     </>}
     {answer !== undefined && <><p>Your reply</p><DataText text={answer.text} /></>}
+    {(sent || post?.status === "closed") && state.draft && <section aria-label="Unsent reply draft"><h4>Your newer unsent draft is kept</h4><DataText text={state.draft} /></section>}
+    {state.boardAttempt?.status === "uncertain" && <button disabled={disabled || busy} onClick={() => { void reply() }}>Recover original reply</button>}
+    {state.boardMessage && <p role="status">{state.boardMessage}</p>}
     {message && <p role="status">{message}</p>}
   </section>
 }

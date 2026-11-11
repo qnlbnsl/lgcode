@@ -7,7 +7,7 @@ import { requiredModule } from "../support/callerRules.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 registerRebuildCheck({ noLog: true });
 
-it.each(["scripts/live/driver.ts", "src/client/alerts/reactor.ts", "src/pieces/viewTables.ts"])(
+it.each(["src/project/display.ts", "src/client/web/display/service.ts", "src/project/design.ts", "src/project/lifecycle.ts", "src/pieces/lists.ts", "scripts/live/driver.ts", "src/client/alerts/reactor.ts", "src/pieces/viewTables.ts"])(
   "FR-157 initializes all piece registrations when %s is the first plain Node import", (entry) => {
     const probe = spawnSync(process.execPath, ["--input-type=module", "-e", `
       import assert from "node:assert/strict";
@@ -19,10 +19,32 @@ it.each(["scripts/live/driver.ts", "src/client/alerts/reactor.ts", "src/pieces/v
         assert.equal(typeof engineLists.views[namespace].reduce, "function");
         assert.ok(Effect.isEffect(engineLists.reactors[namespace]));
       }
-      for (const name of ["start", "board.post", "client.alerts.dismiss", "roles.record"]) {
-        assert.equal(typeof engineLists.planners[name], "function", name);
+      const planners = engineLists.planners, reads = engineLists.reads;
+      assert.equal(engineLists.planners, planners, "planner table identity must be stable");
+      assert.equal(engineLists.reads, reads, "read table identity must be stable");
+      for (const name of ["start", "board.post", "client.alerts.dismiss", "roles.record", "project.design.record", "project.create", "project.archive"]) {
+        assert.ok(Object.hasOwn(planners, name), name);
+        assert.equal(typeof planners[name], "function", name);
       }
-      assert.equal(typeof engineLists.reads["board.status"], "function");
+      const { planners: corePlanners } = await import("../../src/commands/planners.ts");
+      for (const name of ["project.create", "project.archive"]) {
+        assert.equal(planners[name], corePlanners[name], name + " keeps its actual registration");
+        // Construction must remain safe after either import order. Do not run
+        // the Effect, acquire a writer or create/archive anything in this child.
+        assert.ok(Effect.isEffect(planners[name](undefined, {})), name + " returns an Effect");
+      }
+      for (const name of ["board.status", "project.design.read"]) {
+        assert.ok(Object.hasOwn(reads, name), name);
+        assert.equal(typeof reads[name], "function", name);
+      }
+      assert.ok(engineLists.commands.requests.has("project.design.record"));
+      assert.ok(engineLists.commands.requests.has("project.design.read"));
+      assert.deepEqual(engineLists.access["project.design.record"], ["owner", "agent"]);
+      assert.deepEqual(engineLists.access["project.design.read"], ["owner", "agent"]);
+      const declared = [...engineLists.commands.requests.keys()].sort();
+      assert.deepEqual([...Object.keys(planners), ...Object.keys(reads)].sort(), declared);
+      assert.deepEqual(Object.keys(engineLists.access).sort(), declared);
+      assert.deepEqual(Object.keys(planners).filter((name) => Object.hasOwn(reads, name)), []);
     `], { cwd: import.meta.dirname, encoding: "utf8", timeout: 15_000, env: { ...process.env, NODE_NO_WARNINGS: "1" } });
     expect({ status: probe.status, stderr: probe.stderr }).toEqual({ status: 0, stderr: "" });
   },

@@ -1,0 +1,11 @@
+import * as Schema from "effect/Schema"
+import { ClientRequest, ClientSnapshot, EventEnvelope } from "@lgcode/contracts"
+
+export const snapshot = () => Schema.decodeUnknownSync(ClientSnapshot)({ sequence: 12, agents: [{ agentId: "worker", name: "Worker", role: "worker", groups: ["team:p/t"], parent: { _tag: "owner" }, state: { _tag: "working" }, displayedState: "Working", openPermissionRequests: 0, openQuestionsAsked: 0, harness: "codex", account: "default", permission: "ask", folder: "/work", startedAt: 1 }], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0,
+  project: { sequence: 12, truncated: false, projects: [{ projectId: "p", repoId: "r", name: "Real project", goal: "A goal", leadAgentId: "worker", worktreeId: "w", machineId: "local", stage: "build" }],
+    repositories: [{ repoId: "r", name: "Repository", path: "/work/repo" }], workspaces: [{ worktreeId: "w", repoId: "r", machineId: "local", branch: "feature", path: "/work/repo/.worktrees/feature", projectId: "p", teamId: "t" }],
+    teams: [{ projectId: "p", teamId: "t", name: "Team", worktreeId: "w", group: "team:p/t" }],
+    sprints: [{ projectId: "p", sprintId: "s", label: "SP-1", name: "First sprint", goal: "Build the real page", phase: "Build", owner: "worker", needs: [] }],
+    tasks: [{ projectId: "p", taskId: "task", title: "Implement page", owner: "worker", teamId: "t", sprintId: "s", state: "blocked", worktreeId: "w" }], agents: [{ agentId: "worker", projectId: "p", status: "Needs you" }] } })
+export const request = (fields: Record<string, unknown> = {}) => Schema.decodeUnknownSync(ClientRequest)({ kind: "question", id: "question", agentId: "worker", holder: { _tag: "owner" }, status: "open", sourceSequence: 10, openedAt: 1, projectId: "p", sprintId: "s", taskId: "task", canAnswer: true, ...fields })
+export const questionEvent = (id = "question") => Schema.decodeUnknownSync(EventEnvelope)({ sequence: 10, eventId: "question-event", occurredAt: 1, caller: { _tag: "owner" }, event: { _tag: "QuestionAsked", agentId: "worker", questionId: id, deliveryId: "delivery", holder: { _tag: "owner" }, text: "<script>Agent text</script>", title: "Choose a plan", recommendation: "Use the current contract", proposedAnswer: "Proceed" } })
