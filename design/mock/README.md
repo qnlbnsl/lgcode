@@ -28,7 +28,8 @@ resets everything.
 | Home, one table of everything that waits for the owner | `/home` |
 | All projects, one table of every project | `/projects` |
 | Project board, as columns, a table, or a roadmap | `/p/console/board`, `/p/console/board/table`, `/p/console/board/roadmap` |
-| Sprint, task and team pages | opened from the board and the sidebar |
+| Sprint page, with its plan and tasks side by side | `/p/console/sprint/sp7` |
+| Task and team pages | opened from the board and the sidebar |
 | Workflow, the build loop's phases | `/p/console/workflow` |
 | Review rounds, Test runs, End result, and the workflow's settings | `/p/rules/workflow/review`, `/p/console/workflow/runs`, `/p/apiref/workflow/result`, `/p/console/workflow/settings` |
 | Mocks, for a project in its Design stage | `/p/phone/mocks`, and one screen at `/p/phone/mocks/screen/requests` |
@@ -36,7 +37,7 @@ resets everything.
 | Messages, the agents' message board | `/p/console/messages` |
 | Agents, the roster by situation | `/p/console/agents` |
 | Terminal | `/p/console/terminal` |
-| Files and Plans, both coming soon | `/p/console/files`, `/p/console/plans` |
+| Files, coming soon | `/p/console/files` |
 | Git, with generated commit and pull request text | `/p/console/git` |
 | Project settings, with the lead's model and the work assignment table | `/p/console/settings` |
 | Repository design page, the design file on a canvas | `/r/lgcode/design`, and `/r/<repository>/design/<category>/<item>` |
@@ -59,6 +60,8 @@ structure at `/r/atlas-docs/design`.
 - `js/ui.js` holds the shared components.
 - `js/screens/` holds one file for each screen. `js/screens/design.js` holds the Design
   page and the canvas that the Mocks tab reuses for its large preview.
+- `plans/` holds plan pages in HTML. `website-replacement.html` is converted from
+  `.plans/plans/website-replacement/plan.md`, and `plan.css` styles it.
 - `js/icons.js` is generated from Lucide. `vendor/htm-preact` is a link to
   `third_party/htm-preact/`. `fonts` is a link to `design/fonts/`.
 

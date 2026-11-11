@@ -1,5 +1,5 @@
 // The project board, sprint and task pages, the team page, and the repository page.
-import { html, useState, Icon, cx, href, go, ago, clock, dayLabel, useNow, plural, update, uid, useKey, store, DAY } from '../lib.js';
+import { html, useState, useRef, Icon, cx, href, go, ago, clock, dayLabel, useNow, plural, update, uid, useKey, store, DAY, persist, remember } from '../lib.js';
 import {
   STAGES, PHASES, COLUMNS, PRIORITIES, TASK_STATES, sprintsOf, epicsOf, tasksOfSprint, tasksOfTeam, teamOf, teamName, teamsOf, agentOf, agentsOfTeam, agentsOfProject,
   requestsOfSprint, requestsOfTask, openRequests, sprintProgress, agentStatus, byId, repoOf, machineOf, leadOf, routeForAgent, agentLabel, HARNESSES, subLabel,
@@ -170,33 +170,82 @@ export function TaskTable({ s, tasks, showSprint = false }) {
 }
 
 // ---- sprint page ----------------------------------------------------------------
+// A sprint shows its plan and its tasks. The tasks are the short version of the plan, and
+// each task names the part of the plan it carries out. Three views: Plan, Plan and tasks,
+// and Tasks. The plan is an HTML page, drawn in a frame.
+const VIEWS = [['plan', 'Plan', 'file-text'], ['both', 'Plan and tasks', 'columns-2'], ['tasks', 'Tasks', 'list-checks']];
+function PlanPane({ sp, frame }) {
+  const theme = () => { const d = frame.current?.contentDocument; if (d) d.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') || 'light'); };
+  return html`<section class="tk-plan" aria-label="Plan">
+    <div class="tk-panehead"><${Icon} name="file-text" size=${14} class="faint" />${sp.plan ? html`<span class="mono truncate">${sp.plan.file}</span><span class="badge" title=${'Written by ' + sp.plan.by}>${sp.plan.state}</span>`
+      : html`<span class="muted">Plan</span>`}</div>
+    ${sp.plan ? html`<iframe ref=${frame} class="tk-frame" src=${sp.plan.src} title=${'Plan for ' + sp.label} onLoad=${theme}></iframe>`
+      : html`<div class="tk-noplan" data-empty><strong>No plan yet</strong><span>The planner writes it in the Plan phase.</span></div>`}
+  </section>`;
+}
+function TaskRows({ s, tasks, onSection, wide }) {
+  if (!tasks.length) return html`<tr><td colspan=${wide ? 6 : 3} class="muted" data-empty>No tasks yet</td></tr>`;
+  return tasks.map((t) => { const o = t.owner && agentOf(s, t.owner);
+    const sec = t.section && html`<button type="button" class="link tk-sec" onClick=${(e) => { e.stopPropagation(); onSection(t); }}><${Icon} name="file-text" size=${12} />${t.sectionName}</button>`;
+    return wide
+      ? html`<tr key=${t.id} class=${cx('click', t.state === 'blocked' && 's-warn')} onClick=${() => go(`/p/${t.project}/task/${t.id}`)}>
+          <td class="state-cell mono"><a href=${href(`/p/${t.project}/task/${t.id}`)} onClick=${(e) => e.stopPropagation()}>${t.label}</a></td>
+          <td class="wrap">${t.title}</td><td><${TaskState} t=${t} /></td>
+          <td>${o ? html`<span class="row" style="gap:6px"><${Avatar} agent=${o} s=${s} size="sm" />${o.name}</span>` : html`<span class="faint">Unassigned</span>`}</td>
+          <td>${sec || html`<span class="faint">None</span>`}</td><td class="num muted">${t.points}</td></tr>`
+      : html`<tr key=${t.id} class=${cx('click', t.state === 'blocked' && 's-warn')} onClick=${() => go(`/p/${t.project}/task/${t.id}`)}>
+          <td class="state-cell mono tk-label"><a href=${href(`/p/${t.project}/task/${t.id}`)} onClick=${(e) => e.stopPropagation()}>${t.label}</a></td>
+          <td class="wrap"><div class="tk-title">${t.title}</div><div class="tk-sub"><${TaskState} t=${t} />${sec}${o && html`<span class="muted">${o.name}</span>`}</div></td>
+          <td class="num muted">${t.points}</td></tr>`; });
+}
 export function SprintPage({ s, project, sprintId }) {
   const sp = byId(s.sprints, sprintId); const [adding, setAdding] = useState(false); const [title, setTitle] = useState('');
+  const [view, setViewState] = useState(() => persist('sprintView', 'both'));
+  const setView = (v) => { setViewState(v); remember('sprintView', v); };
+  const frame = useRef(null);
   if (!sp) return html`<div class="page"><${Empty} title="This sprint does not exist">It may have been removed. <a class="link" href=${href(`/p/${project.id}/board`)}>Back to the board</a><//></div>`;
   const tasks = tasksOfSprint(s, sp.id); const reqs = requestsOfSprint(s, sp.id); const t = sp.team && teamOf(s, sp.team); const pr = sprintProgress(s, sp);
-  const done = sp.column === 'Done';
+  const done = sp.column === 'Done'; const epic = epicsOf(s, project.id).find((e) => e.id === sp.epic);
   const add = (e) => { e.preventDefault(); if (!title.trim()) return;
     update((st) => { const n = Math.max(...st.tasks.filter((x) => x.project === project.id).map((x) => +x.label.split('-')[1] || 0)) + 1;
       st.tasks.push({ id: uid('t'), project: project.id, label: `${project.prefix}-${n}`, title: title.trim(), sprint: sp.id, team: sp.team, owner: null, state: 'queue', points: 2, files: [], history: [{ ts: Date.now(), who: 'owner', text: 'You added this task. The project lead was told.' }] }); });
     act.toast('Task added. The project lead was told.'); setTitle(''); setAdding(false); };
-  return html`<div class="page narrow">
-    <a class="back" href=${href(`/p/${project.id}/board`)}><${Icon} name="arrow-left" size=${14} />Board</a>
-    <div class="page-head" style="margin-top:6px"><h1 class="page-title">${sp.name}</h1></div>
-    <p class="status-line"><span class="tag">${sp.label}</span><span>${sp.phase}</span><span>${sp.column}</span>${sp.fix && html`<span class="badge info">Fix sprint · merges on its own</span>`}
-      ${reqs.length > 0 && html`<span class="warn-text" style="font-weight:var(--weight-medium)">${plural(reqs.length, 'request')} ${reqs.length === 1 ? 'needs' : 'need'} you</span>`}</p>
-    ${reqs.length > 0 && html`<div class="stack">${reqs.map((r) => html`<${RequestBlock} key=${r.id} s=${s} request=${r} openThread=${() => act.openSidePanel(r.agent, r.id)} />`)}</div>`}
-    <p class="lede">${sp.goal}</p>
-    <dl class="dl facts">
-      <dt>Team</dt><dd>${t ? html`<a class="link" href=${href(`/p/${project.id}/team/${t.id}`)}>${teamName(t)}</a>` : html`<span class="muted">Not staffed yet</span>`}</dd>
-      <dt>Depends on</dt><dd>${sp.dependsOn.length ? sp.dependsOn.map((id, n) => { const d = byId(s.sprints, id); return html`${n > 0 && ', '}<a class="link" href=${href(`/p/${project.id}/sprint/${id}`)}>${d.label} ${d.name}</a>${d.column === 'Done' ? html` <span class="muted">(done)</span>` : ''}`; }) : html`<span class="muted">Nothing</span>`}</dd>
-      <dt>Progress</dt><dd>${pr.total ? `${pr.done} of ${pr.total} tasks done` : 'No tasks yet'}</dd>
-      ${sp.evidence && html`<dt>Evidence</dt><dd class="col" style="gap:2px">${Object.values(sp.evidence).map((e) => html`<span class="row"><${Icon} name="circle-check" size=${14} class="success-text" />${e}</span>`)}</dd>`}
-    </dl>
-    <div class="section-head" style="margin-top:var(--gap-group)"><h2>Tasks</h2><span class="grow"></span>
-      ${done ? html`<span class="faint" style="font-size:var(--text-sm)">A finished sprint takes no new tasks.</span>` : html`<button type="button" class="btn sm" onClick=${() => setAdding(!adding)}><${Icon} name="plus" size=${13} />Add task</button>`}</div>
-    ${adding && html`<form class="row" style="margin-bottom:8px" onSubmit=${add}><input class="input" autofocus placeholder="What should be done?" value=${title} onInput=${(e) => setTitle(e.target.value)} aria-label="Task title" />
-      <button type="submit" class="btn primary" disabled=${!title.trim()}>Add</button><button type="button" class="btn ghost" onClick=${() => setAdding(false)}>Cancel</button></form>`}
-    <div class="table-wrap" data-main><${TaskTable} s=${s} tasks=${tasks} /></div>
+  // A task's plan link scrolls the plan to that part and marks it for a moment.
+  const toSection = (task) => {
+    if (view === 'tasks') setView('both');
+    requestAnimationFrame(() => setTimeout(() => { const d = frame.current?.contentDocument; const h = d?.getElementById(task.section); if (!h) return;
+      h.scrollIntoView({ behavior: 'smooth', block: 'start' }); h.classList.remove('hit'); void h.offsetWidth; h.classList.add('hit'); }, view === 'tasks' ? 200 : 0));
+  };
+  const deps = sp.dependsOn.map((id) => byId(s.sprints, id)).filter(Boolean);
+  const meta = [
+    ['Status', sp.column], ['Phase', sp.phase], ['Priority', sp.priority || 'None'], ['Epic', epic ? epic.name : 'None'],
+    ['Team', t ? html`<a class="link" href=${href(`/p/${project.id}/team/${t.id}`)}>${teamName(t)}</a>` : html`<span class="muted">Not staffed</span>`],
+    ['Depends on', deps.length ? deps.map((d, n) => html`${n > 0 && ', '}<a class="link" href=${href(`/p/${project.id}/sprint/${d.id}`)}>${d.label}</a>${d.column === 'Done' ? ' (done)' : ''}`) : html`<span class="muted">None</span>`],
+    ['Tasks', pr.total ? `${pr.done} of ${pr.total} done` : 'None yet'],
+  ];
+  const taskHead = html`<div class="tk-panehead"><${Icon} name="list-checks" size=${14} class="faint" /><b>Tasks</b><span class="count">${tasks.length}</span><span class="grow"></span>
+    ${!done && html`<button type="button" class="btn sm" onClick=${() => setAdding(!adding)}><${Icon} name="plus" size=${13} />Add task</button>`}</div>
+    ${adding && html`<form class="row tk-add" onSubmit=${add}><input class="input" autofocus placeholder="What should be done?" value=${title} onInput=${(e) => setTitle(e.target.value)} aria-label="Task title" />
+      <button type="submit" class="btn" disabled=${!title.trim()}>Add</button><button type="button" class="btn ghost" onClick=${() => setAdding(false)}>Cancel</button></form>`}`;
+  return html`<div class=${cx('tk', 'v-' + view)}>
+    <header class="tk-head">
+      <div class="tk-titlerow">
+        <a class="icon-btn" href=${href(`/p/${project.id}/board`)} aria-label="Back to the board" data-tip="Board"><${Icon} name="arrow-left" size=${16} /></a>
+        <span class="tag">${sp.label}</span><h1 class="tk-name">${sp.name}</h1>${sp.fix && html`<span class="badge info">Fix sprint</span>`}
+        <span class="grow"></span>
+        <div class="seg tk-views" role="group" aria-label="What to show">${VIEWS.map(([id, label, icon]) => html`<button key=${id} type="button" aria-pressed=${view === id} onClick=${() => setView(id)}><${Icon} name=${icon} size=${14} /><span>${label}</span></button>`)}</div>
+      </div>
+      <p class="tk-goal">${sp.goal}</p>
+      ${sp.evidence && html`<p class="tk-evidence">${Object.values(sp.evidence).map((e) => html`<span class="row"><${Icon} name="circle-check" size=${14} class="success-text" />${e}</span>`)}</p>`}
+      <dl class="tk-meta">${meta.map(([k, v]) => html`<div key=${k}><dt>${k}</dt><dd>${v}</dd></div>`)}</dl>
+      ${reqs.length > 0 && html`<div class="stack tk-reqs">${reqs.map((r) => html`<${RequestBlock} key=${r.id} s=${s} request=${r} openThread=${() => act.openSidePanel(r.agent, r.id)} />`)}</div>`}
+    </header>
+    <div class="tk-body">
+      ${view !== 'tasks' && html`<${PlanPane} sp=${sp} frame=${frame} />`}
+      ${view === 'both' && html`<section class="tk-tasks" aria-label="Tasks">${taskHead}<div class="tk-scroll" data-main><table class="table tk-table"><tbody><${TaskRows} s=${s} tasks=${tasks} onSection=${toSection} /></tbody></table></div></section>`}
+      ${view === 'tasks' && html`<section class="tk-tasks wide" aria-label="Tasks">${taskHead}<div class="tk-scroll" data-main><div class="table-wrap"><table class="table"><thead><tr><th>Task</th><th>Title</th><th>State</th><th>Owner</th><th>Part of the plan</th><th class="num">Points</th></tr></thead>
+        <tbody><${TaskRows} s=${s} tasks=${tasks} onSection=${toSection} wide=${true} /></tbody></table></div></div></section>`}
+    </div>
   </div>`;
 }
 

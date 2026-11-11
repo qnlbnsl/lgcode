@@ -709,6 +709,7 @@ chosen yet.
 The owner decided this on 2026-11-11. It is agreed and not built. From now on,
 every plan in LGcode is an HTML page. Planner agents fill in one template, and the
 page is written to get the point across to the owner in a human-friendly way. The
-plans the agents work from keep their full detail. A project gains a "Plans" tab,
-beside its Git tab, that lists and shows these pages. The mock shows the tab with "Coming soon". The
-template is not written yet.
+plans the agents work from keep their full detail. Each sprint has its own plan, shown on
+the sprint page beside the sprint's tasks. The tasks are the short version of the plan,
+and each task links to the part of the plan it carries out. The mock shows sprint SP-07
+with a real LGcode plan converted to HTML. The template is not written yet.
