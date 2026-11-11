@@ -215,9 +215,11 @@ function BriefCard({ s, r, openThread, who }) {
   const others = isQ ? opts.filter((o) => o !== rec) : [];
   // An approval answers with Allow and Deny. Each has a menu that makes the answer standing.
   const answer = (o) => act.answerRequest(r.id, o);
-  const split = (label, ghost, always, why, o) => html`<span class=${cx('split', ghost && 'ghost')}>
-    <button type="button" class=${cx('btn', ghost && 'ghost')} onClick=${() => answer(o)}>${label}</button>
-    <${Menu} class=${cx('btn split-more', ghost && 'ghost')} label=${'More ways to ' + label.toLowerCase()} trigger=${html`<${Icon} name="chevron-down" size=${14} />`}
+  // The default icon is a check for Allow and a cross for Deny. The sparkles icon replaces it
+  // only on an action the agent recommends.
+  const split = (label, icon, always, why, o) => html`<span class="split">
+    <button type="button" class="btn" onClick=${() => answer(o)}><${Icon} name=${icon} size=${14} />${label}</button>
+    <${Menu} class="btn split-more" label=${'More ways to ' + label.toLowerCase()} trigger=${html`<${Icon} name="chevron-down" size=${14} />`}
       items=${[{ label: always, why, onSelect: () => answer(o === 'deny' ? 'never' : 'always') }]} width=${280} /></span>`;
   const deny = () => { setDeclined(true); setOpen(true); requestAnimationFrame(() => own.current?.focus()); };
   if (!live) return html`<section class="req qc done" id=${'req-' + r.id} tabindex="-1" aria-label=${'Answered: ' + brief}>
@@ -250,10 +252,10 @@ function BriefCard({ s, r, openThread, who }) {
     </div>`}
     <div class="req-actions qc-actions">
       ${rec && !declined && html`<button type="button" class="btn" onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="sparkles" size=${14} class="qc-star" />Accept</button>`}
-      ${rec && !declined && html`<button type="button" class="btn ghost" onClick=${deny}><${Icon} name="sparkles" size=${14} class="qc-star" />Deny</button>`}
-      ${!isQ && split('Allow', false, 'Always allow', 'Runs commands like this one without asking, in this project only.', 'allow')}
-      ${!isQ && split('Deny', true, 'Always deny', 'Refuses commands like this one without asking, in this project only.', 'deny')}
-      <button type="button" class="btn ghost" aria-expanded=${open} aria-controls=${id} onClick=${() => setOpen(!open)}>${open ? 'Hide details' : 'Details'}<${Icon} name=${open ? 'chevron-up' : 'chevron-down'} size=${14} /></button>
+      ${rec && !declined && html`<button type="button" class="btn" onClick=${deny}><${Icon} name="x" size=${14} />Deny</button>`}
+      ${!isQ && split('Allow', 'check', 'Always allow', 'Runs commands like this one without asking, in this project only.', 'allow')}
+      ${!isQ && split('Deny', 'x', 'Always deny', 'Refuses commands like this one without asking, in this project only.', 'deny')}
+      <button type="button" class="btn" aria-expanded=${open} aria-controls=${id} onClick=${() => setOpen(!open)}>${open ? 'Hide details' : 'Details'}<${Icon} name=${open ? 'chevron-up' : 'chevron-down'} size=${14} /></button>
       ${thread}
     </div>
   </section>`;

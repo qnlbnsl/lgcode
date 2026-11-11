@@ -1076,8 +1076,10 @@ and "Open in OpenPencil". The Mocks tab shows one screen on the same canvas.
 
 A question or an approval in a thread starts as a brief. The brief shows what is asked in a
 few words and how long it has waited, and one line of description. A question adds its
-recommended answer beside the sparkles icon, with Accept, Deny and Details. Accept and Deny
-carry the same sparkles icon, so it is clear what they act on. Deny strikes out the
+recommended answer beside the sparkles icon, with Accept, Deny and Details. Each action has a default
+icon, a check for Accept and Allow and a cross for Deny. The sparkles icon replaces the
+default icon only on the action the agent recommends, so on a question only Accept carries
+it. Accept, Deny, Allow and Details are outlined buttons. Deny strikes out the
 recommendation and opens the details with "Your own answer" focused. An approval adds Allow, Deny
 and Details, even when the harness hides the command. Allow has a menu with "Always allow",
 and Deny has a menu with "Always deny". Its command is shown only in the details.
