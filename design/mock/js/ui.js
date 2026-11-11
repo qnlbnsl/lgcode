@@ -240,8 +240,8 @@ function QuestionCard({ s, r, openThread, who }) {
       <footer class="qc-foot">${who && html`<span class="req-who"><${Avatar} agent=${a} s=${s} size="sm" status=${false} />Asked by ${agentLabel(s, a, { withTeam: true })}</span>`}${r.blocks && html`<span class="muted">Blocks ${r.blocks}</span>`}<span class="grow"></span>${thread}</footer>
     </div>`}
     <div class="req-actions qc-actions">
-      ${rec && !declined && html`<button type="button" class="btn" onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="check" size=${14} />Accept</button>`}
-      ${rec && !declined && html`<button type="button" class="btn ghost" onClick=${deny}><${Icon} name="x" size=${14} />Deny</button>`}
+      ${rec && !declined && html`<button type="button" class="btn" onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="sparkles" size=${14} class="qc-star" />Accept</button>`}
+      ${rec && !declined && html`<button type="button" class="btn ghost" onClick=${deny}><${Icon} name="sparkles" size=${14} class="qc-star" />Deny</button>`}
       <button type="button" class="btn ghost" aria-expanded=${open} aria-controls=${id} onClick=${() => setOpen(!open)}>${open ? 'Hide details' : 'Details'}<${Icon} name=${open ? 'chevron-up' : 'chevron-down'} size=${14} /></button>
     </div>
   </section>`;
