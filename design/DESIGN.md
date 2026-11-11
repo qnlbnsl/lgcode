@@ -1074,6 +1074,15 @@ The repository Design page fills the centre with a canvas. One thin bar above it
 Projects and Design tabs, the category and item menus, the file's name, the zoom controls,
 and "Open in OpenPencil". The Mocks tab shows one screen on the same canvas.
 
+A question in a thread starts as a brief. The brief shows the question in a few words and
+how long it has waited, one line of description, and the recommended answer with a star.
+Its buttons are Accept, Deny and Details. Deny strikes out the recommendation and opens the
+details with the "Another answer" box focused. Details opens the full card in place. The
+full card has labelled parts, each with its own colour: the question in blue, what it is
+about, why it matters in amber, and the recommendation in green. The other answers, the
+numbered references, and the agent that asked follow them. Paragraphs start with an indent
+and keep a reading width of about 72 characters.
+
 The owner's messages sit on the right of a chat, in a filled bubble. An agent's messages
 sit on the left without a bubble. Only the project lead's thread has a message box. Every
 other agent's thread is read-only.

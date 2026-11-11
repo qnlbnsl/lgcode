@@ -158,7 +158,7 @@ export function answerRequest(requestId, optionId, text) {
     const lead = agentOf(st, projectOf(st, r.project).lead);
     const left = openRequests(st, { project: r.project }).length;
     if (lead && lead.id !== a.id) {
-      threadOf(st, lead.id).push({ id: uid('m'), type: 'agent', ts: Date.now() + 1, text: `You ${r.kind === 'question' ? 'answered' : r.kind === 'failed' ? 'fixed' : answer.toLowerCase()} "${r.title}". ${left ? `${left} request${left === 1 ? '' : 's'} still wait${left === 1 ? 's' : ''} for you.` : 'Nothing else waits for you on this project.'}` });
+      threadOf(st, lead.id).push({ id: uid('m'), type: 'agent', ts: Date.now() + 1, text: `You ${r.kind === 'question' ? 'answered' : r.kind === 'failed' ? 'fixed' : answer.toLowerCase()} "${r.brief || r.title}". ${left ? `${left} request${left === 1 ? '' : 's'} still wait${left === 1 ? 's' : ''} for you.` : 'Nothing else waits for you on this project.'}` });
       if (!left && lead.state === 'waiting') { lead.state = 'working'; lead.activity = 'Checking in with the team leads'; }
     }
   });
