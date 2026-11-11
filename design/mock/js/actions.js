@@ -73,12 +73,12 @@ function replyFor(a, text) {
   return list[Math.floor(Math.random() * list.length)];
 }
 export function setDraft(key, text) { S().drafts[key] = text; }
-export function sendMessage(agentId, text, context = []) {
+export function sendMessage(agentId, text, context = [], files = []) {
   text = text.trim();
-  if (!text) return;
+  if (!text && !files.length) return;
   const a = agentOf(S(), agentId);
   update((s) => {
-    threadOf(s, agentId).push({ id: uid('m'), type: 'user', ts: Date.now(), text, context });
+    threadOf(s, agentId).push({ id: uid('m'), type: 'user', ts: Date.now(), text, context, files });
     s.drafts['thread:' + agentId] = '';
     s.pending[agentId] = true;
     if (a.state === 'idle') { a.state = 'working'; a.activity = 'Working on your message'; }
@@ -87,7 +87,8 @@ export function sendMessage(agentId, text, context = []) {
     update((s) => {
       if (!s.pending[agentId]) return;
       delete s.pending[agentId];
-      threadOf(s, agentId).push({ id: uid('m'), type: 'agent', ts: Date.now(), text: replyFor(a, text) });
+      const got = files.length ? `I have ${files.length === 1 ? files[0].name : files.length + ' files'}. ` : '';
+      threadOf(s, agentId).push({ id: uid('m'), type: 'agent', ts: Date.now(), text: text ? got + replyFor(a, text) : got + 'What should I do with ' + (files.length === 1 ? 'it' : 'them') + '?' });
       if (a.activity === 'Working on your message') { a.state = 'idle'; a.activity = ''; }
       a.turns += 1; a.context = Math.min(96, a.context + 1);
     });

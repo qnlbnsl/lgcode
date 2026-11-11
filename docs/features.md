@@ -713,3 +713,13 @@ plans the agents work from keep their full detail. Each sprint has its own plan,
 the sprint page beside the sprint's tasks. The tasks are the short version of the plan,
 and each task links to the part of the plan it carries out. The mock shows sprint SP-07
 with a real LGcode plan converted to HTML. The template is not written yet.
+
+## Files and images sent with a message
+
+The owner asked for this on 2026-11-11. It is agreed and not built in the engine. The
+owner can send files and images to an agent with a message. They come from a paperclip
+button in the message box, from a drop on the message box, or from a paste. Images show
+as small pictures before sending and as larger pictures in the thread. Other files show
+as a name and a size. The mock limits each file to 20 megabytes, and that limit is not
+decided. The engine would need to store the files, pass them to the agent's harness, and
+serve them back to every client through the client API.

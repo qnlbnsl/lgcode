@@ -2,7 +2,7 @@
 // These are built by hand, because the mock has no build step and so no component library.
 import {
   html, useState, useEffect, useLayoutEffect, useRef, Icon, cx, ago, clock, dayLabel, useNow, useStore, update, go, href,
-  useKey, HOUR, clamp, plural, isMac,
+  useKey, HOUR, clamp, plural, isMac, uid,
 } from './lib.js';
 import {
   agentOf, projectOf, teamOf, teamName, agentStatus, roleIcon, roleLabel, KIND_LABEL, HARNESSES, subOf, subLabel, machineOf,
@@ -409,7 +409,8 @@ export function Thread({ s, agentId, center, focusReq, onOpenThread }) {
         if (it.type === 'user' && !it.from) {
           body = html`<div class="msg mine" key=${it.id}>
             <div class="meta"><time>${clock(it.ts)}</time></div>
-            <div class="body"><${Rich} text=${it.text} pid=${a.project} />
+            <div class="body">${it.text && html`<${Rich} text=${it.text} pid=${a.project} />`}
+              <${Attachments} files=${it.files} sent=${true} />
               ${it.context?.length > 0 && html`<div class="row" style="flex-wrap:wrap;gap:4px">${it.context.map((c) => html`<span class="tag">${c}</span>`)}</div>`}</div>
           </div>`;
         } else if (it.type === 'user') {
@@ -472,16 +473,42 @@ function ContextPicker({ s, agent, onAdd, onClose }) {
     ${!T.length && !F.length && html`<div class="menu-label">Nothing matches "${q}".</div>`}
   </div>`;
 }
+// Files and images go with a message. They come from the paperclip button, a drop on the
+// message box, or a paste. Images show as small pictures, other files as a name and a size.
+const FILE_LIMIT = 20 * 1024 * 1024;
+export const fileSize = (n) => n < 1024 ? n + ' B' : n < 1024 * 1024 ? Math.round(n / 1024) + ' KB' : (n / 1024 / 1024).toFixed(1) + ' MB';
+export function Attachments({ files, onRemove, sent }) {
+  if (!files?.length) return null;
+  const pics = files.filter((f) => f.image); const docs = files.filter((f) => !f.image);
+  const x = (f) => onRemove && html`<button type="button" class="att-x" aria-label=${'Remove ' + f.name} onClick=${() => onRemove(f.id)}><${Icon} name="x" size=${11} /></button>`;
+  const picRow = (inner) => sent && pics.length ? html`<div class="att-pics">${inner}</div>` : inner;
+  return html`<div class=${cx('att', sent && 'sent')}>
+    ${picRow(pics.map((f) => html`<span class="att-pic" key=${f.id} title=${f.name}>${sent ? html`<a href=${f.url} target="_blank" rel="noopener"><img src=${f.url} alt=${f.name} /></a>` : html`<img src=${f.url} alt=${f.name} />`}${x(f)}</span>`))}
+    ${docs.map((f) => html`<span class="att-file" key=${f.id}><${Icon} name="file" size=${14} class="faint" /><span class="truncate">${f.name}</span><span class="faint">${fileSize(f.size)}</span>${x(f)}</span>`)}
+  </div>`;
+}
 export function Composer({ s, agentId, center }) {
   const a = agentOf(s, agentId); const key = 'thread:' + agentId;
   const [, bump] = useState(0); const [picking, setPicking] = useState(false); const [ctx, setCtx] = useState([]);
+  const [files, setFiles] = useState([]); const [over, setOver] = useState(false); const fileIn = useRef(null);
   const ta = useRef(null);
   const draft = s.drafts[key] || '';
   const st = agentStatus(s, a); const pending = !!s.pending[agentId];
   const fit = () => { const el = ta.current; if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(220, el.scrollHeight) + 'px'; };
   useLayoutEffect(fit, [draft, agentId]);
-  useEffect(() => { setCtx([]); setPicking(false); }, [agentId]);
-  const send = () => { if (!draft.trim()) return; act.sendMessage(agentId, draft, ctx); setCtx([]); bump((n) => n + 1); };
+  useEffect(() => { setCtx([]); setPicking(false); setFiles([]); }, [agentId]);
+  const addFiles = (list) => {
+    const ok = [...list].filter((f) => { if (f.size <= FILE_LIMIT) return true; act.toast(`${f.name} is larger than 20 MB`, 'error'); return false; });
+    setFiles((cur) => [...cur, ...ok.map((f) => ({ id: uid('f'), name: f.name || 'Pasted image.png', size: f.size, image: f.type.startsWith('image/'), url: f.type.startsWith('image/') ? URL.createObjectURL(f) : null }))]);
+    ta.current?.focus();
+  };
+  const dropOn = { onDragOver: (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); setOver(true); } },
+    onDragLeave: (e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOver(false); },
+    onDrop: (e) => { e.preventDefault(); setOver(false); if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files); } };
+  const onPaste = (e) => { const fl = e.clipboardData?.files; if (fl?.length) { if (!e.clipboardData.getData('text/plain')) e.preventDefault(); addFiles(fl); } };
+  const live = s.conn.status === 'live';
+  const ready = (draft.trim() || files.length) && live;
+  const send = () => { if (!draft.trim() && !files.length) return; act.sendMessage(agentId, draft, ctx, files); setCtx([]); setFiles([]); bump((n) => n + 1); };
   const onInput = (e) => {
     const v = e.target.value; act.setDraft(key, v); bump((n) => n + 1);
     const pos = e.target.selectionStart; if (v[pos - 1] === '@' && (pos === 1 || /\s/.test(v[pos - 2]))) setPicking(true);
@@ -511,13 +538,17 @@ export function Composer({ s, agentId, center }) {
       ${busyLine && html`<i class=${cx('dot', st.dot)}></i><span class="truncate">${busyLine}</span>`}
       ${canStop && html`<button type="button" class="btn sm" onClick=${() => act.stopAgent(a.id)}><${Icon} name="square" size=${11} />Stop agent</button>`}
     </div>`}
-    <div class="composer" style="position:relative">
+    <div class=${cx('composer', over && 'drop')} style="position:relative" ...${dropOn}>
+      ${over && html`<div class="drop-note" aria-hidden="true"><${Icon} name="upload" size=${16} />Drop to attach</div>`}
       ${picking && html`<${ContextPicker} s=${s} agent=${a} onAdd=${addCtx} onClose=${() => setPicking(false)} />`}
       ${ctx.length > 0 && html`<div class="ctx">${ctx.map((c) => html`<span class="chip" key=${c}><span class="mono">${c}</span><button type="button" aria-label=${'Remove ' + c} onClick=${() => setCtx(ctx.filter((x) => x !== c))}><${Icon} name="x" size=${11} /></button></span>`)}</div>`}
+      <${Attachments} files=${files} onRemove=${(id) => setFiles(files.filter((f) => f.id !== id))} />
+      <input ref=${fileIn} type="file" multiple hidden onChange=${(e) => { addFiles(e.target.files); e.target.value = ''; }} />
       <label class="sr" for=${'composer-' + agentId}>Message ${a.name}. Enter sends, Shift and Enter adds a line.</label>
-      <textarea ref=${ta} id=${'composer-' + agentId} rows="1" placeholder=${`Message the ${a.name.toLowerCase()}…`} value=${draft} onInput=${onInput} onKeyDown=${onKey} disabled=${s.conn.status !== 'live'}></textarea>
+      <textarea ref=${ta} id=${'composer-' + agentId} rows="1" placeholder=${`Message the ${a.name.toLowerCase()}…`} value=${draft} onInput=${onInput} onKeyDown=${onKey} onPaste=${onPaste} disabled=${!live}></textarea>
       <div class="tools-row">
         <button type="button" class="pick" aria-expanded=${picking} onClick=${() => setPicking(!picking)} data-tip="Add a task or a file" data-tip-side="top"><${Icon} name="at-sign" size=${14} /><span class="not-narrow">Context</span></button>
+        <button type="button" class="pick" aria-label="Attach files or images" data-tip="Attach files or images" data-tip-side="top" disabled=${!live} onClick=${() => fileIn.current?.click()}><${Icon} name="paperclip" size=${14} /></button>
         <${Menu} class="pick" side="top" label="Subscription" trigger=${html`<span class="truncate">${subLabel(s, a.subscription)}</span><${Icon} name="chevron-down" size=${12} />`}
           items=${[{ heading: 'Subscription' }, ...subs.map((x) => ({ label: `${h.name} · ${x.name}`, sub: machineOf(s, x.machine).name, checked: x.id === a.subscription, disabled: !x.signedIn, why: x.signedIn ? null : 'Signed out', onSelect: () => act.setAgentConfig(a.id, { subscription: x.id }) }))]} />
         <${Menu} class="pick" side="top" label="Model" trigger=${html`<span>${a.model}</span><${Icon} name="chevron-down" size=${12} />`}
@@ -527,7 +558,7 @@ export function Composer({ s, agentId, center }) {
         <span class=${cx('ctxuse', a.context >= 80 && 'warn-text')} data-tip="Share of the context window in use" data-tip-side="top">${a.context}%</span>
         ${pending
           ? html`<button type="button" class="send stop" aria-label="Stop this reply" data-tip="Stop this reply" data-tip-side="left" onClick=${() => act.stopReply(agentId)}><${Icon} name="square" size=${12} /></button>`
-          : html`<button type="button" class="send" aria-label="Send" disabled=${!draft.trim() || s.conn.status !== 'live'} onClick=${send}><${Icon} name="arrow-up" size=${15} /></button>`}
+          : html`<button type="button" class="send" aria-label="Send" disabled=${!ready} onClick=${send}><${Icon} name="arrow-up" size=${15} /></button>`}
       </div>
     </div>
   </div>`;
