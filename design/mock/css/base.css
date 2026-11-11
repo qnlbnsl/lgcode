@@ -572,7 +572,16 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--color-
 .att-pics { display: flex; flex-wrap: wrap; gap: 6px; }
 .att-pic { position: relative; display: block; width: 64px; height: 64px; border-radius: var(--radius-sm); border: 1px solid var(--color-line); background: var(--color-sunken); overflow: hidden; flex: none; }
 .att-pic img { display: block; width: 100%; height: 100%; object-fit: cover; }
-.att.sent .att-pic { width: auto; height: auto; max-width: min(320px, 100%); }
+.att-shot { display: grid; gap: 2px; margin: 0; max-width: min(320px, 100%); }
+.att-shot figcaption { font-size: var(--text-xs); color: var(--color-muted); }
+.att.sent .att-pic { width: auto; height: auto; max-width: 100%; }
+.att-img { display: inline-flex; align-items: center; gap: 8px; height: 44px; max-width: 340px; padding: 0 6px 0 4px; border-radius: var(--radius-sm); border: 1px solid var(--color-line); background: var(--color-bg); min-width: 0; }
+.att-thumb { flex: none; width: 36px; height: 36px; border-radius: 4px; background: var(--color-sunken); overflow: hidden; }
+.att-thumb.file { display: grid; place-items: center; color: var(--color-muted); }
+.att-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.att-txt { display: grid; min-width: 0; font-size: var(--text-sm); line-height: 1.3; }
+.att-txt .muted { font-size: var(--text-xs); white-space: nowrap; }
+.att-orig { flex: none; font-size: var(--text-xs); white-space: nowrap; }
 .att.sent .att-pic img { width: auto; height: auto; max-width: 100%; max-height: 240px; object-fit: contain; }
 .att-file { display: inline-flex; align-items: center; gap: 6px; height: 30px; max-width: 280px; padding: 0 6px 0 8px; border-radius: var(--radius-sm); border: 1px solid var(--color-line); background: var(--color-bg); font-size: var(--text-sm); min-width: 0; }
 .att-file .faint { flex: none; font-size: var(--text-xs); }

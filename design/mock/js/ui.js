@@ -474,18 +474,48 @@ function ContextPicker({ s, agent, onAdd, onClose }) {
   </div>`;
 }
 // Files and images go with a message. They come from the paperclip button, a drop on the
-// message box, or a paste. Images show as small pictures, other files as a name and a size.
-const FILE_LIMIT = 20 * 1024 * 1024;
+// message box, or a paste. A large photo is resized on this device before it is sent: the
+// long edge becomes at most 2,048 pixels and the photo is saved as a JPEG. Redrawing it also
+// drops the camera details, such as where the photo was taken. "Send original" keeps the
+// file as it was. A photo the browser cannot read, such as a raw camera file, goes as a file.
+const FILE_LIMIT = 100 * 1024 * 1024;
+const EDGE = 2048; const SHRINK_OVER = 2 * 1024 * 1024;
+const HEIC = /image\/hei[cf]|\.hei[cf]$/i;
 export const fileSize = (n) => n < 1024 ? n + ' B' : n < 1024 * 1024 ? Math.round(n / 1024) + ' KB' : (n / 1024 / 1024).toFixed(1) + ' MB';
-export function Attachments({ files, onRemove, sent }) {
+async function shrink(file) {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, EDGE / Math.max(bmp.width, bmp.height));
+  if (k === 1 && file.size <= SHRINK_OVER) { bmp.close(); return null; }
+  const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(bmp, 0, 0, w, h); bmp.close();
+  const blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.85));
+  return blob && blob.size < file.size ? blob : null;
+}
+// What a staged attachment sends: the resized copy, unless the owner chose the original.
+const sentForm = (f) => (f.small && !f.useOriginal ? { ...f, size: f.small.size, url: f.small.url, name: f.small.name, from: f.size } : f);
+export function Attachments({ files, onRemove, onOriginal, sent }) {
   if (!files?.length) return null;
-  const pics = files.filter((f) => f.image); const docs = files.filter((f) => !f.image);
   const x = (f) => onRemove && html`<button type="button" class="att-x" aria-label=${'Remove ' + f.name} onClick=${() => onRemove(f.id)}><${Icon} name="x" size=${11} /></button>`;
-  const picRow = (inner) => sent && pics.length ? html`<div class="att-pics">${inner}</div>` : inner;
-  return html`<div class=${cx('att', sent && 'sent')}>
-    ${picRow(pics.map((f) => html`<span class="att-pic" key=${f.id} title=${f.name}>${sent ? html`<a href=${f.url} target="_blank" rel="noopener"><img src=${f.url} alt=${f.name} /></a>` : html`<img src=${f.url} alt=${f.name} />`}${x(f)}</span>`))}
-    ${docs.map((f) => html`<span class="att-file" key=${f.id}><${Icon} name="file" size=${14} class="faint" /><span class="truncate">${f.name}</span><span class="faint">${fileSize(f.size)}</span>${x(f)}</span>`)}
-  </div>`;
+  if (sent) {
+    const pics = files.filter((f) => f.image); const docs = files.filter((f) => !f.image);
+    return html`<div class="att sent">
+      ${pics.length > 0 && html`<div class="att-pics">${pics.map((f) => html`<figure class="att-shot" key=${f.id}>
+        <a class="att-pic" href=${f.url} target="_blank" rel="noopener" title=${f.name}><img src=${f.url} alt=${f.name} /></a>
+        <figcaption>${fileSize(f.size)}${f.from ? ', resized from ' + fileSize(f.from) : ''}</figcaption></figure>`)}</div>`}
+      ${docs.map((f) => html`<span class="att-file" key=${f.id}><${Icon} name="file" size=${14} class="faint" /><span class="truncate">${f.name}</span><span class="faint">${fileSize(f.size)}${f.note ? ' · ' + f.note : ''}</span></span>`)}
+    </div>`;
+  }
+  return html`<div class="att">${files.map((f) => {
+    if (!f.image) return html`<span class="att-img" key=${f.id}><span class="att-thumb file"><${Icon} name="file" size=${16} /></span>
+      <span class="att-txt"><span class="truncate">${f.name}</span><span class="muted">${fileSize(f.size)}${f.note ? ' · ' + f.note : ''}</span></span>${x(f)}</span>`;
+    const v = sentForm(f);
+    const line = f.working ? 'Resizing…' : f.small ? (f.useOriginal ? `Original, ${fileSize(f.size)}` : `Resized from ${fileSize(f.size)} to ${fileSize(f.small.size)}`) : fileSize(f.size);
+    return html`<span class="att-img" key=${f.id}>
+      <span class="att-thumb">${v.url && html`<img src=${v.url} alt="" />`}</span>
+      <span class="att-txt"><span class="truncate">${v.name}</span><span class="muted">${line}</span></span>
+      ${f.small && html`<button type="button" class="link att-orig" onClick=${() => onOriginal(f.id)}>${f.useOriginal ? 'Send resized' : 'Send original'}</button>`}
+      ${x(f)}</span>`; })}</div>`;
 }
 export function Composer({ s, agentId, center }) {
   const a = agentOf(s, agentId); const key = 'thread:' + agentId;
@@ -497,9 +527,17 @@ export function Composer({ s, agentId, center }) {
   const fit = () => { const el = ta.current; if (!el) return; el.style.height = 'auto'; el.style.height = Math.min(220, el.scrollHeight) + 'px'; };
   useLayoutEffect(fit, [draft, agentId]);
   useEffect(() => { setCtx([]); setPicking(false); setFiles([]); }, [agentId]);
+  const patch = (id, ch) => setFiles((cur) => cur.map((x) => (x.id === id ? { ...x, ...ch } : x)));
   const addFiles = (list) => {
-    const ok = [...list].filter((f) => { if (f.size <= FILE_LIMIT) return true; act.toast(`${f.name} is larger than 20 MB`, 'error'); return false; });
-    setFiles((cur) => [...cur, ...ok.map((f) => ({ id: uid('f'), name: f.name || 'Pasted image.png', size: f.size, image: f.type.startsWith('image/'), url: f.type.startsWith('image/') ? URL.createObjectURL(f) : null }))]);
+    const ok = [...list].filter((f) => { if (f.size <= FILE_LIMIT) return true; act.toast(`${f.name} is larger than 100 MB`, 'error'); return false; });
+    const items = ok.map((f) => { const pic = f.type.startsWith('image/') && !/gif|svg/.test(f.type);
+      return { id: uid('f'), file: f, name: f.name || 'Pasted image.png', size: f.size, image: pic, working: pic, url: null }; });
+    setFiles((cur) => [...cur, ...items]);
+    for (const it of items.filter((x) => x.image)) {
+      shrink(it.file).then((blob) => patch(it.id, { working: false, url: URL.createObjectURL(it.file),
+        small: blob && { size: blob.size, url: URL.createObjectURL(blob), name: it.name.replace(/\.[^.]+$/, '') + '.jpg' } }))
+        .catch(() => patch(it.id, { working: false, image: false, note: HEIC.test(it.file.type + ' ' + it.name) ? 'Converted by the service' : 'Sent as a file' }));
+    }
     ta.current?.focus();
   };
   const dropOn = { onDragOver: (e) => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { e.preventDefault(); setOver(true); } },
@@ -507,8 +545,8 @@ export function Composer({ s, agentId, center }) {
     onDrop: (e) => { e.preventDefault(); setOver(false); if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files); } };
   const onPaste = (e) => { const fl = e.clipboardData?.files; if (fl?.length) { if (!e.clipboardData.getData('text/plain')) e.preventDefault(); addFiles(fl); } };
   const live = s.conn.status === 'live';
-  const ready = (draft.trim() || files.length) && live;
-  const send = () => { if (!draft.trim() && !files.length) return; act.sendMessage(agentId, draft, ctx, files); setCtx([]); setFiles([]); bump((n) => n + 1); };
+  const ready = (draft.trim() || files.length) && live && !files.some((f) => f.working);
+  const send = () => { if ((!draft.trim() && !files.length) || files.some((f) => f.working)) return; act.sendMessage(agentId, draft, ctx, files.map(sentForm).map(({ file, small, working, useOriginal, ...f }) => f)); setCtx([]); setFiles([]); bump((n) => n + 1); };
   const onInput = (e) => {
     const v = e.target.value; act.setDraft(key, v); bump((n) => n + 1);
     const pos = e.target.selectionStart; if (v[pos - 1] === '@' && (pos === 1 || /\s/.test(v[pos - 2]))) setPicking(true);
@@ -542,7 +580,7 @@ export function Composer({ s, agentId, center }) {
       ${over && html`<div class="drop-note" aria-hidden="true"><${Icon} name="upload" size=${16} />Drop to attach</div>`}
       ${picking && html`<${ContextPicker} s=${s} agent=${a} onAdd=${addCtx} onClose=${() => setPicking(false)} />`}
       ${ctx.length > 0 && html`<div class="ctx">${ctx.map((c) => html`<span class="chip" key=${c}><span class="mono">${c}</span><button type="button" aria-label=${'Remove ' + c} onClick=${() => setCtx(ctx.filter((x) => x !== c))}><${Icon} name="x" size=${11} /></button></span>`)}</div>`}
-      <${Attachments} files=${files} onRemove=${(id) => setFiles(files.filter((f) => f.id !== id))} />
+      <${Attachments} files=${files} onRemove=${(id) => setFiles(files.filter((f) => f.id !== id))} onOriginal=${(id) => patch(id, { useOriginal: !files.find((f) => f.id === id).useOriginal })} />
       <input ref=${fileIn} type="file" multiple hidden onChange=${(e) => { addFiles(e.target.files); e.target.value = ''; }} />
       <label class="sr" for=${'composer-' + agentId}>Message ${a.name}. Enter sends, Shift and Enter adds a line.</label>
       <textarea ref=${ta} id=${'composer-' + agentId} rows="1" placeholder=${`Message the ${a.name.toLowerCase()}…`} value=${draft} onInput=${onInput} onKeyDown=${onKey} onPaste=${onPaste} disabled=${!live}></textarea>

@@ -720,6 +720,26 @@ The owner asked for this on 2026-11-11. It is agreed and not built in the engine
 owner can send files and images to an agent with a message. They come from a paperclip
 button in the message box, from a drop on the message box, or from a paste. Images show
 as small pictures before sending and as larger pictures in the thread. Other files show
-as a name and a size. The mock limits each file to 20 megabytes, and that limit is not
+as a name and a size. The mock limits each file to 100 megabytes, and that limit is not
 decided. The engine would need to store the files, pass them to the agent's harness, and
 serve them back to every client through the client API.
+
+Large photos are resized before they are sent, decided by the owner on 2026-11-11. A photo
+from a phone can be 50 megabytes or more, and the models scale large images down anyway.
+The rules the mock follows are these:
+
+- A photo whose long edge is over 2,048 pixels, or whose file is over 2 megabytes, is
+  redrawn on the owner's device with a long edge of at most 2,048 pixels.
+- The redrawn photo is saved as a JPEG at 85 percent quality. A 33-megabyte test photo
+  became 1.1 megabytes.
+- Redrawing drops the photo's camera details, including the place where it was taken.
+- The chip shows "Resized from 33.4 MB to 1.1 MB", with "Send original" to send the file
+  as it was. A sent photo is captioned with both sizes.
+- Animated images and drawings in the Scalable Vector Graphics format are sent unchanged.
+- A photo that the browser cannot read is sent as a file. A HEIC photo, the iPhone's own
+  format, is marked "Converted by the service", because Chrome cannot read it. Raw camera
+  files, such as ProRAW, are sent as files.
+
+The service must apply the same rules to images that other clients send at full size. The
+common server image library, sharp, cannot read HEIC in its standard build, so the service
+needs a separate converter for it.
