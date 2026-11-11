@@ -192,63 +192,70 @@ export function Resizer({ side, value, min, max, onChange, reset, label }) {
 // where the row already shows the title, the agent and the wait.
 // `openThread` is an address or a function. It is left out when the block already sits
 // in the asking agent's own thread.
-// A question in a thread starts as a brief: the question and its wait, one line of
-// description, and the recommended answer with Accept, Deny and Details. Details opens the
-// full card in place, laid out the way the owner reads: the question, what it is about, why
-// it matters, the recommendation, the other answers, then the references.
+// A question or an approval in a thread starts as a brief: what is asked and how long it
+// has waited, one line of description, and the answer it needs. Details adds a short report
+// under the brief without replacing it: who asked, the full question, what it is about, why
+// it matters, the other answers, and the references.
 function Cited({ text }) {
   return text.split(/(\[\d+\]|`[^`]+`)/).map((t, i) => /^\[\d+\]$/.test(t) ? html`<sup class="qc-cite" key=${i}>${t}</sup>`
-    : /^`/.test(t) ? html`<code key=${i}>${t.slice(1, -1)}</code>` : t.replace(/ $/, '\u00a0'));
+    : /^`/.test(t) ? html`<code key=${i}>${t.slice(1, -1)}</code>` : t.replace(/ $/, ' '));
 }
 function Paras({ list }) { return (Array.isArray(list) ? list : [list]).filter(Boolean).map((t, i) => html`<p key=${i}><${Cited} text=${t} /></p>`); }
-function QuestionCard({ s, r, openThread, who }) {
-  const now = useNow(); const a = agentOf(s, r.agent);
+function BriefCard({ s, r, openThread, who }) {
+  const now = useNow(); const a = agentOf(s, r.agent); const isQ = r.kind === 'question';
   const [open, setOpen] = useState(() => s.ui.panelReq === r.id);
   const [declined, setDeclined] = useState(false);
-  const [text, setText] = useState(''); const other = useRef(null);
+  const [text, setText] = useState(''); const own = useRef(null);
   const live = r.status === 'open'; const waited = now - r.createdAt;
-  const opts = r.options || []; const rec = opts.find((o) => o.primary) || null;
-  const brief = r.brief || r.title; const summary = r.summary || r.body;
-  const recShort = r.recShort || r.recommendation; const id = 'qc-' + r.id;
-  const deny = () => { setDeclined(true); setOpen(true); requestAnimationFrame(() => other.current?.focus()); };
+  const opts = r.options || [];
+  const rec = isQ ? opts.find((o) => o.primary) || null : null;
+  const brief = r.brief || r.title; const summary = r.summary || (isQ ? r.body : null);
+  const recShort = isQ ? r.recShort || r.recommendation : null; const id = 'qc-' + r.id;
+  // The answers on the brief, and the rest in the report.
+  const main = isQ ? [] : opts.filter((o) => o.id !== 'always');
+  const others = isQ ? opts.filter((o) => o !== rec) : opts.filter((o) => o.id === 'always');
+  const deny = () => { setDeclined(true); setOpen(true); requestAnimationFrame(() => own.current?.focus()); };
   if (!live) return html`<section class="req qc done" id=${'req-' + r.id} tabindex="-1" aria-label=${'Answered: ' + brief}>
     <div class="qc-top"><${Icon} name="check" size=${14} class="qc-ok" /><b class="qc-q">${brief}</b><span class="qc-age">${clock(r.answeredAt)}</span></div>
     <p class="qc-answer">${r.answer}</p></section>`;
   const thread = openThread && (typeof openThread === 'string'
-    ? html`<a class="btn ghost sm" href=${href(openThread)}><${Icon} name="message-square" size=${14} />Open thread</a>`
-    : html`<button type="button" class="btn ghost sm" onClick=${openThread}><${Icon} name="message-square" size=${14} />Open thread</button>`);
-  return html`<section class=${cx('req qc', open && 'open')} id=${'req-' + r.id} tabindex="-1" aria-label=${'Question: ' + brief}>
+    ? html`<a class="btn ghost qc-thread" href=${href(openThread)}><${Icon} name="message-square" size=${14} />Open thread</a>`
+    : html`<button type="button" class="btn ghost qc-thread" onClick=${openThread}><${Icon} name="message-square" size=${14} />Open thread</button>`);
+  return html`<section class=${cx('req qc', r.kind, open && 'open')} id=${'req-' + r.id} tabindex="-1" aria-label=${(isQ ? 'Question: ' : 'Approval: ') + brief}>
     <div class="qc-top"><b class="qc-q">${brief}</b><span class=${cx('qc-age', waited >= HOUR && 'long')}>${ago(r.createdAt, now)}</span></div>
-    ${!open && html`
-      ${summary && html`<p class="qc-sum">${summary}</p>`}
-      ${recShort && html`<p class="qc-rec"><${Icon} name="sparkles" size=${14} class="qc-star" /><span>${recShort}</span></p>`}`}
-    ${open && html`<div class="qc-full" id=${id}>
-      <section class="qc-part q"><h5><${Icon} name="circle-help" size=${13} />The question</h5><${Paras} list=${r.body || r.title} /></section>
-      ${r.what && html`<section class="qc-part what"><h5><${Icon} name="info" size=${13} />What it is about</h5><${Paras} list=${r.what} /></section>`}
-      ${(r.whyText || r.why) && html`<section class="qc-part why"><h5><${Icon} name="triangle-alert" size=${13} />Why it matters</h5><${Paras} list=${r.whyText || r.why} /></section>`}
-      ${recShort && html`<section class=${cx('qc-part reco', declined && 'declined')}><h5><${Icon} name="sparkles" size=${13} />Recommendation${declined && html`<span class="qc-tag">Declined</span>`}</h5>
-        <p class="qc-lead">${recShort}</p>${r.recWhy && html`<${Paras} list=${r.recWhy} />`}</section>`}
-      <section class="qc-part other"><h5>Other answers</h5>
-        <div class="req-actions">
-          ${opts.filter((o) => o !== rec).map((o) => html`<button key=${o.id} type="button" class="btn" onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
-          <form class="row grow" style="flex:1 1 200px" onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
-            <input ref=${other} class="input" placeholder="Another answer" aria-label="Another answer" value=${text} onInput=${(e) => setText(e.target.value)} />
-            ${text.trim() && html`<button class="btn" type="submit">Send</button>`}
-          </form>
-        </div></section>
+    ${summary && html`<p class="qc-sum">${summary}</p>`}
+    ${!isQ && html`<p class="qc-cmd">${r.command ? html`<code>${r.command}</code>` : html`<span class="muted">Command hidden by the harness</span>`}</p>`}
+    ${recShort && html`<p class=${cx('qc-rec', declined && 'declined')}><${Icon} name="sparkles" size=${14} class="qc-star" /><span>${recShort}</span>${declined && html`<span class="qc-tag">Declined</span>`}</p>`}
+    ${open && html`<div class="qc-report" id=${id}>
+      <p class="qc-meta">${who && html`<${Avatar} agent=${a} s=${s} size="sm" status=${false} /><span>Asked by ${agentLabel(s, a, { withTeam: true })}</span>`}${r.blocks && html`<span>Blocks ${r.blocks}</span>`}${!isQ && r.tool && html`<span>Tool ${r.tool}</span>`}</p>
+      ${isQ && html`<section class="qc-part q"><h5>The question</h5><${Paras} list=${r.body || r.title} /></section>`}
+      ${!isQ && html`<section class="qc-part"><h5>Command</h5>${r.command ? html`<pre class="qc-pre">${r.command}</pre>` : html`<p class="flat">Hidden by the harness. You cannot see this tool's input.</p>`}
+        <h5 class="qc-sub">Folder</h5><pre class="qc-pre">${r.folder}</pre></section>`}
+      ${r.what && html`<section class="qc-part"><h5>What it is about</h5><${Paras} list=${r.what} /></section>`}
+      ${(r.whyText || r.why) && html`<section class="qc-part why"><h5>Why it matters</h5><${Paras} list=${r.whyText || r.why} /></section>`}
+      ${r.recWhy && html`<section class="qc-part reco"><h5><${Icon} name="sparkles" size=${13} />Why this answer</h5><${Paras} list=${r.recWhy} /></section>`}
+      ${(others.length > 0 || isQ) && html`<section class="qc-part"><h5>Other answers</h5>
+        <ul class="qc-opts">
+          ${others.map((o) => html`<li key=${o.id}><div><b>${o.label}</b>${o.note && html`<p>${o.note}</p>`}</div>
+            <button type="button" class="btn sm" onClick=${() => act.answerRequest(r.id, o.id)}>Choose</button></li>`)}
+          ${isQ && html`<li class="own"><form onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
+            <input ref=${own} class="input" placeholder="Your own answer" aria-label="Your own answer" value=${text} onInput=${(e) => setText(e.target.value)} />
+            <button type="submit" class="btn sm" disabled=${!text.trim()}>Send</button></form></li>`}
+        </ul></section>`}
       ${r.refs?.length > 0 && html`<section class="qc-part refs"><h5>References</h5><ol>${r.refs.map((f, i) => html`<li key=${f}><span class="qc-cite">[${i + 1}]</span><span class="mono">${f}</span></li>`)}</ol></section>`}
-      <footer class="qc-foot">${who && html`<span class="req-who"><${Avatar} agent=${a} s=${s} size="sm" status=${false} />Asked by ${agentLabel(s, a, { withTeam: true })}</span>`}${r.blocks && html`<span class="muted">Blocks ${r.blocks}</span>`}<span class="grow"></span>${thread}</footer>
     </div>`}
     <div class="req-actions qc-actions">
       ${rec && !declined && html`<button type="button" class="btn" onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="sparkles" size=${14} class="qc-star" />Accept</button>`}
       ${rec && !declined && html`<button type="button" class="btn ghost" onClick=${deny}><${Icon} name="sparkles" size=${14} class="qc-star" />Deny</button>`}
+      ${main.map((o) => html`<button key=${o.id} type="button" class=${cx('btn', o.id === 'deny' && 'ghost')} onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
       <button type="button" class="btn ghost" aria-expanded=${open} aria-controls=${id} onClick=${() => setOpen(!open)}>${open ? 'Hide details' : 'Details'}<${Icon} name=${open ? 'chevron-up' : 'chevron-down'} size=${14} /></button>
+      ${thread}
     </div>
   </section>`;
 }
 
 export function RequestBlock({ s, request: r, variant = 'card', openThread = null, primary = false, who = true }) {
-  if (variant === 'card' && r.kind === 'question') return html`<${QuestionCard} s=${s} r=${r} openThread=${openThread} who=${who} />`;
+  if (variant === 'card' && (r.kind === 'question' || r.kind === 'approval')) return html`<${BriefCard} s=${s} r=${r} openThread=${openThread} who=${who} />`;
   const now = useNow();
   const a = agentOf(s, r.agent); const p = projectOf(s, r.project);
   const [text, setText] = useState('');

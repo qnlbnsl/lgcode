@@ -1074,14 +1074,21 @@ The repository Design page fills the centre with a canvas. One thin bar above it
 Projects and Design tabs, the category and item menus, the file's name, the zoom controls,
 and "Open in OpenPencil". The Mocks tab shows one screen on the same canvas.
 
-A question in a thread starts as a brief. The brief shows the question in a few words and
-how long it has waited, one line of description, and the recommended answer beside the sparkles icon.
-Its buttons are Accept, Deny and Details. Accept and Deny carry the same sparkles icon as the recommendation, so it is clear what they act on. Deny strikes out the recommendation and opens the
-details with the "Another answer" box focused. Details opens the full card in place. The
-full card has labelled parts, each with its own colour: the question in blue, what it is
-about, why it matters in amber, and the recommendation in green. The other answers, the
-numbered references, and the agent that asked follow them. Paragraphs start with an indent
-and keep a reading width of about 72 characters.
+A question or an approval in a thread starts as a brief. The brief shows what is asked in a
+few words and how long it has waited, and one line of description. A question adds its
+recommended answer beside the sparkles icon, with Accept, Deny and Details. Accept and Deny
+carry the same sparkles icon, so it is clear what they act on. Deny strikes out the
+recommendation and opens the details with "Your own answer" focused. An approval adds its
+command, or "Command hidden by the harness", with its own answers and Details.
+
+Details keeps the brief and adds a short report under it. The report starts with the agent
+that asked and what the request blocks. Its sections follow: the full question or the
+command and folder, what it is about, why it matters, and why the recommended answer. The
+headings carry the colour, blue for the question, amber for why it matters, and green for
+the recommendation, with no coloured bars. The other answers are rows, each with a short
+note and a "Choose" button, and a question ends them with a "Your own answer" field. The
+numbered references come last. "Open thread" sits at the right end of the card's buttons.
+Paragraphs start with an indent and keep a reading width of about 72 characters.
 
 The owner's messages sit on the right of a chat, in a filled bubble. An agent's messages
 sit on the left without a bubble. Only the project lead's thread has a message box. Every
