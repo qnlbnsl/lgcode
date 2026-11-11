@@ -10778,6 +10778,12 @@ The manager accepted the combined gate under the build-loop rules and authorized
 The full remains exit 1, and the isolated rerun remains exit 0.
 This does not establish a cause or close the timing issue.
 If it recurs in the merged full, the manager requires an earlier acknowledgement or a wait on the correct event rather than a longer deadline.
+
+It recurred in the final merged full on 4f9ae0a, at git.spec.ts:271.
+The alert still showed the initial unconfirmed acknowledgement after five seconds.
+The unchanged case passed on its own in 10.0 seconds.
+The fix stays as stated above: wait on the correct event, not a longer deadline.
+It is the next unit on area/website after the master merge.
 The original logs and failure contexts remain in the W09 author result.
 
 
@@ -10876,3 +10882,9 @@ assertion and deadlines are unchanged, and temporary observations were removed.
 ## 611. The mock preview issuance observation failed in the W11 full
 
 Open: on signed 5e12347, new-project.spec.ts:605 observed status 0 instead of 200 within five seconds in full4. The unchanged uninstrumented case and credits then passed. The cause remains unproved. The manager accepted that combined gate without changing the assertion or deadline.
+
+The same registered component journey failed again in the final merged full on 4f9ae0a, at a different assertion.
+At new-project.spec.ts:626, the preview frame's body never received data-loaded="yes" within five seconds.
+The unchanged case passed on its own in 24.6 seconds.
+Both failures are in the mock and component preview path under a full parallel browser run.
+The cause remains unproved.
