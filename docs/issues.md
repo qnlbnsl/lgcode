@@ -10872,3 +10872,7 @@ terminal-uncertainty assertion. The unchanged isolated case passed with bounded
 temporary handler timing observations; those observations do not explain the
 full failure. Issue 609 remains open and its cause unproved. The Git source,
 assertion and deadlines are unchanged, and temporary observations were removed.
+
+## 611. The mock preview issuance observation failed in the W11 full
+
+Open: on signed 5e12347, new-project.spec.ts:605 observed status 0 instead of 200 within five seconds in full4. The unchanged uninstrumented case and credits then passed. The cause remains unproved. The manager accepted that combined gate without changing the assertion or deadline.
