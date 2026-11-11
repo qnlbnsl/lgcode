@@ -23,11 +23,12 @@ const PRIO_ICON = { Urgent: 'zap', High: 'arrow-up', Medium: 'minus', Low: 'arro
 function Priority({ p, label = false }) {
   return html`<span class=${cx('prio', 'p-' + p.toLowerCase())} title=${'Priority: ' + p}><${Icon} name=${PRIO_ICON[p]} size=${12} />${label && html`<span>${p}</span>`}</span>`;
 }
-function SprintCard({ s, sp }) {
+function SprintCard({ s, sp, hover }) {
   const pr = sprintProgress(s, sp); const reqs = requestsOfSprint(s, sp.id);
   const t = sp.team && teamOf(s, sp.team); const ep = sp.epic && byId(s.epics, sp.epic);
   const failed = reqs.some((r) => r.kind === 'failed');
-  return html`<a class=${cx('sprint-card', reqs.length && (failed ? 'error' : 'warn'), sp.column === 'Done' && 'done')} href=${href(`/p/${sp.project}/sprint/${sp.id}`)}>
+  return html`<a class=${cx('sprint-card', reqs.length && (failed ? 'error' : 'warn'), sp.column === 'Done' && 'done')} href=${href(`/p/${sp.project}/sprint/${sp.id}`)}
+    onMouseEnter=${hover && ((e) => hover.show(sp, e.currentTarget))} onMouseLeave=${hover && hover.hide} onFocus=${hover && ((e) => hover.show(sp, e.currentTarget, true))} onBlur=${hover && hover.hide}>
     <div class="card-top"><span class="tag">${sp.label}</span>${ep && html`<span class="epic-chip truncate">${ep.name}</span>`}<span class="grow"></span><${Priority} p=${sp.priority || 'Medium'} /></div>
     <h3>${sp.name}</h3>
     ${reqs.length > 0 && html`<div class=${cx('need', failed && 'error')}><${Icon} name=${failed ? 'circle-alert' : 'bell'} size=${13} />${reqs.length === 1 ? { question: 'Needs your answer', approval: 'Needs your approval', merge: 'Needs your merge', failed: 'Failed start' }[reqs[0].kind] : `${reqs.length} requests need you`}</div>`}
@@ -45,17 +46,32 @@ function useBoardFilter(s, project) {
   const items = all.filter((x) => (!epic || x.epic === epic) && (!q || `${x.label} ${x.name} ${x.goal}`.toLowerCase().includes(q.toLowerCase())));
   return { q, setQ, epic, setEpic, items, all };
 }
+// Hovering a card shows the sprint's TL;DR under it. The note is fixed to the window, so the
+// scrolling lanes do not clip it, and it goes away when the lanes scroll.
+const canHover = typeof matchMedia === 'function' && matchMedia('(hover: hover)').matches;
+function useCardTip() {
+  const [tip, setTip] = useState(null); const timer = useRef(0);
+  const hide = () => { clearTimeout(timer.current); setTip(null); };
+  const show = (sp, el, now) => { if (!canHover || !sp.goal) return; clearTimeout(timer.current);
+    timer.current = setTimeout(() => { const r = el.getBoundingClientRect(); const below = r.bottom + 140 < innerHeight;
+      const box = (el.closest('.board-lanes') || document.body).getBoundingClientRect();
+      const left = Math.max(r.left, box.left + 8), right = Math.min(r.right, box.right - 8); if (right - left < 120) return;
+      setTip({ sp, left, width: right - left, ...(below ? { top: r.bottom + 6 } : { bottom: innerHeight - r.top + 6 }) }); }, now ? 0 : 350); };
+  const el = tip && html`<div class="card-tldr" role="tooltip" style=${{ left: tip.left + 'px', width: tip.width + 'px', top: tip.top != null ? tip.top + 'px' : 'auto', bottom: tip.bottom != null ? tip.bottom + 'px' : 'auto' }}>
+    <b>TL;DR:</b> ${tip.sp.goal}</div>`;
+  return { show, hide, el };
+}
 function BoardView({ s, items }) {
-  const [col, setCol] = useState('In progress');
+  const [col, setCol] = useState('In progress'); const tip = useCardTip();
   return html`
     <div class="col-jump only-phone-flex" role="tablist" aria-label="Board lanes">${COLUMNS.map((c) => html`<button type="button" key=${c} class="tab" aria-selected=${col === c} onClick=${() => { setCol(c); document.getElementById('lane-' + c.replace(' ', '-'))?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }); }}>${c}<span class="count">${items.filter((x) => x.column === c).length}</span></button>`)}</div>
-    <div class="board-lanes" data-main>
+    <div class="board-lanes" data-main onScrollCapture=${tip.hide}>
       ${COLUMNS.map((c) => { const list = items.filter((x) => x.column === c).sort((a, b) => PRIORITIES.indexOf(a.priority) - PRIORITIES.indexOf(b.priority) || requestsOfSprint(s, b.id).length - requestsOfSprint(s, a.id).length);
         return html`<section class="board-lane" key=${c} id=${'lane-' + c.replace(' ', '-')} aria-label=${c}>
           <header><h2>${c}</h2><span class="count">${list.length}</span></header>
-          <div class="cards">${list.map((sp) => html`<${SprintCard} key=${sp.id} s=${s} sp=${sp} />`)}</div>
+          <div class="cards">${list.map((sp) => html`<${SprintCard} key=${sp.id} s=${s} sp=${sp} hover=${tip} />`)}</div>
         </section>`; })}
-    </div>`;
+    </div>${tip.el}`;
 }
 const TCOLS = [
   { id: 'title', label: 'Title', key: (s, x) => x.label },
