@@ -1,9 +1,11 @@
-// The Mocks tab of a project, and the Design page of a repository.
+// The Mocks tab of a project. It follows the Workflow tab's pattern: one secondary tab row,
+// the same page padding, and the same structure when there is nothing in it yet.
 // A mock screen here is drawn from the same tokens and parts as the page itself.
 import { html, useState, useRef, useLayoutEffect, Icon, cx, href, go, ago, clock, useNow, plural, update, uid, MIN, HOUR, DAY } from '../lib.js';
 import { byId, agentOf, projectOf, repoOf, leadOf, threadOf, routeForAgent } from '../data.js';
 import * as act from '../actions.js';
 import { Avatar, OwnerAvatar, Dialog, registerDialog, Empty } from '../ui.js';
+import { useCanvas, Canvas, ZoomControls } from './design.js';
 
 const VIEWPORTS = { phone: [390, 780], desktop: [1180, 780] };
 const STATUS = { draft: ['', 'Draft'], changed: ['warn', 'Changed'], approved: ['success', 'Approved'] };
@@ -219,82 +221,95 @@ registerDialog('mock-changes', ({ d, s }) => {
 
 // ---- views ---------------------------------------------------------------------------
 function Status({ sc }) { const [tone, word] = STATUS[sc.status]; return html`<span class=${cx('badge', tone)}>${sc.status === 'approved' && html`<${Icon} name="check" size=${11} />`}${word}</span>`; }
+const since = (ts, now) => (ago(ts, now) === 'now' ? 'just now' : ago(ts, now) + ' ago');
 
 function Screens({ s, p, m }) {
   const now = useNow();
-  if (!m.screens.length) return html`<div class="page"><${Empty} title="No screens yet" icon="frame">The Design team records a screen here when it is drawn. <a class="link" href=${href(`/p/${p.id}/chat`)}>Talk to the project lead</a><//></div>`;
-  return html`<div class="mk-grid" data-main>${m.screens.map((sc) => html`<a key=${sc.id} class=${cx('mk-card', sc.status)} href=${href(`/p/${p.id}/mocks/screen/${sc.id}`)} aria-label=${`${sc.name}, ${STATUS[sc.status][1]}`}>
-    <div class="mk-thumb"><${Frame} kind=${sc.kind} max=${.46} /></div>
-    <div class="mk-meta"><div class="row"><b class="grow truncate">${sc.name}</b><${Status} sc=${sc} /></div>
-      <p class="note">${sc.note}</p>
-      <p class="sub"><span>Revision ${sc.rev}</span><span>${ago(sc.updatedAt, now) === 'now' ? 'just now' : ago(sc.updatedAt, now) + ' ago'}</span>${sc.comments.length > 0 && html`<span class="row" style="gap:3px"><${Icon} name="message-square" size=${12} />${sc.comments.length}</span>`}</p></div>
-  </a>`)}</div>`;
+  return html`<div class="table-wrap"><table class="table mk-screens"><thead><tr><th class="mk-th-thumb"></th><th>Screen</th><th>Status</th><th>Note</th><th class="num">Revision</th><th class="num">Comments</th><th class="num">Updated</th></tr></thead><tbody>
+    ${m.screens.length === 0 && html`<tr><td></td><td colspan="6" class="muted" data-empty>No screens</td></tr>`}
+    ${m.screens.map((sc) => html`<tr key=${sc.id} class=${cx('click', sc.status === 'changed' && 's-warn')} onClick=${() => go(`/p/${p.id}/mocks/screen/${sc.id}`)}>
+      <td class="mk-td-thumb"><span class="mk-mini"><${Frame} kind=${sc.kind} max=${.12} /></span></td>
+      <td><a href=${href(`/p/${p.id}/mocks/screen/${sc.id}`)} style="font-weight:var(--weight-medium)">${sc.name}</a></td>
+      <td><${Status} sc=${sc} /></td>
+      <td class="muted wrap">${sc.note}</td>
+      <td class="num">${sc.rev}</td>
+      <td class="num muted">${sc.comments.length || ''}</td>
+      <td class="num muted">${since(sc.updatedAt, now)}</td></tr>`)}
+  </tbody></table></div>`;
 }
 
 function ScreenView({ s, p, m, id }) {
   const now = useNow(); const sc = byId(m.screens, id); const [vp, setVp] = useState('phone'); const [text, setText] = useState(''); const des = designerOf(s, p);
-  if (!sc) return html`<div class="page"><${Empty} title="This screen does not exist">It may have been removed. <a class="link" href=${href(`/p/${p.id}/mocks`)}>Back to the screens</a><//></div>`;
+  if (!sc) return html`<div class="page"><${Empty} title="This screen does not exist">It may have been removed. <a class="link" href=${href(`/p/${p.id}/mocks`)}>Screens</a><//></div>`;
   const i = m.screens.indexOf(sc); const prev = m.screens[i - 1], next = m.screens[i + 1];
   const send = (e) => { e.preventDefault(); if (!text.trim()) return; comment(s, p, sc, text.trim()); setText(''); };
-  const approve = () => { update(() => { sc.status = 'approved'; for (const c of m.changes) if (c.screen === sc.id) c.seen = true; }); act.toast(`${sc.name} approved`); };
   return html`<div class="mk-detail">
     <div class="mk-stagecol">
       <div class="mk-stagebar">
-        <a class="back" href=${href(`/p/${p.id}/mocks`)}><${Icon} name="arrow-left" size=${14} />Screens</a>
-        <b class="truncate grow">${sc.name}</b>
-        <div class="seg">${[['phone', 'smartphone', 'Phone'], ['desktop', 'monitor', 'Desktop']].map(([v, ic, l]) => html`<button type="button" key=${v} aria-pressed=${vp === v} onClick=${() => setVp(v)}><${Icon} name=${ic} size=${13} /><span>${l}</span></button>`)}</div>
+        <a class="icon-btn" aria-label="Screens" href=${href(`/p/${p.id}/mocks`)}><${Icon} name="arrow-left" size=${15} /></a>
+        <b class="mk-name">${sc.name}</b><${Status} sc=${sc} /><span class="muted">Revision ${sc.rev}</span>
+        <span class="grow"></span>
+        <div class="seg">${[['phone', 'smartphone', 'Phone'], ['desktop', 'monitor', 'Desktop']].map(([v, ic, l]) => html`<button type="button" key=${v} aria-pressed=${vp === v} aria-label=${l} data-tip=${l} onClick=${() => setVp(v)}><${Icon} name=${ic} size=${13} /></button>`)}</div>
+        <${StageZoom} />
         <a class="icon-btn" aria-label="Previous screen" aria-disabled=${!prev} href=${prev ? href(`/p/${p.id}/mocks/screen/${prev.id}`) : null}><${Icon} name="chevron-left" size=${16} /></a>
         <a class="icon-btn" aria-label="Next screen" aria-disabled=${!next} href=${next ? href(`/p/${p.id}/mocks/screen/${next.id}`) : null}><${Icon} name="chevron-right" size=${16} /></a>
       </div>
-      <div class="mk-stage" data-main><${Frame} key=${vp} kind=${sc.kind} viewport=${vp} fit="both" /></div>
-      <div class="mk-stagefoot muted"><span class="num">${VIEWPORTS[vp][0]} × ${VIEWPORTS[vp][1]}</span><span class="grow"></span><span class="not-phone">Drawn from this repository's own components</span></div>
+      <${Stage} key=${vp + sc.id + sc.rev} kind=${sc.kind} vp=${vp} />
     </div>
     <aside class="mk-aside">
-      <section><div class="row"><${Status} sc=${sc} /><span class="muted">Revision ${sc.rev} · ${ago(sc.updatedAt, now) === 'now' ? 'just now' : ago(sc.updatedAt, now) + ' ago'}</span></div>
-        <p class="note">${sc.note}</p>
+      <section><p class="note">${sc.note}</p>
         <div class="row" style="flex-wrap:wrap">
-          ${sc.status !== 'approved' && html`<button type="button" class="btn primary" onClick=${approve}><${Icon} name="check" size=${14} />Approve this screen</button>`}
-          <button type="button" class="btn" onClick=${() => act.toast(`Opening ${sc.name} in OpenPencil`)}><${Icon} name="pencil-ruler" size=${14} />Edit design</button></div></section>
-      <section class="mk-comments"><h3>Comments to the ${des.name}</h3>
-        ${sc.comments.length === 0 && !sc.replying && html`<p class="muted">No comments yet. Say what should change, and the ${des.name} records a new revision.</p>`}
+          ${sc.status !== 'approved' && html`<button type="button" class="btn primary" onClick=${() => { update(() => { sc.status = 'approved'; for (const c of m.changes) if (c.screen === sc.id) c.seen = true; }); act.toast(`${sc.name} approved`); }}><${Icon} name="check" size=${14} />Approve</button>`}
+          <button type="button" class="btn ghost" onClick=${() => act.toast(`Opening ${sc.name} in OpenPencil`)}><${Icon} name="pencil-ruler" size=${14} />Edit design</button></div></section>
+      <section class="mk-comments"><h3>Comments</h3>
+        ${sc.comments.length === 0 && !sc.replying && html`<p class="muted" data-empty>No comments</p>`}
         <ol>${sc.comments.map((c, n) => { const a = c.from === 'owner' ? null : agentOf(s, c.from);
-          return html`<li key=${n}>${a ? html`<${Avatar} agent=${a} s=${s} size="sm" status=${false} />` : html`<${OwnerAvatar} s=${s} size="sm" />`}<div><p class="who"><b>${a ? a.name : 'You'}</b><time>${ago(c.ts, now) === 'now' ? 'now' : ago(c.ts, now) + ' ago'}</time></p><p>${c.text}</p></div></li>`; })}
+          return html`<li key=${n}>${a ? html`<${Avatar} agent=${a} s=${s} size="sm" status=${false} />` : html`<${OwnerAvatar} s=${s} size="sm" />`}<div><p class="who"><b>${a ? a.name : 'You'}</b><time>${since(c.ts, now)}</time></p><p>${c.text}</p></div></li>`; })}
           ${sc.replying && html`<li><${Avatar} agent=${des} s=${s} size="sm" status=${false} /><div><span class="typing"><i></i><i></i><i></i></span></div></li>`}</ol>
         <form class="mk-say" onSubmit=${send}><input class="input" placeholder=${`Ask the ${des.name.toLowerCase()} for a change`} aria-label="Comment" value=${text} onInput=${(e) => setText(e.target.value)} />
           <button type="submit" class="btn" disabled=${!text.trim()}>Send</button></form></section>
     </aside>
   </div>`;
 }
+// The large preview uses the Design page's canvas: the screen at its real size, with zoom and Fit.
+const stage = { c: null, listeners: new Set() };
+function StageZoom() {
+  const [, force] = useState(0);
+  useLayoutEffect(() => { const f = () => force((n) => n + 1); stage.listeners.add(f); return () => stage.listeners.delete(f); }, []);
+  return stage.c ? html`<${ZoomControls} c=${stage.c} />` : null;
+}
+function Stage({ kind, vp }) {
+  const c = useCanvas({ initial: 'fit' }); stage.c = c;
+  useLayoutEffect(() => { for (const f of stage.listeners) f(); });
+  const [w, h] = VIEWPORTS[vp]; const UI = DRAW[kind] || ListUI;
+  return html`<${Canvas} c=${c}><div class=${cx('mk-frame flat', vp)} style=${{ width: w + 'px', height: h + 'px' }} aria-hidden="true" inert><${UI} /></div><//>`;
+}
 
 function Changes({ s, p, m }) {
-  const now = useNow(); const unseen = m.changes.filter((c) => !c.seen).length;
-  if (!m.changes.length) return html`<div class="page"><${Empty} title="No changes yet" icon="history">Each new revision of a screen is listed here, with what changed.<//></div>`;
-  return html`<div class="mk-changes" data-main>
-    <div class="row"><p class="muted grow">${unseen ? `${plural(unseen, 'change')} since you last looked.` : 'You have seen every change.'}</p>
-      ${unseen > 0 && html`<button type="button" class="btn sm" onClick=${() => update(() => { for (const c of m.changes) c.seen = true; })}><${Icon} name="check" size=${13} />Mark all as seen</button>`}</div>
-    ${m.changes.map((c) => { const sc = byId(m.screens, c.screen); const by = agentOf(s, c.by); if (!sc) return null;
-      return html`<article key=${c.id} class=${cx('mk-change', !c.seen && 'new')}>
-        <header><a class="link" href=${href(`/p/${p.id}/mocks/screen/${sc.id}`)}>${sc.name}</a><span class="tag">${c.from ? `revision ${c.from} → ${c.to}` : 'revision 1'}</span>${!c.seen && html`<span class="badge warn">New</span>`}
-          <span class="grow"></span><span class="muted">${by ? by.name : 'Designer'} · ${ago(c.ts, now) === 'now' ? 'just now' : ago(c.ts, now) + ' ago'}</span></header>
-        <p>${c.text}</p>
-        ${c.compare && html`<div class="mk-pair"><figure><figcaption>Before · revision ${c.from}</figcaption><div class="mk-thumb"><${Frame} kind=${sc.kind} before=${true} max=${.42} /></div></figure>
-          <figure><figcaption>After · revision ${c.to}</figcaption><div class="mk-thumb"><${Frame} kind=${sc.kind} max=${.42} /></div></figure></div>`}
-      </article>`; })}
-  </div>`;
+  const now = useNow(); const [open, setOpen] = useState(null);
+  return html`<div class="table-wrap"><table class="table mk-changes"><thead><tr><th>Screen</th><th>Revision</th><th>What changed</th><th>By</th><th class="num">When</th></tr></thead><tbody>
+    ${m.changes.length === 0 && html`<tr><td colspan="5" class="muted" data-empty>No changes</td></tr>`}
+    ${m.changes.map((c) => { const sc = byId(m.screens, c.screen); const by = agentOf(s, c.by); if (!sc) return null; const ex = open === c.id;
+      return html`<tr key=${c.id} class=${cx(c.compare && 'click', !c.seen && 's-warn')} onClick=${() => c.compare && setOpen(ex ? null : c.id)}>
+          <td class="state-cell"><a class="link" href=${href(`/p/${p.id}/mocks/screen/${sc.id}`)} onClick=${(e) => e.stopPropagation()}>${sc.name}</a>${!c.seen && html` <span class="badge warn">New</span>`}</td>
+          <td class="mono muted">${c.from ? `${c.from} → ${c.to}` : '1'}</td>
+          <td class="wrap">${c.text}${c.compare && html` <span class="link mk-cmp">${ex ? 'Hide' : 'Compare'}</span>`}</td>
+          <td class="muted">${by ? by.name : 'Designer'}</td>
+          <td class="num muted">${since(c.ts, now)}</td></tr>
+        ${ex && html`<tr class="mk-cmprow"><td colspan="5"><div class="mk-pair"><figure><figcaption>Revision ${c.from}</figcaption><div class="mk-thumb"><${Frame} kind=${sc.kind} before=${true} max=${.42} /></div></figure>
+          <figure><figcaption>Revision ${c.to}</figcaption><div class="mk-thumb"><${Frame} kind=${sc.kind} max=${.42} /></div></figure></div></td></tr>`}`; })}
+  </tbody></table></div>`;
 }
 
 const SCHEMA = { matches: ['success', 'Matches'], differs: ['warn', 'Differs'], new: ['info', 'New'], unavailable: ['', 'Unavailable'] };
 function Data({ m }) {
   const [f, setF] = useState('all'); const rows = m.data.filter((d) => f === 'all' || d.schema === f);
-  if (!m.data.length) return html`<div class="page"><${Empty} title="No fields recorded" icon="database">When a screen is recorded, the fields it shows are listed here and compared with the schema.<//></div>`;
-  return html`<div class="mk-tablepage" data-main>
-    <div class="row" style="flex-wrap:wrap"><p class="muted grow">The fields the screens show, compared with what the engine stores today.</p>
-      <div class="seg">${['all', 'new', 'differs', 'matches', 'unavailable'].filter((k) => k === 'all' || m.data.some((d) => d.schema === k)).map((k) => html`<button type="button" key=${k} aria-pressed=${f === k} onClick=${() => setF(k)}>${k === 'all' ? 'All' : SCHEMA[k][1]}<span class="faint num">${k === 'all' ? m.data.length : m.data.filter((d) => d.schema === k).length}</span></button>`)}</div></div>
+  return html`<div class="wf-bar"><div class="seg">${['all', 'new', 'differs', 'matches', 'unavailable'].map((k) => html`<button type="button" key=${k} aria-pressed=${f === k} onClick=${() => setF(k)}>${k === 'all' ? 'All' : SCHEMA[k][1]}<span class="faint num">${k === 'all' ? m.data.length : m.data.filter((d) => d.schema === k).length}</span></button>`)}</div></div>
     <div class="table-wrap"><table class="table"><thead><tr><th>Field</th><th>Schema</th><th>Sample value</th><th>Shown on</th><th>Note</th></tr></thead><tbody>
+      ${rows.length === 0 && html`<tr><td colspan="5" class="muted" data-empty>No fields</td></tr>`}
       ${rows.map((d) => html`<tr key=${d.field} class=${cx(d.schema === 'differs' && 's-warn')}><td class="state-cell mono">${d.field}</td><td><span class=${cx('badge', SCHEMA[d.schema][0])}>${SCHEMA[d.schema][1]}</span></td>
-        <td class="mono muted truncate" style="max-width:220px">${d.sample}</td><td class="muted">${d.on}</td><td class="wrap muted">${d.note || ''}</td></tr>`)}
-    </tbody></table></div>
-  </div>`;
+        <td class="mono muted truncate" style="max-width:220px">${d.sample}</td><td class="muted">${d.on}</td><td class="wrap muted mk-note">${d.note || ''}</td></tr>`)}
+    </tbody></table></div>`;
 }
 function Demo({ kind }) {
   if (kind === 'button') return html`<span class="row"><span class="btn sm primary">Allow</span><span class="btn sm">Deny</span></span>`;
@@ -306,37 +321,33 @@ function Demo({ kind }) {
   return html`<span class="mk-reqdemo"><b>Approval</b><i></i><i></i></span>`;
 }
 function Components({ m }) {
-  if (!m.components.length) return html`<div class="page"><${Empty} title="No components recorded" icon="component">The parts each screen is built from are listed here.<//></div>`;
-  const draft = m.components.filter((c) => !c.real).length;
-  return html`<div class="mk-tablepage" data-main>
-    <p class="muted">${plural(m.components.length, 'component')} on these screens. ${draft ? `${draft} ${draft === 1 ? 'is a draft that does' : 'are drafts that do'} not exist in the repository yet.` : 'All of them exist in the repository.'}</p>
-    <div class="table-wrap"><table class="table"><thead><tr><th>Component</th><th>Source</th><th>Preview</th><th class="num">Uses</th><th>Screens</th></tr></thead><tbody>
+  return html`<div class="table-wrap"><table class="table"><thead><tr><th>Component</th><th>Source</th><th>Preview</th><th class="num">Uses</th><th>Screens</th></tr></thead><tbody>
+      ${m.components.length === 0 && html`<tr><td colspan="5" class="muted" data-empty>No components</td></tr>`}
       ${m.components.map((c) => html`<tr key=${c.name} class=${cx(!c.real && 's-warn')}><td class="state-cell wrap"><b style="font-weight:var(--weight-medium)">${c.name}</b>${c.note && html`<small class="mk-small">${c.note}</small>`}</td>
         <td><span class=${cx('badge', c.real ? 'success' : 'warn')}>${c.real ? 'Real' : 'Draft'}</span></td><td><${Demo} kind=${c.demo} /></td><td class="num">${c.uses}</td><td class="muted">${c.on.join(', ')}</td></tr>`)}
-    </tbody></table></div>
-  </div>`;
+    </tbody></table></div>`;
 }
 
 export function MocksTab({ s, project: p, route }) {
   const m = ensure(s, p); const now = useNow(); const view = route.parts[3] || 'screens';
-  const unseen = m.changes.filter((c) => !c.seen).length; const des = designerOf(s, p);
-  const tabs = [['screens', 'Screens', m.screens.length], ['changes', 'Changes', unseen, 'warn'], ['data', 'Data'], ['components', 'Components']];
-  let body;
-  if (view === 'screen') body = html`<${ScreenView} key=${route.parts[4]} s=${s} p=${p} m=${m} id=${route.parts[4]} />`;
-  else if (view === 'changes') body = html`<${Changes} s=${s} p=${p} m=${m} />`;
-  else if (view === 'data') body = html`<${Data} m=${m} />`;
-  else if (view === 'components') body = html`<${Components} m=${m} />`;
-  else body = html`<${Screens} s=${s} p=${p} m=${m} />`;
+  const unseen = m.changes.filter((c) => !c.seen).length;
+  const tabs = [['screens', 'Screens', m.screens.length], ['changes', 'Changes', unseen, 'warn'], ['data', 'Data', m.data.length], ['components', 'Components', m.components.length]];
   const open = m.screens.filter((x) => x.status !== 'approved').length;
-  return html`<div class="mk">
-    <div class="mk-bar">
-      <nav class="mk-nav" aria-label="Mock views">${tabs.map(([id, label, n, tone]) => html`<a key=${id} class="wf-tab" aria-current=${(view === 'screen' ? 'screens' : view) === id ? 'page' : null} href=${href(`/p/${p.id}/mocks${id === 'screens' ? '' : '/' + id}`)}>${label}${n > 0 && html`<span class=${cx('count', tone)}>${n}</span>`}</a>`)}</nav>
-      <span class="grow"></span>
-      ${m.approvedAt ? html`<span class="mk-approved"><${Icon} name="circle-check" size=${15} />Approved ${ago(m.approvedAt, now) === 'now' ? 'just now' : ago(m.approvedAt, now) + ' ago'}</span>`
-        : html`<span class="muted mk-left not-phone">${open ? `${open} of ${m.screens.length} not approved` : 'Every screen is approved'}</span>`}
-      <button type="button" class="btn sm" onClick=${() => act.openDialog({ type: 'mock-changes', project: p.id, screen: view === 'screen' ? route.parts[4] : '' })}><${Icon} name="message-square" size=${13} />Request changes</button>
-      ${!m.approvedAt && html`<button type="button" class="btn sm primary" disabled=${!m.screens.length} onClick=${() => approveAll(s, p)}><${Icon} name="check" size=${13} />Approve mocks</button>`}
+  const nav = html`<nav class="wf-nav" aria-label="Mock views">${tabs.map(([id, label, n, tone]) => html`<a key=${id} class="wf-tab" aria-current=${(view === 'screen' ? 'screens' : view) === id ? 'page' : null} href=${href(`/p/${p.id}/mocks${id === 'screens' ? '' : '/' + id}`)}>${label}${n > 0 && html`<span class=${cx('count', tone)}>${n}</span>`}</a>`)}</nav>`;
+  if (view === 'screen') return html`<div class="wf mk-full">${nav}<${ScreenView} key=${route.parts[4]} s=${s} p=${p} m=${m} id=${route.parts[4]} /></div>`;
+  const body = view === 'changes' ? html`<${Changes} s=${s} p=${p} m=${m} />` : view === 'data' ? html`<${Data} m=${m} />` : view === 'components' ? html`<${Components} m=${m} />` : html`<${Screens} s=${s} p=${p} m=${m} />`;
+  return html`<div class="wf" data-main>${nav}
+    <div class="wf-body">
+      <div class="wf-status">
+        ${m.approvedAt ? html`<span class="badge success"><${Icon} name="check" size=${11} />Approved</span><span>${since(m.approvedAt, now)}</span>`
+          : html`<span><b class="num">${m.screens.length - open}</b> of ${plural(m.screens.length, 'screen')} approved</span>`}
+        ${unseen > 0 && html`<span class="warn-text">${plural(unseen, 'change')} not seen</span>`}
+        <span class="grow"></span>
+        ${view === 'changes' && unseen > 0 && html`<button type="button" class="btn sm ghost" onClick=${() => update(() => { for (const c of m.changes) c.seen = true; })}><${Icon} name="check" size=${13} />Mark seen</button>`}
+        <button type="button" class="btn sm" disabled=${!m.screens.length} onClick=${() => act.openDialog({ type: 'mock-changes', project: p.id, screen: '' })}><${Icon} name="message-square" size=${13} />Request changes</button>
+        ${!m.approvedAt && html`<button type="button" class="btn sm primary" disabled=${!m.screens.length} onClick=${() => approveAll(s, p)}><${Icon} name="check" size=${13} />Approve mocks</button>`}
+      </div>
+      ${body}
     </div>
-    <div class="mk-scroll">${body}</div>
   </div>`;
 }

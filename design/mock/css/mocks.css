@@ -50,7 +50,6 @@
 .mk-say { display: flex; gap: var(--space-2); margin-top: 4px; }
 
 /* ---- changes ---------------------------------------------------------------------------- */
-.mk-changes, .mk-tablepage { display: grid; gap: var(--space-3); padding: var(--space-4); align-content: start; max-width: 1040px; width: 100%; grid-template-columns: minmax(0, 1fr); }
 .mk-change { display: grid; gap: var(--space-2); padding: 10px 12px 12px; border: 1px solid var(--color-line); border-left-width: 3px; border-radius: var(--radius-md); background: var(--color-surface); }
 .mk-change.new { border-color: var(--color-warn-line); }
 .mk-change header { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
@@ -166,7 +165,24 @@
   .mk-stagebar .seg > button { min-width: 36px; justify-content: center; }
   .mk-stage { height: 440px; margin: 0 var(--space-3); flex: none; }
   .mk-aside { border-left: 0; border-top: 1px solid var(--color-line); overflow: visible; }
-  .mk-changes, .mk-tablepage { padding: var(--space-3); }
   .mk-swatches, .mk-cols { grid-template-columns: minmax(0, 1fr); }
   .mk-cols { gap: var(--space-3); }
 }
+
+/* ---- round 2: the Mocks tab on the Workflow pattern ----------------------------------- */
+.mk-screens td { vertical-align: middle; }
+.mk-th-thumb, .mk-td-thumb { width: 64px; }
+.mk-mini { display: block; width: 48px; height: 52px; overflow: hidden; border-radius: var(--radius-sm); background: var(--color-sunken); padding: 3px 0 0; }
+.mk-cmp { font-size: var(--text-sm); white-space: nowrap; }
+.mk-cmprow td { background: var(--color-bg); padding: var(--space-3); }
+.wf.mk-full { height: 100%; min-height: 0; }
+.wf.mk-full .mk-detail { flex: 1; min-height: 0; }
+.mk-stagebar .badge { flex: none; }
+.mk-stagecol .dz-canvas { flex: 1; margin: 0 var(--space-4) var(--space-4); border-radius: var(--radius-md); }
+.mk-frame.flat { position: relative; transform: none; }
+.mk-stagebar { flex-wrap: wrap; row-gap: 4px; }
+.mk-name { white-space: nowrap; }
+@media (max-width: 860px) {
+  .mk-stagecol .dz-canvas { flex: none; height: 520px; margin: 0 var(--space-3) var(--space-3); }
+}
+.mk-note { min-width: 260px; }

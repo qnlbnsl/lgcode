@@ -212,3 +212,7 @@
   .ag-totals .subs { grid-column: 1 / -1; }
   .ag-acts .icon-btn { width: 32px; height: 32px; }
 }
+/* A direct message shows one avatar, a short dash, and the second avatar. */
+.dm-pair { display: inline-flex; align-items: center; gap: 3px; flex: none; }
+.dm-pair .avatar { width: 18px; height: 18px; }
+.dm-dash { width: 6px; height: 1.5px; border-radius: 1px; background: var(--color-line-strong); }

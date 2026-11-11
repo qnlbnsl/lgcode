@@ -245,7 +245,7 @@ function ChannelList({ s, project, channels, current, now }) {
   const row = (c) => {
     const unread = c.id === current ? 0 : unreadOf(s, c); const wait = waitingIn(s, c, now); const stalled = wait.some((p) => now - p.ts >= STALL_AFTER);
     return html`<a key=${c.id} class=${cx('ch-row', unread > 0 && 'unread')} aria-current=${c.id === current ? 'page' : null} href=${href(base + c.id)} title=${c.kind === 'dm' ? `${channelLabel(s, c)}. ${channelAbout(s, c)}` : channelAbout(s, c)}>
-      ${c.kind === 'dm' ? html`<span class="avatar-stack">${c.members.map((m) => html`<${Avatar} key=${m} agent=${agentOf(s, m)} size="sm" status=${false} />`)}</span>` : html`<${Icon} name=${c.kind === 'leads' ? 'megaphone' : 'hash'} size=${14} class="ch-icon" />`}
+      ${c.kind === 'dm' ? html`<span class="dm-pair" aria-hidden="true">${c.members.slice(0, 2).map((m, i) => html`${i > 0 && html`<i class="dm-dash"></i>`}<${Avatar} key=${m} agent=${agentOf(s, m)} size="sm" status=${false} />`)}</span>` : html`<${Icon} name=${c.kind === 'leads' ? 'megaphone' : 'hash'} size=${14} class="ch-icon" />`}
       <span class="label truncate">${channelShort(s, c)}</span>
       ${isPrivate(s, c) && html`<${Icon} name="lock" size=${11} class="faint" />`}
       ${wait.length > 0 && html`<span class=${cx('ch-wait', stalled && 'stalled')} title=${plural(wait.length, 'post') + ' waiting for a reply'}><${Icon} name="reply" size=${12} />${wait.length}</span>`}
