@@ -674,3 +674,13 @@ and worktree through first-run setup, has its actual lead create a linked
 sprint, task and question with supported tools, answers from the board, and
 checks the durable result and exact receipt again after service restart. It remains separate from
 `pnpm check` because it consumes the signed-in account's allowance.
+
+## Evaluation rounds that update the model ledger
+
+The owner asked for this on 2026-11-10. It is not built. At the end of each key
+task and at the end of a project, the build loop runs an evaluation round. The
+round grades each task from its reviews and later corrections, and it writes the
+grades to the model ledger. The ledger feeds the list that says which model to
+try for each kind of task. The design is in "Evaluation rounds and the model
+ledger" in
+[docs/specs/2026-11-05-build-loop-design.md](specs/2026-11-05-build-loop-design.md).
