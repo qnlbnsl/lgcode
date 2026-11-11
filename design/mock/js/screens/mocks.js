@@ -231,7 +231,7 @@ function Screens({ s, p, m }) {
       <td class="mk-td-thumb"><span class="mk-mini"><${Frame} kind=${sc.kind} max=${.12} /></span></td>
       <td><a href=${href(`/p/${p.id}/mocks/screen/${sc.id}`)} style="font-weight:var(--weight-medium)">${sc.name}</a></td>
       <td><${Status} sc=${sc} /></td>
-      <td class="muted wrap">${sc.note}</td>
+      <td class="muted wrap mk-note">${sc.note}</td>
       <td class="num">${sc.rev}</td>
       <td class="num muted">${sc.comments.length || ''}</td>
       <td class="num muted">${since(sc.updatedAt, now)}</td></tr>`)}
