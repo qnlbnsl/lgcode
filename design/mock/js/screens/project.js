@@ -95,20 +95,33 @@ function RoadmapView({ s, project, items }) {
   const label = (d) => { const t = new Date(day0.getTime() + d * DAY); return d === 0 ? 'Today' : t.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }); };
   const groups = [...epics.map((e) => ({ e, list: items.filter((sp) => sp.epic === e.id) })), { e: null, list: items.filter((sp) => !sp.epic) }].filter((g) => g.e || g.list.length);
   const todayX = x((now - day0.getTime()) / DAY);
+  // Two dedicated columns: the names stay put on the left, and only the time line scrolls sideways under its own header.
+  const rows = [{ k: 'goal' }];
+  for (const { e, list } of groups) {
+    const st = list.length ? Math.min(...list.map((sp) => sp.start ?? 0)) : null; const en = list.length ? Math.max(...list.map((sp) => sp.end ?? 1)) : null;
+    rows.push({ k: 'epic', id: e ? e.id : 'none', e, n: list.length, st, en });
+    for (const sp of [...list].sort((a, b) => (a.start ?? 0) - (b.start ?? 0))) rows.push({ k: 'sprint', id: sp.id, sp });
+  }
+  const sprintHref = (sp) => href(`/p/${sp.project}/sprint/${sp.id}`);
+  const name = (r) => r.k === 'goal' ? html`<div class="rm-cell rm-goal" key="goal"><${Icon} name="target" size=${13} class="faint" /><span class="truncate">${project.goal}</span></div>`
+    : r.k === 'epic' ? html`<div class="rm-cell epic" key=${r.id}><${Icon} name="layers" size=${13} class="faint" /><b class="truncate">${r.e ? r.e.name : 'No epic'}</b><span class="count">${r.n}</span></div>`
+    : html`<div class="rm-cell" key=${r.id}><span class="tag">${r.sp.label}</span><a class="truncate" href=${sprintHref(r.sp)}>${r.sp.name}</a></div>`;
+  const track = (r) => html`<div class=${cx('rm-cell rm-track', r.k === 'epic' && 'epic')} key=${r.k + (r.id || '')}>
+    ${r.k === 'epic' && r.st != null && html`<span class="rm-bar epic" style=${{ left: x(r.st) + 'px', width: (r.en - r.st) * DAYPX + 'px' }}></span>`}
+    ${r.k === 'sprint' && html`<a class=${cx('rm-bar', 'st-' + r.sp.column.replace(' ', '-').toLowerCase())} href=${sprintHref(r.sp)} style=${{ left: x(r.sp.start ?? 0) + 'px', width: Math.max(0.3, (r.sp.end ?? 1) - (r.sp.start ?? 0)) * DAYPX + 'px' }} title=${`${r.sp.label} ${r.sp.name} · ${r.sp.column}`}><span class="truncate">${r.sp.name}</span></a>`}</div>`;
   return html`<div class="roadmap" data-main>
     <div class="rm-grid" style=${{ '--rm-w': (to - from) * DAYPX + 'px', '--day': DAYPX + 'px' }}>
-      <div class="rm-head"><div class="rm-name">Epic and sprint</div><div class="rm-axis">${days.map((d) => html`<span key=${d} class=${cx(d === 0 && 'today')} style=${{ left: x(d) + 'px' }}>${label(d)}</span>`)}</div></div>
-      <div class="rm-goal"><div class="rm-name"><${Icon} name="target" size=${13} class="faint" /><span class="truncate">${project.goal}</span></div><div class="rm-track"></div></div>
-      ${groups.map(({ e, list }) => { const st = list.length ? Math.min(...list.map((sp) => sp.start ?? 0)) : null; const en = list.length ? Math.max(...list.map((sp) => sp.end ?? 1)) : null;
-        return html`<div class="rm-group" key=${e ? e.id : 'none'}>
-          <div class="rm-row epic"><div class="rm-name"><${Icon} name="layers" size=${13} class="faint" /><b class="truncate">${e ? e.name : 'No epic'}</b><span class="count">${list.length}</span></div>
-            <div class="rm-track">${st != null && html`<span class="rm-bar epic" style=${{ left: x(st) + 'px', width: (en - st) * DAYPX + 'px' }}></span>`}</div></div>
-          ${list.sort((a, b) => (a.start ?? 0) - (b.start ?? 0)).map((sp) => html`<div class="rm-row" key=${sp.id}>
-            <div class="rm-name"><span class="tag">${sp.label}</span><a class="truncate" href=${href(`/p/${sp.project}/sprint/${sp.id}`)}>${sp.name}</a></div>
-            <div class="rm-track"><a class=${cx('rm-bar', 'st-' + sp.column.replace(' ', '-').toLowerCase())} href=${href(`/p/${sp.project}/sprint/${sp.id}`)} style=${{ left: x(sp.start ?? 0) + 'px', width: Math.max(0.3, (sp.end ?? 1) - (sp.start ?? 0)) * DAYPX + 'px' }} title=${`${sp.label} ${sp.name} · ${sp.column}`}><span class="truncate">${sp.name}</span></a></div></div>`)}
-        </div>`; })}
-      ${groups.length === 0 && html`<div class="rm-row"><div class="rm-name muted" data-empty>No epics</div><div class="rm-track"></div></div>`}
-      <i class="rm-now" style=${{ left: `calc(var(--rm-name) + ${todayX}px)` }}></i>
+      <div class="rm-names">
+        <div class="rm-cell rm-head">Epic and sprint</div>
+        ${rows.map(name)}
+        ${groups.length === 0 && html`<div class="rm-cell muted" data-empty>No epics</div>`}
+      </div>
+      <div class="rm-time">
+        <div class="rm-cell rm-head rm-axis">${days.map((d) => html`<span key=${d} class=${cx(d === 0 && 'today')} style=${{ left: x(d) + 'px' }}>${label(d)}</span>`)}</div>
+        ${rows.map(track)}
+        ${groups.length === 0 && html`<div class="rm-cell rm-track"></div>`}
+        <i class="rm-now" style=${{ left: todayX + 'px' }}></i>
+      </div>
     </div>
   </div>`;
 }
