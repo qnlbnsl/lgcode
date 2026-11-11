@@ -1043,3 +1043,39 @@ or narrower.
 - **A docked request has its own identifier.** Above 1800 pixels a docked thread can show a
   request that the page beside it shows too. The docked copy's identifier starts with
   `dock-`, and answering it keeps the focus on the copy that was answered.
+
+## Layout and density, set on 2026-11-10
+
+These rules describe the rebuilt mock in `design/mock/`. They await the owner's approval.
+
+LGcode is an operating tool that the owner keeps open all day. The default density is
+Compact. A row is 30 pixels high. A control is 28 pixels high. The inset inside a region is
+10 pixels. The gap between groups is 20 pixels. Regular density is the alternate, and
+Service settings switches between them. The values live in `design/mock/css/tokens.css`
+under `--row`, `--control`, `--inset` and `--gap-group`.
+
+The main screen has three regions. The sidebar on the left holds the project tree and the
+service pages. The centre holds the current tab. The lead conversation docks on the right of
+every project tab except Chat, and a toggle at the end of the tab row hides it.
+
+A list of like things is a table or a list of rows with hairline dividers. A card is used
+only for an item that moves on its own, such as a sprint on the board or a request that
+needs an answer. A card never sits inside another card.
+
+Each screen has at most one filled primary button. Body text uses the full text colour.
+The muted colour is for captions, paths and times.
+
+## Agent names, set on 2026-11-10
+
+The owner said on 2026-11-10 that agents must not carry invented personal names. An agent
+is named by its role. The names are Project lead, Build lead, Planning lead, Design lead,
+Review lead, Builder 1, Builder 2, Reviewer, Test runner, Test writer, Planner and Designer.
+A team lead's team is shown beside its name. The avatar is a glyph for the role.
+
+## Libraries, set on 2026-11-10
+
+The rebuilt mock has no build step. It draws its screens with Preact through the
+standalone build of htm, kept in `third_party/htm-preact/`. Its icons are Lucide icons in
+`design/mock/js/icons.js`. Its fonts are Inter and JetBrains Mono from `design/fonts/`.
+Menus, dialogs, tabs and toasts are the mock's own small components in
+`design/mock/js/ui.js`. The mock loads nothing from the network.

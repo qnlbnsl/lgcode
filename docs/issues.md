@@ -10888,3 +10888,26 @@ At new-project.spec.ts:626, the preview frame's body never received data-loaded=
 The unchanged case passed on its own in 24.6 seconds.
 Both failures are in the mock and component preview path under a full parallel browser run.
 The cause remains unproved.
+
+## 612. The built web page prints raw engine data and has weak component design
+
+Open: found on 2026-11-10 while comparing the page in `packages/web` with the mock.
+The page's colours and type match the mock's tokens. The faults are in the components.
+An agent thread prints raw engine envelopes and identifiers, with no avatar, name or time.
+The phone notification offer stays on every page and takes about 105 pixels.
+The Terminal tab is a two-line placeholder.
+No screen has a clear primary button.
+The Git tab shows broken glyphs and a folder named ".".
+Machines and Subscriptions mostly say "not available yet".
+The rebuilt mock in `design/mock/` is the proposed reference for fixing these.
+
+## 613. Agents carry invented personal names in the engine and the older mock
+
+Open: the owner rejected invented agent names on 2026-11-10. An agent is named by its role.
+The engine still gives each project lead a name from a fixed list at
+`packages/engine/src/project/lifecycle.ts:21`. The list starts with Sage and Rowan.
+The test `packages/engine/test/api/subscribe-visibility.test.ts` uses those names.
+The older `design/workbench.html` and the files under `design/data/` also use such names.
+The rebuilt mock in `design/mock/` names every agent by its role.
+The engine change is not made yet, because the lead's name is passed to the agent start
+at `lifecycle.ts:251` and is written into stored events.
