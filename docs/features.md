@@ -684,3 +684,13 @@ grades to the model ledger. The ledger feeds the list that says which model to
 try for each kind of task. The design is in "Evaluation rounds and the model
 ledger" in
 [docs/specs/2026-11-05-build-loop-design.md](specs/2026-11-05-build-loop-design.md).
+
+## Questions that carry their own brief
+
+The owner asked for this on 2026-11-11, and it is agreed for the mock. It is not
+built in the engine. When an agent asks the owner a question, it writes a short
+brief of the question, one line of description, a short recommendation, what the
+question is about, why it matters, why it recommends its answer, and the files it
+cites. A thread shows the brief first, with Accept, Deny and Details, and the
+full card opens from Details. The mock in `design/mock/` shows the layout. The
+engine's question records and the agents' instructions would need these fields.
