@@ -89,9 +89,12 @@ th.num .th-sort { flex-direction: row-reverse; }
 .roadmap { flex: 1; min-height: 0; overflow: auto; --rm-name: 260px; }
 .rm-grid { display: grid; grid-template-columns: var(--rm-name) var(--rm-w); width: calc(var(--rm-name) + var(--rm-w)); min-height: 100%; }
 /* the names column: pinned to the left, as tall as the roadmap, and above everything that scrolls under it */
-.rm-names { position: sticky; left: 0; z-index: 5; min-width: 0; background: var(--color-bg); border-right: 1px solid var(--color-line); }
+.rm-names { position: sticky; left: 0; z-index: 5; min-width: 0; background-color: var(--color-bg); border-right: 1px solid var(--color-line); }
+/* both columns carry a ruled line every row, so the space below the last item reads as empty rows, not a void */
+.rm-names, .rm-time { --rm-rule: linear-gradient(to bottom, transparent calc(var(--row) - 1px), var(--color-line) calc(var(--row) - 1px)); }
+.rm-names { background-image: var(--rm-rule); background-size: 100% var(--row); }
 /* the time column: the day lines run its full height, so the grid does not stop at the last row */
-.rm-time { position: relative; min-width: 0; background-image: linear-gradient(to right, var(--color-line) 1px, transparent 1px); background-size: var(--day) 100%; }
+.rm-time { position: relative; min-width: 0; background-image: linear-gradient(to right, var(--color-line) 1px, transparent 1px), var(--rm-rule); background-size: var(--day) 100%, 100% var(--row); }
 .rm-cell { display: flex; align-items: center; gap: 6px; height: var(--row); padding: 0 var(--inset) 0 var(--space-4); border-bottom: 1px solid var(--color-line); min-width: 0; font-size: var(--text-sm); }
 .rm-head { position: sticky; top: 0; z-index: 4; background: var(--color-bg); color: var(--color-muted); font-size: var(--text-xs); font-weight: var(--weight-medium); }
 .rm-axis { position: sticky; padding: 0; }
