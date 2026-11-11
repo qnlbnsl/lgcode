@@ -1060,7 +1060,23 @@ every project tab except Chat, and a toggle at the end of the tab row hides it.
 
 A list of like things is a table or a list of rows with hairline dividers. A card is used
 only for an item that moves on its own, such as a sprint on the board or a request that
-needs an answer. A card never sits inside another card.
+needs an answer. A card never sits inside another card. Home, All projects, the Mocks tab,
+Test runs, and the Assignment section of Project settings are tables for this reason.
+
+A screen with no data keeps its structure. A table shows its header and one muted row,
+such as "No screens" or "No fix sprints". A board keeps its columns.
+
+A status line sits under a secondary tab row and above the main table. It holds the
+counts, the badges and the screen's buttons, and it never holds a sentence that explains
+the screen. Workflow, Mocks, End result and the workflow's settings use it.
+
+The repository Design page fills the centre with a canvas. One thin bar above it holds the
+Projects and Design tabs, the category and item menus, the file's name, the zoom controls,
+and "Open in OpenPencil". The Mocks tab shows one screen on the same canvas.
+
+The owner's messages sit on the right of a chat, in a filled bubble. An agent's messages
+sit on the left without a bubble. Only the project lead's thread has a message box. Every
+other agent's thread is read-only.
 
 Each screen has at most one filled primary button. Body text uses the full text colour.
 The muted colour is for captions, paths and times.
@@ -1070,7 +1086,12 @@ The muted colour is for captions, paths and times.
 The owner said on 2026-11-10 that agents must not carry invented personal names. An agent
 is named by its role. The names are Project lead, Build lead, Planning lead, Design lead,
 Review lead, Builder 1, Builder 2, Reviewer, Test runner, Test writer, Planner and Designer.
-A team lead's team is shown beside its name. The avatar is a glyph for the role.
+A team lead's team is shown beside its name. The avatar is a glyph for the role. A direct
+message between two agents shows the first avatar, a short dash, and the second avatar.
+
+A new project is named from its goal. It shows "Naming…" in the sidebar until the name is
+set. Commit messages and pull request text are written by a small model, Haiku 5.5 by
+default, chosen in Service settings under "Git messages".
 
 ## Libraries, set on 2026-11-10
 
@@ -1079,3 +1100,9 @@ standalone build of htm, kept in `third_party/htm-preact/`. Its icons are Lucide
 `design/mock/js/icons.js`. Its fonts are Inter and JetBrains Mono from `design/fonts/`.
 Menus, dialogs, tabs and toasts are the mock's own small components in
 `design/mock/js/ui.js`. The mock loads nothing from the network.
+
+The Design page's canvas is the mock's own small component in `design/mock/js/screens/design.js`.
+It needs zoom, Fit and focus on one frame, and no library on the approved list does only
+that. Its screen frames are the mock's own addresses drawn in frames, so the Design page
+always shows the code's current screens. The Palette sheet reads `css/tokens.css` at run
+time to compare it with the design file.

@@ -10911,3 +10911,39 @@ The older `design/workbench.html` and the files under `design/data/` also use su
 The rebuilt mock in `design/mock/` names every agent by its role.
 The engine change is not made yet, because the lead's name is passed to the agent start
 at `lifecycle.ts:251` and is written into stored events.
+
+## 614. The design file lags the rebuilt mock's tokens and names
+
+Open: found on 2026-11-10 while building the repository Design page in `design/mock/`.
+The design file is `design/lgcode.fig`.
+Its `Agent row` variants show the name "Rowan", which breaks the rule that agents are named
+by role.
+It has 15 colour variables, while `design/mock/css/tokens.css` has 38 colours.
+Thirteen of the shared colours were retuned in code, and only `surface` and
+`primary-contrast` still agree.
+It has no type, space, density, shape or motion variables.
+The Design page marks every such value "Only in code" or "Retuned in code" until the file
+catches up.
+The full list of changes is in `design/mock/feedback/2026-11-10-design-categories.md`,
+under "What LGcode's file must change to meet the standard".
+The Design lead agent proposes those changes, and the owner approves them.
+
+## 615. The mock's Git tab replaces its structure with a blank page when there is no worktree
+
+Open: found on 2026-11-10 during the second round of the mock.
+The Git tab draws one centred "No worktrees yet" message at
+`design/mock/js/screens/git.js:713` when a project has no worktree.
+The rule since round 2 is that a screen with no data keeps its structure.
+The Git tab should keep its Changes and History columns, with an empty row in each.
+The round 2 brief did not list the Git tab's empty state, so it was left as it is.
+
+## 616. The repository Design page draws every screen frame as a live copy of the mock
+
+Open: found on 2026-11-10 while building the Design page in `design/mock/`.
+Each screen frame on the Screens sheets is a frame that loads the whole mock at that
+screen's address.
+A flow with eight frames starts eight copies of the mock, each with its own data.
+The page takes about a second longer to settle on the larger flows, and it uses more memory
+than a picture would.
+A real build should draw the frames from the design file, or from stored pictures, and load
+a live copy only for the frame the owner opens.

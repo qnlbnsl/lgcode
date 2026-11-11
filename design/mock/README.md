@@ -25,20 +25,25 @@ resets everything.
 
 | Screen | Address after `#` |
 |---|---|
-| Home, with requests across projects | `/home` |
-| Project board, with the lead conversation docked | `/p/console/board` |
+| Home, one table of everything that waits for the owner | `/home` |
+| All projects, one table of every project | `/projects` |
+| Project board, as columns, a table, or a roadmap | `/p/console/board`, `/p/console/board/table`, `/p/console/board/roadmap` |
 | Sprint, task and team pages | opened from the board and the sidebar |
-| Workflow, the build loop's phases and review rounds | `/p/console/workflow` |
-| Mocks, for a project in its Design stage | `/p/phone/mocks` |
+| Workflow, the build loop's phases | `/p/console/workflow` |
+| Review rounds, Test runs, End result, and the workflow's settings | `/p/rules/workflow/review`, `/p/console/workflow/runs`, `/p/apiref/workflow/result`, `/p/console/workflow/settings` |
+| Mocks, for a project in its Design stage | `/p/phone/mocks`, and one screen at `/p/phone/mocks/screen/requests` |
 | Chat with any agent | `/p/console/chat` |
 | Messages, the agents' message board | `/p/console/messages` |
 | Agents, the roster by situation | `/p/console/agents` |
 | Terminal | `/p/console/terminal` |
-| Git | `/p/console/git` |
-| Project settings | `/p/console/settings` |
-| Repository design page | `/r/lgcode/design` |
+| Git, with generated commit and pull request text | `/p/console/git` |
+| Project settings, with the lead's model and the work assignment table | `/p/console/settings` |
+| Repository design page, the design file on a canvas | `/r/lgcode/design`, and `/r/<repository>/design/<category>/<item>` |
 | Machines, Subscriptions, Phone notifications, Service settings | `/machines`, `/subscriptions`, `/notifications`, `/settings` |
 | Login and first run | `/login`, `/setup` |
+
+A repository without a design file, such as `atlas-docs`, shows the Design page's empty
+structure at `/r/atlas-docs/design`.
 
 ## How the files are arranged
 
@@ -51,7 +56,8 @@ resets everything.
 - `js/data.js` holds the sample data and the functions that read it.
 - `js/actions.js` holds every change to the data.
 - `js/ui.js` holds the shared components.
-- `js/screens/` holds one file for each screen.
+- `js/screens/` holds one file for each screen. `js/screens/design.js` holds the Design
+  page and the canvas that the Mocks tab reuses for its large preview.
 - `js/icons.js` is generated from Lucide. `vendor/htm-preact` is a link to
   `third_party/htm-preact/`. `fonts` is a link to `design/fonts/`.
 
