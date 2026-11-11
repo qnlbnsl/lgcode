@@ -275,3 +275,37 @@ export function setConnection(status) { update((s) => { s.conn.status = status; 
 export function setSession(status) { update((s) => { s.session.status = status; }); remember('session', status === 'in' ? 'in' : 'out'); }
 export function resetMock() { try { for (const k of Object.keys(localStorage)) if (k.startsWith('lgcode-mock:')) localStorage.removeItem(k); } catch { /* storage is optional */ } location.hash = '#/home'; location.reload(); }
 export { MIN, teamName, tasksOfSprint, agentLabel, teamOf };
+
+// ---- Git messages ------------------------------------------------------------------
+// The real product sends the staged diff, or the list of commits, to the cheap model the
+// owner picked under Service settings. Its prompt asks for a short conventional commit and
+// forbids attribution lines. The mock imitates the result from the file paths alone.
+export const PR_TITLE_LIMIT = 72;
+const typeOf = (paths) => (paths.every((p) => /(^|\/)(test|tests)\/|\.test\.|\.spec\./.test(p)) ? 'test'
+  : paths.every((p) => /\.(md|mdx|txt)$/.test(p) || /^docs\//.test(p)) ? 'docs'
+  : paths.every((p) => /\.(css|scss)$/.test(p)) ? 'style'
+  : paths.some((p) => /fix|flaky/i.test(p)) ? 'fix' : 'feat');
+const scopeOf = (paths) => {
+  const dirs = paths.map((p) => p.split('/').slice(0, -1).filter((d) => !/^(src|packages|test|tests|lib|public)$/.test(d)).pop()).filter(Boolean);
+  const n = {}; for (const d of dirs) n[d] = (n[d] || 0) + 1;
+  const [top, c] = Object.entries(n).sort((a, b) => b[1] - a[1])[0] || [];
+  return c > paths.length / 2 ? top : null;
+};
+const stemName = (p) => p.split('/').pop().replace(/\.(test|spec)\./, '.').replace(/\.[a-z]+$/, '');
+export function commitMessage(paths) {
+  if (!paths.length) return '';
+  const type = typeOf(paths); const scope = scopeOf(paths);
+  const seen = new Set(); const names = paths.map(stemName).filter((n) => !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()));
+  const verb = { test: 'cover', docs: 'update', style: 'restyle', fix: 'fix', feat: 'update' }[type];
+  const what = names.length <= 2 ? names.join(' and ') : `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+  return `${type}${scope ? `(${scope})` : ''}: ${verb} ${what}`.slice(0, PR_TITLE_LIMIT);
+}
+export function pullRequestText(subjects, evidence) {
+  const lead = subjects.find((x) => !/^merge /i.test(x)) || subjects[0] || 'Changes';
+  const scope = /^\w+(\([^)]*\))?:/.test(lead) ? '' : 'feat: ';
+  let title = (scope + lead[0].toLowerCase() + lead.slice(1)).replace(/\.$/, '');
+  if (title.length > PR_TITLE_LIMIT) title = title.slice(0, PR_TITLE_LIMIT - 1).replace(/\s+\S*$/, '') + '…';
+  const body = ['## Summary', '', ...subjects.slice(0, 8).map((x) => `- ${x}`), ...(subjects.length > 8 ? [`- and ${subjects.length - 8} more commits`] : []),
+    '', '## Evidence', '', `- ${evidence.tests.text}`, `- ${evidence.review.text}`].join('\n');
+  return { title, body };
+}

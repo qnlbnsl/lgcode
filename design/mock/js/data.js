@@ -1,7 +1,7 @@
 // The mock's sample data and the functions that read it.
 // The data is plain objects. It is a design aid, not a contract for the engine.
 // Agents have no personal names: an agent is known by its role and its team.
-import { MIN, HOUR, DAY, persist } from './lib.js';
+import { MIN, HOUR, DAY, persist, FRAMED } from './lib.js';
 
 const T = Date.now();
 const at = (msAgo) => T - msAgo;
@@ -33,8 +33,8 @@ export const ROLES = {
 export const TASK_STATES = { queue: 'Queued', active: 'Active', review: 'In review', blocked: 'Blocked', done: 'Done' };
 export const KIND_LABEL = { question: 'Question', approval: 'Approval', merge: 'Merge', failed: 'Failed start' };
 export const HARNESSES = {
-  claude: { name: 'Claude Code', models: ['Fable 5.2', 'Opus 5.5', 'Sonnet 5.5', 'Haiku 5.5'], efforts: ['Low', 'Medium', 'High', 'Max'], runMode: 'ACP' },
-  codex: { name: 'Codex', models: ['GPT-6.1 Sol', 'GPT-6 Luna'], efforts: ['Low', 'Medium', 'High'], runMode: 'ACP' },
+  claude: { name: 'Claude Code', models: ['Fable 5.2', 'Opus 5.5', 'Sonnet 5.5', 'Haiku 5.5'], efforts: ['Low', 'Medium', 'High', 'Max'], noEffort: ['Haiku 5.5'], runMode: 'ACP' },
+  codex: { name: 'Codex', models: ['GPT-6.1 Sol', 'GPT-6 Luna'], efforts: ['Low', 'Medium', 'High'], noEffort: [], runMode: 'ACP' },
 };
 export const PERMISSION_MODES = ['Read only', 'Ask before every change', 'Edit files without asking', 'Full access'];
 
@@ -289,7 +289,7 @@ export function seed() {
   ];
 
   return {
-    session: { status: persist('session', 'in'), firstRun: false },
+    session: { status: (FRAMED && new URLSearchParams(location.hash.split('?')[1] || '').get('session')) || persist('session', 'in'), firstRun: false },
     conn: { status: 'live', lastHeard: T },
     prefs: {
       theme: persist('theme', 'system'), density: persist('density', 'compact'),
@@ -321,6 +321,26 @@ export const teamsOf = (s, pid) => s.teams.filter((t) => t.project === pid);
 export const agentsOfTeam = (s, tid) => s.agents.filter((a) => a.team === tid);
 export const agentsOfProject = (s, pid) => s.agents.filter((a) => a.project === pid);
 export const leadOf = (s, p) => agentOf(s, p.lead);
+// Whether a model takes an effort setting.
+export const hasEffort = (harness, model) => !(HARNESSES[harness]?.noEffort || []).includes(model);
+export const harnessOfModel = (m) => Object.keys(HARNESSES).find((h) => HARNESSES[h].models.includes(m));
+// The kinds of work a project assigns to a harness, a model and an effort.
+export const WORK_KINDS = ['Plan', 'Build', 'Review', 'Test'];
+// The table the project lead proposes, from the harnesses the owner has signed in to.
+export function proposeAssignment(s) {
+  const on = new Set(s.subscriptions.filter((x) => x.signedIn && x.enabled).map((x) => x.harness));
+  const c = on.has('claude'), x = on.has('codex');
+  const pick = (h, m, e) => ({ harness: h, model: m, effort: hasEffort(h, m) ? e : null });
+  const fallback = c ? 'claude' : x ? 'codex' : 'claude';
+  const best = (prefer) => (prefer === 'codex' && x) ? 'codex' : (prefer === 'claude' && c) ? 'claude' : fallback;
+  const M = { claude: { top: 'Fable 5.2', mid: 'Opus 5.5', low: 'Sonnet 5.5' }, codex: { top: 'GPT-6.1 Sol', mid: 'GPT-6.1 Sol', low: 'GPT-6 Luna' } };
+  return {
+    Plan: pick(best('claude'), M[best('claude')].top, 'High'),
+    Build: pick(best('codex'), M[best('codex')].mid, 'Medium'),
+    Review: pick(best('claude'), M[best('claude')].mid, 'High'),
+    Test: pick(best('codex'), M[best('codex')].low, 'Medium'),
+  };
+}
 export const sprintsOf = (s, pid) => s.sprints.filter((x) => x.project === pid);
 export const epicsOf = (s, pid) => s.epics.filter((x) => x.project === pid);
 export const tasksOfSprint = (s, sid) => s.tasks.filter((t) => t.sprint === sid);

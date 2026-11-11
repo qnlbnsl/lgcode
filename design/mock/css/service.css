@@ -182,3 +182,15 @@
   .svc-teams .select { height: 32px; font-size: var(--text-md); }
 }
 .field > .seg { justify-self: start; }
+/* ---- round 2: lead model and effort, the assignment table, Git messages ------------ */
+.svc-lead { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr) minmax(0, 0.8fr); gap: 6px; max-width: 640px; align-items: center; }
+.svc-noeffort { font-size: var(--text-sm); }
+.svc-assign .select { height: 24px; min-height: 0; font-size: var(--text-sm); padding-left: 8px; min-width: 120px; }
+.svc-assign tr.changed td:first-child { box-shadow: inset 2px 0 0 var(--color-info); }
+.svc-assign-all { gap: 8px; margin-top: 8px; font-size: var(--text-sm); }
+.svc-assign-all .select { height: 28px; min-height: 0; font-size: var(--text-sm); width: 200px; }
+.svc-example { margin: 0; }
+@media (max-width: 860px) {
+  .svc-lead { grid-template-columns: minmax(0, 1fr); }
+  .svc-assign .select { height: 32px; font-size: var(--text-md); }
+}

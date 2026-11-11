@@ -554,6 +554,8 @@ function Changes({ s, w, mode, phone }) {
   const msg = ui.message || ''; const readOnly = w.kind === 'base';
   const can = staged.length > 0 && msg.trim().length > 0 && !w.merge;
   const commitNow = () => { if (!can) return; doCommit(w.id, msg.trim()); setUi({ message: '', file: null }); };
+  const [writing, setWriting] = useState(false);
+  const generate = () => { if (!staged.length || writing) return; setWriting(true); setTimeout(() => { setWriting(false); setUi({ message: act.commitMessage(staged.map((f) => f.path)) }); }, 900); };
   const why = w.merge ? 'Finish or abort the merge first' : !staged.length ? 'Stage a file first' : !msg.trim() ? 'Write a message first' : '';
   if (!w.files.length) {
     return html`<div class="git-clean"><${Empty} title="Nothing to commit" icon="circle-check">
@@ -571,9 +573,10 @@ function Changes({ s, w, mode, phone }) {
   return html`<div class=${cx('git-split', phone && sel && 'detail')}>
     <div class="git-list">
       <form class="git-commit" onSubmit=${(e) => { e.preventDefault(); commitNow(); }}>
-        <textarea class="textarea" rows="2" placeholder=${`Message for the commit on ${baseName(w.branch)}`} aria-label="Commit message" value=${msg}
+        <textarea class="textarea" rows="2" placeholder=${writing ? 'Writing the message…' : `Message for the commit on ${baseName(w.branch)}`} aria-label="Commit message" value=${msg}
           onInput=${(e) => setUi({ message: e.target.value })} onKeyDown=${(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commitNow(); } }}></textarea>
         <div class="row"><span class="muted grow truncate">${why || `${plural(staged.length, 'staged file')} · commits as you`}</span>
+          <button type="button" class="btn sm ghost" disabled=${!staged.length || writing || !!w.merge} data-tip=${`Writes the message with ${s.settings.gitModel || 'Haiku 5.5'}`} onClick=${generate}><${Icon} name=${writing ? 'loader-circle' : 'sparkles'} size=${13} class=${writing ? 'spin' : ''} />Generate</button>
           <button type="submit" class="btn primary sm" disabled=${!can}><${Icon} name="check" size=${13} />Commit</button></div>
       </form>
       <div class="git-groups">${group('Staged', staged, true)}${group('Changes', unstaged, false)}

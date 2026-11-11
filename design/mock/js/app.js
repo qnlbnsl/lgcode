@@ -15,7 +15,8 @@ import { Board, SprintPage, TaskPage, TeamPage, RepoPage } from './screens/proje
 import { ChatTab } from './screens/chat.js';
 import { GitTab, seedGit } from './screens/git.js';
 import { TerminalTab, seedTerminal } from './screens/terminal.js';
-import { MocksTab, RepoDesign, seedMocks } from './screens/mocks.js';
+import { MocksTab, seedMocks } from './screens/mocks.js';
+import { RepoDesign } from './screens/design.js';
 import { MessagesTab, AgentsTab, seedBoard } from './screens/messages.js';
 import { WorkflowTab, seedWorkflow } from './screens/workflow.js';
 import { Machines, Subscriptions, Notifications, ServiceSettings, ProjectSettings, seedService } from './screens/service.js';
@@ -43,7 +44,7 @@ function ProjectTree({ s, route }) {
     const rk = 'repo:' + r.id; const ropen = s.expanded[rk] ?? false;
     const rn = openRequests(s).filter((q) => projectOf(s, q.project).repo === r.id).length;
     return html`<div key=${r.id}>
-      <${TreeRow} kind="repo" depth=${0} open=${ropen} onToggle=${() => act.toggleExpanded(rk)} to=${'/r/' + r.id} current=${path === '/r/' + r.id || path === `/r/${r.id}/design`}
+      <${TreeRow} kind="repo" depth=${0} open=${ropen} onToggle=${() => act.toggleExpanded(rk)} to=${'/r/' + r.id} current=${path === '/r/' + r.id || path.startsWith(`/r/${r.id}/design`)}
         icon=${html`<${Icon} name="folder-git-2" size=${14} class="faint" />`} label=${r.name} state=${!ropen && rn ? rn : null} tone="warn"
         action=${html`<button type="button" class="icon-btn sm hover-act" aria-label=${'New project in ' + r.name} data-tip="New project here" data-tip-side="left" onClick=${() => act.openDialog({ type: 'new-project', repo: r.id })}><${Icon} name="plus" size=${13} /></button>`} />
       ${ropen && html`<div class="tree-children" style="--guide:13px">

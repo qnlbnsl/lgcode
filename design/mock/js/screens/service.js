@@ -3,7 +3,7 @@
 import { html, useState, useEffect, Icon, cx, update, store, go, href, ago, clock, dayLabel, useNow, uid, plural, MIN, HOUR, DAY } from '../lib.js';
 import {
   HARNESSES, PERMISSION_MODES, KIND_LABEL, byId, projectOf, repoOf, agentOf, teamsOf, teamName, agentsOfTeam, agentsOfProject,
-  machineOf, subOf, subLabel, agentStatus, routeForAgent, routeForRequest, openRequests,
+  machineOf, subOf, subLabel, agentStatus, routeForAgent, routeForRequest, openRequests, hasEffort, harnessOfModel, WORK_KINDS, proposeAssignment,
 } from '../data.js';
 import * as act from '../actions.js';
 import { Avatar, Menu, Dialog, registerDialog, Empty, StateWord } from '../ui.js';
@@ -557,6 +557,19 @@ function WorkflowSettings({ s }) {
     <${Row} label="Review rounds" id="wf-r" hint="A minor finding scores 1 point, a major 3, and a blocker 9."><${Num} id="wf-r" value=${set.maxRounds} min=${1} max=${12} unit="at most" onChange=${(v) => setS({ maxRounds: v })} /><//>
   </div>`;
 }
+function GitMessages({ s }) {
+  const set = s.settings; const m = set.gitModel || 'Haiku 5.5'; const h = harnessOfModel(m) || 'claude';
+  const signed = new Set(s.subscriptions.filter((x) => x.signedIn).map((x) => x.harness));
+  return html`<div class="svc-rows">
+    <${Row} label="Model" id="gm-model" hint="Writes commit messages from the staged diff, and pull request titles and descriptions from the commits.">
+      <select id="gm-model" class="select" style="width:240px" value=${m} onChange=${(e) => setS({ gitModel: e.target.value })}>
+        ${Object.entries(HARNESSES).map(([id, x]) => html`<optgroup label=${x.name + (signed.has(id) ? '' : ' (signed out)')}>${x.models.map((mo) => html`<option value=${mo} disabled=${!signed.has(id)}>${mo}</option>`)}</optgroup>`)}</select><//>
+    <${Row} label="Runs on"><span>${HARNESSES[h].name}</span><//>
+    <${Row} label="Commit message"><span class="row" style="gap:6px"><span class="badge outline">Conventional commit</span><span class="badge outline">One line</span><span class="badge outline">No attribution</span></span><//>
+    <${Row} label="Pull request title" id="gm-limit"><span class="row" style="gap:6px"><span class="num">${act.PR_TITLE_LIMIT}</span><span class="muted">characters at most</span></span><//>
+    <${Row} label="Example" top><pre class="code svc-example">${act.commitMessage(['packages/web/src/shell/Sidebar.tsx', 'packages/web/src/shell/NavRail.tsx'])}</pre><//>
+  </div>`;
+}
 function About({ s }) {
   const set = s.settings; const [chk, setChk] = useState(null); const master = s.machines.find((m) => m.role === 'master');
   return html`<div class="svc-rows">
@@ -578,6 +591,7 @@ const SECTIONS = [
   ['remote', 'Remote access', 'wifi', Remote, 'How this page is reached from other devices.'],
   ['sheepdog', 'Sheepdog', 'timer', Sheepdog, 'Watching for agents that stop moving.'],
   ['workflow', 'Workflow', 'workflow', WorkflowSettings, 'The build loop and where you override it.'],
+  ['git', 'Git messages', 'git-commit-horizontal', GitMessages, 'The model that writes commit and pull request messages.'],
   ['about', 'About', 'info', About, 'The version and the service.'],
 ];
 export function ServiceSettings({ s, route }) {
@@ -617,6 +631,17 @@ export function ProjectSettings({ s, project: p }) {
         for (const k of ['agents', 'teams', 'sprints', 'tasks', 'requests', 'channels']) st[k] = st[k].filter((x) => x.project !== id);
         st.posts = st.posts.filter((x) => !ch.has(x.channel)); st.notifications = st.notifications.filter((n) => n.project !== id); });
       act.toast(`Deleted ${p.name}`); } });
+  const signed = new Set(s.subscriptions.filter((x) => x.signedIn && x.enabled).map((x) => x.harness));
+  const asg = p.assignment || { state: 'proposed', rows: proposeAssignment(s), changed: [] };
+  const saveAsg = (next) => { update(() => { p.assignment = next; }); markSaved(); };
+  const setRow = (k, patch) => { const row = { ...asg.rows[k], ...patch };
+    if (patch.harness) { row.model = HARNESSES[patch.harness].models[0]; }
+    row.effort = hasEffort(row.harness, row.model) ? row.effort || 'Medium' : null;
+    saveAsg({ ...asg, rows: { ...asg.rows, [k]: row }, changed: [...new Set([...(asg.changed || []), k])] }); };
+  const [allModel, setAllModel] = useState(() => asg.rows.Plan.model);
+  const applyAll = () => { const h = harnessOfModel(allModel); const rows = {}; for (const k of WORK_KINDS) rows[k] = { harness: h, model: allModel, effort: hasEffort(h, allModel) ? asg.rows[k].effort || 'Medium' : null };
+    saveAsg({ ...asg, rows, changed: [...WORK_KINDS] }); act.toast(`Every row uses ${allModel}`); };
+  const approve = () => { saveAsg({ ...asg, state: 'approved' }); act.toast('Assignment approved. The project lead was told.'); };
   const setPerm = (v) => { update((st) => { for (const a of st.agents) if (a.project === p.id) a.permission = v; }); markSaved(); };
   const setTeam = (t, patch) => { update((st) => { for (const a of agentsOfTeam(st, t.id)) { if (patch.harness && patch.harness !== a.harness) { const hs = HARNESSES[patch.harness]; const sub = st.subscriptions.find((x) => x.harness === patch.harness && x.signedIn && x.machine === p.machine) || st.subscriptions.find((x) => x.harness === patch.harness && x.signedIn); a.harness = patch.harness; a.subscription = sub ? sub.id : a.subscription; a.model = hs.models[0]; a.effort = 'Medium'; } if (patch.model) a.model = patch.model; } if ('needToKnow' in patch) byId(st.teams, t.id).needToKnow = patch.needToKnow; }); markSaved(); };
   return html`<div class="page svc-project">
@@ -641,9 +666,16 @@ export function ProjectSettings({ s, project: p }) {
           <select id="ps-machine" class="select" style="width:300px" value=${p.machine} onChange=${(e) => { const v = e.target.value; set({ machine: v, folder: `${r.folders[v]}/.worktrees/${p.branch.split('/').pop()}` }); }}>
             ${s.machines.map((x) => html`<option value=${x.id} disabled=${x.status !== 'online' || !r.folders[x.id]}>${x.name}${x.status !== 'online' ? ' (offline)' : !r.folders[x.id] ? ` (${r.name} is not on it)` : ''}</option>`)}</select>
           ${m.status !== 'online' && html`<span class="svc-err">${m.name} is offline.</span>`}<//>
-        <${Row} label="Lead subscription" id="ps-sub" hint="The project lead runs on this subscription.">
-          <select id="ps-sub" class="select" style="width:300px" value=${lead.subscription} onChange=${(e) => { const x = subOf(s, e.target.value); update(() => { lead.subscription = x.id; if (lead.harness !== x.harness) { lead.harness = x.harness; lead.model = HARNESSES[x.harness].models[0]; } }); markSaved(); }}>
-            ${subs.map((x) => html`<option value=${x.id} disabled=${!x.signedIn}>${subLabel(s, x.id)}${!x.signedIn ? ' (signed out)' : x.usage ? ` · ${x.usage.pct}% used` : ''}</option>`)}</select><//>
+        <${Row} label="Lead subscription" id="ps-sub" hint="The project lead runs on this subscription." top>
+          <div class="svc-lead">
+            <select id="ps-sub" class="select" value=${lead.subscription} onChange=${(e) => { const x = subOf(s, e.target.value); update(() => { lead.subscription = x.id; if (lead.harness !== x.harness) { lead.harness = x.harness; lead.model = HARNESSES[x.harness].models[0]; lead.effort = hasEffort(x.harness, lead.model) ? 'High' : null; } }); markSaved(); }}>
+              ${subs.map((x) => html`<option value=${x.id} disabled=${!x.signedIn}>${subLabel(s, x.id)}${!x.signedIn ? ' (signed out)' : x.usage ? ` · ${x.usage.pct}% used` : ''}</option>`)}</select>
+            <select class="select" aria-label="Lead model" value=${lead.model} onChange=${(e) => { const v = e.target.value; update(() => { lead.model = v; lead.effort = hasEffort(lead.harness, v) ? lead.effort || 'High' : null; }); markSaved(); }}>
+              ${HARNESSES[lead.harness].models.map((mo) => html`<option value=${mo}>${mo}</option>`)}</select>
+            ${hasEffort(lead.harness, lead.model)
+              ? html`<select class="select" aria-label="Lead effort" value=${lead.effort || 'High'} onChange=${(e) => { const v = e.target.value; update(() => { lead.effort = v; }); markSaved(); }}>${HARNESSES[lead.harness].efforts.map((x) => html`<option value=${x}>${x}</option>`)}</select>`
+              : html`<span class="muted svc-noeffort">No effort setting</span>`}
+          </div><//>
       </div>
     <//>
     <${Section} title="Agents" sub=${`${ags.length} in this project`}>
@@ -655,19 +687,34 @@ export function ProjectSettings({ s, project: p }) {
         <${Row} label="Remove agent credits when merging" hint="Strips the co-author lines agents add to their commits."><${Switch} on=${p.removeCredits ?? s.settings.removeCredits} label="Remove agent credits when merging" onChange=${(v) => set({ removeCredits: v })} /><//>
       </div>
     <//>
+    <${Section} title="Assignment" sub=${asg.state === 'approved' ? 'Approved by you' : `Proposed by the project lead`}
+      action=${asg.state !== 'approved' && html`<button type="button" class="btn sm" onClick=${approve}><${Icon} name="check" size=${13} />Approve</button>`}>
+      <div class="table-wrap svc-assign"><table class="table"><thead><tr><th>Work</th><th>Harness</th><th>Model</th><th>Effort</th></tr></thead>
+        <tbody>${WORK_KINDS.map((k) => { const row = asg.rows[k]; const h = HARNESSES[row.harness];
+          return html`<tr key=${k} class=${cx(asg.changed?.includes(k) && 'changed')}>
+            <td><b style="font-weight:var(--weight-medium)">${k}</b></td>
+            <td><select class="select" aria-label=${k + ' harness'} value=${row.harness} onChange=${(e) => setRow(k, { harness: e.target.value })}>
+              ${Object.entries(HARNESSES).map(([id, x]) => html`<option value=${id} disabled=${!signed.has(id)}>${x.name}${signed.has(id) ? '' : ' (signed out)'}</option>`)}</select></td>
+            <td><select class="select" aria-label=${k + ' model'} value=${row.model} onChange=${(e) => setRow(k, { model: e.target.value })}>${h.models.map((mo) => html`<option value=${mo}>${mo}</option>`)}</select></td>
+            <td>${hasEffort(row.harness, row.model)
+              ? html`<select class="select" aria-label=${k + ' effort'} value=${row.effort || 'Medium'} onChange=${(e) => setRow(k, { effort: e.target.value })}>${h.efforts.map((x) => html`<option value=${x}>${x}</option>`)}</select>`
+              : html`<span class="muted">None</span>`}</td></tr>`; })}</tbody></table></div>
+      <div class="svc-assign-all row">
+        <label for="ps-all" class="muted">Every row</label>
+        <select id="ps-all" class="select" value=${allModel} onChange=${(e) => setAllModel(e.target.value)}>
+          ${Object.entries(HARNESSES).filter(([id]) => signed.has(id)).map(([id, x]) => html`<optgroup label=${x.name}>${x.models.map((mo) => html`<option value=${mo}>${mo}</option>`)}</optgroup>`)}</select>
+        <button type="button" class="btn sm" onClick=${applyAll}>Apply</button>
+      </div>
+    <//>
     <${Section} title="Teams" sub=${teams.length ? null : 'None yet'}>
-      ${teams.length === 0 ? html`<p class="muted" style="max-width:60ch">The project lead starts teams when the plan is ready. Each team gets its own branch and worktrees.</p>`
-      : html`<div class="table-wrap svc-teams"><table class="table"><thead><tr><th>Team</th><th class="c-mid">Agents</th><th>Harness</th><th>Model</th><th>Need-to-know</th></tr></thead>
-        <tbody>${teams.map((t) => { const ta = agentsOfTeam(s, t.id); const tl = ta.find((a) => a.role === 'team-lead') || ta[0]; const mixed = new Set(ta.map((a) => a.harness)).size > 1; const models = [...new Set(ta.map((a) => a.model))];
+      <div class="table-wrap svc-teams"><table class="table"><thead><tr><th>Team</th><th class="c-mid">Agents</th><th>Branch</th><th>Need-to-know</th></tr></thead>
+        <tbody>${teams.length === 0 && html`<tr><td colspan="4" class="muted" data-empty>No teams</td></tr>`}
+        ${teams.map((t) => { const ta = agentsOfTeam(s, t.id);
           return html`<tr key=${t.id}>
-            <td><a class="link" href=${href(`/p/${p.id}/team/${t.id}`)} title=${t.branch}>${teamName(t)}</a></td>
+            <td><a class="link" href=${href(`/p/${p.id}/team/${t.id}`)}>${teamName(t)}</a></td>
             <td class="c-mid"><span class="row" style="gap:3px">${ta.map((a) => html`<a key=${a.id} href=${href(routeForAgent(s, a))} data-tip=${a.name}><${Avatar} agent=${a} s=${s} size="sm" /></a>`)}</span></td>
-            <td><select class="select" aria-label=${'Harness for ' + teamName(t)} value=${mixed ? '' : tl.harness} onChange=${(e) => setTeam(t, { harness: e.target.value })}>
-              ${mixed && html`<option value="" disabled>Mixed</option>`}${Object.entries(HARNESSES).map(([id, h]) => html`<option value=${id}>${h.name}</option>`)}</select></td>
-            <td><select class="select" aria-label=${'Model for ' + teamName(t)} value=${models.length === 1 ? models[0] : ''} disabled=${mixed} onChange=${(e) => { if (e.target.value) setTeam(t, { model: e.target.value }); }}>
-              ${models.length !== 1 && html`<option value="">${mixed ? 'Per agent' : 'Mixed'}</option>`}${!mixed && HARNESSES[tl.harness].models.map((mo) => html`<option value=${mo}>${mo}</option>`)}</select></td>
+            <td class="mono muted truncate">${t.branch}</td>
             <td><${Switch} on=${t.needToKnow} label=${'Need-to-know for ' + teamName(t)} onChange=${(v) => setTeam(t, { needToKnow: v })} /></td></tr>`; })}</tbody></table></div>
-        <p class="svc-hint" style="margin-top:6px">A change applies from each agent's next turn. Set one agent apart in its own thread.</p>`}
     <//>
     <${Section} title="Archive or delete">
       <div class="svc-rows svc-danger">

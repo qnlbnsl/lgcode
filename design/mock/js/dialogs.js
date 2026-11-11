@@ -8,21 +8,49 @@ import * as act from './actions.js';
 import { Dialog, registerDialog, Avatar } from './ui.js';
 
 // ---- quick switcher ---------------------------------------------------------------
+// The real product ranks results with a small embedding model. The mock imitates it here,
+// in one function: the query's words, stemmed and with filler words removed, are matched
+// against each result's name and its wider text (a project's goal and sprints, a
+// repository's description, an agent's role, team and activity). Results that cover more
+// of the query rank higher; a word in the name counts more than a word in the text; a
+// word that names a kind ("project", "agent", "repository") favours that kind; a project
+// lead edges out other agents whose names match; and ties
+// rank repositories, then projects, then agents.
+const STOP = new Set('a an the of on in at to for and or is was were be been which what who where when how that this it its with from by my me i we our any some all was'.split(' '));
+const KIND_WORDS = { repository: 'Repository', repositories: 'Repository', repo: 'Repository', repos: 'Repository', project: 'Project', projects: 'Project', agent: 'Agent', agents: 'Agent' };
+const KIND_ORDER = { Repository: 0, Project: 1, Agent: 2, Page: 3 };
+const stem = (w) => w.replace(/(ing|ed|es|s)$/, '').replace(/(.)\1$/, '$1');
+const words = (t) => (t || '').toLowerCase().split(/[^a-z0-9]+/).filter((w) => w && !STOP.has(w));
+export function searchScore(query, item) {
+  const qw = words(query); if (!qw.length) return 0;
+  const kinds = qw.filter((w) => KIND_WORDS[w]).map((w) => KIND_WORDS[w]);
+  const terms = qw.filter((w) => !KIND_WORDS[w]).map(stem); if (!terms.length && !kinds.length) return 0;
+  const name = new Set(words(item.label).map(stem)); const text = new Set(words(item.text).map(stem));
+  const has = (set, t) => set.has(t) || (t.length > 3 && [...set].some((w) => w.startsWith(t)));
+  let covered = 0, weight = 0;
+  for (const t of terms) { if (has(name, t)) { covered++; weight += 3; } else if (has(text, t)) { covered++; weight += 1; } }
+  if (terms.length && !covered) return 0;
+  const cover = terms.length ? covered / terms.length : 1;
+  return cover * 10 + weight + (kinds.includes(item.kind) ? 4 : 0) + (weight >= 3 ? item.boost || 0 : 0);
+}
 function Switcher({ s }) {
   const [q, setQ] = useState(''); const [i, setI] = useState(0); const list = useRef(null);
   const all = [];
+  for (const r of s.repos) all.push({ kind: 'Repository', label: r.name, sub: r.remote || 'No remote', text: `${r.description || ''} ${r.remote || ''}`, to: '/r/' + r.id, icon: 'folder-git-2', mono: true });
   for (const p of s.projects.filter((x) => !x.archived)) {
-    const st = projectStatus(s, p);
-    all.push({ kind: 'Project', label: p.name, sub: repoOf(s, p).name, note: st.tone === 'warn' ? st.word : p.stage, tone: st.tone, to: `/p/${p.id}/board`, icon: 'kanban' });
+    const st = projectStatus(s, p); const sp = s.sprints.filter((x) => x.project === p.id);
+    all.push({ kind: 'Project', label: p.name, sub: repoOf(s, p).name, text: `${repoOf(s, p).name} ${p.goal || ''} ${p.branch || ''} ${sp.map((x) => x.name + ' ' + x.goal).join(' ')}`, note: st.tone === 'warn' ? st.word : p.stage, tone: st.tone, to: `/p/${p.id}/board`, icon: 'kanban' });
   }
-  for (const t of s.teams) { const p = projectOf(s, t.project); if (p.archived) continue; const n = openRequests(s, { team: t.id }).length; all.push({ kind: 'Team', label: teamName(t), sub: p.name, note: n ? `Needs you · ${n}` : '', tone: n ? 'warn' : null, to: `/p/${p.id}/team/${t.id}`, icon: 'users' }); }
-  for (const a of s.agents) { const p = projectOf(s, a.project); if (p.archived) continue; const st = agentStatus(s, a); const t = a.team && teamOf(s, a.team); all.push({ kind: 'Agent', label: a.name, sub: `${p.name}${t ? ' · ' + teamName(t) : ''}`, note: st.word, tone: st.tone, to: routeForAgent(s, a), agent: a }); }
-  for (const r of s.repos) all.push({ kind: 'Repository', label: r.name, sub: r.remote || 'No remote', to: '/r/' + r.id, icon: 'folder-git-2', mono: true });
-  for (const [to, label, icon] of [['/home', 'Home', 'house'], ['/machines', 'Machines', 'server'], ['/subscriptions', 'Subscriptions', 'key-round'], ['/notifications', 'Phone notifications', 'smartphone'], ['/settings', 'Service settings', 'settings']]) all.push({ kind: 'Page', label, sub: '', to, icon });
-  const ql = q.trim().toLowerCase();
-  const score = (x) => { const l = x.label.toLowerCase(); return l.startsWith(ql) ? 0 : l.includes(ql) ? 1 : (x.sub || '').toLowerCase().includes(ql) ? 2 : 9; };
-  const found = ql ? all.map((x) => [score(x), x]).filter(([n]) => n < 9).sort((a, b) => a[0] - b[0] || (b[1].tone === 'warn') - (a[1].tone === 'warn')).map(([, x]) => x) : all.filter((x) => x.tone === 'warn' || x.kind === 'Project');
-  const shown = found.slice(0, 12);
+  for (const a of s.agents) {
+    const p = projectOf(s, a.project); if (p.archived) continue; const st = agentStatus(s, a); const t = a.team && teamOf(s, a.team);
+    all.push({ kind: 'Agent', label: a.name, sub: `${p.name}${t ? ' · ' + teamName(t) : ''}`, text: `${a.role} ${t ? teamName(t) : ''} ${a.activity || ''} ${p.name} ${repoOf(s, p).name}`, boost: a.role === 'project-lead' ? 0.5 : 0, note: st.word, tone: st.tone, to: routeForAgent(s, a), agent: a });
+  }
+  for (const [to, label, icon] of [['/home', 'Home', 'house'], ['/projects', 'All projects', 'table-2'], ['/machines', 'Machines', 'server'], ['/subscriptions', 'Subscriptions', 'key-round'], ['/notifications', 'Phone notifications', 'smartphone'], ['/settings', 'Service settings', 'settings']]) all.push({ kind: 'Page', label, sub: '', text: '', to, icon });
+  const ql = q.trim();
+  const found = ql
+    ? all.map((x) => [searchScore(ql, x), x]).filter(([n]) => n > 0).sort((a, b) => b[0] - a[0] || KIND_ORDER[a[1].kind] - KIND_ORDER[b[1].kind]).map(([, x]) => x)
+    : all.filter((x) => x.kind === 'Repository' || x.kind === 'Project' || (x.kind === 'Agent' && x.tone === 'warn'));
+  const shown = found.slice(0, 14);
   useEffect(() => setI(0), [q]);
   useEffect(() => { list.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: 'nearest' }); }, [i]);
   const pick = (x) => { act.closeDialog(); go(x.to); };
@@ -36,12 +64,11 @@ function Switcher({ s }) {
     <div class="dialog" role="dialog" aria-modal="true" aria-label="Find project or agent" style="width:min(620px,100%)">
       <div class="search" style="padding:10px 12px;border-bottom:1px solid var(--color-line)">
         <${Icon} name="search" size=${16} class="faint" />
-        <input autofocus class="input lg" style="border:0;box-shadow:none;padding-left:34px;font-size:var(--text-lg)" placeholder="Find a project, team, agent or page" aria-label="Find project or agent" value=${q} onInput=${(e) => setQ(e.target.value)} onKeyDown=${key} ref=${(el) => el && setTimeout(() => el.focus(), 0)} />
+        <input autofocus class="input lg" style="border:0;box-shadow:none;padding-left:34px;font-size:var(--text-lg)" placeholder="Search repositories, projects and agents" aria-label="Find project or agent" value=${q} onInput=${(e) => setQ(e.target.value)} onKeyDown=${key} ref=${(el) => el && setTimeout(() => el.focus(), 0)} />
         <kbd>Esc</kbd>
       </div>
       <div ref=${list} style="overflow:auto;padding:4px;max-height:min(52vh,460px)" role="listbox">
-        ${!ql && html`<div class="menu-label">Projects, and what needs you</div>`}
-        ${shown.length === 0 && html`<div class="empty" data-empty><strong>Nothing matches "${q}"</strong><span>Try a project name, a team such as "Build", or a role such as "Reviewer".</span></div>`}
+        ${shown.length === 0 && html`<div class="empty" data-empty><strong>Nothing matches "${q}"</strong></div>`}
         ${shown.map((x, n) => html`<button type="button" key=${x.kind + x.to} role="option" aria-selected=${n === i} data-active=${n === i} class="menu-item" style="min-height:34px" onMouseEnter=${() => setI(n)} onClick=${() => pick(x)}>
           ${x.agent ? html`<${Avatar} agent=${x.agent} s=${s} size="sm" />` : html`<${Icon} name=${x.icon} size=${15} class="faint" />`}
           <span class=${cx(x.mono && 'mono')} style="font-weight:var(--weight-medium)">${x.label}</span>
@@ -118,11 +145,25 @@ function MergeReview({ s, d }) {
   const seen = new Map();
   for (const c of wt?.commits || []) for (const f of c.files || []) { const k = f.path || f[0]; const o = seen.get(k) || [k, 0, 0]; o[1] += f.add ?? f[2]?.add ?? 0; o[2] += f.del ?? f[2]?.del ?? 0; seen.set(k, o); }
   const files = r.project === 'apiref' || !seen.size ? (r.project === 'apiref' ? docs : []) : [...seen.values()].slice(0, 8);
-  const merge = () => { act.closeDialog(); act.answerRequest(r.id, 'merge'); };
+  const subjects = (wt?.commits || []).slice(0, Math.max(1, ev.commits)).map((k) => k.subject);
+  const first = act.pullRequestText(subjects.length ? subjects : [r.title], ev);
+  const [title, setTitle] = useState(first.title); const [body, setBody] = useState(first.body); const [writing, setWriting] = useState(false);
+  const regen = () => { setWriting(true); setTimeout(() => { const t = act.pullRequestText(subjects.length ? subjects : [r.title], ev); setTitle(t.title); setBody(t.body); setWriting(false); }, 900); };
+  const over = title.length > act.PR_TITLE_LIMIT;
+  const merge = () => { if (over || !title.trim()) return; act.closeDialog(); act.answerRequest(r.id, 'merge'); };
   return html`<${Dialog} title=${r.title} size="wide" onClose=${act.closeDialog}
     foot=${html`<span class="why">Only you can merge into ${r.target}.</span><button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button>
-      <button type="button" class=${cx('btn', ok && 'primary')} onClick=${merge}>${ok ? 'Approve and merge' : 'Approve without evidence'}</button>`}>
+      <button type="button" class=${cx('btn', ok && 'primary')} disabled=${over || !title.trim()} onClick=${merge}>${ok ? 'Approve and merge' : 'Approve without evidence'}</button>`}>
     <p style="line-height:1.55;max-width:var(--measure)">${r.body}</p>
+    <div class="pr-text">
+      <div class="field"><div class="row"><label for="pr-title" class="grow">Pull request title</label>
+          <span class=${cx('num pr-count', over && 'error-text')} aria-live="polite">${title.length} / ${act.PR_TITLE_LIMIT}</span>
+          <button type="button" class="btn sm ghost" disabled=${writing} data-tip=${`Writes the title and description with ${s.settings.gitModel || 'Haiku 5.5'}`} onClick=${regen}><${Icon} name=${writing ? 'loader-circle' : 'sparkles'} size=${13} class=${writing ? 'spin' : ''} />Generate</button></div>
+        <input id="pr-title" class=${cx('input', over && 'invalid')} value=${title} disabled=${writing} onInput=${(e) => setTitle(e.target.value)} />
+        ${over && html`<span class="error" role="alert">Keep the title to ${act.PR_TITLE_LIMIT} characters.</span>`}</div>
+      <div class="field"><label for="pr-body">Description</label>
+        <textarea id="pr-body" class="textarea mono" rows="7" value=${body} disabled=${writing} onInput=${(e) => setBody(e.target.value)}></textarea></div>
+    </div>
     <div class="req closed" style="border-left-color:var(--color-success)"><div class="evidence">
       <div class=${cx('ev', !ev.tests.ok && 'missing')}><${Icon} name=${ev.tests.ok ? 'circle-check' : 'triangle-alert'} size=${14} /><span>${ev.tests.text}</span></div>
       <div class=${cx('ev', !ev.review.ok && 'missing')}><${Icon} name=${ev.review.ok ? 'circle-check' : 'triangle-alert'} size=${14} /><span>${ev.review.text}</span></div>

@@ -111,7 +111,11 @@ export function clamp(n, lo, hi) { return Math.min(hi, Math.max(lo, n)); }
 export function persist(key, fallback) {
   try { const v = localStorage.getItem('lgcode-mock:' + key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; }
 }
+// True when the page is drawn inside a frame on the repository Design page. A framed copy
+// never writes to storage, so it cannot change the page around it.
+export const FRAMED = (() => { try { return window.top !== window.self; } catch { return true; } })();
 export function remember(key, value) {
+  if (FRAMED) return;
   try { localStorage.setItem('lgcode-mock:' + key, JSON.stringify(value)); } catch { /* storage is optional */ }
 }
 export function useMedia(query) {
