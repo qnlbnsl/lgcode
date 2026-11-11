@@ -10888,3 +10888,16 @@ At new-project.spec.ts:626, the preview frame's body never received data-loaded=
 The unchanged case passed on its own in 24.6 seconds.
 Both failures are in the mock and component preview path under a full parallel browser run.
 The cause remains unproved.
+
+## 612. Changing the web port while the page is running is not applied
+
+Found: 2026-11-10, by the owner on the build server after the step-2 merge.
+State: open.
+
+The owner changed the port with `lgcode client web settings set`, from 8787 to 8788 and then to 8888, while the page was running on 8787.
+The settings reply then reported the new port with serverState `running`.
+The listener stayed on 8787, and nothing listened on the new port.
+In `packages/engine/src/client/web/server.ts`, the `changed` handler disconnects clients and stops the display, but it binds again only when no listener exists.
+The status therefore reports a port that is not in use, until the service restarts.
+The fix is to close the old listener and bind the new port when the port changes, and to report `port-taken` if the new port is unavailable.
+A related observation: when 8787 was taken by another program at start, the page bound it within the 30-second retry after the port was freed, as designed.
