@@ -203,9 +203,12 @@ This step delivers items 2, 3 and 5 of what the owner wants.
   to screens. The engine learns to save the OpenPencil file into the repository. The
   import is a conversation with the owner, because the owner must confirm what each screen
   is.
-- **The design file's categories.** The owner wants the design lead to define how a design
-  file is stored and sorted into categories. That decision is needed before the
-  repository Design page is built on real data.
+- **The design file's categories.** The owner wants a design lead to define how a design
+  file is stored and sorted into categories. The owner calls this "Apple Hat". It is an
+  agent launched with instructions to think like a senior user interface and user
+  experience lead from Apple. The second round of the mock asks such an agent for a first
+  proposal. The owner approves the standard before the repository Design page is built on
+  real data.
 - **Setup's config.** Define writes the `.lgcode` config. The design leaves open who
   writes it, because agents cannot edit that folder. This plan suggests that the engine
   writes it from a tool call that the owner approves.
@@ -313,7 +316,8 @@ These are in the order they block work.
    website's worst faults are fixed inside steps 1 and 2 anyway.
 2. **What is the first real project for step 2?** This plan suggests a small change to
    LGcode itself, so the first run is on code the owner knows.
-3. **Who defines the design file's categories, and when?** Step 3 needs the answer.
+3. **Does the owner approve the design file's categories?** A Design lead agent proposes
+   them during the second round of the mock. Step 3 needs the approved standard.
 4. **Who writes the `.lgcode` config?** Step 3 suggests the engine, from an approved tool
    call.
 5. **What is a key task for an evaluation round?** The design suggests a merged sprint.

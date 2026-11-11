@@ -180,12 +180,23 @@ Files: `js/screens/mocks.js`, `css/mocks.css`.
 - The bar holds two menus. The first picks a category. The second picks an item inside
   that category.
 - Show the whole design file: its screens, its components and its palette.
-- The categories below are provisional. The owner wants the design lead to define the
-  real ones. The feedback calls this person or agent "Apple Hat". Do not treat the list
-  as decided, and say so in your hand-over.
+- The owner does not want engineering to invent the categories alone. The owner calls
+  the right author "Apple Hat". The owner explained on 2026-11-10 that this is an agent
+  launched with instructions to think like a senior user interface and user experience
+  lead from Apple.
+- Start one such agent before you build this page. In the mock and in every document,
+  call it the Design lead, because agents are named by role. Give it the design file
+  under `design/`, the tokens, and the list of screens in this mock. Ask it for a
+  standard that says how a design file is stored and how its content maps into a first
+  menu and a second menu.
+- Build the two menus from its answer. Save its answer as
+  `design/mock/feedback/2026-11-10-design-categories.md`.
+- If you cannot start that agent, use the starting list below and say so in your
+  hand-over.
   - Screens, grouped by flow, such as Onboarding, Home and Project.
   - Components, grouped by kind, such as Buttons, Forms and Navigation.
   - Palette, with Colour, Type and Spacing.
+- The owner has not approved any set of categories. Report the set you used.
 
 ### Workflow separates status from titles (feedback section 8)
 
@@ -316,7 +327,8 @@ Commit after each numbered group, on the branch `area/mock-rebuild`.
 - Do not add explaining sentences to a title or a button.
 - Do not make a builder or a test runner something the owner operates.
 - Do not replace a screen's structure with a blank page when it has no data.
-- Do not decide the design file's categories. Mark them provisional.
+- Do not decide the design file's categories yourself. The Design lead agent proposes
+  them, and the owner approves them.
 - Do not edit `design/workbench.html`, `design/data/` or anything under `packages/`.
 - Do not merge into `master`. The owner approves that through a pull request.
 - Do not add a `Co-Authored-By` line to a commit message.
@@ -326,7 +338,8 @@ Commit after each numbered group, on the branch `area/mock-rebuild`.
 Write a short hand-over in `design/mock/feedback/2026-11-10-round-2-result.md`. For each
 part above, say whether it is done, and how you checked it. List every choice you made
 that the owner has not ruled on. Start that list with the three this brief already made:
-the in-place question card, the read-only threads, and the provisional design categories.
+the in-place question card, the read-only threads, and the design categories that the
+Design lead agent proposed.
 Update `design/mock/README.md` and the three sections at the end of `design/DESIGN.md`
 where your work changes them. Record any problem you find and do not fix in
 `docs/issues.md`.
