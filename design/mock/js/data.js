@@ -60,9 +60,12 @@ export function seed() {
     { id: 'sub-codex-work', harness: 'codex', name: 'Work', machine: 'buildbox', enabled: true, signedIn: false, useForNew: false, usage: null },
   ];
   const repos = [
-    { id: 'lgcode', name: 'lgcode', main: 'master', remote: 'github.com/qnlbnsl/lgcode', folders: { studio: '~/projects/lgcode', buildbox: '~/Work/lgcode' }, design: true },
-    { id: 'atlas-docs', name: 'atlas-docs', main: 'main', remote: 'github.com/acme/atlas-docs', folders: { studio: '~/projects/atlas-docs' } },
-    { id: 'billing-api', name: 'billing-api', main: 'main', remote: 'github.com/acme/billing-api', folders: { buildbox: '~/Work/billing-api', studio: '~/projects/billing-api' } },
+    { id: 'lgcode', name: 'lgcode', main: 'master', remote: 'github.com/qnlbnsl/lgcode', folders: { studio: '~/projects/lgcode', buildbox: '~/Work/lgcode' }, design: true,
+      description: 'LGcode runs teams of coding agents for one owner. A project lead plans the work, team leads split it, and builders, reviewers and test runners carry it out. The owner answers questions and approvals from a web page, and soon from a phone.', describedAt: at(2 * HOUR), describedBy: 'console-lead' },
+    { id: 'atlas-docs', name: 'atlas-docs', main: 'main', remote: 'github.com/acme/atlas-docs', folders: { studio: '~/projects/atlas-docs' },
+      description: 'The public documentation site for the Atlas API. The reference is generated from openapi.yaml at build time.', describedAt: at(DAY), describedBy: 'apiref-lead' },
+    { id: 'billing-api', name: 'billing-api', main: 'main', remote: 'github.com/acme/billing-api', folders: { buildbox: '~/Work/billing-api', studio: '~/projects/billing-api' },
+      description: 'The billing service. It issues invoices, voids them, and exports them for accounting.', describedAt: at(2 * DAY), describedBy: 'exports-lead' },
   ];
   const projects = [
     { id: 'console', repo: 'lgcode', name: 'Agent console', prefix: 'AC', goal: 'A workspace where I steer a project through its lead and see what every team is doing.', stage: 'Build', phase: 'build', branch: 'feat/agent-console', folder: '~/projects/lgcode/.worktrees/agent-console', machine: 'studio', lead: 'console-lead', shell: 'zsh', createdAt: at(4 * DAY), hasMocks: true, tests: 'on', agentReview: 'on' },
@@ -186,6 +189,12 @@ export function seed() {
       { id: 'm3', type: 'tools', ts: at(40 * MIN), summary: 'Assigned 2 subitems · wrote 2 builder configs', lines: [{ verb: 'Assign', arg: 'AC-14 → Builder 1', res: '3 points' }, { verb: 'Assign', arg: 'AC-15 → Builder 2', res: '5 points' }] },
       { id: 'm4', type: 'agent', ts: at(18 * MIN), text: 'Builder 1 has the rail rendering. One navigation choice is yours before I assign [[task:t17|AC-17]].' },
       { id: 'm5', type: 'request', ts: at(18 * MIN), requestId: 'q-open' },
+    ],
+    'shell-b1': [
+      { id: 'm1', type: 'user', ts: at(52 * MIN), from: 'shell-lead', text: 'AC-14: fold the sidebar into a 48 pixel rail. The tests are written and fail on their assertions.' },
+      { id: 'm2', type: 'agent', ts: at(50 * MIN), text: 'Reading the sidebar and the six failing tests.' },
+      { id: 'm3', type: 'tools', ts: at(44 * MIN), summary: 'Read 3 files · edited 2 · +64 −11', lines: [{ verb: 'Read', arg: 'packages/web/src/shell/Sidebar.tsx', res: '188 lines' }, { verb: 'Edit', arg: 'packages/web/src/shell/Rail.tsx', res: '+52 −0' }, { verb: 'Edit', arg: 'packages/web/src/styles.css', res: '+12 −11' }] },
+      { id: 'm4', type: 'agent', ts: at(31 * MIN), text: 'The rail renders, and 4 of the 6 tests pass. The keyboard shortcut is next.' },
     ],
     'shell-b2': [
       { id: 'm1', type: 'user', ts: at(40 * MIN), from: 'shell-lead', text: 'AC-15: the sidebar, the bell and Home must count the same open requests. A request held by a lead does not count for the owner.' },

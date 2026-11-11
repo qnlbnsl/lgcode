@@ -187,68 +187,64 @@ export function Resizer({ side, value, min, max, onChange, reset, label }) {
 }
 
 // ---- the request block ----------------------------------------------------------
-// One block for questions, approvals, merges and failed starts, on Home and in threads.
-export function RequestBlock({ s, request: r, context = true, onHome = false }) {
+// One block for questions, approvals, merges and failed starts. It has two shapes:
+// "card" in a thread, with its own heading, and "detail" inside an expanded Home row,
+// where the row already shows the title, the agent and the wait.
+// `openThread` is an address or a function. It is left out when the block already sits
+// in the asking agent's own thread.
+export function RequestBlock({ s, request: r, variant = 'card', openThread = null, primary = false, who = true }) {
   const now = useNow();
   const a = agentOf(s, r.agent); const p = projectOf(s, r.project);
   const [text, setText] = useState('');
   const open = r.status === 'open';
   const waited = now - r.createdAt;
-  const oldest = openRequests(s)[0];
-  const offer = open && s.phoneOffer === 'open' && !s.settings.ntfyServer && oldest && oldest.id === r.id;
-  const primaryFirst = (opts) => opts.map((o, i) => html`<button key=${o.id} type="button"
-      class=${cx('btn', o.primary && !r.blind && 'primary', o.id === 'deny' && 'ghost')}
-      onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`);
-  return html`<section class=${cx('req', r.kind === 'failed' && 'failed', !open && 'closed')} id=${'req-' + r.id} aria-label=${KIND_LABEL[r.kind] + ': ' + r.title}>
-    ${!onHome && html`<div class="req-head">
+  const fill = (yes) => cx('btn', yes && primary && 'primary');
+  const thread = openThread && (typeof openThread === 'string'
+    ? html`<a class="btn ghost" href=${href(openThread)}><${Icon} name="message-square" size=${14} />Open thread</a>`
+    : html`<button type="button" class="btn ghost" onClick=${openThread}><${Icon} name="message-square" size=${14} />Open thread</button>`);
+  const opts = r.options || [];
+  const rec = r.kind === 'question' && r.recommendation ? opts.find((o) => o.primary) : null;
+  const sub = a.failure && subOf(s, a.failure.subscription);
+  const fixed = r.kind === 'failed' && sub && sub.signedIn;
+  return html`<section class=${cx('req', variant, r.kind === 'failed' && 'failed', !open && 'closed')} id=${'req-' + r.id} tabindex="-1" aria-label=${KIND_LABEL[r.kind] + ': ' + r.title}>
+    ${variant === 'card' && html`<div class="req-head">
       <span class=${cx('kind', open ? r.kind : 'closed')}>${KIND_LABEL[r.kind]}</span>
-      ${r.blocks && html`<span class="tag">blocks ${r.blocks}</span>`}
-      <span class=${cx('age', open && waited >= HOUR && 'long')}>${open ? 'Waiting ' + ago(r.createdAt, now) : r.answer + ' · ' + clock(r.answeredAt)}</span>
+      ${who && html`<span class="req-who"><${Avatar} agent=${a} s=${s} size="sm" status=${false} />${agentLabel(s, a, { withTeam: true })}</span>`}
+      <span class=${cx('age', open && waited >= HOUR && 'long')}>${open ? ago(r.createdAt, now) : r.answer + ' · ' + clock(r.answeredAt)}</span>
     </div>
     <h4>${r.title}</h4>`}
-    ${r.body && html`<div class="req-body"><p>${r.body}</p></div>`}
-    ${r.recommendation && html`<p class="rec"><${Icon} name="sparkles" size=${14} /><span><b>${a.name} recommends:</b> ${r.recommendation}</span></p>`}
-    ${r.why && open && html`<p class="rec"><${Icon} name="info" size=${14} /><span>${r.why}</span></p>`}
+    ${r.body && html`<div class="req-body">${variant === 'detail' && html`<span class="req-label">Description</span>`}<p>${r.body}</p></div>`}
+    ${r.recommendation && html`<p class="rec"><${Icon} name="sparkles" size=${14} /><span><b>Recommended:</b> ${r.recommendation}</span></p>`}
     ${r.kind === 'approval' && html`<dl class="kv">
-      <dt>Command</dt><dd>${r.command || html`<span class="muted" style="font-family:var(--font-body)">Hidden by the harness. You cannot see what will be read.</span>`}</dd>
+      <dt>Command</dt><dd>${r.command || html`<span class="muted" style="font-family:var(--font-body)">Hidden by the harness</span>`}</dd>
       <dt>Folder</dt><dd>${r.folder}</dd></dl>`}
     ${r.kind === 'merge' && html`<div class="evidence">
       <div class=${cx('ev', !r.evidence.tests.ok && 'missing')}><${Icon} name=${r.evidence.tests.ok ? 'circle-check' : 'triangle-alert'} size=${14} /><span>${r.evidence.tests.text}</span></div>
-      <div class=${cx('ev', !r.evidence.review.ok && 'missing')}><${Icon} name=${r.evidence.review.ok ? 'circle-check' : 'triangle-alert'} size=${14} /><span>${r.evidence.review.text}</span>
-        ${r.evidence.review.agent && html`<a class="link" href=${href(routeForAgent(s, agentOf(s, r.evidence.review.agent)))}>Open the review</a>`}</div>
+      <div class=${cx('ev', !r.evidence.review.ok && 'missing')}><${Icon} name=${r.evidence.review.ok ? 'circle-check' : 'triangle-alert'} size=${14} /><span>${r.evidence.review.text}</span></div>
       <div class="ev"><${Icon} name="git-commit-horizontal" size=${14} class="muted" /><span class="mono">${r.source}</span><${Icon} name="arrow-right" size=${12} class="muted" /><span class="mono">${r.target}</span><span class="muted">${r.evidence.commits} commits · ${r.evidence.files} files</span></div>
     </div>`}
     ${open && r.kind === 'question' && html`<div class="req-actions">
-      ${primaryFirst(r.options || [])}
-      <form class="row grow" style="flex:1 1 220px" onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
-        <input class="input" placeholder="Or type another answer" aria-label="Another answer" value=${text} onInput=${(e) => setText(e.target.value)} />
+      ${rec && html`<button type="button" class=${fill(true)} onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="check" size=${14} />Accept recommendation</button>`}
+      ${opts.filter((o) => o !== rec).map((o) => html`<button key=${o.id} type="button" class="btn" onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
+      <form class="row grow" style="flex:1 1 200px" onSubmit=${(e) => { e.preventDefault(); if (text.trim()) act.answerRequest(r.id, null, text.trim()); }}>
+        <input class="input" placeholder="Another answer" aria-label="Another answer" value=${text} onInput=${(e) => setText(e.target.value)} />
         ${text.trim() && html`<button class="btn" type="submit">Send</button>`}
       </form>
+      ${thread}
     </div>`}
-    ${open && r.kind === 'approval' && html`<div class="req-actions">${primaryFirst(r.options)}</div>`}
+    ${open && r.kind === 'approval' && html`<div class="req-actions">
+      ${opts.map((o) => html`<button key=${o.id} type="button" class=${cx(fill(o.primary && !r.blind), o.id === 'deny' && 'ghost')} onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
+      ${thread}</div>`}
     ${open && r.kind === 'merge' && html`<div class="req-actions">
-      <button type="button" class="btn primary" onClick=${() => act.openDialog({ type: 'merge-review', requestId: r.id })}>Review and merge</button>
-      <a class="btn" href=${href(`/p/${r.project}/git`)}>Open in Git</a>
-      <button type="button" class="btn ghost" onClick=${() => act.answerRequest(r.id, 'decline')}>Send back</button>
-    </div>`}
+      <button type="button" class=${fill(true)} onClick=${() => act.openDialog({ type: 'merge-review', requestId: r.id })}>Review and merge</button>
+      <button type="button" class="btn" onClick=${() => act.answerRequest(r.id, 'decline')}>Send back</button>
+      ${thread}</div>`}
     ${open && r.kind === 'failed' && html`<div class="req-actions">
-      <button type="button" class="btn primary" onClick=${() => act.openDialog({ type: 'signin', subscription: a.failure?.subscription || a.subscription, then: r.id })}>Sign in on ${machineOf(s, a.failure?.machine || p.machine).name}</button>
-      <button type="button" class="btn" onClick=${() => act.answerRequest(r.id, 'resume')}>Resume</button>
-      <a class="btn ghost" href=${href('/subscriptions')}>Subscriptions</a>
-    </div>`}
-    ${!open && onHome && html`<div class="answer"><${Icon} name="check" size=${14} /><span>${r.answer} at ${clock(r.answeredAt)}</span></div>`}
-    ${context && html`<div class="req-foot">
-      <${AgentLine} s=${s} agent=${a} />
-      ${onHome && html`<a class="link" href=${href(routeForRequest(s, r))}>Open in thread</a>`}
-      ${r.files?.map((f) => html`<span class="tag">${f}</span>`)}
-      <span class="grow"></span>
-      <span>${machineOf(s, p.machine).name}</span>
-    </div>`}
-    ${offer && html`<div class="callout info" style="align-items:center">
-      <${Icon} name="smartphone" size=${15} /><span class="grow">Get a phone notification the next time an agent waits for you.</span>
-      <a class="btn sm" href=${href('/notifications')}>Set up</a>
-      <button type="button" class="btn sm ghost" onClick=${act.declinePhoneOffer}>Not now</button>
-    </div>`}
+      ${fixed
+        ? html`<button type="button" class=${fill(true)} onClick=${() => act.answerRequest(r.id, 'resume')}><${Icon} name="play" size=${13} />Resume</button>`
+        : html`<button type="button" class=${fill(true)} onClick=${() => act.openDialog({ type: 'signin', subscription: a.failure?.subscription || a.subscription, then: r.id })}>Sign in on ${machineOf(s, a.failure?.machine || p.machine).name}</button>`}
+      ${thread}</div>`}
+    ${!open && variant === 'detail' && html`<div class="answer"><${Icon} name="check" size=${14} /><span>${r.answer} at ${clock(r.answeredAt)}</span></div>`}
   </section>`;
 }
 
@@ -275,7 +271,10 @@ function LargeItem({ item }) {
 registerDialog('large-item', ({ d }) => html`<${Dialog} title=${d.title} size="wide" onClose=${act.closeDialog} foot=${html`<button type="button" class="btn" onClick=${act.closeDialog}>Close</button>`}>
   <pre class="code" style="max-height:60vh">${d.lines.join('\n')}\n… ${d.total - d.lines.length} more lines</pre><//>`);
 
-export function Thread({ s, agentId, center, focusReq }) {
+// The owner's messages sit on the right. Agents sit on the left.
+// A request inside a thread is a card. Its "Open thread" goes through `onOpenThread`,
+// which the project view points at the side panel.
+export function Thread({ s, agentId, center, focusReq, onOpenThread }) {
   const a = agentOf(s, agentId); const items = threadOf(s, agentId); const now = useNow();
   const box = useRef(null); const atEnd = useRef(true); const [away, setAway] = useState(false);
   const count = items.length + (s.pending[agentId] ? 1 : 0);
@@ -283,44 +282,46 @@ export function Thread({ s, agentId, center, focusReq }) {
   useLayoutEffect(() => {
     const el = box.current; if (!el) return;
     el.style.scrollBehavior = 'auto';
-    if (focusReq) { const t = el.querySelector('#req-' + focusReq); if (t) { t.scrollIntoView({ block: 'center' }); t.focus?.(); return; } }
+    if (focusReq) { const t = el.querySelector('#req-' + focusReq); if (t) { t.scrollIntoView({ block: 'center' }); t.focus?.({ preventScroll: true }); el.style.scrollBehavior = ''; return; } }
     el.scrollTop = el.scrollHeight; el.style.scrollBehavior = '';
   }, [agentId, focusReq]);
-  useLayoutEffect(() => { const el = box.current; if (el && atEnd.current) el.scrollTop = el.scrollHeight; }, [count]);
+  useLayoutEffect(() => { const el = box.current; if (el && atEnd.current && !focusReq) el.scrollTop = el.scrollHeight; }, [count]);
   const onScroll = (e) => { const el = e.currentTarget; atEnd.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60; setAway(!atEnd.current); };
   const below = away ? openRequests(s, { agent: agentId }).length : 0;
+  const opener = (r) => (r.agent === agentId ? null : onOpenThread ? () => onOpenThread(r.agent, r.id) : routeForRequest(s, r));
   let lastDay = null;
   return html`<div style="position:relative;display:flex;flex-direction:column;flex:1;min-height:0">
     <div ref=${box} class=${cx('thread', center && 'center')} onScroll=${onScroll} tabindex="0" aria-label=${'Thread with ' + a.name}>
-      ${items.length === 0 && html`<div class="empty" data-empty><strong>No messages yet</strong><span>${a.name} has not said anything. Send a message to start.</span></div>`}
+      ${items.length === 0 && html`<div class="empty" data-empty><strong>No messages yet</strong></div>`}
       ${items.map((it) => {
         const d = dayLabel(it.ts, now); const head = d !== lastDay ? html`<div class="day" key=${'d' + it.id}>${d}</div>` : null; lastDay = d;
         let body;
-        if (it.type === 'user') {
-          const from = it.from ? agentOf(s, it.from) : null;
-          body = html`<div class="msg user" key=${it.id}>
-            ${from ? html`<${Avatar} agent=${from} s=${s} status=${false} />` : html`<${OwnerAvatar} s=${s} />`}
-            <div class="meta"><span class="who">${from ? agentLabel(s, from) : 'You'}</span><time>${clock(it.ts)}</time></div>
+        if (it.type === 'user' && !it.from) {
+          body = html`<div class="msg mine" key=${it.id}>
+            <div class="meta"><time>${clock(it.ts)}</time></div>
             <div class="body"><${Rich} text=${it.text} pid=${a.project} />
               ${it.context?.length > 0 && html`<div class="row" style="flex-wrap:wrap;gap:4px">${it.context.map((c) => html`<span class="tag">${c}</span>`)}</div>`}</div>
+          </div>`;
+        } else if (it.type === 'user') {
+          const from = agentOf(s, it.from);
+          body = html`<div class="msg peer" key=${it.id}>
+            <${Avatar} agent=${from} s=${s} status=${false} />
+            <div class="meta"><span class="who">${agentLabel(s, from, { withTeam: true })}</span><time>${clock(it.ts)}</time></div>
+            <div class="body"><${Rich} text=${it.text} pid=${a.project} /></div>
           </div>`;
         } else if (it.type === 'agent') {
           body = html`<div class="msg" key=${it.id}>
             <${Avatar} agent=${a} s=${s} status=${false} />
-            <div class="meta"><span class="who">${a.name}</span><span class="via">${HARNESSES[a.harness].name}</span><time>${clock(it.ts)}</time></div>
+            <div class="meta"><span class="who">${a.name}</span><time>${clock(it.ts)}</time></div>
             <div class="body"><${Rich} text=${it.text} pid=${a.project} /></div>
-            ${it.requests?.length > 0 && html`<div style="grid-column:2;display:grid;gap:2px;max-width:var(--measure)">${it.requests.map((id) => {
-              const r = byId(s.requests, id); if (!r) return null; const ra = agentOf(s, r.agent); const open = r.status === 'open';
-              return html`<a key=${id} class="list-row" style="padding:0 8px;margin-left:-8px" href=${href(routeForRequest(s, r))}>
-                <span class=${cx('kind', open ? r.kind : 'closed')}>${KIND_LABEL[r.kind]}</span>
-                <span class="truncate grow">${r.title}</span>
-                <span class="muted" style="font-size:var(--text-sm);white-space:nowrap">${open ? agentLabel(s, ra, { withTeam: true }) : r.answer}</span>
-                <${Icon} name="arrow-right" size=${13} class="muted" /></a>`;
+            ${it.requests?.length > 0 && html`<div class="req-stack">${it.requests.map((id) => {
+              const r = byId(s.requests, id); if (!r) return null;
+              return html`<${RequestBlock} key=${id} s=${s} request=${r} openThread=${opener(r)} />`;
             })}</div>`}
           </div>`;
         } else if (it.type === 'tools') body = html`<div class="msg" key=${it.id}><span></span><${ToolGroup} item=${it} /></div>`;
         else if (it.type === 'large') body = html`<div class="msg" key=${it.id}><span></span><${LargeItem} item=${it} /></div>`;
-        else if (it.type === 'request') { const r = byId(s.requests, it.requestId); body = r ? html`<div key=${it.id} tabindex="-1"><${RequestBlock} s=${s} request=${r} context=${false} /></div>` : null; }
+        else if (it.type === 'request') { const r = byId(s.requests, it.requestId); body = r ? html`<div class="msg" key=${it.id}><span></span><div class="req-stack"><${RequestBlock} s=${s} request=${r} openThread=${opener(r)} who=${r.agent !== agentId} /></div></div>` : null; }
         else body = html`<div class="day" key=${it.id} style="text-transform:none;letter-spacing:0">${it.text} · ${clock(it.ts)}</div>`;
         return [head, body];
       })}
@@ -329,6 +330,20 @@ export function Thread({ s, agentId, center, focusReq }) {
     ${away && html`<button type="button" class="btn sm" style="position:absolute;right:16px;bottom:8px;box-shadow:var(--shadow-1)" onClick=${() => { box.current.scrollTop = box.current.scrollHeight; }}>
       <${Icon} name="arrow-down" size=${13} />Latest${below ? ` · ${plural(below, 'request')} below` : ''}</button>`}
   </div>`;
+}
+
+// Only the project lead takes messages. Another agent's thread is read-only, and gains a
+// reply box only while that agent has an open question for the owner.
+export function canMessage(s, a) {
+  return a.role === 'project-lead' || openRequests(s, { agent: a.id }).some((r) => r.kind === 'question');
+}
+export function ReadOnlyBar({ s, agent, center, onLead }) {
+  const st = agentStatus(s, agent); const p = projectOf(s, agent.project);
+  return html`<div class=${cx('composer-wrap', center && 'center')}><div class="readonly-bar">
+    <${Icon} name="eye" size=${15} class="muted" /><span class="grow truncate"><b>Read only</b><span class="muted"> · ${agent.activity || st.word}</span></span>
+    ${onLead ? html`<button type="button" class="btn sm" onClick=${onLead}><${Icon} name="crown" size=${13} />Project lead</button>`
+      : html`<a class="btn sm" href=${href(`/p/${p.id}/chat`)}><${Icon} name="crown" size=${13} />Project lead</a>`}
+  </div></div>`;
 }
 
 // ---- composer -----------------------------------------------------------------

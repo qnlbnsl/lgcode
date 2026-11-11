@@ -30,6 +30,17 @@ export function applyPrefs() {
 }
 export function toggleExpanded(key, force) { update((s) => { s.expanded[key] = force ?? !s.expanded[key]; }); }
 
+// ---- the side panel ------------------------------------------------------------
+// The panel beside a project view shows the project lead. "Open thread" on a question
+// swaps in the asking agent's thread, scrolled to the question, until it is answered.
+export function openSidePanel(agentId, requestId = null) {
+  update((s) => {
+    s.ui.panelAgent = agentId; s.ui.panelReq = requestId;
+    if (matchMedia('(max-width: 1180px)').matches) s.ui.panelDrawer = true; else s.prefs.panelOpen = true;
+  });
+}
+export function closeSidePanel() { update((s) => { s.ui.panelAgent = null; s.ui.panelReq = null; }); }
+
 // ---- threads -------------------------------------------------------------------
 const CANNED = {
   'project-lead': [
@@ -151,6 +162,8 @@ export function answerRequest(requestId, optionId, text) {
       if (!left && lead.state === 'waiting') { lead.state = 'working'; lead.activity = 'Checking in with the team leads'; }
     }
   });
+  // The side panel goes back to the project lead once the question it opened for is answered.
+  if (s.ui?.panelReq === requestId) setTimeout(() => { if (S().ui.panelReq === requestId) closeSidePanel(); }, 1200);
   toast({ approval: `${answer}: ${r.title}`, question: 'Answer sent', merge: answer === 'Merged' ? `Merged ${r.source} into ${r.target}` : 'Sent back to the project lead', failed: 'Agent resumed' }[r.kind]);
   // The agent reacts a moment later.
   setTimeout(() => update((st) => {

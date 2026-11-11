@@ -8,9 +8,9 @@ import {
   KIND_LABEL, routeForRequest, routeForAgent, byId, agentLabel, machineOf,
 } from './data.js';
 import * as act from './actions.js';
-import { Avatar, OwnerAvatar, Menu, DialogHost, Toasts, Resizer, Thread, Composer, Tabs, Kbd, StateWord } from './ui.js';
+import { Avatar, OwnerAvatar, Menu, DialogHost, Toasts, Resizer, Thread, Composer, Tabs, Kbd, StateWord, canMessage, ReadOnlyBar } from './ui.js';
 import './dialogs.js';
-import { Home } from './screens/home.js';
+import { Home, AllProjects } from './screens/home.js';
 import { Board, SprintPage, TaskPage, TeamPage, RepoPage } from './screens/project.js';
 import { ChatTab } from './screens/chat.js';
 import { GitTab, seedGit } from './screens/git.js';
@@ -23,7 +23,9 @@ import { Login, FirstRun, seedAuth } from './screens/auth.js';
 
 // ---- sidebar ------------------------------------------------------------------
 function TreeRow({ kind, depth, open, onToggle, to, current, icon, label, state, tone, children, title, action }) {
-  return html`<div class=${cx('tree-row', kind)} aria-current=${current ? 'page' : null} style=${{ paddingLeft: 4 + depth * 14 + 'px' }}>
+  // A single click on the row opens it. The arrow, or a double click on the row, folds it.
+  return html`<div class=${cx('tree-row', kind)} aria-current=${current ? 'page' : null} style=${{ paddingLeft: 4 + depth * 14 + 'px' }}
+    onDblClick=${onToggle ? (e) => { if (!e.target.closest('.twist, .hover-act')) { e.preventDefault(); onToggle(); } } : null}>
     ${onToggle
       ? html`<button type="button" class="twist" aria-expanded=${!!open} aria-label=${(open ? 'Collapse ' : 'Expand ') + (title || label)} onClick=${onToggle}><${Icon} name="chevron-right" size=${13} /></button>`
       : html`<span class="twist none"></span>`}
@@ -112,6 +114,7 @@ function Sidebar({ s, route, onNavigate }) {
     </div>
     <div class="side-rail">
       ${rail('/home', 'house', n ? `Home · ${n} need you` : 'Home', n > 0)}
+      ${rail('/projects', 'table-2', 'All projects')}
       <button type="button" class="icon-btn" aria-label="Find project or agent" data-tip="Find project or agent" data-tip-side="right" onClick=${() => act.openDialog({ type: 'switcher' })}><${Icon} name="search" size=${16} /></button>
       <button type="button" class="icon-btn" aria-label="New project" data-tip="New project" data-tip-side="right" onClick=${() => act.openDialog({ type: 'new-project' })}><${Icon} name="plus" size=${16} /></button>
       <span class="spacer"></span>
@@ -122,11 +125,12 @@ function Sidebar({ s, route, onNavigate }) {
       <button type="button" class="nav-item" onClick=${() => act.openDialog({ type: 'switcher' })}><${Icon} name="search" size=${15} /><span class="truncate">Find project or agent</span><${Kbd} k="K" /></button>
     </div>
     <div class="side-scroll">
-      <div class="side-label" style="margin-top:0"><span>Projects</span>
+      <div class="side-label" style="margin-top:0"><span>Repositories</span>
+        <a class="icon-btn sm" href=${href('/projects')} aria-label="All projects" data-tip="All projects" data-tip-side="left" aria-pressed=${is('/projects')}><${Icon} name="table-2" size=${14} /></a>
         <button type="button" class="icon-btn sm" aria-pressed=${s.prefs.onlyNeedingYou} aria-label="Only projects needing you" data-tip="Only projects needing you" data-tip-side="left" onClick=${() => update((st) => { st.prefs.onlyNeedingYou = !st.prefs.onlyNeedingYou; })}><${Icon} name="filter" size=${13} /></button>
         <button type="button" class="icon-btn sm" aria-label="New project" data-tip="New project" data-tip-side="left" onClick=${() => act.openDialog({ type: 'new-project' })}><${Icon} name="plus" size=${14} /></button>
       </div>
-      <nav aria-label="Projects"><${ProjectTree} s=${s} route=${route} /></nav>
+      <nav aria-label="Repositories"><${ProjectTree} s=${s} route=${route} /></nav>
     </div>
     <div class="side-foot">
       ${nav('/machines', 'server', 'Machines', html`<span class="state faint" style="margin-left:auto;font-size:var(--text-xs)">${s.machines.filter((m) => m.status === 'online').length} of ${s.machines.length} online</span>`)}
@@ -177,11 +181,11 @@ function TopBar({ s, route, project, onMenu }) {
     const r = repoOf(s, project);
     crumbs.push({ to: '/r/' + r.id, label: r.name, cls: 'repo' }, { to: `/p/${project.id}/board`, label: project.name });
     if (route.parts[2] === 'team') { const t = teamOf(s, route.parts[3]); if (t) crumbs.push({ to: route.path, label: teamName(t) }); }
-    if (route.parts[2] === 'chat' && route.parts[3]) { const a = agentOf(s, route.parts[3]); if (a) { if (a.team) crumbs.push({ to: `/p/${project.id}/team/${a.team}`, label: teamName(teamOf(s, a.team)) }); crumbs.push({ to: route.path, label: a.name }); } }
+    if (route.parts[2] === 'chat' && route.parts[3]) { const a = agentOf(s, route.parts[3]); if (a) { if (a.team) crumbs.push({ to: `/p/${project.id}/team/${a.team}`, label: teamName(teamOf(s, a.team)) }); crumbs.push({ to: route.path, label: html`<${Avatar} agent=${a} s=${s} size="sm" status=${false} />${a.name}`, cls: 'agent' }); } }
     if (route.parts[2] === 'sprint') { const sp = byId(s.sprints, route.parts[3]); if (sp) crumbs.push({ to: route.path, label: sp.label }); }
     if (route.parts[2] === 'task') { const t = byId(s.tasks, route.parts[3]); if (t) crumbs.push({ to: route.path, label: t.label }); }
   } else if (route.parts[0] === 'r') { const r = byId(s.repos, route.parts[1]); crumbs.push({ to: '/r/' + route.parts[1], label: r?.name || 'Repository', cls: 'repo' }); }
-  else crumbs.push({ to: route.path, label: { home: 'Home', machines: 'Machines', subscriptions: 'Subscriptions', notifications: 'Phone notifications', settings: 'Service settings' }[route.parts[0]] || 'Home' });
+  else crumbs.push({ to: route.path, label: { home: 'Home', projects: 'All projects', machines: 'Machines', subscriptions: 'Subscriptions', notifications: 'Phone notifications', settings: 'Service settings' }[route.parts[0]] || 'Home' });
   return html`<header class="topbar">
     <button type="button" class="icon-btn only-phone" aria-label="Open navigation" onClick=${onMenu}><${Icon} name="menu" size=${18} /></button>
     <nav class="crumbs" aria-label="Where you are">
@@ -194,30 +198,41 @@ function TopBar({ s, route, project, onMenu }) {
 }
 
 // ---- the project workspace ------------------------------------------------------
-function LeadPanel({ s, agent, project }) {
-  const st = agentStatus(s, agent);
+// The panel beside a project view. It shows the project lead, or, after "Open thread" on a
+// question, the asking agent's thread with a way back to the lead.
+function SidePanel({ s, agent, project }) {
+  const st = agentStatus(s, agent); const isLead = agent.role === 'project-lead';
+  const t = agent.team && teamOf(s, agent.team);
+  const close = () => (matchMedia('(max-width: 1180px)').matches ? update((x) => { x.ui.panelDrawer = false; }) : act.setPref('panelOpen', false));
   return html`<aside class="panel" aria-label=${agent.name + ' thread'} style=${{ '--panel-w': s.prefs.panelWidth + 'px' }}>
     <${Resizer} side="left" label="Resize the thread panel" value=${s.prefs.panelWidth} min=${340} max=${640} reset=${420} onChange=${(v) => act.setPref('panelWidth', v)} />
-    <div class="panel-head">
+    <div class=${cx('panel-head', !isLead && 'other')}>
+      ${!isLead && html`<button type="button" class="icon-btn" aria-label="Back to the project lead" data-tip="Back to the project lead" data-tip-side="right" onClick=${act.closeSidePanel}><${Icon} name="arrow-left" size=${16} /></button>`}
       <${Avatar} agent=${agent} s=${s} />
-      <span class="who truncate">${agentLabel(s, agent, { withTeam: true })}</span>
+      <span class="who truncate">${agent.name}</span>
+      ${t && html`<span class="muted truncate" style="font-size:var(--text-sm)">${teamName(t)}</span>`}
       <span class="what truncate grow"><${StateWord} status=${st} /></span>
-      <a class="icon-btn" href=${href(routeForAgent(s, agent))} aria-label="Open this thread in Chat" data-tip="Open in Chat" data-tip-side="left"><${Icon} name="maximize-2" size=${14} /></a>
-      <button type="button" class="icon-btn only-phone" aria-label="Close" onClick=${() => act.setPref('panelOpen', false)}><${Icon} name="x" size=${16} /></button>
+      <a class="icon-btn" href=${href(routeForAgent(s, agent) + (s.ui.panelReq && !isLead ? '?req=' + s.ui.panelReq : ''))} aria-label="Open this thread in the main view" data-tip="Open in the main view" data-tip-side="left"><${Icon} name="maximize-2" size=${14} /></a>
+      <button type="button" class="icon-btn only-phone" aria-label="Close" onClick=${close}><${Icon} name="x" size=${16} /></button>
     </div>
-    <${Thread} s=${s} agentId=${agent.id} />
-    <${Composer} s=${s} agentId=${agent.id} />
+    <${Thread} key=${agent.id} s=${s} agentId=${agent.id} focusReq=${isLead ? null : s.ui.panelReq} onOpenThread=${act.openSidePanel} />
+    ${canMessage(s, agent) ? html`<${Composer} s=${s} agentId=${agent.id} />` : html`<${ReadOnlyBar} s=${s} agent=${agent} onLead=${act.closeSidePanel} />`}
   </aside>`;
 }
 function ProjectView({ s, route, project }) {
   const tab = route.parts[2] || 'board'; const lead = leadOf(s, project);
+  const chatAgent = tab === 'chat' ? agentOf(s, route.parts[3] || lead.id) : null;
+  const other = s.ui.panelAgent && agentOf(s, s.ui.panelAgent);
+  const side = other && other.project === project.id && other.id !== chatAgent?.id ? other : null;
   const narrow = useMedia('(max-width: 1180px)');
   const open = openRequests(s, { project: project.id }).length;
   const tabs = [
     { id: 'board', label: 'Board' },
     { id: 'workflow', label: 'Workflow' },
     project.hasMocks && { id: 'mocks', label: 'Mocks' },
-    { id: 'chat', label: 'Chat', count: open, tone: 'warn' },
+    chatAgent && chatAgent.role !== 'project-lead'
+      ? { id: 'chat', label: agentLabel(s, chatAgent, { withTeam: true }), icon: 'eye' }
+      : { id: 'chat', label: 'Chat', count: open, tone: 'warn' },
     { id: 'messages', label: 'Messages' },
     { id: 'agents', label: 'Agents' },
     { id: 'terminal', label: 'Terminal' },
@@ -226,9 +241,9 @@ function ProjectView({ s, route, project }) {
   ].filter(Boolean);
   const current = ['sprint', 'task'].includes(tab) ? 'board' : tab === 'team' ? null : tab;
   // The panel docks the lead beside every view except Chat, which is the thread itself.
-  const docked = tab === 'chat' ? null : lead;
+  const docked = side || (tab === 'chat' ? null : lead);
   const wantPanel = docked && s.prefs.panelOpen && !(narrow && s.ui?.panelAuto !== true);
-  const showPanel = docked && (narrow ? s.ui?.panelDrawer : s.prefs.panelOpen);
+  const showPanel = docked && (narrow ? s.ui?.panelDrawer : s.prefs.panelOpen || !!side);
   const togglePanel = () => (narrow ? update((st) => { st.ui = { ...(st.ui || {}), panelDrawer: !st.ui?.panelDrawer }; }) : act.setPref('panelOpen', !s.prefs.panelOpen));
   let body;
   if (tab === 'board') body = html`<${Board} s=${s} project=${project} />`;
@@ -237,7 +252,7 @@ function ProjectView({ s, route, project }) {
   else if (tab === 'team') body = html`<${TeamPage} s=${s} project=${project} teamId=${route.parts[3]} route=${route} />`;
   else if (tab === 'workflow') body = html`<${WorkflowTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'mocks') body = html`<${MocksTab} s=${s} project=${project} route=${route} />`;
-  else if (tab === 'chat') body = html`<${ChatTab} s=${s} project=${project} agentId=${route.parts[3] || lead.id} route=${route} />`;
+  else if (tab === 'chat') body = html`<${ChatTab} s=${s} project=${project} agentId=${chatAgent?.id || route.parts[3]} route=${route} />`;
   else if (tab === 'messages') body = html`<${MessagesTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'agents') body = html`<${AgentsTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'terminal') body = html`<${TerminalTab} s=${s} project=${project} route=${route} />`;
@@ -249,14 +264,14 @@ function ProjectView({ s, route, project }) {
     <div class="view">
       <div class="tabrow" role="tablist" aria-label="Project views">
         <${Tabs} tabs=${tabs} current=${current} base=${`/p/${project.id}/`} />
-        ${docked && html`<div class="tab-end">
+        ${docked && !side && html`<div class="tab-end">
           <button type="button" class="btn sm" aria-pressed=${!!showPanel} onClick=${togglePanel} data-tip=${showPanel ? 'Hide the project lead' : 'Show the project lead'} data-tip-side="left">
             <${Avatar} agent=${lead} s=${s} size="sm" /><span>Project lead</span><${Icon} name="panel-right" size=${14} /></button>
         </div>`}
       </div>
       <div class="view-body" style=${flush ? 'overflow:hidden;display:flex;flex-direction:column' : ''}>${body}</div>
     </div>
-    ${showPanel && html`${narrow && html`<div class="drawer-scrim" style="z-index:71" onClick=${togglePanel}></div>`}<${LeadPanel} s=${s} agent=${docked} project=${project} />`}
+    ${showPanel && html`${narrow && html`<div class="drawer-scrim" style="z-index:71" onClick=${togglePanel}></div>`}<${SidePanel} s=${s} agent=${docked} project=${project} />`}
   </div>`;
 }
 
@@ -269,7 +284,12 @@ function App() {
     if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); act.openDialog({ type: 'switcher' }); }
     if (mod && e.key.toLowerCase() === 'b') { e.preventDefault(); act.setPref('sidebarFolded', !store.state.prefs.sidebarFolded); }
   }, []);
-  useEffect(() => { if (!route.parts.length) go('/home'); }, [route.path]);
+  useEffect(() => {
+    if (!route.parts.length) go('/home');
+    // The old Home tabs keep working: Projects moved to its own page, and Questions and
+    // Approvals became the Type filter on Needs attention.
+    if (route.path === '/home/projects') go('/projects');
+  }, [route.path]);
   useEffect(() => { document.title = 'LGcode'; }, []);
   const top = route.parts[0] || 'home';
   if (top === 'login' || (s.session.status !== 'in' && top !== 'setup')) return html`<${Login} s=${s} /><${Toasts} s=${s} />`;
@@ -279,6 +299,7 @@ function App() {
   if (top === 'p' && project) content = html`<${ProjectView} s=${s} route=${route} project=${project} />`;
   else if (top === 'p') content = html`<div class="view-body"><div class="page"><div class="empty" data-empty><strong>This project does not exist</strong><span>It may have been removed. <a class="link" href=${href('/home')}>Go to Home</a></span></div></div></div>`;
   else if (top === 'r') content = route.parts[2] === 'design' ? html`<${RepoDesign} s=${s} repoId=${route.parts[1]} route=${route} />` : html`<${RepoPage} s=${s} repoId=${route.parts[1]} />`;
+  else if (top === 'projects') content = html`<${AllProjects} s=${s} />`;
   else if (top === 'machines') content = html`<${Machines} s=${s} route=${route} />`;
   else if (top === 'subscriptions') content = html`<${Subscriptions} s=${s} route=${route} />`;
   else if (top === 'notifications') content = html`<${Notifications} s=${s} route=${route} />`;

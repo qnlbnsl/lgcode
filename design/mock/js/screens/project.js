@@ -56,10 +56,7 @@ export function Board({ s, project }) {
       <${StageStrip} s=${s} project=${project} />
       <p class="goal-line"><span class="faint">Goal</span> ${project.goal || html`<span class="muted">No goal yet. Tell the project lead what you want to change.</span>`}</p>
     </div>
-    ${sprints.length === 0 ? html`<div class="page"><${Empty} title="No sprints yet" icon="kanban">
-        ${project.hasMocks ? html`The Design team is drawing the screens first. Sprints appear when you approve the mocks. <a class="link" href=${href(`/p/${project.id}/mocks`)}>Open Mocks</a>`
-          : html`The board fills in when the project lead has shaped the plan. <a class="link" href=${href(`/p/${project.id}/chat`)}>Talk to the project lead</a>`}<//></div>`
-    : html`
+    ${html`
     <div class="col-jump only-phone-flex" role="tablist" aria-label="Board columns">${COLUMNS.map((c) => html`<button type="button" key=${c} class="tab" aria-selected=${(col || 'In progress') === c} onClick=${() => { setCol(c); document.getElementById('col-' + c.replace(' ', '-'))?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>${c}<span class="count">${sprints.filter((x) => x.column === c).length}</span></button>`)}</div>
     <div class="board" data-main>
       ${COLUMNS.map((c) => { const list = sprints.filter((x) => x.column === c).sort((a, b) => (b.fix ? 1 : 0) - (a.fix ? 1 : 0) || requestsOfSprint(s, b.id).length - requestsOfSprint(s, a.id).length);
@@ -106,7 +103,7 @@ export function SprintPage({ s, project, sprintId }) {
     <div class="page-head" style="margin-top:6px"><h1 class="page-title">${sp.name}</h1></div>
     <p class="status-line"><span class="tag">${sp.label}</span><span>${sp.phase}</span><span>${sp.column}</span>${sp.fix && html`<span class="badge info">Fix sprint · merges on its own</span>`}
       ${reqs.length > 0 && html`<span class="warn-text" style="font-weight:var(--weight-medium)">${plural(reqs.length, 'request')} ${reqs.length === 1 ? 'needs' : 'need'} you</span>`}</p>
-    ${reqs.length > 0 && html`<div class="stack">${reqs.map((r) => html`<${RequestBlock} key=${r.id} s=${s} request=${r} />`)}</div>`}
+    ${reqs.length > 0 && html`<div class="stack">${reqs.map((r) => html`<${RequestBlock} key=${r.id} s=${s} request=${r} openThread=${() => act.openSidePanel(r.agent, r.id)} />`)}</div>`}
     <p class="lede">${sp.goal}</p>
     <dl class="dl facts">
       <dt>Team</dt><dd>${t ? html`<a class="link" href=${href(`/p/${project.id}/team/${t.id}`)}>${teamName(t)}</a>` : html`<span class="muted">Not staffed yet</span>`}</dd>
@@ -132,7 +129,7 @@ export function TaskPage({ s, project, taskId }) {
     <div class="page-head" style="margin-top:6px"><h1 class="page-title grow">${t.title}</h1>
       ${o && html`<a class=${cx('btn', !reqs.length && 'primary')} href=${href(routeForAgent(s, o))}><${Icon} name="message-square" size=${14} />Talk to ${o.name}</a>`}</div>
     <p class="status-line"><span class="tag">${t.label}</span><${TaskState} t=${t} /><span>${t.points} points</span></p>
-    ${reqs.length > 0 && html`<div class="stack">${reqs.map((r) => html`<${RequestBlock} key=${r.id} s=${s} request=${r} />`)}</div>`}
+    ${reqs.length > 0 && html`<div class="stack">${reqs.map((r) => html`<${RequestBlock} key=${r.id} s=${s} request=${r} openThread=${() => act.openSidePanel(r.agent, r.id)} />`)}</div>`}
     <dl class="dl facts">
       <dt>Owner</dt><dd>${o ? html`<${AgentLine} s=${s} agent=${o} />` : html`<span class="muted">Unassigned. The team lead assigns it in dependency order.</span>`}</dd>
       <dt>Team</dt><dd>${team ? html`<a class="link" href=${href(`/p/${project.id}/team/${team.id}`)}>${teamName(team)}</a>` : html`<span class="muted">None</span>`}</dd>
@@ -180,12 +177,19 @@ export function RepoPage({ s, repoId }) {
       <a class="tab" role="tab" aria-selected="false" href=${href(`/r/${r.id}/design`)}>Design</a>
       <div class="tab-end"><button type="button" class="btn sm primary" onClick=${() => act.openDialog({ type: 'new-project', repo: r.id })}><${Icon} name="plus" size=${14} />New project</button></div></div>
     <div class="view-body">
-      <dl class="dl facts" style="padding:var(--space-3) var(--space-4);margin:0;border-bottom:1px solid var(--color-line)">
-        <dt>Remote</dt><dd class="mono">${r.remote || html`<span class="muted" style="font-family:var(--font-body)">No remote. This repository lives only on this computer.</span>`}</dd>
-        <dt>Base branch</dt><dd class="mono">${r.main}</dd>
-        <dt>On</dt><dd class="row" style="flex-wrap:wrap;gap:4px 14px">${Object.entries(r.folders).map(([m, f]) => html`<span key=${m}>${machineOf(s, m).name} <span class="mono muted">${f}</span></span>`)}</dd>
-      </dl>
-      <div data-main>${ps.length ? html`<${ProjectTable} s=${s} projects=${ps} showRepo=${false} />` : html`<${Empty} title="No projects in this repository" icon="kanban">Start one with New project. Each project gets its own branch and worktree.<//>`}</div>
+      <div class="repo-facts">
+        <dl class="dl">
+          <dt>Remote</dt><dd class="mono">${r.remote || html`<span class="muted" style="font-family:var(--font-body)">None</span>`}</dd>
+          <dt>Base branch</dt><dd class="mono">${r.main}</dd>
+          <dt>Folders</dt><dd class="row" style="flex-wrap:wrap;gap:4px 14px">${Object.entries(r.folders).map(([m, f]) => html`<span key=${m}>${machineOf(s, m).name} <span class="mono muted">${f}</span></span>`)}</dd>
+        </dl>
+        <section class="repo-desc" aria-label="Product description">
+          <h2>Product</h2>
+          ${r.description ? html`<p>${r.description}</p>${r.describedAt && html`<small class="faint">Updated ${ago(r.describedAt)} ago by the project lead of ${(s.projects.find((p) => p.lead === r.describedBy) || {}).name}</small>`}`
+            : html`<p class="muted">Written by the first project lead.</p>`}
+        </section>
+      </div>
+      <div data-main><${ProjectTable} s=${s} projects=${ps} showRepo=${false} /></div>
     </div>
   </div>`;
 }

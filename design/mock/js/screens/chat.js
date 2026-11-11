@@ -5,7 +5,7 @@ import {
   openRequests, PERMISSION_MODES, roleLabel,
 } from '../data.js';
 import * as act from '../actions.js';
-import { Avatar, Thread, Composer, Menu, Empty, StateWord } from '../ui.js';
+import { Avatar, Thread, Composer, Menu, Empty, StateWord, canMessage, ReadOnlyBar } from '../ui.js';
 
 function Aside({ s, project, a }) {
   const task = a.task && s.tasks.find((t) => t.label === a.task && t.project === a.project);
@@ -56,8 +56,8 @@ export function ChatTab({ s, project, agentId, route }) {
           { label: 'Open its worktree in Git', icon: 'git-branch', onSelect: () => { location.hash = `#/p/${project.id}/git`; } },
         ].filter(Boolean)} />
       </header>
-      <${Thread} key=${a.id} s=${s} agentId=${a.id} center=${true} focusReq=${route.query.get('req')} />
-      <${Composer} key=${'c' + a.id} s=${s} agentId=${a.id} center=${true} />
+      <${Thread} key=${a.id} s=${s} agentId=${a.id} center=${true} focusReq=${route.query.get('req')} onOpenThread=${act.openSidePanel} />
+      ${canMessage(s, a) ? html`<${Composer} key=${'c' + a.id} s=${s} agentId=${a.id} center=${true} />` : html`<${ReadOnlyBar} s=${s} agent=${a} center=${true} />`}
     </div>
     ${wide && html`<${Aside} s=${s} project=${project} a=${a} />`}
   </div>`;

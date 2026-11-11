@@ -339,9 +339,13 @@ function Overview({ s, p, w }) {
 // ---- review rounds -----------------------------------------------------------------
 function Review({ s, p, w }) {
   const now = useNow(); const [rid, setRid] = useState(null); const [sel, setSel] = useState(null); const [filter, setFilter] = useState('all');
-  if (!w.reviews.length) return html`<div class="wf-body"><${Empty} title="No review rounds yet" icon="gauge">
-    ${p.agentReview === 'off' ? 'Agent review is off for this project, so plans and code are not scored in rounds. The Review phase still runs before hand over.' : 'Rounds appear when a plan or a change is first reviewed. Each finding is scored: a minor is 1 point, a major is 3, and a blocker is 9.'}
-    <a class="link" href=${href(`/p/${p.id}/workflow/settings`)}>Open the workflow settings</a><//></div>`;
+  // With no review yet, the page keeps its rounds and its findings table, empty.
+  if (!w.reviews.length) return html`<div class="wf-body">
+    <header class="wf-rvhead"><div class="grow"><h2 class="muted">No review yet</h2></div><span class="badge">${p.agentReview === 'off' ? 'Agent review off' : 'Not started'}</span></header>
+    <div class="wf-rounds">${Array.from({ length: w.settings.maxRounds }, (_, k) => html`<div key=${k} class="wf-round empty"><div class="bar"></div><b>Round ${k + 1}</b><span>${k + 1 >= 5 ? 'Needs your approval' : '—'}</span></div>`)}</div>
+    <div class="table-wrap"><table class="table wf-findings"><thead><tr><th>Finding</th><th>Statement</th><th>Severity</th><th>What the reviewer found</th><th class="num">Points</th><th>State</th></tr></thead>
+      <tbody><tr><td colspan="6" class="muted" data-empty>No findings</td></tr></tbody></table></div>
+  </div>`;
   const rv = byId(w.reviews, rid) || w.reviews[0]; const max = w.settings.maxRounds;
   const n = Math.min(sel || rv.rounds.length, rv.rounds.length); const round = rv.rounds[n - 1];
   const top = Math.max(1, ...rv.rounds.map(roundPoints)); const team = byId(s.teams, rv.team);
@@ -435,7 +439,6 @@ function Runs({ s, p, w }) {
 const ST_WORD = { holds: ['success', 'Holds'], building: ['info', 'Being built'], review: ['info', 'In review'], stuck: ['warn', 'Stuck'], dropped: ['', 'Dropped'], open: ['', 'Not started'] };
 function Result({ s, p, w }) {
   const now = useNow(); const res = w.result; const sts = res.statements; const lead = leadOf(s, p);
-  if (!sts.length) return html`<div class="wf-body"><${Empty} title="The end-result page is not written yet" icon="file-text">The project lead writes it in Define, as numbered statements that say what done means. <a class="link" href=${href(`/p/${p.id}/chat`)}>Talk to the project lead</a><//></div>`;
   const live = sts.filter((x) => x.state !== 'dropped'); const holds = live.filter((x) => x.state === 'holds').length;
   const finished = p.phase === 'handover' || p.phase === 'running'; const pr = res.pr; const merged = pr && (pr.merged || p.merged);
   const req = pr && pr.requestId && byId(s.requests, pr.requestId);
