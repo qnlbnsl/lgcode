@@ -127,6 +127,8 @@ them.
 Finished when: the owner has looked at the second round and approved the daily surfaces,
 which are Home, the sidebar, the board and Chat.
 
+The second round was built on 2026-11-10 and 2026-11-11. It awaits the owner's approval.
+
 ### Step 1: clear the ground
 
 This step is small. It removes the things that would mislead every later step.
@@ -156,38 +158,110 @@ project's Workflow tab shows the phase the engine holds.
 
 This is the step that makes the loop exist. Each phase does the least that still counts.
 
+This step was updated on 2026-11-11, after the second round of the mock and the changes
+the owner made to it afterwards. The mock is on the branch `area/mock-rebuild`, up to
+commit `036b0da`. Its result is recorded in
+`design/mock/feedback/2026-11-10-round-2-result.md`. Each website item below names the
+mock address that is its reference. The addresses follow `#` in the mock.
+
+#### What each phase does in this step
+
 | Phase | The least it does in this step |
 |---|---|
 | 1 Define | The owner types a goal. The lead asks its questions, names the project, and writes the end-result page as numbered statements. The owner approves the page. |
 | 2 Design and teams | The lead starts one build team. Design work is skipped unless the owner asks. |
-| 3 Plan | The lead writes one plan with a "Done when" section. One reviewer reads it once. |
-| 4 Build | Builders work the plan's items in the team's worktree. The lead merges with the engine's merge command after a passing check. |
+| 3 Plan | The lead writes one plan for each sprint, as an HTML page with a "Done when" section. Each task links to the part of the plan it carries out. One reviewer reads the plan once. |
+| 4 Build | Builders work the tasks in the team's worktree. The lead merges with the engine's merge command after a passing check. |
 | 5 Verify | The project's configured test command runs. A failure goes back to the build team. |
 | 6 Review | One reviewer checks the work against the end-result page. Findings go back to the build team. |
-| 7 Hand over | The lead opens a pull request into the base branch. The owner approves it on the merge review. |
+| 7 Hand over | The lead opens a merge request into the base branch. The owner approves it or sends it back with a reason. |
 | 8 Keep running | Nothing yet. The project is marked finished. |
 
-Engine:
+#### Engine work
 
-- The workflow piece gains the moves for each phase, as commands and as agent tools, so a
-  lead moves its own project forward.
-- The end-result page becomes a stored record with numbered statements.
-- A project is created from a goal alone. The lead sets the name with a tool.
-- The loop's reasons to contact the owner become requests: approve the end-result page,
-  and approve the pull request.
+- **The moves between phases.** The workflow piece gains the moves for each phase, as
+  commands and as agent tools, so a lead moves its own project forward.
+- **A project from a goal.** A project is created from a goal alone. It has no name until
+  the lead sets one with a tool. The website shows "Naming…" until then.
+- **The end-result page.** It becomes a stored record with numbered statements. A
+  "Request change" command sends the owner's change to the lead.
+- **A request carries its own brief.** A question or an approval stores a short brief, one
+  line of description, a recommendation, the other answers, and its references. The
+  agent that asks writes them. The mock's cards are drawn from these fields.
+- **An approval answers with Allow or Deny.** The mock also shows "Always allow" and
+  "Always deny" in a menu on each button. Those two wait for the standing permission
+  rules, which are not built. Step 2 stores only Allow and Deny.
+- **A merge request carries its evidence.** It stores a brief, whether users will notice
+  the change, and four facts: the tests, the review, the size of the change, and whether
+  it merges cleanly into the base branch. "Send back" stores the owner's reason and
+  passes it to the lead.
+- **A sprint carries its plan.** The plan is an HTML page stored with the sprint. A task
+  stores a link to one part of that plan. A sprint also stores a one-line summary, which
+  the mock labels "TL;DR".
+- **The board's Backlog lane.** A sprint gains the status "Backlog".
+- **A test run keeps its log.** A run stores its jobs, their steps and each step's log, so
+  the page can show them. The command comes from the project's configuration.
+- **The loop's reasons to contact the owner.** In this step there are three: a question
+  from the lead during Define, the approval of the end-result page, and the merge
+  request.
+- **Records for the evaluation round.** Each task result names the role, the model, the
+  effort and the session. This is the cheap part of step 7, and it starts here.
 
-Website:
+#### Website work
 
-- New project takes a goal and nothing else that the owner must invent.
-- Home becomes the one triage table.
-- Chat puts the owner on the right and shows a question as a card.
-- The Workflow tab shows the phase track and the end-result page from real records.
-- The board shows the plan's items as they move.
+Each surface is rebuilt against the mock. A surface that the thin path does not use is
+left alone until its own step.
 
-Finished when: the owner types a goal for a small real change to LGcode itself, answers
-the lead's questions, approves the end-result page, and next hears from LGcode when the
-pull request is ready. The first such run is recorded in a session report, with every
-place a person had to step in.
+| Surface | What changes | Mock address |
+|---|---|---|
+| Home | One table of everything that waits for the owner, with the columns Title, Type, Repository, Project, Stage, Agent and Waiting. Headings sort. Type, Repository and Project filter. "Show answered" adds the answered rows. The longest wait is first. | `/home` |
+| Home, an expanded row | A question or an approval opens as its brief, with Accept or Allow, Deny, and Details. A merge request opens as its brief, the "Users will notice" line, and one strip of Tests, Review, Changes and Into main. | `/home` |
+| Phone notification offer | One line on the title row, with "Set up" and "Not now". | `/home` |
+| Sidebar | The heading is "Repositories". One click opens a row. The arrow or a double click folds it. A button beside the heading opens the projects table. | every page, and `/projects` |
+| New project | One "Goal" field. The subscriptions are a table with Harness, Subscription, Machine and Models. The project shows as "Naming…" until the lead names it. | the "+" beside "Repositories", and `/setup` |
+| Chat | The owner's messages are on the right, and the agent's are on the left. A question is a card that shows its brief first. "Details" opens the full card in place. The recommended action carries the sparkles icon. | `/p/console/chat` |
+| Chat, another agent | "Open thread" opens the asking agent's thread in the side panel, with that agent's name in the header and a "Back to the project lead" button. Only the project lead has a message box. Another agent's thread is read-only unless that agent has an open question. | `/p/console/chat` |
+| Board | Fixed-width lanes that scroll sideways, with a Backlog lane. Opening the lead panel does not change a card's size. An empty project shows its lanes with no cards. A focus button hides everything but the board, and Escape leaves it. Hovering a card shows the sprint's summary. | `/p/console/board` |
+| Sprint page | The plan and the tasks sit side by side, each with its own toggle. A task's link scrolls the plan to its part. | `/p/console/sprint/sp7` |
+| Workflow | A small status line in place of a title. The phase track. Each phase's detail in five labelled parts. Agents grouped as Waiting, Working and Idle. | `/p/console/workflow` |
+| Test runs | A run list on the left. The selected run shows its jobs, steps and log. "Start full run" names no command. | `/p/console/workflow/runs` |
+| End result | A status line with a progress bar, the numbered statements, and a "Request change" button. | `/p/apiref/workflow/result` |
+| Merge review | The same evidence strip as the Home row, with "Approve and merge" and "Send back". | opened from a merge row on `/home` |
+
+#### What the mock shows that waits for a later step
+
+| In the mock | Waits for | Why it waits |
+|---|---|---|
+| Epics, the Priority field, and the board's Table and Roadmap views | Step 4 | The thin path has one team and one sprint at a time. |
+| The work assignment table, and the lead's model and effort in Project settings | Step 4 | The thin path uses the owner's default harness and model. |
+| The Mocks tab and its approval | Step 4 | The thin path skips design work. |
+| The repository Design page and its canvas | Step 3 | It needs the design import and the approved categories. |
+| The repository's running product description | Step 3 | It needs the agent that reads a V0. |
+| Files and images sent with a message | Step 3 | The deliverables rounds are where the owner will most want to send a screenshot. |
+| "Always allow" and "Always deny" | The standing permission rules | The rules are not built. |
+| Generated commit messages and pull request text | Step 6 | A lead writes its own message until then. |
+| Review rounds with scoring | Steps 4 and 6 | The thin path has one review with no rounds. |
+| Search that ranks by meaning | Step 8 | The current search keeps working. |
+| The Files tab | No step yet | The mock marks it "coming soon", and `docs/features.md` lists it. |
+
+#### What the owner has not ruled on in the mock
+
+The mock's result file lists 12 choices that the owner has not approved. Three of them
+shape this step.
+
+1. A question is answered in a card in place, and the side panel is the second step.
+2. Only the project lead has a message box.
+3. A new project's name is made from its goal.
+
+This step builds them as the mock shows them. A different ruling changes the Chat and New
+project rows above, and nothing in the engine.
+
+#### When this step is finished
+
+The owner types a goal for a small real change to LGcode itself, answers the lead's
+questions, approves the end-result page, and next hears from LGcode when the merge request
+is ready. The first such run is recorded in a session report, with every place a person
+had to step in.
 
 ### Step 3: Define and import, in full
 
