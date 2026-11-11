@@ -694,3 +694,21 @@ question is about, why it matters, why it recommends its answer, and the files i
 cites. A thread shows the brief first, with Accept, Deny and Details, and the
 full card opens from Details. The mock in `design/mock/` shows the layout. The
 engine's question records and the agents' instructions would need these fields.
+
+## A file explorer in the Git view
+
+The owner asked for this on 2026-11-11. It is agreed and not built. The Git view
+gains a "Files" tab that works like the file explorer of an editor such as Visual
+Studio Code: a folder tree of the inspected worktree, and the open file beside it.
+References in questions, approvals and plans link to a file and open it here. The
+mock shows the tab with "Coming soon". The component that shows the files is not
+chosen yet.
+
+## Plans written as HTML pages
+
+The owner decided this on 2026-11-11. It is agreed and not built. From now on,
+every plan in LGcode is an HTML page. Planner agents fill in one template, and the
+page is written to get the point across to the owner in a human-friendly way. The
+plans the agents work from keep their full detail. The Git view gains a "Plans" tab
+that lists and shows these pages. The mock shows the tab with "Coming soon". The
+template is not written yet.

@@ -739,8 +739,10 @@ export function GitTab({ s, project }) {
         <button type="button" aria-pressed=${tab === 'changes'} onClick=${() => setTab('changes')}>Changes${w.files.length > 0 && html`<span class="count">${w.files.length}</span>`}</button>
         <button type="button" aria-pressed=${tab === 'history'} onClick=${() => setTab('history')}>History</button>
         ${(w.merge || tab === 'conflicts') && html`<button type="button" aria-pressed=${tab === 'conflicts'} onClick=${() => setTab('conflicts')}>Conflicts${conflictCount > 0 && html`<span class="count warn">${conflictCount}</span>`}</button>`}
+        <button type="button" aria-pressed=${tab === 'files'} onClick=${() => setTab('files')}>Files</button>
+        <button type="button" aria-pressed=${tab === 'plans'} onClick=${() => setTab('plans')}>Plans</button>
       </div>
-      ${tab !== 'conflicts' && html`<div class="seg not-phone" aria-label="Diff layout">
+      ${(tab === 'changes' || tab === 'history') && html`<div class="seg not-phone" aria-label="Diff layout">
         <button type="button" aria-pressed=${mode === 'unified'} aria-label="Unified diff" data-tip="Unified" onClick=${() => setMode('unified')}><${Icon} name="rows-2" size=${14} /></button>
         <button type="button" aria-pressed=${mode === 'split'} aria-label="Split diff" data-tip=${narrow ? 'Split, best on a wide window' : 'Split'} onClick=${() => setMode('split')}><${Icon} name="columns-2" size=${14} /></button>
       </div>`}
@@ -750,6 +752,8 @@ export function GitTab({ s, project }) {
       <button type="button" class="btn sm warn" onClick=${() => setTab('conflicts')}>Resolve conflicts</button></div>`}
     ${tab === 'changes' ? html`<${Changes} key=${w.id} s=${s} w=${w} mode=${mode} phone=${phone} />`
       : tab === 'history' ? html`<${History} key=${w.id} s=${s} w=${w} mode=${mode} phone=${phone} />`
+      : tab === 'files' ? html`<div class="git-clean"><${Empty} title="Files" icon="folder">Coming soon.<//></div>`
+      : tab === 'plans' ? html`<div class="git-clean"><${Empty} title="Plans" icon="clipboard-list">Coming soon.<//></div>`
       : html`<${Conflicts} key=${w.id} s=${s} w=${w} phone=${phone} />`}
   </div>`;
 }
