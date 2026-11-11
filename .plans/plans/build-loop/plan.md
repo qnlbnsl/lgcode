@@ -244,21 +244,39 @@ left alone until its own step.
 | Search that ranks by meaning | Step 8 | The current search keeps working. |
 | The Files tab | No step yet | The mock marks it "coming soon", and `docs/features.md` lists it. |
 
-#### What the owner has not ruled on in the mock
+#### What the owner ruled on 2026-11-11
 
-The mock's result file lists 12 choices that the owner has not approved. Three of them
-shape this step.
+The mock's result file lists 12 choices. The owner ruled on the two that shape this step.
 
-1. A question is answered in a card in place, and the side panel is the second step.
-2. Only the project lead has a message box.
-3. A new project's name is made from its goal.
+**Where a question shows.** The owner said that the place does not matter, and that a
+question shows in three places.
 
-This step builds them as the mock shows them. A different ruling changes the Chat and New
-project rows above, and nothing in the engine.
+1. In the table on Home.
+2. In the project lead's thread.
+3. In the thread of the agent that asked. The owner leaned towards letting a worker's
+   thread show its own question too, with the answer given right there.
+
+An answer given in any of the three places has the same effect. It is posted to the
+message board for the agent that asked. When the owner wants to talk a question over, the
+conversation is with the lead of the team that asked, and that lead does the rest. So
+"Open thread" on a worker's question opens its team lead's thread.
+
+**How a project gets its name.** A new project's name comes from its goal. The lead sets
+a first name as soon as it knows a little about the project. When the lead starts the
+first team, it renames the project if the work has moved far from that name. After that,
+a lead renames a project when the owner asks, or when the project has moved far from what
+its name says.
+
+The engine work for this step gains two items from these rulings. An answer to a question
+is posted to the message board whichever screen it came from. The lead's naming tool can
+be called again, and the engine records each rename.
+
+The owner has not ruled on the other ten choices in the result file.
 
 #### When this step is finished
 
-The owner types a goal for a small real change to LGcode itself, answers the lead's
+The owner ruled on 2026-11-11 that the first real project is LGcode itself. The owner
+types a goal for a real change to LGcode, answers the lead's
 questions, approves the end-result page, and next hears from LGcode when the merge request
 is ready. The first such run is recorded in a session report, with every place a person
 had to step in.
@@ -381,19 +399,84 @@ suggestions.
 The 20 unchecked foundation findings in issue 519 are handled by rule 3. Each is fixed
 when a step touches its code, and not before.
 
-### Decisions the owner needs to make
+### Where the orchestrated build stops
 
-These are in the order they block work.
+The owner set the end point on 2026-11-11. An agent orchestrates the build of this plan
+until the owner can stop using the terminal.
 
-1. **Is the thin path in step 2 the right next build?** The alternative is to finish the
-   website against the mock first. This plan recommends the thin path, because the
-   website's worst faults are fixed inside steps 1 and 2 anyway.
-2. **What is the first real project for step 2?** This plan suggests a small change to
-   LGcode itself, so the first run is on code the owner knows.
-3. **Does the owner approve the design file's categories?** A Design lead agent proposes
+The end point, in the owner's words: "when I can ditch this terminal UI, go on to" LGcode's
+"hosted website, and be able to run the finalized build. That includes things like
+publishing packages, doing mobile builds, and everything else, including the entire UI
+and OpenPencil."
+
+The owner's purpose: "to get to a point where I can open it and start working on all the
+other finer details of LG code that are not built". The owner also wants the product
+usable enough to bring another of the owner's projects into it, starting with Ananke. The
+owner's note names a second project that the transcript spelled "Enkra". That name needs
+checking with the owner.
+
+What the end point requires, beyond steps 1 to 6:
+
+- **The whole website matches the mock.** Every surface in the mock works on real
+  records, not only the surfaces on the thin path.
+- **The website is hosted.** The owner reaches it over HTTPS, as `docs/remote-access.md`
+  describes, without a terminal open.
+- **OpenPencil works inside it.** The repository Design page opens the design file and
+  saves it into the repository.
+- **A project can publish packages and make phone builds.** These run as steps the lead
+  starts and the owner approves, with their logs on the Test runs page. Accounts and
+  secrets stay with the owner, as the build loop design says.
+- **The owner can change LGcode from inside LGcode.** The owner asked: "If I want to
+  update something, how can I talk to the agent that actually updates it?" The answer in
+  this plan is a project in the LGcode repository. The owner tells its project lead what
+  to change, and the loop does the rest.
+
+Steps 7 and 8 are not needed for the end point. The record keeping from step 7 that
+starts in step 2 is kept.
+
+How the orchestrated build is run:
+
+- The work is integrated on one branch, `area/build-loop`, and each step is a pull request
+  into it. Moving finished work into `master` stays the owner's approval, under rule 7 of
+  `AGENTS.md`.
+- The orchestrator watches the weekly usage and pauses at 90 percent.
+- Each step ends with a session report that lists what a person can now do, what was not
+  checked, and every choice made without the owner.
+
+### OpenPencil: its server or the design file
+
+The owner raised this on 2026-11-11 and has not decided. An agent can change a design in
+two ways.
+
+- **Through OpenPencil's Model Context Protocol (MCP) server.** The agent calls tools, and
+  OpenPencil changes the file. The editor's own rules keep the file valid, and an open
+  editor shows the change at once. It needs OpenPencil running for every design change.
+- **By editing the `.fig` file directly.** It needs nothing running. The agent must write
+  a binary format correctly, and an open editor will not see the change until it reloads.
+
+This plan suggests the server for changes and a direct read of the file for import and
+for drawing the Design page. Step 3 starts by testing both on the real file before any
+code depends on the choice.
+
+### Decisions the owner has made, and those still open
+
+Made on 2026-11-11:
+
+- The build loop is the next build, and an agent orchestrates it to the end point above.
+- The first real project is LGcode itself.
+- A project's name comes from its goal, and a lead may rename it.
+- A question shows on Home, in the project lead's thread, and in the asking agent's
+  thread.
+
+Still open, in the order they block work:
+
+1. **Does the owner approve the design file's categories?** A Design lead agent proposed
    them during the second round of the mock. Step 3 needs the approved standard.
-4. **Who writes the `.lgcode` config?** Step 3 suggests the engine, from an approved tool
+2. **OpenPencil's server or the design file?** Step 3 tests both first.
+3. **Who writes the `.lgcode` config?** Step 3 suggests the engine, from an approved tool
    call.
+4. **Where is the website hosted?** The end point needs an address and a proxy that the
+   owner sets up.
 5. **What is a key task for an evaluation round?** The design suggests a merged sprint.
 6. **Where does the ledger live for a user without Founder OS?** Step 7 needs the answer.
 7. **What happens at the end of review round six?** The design leaves this open.
