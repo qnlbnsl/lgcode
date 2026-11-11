@@ -197,6 +197,7 @@ th.num .th-sort { flex-direction: row-reverse; }
 .tk-name { font-size: var(--text-lg); font-weight: var(--weight-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tk-views button { gap: 6px; }
 .tk-goal { color: var(--color-text); line-height: 1.5; max-width: var(--measure); }
+.tk-tldr { font-weight: var(--weight-strong); color: var(--color-info); }
 .tk-meta { display: flex; flex-wrap: wrap; border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-surface); overflow: hidden; }
 .tk-meta > div { flex: 1 1 auto; min-width: 0; display: grid; gap: 1px; padding: 6px var(--inset); border-right: 1px solid var(--color-line); }
 .tk-meta > div:last-child { border-right: 0; }

@@ -171,9 +171,9 @@ export function TaskTable({ s, tasks, showSprint = false }) {
 
 // ---- sprint page ----------------------------------------------------------------
 // A sprint shows its plan and its tasks. The tasks are the short version of the plan, and
-// each task names the part of the plan it carries out. Three views: Plan, Plan and tasks,
-// and Tasks. The plan is an HTML page, drawn in a frame.
-const VIEWS = [['plan', 'Plan', 'file-text'], ['both', 'Plan and tasks', 'columns-2'], ['tasks', 'Tasks', 'list-checks']];
+// each task names the part of the plan it carries out. Two toggles, Plan and Tasks, show or
+// hide each side; one side always stays. The plan is an HTML page, drawn in a frame.
+const PANES = [['plan', 'Plan', 'file-text'], ['tasks', 'Tasks', 'list-checks']];
 function PlanPane({ sp, frame }) {
   const theme = () => { const d = frame.current?.contentDocument; if (d) d.documentElement.setAttribute('data-theme', document.documentElement.getAttribute('data-theme') || 'light'); };
   return html`<section class="tk-plan" aria-label="Plan">
@@ -202,6 +202,8 @@ export function SprintPage({ s, project, sprintId }) {
   const sp = byId(s.sprints, sprintId); const [adding, setAdding] = useState(false); const [title, setTitle] = useState('');
   const [view, setViewState] = useState(() => persist('sprintView', 'both'));
   const setView = (v) => { setViewState(v); remember('sprintView', v); };
+  const shown = { plan: view !== 'tasks', tasks: view !== 'plan' };
+  const toggle = (k) => { const n = { ...shown, [k]: !shown[k] }; if (n.plan || n.tasks) setView(n.plan && n.tasks ? 'both' : n.plan ? 'plan' : 'tasks'); };
   const frame = useRef(null);
   if (!sp) return html`<div class="page"><${Empty} title="This sprint does not exist">It may have been removed. <a class="link" href=${href(`/p/${project.id}/board`)}>Back to the board</a><//></div>`;
   const tasks = tasksOfSprint(s, sp.id); const reqs = requestsOfSprint(s, sp.id); const t = sp.team && teamOf(s, sp.team); const pr = sprintProgress(s, sp);
@@ -233,9 +235,9 @@ export function SprintPage({ s, project, sprintId }) {
         <a class="icon-btn" href=${href(`/p/${project.id}/board`)} aria-label="Back to the board" data-tip="Board"><${Icon} name="arrow-left" size=${16} /></a>
         <span class="tag">${sp.label}</span><h1 class="tk-name">${sp.name}</h1>${sp.fix && html`<span class="badge info">Fix sprint</span>`}
         <span class="grow"></span>
-        <div class="seg tk-views" role="group" aria-label="What to show">${VIEWS.map(([id, label, icon]) => html`<button key=${id} type="button" aria-pressed=${view === id} onClick=${() => setView(id)}><${Icon} name=${icon} size=${14} /><span>${label}</span></button>`)}</div>
+        <div class="seg tk-views" role="group" aria-label="What to show">${PANES.map(([id, label, icon]) => html`<button key=${id} type="button" aria-pressed=${shown[id]} onClick=${() => toggle(id)}><${Icon} name=${icon} size=${14} /><span>${label}</span></button>`)}</div>
       </div>
-      <p class="tk-goal">${sp.goal}</p>
+      <p class="tk-goal"><b class="tk-tldr">TL;DR:</b> ${sp.goal}</p>
       ${sp.evidence && html`<p class="tk-evidence">${Object.values(sp.evidence).map((e) => html`<span class="row"><${Icon} name="circle-check" size=${14} class="success-text" />${e}</span>`)}</p>`}
       <dl class="tk-meta">${meta.map(([k, v]) => html`<div key=${k}><dt>${k}</dt><dd>${v}</dd></div>`)}</dl>
       ${reqs.length > 0 && html`<div class="stack tk-reqs">${reqs.map((r) => html`<${RequestBlock} key=${r.id} s=${s} request=${r} openThread=${() => act.openSidePanel(r.agent, r.id)} />`)}</div>`}
