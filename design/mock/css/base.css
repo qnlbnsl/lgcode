@@ -478,3 +478,7 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--color-
 .tabrow .tab-end { position: sticky; right: 0; background: var(--color-bg); padding-right: 0; }
 .tabrow .tab-end .btn[aria-pressed="true"] > span:not(.avatar) { display: none; }
 @media (max-width: 860px) { .tabrow .tab-end .btn > span:not(.avatar) { display: none; } }
+.tree-row.naming .label { color: var(--color-faint); font-style: italic; }
+.sub-table td.wrap { white-space: normal; line-height: 1.4; padding-block: 6px; }
+.sub-table tr.off td { color: var(--color-faint); }
+.sub-table input[type="radio"] { accent-color: var(--color-primary); margin: 0; }

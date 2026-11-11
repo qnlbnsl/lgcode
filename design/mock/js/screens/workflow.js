@@ -274,7 +274,32 @@ function StuckCard({ s, p, w }) {
       <button type="button" class="wf-choice" onClick=${() => settle('keep')}><b>Keep it</b><span>It stays as written. Reviewers stop scoring it.</span></button>
       <button type="button" class="wf-choice" onClick=${() => settle('drop')}><b>Drop it</b><span>It leaves the end-result page and the plan.</span></button>
     </div>` : html`<div class="answer"><${Icon} name="check" size=${14} /><span>You chose to ${k.decision || 'answer'}${k.decision ? ' it' : ''}. Round 4 is running.</span></div>`}
-    <div class="req-foot"><${Avatar} agent=${a} s=${s} size="sm" /><a class="link" href=${href(routeForRequest(s, r))}>Open in the ${a.name.toLowerCase()}'s thread</a></div>
+    <div class="req-foot"><${Avatar} agent=${a} s=${s} size="sm" /><span class="muted">${a.name}</span><span class="grow"></span><button type="button" class="btn sm ghost" onClick=${() => act.openSidePanel(a.id, r.id)}><${Icon} name="message-square" size=${13} />Open thread</button></div>
+  </section>`;
+}
+
+// The project's agents in three groups. Waiting hides when empty. Working and Idle show
+// whenever the project has agents, and one hides only when it is empty and another shows.
+function agentGroups(s, p) {
+  const all = s.agents.filter((a) => a.project === p.id);
+  if (!all.length) return [{ id: 'all', label: 'Agents', agents: [] }];
+  const g = [
+    { id: 'waiting', label: 'Waiting', agents: all.filter((a) => a.state === 'waiting' || a.state === 'failed') },
+    { id: 'working', label: 'Working', agents: all.filter((a) => a.state === 'working') },
+    { id: 'idle', label: 'Idle', agents: all.filter((a) => a.state === 'idle' || a.state === 'stopped') },
+  ];
+  const shown = (x) => x.agents.length > 0;
+  return g.filter((x) => x.id === 'waiting' ? shown(x) : shown(x) || !g.some((y) => y !== x && shown(y)));
+}
+function Agents({ s, p }) {
+  const groups = agentGroups(s, p);
+  return html`<section class="wf-agents" aria-label="Agents">
+    ${groups.map((g) => html`<div key=${g.id} class=${cx('wf-group', g.id)}>
+      <div class="wf-group-head"><h3>${g.label}</h3>${g.id !== 'all' && html`<span class="count">${g.agents.length}</span>`}</div>
+      ${g.agents.length === 0 ? html`<p class="muted wf-none" data-empty>No agents running</p>`
+      : html`<ul class="wf-made">${g.agents.map((a) => html`<li key=${a.id}><a class=${cx('wf-item', g.id === 'waiting' && 'warn')} href=${href(routeForAgent(s, a))}>
+          <${Avatar} agent=${a} s=${s} size="sm" /><span class="lbl">${agentLabel(s, a, { withTeam: true })}</span><span class="sub truncate">${a.activity}</span><${Icon} name="chevron-right" size=${14} class="go" /></a></li>`)}</ul>`}
+    </div>`)}
   </section>`;
 }
 
@@ -283,15 +308,17 @@ function Overview({ s, p, w }) {
   const [sel, setSel] = useState(null); const i = sel == null ? cur : sel; const ph = PHASES[i]; const info = INFO[ph.id];
   const times = phaseTimes(s, p, cur); const tm = times[i]; const status = i < cur ? 'done' : i === cur ? 'now' : 'next';
   const reqs = openRequests(s, { project: p.id });
-  const live = teamsOf(s, p.id).filter((t) => t.stage === ph.stage).flatMap((t) => agentsOfTeam(s, t.id)).filter((a) => a.state === 'working' || a.state === 'waiting');
   const ran = ph.id === 'define' && p.hasMocks ? [...info.ran, 'Design lead', 'Designer'] : info.ran;
   const made = info.made(s, p, w).filter(Boolean);
-  const sps = sprintsOf(s, p.id); const doing = sps.filter((x) => x.column === 'In progress' || x.column === 'Review').length; const working = s.agents.filter((a) => a.project === p.id && a.state === 'working').length;
-  const summary = sps.length ? `${sps.filter((x) => x.column === 'Done').length} of ${plural(sps.length, 'sprint')} done, ${doing} under way. ${working ? plural(working, 'agent') : 'No agent'} ${working > 1 ? 'are' : 'is'} working.` : `No sprints yet. ${working ? plural(working, 'agent') : 'No agent'} ${working > 1 ? 'are' : 'is'} working.`;
+  const sps = sprintsOf(s, p.id); const done = sps.filter((x) => x.column === 'Done').length; const doing = sps.filter((x) => x.column === 'In progress' || x.column === 'Review').length;
   const fixes = w.fixes.map((f) => { const sp = f.sprint && byId(s.sprints, f.sprint); return sp ? { ...f, label: sp.label, name: sp.name, to: `/p/${p.id}/sprint/${sp.id}`, column: sp.column } : f; });
   return html`<div class="wf-body">
-    <p class="wf-lead">${p.archived ? html`<b>This project is archived.</b> Its last phase was ${PHASES[cur].name}.` : html`<b>Phase ${cur + 1} of 8, ${PHASES[cur].name}.</b> ${summary}`}
-      ${!p.archived && (reqs.length ? html` <a class="warn-text" style="font-weight:var(--weight-medium)" href=${href('/home')}>${plural(reqs.length, 'request')} ${reqs.length === 1 ? 'waits' : 'wait'} for you.</a>` : ' Nothing waits for you.')}</p>
+    <p class="wf-status">
+      ${p.archived ? html`<span class="badge">Archived</span>` : null}
+      <span>Phase <b class="num">${cur + 1}</b> of 8 · ${PHASES[cur].name}</span>
+      <span>${sps.length ? html`<b class="num">${done}</b> of ${plural(sps.length, 'sprint')} done · <b class="num">${doing}</b> under way` : 'No sprints'}</span>
+      ${!p.archived && reqs.length > 0 && html`<a class="warn-text" href=${href('/home')}>${plural(reqs.length, 'request')} waiting</a>`}
+    </p>
     <${StuckCard} s=${s} p=${p} w=${w} />
     <div class="wf-phases">
       <ol class="wf-rail" aria-label="Phases of the build loop">
@@ -305,34 +332,30 @@ function Overview({ s, p, w }) {
         <header><h2><span class="faint num">${ph.n}</span> ${ph.name}</h2>
           <span class=${cx('badge', status === 'done' && 'success', status === 'now' && 'info')}>${status === 'done' ? 'Done' : status === 'now' ? 'Now' : 'Not started'}</span>
           <span class="grow"></span>
-          <span class="muted wf-time">${status === 'done' ? `${when(tm.start, now)} · took ${ago(tm.start, tm.end)}` : status === 'now' ? `Started ${ago(tm.start, now)} ago` : `Starts when ${PHASES[i - 1].name} ends`}</span></header>
-        <p class="wf-what">${ph.what}</p>
-        <dl class="dl">
+          <span class="muted wf-time">${status === 'done' ? `${when(tm.start, now)} · took ${ago(tm.start, tm.end)}` : status === 'now' ? `Started ${ago(tm.start, now)} ago` : `After ${PHASES[i - 1].name}`}</span></header>
+        <dl class="wf-parts">
+          <dt>What happens</dt><dd>${ph.what}</dd>
           <dt>Run by</dt><dd class="row" style="flex-wrap:wrap;gap:4px">${ran.map((r) => html`<span class="badge outline" key=${r}>${r}</span>`)}</dd>
           <dt>Your part</dt><dd>${info.yours}</dd>
-          ${status !== 'done' && html`<dt>Ends</dt><dd>${info.ends.replace(/^Ends when /, 'When ').replace(/^Runs /, 'It runs ')}</dd>`}
+          <dt>Ends</dt><dd>${info.ends.replace(/^Ends when /, 'When ').replace(/^Runs /, 'It runs ')}</dd>
+          <dt>${status === 'next' ? 'Will produce' : 'Produced'}</dt>
+          <dd><ul class="wf-made">${made.map((m) => { const C = m.to && status !== 'next' ? 'a' : 'div';
+            return html`<li key=${m.label}><${C} class="wf-item" href=${m.to && status !== 'next' ? href(m.to) : null}><${Icon} name=${m.icon} size=${15} /><span class="lbl">${m.label}</span><span class="sub truncate">${status === 'next' ? '' : m.sub}</span>${m.to && status !== 'next' && html`<${Icon} name="chevron-right" size=${14} class="go" />`}<//></li>`; })}</ul></dd>
         </dl>
-        <h3>${status === 'next' ? 'It will produce' : 'Produced'}</h3>
-        <ul class="wf-made">${made.map((m) => { const C = m.to && status !== 'next' ? 'a' : 'div';
-          return html`<li key=${m.label}><${C} class="wf-item" href=${m.to && status !== 'next' ? href(m.to) : null}><${Icon} name=${m.icon} size=${15} /><span class="lbl">${m.label}</span><span class="sub truncate">${status === 'next' ? '' : m.sub}</span>${m.to && status !== 'next' && html`<${Icon} name="chevron-right" size=${14} class="go" />`}<//></li>`; })}</ul>
-        ${status === 'now' && html`<h3>Waiting and working</h3>
-          ${reqs.length === 0 && live.length === 0 && html`<p class="muted">Nothing is running in this phase right now.</p>`}
-          <ul class="wf-made">
-            ${reqs.map((r) => html`<li key=${r.id}><a class="wf-item warn" href=${href(routeForRequest(s, r))}><${Icon} name="bell" size=${15} /><span class="lbl">${r.title}</span><span class="sub truncate">${KIND_LABEL[r.kind]} · waiting ${ago(r.createdAt, now)}</span><${Icon} name="chevron-right" size=${14} class="go" /></a></li>`)}
-            ${live.filter((a) => a.state === 'working').slice(0, 5).map((a) => html`<li key=${a.id}><a class="wf-item" href=${href(routeForAgent(s, a))}><${Avatar} agent=${a} s=${s} size="sm" /><span class="lbl">${agentLabel(s, a, { withTeam: true })}</span><span class="sub truncate">${a.activity}</span><${Icon} name="chevron-right" size=${14} class="go" /></a></li>`)}
-          </ul>`}
       </section>
     </div>
 
+    <${Agents} s=${s} p=${p} />
+
     <div class="section-head wf-sec"><h2>Fix sprints</h2><span class="count">${fixes.length}</span></div>
-    ${fixes.length === 0 ? html`<p class="muted wf-none">No fix sprint was needed. A fix sprint is added when a starting commit fails its full run.</p>`
-    : html`<div class="table-wrap"><table class="table wf-fixes"><thead><tr><th>Sprint</th><th>Why it was added</th><th>How it merges</th><th>State</th></tr></thead><tbody>
-      ${fixes.map((f) => html`<tr key=${f.label} class=${cx(f.to && 'click', !f.auto && 's-warn')} onClick=${() => f.to && go(f.to)}>
+    <div class="table-wrap"><table class="table wf-fixes"><thead><tr><th>Sprint</th><th>Why it was added</th><th>Merge</th><th>State</th></tr></thead><tbody>
+      ${fixes.length === 0 ? html`<tr><td colspan="4" class="muted" data-empty>No fix sprints</td></tr>`
+      : fixes.map((f) => html`<tr key=${f.label} class=${cx(f.to && 'click', !f.auto && 's-warn')} onClick=${() => f.to && go(f.to)}>
         <td class="state-cell wrap"><span class="tag">${f.label}</span> ${f.to ? html`<a class="wf-strong" href=${href(f.to)}>${f.name}</a>` : html`<span class="wf-strong">${f.name}</span>`}</td>
         <td class="wrap muted">${f.why}</td>
-        <td class="wrap">${f.auto && w.settings.autoMergeFix ? html`<span class="badge info">Merges on its own</span><small>after a passing full run</small>` : html`<span class="badge warn">Needs your approval</span><small>${f.auto ? 'merging on its own is off' : 'users would notice'}</small>`}</td>
+        <td class="wrap">${f.auto && w.settings.autoMergeFix ? html`<span class="badge info">On its own</span>` : html`<span class="badge warn">Needs your approval</span>`}</td>
         <td class="wrap muted">${f.column === 'Done' ? 'Merged.' : f.state}</td></tr>`)}
-    </tbody></table></div>`}
+    </tbody></table></div>
   </div>`;
 }
 
@@ -341,7 +364,7 @@ function Review({ s, p, w }) {
   const now = useNow(); const [rid, setRid] = useState(null); const [sel, setSel] = useState(null); const [filter, setFilter] = useState('all');
   // With no review yet, the page keeps its rounds and its findings table, empty.
   if (!w.reviews.length) return html`<div class="wf-body">
-    <header class="wf-rvhead"><div class="grow"><h2 class="muted">No review yet</h2></div><span class="badge">${p.agentReview === 'off' ? 'Agent review off' : 'Not started'}</span></header>
+    <p class="wf-status"><span>No review</span><span class="grow"></span><span class="badge">${p.agentReview === 'off' ? 'Agent review off' : 'Not started'}</span></p>
     <div class="wf-rounds">${Array.from({ length: w.settings.maxRounds }, (_, k) => html`<div key=${k} class="wf-round empty"><div class="bar"></div><b>Round ${k + 1}</b><span>${k + 1 >= 5 ? 'Needs your approval' : '—'}</span></div>`)}</div>
     <div class="table-wrap"><table class="table wf-findings"><thead><tr><th>Finding</th><th>Statement</th><th>Severity</th><th>What the reviewer found</th><th class="num">Points</th><th>State</th></tr></thead>
       <tbody><tr><td colspan="6" class="muted" data-empty>No findings</td></tr></tbody></table></div>
@@ -367,14 +390,13 @@ function Review({ s, p, w }) {
           <b>Round ${k + 1}</b><span class="num">${pts === 0 ? 'Clean' : plural(pts, 'point')}</span></button>`; })}
     </div>
     <p class="wf-legend"><span><i class="sw blocker"></i>Blocker, 9 points</span><span><i class="sw major"></i>Major, 3 points</span><span><i class="sw minor"></i>Minor, 1 point</span>
-      <span class="grow"></span><span class="muted">${rv.next}</span></p>
+</p>
 
     <div class="section-head wf-sec"><h2>Round ${n} findings</h2><span class="count">${round.findings.length}</span>
-      <span class="muted wf-time">${when(round.ts, now)} · ${roundCount(round, 'blocker')} blocker, ${roundCount(round, 'major')} major, ${roundCount(round, 'minor')} minor</span><span class="grow"></span>
+      <span class="muted wf-time">${when(round.ts, now)}</span><span class="grow"></span>
       ${round.findings.length > 0 && html`<div class="seg">${[['all', 'All'], ['open', `Open ${openN}`], ['fixed', `Fixed ${round.findings.length - openN}`]].map(([id, label]) => html`<button type="button" key=${id} aria-pressed=${filter === id} onClick=${() => setFilter(id)}>${label}</button>`)}</div>`}</div>
-    ${round.findings.length === 0 ? html`<p class="callout"><${Icon} name="circle-check" size=${15} class="success-text" /><span>This round found nothing. The review is clean.</span></p>`
-    : list.length === 0 ? html`<p class="muted wf-none">No ${filter} findings in this round.</p>`
-    : html`<div class="table-wrap"><table class="table wf-findings"><thead><tr><th>Finding</th><th>Statement</th><th>Severity</th><th>What the reviewer found</th><th class="num">Points</th><th>State</th></tr></thead><tbody>
+    <div class="table-wrap"><table class="table wf-findings"><thead><tr><th>Finding</th><th>Statement</th><th>Severity</th><th>What the reviewer found</th><th class="num">Points</th><th>State</th></tr></thead><tbody>
+      ${list.length === 0 && html`<tr><td colspan="6" class="muted" data-empty>${round.findings.length === 0 ? 'No findings. The review is clean.' : `No ${filter} findings`}</td></tr>`}
       ${list.map((f) => html`<tr key=${f.id} class=${cx(f.status === 'open' && f.sev !== 'minor' && 's-warn')}>
         <td class="state-cell mono muted">${f.id}</td>
         <td><a class="link num" href=${href(`/p/${p.id}/workflow/result`)} title=${w.result.statements[f.statement - 1]?.text}>${f.statement}</a>${w.stuck && w.stuck.statement === f.statement && w.stuck.review === rv.id && !w.stuck.decision ? html` <span class="badge warn">Stuck</span>` : ''}</td>
@@ -382,56 +404,103 @@ function Review({ s, p, w }) {
         <td class="wrap">${f.text}</td>
         <td class="num">${POINTS[f.sev]}</td>
         <td>${f.status === 'fixed' ? html`<span class="row success-text" style="gap:4px"><${Icon} name="check" size=${13} />Fixed</span>` : html`<span class="muted">Open</span>`}</td></tr>`)}
-    </tbody></table></div>`}
+    </tbody></table></div>
   </div>`;
 }
 
 // ---- test runs -------------------------------------------------------------------
-function RunRow({ s, p, r, now }) {
-  const [open, setOpen] = useState(r.failed > 0 && !r.expected && now - r.ts < 2 * HOUR);
-  const by = r.by && agentOf(s, r.by);
-  const tone = r.running ? 'run' : r.skippedRun ? 'skip' : r.failed ? (r.expected ? 'exp' : 'fail') : 'pass';
-  const icon = { run: 'loader-circle', skip: 'minus', exp: 'circle-dot', fail: 'circle-x', pass: 'circle-check' }[tone];
-  const word = { run: 'Running', skip: 'Skipped', exp: 'Failed as expected', fail: 'Failed', pass: 'Passed' }[tone];
-  const can = r.failures.length > 0 || r.note;
-  const rerun = () => { update((st) => { r.running = true; }); setOpen(false);
-    setTimeout(() => update(() => { r.running = false; r.ts = Date.now(); if (!r.expected) { r.passed += r.failed; r.failed = 0; r.failures = []; r.note = 'Run again by you. Every test passed.'; } act.toast(`${r.kind} finished on ${r.commit}`); }), 2600); };
-  return html`<li class=${cx('wf-run', tone, open && 'open')}>
-    <div class="wf-runrow">
-      <button type="button" class="twist" aria-expanded=${open} aria-label=${open ? 'Hide details' : 'Show details'} disabled=${!can} onClick=${() => setOpen(!open)}><${Icon} name="chevron-right" size=${14} /></button>
-      <span class=${cx('wf-res', tone)}><${Icon} name=${icon} size=${15} class=${tone === 'run' ? 'wf-spin' : ''} />${word}</span>
-      <span class="what"><b>${r.kind}</b><span class="muted truncate">${r.why}</span></span>
-      <span class="nums num">${r.running ? html`<span class="muted">Running ${r.kind === 'Full run' ? w_cmd(s, p).fullRun : w_cmd(s, p).check}</span>` : r.skippedRun ? html`<span class="muted">No tests ran</span>` : html`${(r.passed > 0 || !r.failed) && html`<span>${fmt(r.passed)} passed</span>`}${r.failed > 0 && html`<span class=${r.expected ? 'muted' : 'error-text'}>${fmt(r.failed)} failed</span>`}${r.skipped > 0 && html`<span class="muted">${fmt(r.skipped)} skipped</span>`}`}</span>
-      <span class="tag commit" title=${r.branch}>${r.commit}</span>
-      <span class="muted dur num">${r.dur}</span>
-      <time class="muted num" title=${new Date(r.ts).toLocaleString()}>${ago(r.ts, now) === 'now' ? 'Just now' : ago(r.ts, now) + ' ago'}</time>
-    </div>
-    ${open && html`<div class="wf-rundetail">
-      ${r.note && html`<p class="muted">${r.note}</p>`}
-      ${r.failures.map((f, i) => html`<div class="wf-fail" key=${i}><div class="row"><${Icon} name="circle-x" size=${13} class="error-text" /><b>${f.name}</b></div>
-        <span class="mono muted">${f.file}</span><pre class="code">${f.message}</pre>${f.note && html`<span class="muted">${f.note}</span>`}</div>`)}
-      <div class="row" style="flex-wrap:wrap"><span class="muted">On <span class="mono">${r.branch}</span>${by ? html` · run by ${by.name}` : ' · run by LGcode'}</span><span class="grow"></span>
-        ${by && html`<a class="btn sm ghost" href=${href(routeForAgent(s, by))}><${Icon} name="message-square" size=${13} />Open ${by.name}</a>`}
-        <button type="button" class="btn sm" onClick=${rerun}><${Icon} name="rotate-ccw" size=${13} />Run again</button></div>
-    </div>`}
-  </li>`;
+// Laid out like GitHub Actions: the runs on the left, and the selected run's jobs, their
+// steps, and the log of the selected step on the right. The owner watches; nothing here
+// operates a builder or a test runner.
+const toneOf = (r) => (r.running ? 'run' : r.skippedRun ? 'skip' : r.failed ? (r.expected ? 'exp' : 'fail') : 'pass');
+const TONE_ICON = { run: 'loader-circle', skip: 'minus', exp: 'circle-dot', fail: 'circle-x', pass: 'circle-check' };
+const TONE_WORD = { run: 'Running', skip: 'Skipped', exp: 'Failed as expected', fail: 'Failed', pass: 'Passed' };
+const secs = (d) => { const m = /(?:(\d+) min)?\s*(?:(\d+) s)?/.exec(d || ''); return (+(m[1] || 0)) * 60 + (+(m[2] || 0)); };
+const dur = (n) => (n >= 60 ? `${Math.floor(n / 60)} min ${n % 60} s` : `${n} s`);
+// The jobs and steps of a run, made from its record so every run has the same shape.
+function jobsOf(s, p, r) {
+  const t = toneOf(r); const total = secs(r.dur); const cmd = r.kind === 'Check' ? ensure(s, p).settings.check : ensure(s, p).settings.fullRun;
+  const st = (name, tone, n, log) => ({ name, tone, dur: dur(Math.max(1, Math.round(n))), log });
+  const setup = (n) => [
+    st('Check out', 'pass', 2, [`Checking out ${r.commit} on ${r.branch}`, `HEAD is now at ${r.commit}`]),
+    st('Install', 'pass', n, ['Lockfile is up to date', 'Packages are installed from the cache', 'Done']),
+  ];
+  if (r.skippedRun) return [{ name: 'Changes', tone: 'skip', steps: [st('Compare with the last run', 'skip', 1, [`No commit since ${r.commit}`, 'The run was skipped'])] }];
+  const failLog = r.failures.flatMap((f) => [`FAIL ${f.file}`, `  ✕ ${f.name}`, `    ${f.message}`, '']);
+  const testTone = t === 'run' ? 'run' : t;
+  const testLog = [`> ${cmd}`, '', ...failLog,
+    t === 'run' ? 'Running…' : `Tests: ${r.failed ? r.failed + ' failed, ' : ''}${r.passed} passed${r.skipped ? ', ' + r.skipped + ' skipped' : ''}, ${r.passed + r.failed + r.skipped} total`,
+    ...(r.note ? ['', r.note] : [])];
+  if (r.kind === 'Check') return [{ name: 'Check', tone: testTone, steps: [...setup(total * 0.2), st('Run the related tests', testTone, total * 0.75, testLog), st('Write the report', t === 'run' ? 'queued' : 'pass', 1, ['Report saved for commit ' + r.commit])] }];
+  const unit = Math.round(total * 0.55), flows = Math.round(total * 0.3);
+  return [
+    { name: 'Set up', tone: 'pass', steps: setup(total * 0.1) },
+    { name: 'Tests', tone: testTone, steps: [st('Run the full suite', testTone, unit, testLog), st('Write the report', t === 'run' ? 'queued' : 'pass', 1, ['Report saved for commit ' + r.commit])] },
+    { name: 'User flows', tone: t === 'run' ? 'queued' : 'pass', steps: [st('Start the product', t === 'run' ? 'queued' : 'pass', flows * 0.3, ['The product started from a clean checkout']), st('Run the user flows', t === 'run' ? 'queued' : 'pass', flows * 0.7, ['Web, phone size and the Mac simulator', 'All flows passed'])] },
+  ];
 }
-const w_cmd = (s, p) => ensure(s, p).settings;
+const StepIcon = ({ tone, size = 14 }) => tone === 'queued' ? html`<span class="wf-res queued"><${Icon} name="circle" size=${size} /></span>`
+  : html`<span class=${cx('wf-res', tone)}><${Icon} name=${TONE_ICON[tone]} size=${size} class=${tone === 'run' ? 'wf-spin' : ''} /></span>`;
+function RunDetail({ s, p, r, now }) {
+  const jobs = r ? jobsOf(s, p, r) : [];
+  const firstBad = jobs.findIndex((j) => j.tone === 'fail' || j.tone === 'run');
+  const [ji, setJi] = useState(Math.max(0, firstBad));
+  const job = jobs[ji] || jobs[0];
+  const pick = (j) => { if (!j) return -1; const k = j.steps.findIndex((x) => x.tone === 'fail' || x.tone === 'run'); return k >= 0 ? k : j.steps.findIndex((x) => /^(Run|Compare)/.test(x.name)); };
+  const [open, setOpen] = useState(() => pick(job));
+  const by = r && r.by && agentOf(s, r.by);
+  return html`<section class="wf-rundetail" aria-label="Run">
+    <header class="wf-runhead">${r ? html`
+      <${StepIcon} tone=${toneOf(r)} size=${16} /><b>${r.kind}</b><span class="truncate">${r.why}</span><span class="grow"></span>
+      <span class="tag commit" title=${r.branch}>${r.commit}</span>` : html`<span class="muted">No run selected</span>`}</header>
+    ${r && html`<div class="wf-runmeta">
+      <span class=${cx('wf-res', toneOf(r))}>${TONE_WORD[toneOf(r)]}</span>
+      ${!r.running && !r.skippedRun && html`<span class="num">${fmt(r.passed)} passed</span>${r.failed > 0 && html`<span class=${cx('num', r.expected ? 'muted' : 'error-text')}>${fmt(r.failed)} failed</span>`}${r.skipped > 0 && html`<span class="num muted">${fmt(r.skipped)} skipped</span>`}`}
+      <span class="muted"><span class="mono">${r.branch}</span></span>
+      <span class="muted num">${r.running ? 'Started' : r.dur + ' ·'} ${ago(r.ts, now) === 'now' ? 'just now' : ago(r.ts, now) + ' ago'}</span>
+      <span class="muted">${by ? by.name : 'LGcode'}</span></div>`}
+    <div class="wf-jobs">
+      <nav class="wf-joblist" aria-label="Jobs"><h3>Jobs</h3>
+        ${jobs.length === 0 && html`<p class="muted wf-none" data-empty>No jobs</p>`}
+        ${jobs.map((j, k) => html`<button type="button" key=${j.name} aria-current=${k === ji ? 'true' : null} onClick=${() => { setJi(k); setOpen(pick(j)); }}>
+          <${StepIcon} tone=${j.tone} /><span class="truncate">${j.name}</span></button>`)}
+      </nav>
+      <div class="wf-steps">
+        <h3>${job ? job.name : 'Steps'}</h3>
+        ${!job && html`<p class="muted wf-none" data-empty>No steps</p>`}
+        ${job && job.steps.map((x, k) => html`<div key=${x.name} class=${cx('wf-step-row', open === k && 'open')}>
+          <button type="button" aria-expanded=${open === k} onClick=${() => setOpen(open === k ? -1 : k)}>
+            <${Icon} name="chevron-right" size=${13} class="twist" /><${StepIcon} tone=${x.tone} /><span class="grow truncate">${x.name}</span><span class="muted num">${x.tone === 'queued' ? '' : x.dur}</span></button>
+          ${open === k && html`<pre class="wf-log">${x.log.map((line, n) => html`<span key=${n} class=${cx(/^(FAIL|  ✕)/.test(line) && 'bad')}><i>${n + 1}</i>${line}\n</span>`)}</pre>`}
+        </div>`)}
+      </div>
+    </div>
+  </section>`;
+}
 function Runs({ s, p, w }) {
-  const now = useNow(5000); const [kind, setKind] = useState('all');
-  const kinds = ['Full run', 'Check', 'Nightly'].filter((k) => w.runs.some((r) => r.kind === k));
+  const now = useNow(5000); const [kind, setKind] = useState('all'); const [rid, setRid] = useState(null);
+  const kinds = ['Full run', 'Check', 'Nightly'];
   const runs = w.runs.filter((r) => kind === 'all' || r.kind === kind).sort((a, b) => b.ts - a.ts);
+  const sel = runs.find((r) => r.id === rid) || runs[0];
   const full = w.runs.filter((r) => r.kind !== 'Check' && !r.skippedRun).sort((a, b) => b.ts - a.ts)[0];
   const busy = w.runs.some((r) => r.running);
-  const start = () => { const id = uid('run'); update(() => { w.runs.push({ id, kind: 'Full run', why: 'Started by you', commit: (full && full.commit) || 'HEAD', branch: p.branch, ts: Date.now(), dur: '—', passed: 0, failed: 0, skipped: 0, failures: [], running: true, by: null }); });
+  const start = () => { const id = uid('run'); update(() => { w.runs.push({ id, kind: 'Full run', why: 'Started by you', commit: (full && full.commit) || 'HEAD', branch: p.branch, ts: Date.now(), dur: '—', passed: 0, failed: 0, skipped: 0, failures: [], running: true, by: null }); }); setRid(id);
     setTimeout(() => update(() => { const r = byId(w.runs, id); r.running = false; r.passed = full ? full.passed + full.failed : 1240; r.skipped = full ? full.skipped : 0; r.dur = full ? full.dur : '3 min 2 s'; r.ts = Date.now(); act.toast('Full run passed'); }), 3200); };
-  return html`<div class="wf-body">
-    <header class="wf-rvhead"><div class="grow"><h2>${!full ? 'No full run yet' : full.running ? 'A full run is running' : full.failed ? `The last full run failed ${fmt(full.failed)} of ${fmt(full.passed + full.failed)} tests` : `The last full run passed all ${fmt(full.passed)} tests`}</h2>
-      <p class="muted">${p.tests === 'off' ? 'Tests are off for this project.' : html`A merge needs a passing report for that exact commit. Full runs use <code>${w.settings.fullRun}</code>.`}</p></div>
-      <button type="button" class="btn" disabled=${busy || p.tests === 'off' || p.archived} onClick=${start}><${Icon} name="play" size=${13} />Start a full run</button></header>
-    ${w.runs.length === 0 ? html`<${Empty} title="No runs yet" icon="test-tube-diagonal">The first full run happens in Design and teams, on the starting commit. Check reports follow for each task in Build.<//>`
-    : html`${kinds.length > 1 && html`<div class="seg" style="justify-self:start">${['all', ...kinds].map((k) => html`<button type="button" key=${k} aria-pressed=${kind === k} onClick=${() => setKind(k)}>${k === 'all' ? 'All' : k === 'Check' ? 'Checks' : k === 'Nightly' ? 'Nightly runs' : 'Full runs'}<span class="faint num">${k === 'all' ? w.runs.length : w.runs.filter((r) => r.kind === k).length}</span></button>`)}</div>`}
-      <ul class="wf-runs">${runs.map((r) => html`<${RunRow} key=${r.id} s=${s} p=${p} r=${r} now=${now} />`)}</ul>`}
+  return html`<div class="wf-body wf-wide">
+    <div class="wf-bar">
+      <div class="seg">${['all', ...kinds].map((k) => html`<button type="button" key=${k} aria-pressed=${kind === k} onClick=${() => setKind(k)}>${k === 'all' ? 'All' : k === 'Check' ? 'Checks' : k === 'Nightly' ? 'Nightly' : 'Full runs'}<span class="faint num">${k === 'all' ? w.runs.length : w.runs.filter((r) => r.kind === k).length}</span></button>`)}</div>
+      <span class="grow"></span>
+      ${p.tests === 'off' && html`<span class="muted wf-time">Tests are off</span>`}
+      <button type="button" class="btn" disabled=${busy || p.tests === 'off' || p.archived} onClick=${start}><${Icon} name="play" size=${13} />Start full run</button>
+    </div>
+    <div class="wf-actions">
+      <ul class="wf-runlist" aria-label="Runs">
+        ${runs.length === 0 && html`<li class="muted wf-none" data-empty>No runs</li>`}
+        ${runs.map((r) => { const t = toneOf(r); return html`<li key=${r.id}><button type="button" aria-current=${sel && sel.id === r.id ? 'true' : null} onClick=${() => setRid(r.id)}>
+          <${StepIcon} tone=${t} /><span class="what"><b class="truncate">${r.why}</b><small class="muted"><span>${r.kind}</span> · <span class="mono">${r.commit}</span> · ${ago(r.ts, now) === 'now' ? 'just now' : ago(r.ts, now) + ' ago'}</small></span></button></li>`; })}
+      </ul>
+      <${RunDetail} key=${sel ? sel.id + (sel.running ? 'r' : '') : 'none'} s=${s} p=${p} r=${sel} now=${now} />
+    </div>
   </div>`;
 }
 
@@ -444,14 +513,15 @@ function Result({ s, p, w }) {
   const req = pr && pr.requestId && byId(s.requests, pr.requestId);
   const sprints = sprintsOf(s, p.id); const lastFull = w.runs.filter((r) => r.kind !== 'Check' && !r.skippedRun).sort((a, b) => b.ts - a.ts)[0]; const rv = w.reviews[0];
   return html`<div class="wf-body">
-    <header class="wf-rvhead"><div class="grow"><h2>${finished ? (merged ? 'Finished and merged' : 'Built, reviewed and ready for you') : 'What done means for this project'}</h2>
-      <p class="muted">${res.draft ? 'A draft. The project lead is still writing this page with you.' : `${holds} of ${live.length} statements hold. Every review finding is tied to one of them.`}</p></div>
-      <div class="progress wf-prog" title=${`${holds} of ${live.length}`}>${live.map((x, i) => html`<i key=${i} class=${cx(x.state === 'stuck' && 'warn', (x.state === 'building' || x.state === 'review') && 'active')} style=${{ flex: 1, background: x.state === 'open' ? 'transparent' : null }}></i>`)}</div></header>
+    <div class="wf-status">
+      ${res.draft ? html`<span class="badge">Draft</span>` : finished ? html`<span class=${cx('badge', merged ? 'success' : 'info')}>${merged ? 'Merged' : 'Ready'}</span>` : null}
+      <span><b class="num">${holds}</b> of ${plural(live.length, 'statement')} hold</span><span class="grow"></span>
+      <div class="progress wf-prog" title=${`${holds} of ${live.length}`}>${live.map((x, i) => html`<i key=${i} class=${cx(x.state === 'stuck' && 'warn', (x.state === 'building' || x.state === 'review') && 'active')} style=${{ flex: 1, background: x.state === 'open' ? 'transparent' : null }}></i>`)}</div></div>
 
     ${pr && html`<section class=${cx('wf-pr', merged ? 'merged' : 'wait')}>
       <${Icon} name=${merged ? 'git-merge' : 'git-pull-request'} size=${18} />
       <div class="grow"><b>${pr.title} <span class="muted num">#${pr.number}</span></b>
-        <p class="muted"><span class="mono">${pr.source}</span> into <span class="mono">${pr.target}</span> · ${pr.commits} commits · ${pr.files} files · ${merged ? `merged ${pr.mergedAt ? ago(pr.mergedAt, now) + ' ago' : 'by you'}` : 'users will notice this change, so the merge is yours'}</p></div>
+        <p class="muted"><span class="mono">${pr.source}</span> into <span class="mono">${pr.target}</span> · ${pr.commits} commits · ${pr.files} files · ${merged ? `merged ${pr.mergedAt ? ago(pr.mergedAt, now) + ' ago' : 'by you'}` : 'waiting for you'}</p></div>
       ${merged ? html`<span class="badge success">Merged</span>` : req && req.status === 'open' ? html`<button type="button" class="btn primary" onClick=${() => act.openDialog({ type: 'merge-review', requestId: req.id })}>Review and merge</button>` : html`<span class="badge">${req ? req.answer : 'Open'}</span>`}
     </section>`}
 
@@ -464,12 +534,12 @@ function Result({ s, p, w }) {
         <li><${Icon} name="circle-check" size=${14} class="success-text" /><span>${holds} of ${live.length} statements hold</span></li>
       </ul>
       <h3 style="margin-top:var(--space-4)">Open items</h3>
-      ${res.open.length ? html`<ul class="wf-open">${res.open.map((o, i) => html`<li key=${i}>${o}</li>`)}</ul>` : html`<p class="muted">Nothing is left open.</p>`}</section>
+      ${res.open.length ? html`<ul class="wf-open">${res.open.map((o, i) => html`<li key=${i}>${o}</li>`)}</ul>` : html`<p class="muted">None</p>`}</section>
     </div>`}
 
     <div class="section-head wf-sec"><h2>End-result page</h2><span class="count">${sts.length}</span><span class="grow"></span>
-      <a class="btn sm ghost" href=${href(routeForAgent(s, lead))}><${Icon} name="message-square" size=${13} />Ask the project lead to change it</a></div>
-    <ol class="wf-statements">${sts.map((x, i) => { const [tone, word] = ST_WORD[x.state] || ST_WORD.open;
+      <a class="btn sm ghost" href=${href(routeForAgent(s, lead))}><${Icon} name="message-square" size=${13} />Request change</a></div>
+    <ol class="wf-statements">${sts.length === 0 && html`<li class="open" data-empty><span class="n num"></span><div class="t"><span>No statements</span></div><span></span></li>`}${sts.map((x, i) => { const [tone, word] = ST_WORD[x.state] || ST_WORD.open;
       return html`<li key=${i} class=${x.state}><span class="n num">${i + 1}</span><div class="t"><span>${x.text}</span>${x.note && html`<small>${x.note}</small>`}</div>
         <span class=${cx('badge', tone)}>${x.state === 'holds' && html`<${Icon} name="check" size=${11} />`}${word}</span></li>`; })}</ol>
   </div>`;
@@ -484,7 +554,7 @@ function Settings({ s, p, w }) {
   const proj = (k, v) => { update(() => { p[k] = v ? 'on' : 'off'; }); act.toast('Workflow settings saved'); };
   const step = (k, d, lo, hi) => save(k, Math.min(hi, Math.max(lo, set[k] + d)), true);
   return html`<div class="wf-body wf-settings">
-    <p class="callout"><${Icon} name="info" size=${15} /><span>This is the default workflow, the build loop. Override it for every repository in <code>~/.lgcode</code>, or for <span class="mono">${repo.name}</span> alone in its <code>.lgcode</code> folder. The settings below are written to <code>.lgcode/config</code> on <span class="mono">${p.branch}</span>.</span></p>
+    <p class="wf-status"><span>Build loop</span><span>Saved to <span class="mono">.lgcode/config</span> on <span class="mono">${p.branch}</span></span></p>
     <section><h3>Tests</h3>
       <${Row} title="Run tests" hint="Tests are written first and must fail. A merge needs a passing report."><${Switch} on=${p.tests === 'on'} onChange=${(v) => proj('tests', v)} label="Run tests" /><//>
       <${Row} title="Full-run command" hint="Runs the whole suite on a starting commit, before a merge, and every night."><input class="input mono" aria-label="Full-run command" disabled=${p.tests !== 'on'} value=${set.fullRun} onBlur=${(e) => save('fullRun', e.target.value.trim() || set.fullRun)} onKeyDown=${(e) => e.key === 'Enter' && e.target.blur()} /><//>

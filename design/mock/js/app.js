@@ -54,7 +54,7 @@ function ProjectTree({ s, route }) {
           const inProject = route.parts[0] === 'p' && route.parts[1] === p.id;
           const onLead = inProject && route.parts[2] === 'chat' && (!route.parts[3] || route.parts[3] === lead.id);
           return html`<div key=${p.id}>
-            <${TreeRow} kind="project" depth=${1} open=${popen} onToggle=${() => act.toggleExpanded(pk)} to=${`/p/${p.id}/board`}
+            <${TreeRow} kind=${cx('project', p.naming && 'naming')} depth=${1} open=${popen} onToggle=${() => act.toggleExpanded(pk)} to=${`/p/${p.id}/board`}
               current=${inProject && !['chat', 'team'].includes(route.parts[2])} label=${p.name}
               icon=${null} state=${ps.n ? ps.n : html`<span class="faint">${p.stage}</span>`} tone=${ps.n ? 'warn' : null} />
             ${popen && html`<div class="tree-children" style="--guide:27px">
@@ -246,7 +246,7 @@ function ProjectView({ s, route, project }) {
   const showPanel = docked && (narrow ? s.ui?.panelDrawer : s.prefs.panelOpen || !!side);
   const togglePanel = () => (narrow ? update((st) => { st.ui = { ...(st.ui || {}), panelDrawer: !st.ui?.panelDrawer }; }) : act.setPref('panelOpen', !s.prefs.panelOpen));
   let body;
-  if (tab === 'board') body = html`<${Board} s=${s} project=${project} />`;
+  if (tab === 'board') body = html`<${Board} s=${s} project=${project} route=${route} />`;
   else if (tab === 'sprint') body = html`<${SprintPage} s=${s} project=${project} sprintId=${route.parts[3]} />`;
   else if (tab === 'task') body = html`<${TaskPage} s=${s} project=${project} taskId=${route.parts[3]} />`;
   else if (tab === 'team') body = html`<${TeamPage} s=${s} project=${project} teamId=${route.parts[3]} route=${route} />`;
@@ -258,20 +258,21 @@ function ProjectView({ s, route, project }) {
   else if (tab === 'terminal') body = html`<${TerminalTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'git') body = html`<${GitTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'settings') body = html`<${ProjectSettings} s=${s} project=${project} route=${route} />`;
-  else body = html`<${Board} s=${s} project=${project} />`;
-  const flush = ['chat', 'terminal', 'git', 'messages', 'mocks'].includes(tab);
+  else body = html`<${Board} s=${s} project=${project} route=${route} />`;
+  const flush = ['chat', 'terminal', 'git', 'messages', 'mocks', 'board'].includes(tab);
+  const focus = !!s.ui.focus && tab === 'board';
   return html`<div class="workspace">
     <div class="view">
-      <div class="tabrow" role="tablist" aria-label="Project views">
+      ${!focus && html`<div class="tabrow" role="tablist" aria-label="Project views">
         <${Tabs} tabs=${tabs} current=${current} base=${`/p/${project.id}/`} />
         ${docked && !side && html`<div class="tab-end">
           <button type="button" class="btn sm" aria-pressed=${!!showPanel} onClick=${togglePanel} data-tip=${showPanel ? 'Hide the project lead' : 'Show the project lead'} data-tip-side="left">
             <${Avatar} agent=${lead} s=${s} size="sm" /><span>Project lead</span><${Icon} name="panel-right" size=${14} /></button>
         </div>`}
-      </div>
+      </div>`}
       <div class="view-body" style=${flush ? 'overflow:hidden;display:flex;flex-direction:column' : ''}>${body}</div>
     </div>
-    ${showPanel && html`${narrow && html`<div class="drawer-scrim" style="z-index:71" onClick=${togglePanel}></div>`}<${SidePanel} s=${s} agent=${docked} project=${project} />`}
+    ${showPanel && !focus && html`${narrow && html`<div class="drawer-scrim" style="z-index:71" onClick=${togglePanel}></div>`}<${SidePanel} s=${s} agent=${docked} project=${project} />`}
   </div>`;
 }
 
@@ -305,7 +306,9 @@ function App() {
   else if (top === 'notifications') content = html`<${Notifications} s=${s} route=${route} />`;
   else if (top === 'settings') content = html`<${ServiceSettings} s=${s} route=${route} />`;
   else content = html`<${Home} s=${s} route=${route} />`;
-  return html`<div class=${cx('app', s.prefs.sidebarFolded && 'folded', drawer && 'drawer-open')} style=${{ '--sidebar-w': s.prefs.sidebarWidth + 'px' }}>
+  // Focus hides the sidebar, the top bar, the tab row and the lead panel, so the board fills the window.
+  const focus = s.ui.focus && top === 'p' && (route.parts[2] || 'board') === 'board';
+  return html`<div class=${cx('app', s.prefs.sidebarFolded && 'folded', drawer && 'drawer-open', focus && 'focus')} style=${{ '--sidebar-w': s.prefs.sidebarWidth + 'px' }}>
     <${Sidebar} s=${s} route=${route} onNavigate=${() => setDrawer(false)} />
     ${drawer && html`<div class="drawer-scrim" onClick=${() => setDrawer(false)}></div>`}
     <div class="main">

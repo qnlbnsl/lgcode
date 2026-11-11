@@ -119,7 +119,7 @@ export function FirstRun({ s }) {
   const [path, setPath] = useState(master.workspace + '/');
   const [checked, setChecked] = useState(null); // result of the folder check
   const [checking, setChecking] = useState(false);
-  const [name, setName] = useState('');
+  const [gitModel, setGitModel] = useState(s.settings.gitModel || 'Haiku 5.5');
   const [goal, setGoal] = useState('');
   const [tried, setTried] = useState(false);
   const timers = useRef([]);
@@ -140,16 +140,15 @@ export function FirstRun({ s }) {
   }, [path, step]);
   const found = checked && !checked.error ? checked : null;
   const suggestions = s.repos.filter((r) => r.folders[master.id]).map((r) => r.folders[master.id]);
-  const nameError = !name.trim() ? 'Give the project a name.' : name.trim().length > 60 ? 'Keep the name under 60 characters.' : null;
+  const goalError = !goal.trim() ? 'Write the goal.' : null;
 
   const finish = () => {
     setTried(true);
-    if (nameError || !found) return;
+    if (goalError || !found) return;
     const sub = s.subscriptions.find((x) => x.harness === (connected.includes(harness) ? harness : connected[0]) && x.signedIn) || s.subscriptions[0];
     act.setSession('in');
-    update((st) => { st.session.firstRun = false; });
-    const id = act.createProject({ repo: found.repo, newRepo: found.repo ? null : found.name, name: name.trim(), goal: goal.trim(), machine: master.id, subscription: sub.id });
-    go(`/p/${id}/board`);
+    update((st) => { st.session.firstRun = false; st.settings.gitModel = gitModel; });
+    act.createProject({ repo: found.repo, newRepo: found.repo ? null : found.name, goal: goal.trim(), machine: master.id, subscription: sub.id });
   };
   const next = (e) => {
     e?.preventDefault();
@@ -208,17 +207,17 @@ export function FirstRun({ s }) {
   } else {
     const sub = connected.length ? `${HARNESSES[connected.includes(harness) ? harness : connected[0]].name} · ${PLANS[connected.includes(harness) ? harness : connected[0]]}` : null;
     body = html`
-      <h2>Describe the first project</h2>
-      <p class="auth-lede">A project is one piece of work in a repository. It gets one project lead, which reads your goal, asks what it needs to know, and starts the teams.</p>
-      <div class="field">
-        <label for="setup-name">Project name</label>
-        <input id="setup-name" class=${cx('input lg', tried && nameError && 'invalid')} value=${name} placeholder="Invoice exports" maxlength="80" onInput=${(e) => setName(e.target.value)} autofocus />
-        ${tried && nameError && html`<span class="error" role="alert">${nameError}</span>`}
-      </div>
+      <h2>Start the first project</h2>
       <div class="field">
         <label for="setup-goal">Goal</label>
-        <textarea id="setup-goal" class="textarea" rows="4" value=${goal} placeholder="Export a month of invoices as CSV and as PDF, including voided ones." onInput=${(e) => setGoal(e.target.value)}></textarea>
-        <span class="hint">Say what should be true when it is done, in your own words. The project lead reads this first. You can leave it empty and tell the lead in chat.</span>
+        <textarea id="setup-goal" class=${cx('textarea', tried && goalError && 'invalid')} rows="4" value=${goal} placeholder="Make a mock for the LGcode phone app" onInput=${(e) => setGoal(e.target.value)} autofocus></textarea>
+        ${tried && goalError && html`<span class="error" role="alert">${goalError}</span>`}
+      </div>
+      <div class="field">
+        <label for="setup-git">Model for commit and pull request messages</label>
+        <select id="setup-git" class="select" value=${gitModel} onChange=${(e) => setGitModel(e.target.value)}>
+          ${Object.entries(HARNESSES).map(([id, h]) => html`<optgroup label=${h.name}>${h.models.map((m) => html`<option value=${m}>${m}</option>`)}</optgroup>`)}</select>
+        <span class="hint">Asked once. Change it later in Service settings.</span>
       </div>
       <dl class="dl auth-summary">
         <dt>Repository</dt><dd>${found ? html`<span class="mono">${found.path}</span> <span class="muted">on ${found.branch}</span>` : html`<button type="button" class="link" onClick=${() => to(1)}>Add a repository first</button>`}</dd>

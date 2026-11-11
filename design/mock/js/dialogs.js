@@ -59,12 +59,24 @@ function Switcher({ s }) {
 registerDialog('switcher', Switcher);
 
 // ---- new project ------------------------------------------------------------------
+// A project starts from a goal, which is the first message to its project lead. The lead
+// names the project in its first turn, so the owner never has to invent a name.
+export function SubscriptionTable({ s, machine, value, onPick, name = 'lead-sub' }) {
+  const rows = s.subscriptions.filter((x) => x.enabled);
+  return html`<div class="table-wrap"><table class="table sub-table">
+    <thead><tr><th></th><th>Harness</th><th>Subscription</th><th>Machine</th><th>Models</th></tr></thead>
+    <tbody>${rows.map((x) => { const ok = x.signedIn && (!machine || x.machine === machine); const h = HARNESSES[x.harness];
+      return html`<tr key=${x.id} class=${cx(ok && 'click', !ok && 'off')} aria-selected=${value === x.id} onClick=${() => ok && onPick(x.id)}>
+        <td style="width:28px"><input type="radio" name=${name} aria-label=${`${h.name} · ${x.name}`} checked=${value === x.id} disabled=${!ok} onChange=${() => onPick(x.id)} /></td>
+        <td>${h.name}</td>
+        <td>${x.name}${!x.signedIn ? html` <span class="faint">· signed out</span>` : x.usage ? html` <span class="faint num">· ${x.usage.pct}% used</span>` : ''}</td>
+        <td class="muted">${machineOf(s, x.machine).name}</td>
+        <td class="muted wrap">${h.models.join(', ')}</td></tr>`; })}</tbody></table></div>`;
+}
 function NewProject({ s, d }) {
-  const online = s.machines.filter((m) => m.status === 'online');
   const [machine, setMachine] = useState(d.machine || 'studio');
   const [repo, setRepo] = useState(d.repo || s.repos[0].id);
   const [newRepo, setNewRepo] = useState('');
-  const [name, setName] = useState(d.name || '');
   const [goal, setGoal] = useState(d.goal || '');
   const ready = s.subscriptions.filter((x) => x.signedIn && x.enabled && x.machine === machine);
   const [sub, setSub] = useState(ready[0]?.id);
@@ -72,14 +84,13 @@ function NewProject({ s, d }) {
   const m = machineOf(s, machine); const r = byId(s.repos, repo);
   const isNew = repo === '__new';
   const hasRepo = isNew || !!r?.folders[machine];
-  const slug = act.slug(name || 'project-name');
-  let id = slug, n = 2; while (s.projects.some((p) => p.id === id)) id = `${slug}-${n++}`;
-  const base = isNew ? `${m.workspace}/${act.slug(newRepo || 'new-repository')}` : r?.folders[machine];
-  const dup = s.projects.some((p) => p.repo === repo && p.name.toLowerCase() === name.trim().toLowerCase());
-  const why = m.status !== 'online' ? `${m.name} is offline.` : !hasRepo ? null : !name.trim() ? 'Give the project a name.' : dup ? 'This repository already has a project with that name.' : isNew && !newRepo.trim() ? 'Name the new repository.' : !sub ? `No subscription is signed in on ${m.name}.` : null;
-  const create = () => { if (why || !hasRepo) return; act.closeDialog(); act.createProject({ repo, name: name.trim(), goal: goal.trim(), machine, subscription: sub, newRepo: isNew ? newRepo.trim() : null }); };
-  return html`<${Dialog} title="New project" onClose=${act.closeDialog} onSubmit=${create}
+  const why = m.status !== 'online' ? `${m.name} is offline.` : !hasRepo ? null : !goal.trim() ? 'Write the goal.' : isNew && !newRepo.trim() ? 'Name the new repository.' : !sub ? `No subscription is signed in on ${m.name}.` : null;
+  const create = () => { if (why || !hasRepo) return; act.closeDialog(); act.createProject({ repo, goal: goal.trim(), machine, subscription: sub, newRepo: isNew ? newRepo.trim() : null }); };
+  return html`<${Dialog} title="New project" size="wide" onClose=${act.closeDialog} onSubmit=${create}
     foot=${html`${why && html`<span class="why">${why}</span>`}<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!!why || !hasRepo}>Create project</button>`}>
+    <div class="field"><label for="np-goal">Goal</label>
+      <textarea id="np-goal" class="textarea" rows="3" value=${goal} onInput=${(e) => setGoal(e.target.value)} placeholder="Make a mock for the LGcode phone app" autofocus
+        onKeyDown=${(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); create(); } }}></textarea></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
       <div class="field"><label for="np-machine">Run on</label>
         <select id="np-machine" class="select" value=${machine} onChange=${(e) => setMachine(e.target.value)}>
@@ -89,20 +100,11 @@ function NewProject({ s, d }) {
           ${s.repos.map((x) => html`<option value=${x.id}>${x.name}${x.folders[machine] ? '' : ` (not on ${m.name})`}</option>`)}
           <option value="__new">New repository…</option></select></div>
     </div>
-    ${isNew && html`<div class="field"><label for="np-newrepo">New repository name</label><input id="np-newrepo" class="input" value=${newRepo} onInput=${(e) => setNewRepo(e.target.value)} placeholder="notes-site" />
-      <span class="hint">Created with <code>git init</code> in ${m.workspace}, on the branch main.</span></div>`}
+    ${isNew && html`<div class="field"><label for="np-newrepo">New repository name</label><input id="np-newrepo" class="input" value=${newRepo} onInput=${(e) => setNewRepo(e.target.value)} placeholder="notes-site" /></div>`}
     ${!hasRepo && html`<div class="callout warn"><${Icon} name="triangle-alert" size=${15} /><span class="grow">${r.name} is not on ${m.name}.</span>
-      <button type="button" class="btn sm" onClick=${() => { act.openDialog({ type: 'add-repository', machine, repo, back: { type: 'new-project', machine, repo, name, goal } }); }}>Add it to ${m.name}</button></div>`}
-    <div class="field"><label for="np-name">Project name</label><input id="np-name" class="input" value=${name} onInput=${(e) => setName(e.target.value)} placeholder="Invoice exports" autofocus /></div>
-    <div class="field"><label for="np-goal">Goal</label><textarea id="np-goal" class="textarea" rows="3" value=${goal} onInput=${(e) => setGoal(e.target.value)} placeholder="What do you want to change, and for whom? The project lead turns this into sprints and teams."></textarea></div>
-    <div class="field"><label for="np-sub">Lead subscription</label>
-      <select id="np-sub" class="select" value=${sub} onChange=${(e) => setSub(e.target.value)} disabled=${!ready.length}>
-        ${ready.length === 0 && html`<option>None signed in on ${m.name}</option>`}
-        ${ready.map((x) => html`<option value=${x.id}>${HARNESSES[x.harness].name} · ${x.name}${x.usage ? ` · ${x.usage.pct}% used` : ''}</option>`)}</select></div>
-    <dl class="dl" style="background:var(--color-raised);border-radius:var(--radius-sm);padding:10px 12px">
-      <dt>Branch</dt><dd class="mono">feat/${id}</dd>
-      <dt>Folder</dt><dd class="mono" style="overflow-wrap:anywhere">${base || '—'}/.worktrees/${id}</dd>
-    </dl>
+      <button type="button" class="btn sm" onClick=${() => { act.openDialog({ type: 'add-repository', machine, repo, back: { type: 'new-project', machine, repo, goal } }); }}>Add to ${m.name}</button></div>`}
+    <div class="field"><span class="label">Project lead</span>
+      <${SubscriptionTable} s=${s} machine=${machine} value=${sub} onPick=${setSub} /></div>
   <//>`;
 }
 registerDialog('new-project', NewProject);

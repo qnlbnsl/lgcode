@@ -1,71 +1,139 @@
 // The project board, sprint and task pages, the team page, and the repository page.
-import { html, useState, Icon, cx, href, go, ago, clock, dayLabel, useNow, plural, update, uid } from '../lib.js';
+import { html, useState, Icon, cx, href, go, ago, clock, dayLabel, useNow, plural, update, uid, useKey, store, DAY } from '../lib.js';
 import {
-  STAGES, PHASES, COLUMNS, TASK_STATES, sprintsOf, tasksOfSprint, tasksOfTeam, teamOf, teamName, teamsOf, agentOf, agentsOfTeam, agentsOfProject,
+  STAGES, PHASES, COLUMNS, PRIORITIES, TASK_STATES, sprintsOf, epicsOf, tasksOfSprint, tasksOfTeam, teamOf, teamName, teamsOf, agentOf, agentsOfTeam, agentsOfProject,
   requestsOfSprint, requestsOfTask, openRequests, sprintProgress, agentStatus, byId, repoOf, machineOf, leadOf, routeForAgent, agentLabel, HARNESSES, subLabel,
 } from '../data.js';
 import * as act from '../actions.js';
-import { Avatar, RequestBlock, Empty, StateWord, AgentLine } from '../ui.js';
+import { Avatar, RequestBlock, Empty, StateWord, AgentLine, Menu } from '../ui.js';
 import { ProjectTable } from './home.js';
 
-// ---- stage strip ----------------------------------------------------------------
-export function StageStrip({ s, project }) {
-  const i = STAGES.indexOf(project.stage); const phase = PHASES.find((p) => p.id === project.phase);
-  const stages = project.hasMocks || project.stage === 'Design' ? STAGES : STAGES.slice(1);
-  return html`<div class="stage-strip">
-    <ol class="stages" aria-label="Project stage">
-      ${stages.map((st) => { const n = STAGES.indexOf(st); return html`<li key=${st} class=${cx(n < i && 'done', n === i && 'now')} aria-current=${n === i ? 'step' : null}>
-        <span class="mark">${n < i ? html`<${Icon} name="check" size=${11} />` : n === i ? html`<i></i>` : null}</span><span>${st}</span></li>`; })}
-    </ol>
-    <a class="phase-link" href=${href(`/p/${project.id}/workflow`)}>Phase ${phase.n} of 8 · <b>${phase.name}</b><${Icon} name="arrow-right" size=${12} /></a>
-  </div>`;
+// ---- status line ----------------------------------------------------------------
+// The project's stage and phase as one quiet line that links to Workflow.
+export function StatusLine({ s, project }) {
+  const phase = PHASES.find((p) => p.id === project.phase);
+  return html`<a class="status-link" href=${href(`/p/${project.id}/workflow`)} title="Open Workflow">
+    <span>${phase.name}</span><span class="muted">· Phase ${phase.n} of 8</span><${Icon} name="arrow-right" size=${12} class="faint" /></a>`;
 }
 
 // ---- board ----------------------------------------------------------------------
+// One project, three views of the same items, after GitHub Projects: Board groups by
+// status, Table sorts and filters, Roadmap lays epics and sprints along a time line.
+const PRIO_ICON = { Urgent: 'zap', High: 'arrow-up', Medium: 'minus', Low: 'arrow-down' };
+function Priority({ p, label = false }) {
+  return html`<span class=${cx('prio', 'p-' + p.toLowerCase())} title=${'Priority: ' + p}><${Icon} name=${PRIO_ICON[p]} size=${12} />${label && html`<span>${p}</span>`}</span>`;
+}
 function SprintCard({ s, sp }) {
   const pr = sprintProgress(s, sp); const reqs = requestsOfSprint(s, sp.id);
-  const t = sp.team && teamOf(s, sp.team);
-  const ags = t ? agentsOfTeam(s, t.id) : [];
-  const live = ags.find((a) => a.state === 'working' && a.task && tasksOfSprint(s, sp.id).some((x) => x.label === a.task)) || ags.find((a) => a.state === 'working');
+  const t = sp.team && teamOf(s, sp.team); const ep = sp.epic && byId(s.epics, sp.epic);
   const failed = reqs.some((r) => r.kind === 'failed');
   return html`<a class=${cx('sprint-card', reqs.length && (failed ? 'error' : 'warn'), sp.column === 'Done' && 'done')} href=${href(`/p/${sp.project}/sprint/${sp.id}`)}>
-    ${reqs.length > 0 && html`<div class=${cx('need', failed && 'error')}><${Icon} name=${failed ? 'circle-alert' : 'bell'} size=${13} />${reqs.length === 1 ? { question: 'Needs your answer', approval: 'Needs your approval', merge: 'Needs your merge', failed: 'An agent failed to start' }[reqs[0].kind] : `${reqs.length} requests need you`}</div>`}
-    <div class="row" style="gap:6px"><span class="tag">${sp.label}</span><span class="faint" style="font-size:var(--text-xs)">${sp.phase}</span>
-      ${sp.fix && html`<span class="badge info" title="A fix sprint that users would not notice merges on its own after a passing full run.">Fix sprint</span>`}</div>
+    <div class="card-top"><span class="tag">${sp.label}</span>${ep && html`<span class="epic-chip truncate">${ep.name}</span>`}<span class="grow"></span><${Priority} p=${sp.priority || 'Medium'} /></div>
     <h3>${sp.name}</h3>
-    <p class="goal">${sp.goal}</p>
-    ${pr.total > 0 && html`<div class="row" style="gap:8px">
-      <div class="progress grow">${Array.from({ length: pr.total }, (_, n) => html`<i key=${n} class=${cx(n >= pr.done && n < pr.done + pr.active && 'active')} style=${{ flex: 1, background: n >= pr.done + pr.active ? 'transparent' : null }}></i>`)}</div>
-      <span class="faint num" style="font-size:var(--text-xs)">${pr.done} of ${pr.total}</span></div>`}
-    ${pr.total === 0 && html`<span class="faint" style="font-size:var(--text-xs)">No tasks yet. The plan comes first.</span>`}
-    <div class="row foot">
-      ${t ? html`<span class="avatar-stack">${ags.slice(0, 4).map((a) => html`<${Avatar} key=${a.id} agent=${a} s=${s} size="sm" status=${false} />`)}</span><span class="muted truncate">${teamName(t)}</span>`
-        : html`<span class="faint">No team yet</span>`}
+    ${reqs.length > 0 && html`<div class=${cx('need', failed && 'error')}><${Icon} name=${failed ? 'circle-alert' : 'bell'} size=${13} />${reqs.length === 1 ? { question: 'Needs your answer', approval: 'Needs your approval', merge: 'Needs your merge', failed: 'Failed start' }[reqs[0].kind] : `${reqs.length} requests need you`}</div>`}
+    <div class="card-foot">
+      <span class="stage-word">${sp.phase}</span>
+      ${t ? html`<span class="muted truncate">${t.area || teamName(t)}</span>` : html`<span class="faint">No team</span>`}
+      <span class="grow"></span>
+      ${pr.total > 0 && html`<span class="faint num">${pr.done}/${pr.total}</span>`}
     </div>
-    ${sp.column === 'Done' && sp.evidence && html`<div class="evidence-line"><${Icon} name="circle-check" size=${13} /><span class="truncate">${sp.evidence.tests} · ${sp.evidence.merged || sp.evidence.review}</span></div>`}
-    ${live && sp.column !== 'Done' && html`<div class="live-line"><i class="dot working pulse"></i><span class="truncate"><b>${live.name}</b> ${live.activity}</span></div>`}
   </a>`;
 }
-export function Board({ s, project }) {
-  const sprints = sprintsOf(s, project.id); const ags = agentsOfProject(s, project.id);
-  const open = openRequests(s, { project: project.id });
-  const [col, setCol] = useState(null);
-  if (project.archived) return html`<div class="page"><${Empty} title="This project is archived" icon="archive">Its agents are stopped. <button type="button" class="btn sm" onClick=${() => act.archiveProject(project.id, false)}>Restore</button><//></div>`;
-  return html`<div class="board-page">
-    <div class="board-head">
-      <${StageStrip} s=${s} project=${project} />
-      <p class="goal-line"><span class="faint">Goal</span> ${project.goal || html`<span class="muted">No goal yet. Tell the project lead what you want to change.</span>`}</p>
-    </div>
-    ${html`
-    <div class="col-jump only-phone-flex" role="tablist" aria-label="Board columns">${COLUMNS.map((c) => html`<button type="button" key=${c} class="tab" aria-selected=${(col || 'In progress') === c} onClick=${() => { setCol(c); document.getElementById('col-' + c.replace(' ', '-'))?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>${c}<span class="count">${sprints.filter((x) => x.column === c).length}</span></button>`)}</div>
-    <div class="board" data-main>
-      ${COLUMNS.map((c) => { const list = sprints.filter((x) => x.column === c).sort((a, b) => (b.fix ? 1 : 0) - (a.fix ? 1 : 0) || requestsOfSprint(s, b.id).length - requestsOfSprint(s, a.id).length);
-        return html`<section class="board-col" key=${c} id=${'col-' + c.replace(' ', '-')} aria-label=${c}>
+function useBoardFilter(s, project) {
+  const [q, setQ] = useState(''); const [epic, setEpic] = useState(null);
+  const all = sprintsOf(s, project.id);
+  const items = all.filter((x) => (!epic || x.epic === epic) && (!q || `${x.label} ${x.name} ${x.goal}`.toLowerCase().includes(q.toLowerCase())));
+  return { q, setQ, epic, setEpic, items, all };
+}
+function BoardView({ s, items }) {
+  const [col, setCol] = useState('In progress');
+  return html`
+    <div class="col-jump only-phone-flex" role="tablist" aria-label="Board lanes">${COLUMNS.map((c) => html`<button type="button" key=${c} class="tab" aria-selected=${col === c} onClick=${() => { setCol(c); document.getElementById('lane-' + c.replace(' ', '-'))?.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' }); }}>${c}<span class="count">${items.filter((x) => x.column === c).length}</span></button>`)}</div>
+    <div class="board-lanes" data-main>
+      ${COLUMNS.map((c) => { const list = items.filter((x) => x.column === c).sort((a, b) => PRIORITIES.indexOf(a.priority) - PRIORITIES.indexOf(b.priority) || requestsOfSprint(s, b.id).length - requestsOfSprint(s, a.id).length);
+        return html`<section class="board-lane" key=${c} id=${'lane-' + c.replace(' ', '-')} aria-label=${c}>
           <header><h2>${c}</h2><span class="count">${list.length}</span></header>
-          <div class="cards">${list.map((sp) => html`<${SprintCard} key=${sp.id} s=${s} sp=${sp} />`)}
-            ${list.length === 0 && html`<p class="faint col-empty">${c === 'Done' ? 'Nothing merged yet.' : c === 'Review' ? 'Nothing in review.' : 'Empty.'}</p>`}</div>
+          <div class="cards">${list.map((sp) => html`<${SprintCard} key=${sp.id} s=${s} sp=${sp} />`)}</div>
         </section>`; })}
-    </div>`}
+    </div>`;
+}
+const TCOLS = [
+  { id: 'title', label: 'Title', key: (s, x) => x.label },
+  { id: 'epic', label: 'Epic', key: (s, x) => byId(s.epics, x.epic)?.name || '' },
+  { id: 'priority', label: 'Priority', key: (s, x) => PRIORITIES.indexOf(x.priority) },
+  { id: 'team', label: 'Team', key: (s, x) => (x.team ? teamName(teamOf(s, x.team)) : '~') },
+  { id: 'stage', label: 'Stage', key: (s, x) => STAGES.indexOf(x.phase) },
+  { id: 'status', label: 'Status', key: (s, x) => COLUMNS.indexOf(x.column) },
+  { id: 'progress', label: 'Tasks', key: (s, x) => sprintProgress(s, x).done, num: true },
+];
+function TableView({ s, items }) {
+  const [sort, setSort] = useState({ col: 'status', dir: 'asc' });
+  const c = TCOLS.find((x) => x.id === sort.col);
+  const rows = [...items].sort((a, b) => { const x = c.key(s, a), y = c.key(s, b); return (x < y ? -1 : x > y ? 1 : 0) * (sort.dir === 'asc' ? 1 : -1); });
+  return html`<div class="view-scroll" data-main><table class="table board-table">
+    <thead><tr>${TCOLS.map((col) => html`<th key=${col.id} class=${col.num && 'num'} aria-sort=${sort.col === col.id ? (sort.dir === 'asc' ? 'ascending' : 'descending') : null}>
+      <button type="button" class="th-sort" onClick=${() => setSort(sort.col === col.id ? { col: col.id, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { col: col.id, dir: 'asc' })}>${col.label}${sort.col === col.id && html`<${Icon} name=${sort.dir === 'asc' ? 'arrow-up' : 'arrow-down'} size=${11} />`}</button></th>`)}</tr></thead>
+    <tbody>${rows.map((x) => { const reqs = requestsOfSprint(s, x.id); const pr = sprintProgress(s, x); const t = x.team && teamOf(s, x.team);
+      return html`<tr key=${x.id} class=${cx('click', reqs.length && (reqs.some((r) => r.kind === 'failed') ? 's-error' : 's-warn'))} onClick=${() => go(`/p/${x.project}/sprint/${x.id}`)}>
+        <td class="state-cell"><span class="tag">${x.label}</span> <a href=${href(`/p/${x.project}/sprint/${x.id}`)} onClick=${(e) => e.stopPropagation()} style="font-weight:var(--weight-medium)">${x.name}</a>${reqs.length > 0 && html` <${Icon} name="bell" size=${12} class="warn-text" style="display:inline-block;vertical-align:-1px" />`}</td>
+        <td class="muted">${byId(s.epics, x.epic)?.name || '—'}</td>
+        <td><${Priority} p=${x.priority || 'Medium'} label=${true} /></td>
+        <td class="muted">${t ? teamName(t) : '—'}</td>
+        <td>${x.phase}</td>
+        <td><span class=${cx('status-word', 'st-' + x.column.replace(' ', '-').toLowerCase())}>${x.column}</span></td>
+        <td class="num muted">${pr.total ? `${pr.done} of ${pr.total}` : '—'}</td></tr>`; })}
+      ${rows.length === 0 && html`<tr><td colspan=${TCOLS.length} class="muted" data-empty>No sprints</td></tr>`}</tbody></table></div>`;
+}
+// The roadmap: one row for each epic, with its sprints under it, along a time line in days.
+function RoadmapView({ s, project, items }) {
+  const DAYPX = 96; const now = Date.now();
+  const epics = epicsOf(s, project.id);
+  const span = items.length ? [Math.min(-1, ...items.map((x) => x.start ?? 0)) - 1, Math.max(7, ...items.map((x) => x.end ?? 1)) + 1] : [-2, 8];
+  const from = Math.floor(span[0]), to = Math.ceil(span[1]); const days = Array.from({ length: to - from }, (_, i) => from + i);
+  const x = (d) => (d - from) * DAYPX;
+  const day0 = new Date(now); day0.setHours(0, 0, 0, 0);
+  const label = (d) => { const t = new Date(day0.getTime() + d * DAY); return d === 0 ? 'Today' : t.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }); };
+  const groups = [...epics.map((e) => ({ e, list: items.filter((sp) => sp.epic === e.id) })), { e: null, list: items.filter((sp) => !sp.epic) }].filter((g) => g.e || g.list.length);
+  const todayX = x((now - day0.getTime()) / DAY);
+  return html`<div class="roadmap" data-main>
+    <div class="rm-grid" style=${{ '--rm-w': (to - from) * DAYPX + 'px', '--day': DAYPX + 'px' }}>
+      <div class="rm-head"><div class="rm-name">Epic and sprint</div><div class="rm-axis">${days.map((d) => html`<span key=${d} class=${cx(d === 0 && 'today')} style=${{ left: x(d) + 'px' }}>${label(d)}</span>`)}</div></div>
+      <div class="rm-goal"><div class="rm-name"><${Icon} name="target" size=${13} class="faint" /><span class="truncate">${project.goal}</span></div><div class="rm-track"></div></div>
+      ${groups.map(({ e, list }) => { const st = list.length ? Math.min(...list.map((sp) => sp.start ?? 0)) : null; const en = list.length ? Math.max(...list.map((sp) => sp.end ?? 1)) : null;
+        return html`<div class="rm-group" key=${e ? e.id : 'none'}>
+          <div class="rm-row epic"><div class="rm-name"><${Icon} name="layers" size=${13} class="faint" /><b class="truncate">${e ? e.name : 'No epic'}</b><span class="count">${list.length}</span></div>
+            <div class="rm-track">${st != null && html`<span class="rm-bar epic" style=${{ left: x(st) + 'px', width: (en - st) * DAYPX + 'px' }}></span>`}</div></div>
+          ${list.sort((a, b) => (a.start ?? 0) - (b.start ?? 0)).map((sp) => html`<div class="rm-row" key=${sp.id}>
+            <div class="rm-name"><span class="tag">${sp.label}</span><a class="truncate" href=${href(`/p/${sp.project}/sprint/${sp.id}`)}>${sp.name}</a></div>
+            <div class="rm-track"><a class=${cx('rm-bar', 'st-' + sp.column.replace(' ', '-').toLowerCase())} href=${href(`/p/${sp.project}/sprint/${sp.id}`)} style=${{ left: x(sp.start ?? 0) + 'px', width: Math.max(0.3, (sp.end ?? 1) - (sp.start ?? 0)) * DAYPX + 'px' }} title=${`${sp.label} ${sp.name} · ${sp.column}`}><span class="truncate">${sp.name}</span></a></div></div>`)}
+        </div>`; })}
+      ${groups.length === 0 && html`<div class="rm-row"><div class="rm-name muted" data-empty>No epics</div><div class="rm-track"></div></div>`}
+      <i class="rm-now" style=${{ left: `calc(var(--rm-name) + ${todayX}px)` }}></i>
+    </div>
+  </div>`;
+}
+export function Board({ s, project, route }) {
+  const view = ['table', 'roadmap'].includes(route.parts[3]) ? route.parts[3] : 'board';
+  const f = useBoardFilter(s, project); const focus = !!s.ui.focus;
+  const epics = epicsOf(s, project.id);
+  useKey((e) => { if (e.key === 'Escape' && store.state.ui.focus && !store.state.dialog) update((st) => { st.ui.focus = false; }); }, []);
+  if (project.archived) return html`<div class="page"><${Empty} title="This project is archived" icon="archive">Its agents are stopped. <button type="button" class="btn sm" onClick=${() => act.archiveProject(project.id, false)}>Restore</button><//></div>`;
+  const views = [['board', 'Board', 'kanban'], ['table', 'Table', 'table-2'], ['roadmap', 'Roadmap', 'calendar']];
+  return html`<div class="board-page">
+    <div class="board-bar">
+      <nav class="view-tabs" aria-label="Board views">${views.map(([id, label, icon]) => html`<a key=${id} class="view-tab" aria-current=${view === id ? 'page' : null} href=${href(`/p/${project.id}/board${id === 'board' ? '' : '/' + id}`)}><${Icon} name=${icon} size=${14} />${label}</a>`)}</nav>
+      <div class="search"><${Icon} name="search" size=${14} /><input class="input" placeholder="Filter" aria-label="Filter sprints" value=${f.q} onInput=${(e) => f.setQ(e.target.value)} /></div>
+      <${Menu} class=${cx('btn filter-btn', f.epic && 'set')} label="Epic" width=${240}
+        trigger=${html`<span class="muted">Epic</span><b>${f.epic ? byId(s.epics, f.epic).name : 'All'}</b><${Icon} name="chevron-down" size=${12} />`}
+        items=${[{ label: 'All', sub: String(f.all.length), checked: !f.epic, onSelect: () => f.setEpic(null) }, { sep: true }, ...epics.map((e) => ({ label: e.name, sub: String(f.all.filter((x) => x.epic === e.id).length), checked: f.epic === e.id, onSelect: () => f.setEpic(e.id) }))]} />
+      <span class="grow"></span>
+      <${StatusLine} s=${s} project=${project} />
+      <button type="button" class="btn icon" aria-pressed=${focus} aria-label=${focus ? 'Leave focus' : 'Focus on the board'} data-tip=${focus ? 'Leave focus · Esc' : 'Focus'} data-tip-side="left"
+        onClick=${() => update((st) => { st.ui.focus = !st.ui.focus; })}><${Icon} name=${focus ? 'minimize-2' : 'maximize-2'} size=${14} /></button>
+    </div>
+    ${view === 'board' && html`<${BoardView} s=${s} items=${f.items} />`}
+    ${view === 'table' && html`<${TableView} s=${s} items=${f.items} />`}
+    ${view === 'roadmap' && html`<${RoadmapView} s=${s} project=${project} items=${f.items} />`}
   </div>`;
 }
 

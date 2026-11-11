@@ -24,7 +24,7 @@ function RequestBody({ before }) {
     <span class="mu-kind">Approval</span><h4>Run the web tests</h4>
     <dl><dt>Command</dt><dd>pnpm --filter @lgcode/web test</dd><dt>Folder</dt><dd>~/projects/lgcode/.worktrees/agent-console-shell</dd></dl>
     <p class="mu-agent"><span class="avatar sm"><${Icon} name="hammer" size=${12} /></span><b>Builder 2</b><span>Build team · Shell</span><span class="grow"></span><span>Waiting 6 min</span></p>
-    <div class="mu-actions"><span class="btn primary lg">Allow</span>${!before && html`<span class="btn lg">Always allow this command</span>`}<span class="btn lg ghost">Deny</span></div>
+    <div class="mu-actions"><span class="btn primary lg">Allow</span>${!before && html`<span class="btn lg">Always allow</span>`}<span class="btn lg ghost">Deny</span></div>
   </div>`;
 }
 function ListUI({ before }) {
@@ -122,13 +122,13 @@ export function seedMocks(state) {
       { id: 'requests', name: 'Requests', kind: 'list', status: 'changed', rev: 3, updatedAt: at(52 * MIN), note: 'Filter chips above the list, and the wait on every row.', comments: [
         { from: 'owner', ts: at(2 * HOUR), text: 'I cannot tell which request has waited longest.' },
         { from: D, ts: at(52 * MIN), text: 'Revision 3 puts the wait on every row and sorts the oldest first. I also added filter chips, so a long list stays short.' }] },
-      { id: 'request', name: 'Request', kind: 'request', status: 'changed', rev: 2, updatedAt: at(3 * HOUR), note: 'A third choice, Always allow this command.', comments: [
-        { from: D, ts: at(3 * HOUR), text: 'Revision 2 adds Always allow this command. It makes a standing rule, so it depends on the Standing permission rules project.' }] },
+      { id: 'request', name: 'Request', kind: 'request', status: 'changed', rev: 2, updatedAt: at(3 * HOUR), note: 'A third choice, Always allow.', comments: [
+        { from: D, ts: at(3 * HOUR), text: 'Revision 2 adds Always allow. It makes a standing rule, so it depends on the Standing permission rules project.' }] },
       { id: 'notify', name: 'Notification settings', kind: 'settings', status: 'draft', rev: 1, updatedAt: at(4 * HOUR), note: 'The four alerts, quiet hours, and the server.', comments: [] },
     ],
     changes: [
       { id: 'c1', screen: 'requests', from: 2, to: 3, ts: at(52 * MIN), by: D, seen: false, compare: true, text: 'Added filter chips for questions, approvals and merges. Every row now shows how long it has waited.' },
-      { id: 'c2', screen: 'request', from: 1, to: 2, ts: at(3 * HOUR), by: D, seen: false, compare: true, text: 'Added Always allow this command between Allow and Deny.' },
+      { id: 'c2', screen: 'request', from: 1, to: 2, ts: at(3 * HOUR), by: D, seen: false, compare: true, text: 'Added Always allow between Allow and Deny.' },
       { id: 'c3', screen: 'notify', from: 0, to: 1, ts: at(4 * HOUR), by: D, seen: true, text: 'First drawing of the screen.' },
     ],
     data: [

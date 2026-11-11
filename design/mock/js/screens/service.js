@@ -532,7 +532,7 @@ function Sheepdog({ s }) {
       <${Row} label="Restart after a crash" id="sd-x"><${Num} id="sd-x" value=${set.crashRetries} min=${0} max=${9} unit="times" onChange=${(v) => setS({ crashRetries: v })} /><//>
       <${Row} label="Close an idle team" id="sd-i" hint="A team with no work for this long is stopped. Its branch stays."><${Num} id="sd-i" value=${set.teamIdle} min=${5} max=${1440} unit="minutes" onChange=${(v) => setS({ teamIdle: v })} /><//>
       <h3>Approvals</h3>
-      <${Row} label="Standing permission rules" hint=${'"Always allow this command" stores a rule. Later requests that match it are allowed without asking.'}>
+      <${Row} label="Standing permission rules" hint=${'"Always allow" stores a rule. Later requests that match it are allowed without asking.'}>
         <${Switch} on=${set.standingRules} label="Standing permission rules" onChange=${(v) => setS({ standingRules: v })} /><//>
     </div>
   </div>`;

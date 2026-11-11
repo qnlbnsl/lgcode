@@ -18,7 +18,8 @@ export const PHASES = [
   { id: 'handover', n: 7, name: 'Hand over', stage: 'Hand over', what: 'The work is merged. You try the product and approve what users would notice.' },
   { id: 'running', n: 8, name: 'Keep running', stage: null, what: 'A nightly full run. Failures are explained, and you get a one-line summary.' },
 ];
-export const COLUMNS = ['Planned', 'In progress', 'Review', 'Done'];
+export const COLUMNS = ['Backlog', 'Planned', 'In progress', 'Review', 'Done'];
+export const PRIORITIES = ['Urgent', 'High', 'Medium', 'Low'];
 export const ROLES = {
   'project-lead': { label: 'Project lead', icon: 'crown' },
   'team-lead': { label: 'Team lead', icon: 'flag' },
@@ -119,19 +120,32 @@ export function seed() {
   ];
 
   const sprints = [
-    { id: 'sp1', project: 'console', label: 'SP-01', name: 'Navigation foundation', goal: 'Move between repositories, projects, teams and agents without losing your place.', phase: 'Hand over', column: 'Done', team: 'console-shell', dependsOn: [], evidence: { tests: '412 passed', review: 'Clean after round 2', merged: 'Merged into feat/agent-console' } },
-    { id: 'sp2', project: 'console', label: 'SP-02', name: 'Thread view', goal: 'Keep long replies readable, keep the draft, and open at the latest message.', phase: 'Build', column: 'In progress', team: 'console-threads', dependsOn: ['sp1'] },
-    { id: 'sp3', project: 'console', label: 'SP-03', name: 'Sidebar and attention', goal: 'Show what needs you from anywhere, and fold the sidebar to a rail.', phase: 'Build', column: 'In progress', team: 'console-shell', dependsOn: ['sp1'] },
-    { id: 'sp4', project: 'console', label: 'SP-04', name: 'Narrow-screen pass', goal: 'Verify keyboard navigation and the phone layout at 390 pixels.', phase: 'Review', column: 'Review', team: 'console-review', dependsOn: ['sp1'] },
-    { id: 'sp5', project: 'console', label: 'SP-05', name: 'Project board', goal: 'Turn the project plan into sprints with owners, evidence and blockers.', phase: 'Plan', column: 'Planned', team: null, dependsOn: ['sp2', 'sp3'] },
-    { id: 'sp6', project: 'console', label: 'SP-06', name: 'Git and merge review', goal: 'Stage, commit and integrate team worktrees. Open a review to the base branch.', phase: 'Plan', column: 'Planned', team: null, dependsOn: ['sp5'] },
-    { id: 'fx1', project: 'console', label: 'FX-01', name: 'Fix the flaky reconnect test', goal: 'The starting commit failed its full run. Fix it before SP-03 builds on it.', phase: 'Build', column: 'In progress', team: 'console-shell', dependsOn: [], fix: true, auto: true },
-    { id: 'rp1', project: 'rules', label: 'SP-01', name: 'Rule storage and matching', goal: 'Store a rule the owner approved once, and match later requests against it.', phase: 'Plan', column: 'In progress', team: 'rules-plan', dependsOn: [] },
-    { id: 'rp2', project: 'rules', label: 'SP-02', name: 'Rules page', goal: 'List, pause and remove standing rules.', phase: 'Plan', column: 'Planned', team: null, dependsOn: ['rp1'] },
-    { id: 'ar1', project: 'apiref', label: 'SP-01', name: 'Generate the reference', goal: 'Build every endpoint page from openapi.yaml.', phase: 'Hand over', column: 'Done', team: 'apiref-review', dependsOn: [], evidence: { tests: '96 passed', review: 'Clean after round 3', merged: 'Merged into docs/api-reference' } },
-    { id: 'ar2', project: 'apiref', label: 'SP-02', name: 'Remove hand-written pages', goal: 'Delete the old pages and redirect their addresses.', phase: 'Hand over', column: 'Review', team: 'apiref-review', dependsOn: ['ar1'], evidence: { tests: '104 passed', review: 'Clean after round 2' } },
-    { id: 'ie1', project: 'exports', label: 'SP-01', name: 'CSV export', goal: 'A month of invoices as one CSV file.', phase: 'Build', column: 'In progress', team: 'exports-build', dependsOn: [] },
-    { id: 'ie2', project: 'exports', label: 'SP-02', name: 'PDF export', goal: 'The same month as one PDF, one invoice per page.', phase: 'Plan', column: 'Planned', team: 'exports-build', dependsOn: ['ie1'] },
+    { id: 'sp1', epic: 'ac-nav', priority: 'High', start: -4, end: -2, project: 'console', label: 'SP-01', name: 'Navigation foundation', goal: 'Move between repositories, projects, teams and agents without losing your place.', phase: 'Hand over', column: 'Done', team: 'console-shell', dependsOn: [], evidence: { tests: '412 passed', review: 'Clean after round 2', merged: 'Merged into feat/agent-console' } },
+    { id: 'sp2', epic: 'ac-threads', priority: 'High', start: -1.5, end: 1, project: 'console', label: 'SP-02', name: 'Thread view', goal: 'Keep long replies readable, keep the draft, and open at the latest message.', phase: 'Build', column: 'In progress', team: 'console-threads', dependsOn: ['sp1'] },
+    { id: 'sp3', epic: 'ac-nav', priority: 'Urgent', start: -1, end: 1.5, project: 'console', label: 'SP-03', name: 'Sidebar and attention', goal: 'Show what needs you from anywhere, and fold the sidebar to a rail.', phase: 'Build', column: 'In progress', team: 'console-shell', dependsOn: ['sp1'] },
+    { id: 'sp4', epic: 'ac-threads', priority: 'Medium', start: -0.5, end: 1, project: 'console', label: 'SP-04', name: 'Narrow-screen pass', goal: 'Verify keyboard navigation and the phone layout at 390 pixels.', phase: 'Review', column: 'Review', team: 'console-review', dependsOn: ['sp1'] },
+    { id: 'sp5', epic: 'ac-board', priority: 'Medium', start: 1.5, end: 3.5, project: 'console', label: 'SP-05', name: 'Project board', goal: 'Turn the project plan into sprints with owners, evidence and blockers.', phase: 'Plan', column: 'Planned', team: null, dependsOn: ['sp2', 'sp3'] },
+    { id: 'sp6', epic: 'ac-board', priority: 'Medium', start: 3.5, end: 5.5, project: 'console', label: 'SP-06', name: 'Git and merge review', goal: 'Stage, commit and integrate team worktrees. Open a review to the base branch.', phase: 'Plan', column: 'Planned', team: null, dependsOn: ['sp5'] },
+    { id: 'fx1', epic: 'ac-nav', priority: 'Urgent', start: -0.1, end: 0.3, project: 'console', label: 'FX-01', name: 'Fix the flaky reconnect test', goal: 'The starting commit failed its full run. Fix it before SP-03 builds on it.', phase: 'Build', column: 'In progress', team: 'console-shell', dependsOn: [], fix: true, auto: true },
+    { id: 'rp1', epic: 'pr-rules', priority: 'High', start: -1, end: 1, project: 'rules', label: 'SP-01', name: 'Rule storage and matching', goal: 'Store a rule the owner approved once, and match later requests against it.', phase: 'Plan', column: 'In progress', team: 'rules-plan', dependsOn: [] },
+    { id: 'rp2', epic: 'pr-rules', priority: 'Medium', start: 1, end: 2.5, project: 'rules', label: 'SP-02', name: 'Rules page', goal: 'List, pause and remove standing rules.', phase: 'Plan', column: 'Planned', team: null, dependsOn: ['rp1'] },
+    { id: 'ar1', epic: 'ar-ref', priority: 'High', start: -6, end: -3, project: 'apiref', label: 'SP-01', name: 'Generate the reference', goal: 'Build every endpoint page from openapi.yaml.', phase: 'Hand over', column: 'Done', team: 'apiref-review', dependsOn: [], evidence: { tests: '96 passed', review: 'Clean after round 3', merged: 'Merged into docs/api-reference' } },
+    { id: 'ar2', epic: 'ar-ref', priority: 'High', start: -3, end: -0.2, project: 'apiref', label: 'SP-02', name: 'Remove hand-written pages', goal: 'Delete the old pages and redirect their addresses.', phase: 'Hand over', column: 'Review', team: 'apiref-review', dependsOn: ['ar1'], evidence: { tests: '104 passed', review: 'Clean after round 2' } },
+    { id: 'sp7', epic: 'ac-board', priority: 'Low', start: 5.5, end: 7.5, project: 'console', label: 'SP-07', name: 'Phone layout pass', goal: 'Every project tab works at 390 pixels.', phase: 'Plan', column: 'Backlog', team: null, dependsOn: ['sp4'] },
+    { id: 'sp8', epic: 'ac-threads', priority: 'Low', start: 6, end: 7, project: 'console', label: 'SP-08', name: 'Search inside a thread', goal: 'Find a word in a long thread.', phase: 'Plan', column: 'Backlog', team: null, dependsOn: [] },
+    { id: 'rp3', epic: 'pr-rules', priority: 'Low', start: 2.5, end: 3.5, project: 'rules', label: 'SP-03', name: 'Rule usage counts', goal: 'Show how often each rule allowed a request.', phase: 'Plan', column: 'Backlog', team: null, dependsOn: ['rp2'] },
+    { id: 'ie1', epic: 'ie-exports', priority: 'High', start: -2, end: 1, project: 'exports', label: 'SP-01', name: 'CSV export', goal: 'A month of invoices as one CSV file.', phase: 'Build', column: 'In progress', team: 'exports-build', dependsOn: [] },
+    { id: 'ie2', epic: 'ie-exports', priority: 'Medium', start: 1, end: 3, project: 'exports', label: 'SP-02', name: 'PDF export', goal: 'The same month as one PDF, one invoice per page.', phase: 'Plan', column: 'Planned', team: 'exports-build', dependsOn: ['ie1'] },
+  ];
+
+  // A project is one goal with one or more epics under it. Each sprint belongs to one epic.
+  const epics = [
+    { id: 'ac-nav', project: 'console', name: 'Navigation and attention' },
+    { id: 'ac-threads', project: 'console', name: 'Threads' },
+    { id: 'ac-board', project: 'console', name: 'Board and Git' },
+    { id: 'pr-rules', project: 'rules', name: 'Standing rules' },
+    { id: 'ar-ref', project: 'apiref', name: 'Generated reference' },
+    { id: 'ie-exports', project: 'exports', name: 'Monthly exports' },
   ];
 
   const tk = (id, project, label, title, sprint, team, owner, state, o = {}) => ({ id, project, label, title, sprint, team, owner, state, points: 3, files: [], history: [], ...o });
@@ -165,7 +179,7 @@ export function seed() {
     { id: 'q-merge', kind: 'merge', agent: 'apiref-lead', project: 'apiref', title: 'Merge docs/api-reference into main', body: 'Both sprints are done. Users will notice this change, because the old page addresses now redirect.', createdAt: at(1 * HOUR + 25 * MIN), status: 'open', source: 'docs/api-reference', target: 'main', evidence: { tests: { ok: true, text: 'Full run passed · 104 tests · commit 9c1e7aa' }, review: { ok: true, text: 'Review clean after round 2', agent: 'apiref-rl' }, commits: 14, files: 37 } },
     { id: 'q-stuck', kind: 'question', agent: 'plan-lead', project: 'rules', task: 'r3', title: 'Statement 7 is stuck after round 3. Keep, change or drop it?', body: 'Statement 7 says "A rule matches by exact command text." It drew a major finding in each of three rounds, for 14 of the round\'s 31 points. Reviewers say exact text will miss `pnpm test` with a different filter.', recommendation: 'Change it to match by command and leading arguments.', options: [{ id: 'change', label: 'Change it', primary: true }, { id: 'keep', label: 'Keep it' }, { id: 'drop', label: 'Drop it' }], createdAt: at(34 * MIN), status: 'open', blocks: 'PR-3', why: 'Round 4 does not start until this is settled.' },
     { id: 'q-open', kind: 'question', agent: 'shell-lead', project: 'console', task: 't17', title: 'Where should an agent\'s thread open?', body: 'Should an agent\'s thread open in the main view, keeping the team easy to return to?', recommendation: 'Use the main view. A separate panel would squeeze the reading column, especially on a phone.', options: [{ id: 'main', label: 'Use the main view', primary: true }, { id: 'panel', label: 'Open it in the side panel' }], createdAt: at(18 * MIN), status: 'open', blocks: 'AC-17', files: ['packages/web/src/thread/Thread.tsx'] },
-    { id: 'q-tests', kind: 'approval', agent: 'shell-b2', project: 'console', task: 't15', title: 'Run the web tests', command: 'pnpm --filter @lgcode/web test', folder: '~/projects/lgcode/.worktrees/agent-console-shell', tool: 'Bash', createdAt: at(6 * MIN), status: 'open', blocks: 'AC-15', options: [{ id: 'allow', label: 'Allow', primary: true }, { id: 'always', label: 'Always allow this command' }, { id: 'deny', label: 'Deny' }] },
+    { id: 'q-tests', kind: 'approval', agent: 'shell-b2', project: 'console', task: 't15', title: 'Run the web tests', command: 'pnpm --filter @lgcode/web test', folder: '~/projects/lgcode/.worktrees/agent-console-shell', tool: 'Bash', createdAt: at(6 * MIN), status: 'open', blocks: 'AC-15', options: [{ id: 'allow', label: 'Allow', primary: true }, { id: 'always', label: 'Always allow' }, { id: 'deny', label: 'Deny' }] },
     { id: 'q-trace', kind: 'approval', agent: 'review-r1', project: 'console', task: 't16', title: 'Read the review trace', command: null, folder: '~/projects/lgcode/.worktrees/agent-console-review', tool: 'Read', blind: true, createdAt: at(2 * MIN), status: 'open', blocks: 'AC-16', options: [{ id: 'allow', label: 'Allow without seeing input' }, { id: 'deny', label: 'Deny' }] },
     { id: 'q-old1', kind: 'approval', agent: 'shell-b1', project: 'console', title: 'Install the test browser', command: 'pnpm exec playwright install chromium', folder: '~/projects/lgcode/.worktrees/agent-console-shell', tool: 'Bash', createdAt: at(3 * HOUR), status: 'answered', answer: 'Allowed', answeredAt: at(3 * HOUR - 2 * MIN) },
     { id: 'q-old2', kind: 'question', agent: 'console-lead', project: 'console', title: 'Should the board show sprints or tasks?', body: 'A board of sprints is shorter. A board of tasks shows more.', createdAt: at(2 * DAY), status: 'answered', answer: 'Sprints', answeredAt: at(2 * DAY - 9 * MIN) },
@@ -283,14 +297,14 @@ export function seed() {
       panelWidth: persist('panelWidth', 420), panelOpen: persist('panelOpen', true), onlyNeedingYou: false,
     },
     owner: { name: 'Kunal Bansal', initials: 'KB' },
-    machines, subscriptions, repos, projects, teams, agents, sprints, tasks, requests, threads, channels, posts,
+    machines, subscriptions, repos, projects, teams, agents, epics, sprints, tasks, requests, threads, channels, posts,
     drafts: {}, pending: {}, expanded: { 'repo:lgcode': true, 'project:console': true, 'team:console-shell': true },
     inspecting: { console: 'feat/agent-console/shell' }, toasts: [], dialog: null, phoneOffer: persist('phoneOffer', 'open'),
     settings: {
       ntfyServer: '', ntfyTopic: '', ntfyToken: '',
       webEnabled: true, port: 8787, checkIn: 15, proxyMode: false, publicAddress: '',
       sheepdog: true, standingRules: false, capacityBackoff: 5, crashRetries: 1, teamIdle: 60,
-      removeCredits: false,
+      removeCredits: false, gitModel: 'Haiku 5.5',
     },
     T,
   };
@@ -308,6 +322,7 @@ export const agentsOfTeam = (s, tid) => s.agents.filter((a) => a.team === tid);
 export const agentsOfProject = (s, pid) => s.agents.filter((a) => a.project === pid);
 export const leadOf = (s, p) => agentOf(s, p.lead);
 export const sprintsOf = (s, pid) => s.sprints.filter((x) => x.project === pid);
+export const epicsOf = (s, pid) => s.epics.filter((x) => x.project === pid);
 export const tasksOfSprint = (s, sid) => s.tasks.filter((t) => t.sprint === sid);
 export const tasksOfTeam = (s, tid) => s.tasks.filter((t) => t.team === tid);
 export const machineOf = (s, id) => byId(s.machines, id);
