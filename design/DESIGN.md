@@ -1075,7 +1075,7 @@ Projects and Design tabs, the category and item menus, the file's name, the zoom
 and "Open in OpenPencil". The Mocks tab shows one screen on the same canvas.
 
 A question in a thread starts as a brief. The brief shows the question in a few words and
-how long it has waited, one line of description, and the recommended answer with a star.
+how long it has waited, one line of description, and the recommended answer beside the sparkles icon.
 Its buttons are Accept, Deny and Details. Deny strikes out the recommendation and opens the
 details with the "Another answer" box focused. Details opens the full card in place. The
 full card has labelled parts, each with its own colour: the question in blue, what it is

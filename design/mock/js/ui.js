@@ -221,12 +221,12 @@ function QuestionCard({ s, r, openThread, who }) {
     <div class="qc-top"><b class="qc-q">${brief}</b><span class=${cx('qc-age', waited >= HOUR && 'long')}>${ago(r.createdAt, now)}</span></div>
     ${!open && html`
       ${summary && html`<p class="qc-sum">${summary}</p>`}
-      ${recShort && html`<p class="qc-rec"><${Icon} name="star" size=${14} class="qc-star" /><span>${recShort}</span></p>`}`}
+      ${recShort && html`<p class="qc-rec"><${Icon} name="sparkles" size=${14} class="qc-star" /><span>${recShort}</span></p>`}`}
     ${open && html`<div class="qc-full" id=${id}>
       <section class="qc-part q"><h5><${Icon} name="circle-help" size=${13} />The question</h5><${Paras} list=${r.body || r.title} /></section>
       ${r.what && html`<section class="qc-part what"><h5><${Icon} name="info" size=${13} />What it is about</h5><${Paras} list=${r.what} /></section>`}
       ${(r.whyText || r.why) && html`<section class="qc-part why"><h5><${Icon} name="triangle-alert" size=${13} />Why it matters</h5><${Paras} list=${r.whyText || r.why} /></section>`}
-      ${recShort && html`<section class=${cx('qc-part reco', declined && 'declined')}><h5><${Icon} name="star" size=${13} />Recommendation${declined && html`<span class="qc-tag">Declined</span>`}</h5>
+      ${recShort && html`<section class=${cx('qc-part reco', declined && 'declined')}><h5><${Icon} name="sparkles" size=${13} />Recommendation${declined && html`<span class="qc-tag">Declined</span>`}</h5>
         <p class="qc-lead">${recShort}</p>${r.recWhy && html`<${Paras} list=${r.recWhy} />`}</section>`}
       <section class="qc-part other"><h5>Other answers</h5>
         <div class="req-actions">

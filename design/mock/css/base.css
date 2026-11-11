@@ -501,7 +501,7 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--color-
 .qc-answer { color: var(--color-muted); font-size: var(--text-sm); padding-left: 22px; }
 .qc-sum { color: var(--color-text); line-height: 1.5; max-width: var(--measure); }
 .qc-rec { display: flex; align-items: baseline; gap: 6px; font-weight: var(--weight-medium); line-height: 1.5; max-width: var(--measure); }
-.qc-rec .qc-star, .qc-part.reco h5 .icon { color: var(--color-success); fill: currentColor; flex: none; align-self: center; }
+.qc-rec .qc-star, .qc-part.reco h5 .icon { color: var(--color-success); flex: none; align-self: center; }
 .qc-actions { padding-top: 2px; }
 
 /* the large version: labelled parts, one colour per kind, read like a short paper */
