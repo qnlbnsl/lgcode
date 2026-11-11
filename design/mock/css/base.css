@@ -500,8 +500,6 @@ code { font-family: var(--font-mono); font-size: .92em; background: var(--color-
 .qc-ok { color: var(--color-success); flex: none; align-self: center; }
 .qc-answer { color: var(--color-muted); font-size: var(--text-sm); padding-left: 22px; }
 .qc-sum { color: var(--color-text); line-height: 1.5; max-width: var(--measure); }
-.qc-cmd code { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; font-family: var(--font-mono); font-size: var(--text-sm); background: var(--color-sunken); border-radius: 4px; padding: 2px 6px; }
-.qc-cmd .muted { font-size: var(--text-sm); }
 .qc-rec { display: flex; align-items: baseline; gap: 6px; font-weight: var(--weight-medium); line-height: 1.5; max-width: var(--measure); }
 .qc-rec.declined span:not(.qc-tag) { text-decoration: line-through; color: var(--color-muted); }
 .qc-star, .qc-part.reco h5 .icon { color: var(--color-success); flex: none; align-self: center; }

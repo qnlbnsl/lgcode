@@ -1079,7 +1079,7 @@ few words and how long it has waited, and one line of description. A question ad
 recommended answer beside the sparkles icon, with Accept, Deny and Details. Accept and Deny
 carry the same sparkles icon, so it is clear what they act on. Deny strikes out the
 recommendation and opens the details with "Your own answer" focused. An approval adds its
-command, or "Command hidden by the harness", with its own answers and Details.
+own answers and Details. Its command is shown only in the details.
 
 Details keeps the brief and adds a short report under it. The report starts with the agent
 that asked and what the request blocks. Its sections follow: the full question or the
