@@ -138,7 +138,7 @@ export function answerRequest(requestId, optionId, text) {
   const s = S(); const r = byId(s.requests, requestId); if (!r || r.status !== 'open') return;
   const a = agentOf(s, r.agent); const opt = (r.options || []).find((o) => o.id === optionId);
   let answer;
-  if (r.kind === 'approval') answer = optionId === 'deny' ? 'Denied' : optionId === 'always' ? 'Allowed, always' : 'Allowed';
+  if (r.kind === 'approval') answer = optionId === 'deny' ? 'Denied' : optionId === 'never' ? 'Denied, always' : optionId === 'always' ? 'Allowed, always' : 'Allowed';
   else if (r.kind === 'merge') answer = optionId === 'decline' ? 'Sent back' : 'Merged';
   else if (r.kind === 'failed') answer = 'Resumed';
   else answer = text ? text : (opt ? opt.label : 'Answered');
@@ -153,7 +153,7 @@ export function answerRequest(requestId, optionId, text) {
       a.state = 'working'; a.failure = null;
       a.activity = r.kind === 'approval' ? (optionId === 'deny' ? 'Finding another way' : `Running ${r.command || r.title}`) : r.kind === 'merge' ? 'Writing the finished page' : 'Applying your answer';
     }
-    if (optionId === 'always') st.settings.standingRules = true;
+    if (optionId === 'always' || optionId === 'never') st.settings.standingRules = true;
     if (r.kind === 'merge' && optionId !== 'decline') { const p = projectOf(st, r.project); p.merged = true; for (const sp of st.sprints) if (sp.project === p.id) sp.column = 'Done'; }
     const lead = agentOf(st, projectOf(st, r.project).lead);
     const left = openRequests(st, { project: r.project }).length;

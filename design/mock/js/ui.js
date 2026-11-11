@@ -212,8 +212,13 @@ function BriefCard({ s, r, openThread, who }) {
   const brief = r.brief || r.title; const summary = r.summary || (isQ ? r.body : null);
   const recShort = isQ ? r.recShort || r.recommendation : null; const id = 'qc-' + r.id;
   // The answers on the brief, and the rest in the report.
-  const main = isQ ? [] : opts.filter((o) => o.id !== 'always');
-  const others = isQ ? opts.filter((o) => o !== rec) : opts.filter((o) => o.id === 'always');
+  const others = isQ ? opts.filter((o) => o !== rec) : [];
+  // An approval answers with Allow and Deny. Each has a menu that makes the answer standing.
+  const answer = (o) => act.answerRequest(r.id, o);
+  const split = (label, ghost, always, why, o) => html`<span class=${cx('split', ghost && 'ghost')}>
+    <button type="button" class=${cx('btn', ghost && 'ghost')} onClick=${() => answer(o)}>${label}</button>
+    <${Menu} class=${cx('btn split-more', ghost && 'ghost')} label=${'More ways to ' + label.toLowerCase()} trigger=${html`<${Icon} name="chevron-down" size=${14} />`}
+      items=${[{ label: always, why, onSelect: () => answer(o === 'deny' ? 'never' : 'always') }]} width=${280} /></span>`;
   const deny = () => { setDeclined(true); setOpen(true); requestAnimationFrame(() => own.current?.focus()); };
   if (!live) return html`<section class="req qc done" id=${'req-' + r.id} tabindex="-1" aria-label=${'Answered: ' + brief}>
     <div class="qc-top"><${Icon} name="check" size=${14} class="qc-ok" /><b class="qc-q">${brief}</b><span class="qc-age">${clock(r.answeredAt)}</span></div>
@@ -246,7 +251,8 @@ function BriefCard({ s, r, openThread, who }) {
     <div class="req-actions qc-actions">
       ${rec && !declined && html`<button type="button" class="btn" onClick=${() => act.answerRequest(r.id, rec.id)}><${Icon} name="sparkles" size=${14} class="qc-star" />Accept</button>`}
       ${rec && !declined && html`<button type="button" class="btn ghost" onClick=${deny}><${Icon} name="sparkles" size=${14} class="qc-star" />Deny</button>`}
-      ${main.map((o) => html`<button key=${o.id} type="button" class=${cx('btn', o.id === 'deny' && 'ghost')} onClick=${() => act.answerRequest(r.id, o.id)}>${o.label}</button>`)}
+      ${!isQ && split('Allow', false, 'Always allow', 'Runs commands like this one without asking, in this project only.', 'allow')}
+      ${!isQ && split('Deny', true, 'Always deny', 'Refuses commands like this one without asking, in this project only.', 'deny')}
       <button type="button" class="btn ghost" aria-expanded=${open} aria-controls=${id} onClick=${() => setOpen(!open)}>${open ? 'Hide details' : 'Details'}<${Icon} name=${open ? 'chevron-up' : 'chevron-down'} size=${14} /></button>
       ${thread}
     </div>
