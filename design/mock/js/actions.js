@@ -154,6 +154,7 @@ export function answerRequest(requestId, optionId, text) {
       a.activity = r.kind === 'approval' ? (optionId === 'deny' ? 'Finding another way' : `Running ${r.command || r.title}`) : r.kind === 'merge' ? 'Writing the finished page' : 'Applying your answer';
     }
     if (optionId === 'always' || optionId === 'never') st.settings.standingRules = true;
+    if (r.kind === 'merge' && optionId === 'decline' && text) { r.reason = text; threadOf(st, a.id).push({ id: uid('m'), type: 'user', ts: Date.now(), text: `Sent back "${r.title}": ${text}` }); }
     if (r.kind === 'merge' && optionId !== 'decline') { const p = projectOf(st, r.project); p.merged = true; for (const sp of st.sprints) if (sp.project === p.id) sp.column = 'Done'; }
     const lead = agentOf(st, projectOf(st, r.project).lead);
     const left = openRequests(st, { project: r.project }).length;

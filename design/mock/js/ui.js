@@ -261,8 +261,48 @@ function BriefCard({ s, r, openThread, who }) {
   </section>`;
 }
 
+// ---- merge brief --------------------------------------------------------------------
+// A merge reads as a brief, the reason it needs the owner, one row of evidence, and the
+// buttons. The same row of evidence sits in the merge review dialog.
+export function MergeFacts({ s, r }) {
+  const ev = r.evidence; const rv = ev.review.agent && agentOf(s, ev.review.agent);
+  const cell = (k, tone, value, sub) => html`<div key=${k} class=${cx(tone === 'warn' && 'warn')}><dt>${k}</dt>
+    <dd>${tone && html`<${Icon} name=${tone === 'ok' ? 'circle-check' : 'triangle-alert'} size=${13} />`}<span>${value}</span></dd>${sub && html`<dd class="sub">${sub}</dd>`}</div>`;
+  const cf = ev.conflicts;
+  return html`<dl class="mg-facts">
+    ${cell('Tests', ev.tests.ok ? 'ok' : 'warn', ev.tests.value || (ev.tests.ok ? 'Passed' : 'Not run'), ev.tests.sub)}
+    ${cell('Review', ev.review.ok ? 'ok' : 'warn', ev.review.value || (ev.review.ok ? 'Clean' : 'Not finished'), rv ? rv.name : ev.review.sub)}
+    ${cell('Changes', null, `${plural(ev.commits, 'commit')} · ${plural(ev.files, 'file')}`, ev.add != null && html`<span class="success-text">+${ev.add}</span> <span class="error-text">−${ev.del}</span>`)}
+    ${cell('Into ' + r.target, cf == null ? null : cf ? 'warn' : 'ok', cf == null ? 'Not checked' : cf ? plural(cf, 'conflict') : 'No conflicts', html`<span class="mono">${r.source}</span>`)}
+  </dl>`;
+}
+function MergeBrief({ s, r, openThread }) {
+  const [back, setBack] = useState(false); const [why, setWhy] = useState(''); const box = useRef(null);
+  const live = r.status === 'open';
+  const thread = openThread && (typeof openThread === 'string'
+    ? html`<a class="btn ghost qc-thread" href=${href(openThread)}><${Icon} name="message-square" size=${14} />Open thread</a>`
+    : html`<button type="button" class="btn ghost qc-thread" onClick=${openThread}><${Icon} name="message-square" size=${14} />Open thread</button>`);
+  const send = (e) => { e.preventDefault(); if (why.trim()) act.answerRequest(r.id, 'decline', why.trim()); };
+  return html`<section class=${cx('req mg', !live && 'closed')} id=${'req-' + r.id} tabindex="-1" aria-label=${'Merge: ' + r.title}>
+    <p class="mg-brief">${r.brief || r.body}</p>
+    ${r.notice && html`<p class="mg-notice"><b>Users will notice:</b> ${r.notice}</p>`}
+    <${MergeFacts} s=${s} r=${r} />
+    ${live && !back && html`<div class="req-actions qc-actions">
+      <button type="button" class="btn primary" onClick=${() => act.openDialog({ type: 'merge-review', requestId: r.id })}><${Icon} name="git-merge" size=${14} />Review and merge</button>
+      <button type="button" class="btn" onClick=${() => { setBack(true); requestAnimationFrame(() => box.current?.focus()); }}><${Icon} name="undo-2" size=${14} />Send back</button>
+      ${thread}</div>`}
+    ${live && back && html`<form class="mg-back" onSubmit=${send}>
+      <label for=${'why-' + r.id}>What should change?</label>
+      <div class="row"><input id=${'why-' + r.id} ref=${box} class="input" value=${why} onInput=${(e) => setWhy(e.target.value)} placeholder="The redirects should keep the old anchors" />
+        <button type="submit" class="btn" disabled=${!why.trim()}><${Icon} name="undo-2" size=${14} />Send back</button>
+        <button type="button" class="btn ghost" onClick=${() => { setBack(false); setWhy(''); }}>Cancel</button></div></form>`}
+    ${!live && html`<div class="answer"><${Icon} name="check" size=${14} /><span>${r.answer} at ${clock(r.answeredAt)}${r.reason ? ': ' + r.reason : ''}</span></div>`}
+  </section>`;
+}
+
 export function RequestBlock({ s, request: r, variant = 'card', openThread = null, primary = false, who = true }) {
   if (variant === 'card' && (r.kind === 'question' || r.kind === 'approval')) return html`<${BriefCard} s=${s} r=${r} openThread=${openThread} who=${who} />`;
+  if (variant === 'detail' && r.kind === 'merge') return html`<${MergeBrief} s=${s} r=${r} openThread=${openThread} />`;
   const now = useNow();
   const a = agentOf(s, r.agent); const p = projectOf(s, r.project);
   const [text, setText] = useState('');

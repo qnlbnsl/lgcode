@@ -454,7 +454,8 @@ function openReview(s, w, project) {
       id: 'q-merge-' + project.id, kind: 'merge', agent: project.lead, project: project.id, title: `Merge ${w.branch} into ${w.parent}`,
       body: dirty ? `You opened this review early. ${plural(dirty, 'team worktree')} still ${dirty === 1 ? 'holds' : 'hold'} work that is not on ${w.branch}.` : 'Every team has integrated its work. Users will notice this change.',
       createdAt: Date.now(), status: 'open', source: w.branch, target: w.parent,
-      evidence: { tests: { ok: false, text: `No full run on the latest commit ${w.commits[0]?.hash || ''}` }, review: { ok: false, text: 'The review team has not finished its last round' }, commits: w.ahead, files: Math.max(7, w.ahead * 4) },
+      brief: dirty ? `You opened this review early. ${plural(dirty, 'team worktree')} still ${dirty === 1 ? 'holds' : 'hold'} work that is not on ${w.branch}.` : 'Every team has integrated its work.', notice: dirty ? null : 'This change reaches users.',
+      evidence: { tests: { ok: false, text: `No full run on the latest commit ${w.commits[0]?.hash || ''}`, value: 'No full run', sub: 'On the latest commit' }, review: { ok: false, text: 'The review team has not finished its last round', value: 'Not finished', sub: 'Last round still open' }, commits: w.ahead, files: Math.max(7, w.ahead * 4) },
     };
     update((st) => { st.requests = st.requests.filter((x) => x.id !== r.id); st.requests.push(r); });
   }

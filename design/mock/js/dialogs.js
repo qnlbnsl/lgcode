@@ -5,7 +5,7 @@ import {
   projectOf, repoOf, agentOf, teamOf, teamName, machineOf, subOf, byId, HARNESSES, openRequests, agentStatus, projectStatus, routeForAgent,
 } from './data.js';
 import * as act from './actions.js';
-import { Dialog, registerDialog, Avatar } from './ui.js';
+import { Dialog, registerDialog, Avatar, MergeFacts } from './ui.js';
 
 // ---- quick switcher ---------------------------------------------------------------
 // The real product ranks results with a small embedding model. The mock imitates it here,
@@ -154,7 +154,8 @@ function MergeReview({ s, d }) {
   return html`<${Dialog} title=${r.title} size="wide" onClose=${act.closeDialog}
     foot=${html`<span class="why">Only you can merge into ${r.target}.</span><button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button>
       <button type="button" class=${cx('btn', ok && 'primary')} disabled=${over || !title.trim()} onClick=${merge}>${ok ? 'Approve and merge' : 'Approve without evidence'}</button>`}>
-    <p style="line-height:1.55;max-width:var(--measure)">${r.body}</p>
+    <p class="mg-brief">${r.brief || r.body}</p>
+    ${r.notice && html`<p class="mg-notice"><b>Users will notice:</b> ${r.notice}</p>`}
     <div class="pr-text">
       <div class="field"><div class="row"><label for="pr-title" class="grow">Pull request title</label>
           <span class=${cx('num pr-count', over && 'error-text')} aria-live="polite">${title.length} / ${act.PR_TITLE_LIMIT}</span>
@@ -164,11 +165,7 @@ function MergeReview({ s, d }) {
       <div class="field"><label for="pr-body">Description</label>
         <textarea id="pr-body" class="textarea mono" rows="7" value=${body} disabled=${writing} onInput=${(e) => setBody(e.target.value)}></textarea></div>
     </div>
-    <div class="req closed" style="border-left-color:var(--color-success)"><div class="evidence">
-      <div class=${cx('ev', !ev.tests.ok && 'missing')}><${Icon} name=${ev.tests.ok ? 'circle-check' : 'triangle-alert'} size=${14} /><span>${ev.tests.text}</span></div>
-      <div class=${cx('ev', !ev.review.ok && 'missing')}><${Icon} name=${ev.review.ok ? 'circle-check' : 'triangle-alert'} size=${14} /><span>${ev.review.text}</span></div>
-      <div class="ev"><${Icon} name="git-commit-horizontal" size=${14} class="muted" /><span class="mono">${r.source}</span><${Icon} name="arrow-right" size=${12} class="muted" /><span class="mono">${r.target}</span><span class="muted">${ev.commits} commits</span></div>
-    </div></div>
+    <${MergeFacts} s=${s} r=${r} />
     <div><div class="section-head"><h3>${ev.files} files changed</h3><span class="grow"></span><a class="link" href="#/p/${r.project}/git" onClick=${act.closeDialog}>Open every diff in Git</a></div>
       <table class="table"><tbody>${files.map(([f, add, del]) => html`<tr><td class="mono truncate">${f}</td><td class="num success-text">+${add}</td><td class="num error-text">−${del}</td></tr>`)}
         ${ev.files > files.length && html`<tr><td class="muted">${files.length ? 'and ' : ''}${ev.files - files.length}${files.length ? ' more' : ' files'}</td><td></td><td></td></tr>`}</tbody></table></div>
