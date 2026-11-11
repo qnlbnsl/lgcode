@@ -697,9 +697,9 @@ engine's question records and the agents' instructions would need these fields.
 
 ## A file explorer in the Git view
 
-The owner asked for this on 2026-11-11. It is agreed and not built. The Git view
-gains a "Files" tab that works like the file explorer of an editor such as Visual
-Studio Code: a folder tree of the inspected worktree, and the open file beside it.
+The owner asked for this on 2026-11-11. It is agreed and not built. A project
+gains a "Files" tab, beside its Git tab, that works like the file explorer of an editor
+such as Visual Studio Code: a folder tree of the inspected worktree, and the open file beside it.
 References in questions, approvals and plans link to a file and open it here. The
 mock shows the tab with "Coming soon". The component that shows the files is not
 chosen yet.
@@ -709,6 +709,6 @@ chosen yet.
 The owner decided this on 2026-11-11. It is agreed and not built. From now on,
 every plan in LGcode is an HTML page. Planner agents fill in one template, and the
 page is written to get the point across to the owner in a human-friendly way. The
-plans the agents work from keep their full detail. The Git view gains a "Plans" tab
-that lists and shows these pages. The mock shows the tab with "Coming soon". The
+plans the agents work from keep their full detail. A project gains a "Plans" tab,
+beside its Git tab, that lists and shows these pages. The mock shows the tab with "Coming soon". The
 template is not written yet.

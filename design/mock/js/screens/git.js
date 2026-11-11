@@ -702,6 +702,11 @@ function Integrate({ s, w, project }) {
 
 // ---- the tab ----------------------------------------------------------------------
 const KIND_WORD = { base: 'Base', project: 'Project', team: 'Team', agent: 'Agent' };
+// Files and Plans are their own project tabs beside Git. Both are placeholders until the
+// file view is chosen and the plan template is written.
+export function FilesTab() { return html`<div class="git"><div class="git-clean"><${Empty} title="Files" icon="folder">Coming soon.<//></div></div>`; }
+export function PlansTab() { return html`<div class="git"><div class="git-clean"><${Empty} title="Plans" icon="clipboard-list">Coming soon.<//></div></div>`; }
+
 export function GitTab({ s, project }) {
   const phone = useMedia('(max-width: 860px)'); const narrow = useMedia('(max-width: 1100px)');
   const [modePref, setModePref] = useState(() => persist('gitDiffMode', 'unified'));
@@ -739,10 +744,8 @@ export function GitTab({ s, project }) {
         <button type="button" aria-pressed=${tab === 'changes'} onClick=${() => setTab('changes')}>Changes${w.files.length > 0 && html`<span class="count">${w.files.length}</span>`}</button>
         <button type="button" aria-pressed=${tab === 'history'} onClick=${() => setTab('history')}>History</button>
         ${(w.merge || tab === 'conflicts') && html`<button type="button" aria-pressed=${tab === 'conflicts'} onClick=${() => setTab('conflicts')}>Conflicts${conflictCount > 0 && html`<span class="count warn">${conflictCount}</span>`}</button>`}
-        <button type="button" aria-pressed=${tab === 'files'} onClick=${() => setTab('files')}>Files</button>
-        <button type="button" aria-pressed=${tab === 'plans'} onClick=${() => setTab('plans')}>Plans</button>
       </div>
-      ${(tab === 'changes' || tab === 'history') && html`<div class="seg not-phone" aria-label="Diff layout">
+      ${tab !== 'conflicts' && html`<div class="seg not-phone" aria-label="Diff layout">
         <button type="button" aria-pressed=${mode === 'unified'} aria-label="Unified diff" data-tip="Unified" onClick=${() => setMode('unified')}><${Icon} name="rows-2" size=${14} /></button>
         <button type="button" aria-pressed=${mode === 'split'} aria-label="Split diff" data-tip=${narrow ? 'Split, best on a wide window' : 'Split'} onClick=${() => setMode('split')}><${Icon} name="columns-2" size=${14} /></button>
       </div>`}
@@ -752,8 +755,6 @@ export function GitTab({ s, project }) {
       <button type="button" class="btn sm warn" onClick=${() => setTab('conflicts')}>Resolve conflicts</button></div>`}
     ${tab === 'changes' ? html`<${Changes} key=${w.id} s=${s} w=${w} mode=${mode} phone=${phone} />`
       : tab === 'history' ? html`<${History} key=${w.id} s=${s} w=${w} mode=${mode} phone=${phone} />`
-      : tab === 'files' ? html`<div class="git-clean"><${Empty} title="Files" icon="folder">Coming soon.<//></div>`
-      : tab === 'plans' ? html`<div class="git-clean"><${Empty} title="Plans" icon="clipboard-list">Coming soon.<//></div>`
       : html`<${Conflicts} key=${w.id} s=${s} w=${w} phone=${phone} />`}
   </div>`;
 }

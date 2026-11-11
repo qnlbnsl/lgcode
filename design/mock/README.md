@@ -36,6 +36,7 @@ resets everything.
 | Messages, the agents' message board | `/p/console/messages` |
 | Agents, the roster by situation | `/p/console/agents` |
 | Terminal | `/p/console/terminal` |
+| Files and Plans, both coming soon | `/p/console/files`, `/p/console/plans` |
 | Git, with generated commit and pull request text | `/p/console/git` |
 | Project settings, with the lead's model and the work assignment table | `/p/console/settings` |
 | Repository design page, the design file on a canvas | `/r/lgcode/design`, and `/r/<repository>/design/<category>/<item>` |
