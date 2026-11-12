@@ -704,7 +704,6 @@ function Integrate({ s, w, project }) {
 // ---- the tab ----------------------------------------------------------------------
 const KIND_WORD = { base: 'Base', project: 'Project', team: 'Team', agent: 'Agent' };
 // Files is its own project tab beside Git. It is a placeholder until the file view is chosen.
-export function FilesTab() { return html`<div class="git"><div class="git-clean"><${Empty} title="Files" icon="folder">Coming soon.<//></div></div>`; }
 
 export function GitTab({ s, project }) {
   const phone = useMedia('(max-width: 860px)'); const narrow = useMedia('(max-width: 1100px)');

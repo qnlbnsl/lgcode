@@ -13,7 +13,8 @@ import './dialogs.js';
 import { Home, AllProjects } from './screens/home.js';
 import { Board, SprintPage, TaskPage, TeamPage, RepoPage } from './screens/project.js';
 import { ChatTab } from './screens/chat.js';
-import { GitTab, FilesTab, seedGit } from './screens/git.js';
+import { GitTab, seedGit } from './screens/git.js';
+import { FilesTab } from './screens/files.js';
 import { TerminalTab, seedTerminal } from './screens/terminal.js';
 import { MocksTab, seedMocks } from './screens/mocks.js';
 import { RepoDesign } from './screens/design.js';
@@ -258,7 +259,7 @@ function ProjectView({ s, route, project }) {
   else if (tab === 'messages') body = html`<${MessagesTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'agents') body = html`<${AgentsTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'terminal') body = html`<${TerminalTab} s=${s} project=${project} route=${route} />`;
-  else if (tab === 'files') body = html`<${FilesTab} />`;
+  else if (tab === 'files') body = html`<${FilesTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'git') body = html`<${GitTab} s=${s} project=${project} route=${route} />`;
   else if (tab === 'settings') body = html`<${ProjectSettings} s=${s} project=${project} route=${route} />`;
   else body = html`<${Board} s=${s} project=${project} route=${route} />`;

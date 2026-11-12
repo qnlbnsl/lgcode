@@ -411,21 +411,26 @@ and OpenPencil."
 
 The owner's purpose: "to get to a point where I can open it and start working on all the
 other finer details of LG code that are not built". The owner also wants the product
-usable enough to bring another of the owner's projects into it, starting with Ananke. The
-owner's note names a second project that the transcript spelled "Enkra". That name needs
-checking with the owner.
+usable enough to bring the owner's project Ananke into it. Ananke is the code name, and
+Enkra is its public name. The owner uses both for the same project.
 
 What the end point requires, beyond steps 1 to 6:
 
 - **The whole website matches the mock.** Every surface in the mock works on real
   records, not only the surfaces on the thin path.
-- **The website is hosted.** The owner reaches it over HTTPS, as `docs/remote-access.md`
-  describes, without a terminal open.
+- **The website is hosted.** The owner chose its address on 2026-11-12. The address
+  is kept out of this repository, and it lives in the service's own configuration. The
+  owner reaches it over HTTPS, as `docs/remote-access.md` describes,
+  without a terminal open. The owner sets up the proxy for that address.
 - **OpenPencil works inside it.** The repository Design page opens the design file and
   saves it into the repository.
+- **LGcode installs from its repository.** The owner ruled on 2026-11-12 that
+  distribution is simple for now. A person downloads the repository, runs the documented
+  steps, and those steps build the package and install it locally. The release is
+  published on GitHub. Wider distribution is decided later.
 - **A project can publish packages and make phone builds.** These run as steps the lead
   starts and the owner approves, with their logs on the Test runs page. Accounts and
-  secrets stay with the owner, as the build loop design says.
+  secrets stay with the owner, and the build stops to ask when a step needs one.
 - **The owner can change LGcode from inside LGcode.** The owner asked: "If I want to
   update something, how can I talk to the agent that actually updates it?" The answer in
   this plan is a project in the LGcode repository. The owner tells its project lead what
@@ -468,6 +473,11 @@ Made on 2026-11-11:
 - A question shows on Home, in the project lead's thread, and in the asking agent's
   thread.
 
+Made on 2026-11-12:
+
+- The hosted website's address is chosen. It is kept out of this repository.
+- LGcode is installed from its repository and released on GitHub for now.
+
 Still open, in the order they block work:
 
 1. **Does the owner approve the design file's categories?** A Design lead agent proposed
@@ -475,11 +485,9 @@ Still open, in the order they block work:
 2. **OpenPencil's server or the design file?** Step 3 tests both first.
 3. **Who writes the `.lgcode` config?** Step 3 suggests the engine, from an approved tool
    call.
-4. **Where is the website hosted?** The end point needs an address and a proxy that the
-   owner sets up.
-5. **What is a key task for an evaluation round?** The design suggests a merged sprint.
-6. **Where does the ledger live for a user without Founder OS?** Step 7 needs the answer.
-7. **What happens at the end of review round six?** The design leaves this open.
+4. **What is a key task for an evaluation round?** The design suggests a merged sprint.
+5. **Where does the ledger live for a user without Founder OS?** Step 7 needs the answer.
+6. **What happens at the end of review round six?** The design leaves this open.
 
 ### What could go wrong
 
