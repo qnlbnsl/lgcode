@@ -11005,10 +11005,13 @@ A browser that used the page before the rename shows the defaults once, and then
 ## 621. The Reverse Fig profile for the mock points at the removed workbench
 
 Found: 2026-11-12, while removing the older workbench from `design/`.
-State: open.
+State: fixed on 2026-11-12.
 
 The profile `skills/reverse-fig/profiles/lgtm-mock.mjs` builds `design/lgtm.fig` from the web mock.
 It opens `http://127.0.0.1:4178/workbench.html`, and its component snippets use the workbench's class names.
 The workbench was removed on 2026-11-12, so the profile cannot run until it is pointed at `design/mock/`.
 The rebuilt mock uses different class names, so the snippets need rewriting as well as the address.
-The existing `design/lgtm.fig` is unchanged.
+The fix points the profile at `http://127.0.0.1:4178/mock/#/home` and copies the rebuilt mock's markup.
+The components are now Button, Status dot, Agent row, Connection status, Segmented control, Inline link, Count and Badge.
+The agent rows show role names, such as Builder 2, in place of the invented name Rowan.
+`design/lgtm.fig` was made again from the rebuilt mock, and 15 of its 32 variants match the browser within 3 percent.
