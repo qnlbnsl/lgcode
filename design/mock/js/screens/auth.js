@@ -1,4 +1,4 @@
-// The login page and the three first-run pages. LGcode has one user and one password,
+// The login page and the three first-run pages. LGTM Studio has one user and one password,
 // so there is no user name, no account and no pairing here.
 import { html, useState, useEffect, useRef, Icon, cx, update, go, href, parseRoute } from '../lib.js';
 import { HARNESSES, machineOf } from '../data.js';
@@ -11,7 +11,7 @@ function insecureOrigin() {
   return location.protocol !== 'https:' && !LOOPBACK.test(location.hostname);
 }
 function Brand({ sub }) {
-  return html`<div class="auth-brand"><span class="auth-mark">LG</span><div><h1>LGcode</h1>${sub && html`<p>${sub}</p>`}</div></div>`;
+  return html`<div class="auth-brand"><span class="auth-mark">LG</span><div><h1>LGTM Studio</h1>${sub && html`<p>${sub}</p>`}</div></div>`;
 }
 function Spinner({ size = 14 }) { return html`<${Icon} name="loader-circle" size=${size} class="auth-spin" />`; }
 
@@ -55,7 +55,7 @@ export function Login({ s }) {
       ${down && !insecure && html`<div class="callout error" role="alert"><${Icon} name="wifi-off" size=${14} />
         <span class="grow"><b>The service is not answering.</b> This page could not reach <span class="mono">${master.address}</span>. Agents that were running keep running. Start the service again with <span class="mono">lgcode serve --detach</span>.</span></div>`}
       ${insecure && html`<div class="callout warn" role="alert"><${Icon} name="shield-alert" size=${14} />
-        <span><b>This page is not on a secure connection.</b> LGcode accepts the password only over HTTPS, or from the computer the service runs on. Open the HTTPS address, or forward the port and open <span class="mono">127.0.0.1</span>.</span></div>`}
+        <span><b>This page is not on a secure connection.</b> LGTM Studio accepts the password only over HTTPS, or from the computer the service runs on. Open the HTTPS address, or forward the port and open <span class="mono">127.0.0.1</span>.</span></div>`}
 
       <form class="auth-form" onSubmit=${submit} novalidate>
         <div class="field">
@@ -179,7 +179,7 @@ export function FirstRun({ s }) {
                 <div class="auth-code" aria-label="Sign-in code">${CODES[id]}</div>
                 <div class="row" style="gap:8px"><${Spinner} /><span class="muted grow">Waiting for you to approve…</span><button type="button" class="btn sm ghost" onClick=${() => cancelSignin(id)}>Cancel</button></div>`
               : html`
-                <p>${h.name} signs in on <b>${master.name}</b>, the computer the service runs on. LGcode never sees your ${h.name} password.</p>
+                <p>${h.name} signs in on <b>${master.name}</b>, the computer the service runs on. LGTM Studio never sees your ${h.name} password.</p>
                 <div><button type="button" class="btn" onClick=${() => startSignin(id)}><${Icon} name="log-in" size=${14} /><span>Sign in with ${h.name}</span></button></div>`}
             </div>`}
           </div>`;
@@ -189,7 +189,7 @@ export function FirstRun({ s }) {
   } else if (step === 1) {
     body = html`
       <h2>Add a repository</h2>
-      <p class="auth-lede">Point LGcode at a Git repository on <b>${master.name}</b>. Agents work in worktrees beside it, and never on the branch you have checked out.</p>
+      <p class="auth-lede">Point LGTM Studio at a Git repository on <b>${master.name}</b>. Agents work in worktrees beside it, and never on the branch you have checked out.</p>
       <div class="field">
         <label for="setup-path">Repository folder</label>
         <input id="setup-path" class=${cx('input lg mono', tried && checked?.error && 'invalid')} value=${path} spellcheck=${false} autocapitalize="off" autocomplete="off" onInput=${(e) => setPath(e.target.value)} autofocus />
@@ -210,7 +210,7 @@ export function FirstRun({ s }) {
       <h2>Start the first project</h2>
       <div class="field">
         <label for="setup-goal">Goal</label>
-        <textarea id="setup-goal" class=${cx('textarea', tried && goalError && 'invalid')} rows="4" value=${goal} placeholder="Make a mock for the LGcode phone app" onInput=${(e) => setGoal(e.target.value)} autofocus></textarea>
+        <textarea id="setup-goal" class=${cx('textarea', tried && goalError && 'invalid')} rows="4" value=${goal} placeholder="Make a mock for the LGTM Studio phone app" onInput=${(e) => setGoal(e.target.value)} autofocus></textarea>
         ${tried && goalError && html`<span class="error" role="alert">${goalError}</span>`}
       </div>
       <div class="field">

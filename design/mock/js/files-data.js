@@ -1,4 +1,4 @@
-// The files the Files tab shows. In LGcode the service asks the machine that holds the
+// The files the Files tab shows. In LGTM Studio the service asks the machine that holds the
 // worktree for one folder at a time and for one file at a time, and passes the answer on.
 // Here the listing and the text are held in memory.
 
@@ -34,9 +34,9 @@ export function listFiles(repo, extra = []) {
 // ---- file text ----------------------------------------------------------------------
 const TEXT = {
   '.nvmrc': '26\n',
-  'README.md': `# LGcode
+  'README.md': `# LGTM Studio
 
-LGcode runs teams of coding agents: an orchestrator, team leads, and workers.
+LGTM Studio runs teams of coding agents: an orchestrator, team leads, and workers.
 It connects them through a strict message board, and it exposes everything
 through an authenticated client API for web, desktop and mobile apps.
 

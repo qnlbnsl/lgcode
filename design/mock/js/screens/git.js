@@ -714,7 +714,7 @@ export function GitTab({ s, project }) {
   const mine = all.filter((w) => w.kind !== 'base');
   if (!mine.length) {
     return html`<div class="git"><div class="git-clean"><${Empty} title="No worktrees yet" icon="git-branch">
-      ${project.name} is still in ${project.stage}. LGcode creates the branch <span class="mono">${project.branch}</span> and a worktree for each team when the plan is approved and building starts.
+      ${project.name} is still in ${project.stage}. LGTM Studio creates the branch <span class="mono">${project.branch}</span> and a worktree for each team when the plan is approved and building starts.
       <a class="link" href=${`#/p/${project.id}/workflow`}>See where the project is</a><//></div></div>`;
   }
   const order = { project: 0, team: 1, agent: 2, base: 3 };

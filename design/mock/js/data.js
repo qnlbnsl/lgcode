@@ -50,7 +50,7 @@ function agent(id, project, team, role, name, o = {}) {
 
 export function seed() {
   const machines = [
-    { id: 'studio', name: 'Studio', role: 'master', status: 'online', here: true, slots: { used: 11, limit: 16 }, lastSeen: T, address: '127.0.0.1:8787', workspace: '~/projects', os: 'Linux' },
+    { id: 'studio', name: 'Workstation', role: 'master', status: 'online', here: true, slots: { used: 11, limit: 16 }, lastSeen: T, address: '127.0.0.1:8787', workspace: '~/projects', os: 'Linux' },
     { id: 'buildbox', name: 'Buildbox', role: 'worker', status: 'online', slots: { used: 3, limit: 8 }, lastSeen: at(20_000), address: '192.168.141.18', workspace: '~/Work', connectedFor: 2 * DAY + 4 * HOUR, os: 'Linux' },
     { id: 'laptop', name: 'Laptop', role: 'worker', status: 'offline', slots: { used: 0, limit: 4 }, lastSeen: at(2 * HOUR + 12 * MIN), address: '192.168.141.40', workspace: '~/code', os: 'Linux' },
   ];
@@ -62,7 +62,7 @@ export function seed() {
   ];
   const repos = [
     { id: 'lgcode', name: 'lgcode', main: 'master', remote: 'github.com/qnlbnsl/lgcode', folders: { studio: '~/projects/lgcode', buildbox: '~/Work/lgcode' }, design: true,
-      description: 'LGcode runs teams of coding agents for one owner. A project lead plans the work, team leads split it, and builders, reviewers and test runners carry it out. The owner answers questions and approvals from a web page, and soon from a phone.', describedAt: at(2 * HOUR), describedBy: 'console-lead' },
+      description: 'LGTM Studio runs teams of coding agents for one owner. A project lead plans the work, team leads split it, and builders, reviewers and test runners carry it out. The owner answers questions and approvals from a web page, and soon from a phone.', describedAt: at(2 * HOUR), describedBy: 'console-lead' },
     { id: 'atlas-docs', name: 'atlas-docs', main: 'main', remote: 'github.com/acme/atlas-docs', folders: { studio: '~/projects/atlas-docs' },
       description: 'The public documentation site for the Atlas API. The reference is generated from openapi.yaml at build time.', describedAt: at(DAY), describedBy: 'apiref-lead' },
     { id: 'billing-api', name: 'billing-api', main: 'main', remote: 'github.com/acme/billing-api', folders: { buildbox: '~/Work/billing-api', studio: '~/projects/billing-api' },

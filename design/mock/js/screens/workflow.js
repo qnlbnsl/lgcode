@@ -458,7 +458,7 @@ function RunDetail({ s, p, r, now }) {
       ${!r.running && !r.skippedRun && html`<span class="num">${fmt(r.passed)} passed</span>${r.failed > 0 && html`<span class=${cx('num', r.expected ? 'muted' : 'error-text')}>${fmt(r.failed)} failed</span>`}${r.skipped > 0 && html`<span class="num muted">${fmt(r.skipped)} skipped</span>`}`}
       <span class="muted"><span class="mono">${r.branch}</span></span>
       <span class="muted num">${r.running ? 'Started' : r.dur + ' ·'} ${ago(r.ts, now) === 'now' ? 'just now' : ago(r.ts, now) + ' ago'}</span>
-      <span class="muted">${by ? by.name : 'LGcode'}</span></div>`}
+      <span class="muted">${by ? by.name : 'LGTM Studio'}</span></div>`}
     <div class="wf-jobs">
       <nav class="wf-joblist" aria-label="Jobs"><h3>Jobs</h3>
         ${jobs.length === 0 && html`<p class="muted wf-none" data-empty>No jobs</p>`}

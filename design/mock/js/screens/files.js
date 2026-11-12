@@ -1,5 +1,5 @@
 // The project's Files tab: the inspected worktree as a folder tree, and the open file
-// beside it. The files live on whichever machine holds the worktree. LGcode asks that
+// beside it. The files live on whichever machine holds the worktree. LGTM Studio asks that
 // machine for one folder or one file at a time and passes the answer on, so the page and
 // a phone read files the same way. Files are read-only here.
 import { html, useState, useEffect, useMemo, Icon, cx, go, href, useMedia, plural } from '../lib.js';

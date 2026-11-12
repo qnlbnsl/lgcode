@@ -110,7 +110,7 @@ function Sidebar({ s, route, onNavigate }) {
   const rail = (to, icon, label, pip) => html`<a class="icon-btn" href=${href(to)} aria-label=${label} data-tip=${label} data-tip-side="right" aria-pressed=${is(to)}><${Icon} name=${icon} size=${16} />${pip && html`<i class="pip"></i>`}</a>`;
   return html`<aside class="sidebar" aria-label="Navigation" onClick=${(e) => { if (e.target.closest('a')) onNavigate?.(); }}>
     <div class="side-head">
-      <a class="brand" href=${href('/home')}><span class="brand-mark">LG</span><span>LGcode</span></a>
+      <a class="brand" href=${href('/home')}><span class="brand-mark">LG</span><span>LGTM Studio</span></a>
       <button type="button" class="icon-btn not-phone" aria-label=${folded ? 'Open the sidebar' : 'Fold the sidebar'} data-tip=${(folded ? 'Open' : 'Fold') + ' sidebar · ' + (isMac ? '⌘' : 'Ctrl ') + 'B'} data-tip-side=${folded ? 'right' : 'bottom'}
         onClick=${() => act.setPref('sidebarFolded', !folded)}><${Icon} name="panel-left" size=${16} /></button>
     </div>
@@ -166,7 +166,7 @@ function Live({ s }) {
   const word = { live: 'Live', reconnecting: 'Reconnecting', offline: 'Offline' }[c.status];
   return html`<${Menu} class=${cx('live', c.status)} align="end" width=${280} label=${'Connection: ' + word}
     trigger=${html`<i class=${cx('dot', c.status === 'live' ? 'working' : c.status === 'reconnecting' ? 'waiting' : 'failed')}></i><span class="not-phone">${word}</span>`}
-    header=${html`<div style="padding:8px 8px 6px;line-height:1.5"><b>${word}</b><div class="muted" style="font-size:var(--text-sm)">${c.status === 'live' ? 'Connected to the service on Studio.' : `Last heard from the service ${ago(c.lastHeard, now)} ago. You can read, and changes wait until it is back.`}</div></div>`}
+    header=${html`<div style="padding:8px 8px 6px;line-height:1.5"><b>${word}</b><div class="muted" style="font-size:var(--text-sm)">${c.status === 'live' ? 'Connected to the service on Workstation.' : `Last heard from the service ${ago(c.lastHeard, now)} ago. You can read, and changes wait until it is back.`}</div></div>`}
     items=${c.status === 'live' ? [{ label: 'Service settings', icon: 'settings', onSelect: () => go('/settings') }] : [{ label: 'Reconnect now', icon: 'refresh-cw', onSelect: () => { act.setConnection('live'); act.toast('Connected'); } }]} />`;
 }
 function Inspecting({ s, project }) {
@@ -295,7 +295,7 @@ function App() {
     // Approvals became the Type filter on Needs attention.
     if (route.path === '/home/projects') go('/projects');
   }, [route.path]);
-  useEffect(() => { document.title = 'LGcode'; }, []);
+  useEffect(() => { document.title = 'LGTM Studio'; }, []);
   const top = route.parts[0] || 'home';
   if (top === 'login' || (s.session.status !== 'in' && top !== 'setup')) return html`<${Login} s=${s} /><${Toasts} s=${s} />`;
   if (top === 'setup') return html`<${FirstRun} s=${s} route=${route} /><${DialogHost} s=${s} /><${Toasts} s=${s} />`;

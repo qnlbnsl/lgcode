@@ -116,7 +116,7 @@ function NewProject({ s, d }) {
   return html`<${Dialog} title="New project" size="wide" onClose=${act.closeDialog} onSubmit=${create}
     foot=${html`${why && html`<span class="why">${why}</span>`}<button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${!!why || !hasRepo}>Create project</button>`}>
     <div class="field"><label for="np-goal">Goal</label>
-      <textarea id="np-goal" class="textarea" rows="3" value=${goal} onInput=${(e) => setGoal(e.target.value)} placeholder="Make a mock for the LGcode phone app" autofocus
+      <textarea id="np-goal" class="textarea" rows="3" value=${goal} onInput=${(e) => setGoal(e.target.value)} placeholder="Make a mock for the LGTM Studio phone app" autofocus
         onKeyDown=${(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); create(); } }}></textarea></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3)">
       <div class="field"><label for="np-machine">Run on</label>

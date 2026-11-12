@@ -1,4 +1,4 @@
-/* A plan page: an HTML document that a planner fills in, read inside LGcode's sprint page.
+/* A plan page: an HTML document that a planner fills in, read inside LGTM Studio's sprint page.
    Every colour comes from tokens.css. The layout here is a first pass. */
 html { background: var(--color-bg); color: var(--color-text); font-family: var(--font-body); font-size: 14px; }
 body { margin: 0; }

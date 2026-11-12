@@ -102,13 +102,13 @@ function MachineDetail({ s, m, now }) {
   return html`<div class="svc-detail">
     ${m.status === 'offline' && html`<div class="callout warn" style="grid-column:1/-1"><${Icon} name="wifi-off" size=${15} />
       <span class="grow">${m.name} stopped answering at ${clock(m.lastSeen)}. Its agents are paused, and they start again when it reconnects. On ${m.name}, run <code>lgcode connect</code>.</span></div>`}
-    ${m.status === 'pairing' && html`<div class="callout info" style="grid-column:1/-1"><${Icon} name="loader-circle" size=${15} class="svc-spin" /><span class="grow">${m.name} is connected. LGcode is scanning it for harnesses and repositories.</span></div>`}
+    ${m.status === 'pairing' && html`<div class="callout info" style="grid-column:1/-1"><${Icon} name="loader-circle" size=${15} class="svc-spin" /><span class="grow">${m.name} is connected. LGTM Studio is scanning it for harnesses and repositories.</span></div>`}
     <div>
       <h3>This machine</h3>
       <dl class="dl">
         <dt>Workspace</dt><dd class="mono">${m.workspace}</dd>
         <dt>System</dt><dd>${m.os} · ${m.cores} cores · ${m.ram} GB</dd>
-        <dt>LGcode</dt><dd>${m.version}${m.version !== s.settings.version ? html` <span class="warn-text">· older than Studio (${s.settings.version})</span>` : ''}</dd>
+        <dt>LGTM Studio</dt><dd>${m.version}${m.version !== s.settings.version ? html` <span class="warn-text">· older than the service (${s.settings.version})</span>` : ''}</dd>
         ${m.connectedFor && m.status === 'online' && html`<dt>Connected</dt><dd>${ago(now - m.connectedFor, now)}</dd>`}
         <dt>Agent limit</dt><dd><${Num} id=${'lim-' + m.id} value=${m.slots.limit} min=${1} max=${64} unit="at once" onChange=${(v) => update(() => { m.slots.limit = v; })} /></dd>
       </dl>
@@ -197,7 +197,7 @@ function PairMachine({ s }) {
     foot=${html`<span class="why">${step === 0 ? `The code works once and expires in ${mm}:${String(ss).padStart(2, '0')}.` : taken ? 'A machine already has that name.' : 'Confirm only a machine you started yourself.'}</span>
       <button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${step === 0 || !name.trim() || taken}>Confirm ${step === 1 && name.trim() ? name.trim() : 'machine'}</button>`}>
     <ol class="svc-steps">
-      <li class="done"><span class="n">1</span><div><b>Install LGcode on the other machine.</b><${Command} text="npm install -g lgcode" /></div></li>
+      <li class="done"><span class="n">1</span><div><b>Install LGTM Studio on the other machine.</b><${Command} text="npm install -g lgcode" /></div></li>
       <li class=${step > 0 ? 'done' : 'now'}><span class="n">2</span><div><b>Run this command there.</b>
         <${Command} text=${`lgcode connect ${master.name.toLowerCase()}.lan:${s.settings.port} --code ${code}`} /></div></li>
       <li class=${step > 0 ? 'now' : ''}><span class="n">3</span><div><b>Confirm the machine here.</b>
@@ -243,7 +243,7 @@ function AddRepository({ s, d }) {
         ${s.machines.map((x) => html`<option value=${x.id} disabled=${x.status !== 'online'}>${x.name}${x.status !== 'online' ? ' (offline)' : x.here ? ' (this computer)' : ''}</option>`)}</select></div>
     <div class="field"><label for="ar-path">Folder on ${m.name}</label>
       <input id="ar-path" class="input mono" value=${path} onInput=${(e) => setPath(e.target.value)} placeholder=${m.workspace + '/my-repository'} autofocus spellcheck="false" />
-      <span class="hint">The folder must already be a git repository. LGcode adds its worktrees under <code>.worktrees</code> inside it.</span></div>
+      <span class="hint">The folder must already be a git repository. LGTM Studio adds its worktrees under <code>.worktrees</code> inside it.</span></div>
     <dl class="dl svc-detected">
       <dt>Base branch</dt><dd class="mono">${found ? found.main : html`<span class="faint">${valid ? 'Detecting…' : '—'}</span>`}</dd>
       <dt>Remote</dt><dd class="mono" style="overflow-wrap:anywhere">${found ? (found.remote || 'No remote') : html`<span class="faint">${valid ? 'Detecting…' : '—'}</span>`}</dd>
@@ -269,7 +269,7 @@ function SubRow({ s, x, now }) {
   const signOut = () => act.confirm({ title: `Sign out of ${h.name} · ${x.name}?`, body: `The sign-in on ${m.name} is removed. Sign in again at any time.`, action: 'Sign out',
     lost: ags.length ? [`${plural(ags.length, 'agent')} ${ags.length === 1 ? 'uses' : 'use'} it and will pause at the next turn`] : [],
     onConfirm: () => { update(() => { x.signedIn = false; x.usage = null; x.window = null; x.useForNew = false; }); act.toast(`Signed out of ${h.name} · ${x.name}`); } });
-  const remove = () => act.confirm({ title: `Remove ${h.name} · ${x.name}?`, body: 'The subscription and its sign-in are removed from LGcode.', action: 'Remove subscription',
+  const remove = () => act.confirm({ title: `Remove ${h.name} · ${x.name}?`, body: 'The subscription and its sign-in are removed from LGTM Studio.', action: 'Remove subscription',
     lost: ags.length ? [`${plural(ags.length, 'agent')} will need another subscription`] : [],
     onConfirm: () => { update((stt) => { stt.subscriptions = stt.subscriptions.filter((y) => y.id !== x.id); }); act.toast('Subscription removed'); } });
   const signIn = () => act.openDialog({ type: 'signin', subscription: x.id });
@@ -322,7 +322,7 @@ export function Subscriptions({ s }) {
         </div>
       </section>`; })}
     </div>
-    <p class="svc-foot-note">A subscription is one sign-in for one harness on one machine. The sign-in happens in the harness's own program, and LGcode never sees the password.</p>
+    <p class="svc-foot-note">A subscription is one sign-in for one harness on one machine. The sign-in happens in the harness's own program, and LGTM Studio never sees the password.</p>
   </div></div>`;
 }
 function AddSubscription({ s }) {
@@ -357,7 +357,7 @@ const DELIVERY = { sent: ['Sent to phone', 'muted'], off: ['Not sent', 'faint'],
 function sendTest() {
   const s = store.state; const server = s.settings.ntfyServer;
   const ok = /\./.test(server) && !/localhost/.test(server);
-  update((st) => { st.notifications.unshift({ id: uid('n'), ts: Date.now(), kind: 'test', title: 'Test notification from LGcode', read: true, delivery: ok ? 'sent' : 'failed', error: ok ? null : `Could not reach ${server}` }); });
+  update((st) => { st.notifications.unshift({ id: uid('n'), ts: Date.now(), kind: 'test', title: 'Test notification from LGTM Studio', read: true, delivery: ok ? 'sent' : 'failed', error: ok ? null : `Could not reach ${server}` }); });
   act.toast(ok ? `Test sent to ${s.settings.ntfyTopic}` : `Could not reach ${server}`, ok ? 'ok' : 'error');
 }
 function NtfyForm({ s }) {
@@ -429,7 +429,7 @@ export function Notifications({ s }) {
               <i class="pip" aria-label=${n.read ? null : 'Unread'}></i>
               <span class=${cx('kind', n.kind === 'failed' ? 'failed' : r && r.status === 'open' ? n.kind : 'closed')}>${NOTE_KIND[n.kind]}</span>
               ${clickable ? html`<a class="title truncate" href=${href(r ? routeForRequest(s, r) : n.to)} onClick=${(e) => { e.preventDefault(); open(n); }}>${n.title}</a>` : html`<span class="title truncate">${n.title}</span>`}
-              <span class="from muted truncate">${a ? a.name : 'LGcode'}${p ? ' · ' + p.name : ''}${r && r.status !== 'open' ? ' · ' + r.answer : ''}</span>
+              <span class="from muted truncate">${a ? a.name : 'LGTM Studio'}${p ? ' · ' + p.name : ''}${r && r.status !== 'open' ? ' · ' + r.answer : ''}</span>
               <span class=${cx('del', dc)} title=${n.error || (del === 'off' ? 'Phone notifications were not set up' : null)}>${del === 'failed' ? html`<${Icon} name="circle-alert" size=${13} />` : del === 'sent' ? html`<${Icon} name="check" size=${13} />` : null}${dw}
                 ${del === 'failed' && html`<button type="button" class="link" onClick=${() => retry(n)}>Retry</button>`}</span>
               <time class="muted">${now - n.ts < DAY ? clock(n.ts) : ago(n.ts, now) + ' ago'}</time>
@@ -496,7 +496,7 @@ function Remote({ s }) {
   const fwd = `ssh -L ${f.port}:127.0.0.1:${f.port} ${master.name.toLowerCase()}`;
   return html`<form onSubmit=${(e) => { e.preventDefault(); save(); }}>
     <div class="svc-rows">
-      <${Row} label="Web page" hint="Turn it off to use LGcode from the terminal only."><${Switch} on=${f.webEnabled} label="Web page" onChange=${(v) => setF({ ...f, webEnabled: v })} /><//>
+      <${Row} label="Web page" hint="Turn it off to use LGTM Studio from the terminal only."><${Switch} on=${f.webEnabled} label="Web page" onChange=${(v) => setF({ ...f, webEnabled: v })} /><//>
       <${Row} label="Listens on" hint="This computer only. The service never listens on the network.">
         <span class="row" style="gap:6px"><span class="svc-fixed mono">http://127.0.0.1:</span><input class="input num-field mono" type="number" aria-label="Port" value=${f.port} onInput=${(e) => setF({ ...f, port: +e.target.value })} /></span>
         ${badPort && html`<span class="svc-err">${badPort}</span>`}<//>
@@ -540,7 +540,7 @@ function Sheepdog({ s }) {
 function WorkflowSettings({ s }) {
   const set = s.settings; const [checked, setChecked] = useState(null);
   return html`<div class="svc-rows">
-    <${Row} label="Workflow" hint="LGcode ships one workflow. Override it for every repository, or for one.">
+    <${Row} label="Workflow" hint="LGTM Studio ships one workflow. Override it for every repository, or for one.">
       <span class="row"><b style="font-weight:var(--weight-medium)">Build loop</b><span class="badge outline">Default</span></span><//>
     <${Row} label="Your overrides" id="wf-path" hint="Files here replace the default workflow for every repository." top>
       <span class="row"><input id="wf-path" class="input mono grow" value=${set.workflowPath} onInput=${(e) => setS({ workflowPath: e.target.value })} spellcheck="false" />
@@ -573,7 +573,7 @@ function GitMessages({ s }) {
 function About({ s }) {
   const set = s.settings; const [chk, setChk] = useState(null); const master = s.machines.find((m) => m.role === 'master');
   return html`<div class="svc-rows">
-    <${Row} label="Version"><span class="row"><b style="font-weight:var(--weight-medium)">LGcode ${set.version}</b><span class="tag">${set.commit}</span>
+    <${Row} label="Version"><span class="row"><b style="font-weight:var(--weight-medium)">LGTM Studio ${set.version}</b><span class="tag">${set.commit}</span>
       <button type="button" class="btn sm" onClick=${() => { setChk('loading'); setTimeout(() => setChk('done'), 900); }}>${chk === 'loading' ? 'Checking…' : 'Check for an update'}</button>
       ${chk === 'done' && html`<span class="row success-text" style="gap:4px;font-size:var(--text-sm)"><${Icon} name="check" size=${13} />Up to date</span>`}</span><//>
     <${Row} label="Service"><span class="row" style="gap:6px"><i class=${cx('dot', s.conn.status === 'live' ? 'working' : 'waiting')}></i>${s.conn.status === 'live' ? `Running on ${master.name}` : 'Not answering'}<span class="muted">· Node.js 26</span></span><//>
