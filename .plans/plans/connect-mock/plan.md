@@ -262,4 +262,4 @@ of the build loop plan's steps 1 and 2.
 - **The terminal is larger than it looks.** A real terminal needs a process on the
   machine and a stream both ways. If it stalls, it becomes its own step.
 - **The gap table is a first reading.** Step 1's checked table may move items between
-  steps 2, 3 and 4.
+  steps 2, 4 and 5.
