@@ -5,6 +5,10 @@
 This standard is a proposal. The owner has not approved it. Nothing in it is binding until
 the owner says so.
 
+The owner's verdict on 2026-11-11: "I'm not approving it, but it is a good start. We'll have
+to refine those categories as I use this thing." The categories stay as a starting point,
+and they change as the owner uses the Design page.
+
 It says how a repository keeps its design file, how the file is named inside, and how its
 content fills the two menus and the canvas of the repository Design page.
 

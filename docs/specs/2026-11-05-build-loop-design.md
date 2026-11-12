@@ -276,16 +276,26 @@ The rule is to learn from a mistake, write it down, and move on.
 
 ### When an evaluation round runs
 
-An evaluation round runs at the end of each key task, and once more at the end
-of the project. The steps below place it in three phases.
+The owner decided the timing on 2026-11-11. An evaluation round runs at the end
+of each phase step, and it grades the work of that step. After 3 Plan, the
+evaluators grade the planning. After 4 Build, they grade the building. The other
+phases work the same way.
 
-- In 4 Build, a round runs when a sprint merges into the project branch.
-- In 7 Hand over, a round runs after the work is merged and the finished page is
-  written.
+The session reports are the main evidence. Every agent writes one, so the round
+does not need its own records beyond the result lines below.
+
+The owner rejected a round after every team finishes. A project can have many
+teams, and grading each one would be too many rounds.
+
+- In 7 Hand over, the last round runs after the work is merged and the finished
+  page is written.
 - In 8 Keep running, the nightly lessons step feeds the same record.
 
-An evaluation round never blocks the work. The next sprint starts while the
-round runs.
+An evaluation round never blocks the work. The next step starts while the round
+runs.
+
+Two related ideas are recorded in `docs/features.md`, under "Evaluation at
+project teardown". They are not decided.
 
 ### What an evaluation round does
 
@@ -328,12 +338,13 @@ it.
 
 - **Who evaluates.** Today the owner runs three evaluators from different labs
   and compares their grades. Whether the loop starts them itself is open.
-- **What counts as a key task.** The agent suggests a merged sprint. A single
-  subitem is too small to grade on its own.
+- **What counts as a key task.** Decided by the owner on 2026-11-11: a phase
+  step. "When an evaluation round runs" above has the details.
 - **Where the ledger lives for other users.** Decided by the owner on
   2026-11-11: model evaluation moves out of Founder OS and into LGcode, as
   research. LGcode ships one default model selection ledger, which each user
-  can update.
+  can update. How Founder OS and LGTM Studio are split is decided after the
+  build loop is built.
 - **How the list reaches LGcode.** Whether LGcode reads the model selection
   list from a file or the owner copies choices into settings is open.
 

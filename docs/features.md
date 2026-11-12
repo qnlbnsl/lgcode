@@ -603,14 +603,35 @@ The full design is in
   storage. Recorded mocks retain an opaque origin. The editor receives no
   owner cookie or owner origin authority.
 
+## Evaluation at project teardown
+
+The owner raised these ideas on 2026-11-11. They are not decided. The decided
+timing is a round after each phase step, in the build loop design's
+"Evaluation rounds and the model ledger".
+
+- When a project is torn down, LGTM Studio offers: "Would you like to evaluate
+  how the models did from the session reports and help improve the model
+  ledger?" The round runs only if the user says yes.
+- The round reads the project's session reports and logs. The user reads the
+  evaluation before anything else happens with it.
+- The results are kept locally, in LGTM Studio's config files.
+- LGTM Studio could send the results to a public endpoint, so that many users
+  improve the shared model ledger. This sends data off the user's machine, so it
+  needs the user's consent each time, and the payload must leave out code, file
+  paths and anything else private. SECURITY.md applies to it.
+
 ## Open questions
 
 - Which licence should LGcode use?
-- Should LGcode be renamed LGTM code? The owner raised the name on
-  2026-11-09 and asked for it to be kept as a to-do. Nothing is renamed until
-  the owner decides.
 
 ## Decided
+
+- **The product is renamed LGTM Studio** (2026-11-11). The owner raised "LGTM
+  code" on 2026-11-09 and chose "LGTM Studio" on 2026-11-11. The build loop
+  plan, in "The new name", lists what the rename covers. The spelling, with or
+  without the space, and the new command and folder names are still open. The
+  mock shows the new name. The code and the documents still say LGcode until the
+  rename work in step 1 of the build loop plan.
 
 - **Language: TypeScript** (2026-10-30). One language for the backend, the
   web page and the future apps, so the client API's types are written once.

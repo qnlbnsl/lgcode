@@ -158,6 +158,10 @@ The new name:
   account.
 - An existing installation keeps working. The service reads the old folder and the old
   variables when the new ones are absent.
+- The mock's visible name was changed to "LGTM Studio" on 2026-11-11, on
+  `area/mock-rebuild`. Its machine named "Studio" became "Workstation", so the two names
+  are not confused. The mock still uses `lgcode` for the command, the package, the
+  variables and the folders, until those names are chosen.
 
 Website:
 
@@ -250,7 +254,7 @@ left alone until its own step.
 | Epics, the Priority field, and the board's Table and Roadmap views | Step 4 | The thin path has one team and one sprint at a time. |
 | The work assignment table, and the lead's model and effort in Project settings | Step 4 | The thin path uses the owner's default harness and model. |
 | The Mocks tab and its approval | Step 4 | The thin path skips design work. |
-| The repository Design page and its canvas | Step 3 | It needs the design import and the approved categories. |
+| The repository Design page and its canvas | Step 3 | It needs the design import. It starts from the proposed categories, which the owner refines through use. |
 | The repository's running product description | Step 3 | It needs the agent that reads a V0. |
 | Files and images sent with a message | Step 3 | The deliverables rounds are where the owner will most want to send a screenshot. |
 | "Always allow" and "Always deny" | The standing permission rules | The rules are not built. |
@@ -314,8 +318,9 @@ This step delivers items 2, 3 and 5 of what the owner wants.
   file is stored and sorted into categories. The owner calls this "Apple Hat". It is an
   agent launched with instructions to think like a senior user interface and user
   experience lead from Apple. The second round of the mock asks such an agent for a first
-  proposal. The owner approves the standard before the repository Design page is built on
-  real data.
+  proposal. On 2026-11-11 the owner said the proposal is a good start but is not
+  approved. The categories are refined as the owner uses the product, so step 3 builds
+  on them as a starting point and expects them to change.
 - **Setup's config.** Define writes the `.lgcode` config. The design leaves open who
   writes it, because agents cannot edit that folder. This plan suggests that the engine
   writes it from a tool call that the owner approves.
@@ -357,7 +362,7 @@ failing test produces a fix sprint that the owner only reads about.
 
 ### Step 6: Review and Hand over, in full
 
-- Review gains its rounds, with a limit of six, and the scoring that decides when a
+- Review gains its rounds, with no hard limit, and the scoring that decides when a
   statement is stuck.
 - Hand over writes the finished page, opens the pull request, and asks for the release
   approval.
@@ -376,8 +381,9 @@ This step delivers items 7 and 8 of what the owner wants. Its design is the sect
 
 - Every task result names the role, the model, the effort and the session. Every review
   result carries a grade.
-- An evaluation round runs when a sprint merges and when a project is handed over. It
-  never holds up the next sprint.
+- An evaluation round runs at the end of each phase step, and it grades that step's work.
+  The evaluators grade planning after planning, and building after building. They rely
+  mainly on the session reports. It never holds up the next step.
 - The round writes a run file in the format of the model ledger.
 - A lesson about the work goes into the skills. A lesson about a model goes into the
   ledger.
@@ -507,18 +513,24 @@ Made later on 2026-11-11:
   related research leave Founder OS and become part of LGcode, as research. The owner
   will strip that content out of Ananke (Enkra) and Founder OS. LGcode ships one default
   model selection ledger, which each user can update. The run-by-run grades stay out of
-  what LGcode ships.
+  what LGcode ships. How Founder OS and LGTM Studio are split is decided after this build.
+- **The design file's categories are a starting point.** The owner, on 2026-11-11: "I'm
+  not approving it, but it is a good start. We'll have to refine those categories as I use
+  this thing." The proposal is in `design/mock/feedback/2026-11-10-design-categories.md`.
+- **An evaluation round runs after each phase step.** After planning, the evaluators grade
+  the planning. After building, they grade the building. The session reports are the main
+  evidence. The owner chose this over grading after every team, which would be too many
+  rounds. Two related ideas are in `docs/features.md`: an offer to evaluate at project
+  teardown, and a public endpoint that collects evaluation results.
 - **Review rounds have no hard limit.** From round 6 on, each further round asks the
   owner first. The owner either approves the next round, and the question comes back
   after it, or says to stop reviewing and go on with the work.
 
 Still open, in the order they block work:
 
-1. **Does the owner approve the design file's categories?** A Design lead agent proposed
-   them during the second round of the mock, in
-   `design/mock/feedback/2026-11-10-design-categories.md`. The mock shows them at
-   `/r/lgcode/design`. Step 3 needs the approved standard.
-2. **What is a key task for an evaluation round?** The design suggests a merged sprint.
+1. **Is the new name spelled "LGTM Studio" or "LGTMStudio"?** The owner's message on
+   2026-11-11 said "LGTM Studio", and the mock now shows that. The section "The new name"
+   above says "LGTMStudio". The command and folder names follow from the answer.
 
 ### What could go wrong
 
