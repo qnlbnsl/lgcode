@@ -153,6 +153,7 @@ The new name:
 - The rename covers the visible name in the website and the mock, the documents, the
   package names, the command, the environment variables that start with `LGCODE_`, and
   the `.lgcode` and `~/.lgcode` folders.
+- The product's public site is `lgtmstudio.dev`. The renamed README links to it.
 - The name is written "LGTM Studio" wherever people read it. A name inside code, such as
   a package, a command or a folder, has no space and is written in lower case.
 - Three details are the agent's suggestions, and the owner has not ruled on them. The

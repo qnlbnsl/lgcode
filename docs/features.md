@@ -633,6 +633,9 @@ timing is a round after each phase step, in the build loop design's
   names are still open. The
   mock shows the new name. The code and the documents still say LGcode until the
   rename work in step 1 of the build loop plan.
+- **The public site is `lgtmstudio.dev`** (2026-11-11). It is the product's
+  public website. It is not the address where the owner's own instance runs,
+  which stays out of this repository.
 
 - **Language: TypeScript** (2026-10-30). One language for the backend, the
   web page and the future apps, so the client API's types are written once.
