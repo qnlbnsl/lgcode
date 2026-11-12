@@ -156,10 +156,13 @@ The new name:
 - The product's public site is `lgtmstudio.dev`. The renamed README links to it.
 - The name is written "LGTM Studio" wherever people read it. A name inside code, such as
   a package, a command or a folder, has no space and is written in lower case.
-- Three details are the agent's suggestions, and the owner has not ruled on them. The
-  command becomes `lgtmstudio`. The folders become `.lgtmstudio` and `~/.lgtmstudio`. The
-  GitHub repository is renamed by the owner, because that is an action on the owner's
-  account.
+- The owner ruled on 2026-11-12 that the short name is `lgtm`. The command is `lgtm`. The
+  configuration folders are `.lgtm` in a repository and `~/.lgtm` in the home folder.
+- Two details are the agent's suggestions, and the owner has not ruled on them. The
+  environment variables start with `LGTM_`. The GitHub repository is renamed by the
+  owner, because that is an action on the owner's account.
+- Before the command is renamed, the build checks whether another program named `lgtm`
+  is already installed on the owner's machines, and it reports any clash.
 - An existing installation keeps working. The service reads the old folder and the old
   variables when the new ones are absent.
 - The mock's visible name was changed to "LGTM Studio" on 2026-11-11, on
