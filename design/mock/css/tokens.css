@@ -1,0 +1,113 @@
+/* LGTM Studio mock tokens. Field is the light mode and Dusk is the dark mode, the pair the
+   owner chose on 2026-11-05. This file retunes both for contrast and depth, and adds the
+   four density tokens. Every colour in the mock is written here and nowhere else. */
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url(../fonts/inter/InterVariable-latin.woff2) format('woff2')}
+@font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400 800;font-display:swap;src:url(../fonts/jetbrains-mono/JetBrainsMono-latin.woff2) format('woff2')}
+
+:root {
+  color-scheme: light;
+  /* surfaces, from the furthest back to the nearest */
+  --color-sidebar: #edf1ea;
+  --color-bg: #f7f9f5;
+  --color-surface: #ffffff;
+  --color-raised: #f0f4ee;
+  --color-sunken: #e8ede5;
+  --color-line: #dbe3d8;
+  --color-line-strong: #bfccbc;
+  /* text */
+  --color-text: #15231b;
+  --color-muted: #55645a;
+  --color-faint: #77857c;
+  /* action and selection */
+  --color-primary: #1d6843;
+  --color-primary-hover: #17573a;
+  --color-primary-contrast: #ffffff;
+  --color-primary-soft: #e0efe4;
+  --color-selected: #dcebdc;
+  --color-focus: #1d6843;
+  --color-accent: #3d7358;
+  /* states: green runs, amber waits for the owner, red failed, blue informs */
+  --color-success: #1f7446;
+  --color-success-soft: #e1f1e6;
+  --color-warn: #8f5600;
+  --color-warn-soft: #fcf1d9;
+  --color-warn-line: #e3bd62;
+  --color-error: #b02f3d;
+  --color-error-soft: #fbe9eb;
+  --color-info: #2a5f8c;
+  --color-info-soft: #e4eef6;
+  /* diff */
+  --color-add-bg: #e3f3e6;
+  --color-add-strong: #bfe3c7;
+  --color-del-bg: #fbe7e9;
+  --color-del-strong: #f3c4ca;
+  /* terminal: stays dark in both modes */
+  --color-term-bg: #17131a;
+  --color-term-text: #ebe2e8;
+  --color-term-muted: #9a8c97;
+  --color-term-green: #a9d4ae;
+  --color-term-amber: #f0cf8e;
+  --color-term-red: #f3a3ae;
+  --color-term-blue: #a9c7e8;
+  --color-scrim: rgb(18 30 22 / .36);
+  --shadow-1: 0 1px 2px rgb(22 48 28 / .06), 0 2px 8px rgb(22 48 28 / .06);
+  --shadow-2: 0 4px 12px rgb(22 48 28 / .10), 0 16px 48px rgb(22 48 28 / .16);
+
+  --font-display: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+  --text-xs: 11px; --text-sm: 12px; --text-md: 13px; --text-lg: 15px; --text-xl: 20px; --text-input: 16px;
+  --weight-body: 400; --weight-medium: 500; --weight-strong: 600;
+  --measure: 68ch; --leading-body: 1.6; --leading-tight: 1.25;
+
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px;
+  --space-7: 28px; --space-8: 32px; --space-9: 36px; --space-10: 40px; --space-11: 44px; --space-12: 48px;
+  --radius-sm: 5px; --radius-md: 8px; --radius-lg: 12px; --radius-pill: 999px;
+
+  /* density: Compact, for a tool that stays open all day */
+  --row: 30px; --control: 28px; --inset: 10px; --gap-group: 20px;
+  --control-lg: 34px;
+  --topbar: 44px; --tabrow: 38px;
+
+  --motion-fast: 120ms; --motion-slow: 240ms; --ease: cubic-bezier(.22,.7,.35,1);
+}
+
+:root[data-density="regular"] { --row: 36px; --control: 32px; --inset: 12px; --gap-group: 24px; --control-lg: 38px; }
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-sidebar: #19151c;
+  --color-bg: #1e1921;
+  --color-surface: #262028;
+  --color-raised: #2f2832;
+  --color-sunken: #151117;
+  --color-line: #382f3b;
+  --color-line-strong: #514553;
+  --color-text: #f3ebf0;
+  --color-muted: #b6a7b2;
+  --color-faint: #8d7f8b;
+  --color-primary: #f0b89f;
+  --color-primary-hover: #f6c9b4;
+  --color-primary-contrast: #2c1a1f;
+  --color-primary-soft: #43313a;
+  --color-selected: #3d303e;
+  --color-focus: #f0b89f;
+  --color-accent: #d3b7d5;
+  --color-success: #a9d4ae;
+  --color-success-soft: #26342b;
+  --color-warn: #f0cf8e;
+  --color-warn-soft: #3a2f1f;
+  --color-warn-line: #8a6d33;
+  --color-error: #f3a3ae;
+  --color-error-soft: #40232b;
+  --color-info: #a9c7e8;
+  --color-info-soft: #24303d;
+  --color-add-bg: #223428;
+  --color-add-strong: #2f4d38;
+  --color-del-bg: #40242b;
+  --color-del-strong: #5c2f39;
+  --color-term-bg: #120f14;
+  --color-scrim: rgb(8 5 9 / .58);
+  --shadow-1: 0 1px 2px rgb(8 4 9 / .3), 0 2px 8px rgb(8 4 9 / .25);
+  --shadow-2: 0 4px 12px rgb(8 4 9 / .35), 0 16px 48px rgb(8 4 9 / .45);
+}

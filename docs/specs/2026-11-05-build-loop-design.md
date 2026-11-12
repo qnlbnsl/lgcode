@@ -125,8 +125,9 @@ were about them.
 |             | majors are open, and it looks only for those.                 |
 | 4 and 5     | The same, and the owner gets a ping saying why another round  |
 |             | is needed. The next round waits for their approval.           |
-| 6           | This is the limit. The owner cuts, splits or accepts the plan |
-|             | if blockers or majors are still open.                         |
+| 6 and on    | There is no hard limit. Each further round asks the owner     |
+|             | first. The owner approves the next round, or says to stop and |
+|             | go on with the work. Decided by the owner on 2026-11-11.      |
 
 Minors are folded in every round, including after round 3. A minor folded in the
 last round has no review after it, so it is marked in the plan and left to the
@@ -181,16 +182,22 @@ places a copy in `~/.sheprd`. Agents can read `.sheprd` and cannot edit it.
 
 These points need the owner's word:
 
-- **How setup's config arrives.** Setup produces the `.sheprd` config, but
-  agents cannot edit that folder. Who writes it is open.
-- **The end of round 6.** Cut, split or accept was the agent's choice, and the
-  owner has not ruled on it.
+- **How setup's config arrives.** Decided by the owner on 2026-11-11: the owner
+  runs `lgcode init` in the repository. It writes the template files into
+  `.lgcode`, copies the global settings from `~/.lgcode` when they exist, and
+  starts setup with the owner's preferred harness.
+- **The end of round 6.** Decided by the owner on 2026-11-11: there is no hard
+  limit. Each round from round 6 on asks the owner first, and the owner either
+  approves it or says to stop and go on with the work.
 - **The ping past round 4.** The owner asked for a notice and for approval of
   each round. The agent made them one ping.
 
 These points were set aside on purpose: how migration numbers are handed out,
-model selection, which other steps a script should control, a test index for
+which other steps a script should control, a test index for
 choosing narrow runs, and the template for the end-result page.
+
+Model selection was set aside on 2026-11-05. The owner brought it into the loop
+on 2026-11-10, in "Evaluation rounds and the model ledger" below.
 
 ## Additions still to be designed
 
@@ -246,6 +253,100 @@ the teams' plans have been checked against each other. A script could then fail
 any change to a frozen interface, the way the frozen-test script does for tests.
 A team that needs a change would take the existing plan wrong move back to 3 Plan.
 What counts as an interface, and who can unfreeze one, are open.
+
+## Evaluation rounds and the model ledger
+
+The owner asked for this addition on 2026-11-10. It is not in the chart yet, and
+none of it is built.
+
+### What the owner asked for
+
+The owner's words: "At the end of the project, or maybe not at the end of the
+project but at the end of key tasks, we run an evaluation round, just seeing how
+good things went or how bad it went, where we discovered issues and whatnot, and
+whether the next time this runs, we should try a different model."
+
+The purpose, in the owner's words: "figuring out which model is the best for
+which task". The owner expects a pattern to emerge that sorts the AI labs into
+buckets. One lab's frontier models are good at some kinds of work. Its faster
+models are good at other kinds. Another lab is better at a third kind.
+
+The owner also said that mistakes are expected, from the owner and from agents.
+The rule is to learn from a mistake, write it down, and move on.
+
+### When an evaluation round runs
+
+The owner decided the timing on 2026-11-11. An evaluation round runs at the end
+of each phase step, and it grades the work of that step. After 3 Plan, the
+evaluators grade the planning. After 4 Build, they grade the building. The other
+phases work the same way.
+
+The session reports are the main evidence. Every agent writes one, so the round
+does not need its own records beyond the result lines below.
+
+The owner rejected a round after every team finishes. A project can have many
+teams, and grading each one would be too many rounds.
+
+- In 7 Hand over, the last round runs after the work is merged and the finished
+  page is written.
+- In 8 Keep running, the nightly lessons step feeds the same record.
+
+An evaluation round never blocks the work. The next step starts while the round
+runs.
+
+Two related ideas are recorded in `docs/features.md`, under "Evaluation at
+project teardown". They are not decided.
+
+### What an evaluation round does
+
+An evaluation round answers four questions about each task since the last
+round.
+
+1. How well did the work go? The round reads the review findings, the failure
+   reports, the number of review rounds, and any later correction.
+2. Where were problems found, and who found them?
+3. Which model, at which effort, did the task?
+4. Should a different model do this kind of task next time?
+
+A grade counts only where an independent review or a later correction backs it.
+A model's own claim that its work is good is not evidence.
+
+Each task's result names the role, the model, the effort and the session that
+did it. Each review result carries a grade for the work it reviewed. Without
+these lines the round cannot grade the task.
+
+### Where the results go
+
+The agreed grades are written to the model ledger. The ledger is one file for
+each run, at `model-ledger/runs/<date>-<project>-<run>.md` in the Founder OS
+repository. Its README file defines the grades and the flags. The flags are
+`unverified-claim`, `instruction-breach`, `test-gaming`, `scope-creep` and
+`stub`.
+
+The ledger feeds the model selection list, which says which model to try for
+each kind of task. A model moves to harder or easier work when its grades say
+so. The agent suggests that LGcode reads the list when it starts an agent, and
+that the owner can override the choice for one project.
+
+A lesson that is about the work and not about a model goes into the skills, as
+8 Keep running already says.
+
+### What is not decided
+
+The rest of this section is the agent's reading, and the owner has not ruled on
+it.
+
+- **Who evaluates.** Today the owner runs three evaluators from different labs
+  and compares their grades. Whether the loop starts them itself is open.
+- **What counts as a key task.** Decided by the owner on 2026-11-11: a phase
+  step. "When an evaluation round runs" above has the details.
+- **Where the ledger lives for other users.** Decided by the owner on
+  2026-11-11: model evaluation moves out of Founder OS and into LGcode, as
+  research. LGcode ships one default model selection ledger, which each user
+  can update. How Founder OS and LGTM Studio are split is decided after the
+  build loop is built.
+- **How the list reaches LGcode.** Whether LGcode reads the model selection
+  list from a file or the owner copies choices into settings is open.
 
 ## Changes this design made to the repository's rules
 
@@ -439,8 +540,8 @@ because they already know what they wrote.
 Every finding gets folded in every round, minors included. Past round 3
 another review runs only for blockers and majors, and the reviewers are told
 to look only for those. Past round 4, each further round pings the owner with
-why it is needed and waits for their approval. Round 6 is the limit: if
-blockers or majors are still open, the owner cuts, splits or accepts the plan.
+why it is needed and waits for their approval. From round 6 on this repeats
+with no hard limit, until the owner says to stop and go on with the work.
 A minor folded in the last round has no review after it, so it is marked in
 the plan and left for the later checks. When the owner changes a plan's scope,
 the count restarts for the changed part, which gets a full review. 6 Review
@@ -662,7 +763,9 @@ gets fixed without a ping.
 - Device checked -> Approve release?
 - Approve release? -> Deployed: yes: approve deploy [OWNER]
 - Deployed -> Live product tested: Test the live product
-- Live product tested -> More sprints?
+- Live product tested -> Evaluation round run: Grade each task, update the
+  model ledger
+- Evaluation round run -> More sprints?
 - More sprints? -> 2 Design and teams: yes
 - More sprints? -> 8 Keep running: no
 - Approve release? -> 4 Build or 1 Define: no: ask for a change [OWNER]
@@ -672,6 +775,10 @@ gets fixed without a ping.
 Fix sprints run on their own. A fix that users would notice comes to the owner
 like any other work.
 
+The evaluation round also runs after each sprint merges in 4 Build. It does not
+hold up the next sprint. "Evaluation rounds and the model ledger" above has the
+detail.
+
 ### 8 Keep running
 
 - Released -> Tests on?
@@ -680,7 +787,8 @@ like any other work.
 - Nightly run done -> Skipped tests checked: Check skipped tests
 - Skipped tests checked -> Failures explained: Explain what failed and why
   [OWNER IF NEEDED]
-- Failures explained -> Lessons in skills: Write lessons into skills
+- Failures explained -> Lessons in skills: Write lessons into skills, grades into the
+  model ledger
 - Lessons in skills -> Owner told: Send owner a one-line summary [OWNER]
 - Owner told -> Bug?
 - Bug? -> 4 Build: yes

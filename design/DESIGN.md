@@ -1043,3 +1043,85 @@ or narrower.
 - **A docked request has its own identifier.** Above 1800 pixels a docked thread can show a
   request that the page beside it shows too. The docked copy's identifier starts with
   `dock-`, and answering it keeps the focus on the copy that was answered.
+
+## Layout and density, set on 2026-11-10
+
+These rules describe the rebuilt mock in `design/mock/`. They await the owner's approval.
+
+LGcode is an operating tool that the owner keeps open all day. The default density is
+Compact. A row is 30 pixels high. A control is 28 pixels high. The inset inside a region is
+10 pixels. The gap between groups is 20 pixels. Regular density is the alternate, and
+Service settings switches between them. The values live in `design/mock/css/tokens.css`
+under `--row`, `--control`, `--inset` and `--gap-group`.
+
+The main screen has three regions. The sidebar on the left holds the project tree and the
+service pages. The centre holds the current tab. The lead conversation docks on the right of
+every project tab except Chat, and a toggle at the end of the tab row hides it.
+
+A list of like things is a table or a list of rows with hairline dividers. A card is used
+only for an item that moves on its own, such as a sprint on the board or a request that
+needs an answer. A card never sits inside another card. Home, All projects, the Mocks tab,
+Test runs, and the Assignment section of Project settings are tables for this reason.
+
+A screen with no data keeps its structure. A table shows its header and one muted row,
+such as "No screens" or "No fix sprints". A board keeps its columns.
+
+A status line sits under a secondary tab row and above the main table. It holds the
+counts, the badges and the screen's buttons, and it never holds a sentence that explains
+the screen. Workflow, Mocks, End result and the workflow's settings use it.
+
+The repository Design page fills the centre with a canvas. One thin bar above it holds the
+Projects and Design tabs, the category and item menus, the file's name, the zoom controls,
+and "Open in OpenPencil". The Mocks tab shows one screen on the same canvas.
+
+A question or an approval in a thread starts as a brief. The brief shows what is asked in a
+few words and how long it has waited, and one line of description. A question adds its
+recommended answer beside the sparkles icon, with Accept, Deny and Details. Each action has a default
+icon, a check for Accept and Allow and a cross for Deny. The sparkles icon replaces the
+default icon only on the action the agent recommends, so on a question only Accept carries
+it. Accept, Deny, Allow and Details are outlined buttons. Deny strikes out the
+recommendation and opens the details with "Your own answer" focused. An approval adds Allow, Deny
+and Details, even when the harness hides the command. Allow has a menu with "Always allow",
+and Deny has a menu with "Always deny". Its command is shown only in the details.
+
+Details keeps the brief and adds a short report under it. The report starts with the agent
+that asked and what the request blocks. Its sections follow: the full question or the
+command and folder, what it is about, why it matters, and why the recommended answer. The
+headings carry the colour, blue for the question, amber for why it matters, and green for
+the recommendation, with no coloured bars. The other answers are rows, each with a short
+note and a "Choose" button, and a question ends them with a "Your own answer" field. The
+numbered references come last. "Open thread" sits at the right end of the card's buttons.
+Paragraphs start with an indent and keep a reading width of about 72 characters.
+
+The owner's messages sit on the right of a chat, in a filled bubble. An agent's messages
+sit on the left without a bubble. Only the project lead's thread has a message box. Every
+other agent's thread is read-only.
+
+Each screen has at most one filled primary button. Body text uses the full text colour.
+The muted colour is for captions, paths and times.
+
+## Agent names, set on 2026-11-10
+
+The owner said on 2026-11-10 that agents must not carry invented personal names. An agent
+is named by its role. The names are Project lead, Build lead, Planning lead, Design lead,
+Review lead, Builder 1, Builder 2, Reviewer, Test runner, Test writer, Planner and Designer.
+A team lead's team is shown beside its name. The avatar is a glyph for the role. A direct
+message between two agents shows the first avatar, a short dash, and the second avatar.
+
+A new project is named from its goal. It shows "Naming…" in the sidebar until the name is
+set. Commit messages and pull request text are written by a small model, Haiku 5.5 by
+default, chosen in Service settings under "Git messages".
+
+## Libraries, set on 2026-11-10
+
+The rebuilt mock has no build step. It draws its screens with Preact through the
+standalone build of htm, kept in `third_party/htm-preact/`. Its icons are Lucide icons in
+`design/mock/js/icons.js`. Its fonts are Inter and JetBrains Mono from `design/fonts/`.
+Menus, dialogs, tabs and toasts are the mock's own small components in
+`design/mock/js/ui.js`. The mock loads nothing from the network.
+
+The Design page's canvas is the mock's own small component in `design/mock/js/screens/design.js`.
+It needs zoom, Fit and focus on one frame, and no library on the approved list does only
+that. Its screen frames are the mock's own addresses drawn in frames, so the Design page
+always shows the code's current screens. The Palette sheet reads `css/tokens.css` at run
+time to compare it with the design file.
