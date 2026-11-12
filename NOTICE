@@ -68,6 +68,16 @@ where the code lives in LGTM Studio, and where the licence text is.
   Licence texts: third_party/htm-preact/LICENSE and
   third_party/htm-preact/preact.LICENSE.
 
+- CodeMirror 6 (https://codemirror.net), @codemirror/view 6.43.15 and the
+  packages listed in third_party/codemirror/README.md
+  Copyright (C) 2018-2024 Marijn Haverbeke and others. MIT License.
+  In LGTM Studio: third_party/codemirror/codemirror.bundle.js, one unchanged
+  bundle of those packages, loaded only by the web mock in design/mock/ as the
+  Files tab's editor. No production code uses it.
+  The versions, build command and checksum are listed in
+  third_party/codemirror/README.md.
+  Licence texts, one for each package: third_party/codemirror/LICENSE.
+
 LGTM Studio is also inspired by Herdr Synapse
 (https://github.com/vitalysim/herdr-synapse), Copyright 2026 Vitaly
 Simonovich, Apache License 2.0. No Synapse code has been copied into LGTM Studio.

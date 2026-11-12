@@ -36,19 +36,15 @@
 .fx-crumbs .faint { flex: none; }
 .fx-crumbs b { flex: 0 0.01 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--color-text); font-weight: var(--weight-medium); }
 .fx-size { flex: none; font-size: var(--text-sm); white-space: nowrap; }
-@container fxmain (max-width: 620px) { .fx-size, .fx-lbl { display: none; } }
-.fx-code { font-variant-ligatures: none; flex: 1; min-height: 0; overflow: auto; font-family: var(--font-mono); font-size: var(--text-sm); line-height: 1.6; padding: 8px 0 var(--space-6); }
-.fx-code table { border-collapse: collapse; min-width: 100%; }
-.fx-code td { padding: 0; vertical-align: top; }
-.fx-ln { position: sticky; left: 0; min-width: 48px; padding: 0 12px 0 8px !important; text-align: right; color: var(--color-faint); background: var(--color-bg); user-select: none; }
-.fx-tx { white-space: pre; padding-right: var(--space-6) !important; color: var(--color-text); }
-.fx-code.wrap .fx-tx { white-space: pre-wrap; overflow-wrap: anywhere; }
-.fx-code tr:hover .fx-tx, .fx-code tr:hover .fx-ln { background: var(--color-raised); }
-.t-kw { color: var(--color-info); }
-.t-str { color: var(--color-success); }
-.t-cm { color: var(--color-faint); font-style: italic; }
-.t-num { color: var(--color-warn); }
-.t-tag, .t-ty { color: var(--color-accent); }
+@container fxmain (max-width: 620px) { .fx-size, .fx-lbl, .fx-ro { display: none; } }
+@container fxmain (max-width: 460px) { .fx-head .fx-st { display: none; } .fx-crumbs b { min-width: 64px; } }
+.fx-editor { flex: 1; min-height: 0; overflow: hidden; }
+.fx-editor .cm-editor { height: 100%; }
+.fx-unsaved { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--color-text); }
+.fx-ro { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-sm); white-space: nowrap; }
+.fx-busy { flex: none; display: flex; align-items: center; gap: 6px; margin: 0; padding: 6px var(--space-4); font-size: var(--text-sm); color: var(--color-muted); background: var(--color-info-soft); border-bottom: 1px solid var(--color-line); }
+.fx-busy .icon { flex: none; color: var(--color-info); }
+.fx-commit-note { font-size: var(--text-sm); line-height: 1.5; overflow-wrap: anywhere; }
 .fx-state { flex: 1; display: grid; place-content: center; justify-items: center; gap: 6px; padding: var(--space-6); text-align: center; color: var(--color-muted); }
 .fx-state strong { color: var(--color-text); font-weight: var(--weight-medium); }
 .fx-state .btn { margin-top: 6px; }
