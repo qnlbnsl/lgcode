@@ -28,6 +28,11 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   The installer and login integration are not built by the rename and split.
 - **Project configuration in `.lgcode`** (agreed, 2026-11-05).
   Define the folder's contents and loading rules in the next piece.
+  The owner decided on 2026-11-11 that `lgcode init`, run in a repository,
+  creates the folder. It writes the template files, puts the project in setup
+  mode, copies the global settings from `~/.lgcode` when LGcode was set up
+  globally before, and starts the setup conversation with the owner's
+  preferred harness.
   Agents can read the folder, and changes require the owner through the
   existing settings protection.
 - **An overridable default workflow** (agreed, 2026-11-05).
@@ -684,6 +689,10 @@ grades to the model ledger. The ledger feeds the list that says which model to
 try for each kind of task. The design is in "Evaluation rounds and the model
 ledger" in
 [docs/specs/2026-11-05-build-loop-design.md](specs/2026-11-05-build-loop-design.md).
+
+The owner decided on 2026-11-11 that model evaluation leaves Founder OS and becomes
+part of LGcode, as research. LGcode ships one default model selection ledger, and each
+user can update it.
 
 ## Questions that carry their own brief
 

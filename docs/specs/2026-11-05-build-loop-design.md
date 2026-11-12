@@ -125,8 +125,9 @@ were about them.
 |             | majors are open, and it looks only for those.                 |
 | 4 and 5     | The same, and the owner gets a ping saying why another round  |
 |             | is needed. The next round waits for their approval.           |
-| 6           | This is the limit. The owner cuts, splits or accepts the plan |
-|             | if blockers or majors are still open.                         |
+| 6 and on    | There is no hard limit. Each further round asks the owner     |
+|             | first. The owner approves the next round, or says to stop and |
+|             | go on with the work. Decided by the owner on 2026-11-11.      |
 
 Minors are folded in every round, including after round 3. A minor folded in the
 last round has no review after it, so it is marked in the plan and left to the
@@ -181,10 +182,13 @@ places a copy in `~/.sheprd`. Agents can read `.sheprd` and cannot edit it.
 
 These points need the owner's word:
 
-- **How setup's config arrives.** Setup produces the `.sheprd` config, but
-  agents cannot edit that folder. Who writes it is open.
-- **The end of round 6.** Cut, split or accept was the agent's choice, and the
-  owner has not ruled on it.
+- **How setup's config arrives.** Decided by the owner on 2026-11-11: the owner
+  runs `lgcode init` in the repository. It writes the template files into
+  `.lgcode`, copies the global settings from `~/.lgcode` when they exist, and
+  starts setup with the owner's preferred harness.
+- **The end of round 6.** Decided by the owner on 2026-11-11: there is no hard
+  limit. Each round from round 6 on asks the owner first, and the owner either
+  approves it or says to stop and go on with the work.
 - **The ping past round 4.** The owner asked for a notice and for approval of
   each round. The agent made them one ping.
 
@@ -326,9 +330,10 @@ it.
   and compares their grades. Whether the loop starts them itself is open.
 - **What counts as a key task.** The agent suggests a merged sprint. A single
   subitem is too small to grade on its own.
-- **Where the ledger lives for other users.** The ledger is in the owner's
-  Founder OS repository. A user without that repository needs a place in
-  `~/.lgcode`.
+- **Where the ledger lives for other users.** Decided by the owner on
+  2026-11-11: model evaluation moves out of Founder OS and into LGcode, as
+  research. LGcode ships one default model selection ledger, which each user
+  can update.
 - **How the list reaches LGcode.** Whether LGcode reads the model selection
   list from a file or the owner copies choices into settings is open.
 
@@ -524,8 +529,8 @@ because they already know what they wrote.
 Every finding gets folded in every round, minors included. Past round 3
 another review runs only for blockers and majors, and the reviewers are told
 to look only for those. Past round 4, each further round pings the owner with
-why it is needed and waits for their approval. Round 6 is the limit: if
-blockers or majors are still open, the owner cuts, splits or accepts the plan.
+why it is needed and waits for their approval. From round 6 on this repeats
+with no hard limit, until the owner says to stop and go on with the work.
 A minor folded in the last round has no review after it, so it is marked in
 the plan and left for the later checks. When the owner changes a plan's scope,
 the count restarts for the changed part, which gets a full review. 6 Review

@@ -450,8 +450,9 @@ How the orchestrated build is run:
 
 ### OpenPencil: its server or the design file
 
-The owner raised this on 2026-11-11 and has not decided. An agent can change a design in
-two ways.
+The owner raised this on 2026-11-11 and decided the same day: agents change designs
+through OpenPencil's tool server, because it is more reliable. An agent could change a
+design in two ways.
 
 - **Through OpenPencil's Model Context Protocol (MCP) server.** The agent calls tools, and
   OpenPencil changes the file. The editor's own rules keep the file valid, and an open
@@ -459,9 +460,9 @@ two ways.
 - **By editing the `.fig` file directly.** It needs nothing running. The agent must write
   a binary format correctly, and an open editor will not see the change until it reloads.
 
-This plan suggests the server for changes and a direct read of the file for import and
-for drawing the Design page. Step 3 starts by testing both on the real file before any
-code depends on the choice.
+Changes go through the server. A direct read of the file is still allowed for import and
+for drawing the Design page, because reading cannot corrupt the file. Step 3 starts by
+proving the server on the real file before any code depends on it.
 
 ### Decisions the owner has made, and those still open
 
@@ -478,16 +479,31 @@ Made on 2026-11-12:
 - The hosted website's address is chosen. It is kept out of this repository.
 - LGcode is installed from its repository and released on GitHub for now.
 
+Made later on 2026-11-11:
+
+- **Agents change designs through OpenPencil's tool server.** The owner: "It'll be way
+  more reliable with that."
+- **A project is set up by `lgcode init`.** Run inside a repository, it writes the
+  template files into `.lgcode` and puts the project in setup mode. It checks whether
+  LGcode was ever set up globally, in `~/.lgcode`. If it was, it copies those settings and
+  starts the setup conversation with the owner's preferred harness. What `lgcode init`
+  does when LGcode was never set up globally is not decided.
+- **Model evaluation moves into LGcode.** The evaluation rounds, the model ledger and the
+  related research leave Founder OS and become part of LGcode, as research. The owner
+  will strip that content out of Ananke (Enkra) and Founder OS. LGcode ships one default
+  model selection ledger, which each user can update. The run-by-run grades stay out of
+  what LGcode ships.
+- **Review rounds have no hard limit.** From round 6 on, each further round asks the
+  owner first. The owner either approves the next round, and the question comes back
+  after it, or says to stop reviewing and go on with the work.
+
 Still open, in the order they block work:
 
 1. **Does the owner approve the design file's categories?** A Design lead agent proposed
-   them during the second round of the mock. Step 3 needs the approved standard.
-2. **OpenPencil's server or the design file?** Step 3 tests both first.
-3. **Who writes the `.lgcode` config?** Step 3 suggests the engine, from an approved tool
-   call.
-4. **What is a key task for an evaluation round?** The design suggests a merged sprint.
-5. **Where does the ledger live for a user without Founder OS?** Step 7 needs the answer.
-6. **What happens at the end of review round six?** The design leaves this open.
+   them during the second round of the mock, in
+   `design/mock/feedback/2026-11-10-design-categories.md`. The mock shows them at
+   `/r/lgcode/design`. Step 3 needs the approved standard.
+2. **What is a key task for an evaluation round?** The design suggests a merged sprint.
 
 ### What could go wrong
 
