@@ -1,5 +1,3 @@
-import { isServiceVariable } from "@lgtm/contracts/legacyNames"
-
 interface EnvironmentOptions {
   readonly parent: Readonly<Record<string, string | undefined>>
   readonly accountVariables?: Readonly<Record<string, string | undefined>>
@@ -15,7 +13,7 @@ export function buildBaseEnvironment(options: EnvironmentOptions): Record<string
     if (value !== undefined && (baseNames.has(name) || name.startsWith("LC_"))) environment[name] = value
   }
   for (const [name, value] of Object.entries(options.accountVariables ?? {})) {
-    if (value !== undefined && !name.startsWith("HERDR_") && !isServiceVariable(name)) environment[name] = value
+    if (value !== undefined && !name.startsWith("HERDR_") && !name.startsWith("LGTM_")) environment[name] = value
   }
   if (options.lgtmSocket !== undefined) environment.LGTM_SOCKET = options.lgtmSocket
   if (options.lgtmToken !== undefined) environment.LGTM_TOKEN = options.lgtmToken

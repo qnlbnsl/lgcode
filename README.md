@@ -25,8 +25,6 @@ LGTM Studio ships a default workflow that people can override.
 
 ## Where LGTM Studio came from
 
-The project was called Sheprd until 2026-11-08.
-
 LGTM Studio is inspired by [Herdr Synapse](https://github.com/vitalysim/herdr-synapse),
 created by [Vitaly Simonovich](https://github.com/vitalysim). Synapse showed
 that agents inside one Herdr session can work as a team: a shared board, a

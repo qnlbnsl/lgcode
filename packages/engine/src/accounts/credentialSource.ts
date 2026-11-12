@@ -219,7 +219,7 @@ const directory = (configured: string | undefined, fallback: string): string =>
 //   `oauth_creds.json` (packages/core/src/config/storage.ts); both read
 //   2026-11-02 on the main branch. A relative home fails closed, as above.
 // - Cursor, and any other harness: no file store is established in this
-//   repository (.plans/plans/shepherd-engine/scouting.md:89 names only
+//   repository (.plans/plans/lgtm-engine/scouting.md:89 names only
 //   `CURSOR_API_KEY` and `agent login`), so the source has no paths.
 export const credentialSourceFor = (input: {
   readonly harnessId: string;

@@ -423,7 +423,7 @@
         "suite": "design/checks.mjs",
         "line": 45,
         "column": 2,
-        "predicate": "await page.locator('[data-repo=\"lgcode\"]').count()===1"
+        "predicate": "await page.locator('[data-repo=\"lgtm\"]').count()===1"
       },
       "label": "Repositories are the root of navigation",
       "bindings": {},
@@ -439,7 +439,7 @@
         "suite": "design/checks.mjs",
         "line": 46,
         "column": 2,
-        "predicate": "await page.locator('[data-repo=\"lgcode\"] [data-project]').count()===3"
+        "predicate": "await page.locator('[data-repo=\"lgtm\"] [data-project]').count()===3"
       },
       "label": "A repository contains several independent projects",
       "bindings": {},
@@ -503,7 +503,7 @@
         "suite": "design/checks.mjs",
         "line": 50,
         "column": 2,
-        "predicate": "await page.locator('#sidebar [data-open-repo=\"lgcode\"]').count()===1"
+        "predicate": "await page.locator('#sidebar [data-open-repo=\"lgtm\"]').count()===1"
       },
       "label": "Repository has its own projects page",
       "bindings": {},
@@ -679,7 +679,7 @@
         "suite": "design/checks.mjs",
         "line": 67,
         "column": 2,
-        "predicate": "await page.locator('#breadcrumb').textContent().then(t=>t.includes('lgcode')&&t.includes('Agent console'))"
+        "predicate": "await page.locator('#breadcrumb').textContent().then(t=>t.includes('lgtm')&&t.includes('Agent console'))"
       },
       "label": "Changing workspace preserves repository and project",
       "bindings": {},
@@ -1212,7 +1212,7 @@
         "suite": "design/checks.mjs",
         "line": 126,
         "column": 2,
-        "predicate": "await page.locator('#breadcrumb').textContent().then(t=>t.includes('lgcode')&&t.includes('Garden'))"
+        "predicate": "await page.locator('#breadcrumb').textContent().then(t=>t.includes('lgtm')&&t.includes('Garden'))"
       },
       "label": "New project belongs to its selected known repository",
       "bindings": {},
@@ -2540,9 +2540,9 @@
         "suite": "design/operations-checks.mjs",
         "line": 20,
         "column": 2,
-        "predicate": "await text('#auth-title')==='Sign in to LGcode'&&await page.locator('.auth-mark').isVisible()&&(await page.locator('.auth-mark').boundingBox()).y<(await page.locator('#auth-title').boundingBox()).y"
+        "predicate": "await text('#auth-title')==='Sign in to LGTM Studio'&&await page.locator('.auth-mark').isVisible()&&(await page.locator('.auth-mark').boundingBox()).y<(await page.locator('#auth-title').boundingBox()).y"
       },
-      "label": "Login says Sign in to LGcode under the logo mark",
+      "label": "Login says Sign in to LGTM Studio under the logo mark",
       "bindings": {},
       "groups": [
         "auth"
@@ -2828,7 +2828,7 @@
         "suite": "design/operations-checks.mjs",
         "line": 45,
         "column": 2,
-        "predicate": "await page.locator('#permission-perm-iris [data-permission-answer=\"allow\"]').isDisabled()&&(await page.locator('#permission-perm-iris [data-permission-answer=\"allow\"]').getAttribute('title')).startsWith('LGcode is offline')&&await text('#permission-perm-iris').then(t=>t.includes('pnpm'))"
+        "predicate": "await page.locator('#permission-perm-iris [data-permission-answer=\"allow\"]').isDisabled()&&(await page.locator('#permission-perm-iris [data-permission-answer=\"allow\"]').getAttribute('title')).startsWith('LGTM Studio is offline')&&await text('#permission-perm-iris').then(t=>t.includes('pnpm'))"
       },
       "label": "Offline keeps the request readable and disables Allow with the reason",
       "bindings": {},
@@ -2926,7 +2926,7 @@
         "suite": "design/operations-checks.mjs",
         "line": 54,
         "column": 2,
-        "predicate": "await permission.textContent().then(t=>t.includes('pnpm --filter @lgcode/web test')&&t.includes('perm-iris'))"
+        "predicate": "await permission.textContent().then(t=>t.includes('pnpm --filter @lgtm/web test')&&t.includes('perm-iris'))"
       },
       "label": "Permission request shows identity and actual tool input",
       "bindings": {},
@@ -4613,7 +4613,7 @@
         "suite": "design/workspace-tools-checks.mjs",
         "line": 55,
         "column": 121,
-        "predicate": "(await text('#pair-code-value')).length>=20&&(await text('#pair-command')).startsWith('lgcode connect ')"
+        "predicate": "(await text('#pair-code-value')).length>=20&&(await text('#pair-command')).startsWith('lgtm connect ')"
       },
       "label": "The master shows the pairing code and the command",
       "bindings": {},
@@ -6548,7 +6548,7 @@
         "suite": "design/home-checks.mjs",
         "line": 27,
         "column": 2,
-        "predicate": "await text('#home-detail').then(t=>t.includes('pnpm --filter @lgcode/web test')&&t.includes('perm-iris'))"
+        "predicate": "await text('#home-detail').then(t=>t.includes('pnpm --filter @lgtm/web test')&&t.includes('perm-iris'))"
       },
       "label": "Approval detail shows exact input before answering",
       "bindings": {},
@@ -6760,7 +6760,7 @@
         "suite": "design/home-checks.mjs",
         "line": 37,
         "column": 2,
-        "predicate": "await page.locator('#project-location-preview dt').allTextContents().then(t=>t.join()==='Branch,Folder')&&await text('#project-location-preview').then(t=>t.includes('remote-compiler')&&t.includes('~/work/lgcode/.worktrees/remote-compiler'))"
+        "predicate": "await page.locator('#project-location-preview dt').allTextContents().then(t=>t.join()==='Branch,Folder')&&await text('#project-location-preview').then(t=>t.includes('remote-compiler')&&t.includes('~/work/lgtm-studio/.worktrees/remote-compiler'))"
       },
       "label": "Project setup previews the branch and folder on the selected machine as two labelled lines",
       "bindings": {},
@@ -6809,7 +6809,7 @@
         "suite": "design/home-checks.mjs",
         "line": 39,
         "column": 210,
-        "predicate": "await text('#view-body').then(t=>t.includes('Buildbox')&&t.includes('~/work/lgcode/.worktrees/remote-compiler'))"
+        "predicate": "await text('#view-body').then(t=>t.includes('Buildbox')&&t.includes('~/work/lgtm-studio/.worktrees/remote-compiler'))"
       },
       "label": "Project settings retains the selected host and path",
       "bindings": {},
@@ -6878,7 +6878,7 @@
         "suite": "design/home-checks.mjs",
         "line": 43,
         "column": 306,
-        "predicate": "await text('#workspace-location').then(t=>t.includes('Main checkout')&&t.includes('Buildbox')&&t.includes('~/work/lgcode'))"
+        "predicate": "await text('#workspace-location').then(t=>t.includes('Main checkout')&&t.includes('Buildbox')&&t.includes('~/work/lgtm-studio'))"
       },
       "label": "Remote creation without a worktree identifies its main checkout",
       "bindings": {},
@@ -6994,7 +6994,7 @@
         "suite": "design/home-checks.mjs",
         "line": 45,
         "column": 179,
-        "predicate": "await page.locator('#project-machine').inputValue()==='buildbox'&&await page.locator('#project-repo').inputValue()==='lgcode'"
+        "predicate": "await page.locator('#project-machine').inputValue()==='buildbox'&&await page.locator('#project-repo').inputValue()==='lgtm'"
       },
       "label": "Starting on a machine selects a repository present there instead of changing host",
       "bindings": {},
@@ -7723,7 +7723,7 @@
         "suite": "design/home-checks.mjs",
         "line": 63,
         "column": 97,
-        "predicate": "(await cmd.textContent())==='pnpm --filter @lgcode/web test'&&(await cmd.evaluate(e=>getComputedStyle(e).fontFamily)).includes('JetBrains Mono')&&await cmd.isVisible()"
+        "predicate": "(await cmd.textContent())==='pnpm --filter @lgtm/web test'&&(await cmd.evaluate(e=>getComputedStyle(e).fontFamily)).includes('JetBrains Mono')&&await cmd.isVisible()"
       },
       "label": "HOME-5: An approval row shows its command in monospace after the title",
       "bindings": {},
@@ -7739,7 +7739,7 @@
         "suite": "design/home-checks.mjs",
         "line": 64,
         "column": 2,
-        "predicate": "await page.evaluate(()=>{const long='x'.repeat(80);permissionItems.find(r=>r.id==='perm-iris').input.command=long;renderHomeBody();const t=document.querySelector('[data-home-item=\"approval:perm-iris\"] .home-row-command').textContent;permissionItems.find(r=>r.id==='perm-iris').input.command='pnpm --filter @lgcode/web test';renderHomeBody();return t.length===61&&t.endsWith('…')})"
+        "predicate": "await page.evaluate(()=>{const long='x'.repeat(80);permissionItems.find(r=>r.id==='perm-iris').input.command=long;renderHomeBody();const t=document.querySelector('[data-home-item=\"approval:perm-iris\"] .home-row-command').textContent;permissionItems.find(r=>r.id==='perm-iris').input.command='pnpm --filter @lgtm/web test';renderHomeBody();return t.length===61&&t.endsWith('…')})"
       },
       "label": "HOME-5: A long command shows its first 60 characters",
       "bindings": {},
@@ -7771,7 +7771,7 @@
         "suite": "design/home-checks.mjs",
         "line": 67,
         "column": 2,
-        "predicate": "await page.locator('#home-detail .request-fields dt').allTextContents().then(t=>t.join()==='Command,Folder')&&await page.locator('#home-detail .request-fields code').first().textContent()==='pnpm --filter @lgcode/web test'&&(await page.locator('#home-detail .request-fields code').first().evaluate(e=>getComputedStyle(e).fontFamily)).includes('JetBrains Mono')"
+        "predicate": "await page.locator('#home-detail .request-fields dt').allTextContents().then(t=>t.join()==='Command,Folder')&&await page.locator('#home-detail .request-fields code').first().textContent()==='pnpm --filter @lgtm/web test'&&(await page.locator('#home-detail .request-fields code').first().evaluate(e=>getComputedStyle(e).fontFamily)).includes('JetBrains Mono')"
       },
       "label": "HOME-8: An approval shows Command and Folder as labelled monospace lines",
       "bindings": {},
@@ -8018,9 +8018,9 @@
         "suite": "design/revision-checks.mjs",
         "line": 14,
         "column": 2,
-        "predicate": "await text('.brand')==='LGcode'&&(await page.title()).startsWith('LGcode')"
+        "predicate": "await text('.brand')==='LGTM Studio'&&(await page.title()).startsWith('LGTM Studio')"
       },
-      "label": "The product is named LGcode",
+      "label": "The product is named LGTM Studio",
       "bindings": {},
       "groups": [
         "shell"
@@ -8034,7 +8034,7 @@
         "suite": "design/revision-checks.mjs",
         "line": 15,
         "column": 2,
-        "predicate": "!/shephrd|sheprd/i.test(await page.content())"
+        "predicate": "!/lgtm|lgtm/i.test(await page.content())"
       },
       "label": "The old names are gone from the page",
       "bindings": {},
@@ -9334,7 +9334,7 @@
         "suite": "design/revision-checks.mjs",
         "line": 177,
         "column": 2,
-        "predicate": "(await at('.repo-heading:has([data-open-repo=\"lgcode\"]) .attention-number').textContent()).match(/^\\d+$/)"
+        "predicate": "(await at('.repo-heading:has([data-open-repo=\"lgtm\"]) .attention-number').textContent()).match(/^\\d+$/)"
       },
       "label": "A repository rolls up attention",
       "bindings": {},
@@ -11638,7 +11638,7 @@
         "suite": "design/revision-checks.mjs",
         "line": 398,
         "column": 2,
-        "predicate": "await f.evaluate(()=>document.documentElement.dataset.theme==='dark'&&localStorage.getItem('lgcode-theme')==='dark')&&await at('[data-theme-choice=\"dark\"]').getAttribute('aria-pressed')==='true'"
+        "predicate": "await f.evaluate(()=>document.documentElement.dataset.theme==='dark'&&localStorage.getItem('lgtm-theme')==='dark')&&await at('[data-theme-choice=\"dark\"]').getAttribute('aria-pressed')==='true'"
       },
       "label": "Choosing Dark applies and remembers it",
       "bindings": {},
@@ -11655,7 +11655,7 @@
         "suite": "design/revision-checks.mjs",
         "line": 400,
         "column": 2,
-        "predicate": "await f.evaluate(()=>document.documentElement.dataset.theme==='light'&&localStorage.getItem('lgcode-theme')===null)"
+        "predicate": "await f.evaluate(()=>document.documentElement.dataset.theme==='light'&&localStorage.getItem('lgtm-theme')===null)"
       },
       "label": "Match system follows the device and forgets the manual choice",
       "bindings": {},
@@ -11737,7 +11737,7 @@
         "suite": "design/revision-checks.mjs",
         "line": 414,
         "column": 2,
-        "predicate": "await f.evaluate(()=>{const h=document.querySelector('.repo-heading:has([data-open-repo=\"lgcode\"])'),d=document.createElement('i');d.style.color='var(--color-selected)';document.body.append(d);const c=getComputedStyle(d).color;d.remove();return getComputedStyle(h).backgroundColor===c&&h.getBoundingClientRect().height>=28})"
+        "predicate": "await f.evaluate(()=>{const h=document.querySelector('.repo-heading:has([data-open-repo=\"lgtm\"])'),d=document.createElement('i');d.style.color='var(--color-selected)';document.body.append(d);const c=getComputedStyle(d).color;d.remove();return getComputedStyle(h).backgroundColor===c&&h.getBoundingClientRect().height>=28})"
       },
       "label": "The selected repository fills its whole row",
       "bindings": {},
@@ -11801,7 +11801,7 @@
         "suite": "design/revision-checks.mjs",
         "line": 420,
         "column": 52,
-        "predicate": "await f.evaluate(()=>state.view==='repository'&&state.repoId==='lgcode')"
+        "predicate": "await f.evaluate(()=>state.view==='repository'&&state.repoId==='lgtm')"
       },
       "label": "The repository in the top bar opens its projects",
       "bindings": {},
@@ -15007,7 +15007,7 @@
         "suite": "design/revision-checks.mjs",
         "line": 777,
         "column": 2,
-        "predicate": "await m.locator('#bell-dot').evaluate(e=>e.classList.contains('wait'))&&(await m.locator('#attention-toggle').getAttribute('aria-label')).endsWith('LGcode is reconnecting')&&await m.locator('#connection-status').isHidden()"
+        "predicate": "await m.locator('#bell-dot').evaluate(e=>e.classList.contains('wait'))&&(await m.locator('#attention-toggle').getAttribute('aria-label')).endsWith('LGTM Studio is reconnecting')&&await m.locator('#connection-status').isHidden()"
       },
       "label": "TOP-3: a lost connection turns the bell’s dot amber, and the bell’s name says so",
       "bindings": {},
@@ -15985,7 +15985,7 @@
         "suite": "design/onboarding-checks.mjs",
         "line": 23,
         "column": 2,
-        "predicate": "await page.locator('#auth-title').textContent()==='Sign in to LGcode'"
+        "predicate": "await page.locator('#auth-title').textContent()==='Sign in to LGTM Studio'"
       },
       "label": "A first visit is asked to sign in, not welcomed back",
       "bindings": {},
@@ -16002,7 +16002,7 @@
         "suite": "design/onboarding-checks.mjs",
         "line": 25,
         "column": 2,
-        "predicate": "await title(page)==='LGcode'&&await page.locator('#setup').isVisible()"
+        "predicate": "await title(page)==='LGTM Studio'&&await page.locator('#setup').isVisible()"
       },
       "label": "Login opens the first page",
       "bindings": {},
@@ -16793,7 +16793,7 @@
         "suite": "design/onboarding-checks.mjs",
         "line": 90,
         "column": 2,
-        "predicate": "await title(page)==='LGcode'"
+        "predicate": "await title(page)==='LGTM Studio'"
       },
       "label": "Finished setup leaves no step behind to resume",
       "bindings": {},
@@ -16997,7 +16997,7 @@
         "suite": "design/onboarding-checks.mjs",
         "line": 133,
         "column": 2,
-        "predicate": "await title(page)==='LGcode'&&page.url().includes('setup=both')"
+        "predicate": "await title(page)==='LGTM Studio'&&page.url().includes('setup=both')"
       },
       "label": "Coming back returns to setup in the same state",
       "bindings": {},
@@ -18924,7 +18924,7 @@
         "suite": "design/mocks-checks.mjs",
         "line": 115,
         "column": 2,
-        "predicate": "await page.locator('.pencil').isVisible()&&(await page.locator('.pencil').textContent()).includes('design/lgcode.fig')||await page.locator('#pencil-slot[data-src*=\"lgcode.fig\"]').count()===1"
+        "predicate": "await page.locator('.pencil').isVisible()&&(await page.locator('.pencil').textContent()).includes('design/lgtm.fig')||await page.locator('#pencil-slot[data-src*=\"lgtm.fig\"]').count()===1"
       },
       "label": "Edit opens OpenPencil on the repository design file",
       "bindings": {},
@@ -20777,7 +20777,7 @@
         "line": 38,
         "column": 7,
         "test_title": "5.5 external link: catches requiring a Strict session cookie on the initial cross-site static navigation",
-        "assertion_context": "      const firstRequest = await navigation;\n      expect((await firstRequest.allHeaders())[\"cookie\"]).toBeUndefined();\n      await expect(page).toHaveTitle(\"LGcode browser fixture\");\n      expect(await page.evaluate(async () => (await fetch(\"/api/session\", { method: \"POST\" })).status)).toBe(204);\n      expect(await page.evaluate(() => new Promise<boolean>((resolve) => {\n        const socket = new WebSocket(`${location.origin.replace(\"http:\", \"ws:\")}/api`);"
+        "assertion_context": "      const firstRequest = await navigation;\n      expect((await firstRequest.allHeaders())[\"cookie\"]).toBeUndefined();\n      await expect(page).toHaveTitle(\"LGTM Studio browser fixture\");\n      expect(await page.evaluate(async () => (await fetch(\"/api/session\", { method: \"POST\" })).status)).toBe(204);\n      expect(await page.evaluate(() => new Promise<boolean>((resolve) => {\n        const socket = new WebSocket(`${location.origin.replace(\"http:\", \"ws:\")}/api`);"
       },
       "case": {},
       "groups": [],
@@ -20791,7 +20791,7 @@
         "line": 39,
         "column": 13,
         "test_title": "5.5 external link: catches requiring a Strict session cookie on the initial cross-site static navigation",
-        "assertion_context": "      expect((await firstRequest.allHeaders())[\"cookie\"]).toBeUndefined();\n      await expect(page).toHaveTitle(\"LGcode browser fixture\");\n      expect(await page.evaluate(async () => (await fetch(\"/api/session\", { method: \"POST\" })).status)).toBe(204);\n      expect(await page.evaluate(() => new Promise<boolean>((resolve) => {\n        const socket = new WebSocket(`${location.origin.replace(\"http:\", \"ws:\")}/api`);\n        const timer = setTimeout(() => { socket.close(); resolve(false); }, 3_000);"
+        "assertion_context": "      expect((await firstRequest.allHeaders())[\"cookie\"]).toBeUndefined();\n      await expect(page).toHaveTitle(\"LGTM Studio browser fixture\");\n      expect(await page.evaluate(async () => (await fetch(\"/api/session\", { method: \"POST\" })).status)).toBe(204);\n      expect(await page.evaluate(() => new Promise<boolean>((resolve) => {\n        const socket = new WebSocket(`${location.origin.replace(\"http:\", \"ws:\")}/api`);\n        const timer = setTimeout(() => { socket.close(); resolve(false); }, 3_000);"
       },
       "case": {},
       "groups": [],
@@ -20805,7 +20805,7 @@
         "line": 40,
         "column": 7,
         "test_title": "5.5 external link: catches requiring a Strict session cookie on the initial cross-site static navigation",
-        "assertion_context": "      await expect(page).toHaveTitle(\"LGcode browser fixture\");\n      expect(await page.evaluate(async () => (await fetch(\"/api/session\", { method: \"POST\" })).status)).toBe(204);\n      expect(await page.evaluate(() => new Promise<boolean>((resolve) => {\n        const socket = new WebSocket(`${location.origin.replace(\"http:\", \"ws:\")}/api`);\n        const timer = setTimeout(() => { socket.close(); resolve(false); }, 3_000);\n        socket.onopen = () => { clearTimeout(timer); socket.close(); resolve(true); };"
+        "assertion_context": "      await expect(page).toHaveTitle(\"LGTM Studio browser fixture\");\n      expect(await page.evaluate(async () => (await fetch(\"/api/session\", { method: \"POST\" })).status)).toBe(204);\n      expect(await page.evaluate(() => new Promise<boolean>((resolve) => {\n        const socket = new WebSocket(`${location.origin.replace(\"http:\", \"ws:\")}/api`);\n        const timer = setTimeout(() => { socket.close(); resolve(false); }, 3_000);\n        socket.onopen = () => { clearTimeout(timer); socket.close(); resolve(true); };"
       },
       "case": {},
       "groups": [],
@@ -21783,7 +21783,7 @@
         "line": 5,
         "column": 9,
         "test_title": "provides a browser document for end-to-end tests",
-        "assertion_context": "  await page.setContent(\"<main><h1>LGcode</h1></main>\");\n  await expect(page.getByRole(\"heading\", { name: \"LGcode\" })).toBeVisible();\n});"
+        "assertion_context": "  await page.setContent(\"<main><h1>LGTM Studio</h1></main>\");\n  await expect(page.getByRole(\"heading\", { name: \"LGTM Studio\" })).toBeVisible();\n});"
       },
       "case": {},
       "groups": [],

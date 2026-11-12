@@ -1,7 +1,7 @@
 import { constants } from "node:fs"
 import { access, stat } from "node:fs/promises"
 import * as NodeServices from "@effect/platform-node/NodeServices"
-import { isServiceVariable, ProjectName, type Account, type HarnessSettings, type ProjectLeadDefaults } from "@lgtm/contracts"
+import { ProjectName, type Account, type HarnessSettings, type ProjectLeadDefaults } from "@lgtm/contracts"
 import { HomeDirectory } from "@lgtm/t3-provider-instance/HostProcess"
 import { mergeProviderInstanceEnvironment } from "@lgtm/t3-provider-instance/instanceEnvironment"
 import * as Effect from "effect/Effect"
@@ -29,7 +29,7 @@ export const accountReadiness = (input: Input, harness: HarnessSettings, account
   if (!(yield* adapterInstalled(harness))) return "missing-executable" as const
   let variables: Record<string, string> = {}
   for (const [name, raw] of Object.entries(account.environment ?? {})) {
-    if (isServiceVariable(name) || name.startsWith("HERDR_")) continue
+    if (name.startsWith("LGTM_") || name.startsWith("HERDR_")) continue
     if (raw.startsWith("secret:")) {
       if (raw.startsWith("secret:client.")) return "unavailable" as const
       const value = yield* input.runtime.secrets.resolve(raw)

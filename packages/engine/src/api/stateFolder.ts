@@ -1,20 +1,11 @@
-import { existsSync, lstatSync, mkdirSync } from "node:fs";
+import { lstatSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { legacyStateFolderName, stateFolderName } from "@lgtm/contracts/legacyNames";
-
-// An installation from before the rename keeps its folder: the old name is
-// used while it exists and the new one does not.
-const preferCurrent = (parent: string): string => {
-  const current = resolve(parent, stateFolderName);
-  const legacy = resolve(parent, legacyStateFolderName);
-  return !existsSync(current) && existsSync(legacy) ? legacy : current;
-};
 
 export const stateFolder = (environment: Record<string, string | undefined>): string => {
   if (environment.LGTM_HOME !== undefined) return resolve(environment.LGTM_HOME);
-  if (environment.XDG_STATE_HOME !== undefined) return preferCurrent(environment.XDG_STATE_HOME);
+  if (environment.XDG_STATE_HOME !== undefined) return resolve(environment.XDG_STATE_HOME, "lgtm");
   if (environment.HOME === undefined) throw new Error("home folder is unavailable");
-  return preferCurrent(resolve(environment.HOME, ".local/state"));
+  return resolve(environment.HOME, ".local/state/lgtm");
 };
 
 // No repair of unsafe permissions: fail before creating the lock, credential

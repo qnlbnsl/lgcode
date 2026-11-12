@@ -3,7 +3,7 @@
  "domain": "engine",
  "work_area": "infra",
  "source": "AGENTS.md",
- "summary": "Sets up and maintains Shephrd's Node.js 26 workspace, toolchain, Herdr plugin manifest and copied third-party packages.",
+ "summary": "Sets up and maintains LGTM Studio's Node.js 26 workspace, toolchain, Herdr plugin manifest and copied third-party packages.",
  "edit": [
   "package.json",
   "pnpm-workspace.yaml",
@@ -45,7 +45,7 @@
    "words": 76,
    "worker": true,
    "lead": true,
-   "why": "What Shephrd is and that it is not a Synapse fork; every scope needs it to stay in bounds."
+   "why": "What LGTM Studio is and that it is not a Synapse fork; every scope needs it to stay in bounds."
   },
   {
    "heading": "Status",

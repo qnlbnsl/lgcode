@@ -8,7 +8,7 @@ import type { HarnessSettings } from "@lgtm/contracts";
 export const denyArguments = (harness: HarnessSettings, folder: string, stateFolder: string, environment: Record<string, string | undefined>): string[] => {
   const mechanism = harness.denyReadMechanism;
   if (mechanism._tag === "none") return [];
-  const paths = [".claude/settings.json", ".claude/settings.local.json", ".claude/commands", ".claude/agents", ".mcp.json", ".codex", ".gemini", ".cursor", ".lgtm", ".lgcode"].map((path) => join(folder, path));
+  const paths = [".claude/settings.json", ".claude/settings.local.json", ".claude/commands", ".claude/agents", ".mcp.json", ".codex", ".gemini", ".cursor", ".lgtm"].map((path) => join(folder, path));
   if (environment.CLAUDE_CONFIG_DIR !== undefined) paths.push(resolve(folder, environment.CLAUDE_CONFIG_DIR));
   return [
     ...mechanism.readArguments.map((argument) => argument.replaceAll("{stateFolder}", realpathSync(stateFolder))),

@@ -29,7 +29,7 @@ export const RECORDING_STEP = { id: "recording", title: "the fixtures of Claude 
 
 // L-1: every outcome is checked by the same routine with a live or fake driver.
 export const PROBE_STEPS = [
-  { id: "sandbox-mcp", title: "PB-A3: each real harness calls a LGTM Studio tool through its socket" },
+  { id: "sandbox-mcp", title: "PB-A3: each real harness calls an LGTM Studio tool through its socket" },
   { id: "removed-variables", title: "SEC-PB-5 and SEC-PB-8: both variables removed; owner ancestry refuses, including core inheritance" },
   { id: "state-read", title: "SEC-PB-6: each harness attempts the non-secret state canary read" },
   { id: "slash-up", title: "SEC-PB-2: Codex child to Claude parent /compact arrives escaped and runs no command; no Codex parent receiver in this team" },

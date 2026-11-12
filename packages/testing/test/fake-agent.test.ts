@@ -632,7 +632,7 @@ live("replay history on load sends the scripted history, in order, as user and a
   )
 )
 
-live("a LGTM Studio command step connects to LGTM_SOCKET with the token in an Authorization bearer header, and never prints the token (breaks if the step skips the token, sends it another way, or echoes it into the thread; rows 54 and 71)", () =>
+live("an LGTM Studio command step connects to LGTM_SOCKET with the token in an Authorization bearer header, and never prints the token (breaks if the step skips the token, sends it another way, or echoes it into the thread; rows 54 and 71)", () =>
   Effect.gen(function*() {
     const socketFolder = yield* temporaryFolder
     const socketPath = join(socketFolder, "s")

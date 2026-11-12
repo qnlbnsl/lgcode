@@ -15,7 +15,7 @@ function initializeTheme(){
   const saved=localStorage.getItem('lgtm-theme');
   if(['light','dark'].includes(saved))chosenTheme=saved;
   else{
-   const legacy=localStorage.getItem('sheprd-mock-direction');
+   const legacy=localStorage.getItem('lgtm-mock-direction');
    if(legacy==='b'||legacy==='c'){chosenTheme=legacy==='b'?'light':'dark';localStorage.setItem('lgtm-theme',chosenTheme)}
   }
  }catch{}

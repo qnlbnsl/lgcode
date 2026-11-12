@@ -7,7 +7,6 @@ import { runCommand } from "./commands/run.ts"
 import { setCarrierToken } from "./commands/carrierToken.ts"
 import { setSecret } from "./commands/setSecret.ts"
 import { serveDetach } from "./serve.ts"
-import { adoptLegacyVariables } from "@lgtm/contracts/legacyNames"
 
 const version = (): string =>
   (JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as { version: string }).version
@@ -74,7 +73,6 @@ const exit = (code: number): void => {
   process.stdout.write("", () => process.stderr.write("", () => process.exit(code)))
 }
 
-adoptLegacyVariables(process.env)
 const fiber = Effect.runFork(main(process.argv.slice(2), process.env))
 let signalCode: number | undefined
 for (const [signal, code] of [["SIGTERM", 143], ["SIGINT", 130]] as const) {

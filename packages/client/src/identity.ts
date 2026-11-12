@@ -1,6 +1,5 @@
-import { existsSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
-import { legacyStateFolderName, stateFolderName } from "@lgtm/contracts/legacyNames"
 import { ClientError } from "./errors.ts"
 
 export type Environment = Readonly<Record<string, string | undefined>>
@@ -15,20 +14,12 @@ export interface Identity {
 
 const present = (value: string | undefined): value is string => value !== undefined && value !== ""
 
-// An installation from before the rename keeps its folder: the old name is
-// used while it exists and the new one does not.
-const preferCurrent = (parent: string): string => {
-  const current = resolve(parent, stateFolderName)
-  const legacy = resolve(parent, legacyStateFolderName)
-  return !existsSync(current) && existsSync(legacy) ? legacy : current
-}
-
 // The state folder, resolved as the engine resolves it (engine/api/stateFolder.ts).
 export const stateFolder = (environment: Environment): string => {
   if (present(environment.LGTM_HOME)) return resolve(environment.LGTM_HOME)
-  if (present(environment.XDG_STATE_HOME)) return preferCurrent(environment.XDG_STATE_HOME)
+  if (present(environment.XDG_STATE_HOME)) return resolve(environment.XDG_STATE_HOME, "lgtm")
   if (!present(environment.HOME)) throw new ClientError({ message: "the home folder is unavailable; set LGTM_HOME" })
-  return preferCurrent(resolve(environment.HOME, ".local/state"))
+  return resolve(environment.HOME, ".local/state/lgtm")
 }
 
 // Both variables name an agent. Neither names the owner's terminal. One alone

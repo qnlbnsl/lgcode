@@ -23,7 +23,6 @@ import { SecretStore as SecretStoreService } from "./commands/SecretStore.ts";
 import { application, listen } from "./api/server.ts";
 import { serviceLog } from "./api/serviceLog.ts";
 import { prepareStateFolder, stateFolder } from "./api/stateFolder.ts";
-import { adoptLegacyVariables } from "@lgtm/contracts/legacyNames";
 import * as CommandHandler from "./commands/CommandHandler.ts";
 import { isInferredSecretValue } from "./identity/inferredSecret.ts";
 import { redactingLoggerLayer } from "./identity/logger.ts";
@@ -189,7 +188,6 @@ const program = (inheritedToken: string | undefined, webPassword: Redacted.Redac
 // A graceful signal interrupts the whole scoped program. Finalizers close
 // connections and adapters before releasing the lifetime lock.
 if (process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url) {
-  adoptLegacyVariables(process.env);
   const inheritedToken = process.env.LGTM_TOKEN;
   const webPassword = process.env.LGTM_WEB_PASSWORD === undefined ? undefined : Redacted.make(process.env.LGTM_WEB_PASSWORD);
   delete process.env.LGTM_WEB_PASSWORD;
