@@ -31,12 +31,12 @@ and step 1 replaces it with a checked one.
 ## What the owner ruled on 2026-11-12
 
 - **The mock becomes the website.** The React page in `packages/web` is replaced by it.
-- **The website is written in React and TypeScript.** The owner allowed another framework
-  if one fits better. This plan keeps React, because `packages/web` already uses it and
-  the mock's Preact components move to React with little change.
-- **The mock is converted before it is connected.** The owner offered to have the mock
-  converted to React first. This plan takes that offer. The converted screens live in
-  `packages/web`, with the mock's stylesheets and structure kept as they are.
+- **The mock is connected as it is.** The owner ruled later on 2026-11-12 that the
+  website is not converted first. The mock's plain JavaScript screens are connected to the
+  engine. The owner starts the conversion to React and TypeScript, or to another
+  framework, after the website works.
+- **The contract moves to gRPC and Protocol Buffers.** The owner ruled: "gRPC is the way to
+  go."
 - **LGTM Studio is the first project, and it is used on itself.** As soon as the website
   can run a project on the real engine, the rest of this plan is built as projects inside
   LGTM Studio, on its own repository.
@@ -66,13 +66,35 @@ The choices:
 | Move the contract to Protocol Buffers, and carry it over the same WebSocket | About 110 requests are rewritten as `.proto` files, and code is generated for TypeScript. | Large. The contract no longer comes from Effect, so code copied from T3 Code needs adapting. A phone app in Swift or Kotlin could then use the same contract. |
 | Move to gRPC | The same rewrite, plus a different server. A browser cannot speak gRPC directly, so it needs gRPC-Web or Connect, and a proxy or a second listener. | Largest. It replaces the working API layer. |
 
-This plan's recommendation: measure first. Step 1 times a call and a pushed update on the
-real website. If a call is slow, the cause is found before the transport is blamed. The
-binary message format is switched on in step 1, because it is nearly free. Protocol
-Buffers is decided after the measurement, and it matters most if the phone apps will not
-be written in TypeScript.
+The owner chose gRPC on 2026-11-12. The rest of this section says how this plan carries
+that out. The owner has not ruled on these details.
 
-The owner has not ruled on this.
+**When the move happens.** The mock is connected first over the WebSocket that exists, in
+steps 1 and 2. The move to gRPC is step 3. This order gets a working website soonest. The
+mapping from the engine's records to the screens does not depend on the transport, so it
+is not written twice.
+
+**How a browser reaches gRPC.** A browser cannot speak gRPC itself. This plan suggests the
+Connect protocol. One server answers gRPC, gRPC-Web and Connect on the same port, from the
+same `.proto` files. The command, the Model Context Protocol server and a future phone app
+use gRPC. The browser uses Connect, with no proxy between. The library's current
+documentation is read before any code is written.
+
+**The owner's idea of a server-rendered website in the middle.** The owner suggested
+Next.js or Nuxt, with the website's own server calling the engine over gRPC. This plan
+advises against it for this product, for three reasons.
+
+1. The slow part of any call is the trip between the browser and the server. A middle
+   server adds a second trip and does not shorten the first.
+2. The engine and the middle server would run on the same machine, where gRPC saves
+   nothing a person could notice.
+3. The pages are live and signed in. Server rendering helps pages that must load fast for
+   strangers and search engines. Live updates would still need their own open connection
+   to the browser.
+
+The engine keeps serving the website's files, and the browser talks to the engine
+directly. The choice of framework for the screens is separate, and it is made when the
+conversion starts.
 
 ## What each screen needs
 
@@ -111,15 +133,11 @@ mean the request returns everything the screen shows.
 Each step ends with something the owner can do on the real website. The work is on the
 branch `area/build-loop`, with one pull request for each step.
 
-### Step 0: the mock is converted to React and TypeScript
-
-The owner arranges this with another agent. The converted website lives in `packages/web`.
-It still runs on the sample data, and it looks and behaves as the mock does.
-
 ### Step 1: one real connection, and the website stops inventing data
 
 - Write a real connection for the mock. It uses the existing browser client in
-  `packages/client`, and it lives in TypeScript.
+  `packages/client`, and it lives in TypeScript. Nothing else in the mock knows which
+  transport it uses, so step 3 changes only this file.
 - Add a live mode to `mount()`. In live mode the mock does not call `seed()` and does not
   start the simulation. It fills its store from `snapshot` and keeps it current from
   `subscribe`.
@@ -152,11 +170,22 @@ The owner can then: do everything the old website did, on the new one. The old p
 removed at the end of this step.
 
 From here on, LGTM Studio is used on itself. The owner creates a project in the LGTM
-Studio repository for each later step, and its project lead runs the work. Until step 5
+Studio repository for each later step, and its project lead runs the work. Until step 6
 is built, the lead is steered by hand: the owner, or the orchestrating agent, tells it
-what to do next. After step 5 the workflow does that.
+what to do next. After step 6 the workflow does that.
 
-### Step 3: the engine gains what the daily surfaces show and it lacks
+### Step 3: the contract moves to gRPC and Protocol Buffers
+
+- The requests in `packages/contracts` are written as `.proto` files, and the TypeScript
+  types are generated from them.
+- The engine answers gRPC and Connect. The website, the command and the Model Context
+  Protocol server move to it.
+- The old WebSocket API is removed when nothing uses it.
+- A call and a pushed update are timed before and after the move, on the real website.
+
+The owner can then: use the same website, with every call on the new contract.
+
+### Step 4: the engine gains what the daily surfaces show and it lacks
 
 These are small additions to records that already exist.
 
@@ -171,7 +200,7 @@ These are small additions to records that already exist.
 The owner can then: use Home, Chat, the board and the sprint page exactly as the mock
 shows them.
 
-### Step 4: the new surfaces the engine has nothing for
+### Step 5: the new surfaces the engine has nothing for
 
 Each of these is a new piece in the engine, a set of requests, and the screen's mapping.
 
@@ -187,7 +216,7 @@ Each of these is a new piece in the engine, a set of requests, and the screen's 
 
 The owner can then: stop opening a terminal for everyday work on a project.
 
-### Step 5: the autonomous workflow behind the Workflow tab
+### Step 6: the autonomous workflow behind the Workflow tab
 
 "Build loop" here means the product feature: the autonomous workflow that moves a project
 through its eight phases without the owner. It does not mean the way this plan itself is
@@ -198,7 +227,7 @@ here, because they show the loop and nothing else.
 The owner can then: type a goal and next hear from LGTM Studio when the merge request is
 ready.
 
-### Step 6: installing and hosting
+### Step 7: installing and hosting
 
 - The documented steps build the package and install it from the repository.
 - The website is served at the owner's address over HTTPS. The owner sets up the proxy.
@@ -210,14 +239,16 @@ The owner can then: stop using the terminal, which is the end point the owner se
 
 The build loop plan put the loop first and brought the website along. The owner's
 direction on 2026-11-12 puts the website first: connect the mock, then build what is
-missing. This plan keeps the loop as step 5. Steps 1 to 4 here replace the website parts
+missing. This plan keeps the loop as step 6. Steps 1 to 5 here replace the website parts
 of the build loop plan's steps 1 and 2.
 
 ## Decisions the owner needs to make
 
-1. **Does the contract move to Protocol Buffers?** This plan recommends measuring first
-   and switching only the message format in step 1.
-2. **Is the autonomous workflow step 5, after the website works on real data?** This plan
+1. **Is the move to gRPC step 3, after the website works on the existing connection?**
+   This plan assumes yes.
+2. **Does the browser reach the engine directly through Connect, with no server-rendered
+   website in the middle?** This plan recommends yes.
+3. **Is the autonomous workflow step 6, after the website works on real data?** This plan
    assumes yes.
 
 ## What could go wrong
