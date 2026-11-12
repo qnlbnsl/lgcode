@@ -6,7 +6,7 @@ import { createServer } from "node:net"
 import { act } from "react"
 import { createRoot } from "react-dom/client"
 import * as NodeSocket from "@effect/platform-node/NodeSocket"
-import { makeNodeSocket } from "@lgcode/client/nodeSocket"
+import { makeNodeSocket } from "@lgtm/client/nodeSocket"
 import { connectWith, type Client } from "../../client/src/core.ts"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
@@ -29,7 +29,7 @@ import { createGitSession, readResult, workspaceKey } from "../src/git/state.ts"
 // Only browser socket construction is substituted. The client below performs
 // authenticated real RPCs against the real handler, SQL, redactor and Git.
 const browser = vi.hoisted(() => ({ client: undefined as Client | undefined }))
-vi.mock("@lgcode/client/browser", () => ({ connect: () => Effect.succeed(browser.client!) }))
+vi.mock("@lgtm/client/browser", () => ({ connect: () => Effect.succeed(browser.client!) }))
 ;(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 let rig: Rig
 const git = (path: string, ...args: string[]) => execFileSync("/usr/bin/git", ["-C", path, ...args], { encoding: "utf8" }).trim()
@@ -42,7 +42,7 @@ const unusedPort = () => new Promise<number>((resolve, reject) => {
   })
 })
 beforeEach(() => {
-  rig = makeRig(); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  rig = makeRig(); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   git(rig.work, "init", "-b", "main"); git(rig.work, "config", "user.name", "Web Git test"); git(rig.work, "config", "user.email", "web@example.invalid"); git(rig.work, "config", "commit.gpgsign", "false")
   save(rig.work, "file.txt", "base\n"); git(rig.work, "add", "--all"); git(rig.work, "commit", "-m", "Initial")
   HTMLDialogElement.prototype.showModal = function () { this.open = true }

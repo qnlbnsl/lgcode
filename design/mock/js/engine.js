@@ -1,7 +1,7 @@
 // The website's connection to the engine.
 //
 // In the real product, every change the owner makes is a client API call: an Effect RPC
-// request named by its tag in @lgcode/contracts, such as "prompt" or "answer". Every update
+// request named by its tag in @lgtm/contracts, such as "prompt" or "answer". Every update
 // the engine pushes arrives on the "subscribe" stream. The mock has no engine, so it applies
 // each change in the browser, and it reports the call here as well.
 //
@@ -16,7 +16,7 @@ let current = local;
 export function setConnection(connection) { current = connection || local; }
 export function connection() { return current; }
 
-// A request from the website to the engine. `tag` is the RPC's tag in @lgcode/contracts.
+// A request from the website to the engine. `tag` is the RPC's tag in @lgtm/contracts.
 export function call(tag, payload) {
   try { current.call(tag, payload); } catch (e) { console.error('The connection failed to send', tag, e); }
 }

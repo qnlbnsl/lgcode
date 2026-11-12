@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 
 import { expect, it } from "@effect/vitest";
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgtm/contracts";
 
 import { findLeaks, threadSources } from "../support/acceptance.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";

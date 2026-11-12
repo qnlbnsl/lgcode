@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url"
 
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { assert, it } from "@effect/vitest"
-import { HarnessSettings } from "@lgcode/contracts"
+import { HarnessSettings } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { afterEach, beforeEach, vi } from "vitest"
@@ -46,7 +46,7 @@ const program = async (directory: string, name: string, mode = 0o755) => {
 
 beforeEach(async () => {
   // Keep the formerly random `npx` ancestor deterministic (issue 361).
-  root = await mkdtemp(join(tmpdir(), "lgcode-harnesses-npx-"))
+  root = await mkdtemp(join(tmpdir(), "lgtm-harnesses-npx-"))
   binDirectory = join(root, "bin")
   pathDirectory = join(root, "path-one")
   otherPathDirectory = join(root, "path-two")
@@ -107,7 +107,7 @@ live("every resolved harness records its modes with a level, so a mode change is
     for (const harness of result.harnesses) {
       const ids = harness.reportedModes.map((mode) => mode.id)
       assert.equal(new Set(ids).size, ids.length, `${harness.id} lists a mode twice`)
-      // Every mode LGcode asks for is a mode the harness reports, at the level that asks for it or below.
+      // Every mode LGTM Studio asks for is a mode the harness reports, at the level that asks for it or below.
       const levels = ["read-only", "ask", "edit", "full"] as const
       for (const [index, level] of levels.entries()) {
         const reported = harness.reportedModes.find((mode) => mode.id === harness.permissionMapping[level])

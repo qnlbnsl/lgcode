@@ -158,7 +158,7 @@ The mock makes this part of the website, so it no longer waits until after it.
 - [ ] Pair with an expiring code, and confirm on both computers. The owner approved
       a pairing code for machines on 2026-11-06, and chose that the website generates
       it. Web login stays one password.
-- [ ] Add `lgcode connect <address>`, which starts the pairing from the other computer.
+- [ ] Add `lgtm connect <address>`, which starts the pairing from the other computer.
 - [ ] Secure the link with a secure WebSocket and self-signed certificates that each
       side trusts after pairing, as the owner described on 2026-11-06.
 - [ ] Have the worker connect out to the master, and report its capacity in agent
@@ -167,7 +167,7 @@ The mock makes this part of the website, so it no longer waits until after it.
       and a worker cannot place projects. Moving running work is separate.
 - [ ] Run agents through the same runner commands the engine uses locally, with the
       master's event log as the only record, and no duplicate work after a failure.
-- [ ] Let an agent's LGcode tools, the terminal and git reads reach the right machine.
+- [ ] Let an agent's LGTM Studio tools, the terminal and git reads reach the right machine.
 - [ ] Rework who-is-calling checks, because the master cannot inspect a process on
       another machine.
 - [ ] Decide how work moves between machines. Git through the shared remote is the
@@ -350,7 +350,7 @@ These are on `.scratch/security/attack-todo.md` as what must hold.
 - [ ] Step 1: Engine data, including current first-run, service, stage, and mocks data.
 - [ ] Step 2: Replace the page in React and pass the full browser parity matrix.
 - [ ] Step 3: Real terminals and subscription sign-in.
-- [ ] Step 4: Installer and `.lgcode` configuration.
+- [ ] Step 4: Installer and `.lgtm` configuration.
 - [ ] Step 5: Pairing, worker mode, remote runner, and final integration.
 
 Each gate requires `pnpm check` and `pnpm live-check:web` from the website team.

@@ -1,4 +1,4 @@
-# What Shephrd keeps from Herdr and Herdr Synapse
+# What LGTM Studio keeps from Herdr and Herdr Synapse
 
 Researched on 2026-10-30, from Herdr 0.9.3 on the owner's machine and the
 Herdr Synapse checkout one folder up from this repository (the owner's fork,
@@ -8,13 +8,13 @@ the fork.
 "Synapse-list item N" means item N of the earlier message-board feature list
 at `docs/message-board/features.md` in the `herdr-synapse` checkout. That list
 has 60 items and records the owner's decisions of 2026-10-25. It remains the
-main input for Shephrd's message board.
+main input for LGTM Studio's message board.
 
-## Herdr: what Shephrd stands on
+## Herdr: what LGTM Studio stands on
 
 Herdr is a terminal workspace manager for coding agents. It has a terminal
 client, a server that keeps running when the client closes, and a socket
-interface that answers in JSON. Shephrd uses these parts of it:
+interface that answers in JSON. LGTM Studio uses these parts of it:
 
 - **Visible agent sessions.** `herdr agent start --kind <kind>` starts an
   interactive agent in its own pane. Herdr knows 24 agent kinds, including
@@ -23,7 +23,7 @@ interface that answers in JSON. Shephrd uses these parts of it:
   or unknown. "Blocked" means Herdr recognised an approval or a question on
   screen. Stall detection and the waker both read these states.
 - **Safe typing.** `prompt_if_idle` types a prompt only when the agent is
-  idle. Shephrd's typed nudge, for agents that cannot be woken any other way,
+  idle. LGTM Studio's typed nudge, for agents that cannot be woken any other way,
   goes through it.
 - **Reading and keys.** `agent read`, `agent send-keys` and
   `agent wait --until blocked`.
@@ -37,9 +37,9 @@ interface that answers in JSON. Shephrd uses these parts of it:
 - **Remote machines.** `herdr --remote <ssh-target>` and `herdr machine`
   reach agents on other machines over SSH (Secure Shell).
 - **Plugins.** A `herdr-plugin.toml` manifest declares startup commands and
-  actions. This is how Shephrd installs into Herdr.
+  actions. This is how LGTM Studio installs into Herdr.
 
-Herdr gaps that Shephrd must work around:
+Herdr gaps that LGTM Studio must work around:
 
 - There is no `agent stop`. Closing the pane is the only way to stop an agent.
 - `agent start` sent right after a pane split was once silently swallowed.
@@ -59,7 +59,7 @@ file.
 - **The operator is proven, not claimed.** Synapse identifies the human by
   the process tree and a verified origin, not by a name an agent could set.
   `operator grant` hands that authority to an agent with an expiry, and every
-  use is written to the audit log. Shephrd's token per agent (T3 Code
+  use is written to the audit log. LGTM Studio's token per agent (T3 Code
   research, item 1) replaces the process-tree check for agents. The rule that
   the owner's authority must be proven stays.
 - **Only an idle, quiet agent is spoken to.** Synapse types a nudge only when
@@ -99,7 +99,7 @@ file.
   The dashboard can start from it.
 - **The small MCP server** (`canvas_mcp.py`). It is a standard-library MCP
   server with the launch flags already wired. It is the natural start for
-  Shephrd's MCP server.
+  LGTM Studio's MCP server.
 - **The test session** (`bin/herdr-synapse-sandbox`). It runs an isolated
   Herdr session with its own state, for trying things without touching real
   teams.
@@ -116,7 +116,7 @@ The Synapse-list's cut list (its section 14) still applies:
 
 ## Lessons from running Synapse in the Foundry
 
-These are the failures that Shephrd's design has to prevent. Each one was
+These are the failures that LGTM Studio's design has to prevent. Each one was
 seen in a real Foundry run.
 
 - **A wake that was held was never delivered.** A planner stalled five times,

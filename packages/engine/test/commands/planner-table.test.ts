@@ -1,4 +1,4 @@
-import { CommandsRpcGroup } from "@lgcode/contracts";
+import { CommandsRpcGroup } from "@lgtm/contracts";
 import { expect, it } from "vitest";
 import { loadLists } from "../support/fixturePiece.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";

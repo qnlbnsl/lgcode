@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 

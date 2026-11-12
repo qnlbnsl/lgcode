@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest"
 import * as Effect from "effect/Effect"
-import type { Client } from "@lgcode/client/browser"
-import type { ClientSnapshot } from "@lgcode/contracts"
+import type { Client } from "@lgtm/client/browser"
+import type { ClientSnapshot } from "@lgtm/contracts"
 import { readNavigation, stringPages } from "../src/data/projectReads.ts"
 
 const snapshot = (project?: object, failedSections?: string[]) => ({ sequence: 1, agents: [], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0,

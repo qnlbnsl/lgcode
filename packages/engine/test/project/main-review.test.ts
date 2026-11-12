@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { join } from "node:path"
 import { it } from "@effect/vitest"
 import * as NodeSocket from "@effect/platform-node/NodeSocket"
-import { makeNodeSocket } from "@lgcode/client/nodeSocket"
+import { makeNodeSocket } from "@lgtm/client/nodeSocket"
 import { connectWith, type Client } from "../../../client/src/core.ts"
 import * as Effect from "effect/Effect"
 import * as Fiber from "effect/Fiber"
@@ -54,7 +54,7 @@ const refusal = (effect: Effect.Effect<any, any>) => effect.pipe(Effect.result, 
   expect(r._tag).toBe("Failure"); if (r._tag !== "Failure") throw new Error("expected refusal"); return r.failure.reason as string
 }))
 beforeEach(() => {
-  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   git(rig.work, "init", "-b", "main"); git(rig.work, "config", "user.name", "Review fixture")
   git(rig.work, "config", "user.email", "review@example.invalid"); git(rig.work, "config", "commit.gpgsign", "false")
   save(rig.work, "file.txt", "base\n"); commit(rig.work, "Initial")

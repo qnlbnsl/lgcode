@@ -12,7 +12,7 @@ import { agent, boardState, change, encodedBytes, eventsOf, owner, postAs, provi
 import { channel as channelEvent, post as postEvent } from "./fixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const run = <A, E, R>(body: (credentials: Record<string, Credential>) => Effect.Effect<A, E, R>) => provideBoard(rig, Effect.gen(function* () {
   yield* registerRebuildCheck();

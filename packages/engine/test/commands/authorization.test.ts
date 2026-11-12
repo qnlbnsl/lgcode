@@ -2,7 +2,7 @@ import { mkdirSync, renameSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { it } from "@effect/vitest";
-import type { PermissionLevel } from "@lgcode/contracts";
+import type { PermissionLevel } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import { afterEach, beforeEach, expect, vi } from "vitest";
@@ -31,7 +31,7 @@ let rig: Rig;
 beforeEach(() => {
   rig = makeRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+  vi.stubEnv("LGTM_HOME", rig.stateFolder);
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -622,7 +622,7 @@ for (const row of [{ grand: "idle", allowed: "grand" }, { grand: "paused", allow
 
 // The answerer's own ceiling (rows 35b, 56): an agent may choose an option
 // only at or below its own mode, and never one that persists beyond the
-// session or has a kind LGcode does not know; the owner may choose any.
+// session or has a kind LGTM Studio does not know; the owner may choose any.
 const ceilingOptions = [
   ...standardOptions,
   option("sticky", "allow_once", "ask", true),

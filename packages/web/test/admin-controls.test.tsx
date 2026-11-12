@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
-import type { ClientSnapshot, Project, Repository, Workspace } from "@lgcode/contracts"
+import type { ClientSnapshot, Project, Repository, Workspace } from "@lgtm/contracts"
 import type { ShellData } from "../src/data/ShellDataProvider.tsx"
 import { createRequestSources } from "../src/data/requestSources.ts"
 import { Alerts } from "../src/admin/alerts.tsx"
@@ -15,7 +15,7 @@ import { Machines } from "../src/admin/machines.tsx"
 import { NotificationPrompt } from "../src/admin/notification-prompt.tsx"
 
 const mock = vi.hoisted(() => ({ client: undefined as unknown, data: undefined as unknown, disabled: false }))
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(mock.client) }
 })
@@ -242,11 +242,11 @@ it("permanently dismisses the waiting-request offer only after an acknowledged c
   await settle(() => expect(button(element, "Not now")).toBeDefined())
   await click(element, "Not now")
   await settle(() => expect(button(element, "Retry dismissal")).toBeDefined())
-  expect(localStorage.getItem("lgcode-phone-notifications-dismissed")).toBeNull()
+  expect(localStorage.getItem("lgtm-phone-notifications-dismissed")).toBeNull()
   await click(element, "Retry dismissal")
   await settle(() => expect(element.querySelector("aside")).toBeNull())
   expect(dismiss.mock.calls[0]![0]).toEqual(dismiss.mock.calls[1]![0])
-  expect(localStorage.getItem("lgcode-phone-notifications-dismissed")).toBe("true")
+  expect(localStorage.getItem("lgtm-phone-notifications-dismissed")).toBe("true")
   const second = await render(<NotificationPrompt onSessionExpired={vi.fn()} />)
   expect(second.element.querySelector("aside")).toBeNull()
 })

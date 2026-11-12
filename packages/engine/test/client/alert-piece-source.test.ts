@@ -1,4 +1,4 @@
-import type { AlertSourceRequest } from "@lgcode/contracts";
+import type { AlertSourceRequest } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import { expect, it } from "vitest";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";

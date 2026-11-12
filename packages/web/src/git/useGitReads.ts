@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import type { ProjectId, Workspace } from "@lgcode/contracts"
+import type { ProjectId, Workspace } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { requestId, withClient } from "../thread/client.ts"
 import type { ConnectionState } from "../watchSituation.ts"

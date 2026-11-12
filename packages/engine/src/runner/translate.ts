@@ -1,4 +1,4 @@
-import type { Event } from "@lgcode/contracts";
+import type { Event } from "@lgtm/contracts";
 
 type Content = Extract<Event, { _tag: "ThreadItem" }>["content"];
 export interface Translated {

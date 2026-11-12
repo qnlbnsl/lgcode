@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto";
 import {
   WaitId, holds, reasonOf, waitSatisfied, pieceNamespaces,
   type AgentId, type Event, type EventEnvelope, type WaitMember,
-} from "@lgcode/contracts";
+} from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as PubSub from "effect/PubSub";
 import * as Schema from "effect/Schema";

@@ -17,9 +17,9 @@ Read `client.agent.configuration` again to learn whether the live harness applie
 The command-line interface exposes the same operations:
 
 ```sh
-lgcode client agent configuration --input '{"agentId":"<agent-id>"}'
-lgcode configure --input '{"agentId":"<agent-id>","model":"<choice-id>","effort":"<choice-id>"}'
-lgcode client agent context --input '{"agentId":"<agent-id>"}'
+lgtm client agent configuration --input '{"agentId":"<agent-id>"}'
+lgtm configure --input '{"agentId":"<agent-id>","model":"<choice-id>","effort":"<choice-id>"}'
+lgtm client agent context --input '{"agentId":"<agent-id>"}'
 ```
 
 The `desired` fields survive service restarts and stopped agents.

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { ContextSearchResult } from "@lgcode/contracts"
+import type { ContextSearchResult } from "@lgtm/contracts"
 import { requestId, withClient } from "./client.ts"
 import { referenceKey, type ContextScope, type SelectedContext } from "./conversationState.tsx"
 import { visibleText } from "./text.tsx"

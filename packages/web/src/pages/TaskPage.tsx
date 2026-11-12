@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
-import { TaskHistoryEntry, type ProjectId, type TaskId } from "@lgcode/contracts"
-import type { Client } from "@lgcode/client/browser"
+import { TaskHistoryEntry, type ProjectId, type TaskId } from "@lgtm/contracts"
+import type { Client } from "@lgtm/client/browser"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { useShellData } from "../data/ShellDataProvider.tsx"

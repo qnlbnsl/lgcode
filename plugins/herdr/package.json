@@ -1,13 +1,13 @@
 {
-  "name": "@lgcode/herdr-plugin",
+  "name": "@lgtm/herdr-plugin",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "engines": { "node": ">=26.13 <27" },
   "scripts": { "typecheck": "tsc --noEmit" },
   "dependencies": {
-    "@lgcode/client": "workspace:*",
-    "@lgcode/viewer": "workspace:*"
+    "@lgtm/client": "workspace:*",
+    "@lgtm/viewer": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

@@ -4,7 +4,7 @@ import { join } from "node:path";
 import * as Redacted from "effect/Redacted";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
-import { connect, waitForAgents } from "@lgcode/client";
+import { connect, waitForAgents } from "@lgtm/client";
 import { serve } from "../../src/api/server.ts";
 import { it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
@@ -15,7 +15,7 @@ import { requestPermission, requestRow, questionRow, snapshot, tagged, eventuall
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 it.live("1.45 stop cancels all of the asker's permissions with withdrawals in its stop batch, keeps questions, and closes a parent's wait", () => deliveryRig(rig, (runner) => Effect.gen(function* () {
   yield* registerRebuildCheck();
@@ -81,7 +81,7 @@ it.live("stop and resume an asker holding another duty, then complete a real own
   chmodSync(rig.stateFolder, 0o700);
   writeFileSync(join(rig.stateFolder, "owner-credential"), secret, { mode: 0o600 });
   yield* serve({ socketPath: join(rig.stateFolder, "engine.sock"), ownerCredential: Redacted.make(secret.toString("base64url")), debug: false });
-  const client = yield* connect({ environment: { LGCODE_HOME: rig.stateFolder } });
+  const client = yield* connect({ environment: { LGTM_HOME: rig.stateFolder } });
   const started = yield* Deferred.make<void>();
   const observed = { ...client, "client.snapshot": (payload: any) => client["client.snapshot"](payload).pipe(Effect.tap(() => Deferred.succeed(started, undefined))) };
   let finished = false;

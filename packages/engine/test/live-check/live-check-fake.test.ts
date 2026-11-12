@@ -108,8 +108,8 @@ scenario("live-check routine with the fake driver: all nine flow steps and the f
   expect(result.worker.agentId).toBe(worker.agentId);
   const workerEcho = (yield* w.token(worker)).echo;
   const leadToken = (yield* w.token({ agentId: state.lead!.agentId, echo: state.lead!.echo, accountId: "" })).token;
-  expect(workerEcho.env.LGCODE_TOKEN, "the worker was given the lead's token").not.toBe(leadToken);
-  expect(workerEcho.env.LGCODE_SOCKET, "the worker's tools do not reach this service").toBe(w.root.socket);
+  expect(workerEcho.env.LGTM_TOKEN, "the worker was given the lead's token").not.toBe(leadToken);
+  expect(workerEcho.env.LGTM_SOCKET, "the worker's tools do not reach this service").toBe(w.root.socket);
   const all = yield* since(w.owner, 0);
   expect(threadText(all, worker.agentId)).toContain("permission:selected:allow-once");
   expect(promptsOf(peekEcho(worker.echo)!)[0], "the adapter did not receive the first prompt").toContain("Write the file.");

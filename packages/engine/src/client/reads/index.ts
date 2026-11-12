@@ -1,6 +1,6 @@
 import { agentConfiguration, agentContext } from "./agentConfiguration.ts";
-import type { ClientFilter, ClientStreamItem } from "@lgcode/contracts";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import type { ClientFilter, ClientStreamItem } from "@lgtm/contracts";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import type { ReadHandler } from "../../api/reads.ts";

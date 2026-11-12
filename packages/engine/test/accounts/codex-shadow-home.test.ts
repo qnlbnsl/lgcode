@@ -19,7 +19,7 @@ import { snapshot } from "../support/routingRig.ts";
 let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+  vi.stubEnv("LGTM_HOME", rig.stateFolder);
   vi.stubEnv("HOME", rig.home);
   vi.stubEnv("CODEX_HOME", join(rig.home, ".codex"));
 });
@@ -133,8 +133,8 @@ it.effect("6.5 E2: catches inherited provider credentials, unresolved references
   const account = accountFor("claude", {}, echo, {
     REGION: "account-region", LANG: "account-locale", CLAUDE_CONFIG_DIR: "~/separate-config",
     HERDR_SOCKET_PATH: join(rig.root, "must-not-reach-child.sock"), HERDR_ENV: "1",
-    LGCODE_SOCKET: join(rig.root, "wrong-engine.sock"), LGCODE_TOKEN: "secret:ignored",
-    LGCODE_TEST_DEBUG: "1",
+    LGTM_SOCKET: join(rig.root, "wrong-engine.sock"), LGTM_TOKEN: "secret:ignored",
+    LGTM_TEST_DEBUG: "1",
   });
   const store = persistentSecretStore({ stateFolder: rig.stateFolder });
   const parent = serviceEnvironment(rig);
@@ -155,19 +155,19 @@ it.effect("6.5 E2: catches inherited provider credentials, unresolved references
     const started = success(yield* call(ownerCredential, "start", startPayloadFor(harness, changed, rig.work)));
     const child = yield* readEcho(echo);
     expect(child.env).toMatchObject({
-      PATH: "/usr/bin:/bin", HOME: rig.home, USER: "lgcode-test", LOGNAME: "lgcode-test", SHELL: "/bin/sh",
+      PATH: "/usr/bin:/bin", HOME: rig.home, USER: "lgtm-test", LOGNAME: "lgtm-test", SHELL: "/bin/sh",
       LANG: "account-locale", LC_ALL: "C.UTF-8", LC_CTYPE: "C.UTF-8", TERM: "dumb", TMPDIR: rig.root, TZ: "UTC",
       REGION: "account-region", CLAUDE_CONFIG_DIR: join(rig.home, "separate-config"),
-      ANTHROPIC_API_KEY: planted, LGCODE_SOCKET: rig.socket,
+      ANTHROPIC_API_KEY: planted, LGTM_SOCKET: rig.socket,
     });
-    expect(child.env.LGCODE_TOKEN).toMatch(/^shp_a_/);
-    expect(child.env.LGCODE_TOKEN).not.toBe(parent.LGCODE_TOKEN);
-    expect(Object.keys(child.env).filter((key) => key.startsWith("LGCODE_")).sort()).toEqual(["LGCODE_SOCKET", "LGCODE_TOKEN"]);
+    expect(child.env.LGTM_TOKEN).toMatch(/^shp_a_/);
+    expect(child.env.LGTM_TOKEN).not.toBe(parent.LGTM_TOKEN);
+    expect(Object.keys(child.env).filter((key) => key.startsWith("LGTM_")).sort()).toEqual(["LGTM_SOCKET", "LGTM_TOKEN"]);
     expect(Object.keys(child.env).filter((key) => key.startsWith("HERDR_"))).toEqual([]);
     for (const name of ["OPENAI_API_KEY", "NODE_OPTIONS", "XDG_STATE_HOME"]) expect(child.env[name]).toBeUndefined();
     expect(JSON.stringify(child.env)).not.toContain("secret:");
     const publicData = JSON.stringify([yield* readLog, yield* snapshot, stored, started, context.logLines]);
-    for (const secret of [planted, Buffer.from(planted).toString("base64"), child.env.LGCODE_TOKEN!]) expect(publicData).not.toContain(secret);
+    for (const secret of [planted, Buffer.from(planted).toString("base64"), child.env.LGTM_TOKEN!]) expect(publicData).not.toContain(secret);
     // A fresh store layer reads the committed value from disk, rather than
     // borrowing the first layer's map or the redaction fixture.
     const reference = changed.environment!.ANTHROPIC_API_KEY!;

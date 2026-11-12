@@ -1,4 +1,4 @@
-import { projectAgentStatus, type Caller, type ProjectSnapshot, type Task } from "@lgcode/contracts"
+import { projectAgentStatus, type Caller, type ProjectSnapshot, type Task } from "@lgtm/contracts"
 import type { Snapshot } from "../commands/internal.ts"
 import { projectedTask } from "./decisions.ts"
 import { canReadProject } from "./access.ts"
@@ -18,7 +18,7 @@ export const projectAgents = (snapshot: Snapshot, projectId: string) => {
       tasks: Object.values(view.tasks).filter((task) => task.projectId === projectId && task.owner === agent.agentId).map((task) => projectedTask(snapshot, task)) })
   }))
 }
-export const taskMetadata = ({ history: _history, ...task }: import("@lgcode/contracts").ProjectTaskRecord): Task => task
+export const taskMetadata = ({ history: _history, ...task }: import("@lgtm/contracts").ProjectTaskRecord): Task => task
 export const snapshotFor = (caller: Caller, snapshot: Snapshot): typeof ProjectSnapshot.Type | undefined => {
   if (caller._tag !== "owner" && caller._tag !== "agent") return
   const view = projectView(snapshot)

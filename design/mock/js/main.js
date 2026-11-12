@@ -2,4 +2,4 @@
 // imports mount() from app.js and calls it itself.
 import { mount } from './app.js';
 
-window.lgcode = mount(document.getElementById('app')); // for poking at the mock from the console
+window.lgtm = mount(document.getElementById('app')); // for poking at the mock from the console

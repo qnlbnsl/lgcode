@@ -7,7 +7,7 @@
 
 ## Session summary
 
-The planning team wrote and reviewed the plans for rows 2 to 4 of the epic `.plans/epics/shepherd-foundation/epic.md`. The owner accepted all three. These are plans only, so no code was built or run.
+The planning team wrote and reviewed the plans for rows 2 to 4 of the epic `.plans/epics/lgtm-foundation/epic.md`. The owner accepted all three. These are plans only, so no code was built or run.
 
 The client API plan was accepted at `b38aa6f`, with contract version 17, 12 build units and 48 launches. The message board plan was accepted at `ea7aea5`, with contract version 15, 9 build units and 33 launches. The foundry roles plan was accepted at `57b2822`, with 17 build units and about 57 launches, or 14 units and about 42 launches if standing rules are deferred.
 
@@ -17,14 +17,14 @@ Later commits on the client API and board branches leave those contracts unchang
 
 | Question | The owner's decision |
 |---|---|
-| Web login, question 6 | One password from `SHEPHRD_WEB_PASSWORD`. There is no pairing, no device credential and no rate limit. A logged-in session is the owner. Mobile login comes later and starts from what Home Assistant does. |
+| Web login, question 6 | One password from `LGTM_WEB_PASSWORD`. There is no pairing, no device credential and no rate limit. A logged-in session is the owner. Mobile login comes later and starts from what Home Assistant does. |
 | Visual Studio Code extension, question 9 | It stays out, and it is one of the last things, along with the mobile app. |
-| Proxy and encryption, question 10 | Shephrd serves plain HTTP on loopback. The proxy, certificates and DNS (Domain Name System) are the owner's later work. |
+| Proxy and encryption, question 10 | LGTM Studio serves plain HTTP on loopback. The proxy, certificates and DNS (Domain Name System) are the owner's later work. |
 | Board plan, question 12 | The owner sent it back. It gained an acknowledge command, a bounded reminder for unanswered questions, and labelled post text. |
-| Roles plan, question 13 | Accepted. Worktrees go to `<repo>/.worktrees/` and become their own plan, `shepherd-worktrees`. |
+| Roles plan, question 13 | Accepted. Worktrees go to `<repo>/.worktrees/` and become their own plan, `lgtm-worktrees`. |
 | `AGENTS.md` rule 7 | Rewritten: agents have full authority inside a team, and moving work into the base branch waits for the owner. |
 
-The owner also approved, in a design talk recorded in `docs/specs/2026-11-03-client-api-design.md`, shipping remote access before Shephrd has its own Unix user.
+The owner also approved, in a design talk recorded in `docs/specs/2026-11-03-client-api-design.md`, shipping remote access before LGTM Studio has its own Unix user.
 
 ## Session metrics
 
@@ -49,7 +49,7 @@ The owner also approved, in a design talk recorded in `docs/specs/2026-11-03-cli
 
 ## Attribution
 
-Every commit on a worker branch was written by that branch's planner. Transcripts are at `~/.claude/projects/-home-qnlbnsl-projects-personal-herdr-synapse-sheprd--claude-worktrees-<worktree>/<session>.jsonl`.
+Every commit on a worker branch was written by that branch's planner. Transcripts are at `~/.claude/projects/-home-qnlbnsl-projects-personal-herdr-synapse-lgtm--claude-worktrees-<worktree>/<session>.jsonl`.
 
 | Commits | Branch | Agent | Harness | Model | Effort | Session |
 |---|---|---|---|---|---|---|
@@ -74,7 +74,7 @@ The lead's commit also holds issue and feature entries drafted by a Claude Sonne
 
 - The owner's choice on `isHarnessSettings` is issue 353.
 - A hang in the middle of a turn is caught only at the sheepdog's two-hour runaway limit. The owner accepted this as a limit.
-- `shepherd-worktrees` is on hold by the owner until the build is running.
+- `lgtm-worktrees` is on hold by the owner until the build is running.
 - Standing rules depend on recordings the owner runs for each harness, and on today's evidence no harness qualifies.
 
 No security issue is outstanding from this run. No commit broke a repository rule.

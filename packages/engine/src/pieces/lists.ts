@@ -1,7 +1,7 @@
 import {
   CommandsRpcGroup, Event, EventEnvelope, commandAccess, commandGroups, eventGroups, eventVisibility,
   holdUnsettled, requestHeld, type HoldCondition, type Caller, type CallerKind, type PieceNamespace, type VisibilityClass,
-} from "@lgcode/contracts";
+} from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import type * as Schema from "effect/Schema";
 import type * as RpcGroup from "effect/rpc/RpcGroup";
@@ -45,7 +45,7 @@ export interface EngineLists {
   readonly commandGroups: ReadonlyArray<{ readonly namespace: string; readonly group: RpcGroup.RpcGroup<any> }>;
   readonly eventGroups: ReadonlyArray<{ readonly namespace: string; readonly events: Schema.Top }>;
   readonly commands: RpcGroup.RpcGroup<any>;
-  readonly event: Schema.Codec<import("@lgcode/contracts").Event, unknown>;
+  readonly event: Schema.Codec<import("@lgtm/contracts").Event, unknown>;
   readonly envelope: Schema.Codec<EventEnvelope, unknown>;
   readonly access: Readonly<Record<string, ReadonlyArray<CallerKind>>>;
   readonly planners: PlannerTable;

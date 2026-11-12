@@ -1,7 +1,7 @@
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
-import { holdUnsettled, requestHeld, type HoldCondition } from "@lgcode/contracts";
-import { holdsIncoming, holdsUnsettled } from "@lgcode/contracts/board/conditions";
-import type { BoardView } from "@lgcode/contracts/board/view";
+import { holdUnsettled, requestHeld, type HoldCondition } from "@lgtm/contracts";
+import { holdsIncoming, holdsUnsettled } from "@lgtm/contracts/board/conditions";
+import type { BoardView } from "@lgtm/contracts/board/view";
 import * as Effect from "effect/Effect";
 import { expect } from "vitest";
 

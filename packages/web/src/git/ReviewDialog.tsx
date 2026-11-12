@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { GitMainReview, type GitEvidenceSet, type Workspace } from "@lgcode/contracts"
+import { GitMainReview, type GitEvidenceSet, type Workspace } from "@lgtm/contracts"
 import type { Review } from "./state.ts"
 import { visibleText, DataText } from "../thread/text.tsx"
 import { threadHref } from "../thread/links.ts"

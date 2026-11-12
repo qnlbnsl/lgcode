@@ -2,14 +2,14 @@
 //   node design/data/validate.mjs design/data/sample/events.json [more files]
 // Event types starting "project." are proposed, so only their list is printed.
 // A worktree has no node_modules, so the contracts load from the nearest checkout
-// above this file that does. LGCODE_ROOT overrides that choice.
+// above this file that does. LGTM_ROOT overrides that choice.
 import {existsSync,readFileSync} from 'node:fs';
 import {resolve,dirname} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 
 const here=dirname(fileURLToPath(import.meta.url));
-let root=process.env.LGCODE_ROOT||resolve(here,'../..');
-while(!process.env.LGCODE_ROOT&&!existsSync(resolve(root,'packages/contracts/node_modules/effect'))&&dirname(root)!==root)root=dirname(root);
+let root=process.env.LGTM_ROOT||resolve(here,'../..');
+while(!process.env.LGTM_ROOT&&!existsSync(resolve(root,'packages/contracts/node_modules/effect'))&&dirname(root)!==root)root=dirname(root);
 const load=path=>import(pathToFileURL(resolve(root,'packages/contracts/src',path)).href);
 const {Schema}=await import(pathToFileURL(resolve(root,'packages/contracts/node_modules/effect/dist/index.js')).href);
 const {EngineEvent}=await load('events.ts');

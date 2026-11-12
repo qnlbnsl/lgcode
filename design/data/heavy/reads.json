@@ -525,7 +525,7 @@
      }
     ]
    },
-   "buildbox-lgcode-main": {
+   "buildbox-lgtm-main": {
     "owner": "Main checkout",
     "activity": "No uncommitted changes",
     "files": [],
@@ -843,7 +843,7 @@
   }
  },
  "terminal": {
-  "ls": "app/  engine/  docs/  .lgcode/",
+  "ls": "app/  engine/  docs/  .lgtm/",
   "replies": {
    "whoami": "owner",
    "date": "Fri Nov  6 10:56:00 UTC 2026",
@@ -1020,7 +1020,7 @@
   },
   "carrier": {
    "server": "https://ntfy.sh",
-   "topic": "lgcode-owner"
+   "topic": "lgtm-owner"
   },
   "tokenSet": false,
   "web": {
@@ -1248,7 +1248,7 @@
   "screenDelay": 700
  },
  "schema": {
-  "lgcode": {
+  "lgtm": {
    "Project": {
     "id": "text",
     "repoId": "text",
@@ -1289,8 +1289,8 @@
   }
  },
  "design": {
-  "lgcode": {
-   "file": "design/lgcode.fig",
+  "lgtm": {
+   "file": "design/lgtm.fig",
    "tokens": [
     "--color-bg",
     "--color-surface",

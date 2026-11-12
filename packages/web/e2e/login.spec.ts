@@ -25,7 +25,7 @@ test("5.5 external link: catches requiring a Strict session cookie on the initia
   await withBrowserWeb(async ({ origin, password }) => {
     await page.goto(origin);
     await page.evaluate(async (password) => { await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) }); }, password);
-    const outside = createServer((_request, response) => { response.setHeader("Content-Type", "text/html"); response.end(`<a href="${origin}">Open LGcode</a>`); });
+    const outside = createServer((_request, response) => { response.setHeader("Content-Type", "text/html"); response.end(`<a href="${origin}">Open LGTM Studio</a>`); });
     await new Promise<void>((resolve, reject) => { outside.once("error", reject); outside.listen(0, "127.0.0.1", resolve); });
     try {
       const port = (outside.address() as import("node:net").AddressInfo).port;
@@ -33,10 +33,10 @@ test("5.5 external link: catches requiring a Strict session cookie on the initia
       // 127.0.0.1 alone would not exercise SameSite=Strict.
       await page.goto(`http://localhost:${port}`);
       const navigation = page.waitForRequest((request) => request.isNavigationRequest() && request.url().startsWith(origin));
-      await page.getByRole("link", { name: "Open LGcode" }).click();
+      await page.getByRole("link", { name: "Open LGTM Studio" }).click();
       const firstRequest = await navigation;
       expect((await firstRequest.allHeaders())["cookie"]).toBeUndefined();
-      await expect(page).toHaveTitle("LGcode browser fixture");
+      await expect(page).toHaveTitle("LGTM Studio browser fixture");
       expect(await page.evaluate(async () => (await fetch("/api/session", { method: "POST" })).status)).toBe(204);
       expect(await page.evaluate(() => new Promise<boolean>((resolve) => {
         const socket = new WebSocket(`${location.origin.replace("http:", "ws:")}/api`);

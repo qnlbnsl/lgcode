@@ -1,4 +1,4 @@
-import type { ClientRequest, EventEnvelope, ProjectRequestLink } from "@lgcode/contracts";
+import type { ClientRequest, EventEnvelope, ProjectRequestLink } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import type { ReadHandler } from "../../api/reads.ts";
 import { refused } from "../../commands/internal.ts";

@@ -6,7 +6,7 @@ import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as SqlClient from "effect/sql/SqlClient";
 import { afterEach, beforeEach, expect, vi } from "vitest";
-import { ownerOnlyCommands } from "@lgcode/contracts";
+import { ownerOnlyCommands } from "@lgtm/contracts";
 import { toolNames } from "../../../mcp/src/tools.ts";
 import { serve } from "../../src/api/server.ts";
 import { connect, upgradeStatus } from "../support/socketClient.ts";
@@ -20,7 +20,7 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { eventually, tagged } from "../support/routingRig.ts";
 
 let rig: RunnerRig;
-beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig); });
 registerRebuildCheck({ noLog: true });
 const live = (name: string, test: () => Effect.Effect<unknown, unknown, any>) => it.live(name, () => test() as Effect.Effect<unknown, unknown, never>, 60_000);
@@ -152,7 +152,7 @@ live("W05c: only owner credentials can configure or read composer data; labels a
     const state = yield* context.input({ _tag: "owner" });
     const echo = Object.values(state.snapshot.accounts)[0]!;
     const child = peekEcho(echo.environment!.FAKE_AGENT_ECHO!)!;
-    const agent = { _tag: "agent" as const, token: Redacted.make(child.env.LGCODE_TOKEN!) };
+    const agent = { _tag: "agent" as const, token: Redacted.make(child.env.LGTM_TOKEN!) };
     for (const command of ["configure", "client.agent.configuration", "client.agent.context"]) {
       expect(ownerOnlyCommands).toContain(command);
       expect(toolNames).not.toContain(command);
@@ -162,7 +162,7 @@ live("W05c: only owner credentials can configure or read composer data; labels a
     const bearer = "w05c-owner-credential-for-socket-test";
     yield* serve({ socketPath: rig.socket, ownerCredential: Redacted.make(bearer), debug: false });
     const ownerClient = yield* connect(rig.socket, bearer);
-    const agentClient = yield* connect(rig.socket, child.env.LGCODE_TOKEN!);
+    const agentClient = yield* connect(rig.socket, child.env.LGTM_TOKEN!);
     expect((yield* ownerClient["client.agent.configuration"]({ requestId: randomUUID() as any, agentId: started.agentId })).configuration.status).toBe("applied");
     for (const name of ["configure", "client.agent.configuration", "client.agent.context"] as const) {
       const result = yield* (agentClient[name] as (payload: any) => Effect.Effect<any, any>)({ requestId: randomUUID(), agentId: started.agentId, model: "model-large" }).pipe(Effect.result);

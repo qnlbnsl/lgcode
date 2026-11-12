@@ -1,4 +1,4 @@
-import type { Event, ClientStreamItem } from "@lgcode/contracts";
+import type { Event, ClientStreamItem } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Stream from "effect/Stream";
 import type { Input } from "../commands/internal.ts";

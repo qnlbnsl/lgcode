@@ -1,4 +1,4 @@
-import type { AgentId, ProjectRequestLink, Task, ProjectTaskRecord, TaskHistoryEntry } from "@lgcode/contracts"
+import type { AgentId, ProjectRequestLink, Task, ProjectTaskRecord, TaskHistoryEntry } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { refused, type Snapshot } from "../commands/internal.ts"
 import { cutUtf8 } from "../client/reads/display.ts"

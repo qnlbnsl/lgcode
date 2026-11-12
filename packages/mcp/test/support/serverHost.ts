@@ -3,7 +3,7 @@
 import * as Effect from "effect/Effect";
 import { realClock, runMcp } from "../../src/index.ts";
 
-if (process.env.LGCODE_TEST_FAST_RECOVERY_CLOCK === "1") {
+if (process.env.LGTM_TEST_FAST_RECOVERY_CLOCK === "1") {
   let now = 0;
   Object.assign(realClock, {
     now: () => now,

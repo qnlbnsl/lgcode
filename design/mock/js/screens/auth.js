@@ -53,7 +53,7 @@ export function Login({ s }) {
 
       ${status === 'expired' && !insecure && html`<div class="callout info" role="status"><${Icon} name="clock" size=${14} /><span>You were signed out because the session expired. Sign in again and you return to where you were.</span></div>`}
       ${down && !insecure && html`<div class="callout error" role="alert"><${Icon} name="wifi-off" size=${14} />
-        <span class="grow"><b>The service is not answering.</b> This page could not reach <span class="mono">${master.address}</span>. Agents that were running keep running. Start the service again with <span class="mono">lgcode serve --detach</span>.</span></div>`}
+        <span class="grow"><b>The service is not answering.</b> This page could not reach <span class="mono">${master.address}</span>. Agents that were running keep running. Start the service again with <span class="mono">lgtm serve --detach</span>.</span></div>`}
       ${insecure && html`<div class="callout warn" role="alert"><${Icon} name="shield-alert" size=${14} />
         <span><b>This page is not on a secure connection.</b> LGTM Studio accepts the password only over HTTPS, or from the computer the service runs on. Open the HTTPS address, or forward the port and open <span class="mono">127.0.0.1</span>.</span></div>`}
 
@@ -68,7 +68,7 @@ export function Login({ s }) {
               <${Icon} name=${show ? 'eye-off' : 'eye'} size=${15} /></button>
           </div>
           <span id="login-note" class=${error ? 'error' : 'hint'} role=${error ? 'alert' : null}>
-            ${error || (caps ? html`<span class="warn-text">Caps Lock is on.</span>` : html`The one password set on the service as <span class="mono">LGCODE_WEB_PASSWORD</span>.`)}</span>
+            ${error || (caps ? html`<span class="warn-text">Caps Lock is on.</span>` : html`The one password set on the service as <span class="mono">LGTM_WEB_PASSWORD</span>.`)}</span>
         </div>
         ${down
           ? html`<button type="button" class="btn lg block" disabled=${retrying} onClick=${retry}>${retrying ? html`<${Spinner} /><span>Trying…</span>` : html`<${Icon} name="refresh-cw" size=${14} /><span>Try again</span>`}</button>`
@@ -106,7 +106,7 @@ function checkPath(raw, s) {
   if (/\s/.test(name)) return { error: 'No Git repository was found there. Check the spelling of the folder.' };
   const known = s.repos.find((r) => Object.values(r.folders).includes(path)) || s.repos.find((r) => r.name === name);
   return known
-    ? { name: known.name, repo: known.id, branch: known.main, remote: known.remote, commits: known.id === 'lgcode' ? '1,204' : '386', path }
+    ? { name: known.name, repo: known.id, branch: known.main, remote: known.remote, commits: known.id === 'lgtm' ? '1,204' : '386', path }
     : { name, repo: null, branch: 'main', remote: null, commits: '57', path };
 }
 

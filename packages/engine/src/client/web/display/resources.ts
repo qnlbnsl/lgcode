@@ -1,6 +1,6 @@
 import { realpath } from "node:fs/promises"
 import { extname } from "node:path"
-import { isRepositoryArtifactPath } from "@lgcode/contracts"
+import { isRepositoryArtifactPath } from "@lgtm/contracts"
 import { fingerprint } from "../../../project/artifacts.ts"
 import { filePath, smallFile } from "../../../project/git/paths.ts"
 

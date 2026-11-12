@@ -23,9 +23,9 @@ The 2026-11-09 section below supersedes the earlier golden-mock and implementati
 - One master runs the work, and other computers join it as workers, "basically
   spread the load of a project accross machines. and they get their commands
   through the main."
-- A new computer joins by running `lgcode connect` and entering the master's address.
+- A new computer joins by running `lgtm connect` and entering the master's address.
 - The link is "a secure WebSocket with self-signed certificates that both the host
-  ... and the client Sheprd trust".
+  ... and the client LGTM Studio trust".
 - A pairing code is fine for machines, and the website generates it. Web login stays
   one password.
 
@@ -146,7 +146,7 @@ memory, so that a reload can reattach. A session ends when its shell exits or th
 stops. Resize, interrupt and clear are controls on the same stream.
 
 A real terminal in Node.js normally means `node-pty`, which is a native dependency. It
-would be Sheprd's first, and the installer has to carry it. The first task is to prove
+would be LGTM Studio's first, and the installer has to carry it. The first task is to prove
 that it builds and runs on Node.js 26.
 
 ## Subscriptions
@@ -156,7 +156,7 @@ An account gains a machine, and the page works out its active agent count.
 
 Signing in runs the harness's own login inside a terminal session, on the account's
 machine, with the variable that points the harness at that account's private login folder.
-`harnesses.ts` already knows those variables. So Sheprd never handles the provider's
+`harnesses.ts` already knows those variables. So LGTM Studio never handles the provider's
 password or token, and each harness's own flow still works. The status updates when the
 engine next reads that login.
 
@@ -166,7 +166,7 @@ engine next reads that login.
 
 1. The owner clicks Connect machine on the Machines page and names the machine. The master
    shows a code of about 20 characters that works once and expires after 10 minutes.
-2. The owner runs `lgcode connect <address>` on the other computer, which asks for the code.
+2. The owner runs `lgtm connect <address>` on the other computer, which asks for the code.
 3. The two sides exchange public keys over a secure WebSocket. Each side proves that it
    knows the code by signing both public keys with it.
 4. The machine appears on the page as awaiting confirmation, and the owner confirms it.
@@ -174,7 +174,7 @@ engine next reads that login.
 
 The master's worker port stays off until the owner connects a first machine, which keeps
 `SECURITY.md` rule 1. It is its own port, because the owner's HTTPS proxy would end the
-encryption before Sheprd saw it.
+encryption before LGTM Studio saw it.
 
 ### Running work on a worker
 
@@ -236,7 +236,7 @@ work together. This is the order of building and not a smaller scope.
    team chat read.
 2. **The page.** Rewritten against step 1, and replacing the current page.
 3. **Terminal and subscriptions.** Terminal first, because sign-in uses it.
-4. **Installer and `.lgcode` config.** This was already next, and a worker needs it to get Sheprd
+4. **Installer and `.lgtm` config.** This was already next, and a worker needs it to get LGTM Studio
    onto another computer. The workspace folder setting moves here from the page's first run.
 5. **Machines.** Pairing, the worker mode and the remote runner.
 
@@ -327,8 +327,8 @@ The run folder also holds a copy in `.scratch/foundry-runs/website-1/plan.md`.
 The mock files remain owned by the mock session.
 
 The earlier descriptions above are historical where this section replaces them.
-The product and command are LGcode and `lgcode`.
-Configuration lives under `.lgcode`.
+The product and command are LGTM Studio and `lgtm`.
+Configuration lives under `.lgtm`.
 
 ### Project discovery, setup, and lifecycle
 

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type Ref } from "react"
-import { stageLabel, type Project } from "@lgcode/contracts"
+import { stageLabel, type Project } from "@lgtm/contracts"
 import type { ShellRoute } from "../routes.ts"
 import { shellHref } from "../routes.ts"
 import { useShellData } from "../data/ShellDataProvider.tsx"

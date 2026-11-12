@@ -1,4 +1,4 @@
-import type { Event } from "@lgcode/contracts";
+import type { Event } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Redacted from "effect/Redacted";

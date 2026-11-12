@@ -1,6 +1,6 @@
 import { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
-import type { Client } from "@lgcode/client/browser"
+import type { Client } from "@lgtm/client/browser"
 import * as Effect from "effect/Effect"
 import { afterEach, expect, it, vi } from "vitest"
 import { NewProjectSession } from "../src/project/creation.ts"

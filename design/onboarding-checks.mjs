@@ -6,7 +6,7 @@ const check=(ok,label)=>{(ok?passed:failures).push(label)};
 const fresh=async({query='?sample=first',width=1440,height=900,scheme='dark'}={})=>{
  const context=await browser.newContext({viewport:{width,height},colorScheme:scheme}),page=await context.newPage();
  page.setDefaultTimeout(5000);page.on('pageerror',e=>errors.push(query+': '+e.message));
- await page.goto(base+query);await page.waitForFunction(()=>window.lgcodeReady);
+ await page.goto(base+query);await page.waitForFunction(()=>window.lgtmReady);
  return page;
 };
 const logIn=async page=>{await page.fill('#login-password','secret');await page.click('#login-submit')};
@@ -20,9 +20,9 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  const page=await fresh();
  check(await page.locator('#auth-gate').isVisible(),'A first run starts at the login page');
  check(!await page.locator('#setup').isVisible()&&!await page.locator('.app').isVisible(),'Nothing else shows before login');
- check(await page.locator('#auth-title').textContent()==='Sign in to LGcode','A first visit is asked to sign in, not welcomed back');
+ check(await page.locator('#auth-title').textContent()==='Sign in to LGTM Studio','A first visit is asked to sign in, not welcomed back');
  await logIn(page);
- check(await title(page)==='LGcode'&&await page.locator('#setup').isVisible(),'Login opens the first page');
+ check(await title(page)==='LGTM Studio'&&await page.locator('#setup').isVisible(),'Login opens the first page');
  check(!await page.locator('.app').isVisible(),'The empty app stays hidden during setup');
  check(await page.locator('.setup-pairs div').count()===3,'The first page shows three paired promises');
  check(await page.locator('#setup input,#setup select,#setup textarea').filter({visible:true}).count()===0,'The first page asks for nothing');
@@ -85,9 +85,9 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  await page.click('#new-project');
  check(await page.locator('#project-dialog [data-close="project-dialog"]').first().isVisible()&&await page.locator('#project-form footer button.secondary').textContent()==='Cancel','The usual dialog is back to normal');
  await page.click('#project-form footer button.secondary');
- await page.reload();await page.waitForFunction(()=>window.lgcodeReady);
+ await page.reload();await page.waitForFunction(()=>window.lgtmReady);
  await logIn(page);
- check(await title(page)==='LGcode','Finished setup leaves no step behind to resume');
+ check(await title(page)==='LGTM Studio','Finished setup leaves no step behind to resume');
  await page.context().close();
 }
 // Set up phone notifications goes to the notification service, and setting one ends the offer.
@@ -98,7 +98,7 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  await page.waitForSelector('.push-prompt');
  await page.locator('.push-prompt [data-fix-notifications]').click();
  check(await page.evaluate(()=>state.view)==='settings'&&await page.evaluate(()=>document.activeElement.id)==='carrier-server','Set up phone notifications opens the notification service');
- await page.fill('#carrier-server','https://ntfy.sh');await page.fill('#carrier-topic','lgcode-owner');await page.locator('#carrier-topic').blur();
+ await page.fill('#carrier-server','https://ntfy.sh');await page.fill('#carrier-topic','lgtm-owner');await page.locator('#carrier-topic').blur();
  await page.waitForFunction(()=>!!sampleSettings.carrier);
  check(!await page.evaluate(()=>pushPromptDue()),'A notification service ends the offer');
  await page.evaluate(()=>go({view:'home'}));
@@ -111,7 +111,7 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  await toProject(page);
  await page.locator('#project-form footer [data-setup-back]').click();
  check(await title(page)==='Found on this computer','Back works from the first project');
- await page.reload();await page.waitForFunction(()=>window.lgcodeReady);
+ await page.reload();await page.waitForFunction(()=>window.lgtmReady);
  await page.waitForSelector('#project-name:visible');
  check(await title(page)==='First project','Back does not lower how far the owner got');
  check(await page.locator('#auth-gate').isHidden(),'A reload in the same tab stays logged in');
@@ -125,12 +125,12 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
 {
  const page=await fresh({query:'?sample=first&setup=both'});
  await logIn(page);
- await page.click('text=Look around first');await page.waitForFunction(()=>window.lgcodeReady);
+ await page.click('text=Look around first');await page.waitForFunction(()=>window.lgtmReady);
  check(await page.locator('.app').isVisible()&&await page.evaluate(()=>projects.length)>0,'Look around first opens the sample');
  check(await page.locator('#auth-gate').isHidden(),'Looking around asks for no second login');
  check(await page.locator('#back-to-setup').isVisible(),'The sample offers its way back');
- await page.click('#back-to-setup');await page.waitForFunction(()=>window.lgcodeReady);
- check(await title(page)==='LGcode'&&page.url().includes('setup=both'),'Coming back returns to setup in the same state');
+ await page.click('#back-to-setup');await page.waitForFunction(()=>window.lgtmReady);
+ check(await title(page)==='LGTM Studio'&&page.url().includes('setup=both'),'Coming back returns to setup in the same state');
  await page.context().close();
  const plain=await fresh({query:''});
  check(await plain.locator('#back-to-setup').isHidden(),'The normal sample shows no way back to setup');
@@ -139,7 +139,7 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  await plain.evaluate(()=>document.querySelector('#notes').showModal());
  const links=await plain.locator('.first-run-links a').evaluateAll(all=>all.map(a=>a.getAttribute('href')));
  check(links.length===7&&links.every(l=>l.includes('reset=1')),'Design notes reach all seven first-run states');
- await plain.locator('.first-run-links a').first().click();await plain.waitForFunction(()=>window.lgcodeReady);
+ await plain.locator('.first-run-links a').first().click();await plain.waitForFunction(()=>window.lgtmReady);
  check(await plain.locator('#auth-gate').isVisible()&&!plain.url().includes('reset'),'A Design notes link really opens a first run, and a reload will not reset it');
  await plain.context().close();
 }
@@ -155,7 +155,7 @@ const toProject=async page=>{await toFound(page);await page.click('[data-setup-g
  await out.click('#sign-in-close');
  check(await out.locator('.setup-rows li',{hasText:'Claude Code'}).locator('.setup-state').textContent()==='Signed in','The row updates after sign-in');
  check(await out.locator('[data-setup-go=project]').isEnabled(),'Continue opens after sign-in');
- await out.reload();await out.waitForFunction(()=>window.lgcodeReady);await out.waitForSelector('#setup-harnesses');
+ await out.reload();await out.waitForFunction(()=>window.lgtmReady);await out.waitForSelector('#setup-harnesses');
  check(await out.locator('.setup-rows li',{hasText:'Claude Code'}).locator('.setup-state').textContent()==='Signed in','A sign-in survives a reload');
  await out.context().close();
 

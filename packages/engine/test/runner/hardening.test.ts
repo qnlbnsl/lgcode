@@ -23,7 +23,7 @@ let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+  vi.stubEnv("LGTM_HOME", rig.stateFolder);
 });
 afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig); });
 registerRebuildCheck({ noLog: true });

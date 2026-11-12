@@ -1,6 +1,6 @@
-import { comparePermission, type Actor, type AgentId, type Caller } from "@lgcode/contracts";
-import type { BoardAddressee, BoardAuthor, ReplyMode } from "@lgcode/contracts/board/ids";
-import type { BoardPostView, BoardView } from "@lgcode/contracts/board/view";
+import { comparePermission, type Actor, type AgentId, type Caller } from "@lgtm/contracts";
+import type { BoardAddressee, BoardAuthor, ReplyMode } from "@lgtm/contracts/board/ids";
+import type { BoardPostView, BoardView } from "@lgtm/contracts/board/view";
 import type { Snapshot } from "../commands/internal.ts";
 import { holderAbove } from "../routing/holders.ts";
 import { canReadContext } from "../project/context.ts";

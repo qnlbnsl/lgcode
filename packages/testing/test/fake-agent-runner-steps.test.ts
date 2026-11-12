@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url"
 
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { assert, it } from "@effect/vitest"
-import * as AcpClient from "@lgcode/t3-effect-acp/client"
+import * as AcpClient from "@lgtm/t3-effect-acp/client"
 import * as Effect from "effect/Effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import * as Stream from "effect/Stream"
@@ -30,7 +30,7 @@ const planted = "sk-ant-api03-PLANTEDRUNNERSTEP0123456789"
 type Update = { readonly sessionUpdate: string; readonly [key: string]: unknown }
 
 const temporaryFolder = Effect.acquireRelease(
-  Effect.promise(() => mkdtemp(join(tmpdir(), "lgcode-fake-agent-6a-"))),
+  Effect.promise(() => mkdtemp(join(tmpdir(), "lgtm-fake-agent-6a-"))),
   (folder) => Effect.promise(() => rm(folder, { recursive: true, force: true }))
 )
 
@@ -154,7 +154,7 @@ live("replay --match method answers a client's own frames with the recorded repl
     const until = (count: number) => Effect.promise(async () => {
       for (let attempt = 0; attempt < 200 && lines.length < count; attempt++) await new Promise((resolve) => setTimeout(resolve, 25))
     })
-    child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 41, method: "initialize", params: { protocolVersion: 2, clientInfo: { name: "lgcode", version: "1" } } }) + "\n")
+    child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 41, method: "initialize", params: { protocolVersion: 2, clientInfo: { name: "lgtm", version: "1" } } }) + "\n")
     yield* until(1)
     child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 42, method: "session/set_model", params: {} }) + "\n")
     yield* until(2)

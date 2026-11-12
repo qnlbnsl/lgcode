@@ -40,14 +40,14 @@ it("I02 catches refusing the owner's terminal, or reading the credential as UTF-
   expect(peer.upgrades[0]!.authorization === `Bearer ${ownerCredential}`, "owner credential encoding/source").toBe(true);
 });
 
-for (const present of ["LGCODE_SOCKET", "LGCODE_TOKEN"] as const) {
+for (const present of ["LGTM_SOCKET", "LGTM_TOKEN"] as const) {
   it(`I03 ${present} alone catches silent owner fallback or a credential sent with incomplete agent identity`, async () => {
     const connect = await loadClient();
     const root = prepareRoot();
     const peer = await fakeEngine(root);
-    const environment = { ...serviceEnvironment(root), [present]: present === "LGCODE_SOCKET" ? root.socket : token };
+    const environment = { ...serviceEnvironment(root), [present]: present === "LGTM_SOCKET" ? root.socket : token };
     const message = refusal(await attempt(connect({ environment })));
-    expect(message).toMatch(/LGCODE_SOCKET|LGCODE_TOKEN|both|together/i);
+    expect(message).toMatch(/LGTM_SOCKET|LGTM_TOKEN|both|together/i);
     expect(peer.upgrades).toHaveLength(0);
   });
 }
@@ -63,7 +63,7 @@ for (const mode of [0o770, 0o707, 0o777]) {
     chmodSync(ancestor, mode);
     const socketPath = join(folder, "engine.sock");
     const peer = await fakeEngine(root, { socketPath });
-    refusal(await attempt(connect({ environment: { ...agentEnvironment(root), LGCODE_SOCKET: socketPath } })));
+    refusal(await attempt(connect({ environment: { ...agentEnvironment(root), LGTM_SOCKET: socketPath } })));
     expect(peer.upgrades).toHaveLength(0);
   });
 }
@@ -133,7 +133,7 @@ for (const branch of ["foreign parent", "foreign socket", "root socket", "foreig
         return { uid: owner, mode, isDirectory: () => stat.isDirectory(), isSocket: () => stat.isSocket(), isSymbolicLink: () => stat.isSymbolicLink() };
       },
     };
-    const exit = await attempt(connect({ environment: { ...agentEnvironment(root), LGCODE_SOCKET: socketPath }, socketSecurity }));
+    const exit = await attempt(connect({ environment: { ...agentEnvironment(root), LGTM_SOCKET: socketPath }, socketSecurity }));
     if (branch === "root sticky" || branch === "root safe") {
       expect(Exit.isSuccess(exit)).toBe(true);
       expect(peer.upgrades).toHaveLength(1);
@@ -150,14 +150,14 @@ it("I08 catches omitting or inventing the caller's process ancestry/start times 
   const peer = await fakeEngine(root);
   expect(Exit.isSuccess(await attempt(connect({ environment: agentEnvironment(root) })))).toBe(true);
   const headers = peer.upgrades[0]!;
-  const chain = String(headers["lgcode-ancestors"]).split(",");
+  const chain = String(headers["lgtm-ancestors"]).split(",");
   const stat = (pid: number) => {
     const text = readFileSync(`/proc/${pid}/stat`, "utf8");
     return text.slice(text.lastIndexOf(")") + 2).trim().split(/\s+/);
   };
   expect(chain[0]).toBe(`${process.pid}:${stat(process.pid)[19]}`);
   expect(chain[1]).toBe(`${process.ppid}:${stat(process.ppid)[19]}`);
-  expect(headers["lgcode-process-group"]).toBe(stat(process.pid)[2]);
+  expect(headers["lgtm-process-group"]).toBe(stat(process.pid)[2]);
   let pid = process.pid;
   for (const pair of chain) {
     const fields = stat(pid);

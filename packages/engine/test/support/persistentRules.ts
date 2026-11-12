@@ -1,4 +1,4 @@
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { vi } from "vitest";
@@ -14,7 +14,7 @@ import type { EngineLists } from "../../src/pieces/lists.ts";
 
 export async function withPersistentRules(lists: Rules, body: (rig: Rig, runner: FakeRunner) => Effect.Effect<unknown, unknown, any>, decorate?: (real: SecretStore["Service"]) => SecretStore["Service"]) {
   const rig = makeRig();
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+  vi.stubEnv("LGTM_HOME", rig.stateFolder);
   try {
     await Effect.runPromise(Effect.gen(function* () {
       const runner = yield* makeFakeRunner();

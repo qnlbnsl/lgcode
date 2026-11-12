@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 
 import { it } from "@effect/vitest";
-import { Actor } from "@lgcode/contracts";
+import { Actor } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Schema from "effect/Schema";
@@ -17,8 +17,8 @@ import { append, sequence, withViews } from "../support/withViews.ts";
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/lgcode-rebuild-");
-  vi.stubEnv("LGCODE_HOME", home);
+  home = mkdtempSync("/tmp/lgtm-rebuild-");
+  vi.stubEnv("LGTM_HOME", home);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

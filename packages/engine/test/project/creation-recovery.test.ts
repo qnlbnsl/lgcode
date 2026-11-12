@@ -26,7 +26,7 @@ const live = (name: string, body: () => Effect.Effect<unknown, unknown, any>) =>
 let rig: Rig
 const git = (path: string, ...args: string[]) => execFileSync("git", ["-C", path, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
 beforeEach(() => {
-  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   git(rig.work, "init", "-b", "main")
   git(rig.work, "-c", "user.name=Test", "-c", "user.email=test@example.test", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "Initial")
 })
@@ -240,7 +240,7 @@ live("retries a mkdir whose claim append failed, using only its own filesystem w
     expect(failureOf(yield* call(owner, "project.create", request))?._tag).toBe("LogWriteFailed")
     const row = success(yield* call(owner, "project.creations", {})).items[0]
     expect(row.folderIdentity).toBeUndefined()
-    expect(readFileSync(join(row.workspace.path, ".lgcode-project-creation"), "utf8")).toContain(request.requestId)
+    expect(readFileSync(join(row.workspace.path, ".lgtm-project-creation"), "utf8")).toContain(request.requestId)
     return request
   }))
   yield* provideRestart(rig, runner.layer, Effect.gen(function* () {

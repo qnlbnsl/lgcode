@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   EventEnvelope, commandOutcome, publicAddressError,
   type Caller, type Event, type HarnessSettings, type RequestId,
-} from "@lgcode/contracts";
+} from "@lgtm/contracts";
 import * as Cause from "effect/Cause";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
@@ -60,7 +60,7 @@ export class CommandHandler extends Context.Service<CommandHandler, {
   readonly cache: (target: CacheTarget) => Effect.Effect<"flush" | "compact" | undefined, CommandRefused | LogWriteFailed>;
   readonly input: (actor: Caller) => Effect.Effect<Input>;
   readonly execute: (credential: Credential, name: string, payload: unknown) => Effect.Effect<Record<string, unknown>, CommandRefused | LogWriteFailed>;
-}>()("lgcode/engine/commands/CommandHandler") {}
+}>()("lgtm/engine/commands/CommandHandler") {}
 
 const canonical = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
@@ -324,7 +324,7 @@ export const layer = (configuration: Pick<Runtime, "home" | "stateFolder" | "plu
             if (name === "project.design.record") return { finalize: yield* prepareDesignRecord(input, admitted.payload) };
             if (name === "project.mocks.record" || name === "project.mocks.approve") return { finalize: yield* prepareMock(input, name, admitted.payload) };
             if (name === "prompt" || name === "board.post") {
-              const files = yield* prepareContextFiles(input, admitted.payload.context as import("@lgcode/contracts").ContextReference[] | undefined);
+              const files = yield* prepareContextFiles(input, admitted.payload.context as import("@lgtm/contracts").ContextReference[] | undefined);
               return { finalize: name === "prompt" ? promptPlanner(files) : postPlanner(files) };
             }
             return yield* planGitOperation({ runtime, actor: admitted.actor, snapshot: admitted.snapshot }, name, admitted.payload,

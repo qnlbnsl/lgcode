@@ -1,6 +1,6 @@
-# LGcode: problems found
+# LGTM Studio: problems found
 
-A running list of problems found while building or using Shephrd. Add a
+A running list of problems found while building or using LGTM Studio. Add a
 problem here in the same change that finds it, even if it is not fixed yet.
 Never delete an entry; mark it fixed and say where.
 
@@ -109,19 +109,19 @@ Node.js built-in modules to type-check.
 ## 7. A symbolic link to the launcher runs from the wrong folder
 
 Found: 2026-11-01, in the unit 1 review.
-State: fixed in unit 2: `bin/shephrd` follows links, and
+State: fixed in unit 2: `bin/lgtm` follows links, and
 `launcher-links.test.ts` covers it. Commit: 87e2d4c. The first fix used
 `readlink` from `PATH`; issue 20 replaced that.
 
-What happened: `bin/shephrd` found its checkout with `dirname "$0"` and does
+What happened: `bin/lgtm` found its checkout with `dirname "$0"` and does
 not follow a symbolic link to the file itself. A link such as
-`~/.local/bin/shephrd -> <repo>/bin/shephrd` makes it look for
+`~/.local/bin/lgtm -> <repo>/bin/lgtm` makes it look for
 `bin/stub-entry.ts` next to the link, and Node.js exits 1 with
 `Cannot find module`.
 What should happen: the launcher resolves its own path through any links,
 or prints a clear message when the entry file is missing.
 Why it matters: a link on the path is a likely way for the owner to run
-`shephrd` from any terminal.
+`lgtm` from any terminal.
 
 ## 8. The launcher looks up `dirname` on the path
 
@@ -131,7 +131,7 @@ Commit: 87e2d4c. The first fix still ran `readlink` from `PATH` before the
 chosen Node.js, which the focused review found; issue 20 fixed that, so now
 only shell builtins and the chosen Node.js run.
 
-What happened: `bin/shephrd` ran `dirname` from `PATH`. Decision 22 allows
+What happened: `bin/lgtm` ran `dirname` from `PATH`. Decision 22 allows
 a path lookup only for `node`.
 What should happen: the launcher uses shell parameter expansion, so
 `node` is the only program found through `PATH`.
@@ -168,7 +168,7 @@ What happened: `pnpm-workspace.yaml` aliased `typescript` to the pre-release
 `@tsc-rs/typescript` 0.8.0 with no comment. It matches the T3 Code
 reference, which plan check PB-A6 requires, but nothing in this repository
 said so. `vitest.config.ts` also set `VP_REMOTE_CACHE` and
-`VP_REMOTE_CACHE_URL`, which only the vite-plus tool reads; Shephrd runs
+`VP_REMOTE_CACHE_URL`, which only the vite-plus tool reads; LGTM Studio runs
 plain Vitest.
 What should happen: one comment names T3 Code as the reason for the alias,
 and the two cache variables are removed or credited to T3 Code.
@@ -182,12 +182,12 @@ State: fixed in `herdr-plugin.toml`; the owner re-runs the link.
 
 What happened: `herdr plugin link` stopped with "TOML parse error at line 10,
 [[actions]]: missing field `title`". The `serve` action had `name = "Start
-Shephrd"`, but Herdr names an action's label `title`, as the Synapse
+LGTM Studio"`, but Herdr names an action's label `title`, as the Synapse
 manifest does. Neither the plan's task 1f nor the unit 1 manifest test named
 the field, so the test passed.
 What should happen: each `[[actions]]` entry has `id`, `title`, `contexts`
 and `command`.
-Why it matters: Herdr cannot load Shephrd at all until the manifest parses.
+Why it matters: Herdr cannot load LGTM Studio at all until the manifest parses.
 
 ## 12. The copied SQLite client needed changes for Node.js 26 types
 
@@ -216,8 +216,8 @@ other calls are not gated: `protocol.ts` lines 503 and 599, and
 an encoding failure, which can include a value the handler held. Line 547 logs
 only structural diagnostics.
 What should happen: the service's logger passes through the redactor before
-Shephrd registers any extension handler, and a test greps its output for
-planted secrets, as decision 57 requires. Shephrd never sets `logIncoming`,
+LGTM Studio registers any extension handler, and a test greps its output for
+planted secrets, as decision 57 requires. LGTM Studio never sets `logIncoming`,
 `logOutgoing` or `logger` outside tests.
 Rule for the units that run ACP (6a, 6d and 7a): install the redacting service
 logger before constructing any ACP runner or handler. Keep wire logging off,
@@ -225,7 +225,7 @@ except behind the temporary-home test gate of decision 74. Test planted secrets
 through four paths: the core path, notification handlers, extension-handler
 defects, and encoding failures.
 Why it matters: until then, a handler defect could write a secret to the log.
-No Shephrd code registers a handler yet, so nothing leaks today.
+No LGTM Studio code registers a handler yet, so nothing leaks today.
 
 What changed in unit 7a: the service installs the redacting logger before
 building the runner or handler. The registry includes the owner credential,
@@ -243,8 +243,8 @@ State: open; belongs to the unit that starts harness processes.
 What happens: `mergeProviderInstanceEnvironment` (`instanceEnvironment.ts`) and
 `makeClaudeEnvironment` (`ClaudeHome.ts`) use `process.env` when the caller
 passes no base environment.
-What should happen: Shephrd always passes an explicit base environment, so an
-agent gets exactly `SHEPHRD_SOCKET` and `SHEPHRD_TOKEN` and what the harness
+What should happen: LGTM Studio always passes an explicit base environment, so an
+agent gets exactly `LGTM_SOCKET` and `LGTM_TOKEN` and what the harness
 needs, as decision 57 says.
 Why it matters: a call without the argument would hand every variable of the
 service to a harness process.
@@ -260,17 +260,17 @@ mode.
 What should happen: tests pass only made-up values to it.
 Why it matters: a real token passed to it would sit in a temporary folder.
 
-## 16. The ACP schema generator cannot finish in Shephrd
+## 16. The ACP schema generator cannot finish in LGTM Studio
 
 Found: 2026-11-01, in the unit 2 security read.
 State: open; low priority.
 
 What happens: `effect-acp/scripts/generate.ts` downloads schema files from
 GitHub and ends by running `pnpm exec vp fmt`. The `vp` program belongs to the
-vite-plus tool, which Shephrd does not install, so the last step fails after
+vite-plus tool, which LGTM Studio does not install, so the last step fails after
 the files are written.
-What should happen: if Shephrd regenerates the schemas, the formatting step is
-replaced by a Shephrd tool, and the change is recorded in the README table.
+What should happen: if LGTM Studio regenerates the schemas, the formatting step is
+replaced by an LGTM Studio tool, and the change is recorded in the README table.
 Why it matters: someone running `generate` gets a confusing failure.
 
 ## 17. T3 Code has no unit test for the replay helpers
@@ -279,8 +279,8 @@ Found: 2026-11-01, in unit 2.
 State: fixed; recorded in `third_party/t3code/README.md`.
 
 What happened: criterion 2.4 needs a test named `replayTranscript.test.ts`, but
-T3 Code has none for `provider-testing`. A test was written for Shephrd, with
-a fixture, and the README table marks both as written for Shephrd.
+T3 Code has none for `provider-testing`. A test was written for LGTM Studio, with
+a fixture, and the README table marks both as written for LGTM Studio.
 What should happen: nothing further.
 Why it matters: the copied helpers would otherwise have no test at all.
 
@@ -293,10 +293,10 @@ What happened: after a frozen install, `import.meta.resolve` failed with
 `ERR_MODULE_NOT_FOUND` from `packages/engine` and `packages/testing` for the
 copied packages. Decision rows 23 and 71 require these edges before the
 manifests freeze.
-What should happen: `engine` depends on `@shephrd/t3-effect-acp`,
-`@shephrd/t3-node-sqlite` and `@shephrd/t3-provider-instance`. `testing`
-depends on `@shephrd/t3-effect-acp` and `@shephrd/t3-provider-testing`, all as
-`workspace:*`. Nothing depends on `@shephrd/t3-source-control`, which has no
+What should happen: `engine` depends on `@lgtm/t3-effect-acp`,
+`@lgtm/t3-node-sqlite` and `@lgtm/t3-provider-instance`. `testing`
+depends on `@lgtm/t3-effect-acp` and `@lgtm/t3-provider-testing`, all as
+`workspace:*`. Nothing depends on `@lgtm/t3-source-control`, which has no
 planned consumer. `testing` does not depend on the provider-instance copy,
 because unit 8a's fake agent only needs the protocol library and the replay
 helpers; unit 8a's harness defaults and environment builder live in `engine`.
@@ -632,10 +632,10 @@ State: open.
 
 What happens: `scrubText` replaces every value of the parent environment that
 is eight or more characters long. Under pnpm, `npm_package_name` was
-`shepherd` when this was found (the product is now called Shephrd, whose
+`lgtm` when this was found (the product is now called LGTM Studio, whose
 seven-letter package name is below the limit, but the same over-scrubbing
 applies to any longer value), so ordinary text such as a source note naming
-`shepherd-engine` becomes `<redacted>-engine`. The re-recorded
+`lgtm-engine` becomes `<redacted>-engine`. The re-recorded
 `errors/cursor-out-of-usage.json` was over-scrubbed this way, so the earlier
 committed copy was kept.
 What should happen: the scrubber redacts the values of account variables and
@@ -646,14 +646,14 @@ fixtures' text and can hide real differences between recordings.
 
 Rechecked: 2026-11-02, against the live-check recordings from engine 71d13c1.
 The refreshed first and second harness recordings both keep
-`shephrd-recorder`, and neither has an over-redacted ordinary word.
+`lgtm-recorder`, and neither has an over-redacted ordinary word.
 The second recording's `msg_<redacted>` is a scrubbed message identifier.
 The cause remains in `packages/engine/scripts/recorder.ts`, line 26:
 `scrubText` still adds every environment value of eight or more characters
 to its replacement list, without checking the variable name.
-Calling it with `npm_package_name: "shepherd"` changes `shepherd-recorder`
-to `<redacted>-recorder`; using `npm_package_name: "shephrd"` leaves
-`shephrd-recorder` intact.
+Calling it with `npm_package_name: "lgtm"` changes `lgtm-recorder`
+to `<redacted>-recorder`; using `npm_package_name: "lgtm"` leaves
+`lgtm-recorder` intact.
 The symptom disappeared because the package name is shorter, so this issue
 stays open, as issue 192 also records.
 
@@ -685,7 +685,7 @@ usage again, the owner re-records it so a real greeting exists. Unit 6a's
 mapping of this harness's out-of-usage reply should use this transcript
 together with `errors/cursor-out-of-usage.json`.
 Why it matters: the adapter reports running out of usage as ordinary agent
-text with a normal stop reason, so Shephrd cannot tell it from a reply by the
+text with a normal stop reason, so LGTM Studio cannot tell it from a reply by the
 stop reason alone.
 
 ## 39. The read-only connection exists only when the SQLite layer turns on its reader workers
@@ -1280,10 +1280,10 @@ Found: 2026-11-01, while building unit 5d.
 State: closed by the owner's decision on 2026-11-03.
 
 What happens: `WaitOpened` requires the waiter's agent identifier, and `Delivery.target` must be an agent. The engine therefore refuses a `wait` from the owner with "command refused".
-Why it mattered: the original decision row 26 gave the owner's terminal `shephrd wait --block`. `AGENTS.md` rule 5 requires that what the owner can do from the terminal is also possible through the API.
+Why it mattered: the original decision row 26 gave the owner's terminal `lgtm wait --block`. `AGENTS.md` rule 5 requires that what the owner can do from the terminal is also possible through the API.
 The original proposal was for the contracts to give a wait an owner waiter, at least for blocking waits, which create no delivery.
 
-Closing decision: row 26 of `.plans/plans/shepherd-engine/decisions.md`,
+Closing decision: row 26 of `.plans/plans/lgtm-engine/decisions.md`,
 as amended on 2026-11-03, restricts blocking waits to agents.
 The owner waiter is declined for this engine plan.
 Owner clients get the same result by subscribing to events.
@@ -2299,18 +2299,18 @@ agents the first run had just reloaded, and interrupt them again.
 What changed in unit 7a: a failed recovery exits the service with a nonzero
 status and closes its listener. The service never retries recovery in place.
 
-## 160. The fake agent's Shephrd command step does not speak the engine's protocol
+## 160. The fake agent's LGTM Studio command step does not speak the engine's protocol
 
 Found: 2026-11-01, while writing the unit 7a tests.
-State: fixed in unit 7b: the step uses the real `@shephrd/client`.
+State: fixed in unit 7b: the step uses the real `@lgtm/client`.
 
-What happens: the `shephrd_command` step in `packages/testing/src/fakeAgent.ts`
-opens a WebSocket to `SHEPHRD_SOCKET` and sends `{ command, input }` as JSON.
+What happens: the `lgtm_command` step in `packages/testing/src/fakeAgent.ts`
+opens a WebSocket to `LGTM_SOCKET` and sends `{ command, input }` as JSON.
 That is not an Effect RPC request, and the step reports
-`shephrd_command:ok` on any reply at all, an error reply included.
+`lgtm_command:ok` on any reply at all, an error reply included.
 What should happen: the step sends a real RPC request through unit 7b's
 client and reports the reply's outcome.
-Why it matters: a test that trusts `shephrd_command:ok` would pass while the
+Why it matters: a test that trusts `lgtm_command:ok` would pass while the
 command failed. Unit 7a's tests do not use the step: criterion 7.10 reads
 the reloaded agent's token from the fake agent's echo file and calls through
 the test-only client in `packages/engine/test/support/socketClient.ts`.
@@ -2548,7 +2548,7 @@ Found: 2026-11-01, while checking the sibling tests for unit 7b.
 State: fixed in unit 7b: the fixture now calls `ask`.
 
 What happens: the test beginning at `packages/testing/test/fake-agent.test.ts:635`
-asks the `shephrd_command` step to call `post`, which is absent from the
+asks the `lgtm_command` step to call `post`, which is absent from the
 contracts' remote procedure call group. It checks the upgrade's bearer
 header, and accepts either an `ok` or a `failed` report. It cannot prove
 that a real command succeeded, or that an error reply was reported as a
@@ -2663,7 +2663,7 @@ Fix: F02 still requires exactly one `CommandRefused` for `accounts`. It now
 checks that no `AccountChanged` follows that refusal, excluding the account
 created by the setup helper before the agent's prompt.
 
-## 181. Foreground `shephrd serve` is not supported
+## 181. Foreground `lgtm serve` is not supported
 
 Found: 2026-11-01, while wiring `serve` in the command-line tool.
 State: open.
@@ -2695,7 +2695,7 @@ Found: 2026-11-01, while building the client's ancestry header.
 State: closed by the owner's ruling, unit 7b fix round 1.
 
 What happened: `packages/client/src/ancestry.ts` reads `/proc/<pid>/stat` to
-build `Shephrd-Ancestors`, and the engine's check had a macOS reader that the
+build `LGTM-Ancestors`, and the engine's check had a macOS reader that the
 client had no counterpart for.
 Owner ruling, 2026-11-01, verbatim: "yeah linux only for now. shoud be easy
 enought to port to macos". Version 1 is Linux only.
@@ -2708,7 +2708,7 @@ owner credential is refused. Both take the platform as an argument for tests.
 Porting later: add the `ps -o ppid=,lstart=` reader (decision row 64) to both
 halves and lift the two platform checks.
 
-## 184. `shephrd mcp` discards its own logs
+## 184. `lgtm mcp` discards its own logs
 
 Found: 2026-11-01, while building the tool server.
 State: open.
@@ -2736,7 +2736,7 @@ by the user, with mode 0600, before reading it.
 
 ## 190. The Herdr plugin manifest still lists macOS as a supported platform
 
-Found: 2026-11-01, during the rename to Shephrd.
+Found: 2026-11-01, during the rename to LGTM Studio.
 State: fixed in commit 7887d87 (manifest, frozen test, plan task 1f and decisions
 row 78 now say Linux only).
 
@@ -2750,32 +2750,32 @@ What should happen: the manifest lists only `linux` until the macOS port
 Why it matters: Herdr on a Mac would offer to start a service whose
 ancestry check and leftover sweep do not work there.
 
-## 191. Planning records outside the rename's edit list still say Shepherd
+## 191. Planning records outside the rename's edit list still used an earlier name
 
-Found: 2026-11-01, during the rename to Shephrd.
-State: fixed in commit 7887d87 (the twelve prose lines now say Shephrd; slugs and
+Found: 2026-11-01, during the rename to LGTM Studio.
+State: fixed in commit 7887d87 (the twelve prose lines now say LGTM Studio; slugs and
 paths are kept).
 
-What happens: `.plans/epics/shepherd-foundation/epic.md`, `.plans/roadmap.md`
+What happens: `.plans/epics/lgtm-foundation/epic.md`, `.plans/roadmap.md`
 and the three `.plans/scopes/engine/*/scope.json` files (their `summary` and
-`why` text) still call the product Shepherd, because the rename task did not
+`why` text) still used an earlier product name, because the rename task did not
 cover them. The plan folder path and the epic names are kept on purpose, so
 links do not break.
-What should happen: the text in those files uses Shephrd; their file paths and
+What should happen: the text in those files uses LGTM Studio; their file paths and
 topic names stay.
 Why it matters: scope summaries are loaded into every worker's instructions,
 so they will keep teaching the old name.
 
 ## 192. The fixture scrubber no longer hits the package name, and the old note is stale
 
-Found: 2026-11-01, during the rename to Shephrd.
+Found: 2026-11-01, during the rename to LGTM Studio.
 State: open.
 
 What happens: issue 37 was found because pnpm's `npm_package_name` was
-`shepherd`, eight characters, and the scrubber removed it. The new package
-name `shephrd` has seven characters, so the scrubber now leaves it alone, and
+the earlier package name, eight characters long, and the scrubber removed it.
+The renamed package had seven characters, so the scrubber left it alone, and
 the committed `errors/cursor-out-of-usage.json` keeps its source note
-naming the plan folder `shepherd-engine`. The rule in issue 37 (redact only
+naming the plan folder `lgtm-engine`. The rule in issue 37 (redact only
 values that can hold secrets) is still not built.
 What should happen: issue 37 is fixed on its own terms and does not depend on
 the length of the product's name.
@@ -3054,7 +3054,7 @@ Every signalled process in the test was started by that test.
 
 There is also a test race at the same folder-ownership boundary.
 The existing real-entry case in `dry-run.test.ts` compares every
-`/tmp/shephrd-live-*` folder before and after its child runs.
+`/tmp/lgtm-live-*` folder before and after its child runs.
 It fails if a parallel service test creates or removes its own folder during
 that interval, even when the dry run performs no input or output.
 This occurred in the parallel scoped run, and the case passed in isolation.
@@ -3675,7 +3675,7 @@ State: open; the owner decides.
 
 What happens: the repository names no file where Cursor's command-line
 agent keeps its login.
-`.plans/plans/shepherd-engine/scouting.md`, line 89, names only
+`.plans/plans/lgtm-engine/scouting.md`, line 89, names only
 `CURSOR_API_KEY` and `agent login`.
 So `credentialSourceFor` gives Cursor no store, and Cursor launches are not
 refused.
@@ -3939,7 +3939,7 @@ load, the wait or timeout in that test is examined, as in issue 196: the wait
 should name the thing the next assertion is about, and fixed 30-second
 timeouts should be checked against the work the test does.
 
-## 236. A Codex agent's call to a Shephrd tool is cancelled before Shephrd sees it
+## 236. A Codex agent's call to an LGTM Studio tool is cancelled before LGTM Studio sees it
 
 Found: 2026-11-03, by the live check at 9340f71 (live-check-2, run 1, step
 `sandbox-mcp`, criterion PB-A3), against the real Codex adapter
@@ -3949,8 +3949,8 @@ State: fixed locally by owner option (b), in commit
 Real-adapter validation remains pending the lead's next run.
 
 What happens: the Codex worker, started with the permission "ask", was told
-to call the Shephrd MCP (Model Context Protocol) tool `ask` once. It did call
-`mcp.shephrd.ask` with the right arguments (event 112), but the call failed
+to call the LGTM Studio MCP (Model Context Protocol) tool `ask` once. It did call
+`mcp.lgtm.ask` with the right arguments (event 112), but the call failed
 with `{"error":{"message":"user cancelled MCP tool call"}}` (event 113), and
 the agent reported "The ask call was cancelled by the user." No
 `PermissionRequested` event was written between the two, so neither the lead
@@ -3961,31 +3961,31 @@ tool call as an elicitation. `codex-acp` forwards a form elicitation only when
 the client advertises form elicitation, and it falls back to an ordinary
 permission request only for a URL elicitation or a form with no fields
 (`dist/index.js:38997-39011`, `:39129-39149`). In every other case it answers
-"cancel" itself. Shephrd's runner initializes every adapter with
+"cancel" itself. LGTM Studio's runner initializes every adapter with
 `clientCapabilities: {}` (`packages/engine/src/runner/AcpRunner.ts:510`), so
 the approval is cancelled inside the adapter. The exact elicitation was not
 captured, because the protocol log was off for this run.
 Why it matters: a Codex agent that asks before changes may be unable to use
-any Shephrd tool (ask, post, wait and the others) unless Codex skips approval
+any LGTM Studio tool (ask, post, wait and the others) unless Codex skips approval
 for it. A Codex worker then cannot report back or ask its lead through
-Shephrd, and the live check's PB-A3 row for Codex fails.
+LGTM Studio, and the live check's PB-A3 row for Codex fails.
 The owner chose option (b) on 2026-11-03. The original options were:
 - Advertise form elicitation in the runner and route a tool-approval
-  elicitation through Shephrd's permission flow, like any other permission
+  elicitation through LGTM Studio's permission flow, like any other permission
   request. This changes the runner and may need a contract for the answer.
-- Or start Codex with Shephrd's own MCP server marked as not needing approval.
+- Or start Codex with LGTM Studio's own MCP server marked as not needing approval.
   This is smaller, but it removes a prompt, so it is a permission decision for
   the owner.
 Evidence: `.scratch/foundry-runs/engine-build-1/live-check-2/live-check-run1.log`
 and `run1-sandbox-mcp-events.txt` beside it.
 
-The runner now configures only the Codex Shephrd server with
+The runner now configures only the Codex LGTM Studio server with
 `default_tools_approval_mode: "approve"` through the adapter's `CODEX_CONFIG`.
 It passes an empty ACP server list for start, load and resume, because the
 adapter replaces the configured server map when that list is populated.
-The configuration names `SHEPHRD_SOCKET` and `SHEPHRD_TOKEN` in `env_vars`;
+The configuration names `LGTM_SOCKET` and `LGTM_TOKEN` in `env_vars`;
 it contains neither variable's value. Other account keys and servers retain
-their settings. Invalid account JSON and a pre-existing Shephrd server refuse
+their settings. Invalid account JSON and a pre-existing LGTM Studio server refuse
 the launch before spawning, with a fixed reason that exposes no value.
 
 This departs from plan row 6.1 and decision 21 for Codex only: its server is
@@ -3999,23 +3999,23 @@ Its [`create_env_for_mcp_server`](https://github.com/openai/codex/blob/rust-v0.1
 reads the named variables from Codex's own environment independently of the
 shell policy, so `shell_environment_policy.inherit=core` does not remove them
 from this MCP environment. These source facts were checked on 2026-11-03.
-The fake-agent tests in `runner/shephrd-server.test.ts` cover all three
+The fake-agent tests in `runner/lgtm-server.test.ts` cover all three
 session methods, preservation, refusal before spawning and unchanged Claude
 behavior. The actual adapter and server journey awaits the lead's run.
 
-## 237. Approval-gated tool servers need form elicitation routed through Shephrd
+## 237. Approval-gated tool servers need form elicitation routed through LGTM Studio
 
 Found: 2026-11-03, while the owner decided issue 236.
 
 Status: open. This is option (a), reserved as a follow-up by the owner.
 
 The runner advertises no form elicitation capability. A Codex adapter can
-therefore cancel a tool-approval elicitation before Shephrd sees a permission
-request. Issue 236 configures Shephrd's own server to need no such approval,
+therefore cancel a tool-approval elicitation before LGTM Studio sees a permission
+request. Issue 236 configures LGTM Studio's own server to need no such approval,
 but other tool servers retain their approval settings.
 
 Advertise form elicitation and route a tool-approval elicitation through
-Shephrd's permission flow. This is needed once agents use other tool servers
+LGTM Studio's permission flow. This is needed once agents use other tool servers
 that require approval. The work must preserve the server's requested approval
 and carry its answer through the adapter, rather than cancel it internally.
 
@@ -4099,9 +4099,9 @@ The owner's decision, relayed through the manager on 2026-11-03:
 
 > do not fix it now. The tokens are per spawn and short-lived, and on a single-user machine this is ordinary exposure, the same as any tool that puts a token on its command line. Leave issue 240 open and deferred to the hostile pass.
 
-The runner gives every adapter except Codex the Shephrd tool server through
+The runner gives every adapter except Codex the LGTM Studio tool server through
 the Agent Client Protocol (ACP) `mcpServers` list, with the agent's token as
-the value of the `SHEPHRD_TOKEN` environment entry
+the value of the `LGTM_TOKEN` environment entry
 (`packages/engine/src/runner/AcpRunner.ts:517-518`). The Claude Code adapter
 hands that list to the Claude Agent SDK. SDK version 0.3.312 starts the
 `claude` program with `--mcp-config` followed by the whole list as JSON, so
@@ -4116,7 +4116,7 @@ is the run's work folder). The Codex row of the same step reports the same
 process, because the scan checks every token of the run against every
 argument snapshot. Codex itself receives only the variable names through
 `CODEX_CONFIG` (issue 236, option (b)), so its token is not in any argument.
-The run's folder is kept at `/tmp/shephrd-live-Twd6bJ`.
+The run's folder is kept at `/tmp/lgtm-live-Twd6bJ`.
 
 Possible fixes, not chosen: pass only the variable's name and let the tool
 server inherit the value from the adapter's environment, which already holds
@@ -4137,8 +4137,8 @@ terminal-output fix does not change the ancestry guard.
 The Claude lead ran the exact removed-variable command. Events 157-158
 record its input, event 159 requests permission, event 161 selects allow-once,
 and event 162 marks the call completed. The call id is
-toolu_01H5T2W8rk4qpNBxZNMddW4r. The command removes SHEPHRD_SOCKET and
-SHEPHRD_TOKEN with env -u, sets SHEPHRD_HOME to the run's state folder and
+toolu_01H5T2W8rk4qpNBxZNMddW4r. The command removes LGTM_SOCKET and
+LGTM_TOKEN with env -u, sets LGTM_HOME to the run's state folder and
 starts the real command-line interface's accounts list command. Its actual
 tool result, line 102 of the lead's session file, contains the accounts list
 and LCP_EXIT=0. The engine's thread lost that output, as recorded in issue 242.
@@ -4149,8 +4149,8 @@ adapter shell's request. The exact reason it missed the caller's ancestry
 remains to be established. Passing fake-adapter tests do not refute this
 observed real-adapter result.
 
-Evidence: /tmp/shephrd-live-Twd6bJ/state/events.sqlite, opened read-only, and
-/home/qnlbnsl/.claude/projects/-tmp-shephrd-live-Twd6bJ-work/e04b371b-45ed-4430-a3a0-483cbb74acd7.jsonl,
+Evidence: /tmp/lgtm-live-Twd6bJ/state/events.sqlite, opened read-only, and
+/home/qnlbnsl/.claude/projects/-tmp-lgtm-live-Twd6bJ-work/e04b371b-45ed-4430-a3a0-483cbb74acd7.jsonl,
 lines 101-102. The exact command is recorded in the worker's round-4 result.
 It contains no token value.
 
@@ -4238,13 +4238,13 @@ engine or sandbox rule was changed.
 
 Events 233-234 show the exact removed-variable command and its failed
 completion for Codex. Its session tool output at line 47 contains a complete
-LCP_ENV_BEGIN and LCP_ENV_END listing. Neither SHEPHRD_SOCKET nor
-SHEPHRD_TOKEN appears in it. Core inheritance did remove both names. The
+LCP_ENV_BEGIN and LCP_ENV_END listing. Neither LGTM_SOCKET nor
+LGTM_TOKEN appears in it. Core inheritance did remove both names. The
 probe printed absent=false because issue 242 hid the output, rather than
 because either name was observed. The probe now distinguishes an unobserved
 listing from observed absent or present names, without weakening its gate.
 
-The actual command-line interface printed `shephrd: the folder /tmp above
+The actual command-line interface printed `lgtm: the folder /tmp above
 the socket is owned by another user`, followed by LCP_EXIT=1. This is the
 local check in packages/client/src/socketCheck.ts, before authentication.
 It is not the HTTP 403 ancestry refusal required by SEC-PB-8. The original
@@ -4267,8 +4267,8 @@ Status: fixed locally in live-check probe fix round 4. Real-adapter
 confirmation remains for the lead's next run.
 
 Claude used ToolSearch with exactly
-`{"query":"select:mcp__shephrd__ask","max_results":1}`. Its result named only
-mcp__shephrd__ask. It then called that tool with the exact marker and wrote
+`{"query":"select:mcp__lgtm__ask","max_results":1}`. Its result named only
+mcp__lgtm__ask. It then called that tool with the exact marker and wrote
 its authenticated QuestionAsked at event 127. The probe rejected the lookup
 after the turn ended, so it never sent Codex its sandbox prompt. Codex's
 later authenticated ask at event 270 was issued by the probe's agent client
@@ -4728,7 +4728,7 @@ Why it matters: an agent can stay blocked on a request that no client can see.
 Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding s08 F-2.
 State: open, deferred by the owner on 2026-11-03.
 
-Evidence: `.scratch/foundry-runs/engine-build-1/review-post-build/results/shepherd-engine-s08.md` (not tracked), F-2, confirms the path by source
+Evidence: `.scratch/foundry-runs/engine-build-1/review-post-build/results/lgtm-engine-s08.md` (not tracked), F-2, confirms the path by source
 inspection and hand reasoning.
 
 What happens: `packages/cli/src/serve.ts` launches the detached service with
@@ -4753,7 +4753,7 @@ or a detached service crash.
 Found: 2026-11-03, in the post-build review of commit `8ff4c9b`, finding s13 F-3.
 State: open, deferred by the owner on 2026-11-03.
 
-Evidence: `.scratch/foundry-runs/engine-build-1/review-post-build/results/shepherd-engine-s13.md` (not tracked), F-3, confirms the path by source
+Evidence: `.scratch/foundry-runs/engine-build-1/review-post-build/results/lgtm-engine-s13.md` (not tracked), F-3, confirms the path by source
 inspection and hand reasoning.
 
 What happens: `accounts set` in `packages/engine/src/commands/accounts.ts`
@@ -5176,7 +5176,7 @@ Found: 2026-11-03, in live-check run 4 at commit
 `f94dd9996a93cf658ddf3ee52cdbbf7fb5fc1ab9`.
 Status: open, recorded; the engine is not changed in fix round 8.
 
-`packages/engine/src/runner/harnesses.ts:60` maps Shephrd's `ask` level to
+`packages/engine/src/runner/harnesses.ts:60` maps LGTM Studio's `ask` level to
 Codex's `read-only` mode.
 In `@agentclientprotocol/codex-acp` version 2.5.0, the installed source at
 `dist/index.js:40424-40449` gives that mode an `on-request` approval policy
@@ -5277,7 +5277,7 @@ The log is `.scratch/foundry-runs/engine-build-1/live-check-2/live-check-run6.lo
 The Codex worker runs on `gpt-6-luna` at low effort.
 In the final run, this model declined two exact commands from a probe.
 It declined the removed-variables command, because that command removes both
-Shephrd variables before it asks for account data.
+LGTM Studio variables before it asks for account data.
 It also declined the restart hold, because the prompt says that the hold is part
 of a restart probe.
 The same prompts ran on Codex in earlier runs: the restart hold passed in live
@@ -5438,7 +5438,7 @@ Why it matters: Unwrapped text from a new sender could be read by an agent as an
 Found: 2026-11-03, while planning the client API plan.
 State: open.
 
-What happens: The root `pnpm -r test` passes without checking anything (client API row 111). The engine package has only a `typecheck` script, so `pnpm --filter @shephrd/engine test` also runs nothing. Tests run only through the root `vitest run`.
+What happens: The root `pnpm -r test` passes without checking anything (client API row 111). The engine package has only a `typecheck` script, so `pnpm --filter @lgtm/engine test` also runs nothing. Tests run only through the root `vitest run`.
 What should happen: Not decided. The real gate is the root `pnpm check`.
 Why it matters: A passing test command that checks nothing gives false confidence.
 
@@ -5510,7 +5510,7 @@ Why it matters: The owner may be alerted twice for one matter.
 Found: 2026-11-03, while planning the client API plan.
 State: open.
 
-What happens: The default access on an ntfy server can leave topics open, and Shephrd cannot check the owner's server (client API row 115). The setup document advises deny-all.
+What happens: The default access on an ntfy server can leave topics open, and LGTM Studio cannot check the owner's server (client API row 115). The setup document advises deny-all.
 What should happen: The owner sets deny-all on the ntfy server, as the setup document advises.
 Why it matters: Anyone who learns a topic name could read the owner's alerts or send false ones.
 
@@ -5603,9 +5603,9 @@ State: open.
 
 What happens: While the web server is down, another local user can hold its loopback port and serve a long-cached page (client API row 167).
 What should happen: The owner is told. Not otherwise decided.
-Why it matters: A browser could be shown a page that did not come from Shephrd.
+Why it matters: A browser could be shown a page that did not come from LGTM Studio.
 
-## 321. An agent that runs `shephrd client subscribe` reads events with no data envelope
+## 321. An agent that runs `lgtm client subscribe` reads events with no data envelope
 
 Found: 2026-11-03, while planning the client API plan.
 State: open.
@@ -5633,8 +5633,8 @@ Why it matters: A client cannot show which request a changed file belongs to.
 Found: 2026-11-03, while planning the client API plan.
 State: open.
 
-What happens: A Herdr pane's command starts from Herdr's environment and not the engine's, so `SHEPHRD_WEB_PASSWORD` could reach it (client API row 188, TM-PB-6).
-What should happen: The interactive mode plan clears `SHEPHRD_WEB_PASSWORD` in a pane's command.
+What happens: A Herdr pane's command starts from Herdr's environment and not the engine's, so `LGTM_WEB_PASSWORD` could reach it (client API row 188, TM-PB-6).
+What should happen: The interactive mode plan clears `LGTM_WEB_PASSWORD` in a pane's command.
 Why it matters: An agent in a pane could read the owner's web password.
 
 ## 324. The engine design still names paired devices and device credentials
@@ -6011,7 +6011,7 @@ historical cause. This issue remains open.
 Found: 2026-11-04, by the builder or test writer of unit b1, during the foundation build.
 State: fixed during the foundation review repair of FR-152.
 
-What happens: `packages/engine/test/runner/harnesses.test.ts:82` rejects any adapter path containing the substring `npx`, including its random temporary directory. The whole gate generated `/tmp/shephrd-harnesses-bQtnpx/`, causing a false positive. The isolated case passed on rerun. The lead should narrow the assertion to the executable or invocation.
+What happens: `packages/engine/test/runner/harnesses.test.ts:82` rejects any adapter path containing the substring `npx`, including its random temporary directory. The whole gate generated `/tmp/lgtm-harnesses-bQtnpx/`, causing a false positive. The isolated case passed on rerun. The lead should narrow the assertion to the executable or invocation.
 Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
 
 The fixture now always uses an ancestor containing `npx`, which deterministically
@@ -6077,7 +6077,7 @@ No stored record is removed or cut.
 Found: 2026-11-04, by the builder or test writer of unit r9, during the foundation build.
 State: open, for the final review.
 
-What happens: The transcript fallback refuses a Claude project-folder key longer than 200 characters, because Claude Code hashes such keys in its own way. Shephrd then schedules nothing rather than guess a path. An agent in such a folder gets no cache timing from this fallback.
+What happens: The transcript fallback refuses a Claude project-folder key longer than 200 characters, because Claude Code hashes such keys in its own way. LGTM Studio then schedules nothing rather than guess a path. An agent in such a folder gets no cache timing from this fallback.
 Why it matters: The foundation build's reviews are held until its end, so this waits for the final review.
 
 ## 367. The board restart acceptance case failed once in a full check
@@ -6211,7 +6211,7 @@ The first fix's guide, security rule, plan and three contract copies incorrectly
 required certificate trust.
 Those requirements now describe the expected browser certificate warning and
 the accepted continuation without installing trust.
-Shephrd still holds no certificate and serves only HTTP on loopback.
+LGTM Studio still holds no certificate and serves only HTTP on loopback.
 The existing browser fixtures ignore certificate errors for the self-signed
 proxy and prove login and authenticated requests without installing trust.
 Their comments now describe that bypass accurately.
@@ -7967,7 +7967,7 @@ pretty-printed object. `mcpAskDiscovery` still requires a serialized array
 on each output line. It rejected this output before the Codex sandbox probe
 could run, even though Claude's authenticated ask succeeded.
 
-Evidence: `/tmp/shephrd-live-IEqoM1/state/events.sqlite`, read-only.
+Evidence: `/tmp/lgtm-live-IEqoM1/state/events.sqlite`, read-only.
 The grouped discovery starts at sequence 148.
 The exact ask starts at sequence 152.
 The assigned run folder contains `live-check.log` and the result report.
@@ -7991,23 +7991,23 @@ snapshots, replacement updates, omitted fields, and empty results.
 The assigned run folder contains the round 2 check logs and result report.
 No deferred security issue was repaired to improve the live-check count.
 
-## 484. Shephrd's own tools can wait for harness approval
+## 484. LGTM Studio's own tools can wait for harness approval
 
 Found: 2026-11-05, during the roles live check's `wave` step.
-State: fixed on `area/shephrd-tools`.
+State: fixed on `area/lgtm-tools`.
 
-A Claude lead in ask mode requested permission for `mcp__shephrd__roles_orient`.
+A Claude lead in ask mode requested permission for `mcp__lgtm__roles_orient`.
 The run waited five minutes because nobody answered that request.
-The owner decided that Shephrd's own tools need no harness approval on any
+The owner decided that LGTM Studio's own tools need no harness approval on any
 harness or permission mode. Codex already had this setting through issue 236.
 
 Claude's pinned `claude-agent-acp` 0.99.1 accepts
 `_meta.claudeCode.options.allowedTools` on session creation and reload.
-The runner supplies the server rule `mcp__shephrd` to the Agent Software
+The runner supplies the server rule `mcp__lgtm` to the Agent Software
 Development Kit 0.3.312. It does not write a settings file.
 The real Haiku read-only proof found that plan mode still asks despite this
 rule. The runner answers once when the SDK's structured server identity is
-`shephrd` from source `dynamic`, with the matching structured tool name.
+`lgtm` from source `dynamic`, with the matching structured tool name.
 Protocol version 2 puts that name in `toolCall.name`.
 Protocol version 1 puts it in `_meta.claudeCode.toolName`.
 Configured and plugin sources with the same name keep their normal hold.
@@ -8038,11 +8038,11 @@ The source comments in `AcpRunner.ts`, `codexMcp.ts`, and `cursorMcp.ts`
 identify the adapter versions and source entry points. The runner tests cover
 every harness and permission mode, session creation and reload, other servers,
 native tools, uncertain Gemini identity, and private Cursor settings cleanup.
-Every Shephrd call still passes through the existing authenticated engine
+Every LGTM Studio call still passes through the existing authenticated engine
 handlers and their caller-rights checks. An API question still reaches its
 recipient; only the harness approval prompt is exempt.
 Real verification and the full check results are recorded beside the assigned
-brief in `.scratch/foundry-runs/foundation-plans-1/shephrd-tools/result.md`.
+brief in `.scratch/foundry-runs/foundation-plans-1/lgtm-tools/result.md`.
 
 ## 485. Cursor's native login store is missing from credential redaction
 
@@ -8061,13 +8061,13 @@ The registry needs this source, its refresh behavior, and regression coverage
 before Cursor's native login can be claimed to have the same coverage as
 Claude and Codex.
 
-## 486. The live check relies on a Shephrd permission prompt for Claude options
+## 486. The live check relies on an LGTM Studio permission prompt for Claude options
 
 Found: 2026-11-05, in the first approval-free tools live check.
-State: fixed on `area/shephrd-tools`.
+State: fixed on `area/lgtm-tools`.
 
 The `permission-kinds` observation ran immediately after `sandbox-mcp`.
-Its only Claude permission evidence came from the Shephrd call that no
+Its only Claude permission evidence came from the LGTM Studio call that no
 longer asks. The step failed with no observed Claude options.
 The observation now follows `always-allow`, which attempts a native command
 and records its real offered options. The option checks still require
@@ -8079,14 +8079,14 @@ was relaxed. The independent probe order and its regression tests were updated.
 Found: 2026-11-05, in the second approval-free tools live check.
 State: open. This is separate from the permission change.
 
-The `sandbox-mcp` prompt required exactly one Shephrd `ask` call and prohibited
+The `sandbox-mcp` prompt required exactly one LGTM Studio `ask` call and prohibited
 other tools. The Claude call completed and created its authenticated question.
 The Codex turn issued a native web search with an empty query instead.
 The existing strict probe rejected this unexpected call. It did not treat the
 agent's reply as tool evidence. The Codex approval configuration was unchanged.
 The separate Luna proof completed `roles.orient` and `ask` without permission.
 
-Evidence: `/tmp/shephrd-live-BNBMph/state/events.sqlite`, read-only.
+Evidence: `/tmp/lgtm-live-BNBMph/state/events.sqlite`, read-only.
 The unexpected web search is at sequences 157 and 158.
 After reload, the same Codex agent repeated its hold command and ended its
 turn without the requested MCP question. The strict reload observation timed
@@ -8098,7 +8098,7 @@ inputs and accepted outcomes remain unchanged.
 ## 488. Cursor's Auto model uses a different protocol identifier
 
 Found: 2026-11-05, during the requested real Cursor proof.
-State: fixed on `area/shephrd-tools`.
+State: fixed on `area/lgtm-tools`.
 
 The installed Cursor version `2026.10.14-941492e` lists `auto` in its terminal
 model catalog. Its Agent Client Protocol (ACP) session instead advertises
@@ -8118,7 +8118,7 @@ Uncertain and duplicate options retain the original request and its refusal.
 ## 489. Disposable Cursor settings also contain its session history
 
 Found: 2026-11-05, while preparing the real Cursor reload proof.
-State: fixed on `area/shephrd-tools`.
+State: fixed on `area/lgtm-tools`.
 
 Cursor `2026.10.14-941492e` stores its ACP session databases beneath
 `CURSOR_CONFIG_DIR/acp-sessions`. Its installed `6136.index.js`, in
@@ -8138,14 +8138,14 @@ the assigned brief in `cursor-proof.md`.
 ## 490. Cursor restores the previous MCP provider name on reload
 
 Found: 2026-11-05, during the requested real Cursor reload proof.
-State: fixed on `area/shephrd-tools`, with a successful live stop/resume proof.
+State: fixed on `area/lgtm-tools`, with a successful live stop/resume proof.
 
 The read-only Auto session loaded successfully. Its one permitted extra
 prompt called `roles.orient` using the provider name from the conversation.
 The replacement process had a new random name and a native allow rule for
 that new name. Cursor therefore requested human approval for the old name.
 The request is at sequence 80 in
-`/tmp/shephrd-live-C4DAkt/state/events.sqlite`.
+`/tmp/lgtm-live-C4DAkt/state/events.sqlite`.
 
 The runner now persists each agent's unguessable name beside its session
 history, in a file with mode 0600. The replacement process uses that same
@@ -8159,7 +8159,7 @@ The manager then sent one more real reload proof assignment. On commit `6bea2c4`
 a Cursor Auto agent in ask mode completed `roles.orient` and `ask`, ended
 its turn, stopped, and resumed the same session. The second prompt completed
 both calls and ended its turn. Neither turn requested permission.
-The database is `/tmp/shephrd-live-E1UN83/state/events.sqlite`.
+The database is `/tmp/lgtm-live-E1UN83/state/events.sqlite`.
 The initial orientation, question, and turn end are at sequences 51, 55,
 and 61. The agent stopped at sequence 62 and reloaded at sequence 66.
 The second orientation, question, and turn end are at sequences 89, 93,
@@ -8170,7 +8170,7 @@ beside the assigned brief. No application fix was needed for this run.
 ## 491. The roles live check rejected the board's expected no-answer disposition
 
 Found: 2026-11-05, after the owner's roles check at `5dd41b7`.
-State: fixed on `area/shephrd-tools`; the owner must repeat the real stall check.
+State: fixed on `area/lgtm-tools`; the owner must repeat the real stall check.
 
 The wave and timed flush passed in `run-TnMigw`. The first-stall check
 rejected every `board.AddresseeResolved` event, including `no-answer`.
@@ -8199,7 +8199,7 @@ No real roles run was performed for this fix.
 ## 492. The roles worker prompt did not cover the board's stall reminder
 
 Found: 2026-11-05, during the owner's roles check at `bac865a`.
-State: fixed on `area/shephrd-tools`; the owner must repeat the real stall check.
+State: fixed on `area/lgtm-tools`; the owner must repeat the real stall check.
 
 The Luna worker left the initial obligation unanswered and ended its turn
 at sequence 272. The board sent its reminder at 273. That reminder asks
@@ -8219,8 +8219,8 @@ No real roles run was performed for this prompt fix.
 
 ## 493. The live startup preflight depended on the owner's Herdr service
 
-Found: 2026-11-05, during the standalone Sheprd split.
-State: fixed on `area/sheprd-split`.
+Found: 2026-11-05, during the standalone LGTM Studio split.
+State: fixed on `area/lgtm-split`.
 
 The live check required a Herdr startup hook to have started a service in the
 owner's real state folder.
@@ -8590,7 +8590,7 @@ not host vim or an agent's command line. Because the mock is golden, that would 
 been built as drawn. Git stopped short of the window height, and its columns scrolled
 together. The tab row moved sideways between views. A thread opened at its top, so a
 pending permission's buttons were below the fold. Iris's branch and worktree disagreed
-across the page. The brand and storage keys said "shephrd", and "Add Project", "Source
+across the page. The brand and storage keys said "lgtm", and "Add Project", "Source
 Control" and "Workspace settings" competed with other names for the same things. Text
 went down to 9 pixels. The Alerts badge counted requests, which duplicated the bell.
 
@@ -8621,7 +8621,7 @@ its end and returns to its top when reopened. The split diff added in that revie
 each side separately, so the lines of the two sides do not correspond. The 71 checks in
 `design/revision-checks.mjs` did not catch either problem.
 
-## 516. Sheprd cannot run Grok without Fast through Cursor's Agent Client Protocol
+## 516. LGTM Studio cannot run Grok without Fast through Cursor's Agent Client Protocol
 
 Found: 2026-11-06, while setting up the advisory board on a private engine.
 State: open. Not fixed.
@@ -8631,7 +8631,7 @@ Cursor's Agent Client Protocol (ACP) mode offers Grok 4.7 only as
 value with `fast=false`, and it refused `grok-4.7-high`. Launch arguments and a
 private `CURSOR_CONFIG_DIR` did not change the offered value. The interactive
 `cursor-agent --model grok-4.7-high` runs without Fast. The owner's rule is no
-fast modes, so a Grok agent cannot run under Sheprd's engine today. The board
+fast modes, so a Grok agent cannot run under LGTM Studio's engine today. The board
 used Herdr Synapse's team board and interactive panes instead.
 
 ## 517. Moving the mock onto data files exposed four faults in it
@@ -8701,7 +8701,7 @@ The check did not cover the 526 Claude findings and 139 Grok findings that were 
 Found: 2026-11-07, recorded from review finding K-368.
 State: open. The owner ruled on 2026-11-07, and the code change waits until the freeze lifts.
 
-When an orchestrator posts a question that needs a reply to a lead, the lead goes idle while its workers run. After 20 minutes the lead receives `StallSeen`, and on the third episode the orchestrator receives `ReplaceAdvised`. The code is `packages/engine/src/roles/sheepdog/rules/stall.ts:145-150`. The plan's criterion 4.3, at `.plans/plans/shepherd-foundry-roles/plan.md:939`, says both "nor is the lead" and "still nudged". The plan's line 69 says that a worker waiting on a busy agent is not stalled. No test covers an orchestrator's post to a lead with a busy descendant.
+When an orchestrator posts a question that needs a reply to a lead, the lead goes idle while its workers run. After 20 minutes the lead receives `StallSeen`, and on the third episode the orchestrator receives `ReplaceAdvised`. The code is `packages/engine/src/roles/sheepdog/rules/stall.ts:145-150`. The plan's criterion 4.3, at `.plans/plans/lgtm-foundry-roles/plan.md:939`, says both "nor is the lead" and "still nudged". The plan's line 69 says that a worker waiting on a busy agent is not stalled. No test covers an orchestrator's post to a lead with a busy descendant.
 
 The owner ruled on 2026-11-07 that the lead keeps both the nudges and the replacement advice in this case. The advice changes form, as follows:
 
@@ -8732,32 +8732,31 @@ State: both are fixed on that branch.
   person signed in only to Codex would have got a lead on an account that does not work. The form
   now offers the signed-in harnesses, and it hides the choice when there is one.
 
-## 523. The LGcode rename does not migrate existing state or environment variables
+## 523. An earlier rename did not migrate existing state or environment variables
 
-Found: 2026-11-08, while renaming Sheprd to LGcode.
-State: accepted for this rename, with no automatic migration.
+Found: 2026-11-08, during an earlier rename of the product.
+State: accepted, with no automatic migration. On 2026-11-12 the owner chose to start fresh under the name LGTM Studio.
 
-What happens: LGcode reads `~/.local/state/lgcode` by default and uses the
-`LGCODE_` environment variables. Existing state under `~/.local/state/sheprd`
-and the old `SHEPRD_` variables are not migrated or read. Configuration folders
-are now `.lgcode` and `~/.lgcode`, with no aliases for the old names.
-What should happen: an owner who ran Sheprd starts fresh, or stops the old
-service and moves the state folder by hand before starting LGcode. The owner
+What happens: the renamed program read a new state folder and new environment
+variables. Existing state under the old folder and the old variables were not
+migrated or read. The configuration folders had no aliases for the old names.
+What should happen: an owner who ran LGTM Studio starts fresh, or stops the old
+service and moves the state folder by hand before starting LGTM Studio. The owner
 also updates environment variables, configuration folder names, and commands.
 Why it matters: an existing owner otherwise sees an empty installation, and
-old service settings, including the web password, do not configure LGcode.
+old service settings, including the web password, do not configure LGTM Studio.
 
 ## 524. The live check's Codex tool step can fail because the agent never calls the tool
 
-Found: 2026-11-08, while checking the LGcode rename.
+Found: 2026-11-08, while checking an earlier rename of the product.
 State: open.
 
-In the first `pnpm live-check` run on the rename branch, the `sandbox-mcp` step failed with "codex: not attempted; exact ask tool calls=0". The Codex agent, GPT-6 Luna at low effort, made no call to the `lgcode` ask tool, so the probe had nothing to judge. The Claude agent's call succeeded in the same run. A second run passed the step for both agents, with the same code, so the failure depends on whether the model chooses to call the tool. The step should give the agent a second prompt, or run on a model that follows the instruction reliably, before it reports a failure.
+In the first `pnpm live-check` run on the rename branch, the `sandbox-mcp` step failed with "codex: not attempted; exact ask tool calls=0". The Codex agent, GPT-6 Luna at low effort, made no call to the `lgtm` ask tool, so the probe had nothing to judge. The Claude agent's call succeeded in the same run. A second run passed the step for both agents, with the same code, so the failure depends on whether the model chooses to call the tool. The step should give the agent a second prompt, or run on a model that follows the instruction reliably, before it reports a failure.
 
 ## 525. OpenPencil's command-line tool guesses the width of Inter Medium and SemiBold text
 
 Found: 2026-11-08, while building the Reverse Fig skill on the branch `area/reverse-fig`.
-State: worked around in the skill; the cause is in OpenPencil 0.16.0, not in LGcode.
+State: worked around in the skill; the cause is in OpenPencil 0.16.0, not in LGTM Studio.
 
 - OpenPencil lays text out with its own font measurements. From the command line, it measures
   Inter Regular and Bold, but Inter Medium and SemiBold fall back to a rough estimate of 0.6 of
@@ -8796,7 +8795,7 @@ From this point, the manager runs `pnpm live-check` at each build-step gate.
 The website seats continue to run `pnpm check` and `pnpm live-check:web`.
 The gate report must name the commit and attribute the broader live result to the manager.
 The run evidence is recorded in `.scratch/foundry-runs/website-1/run.md` in the main checkout.
-The lead's private live run is `/tmp/lgcode-live-KULrQh`.
+The lead's private live run is `/tmp/lgtm-live-KULrQh`.
 
 ## 527. Piece reducers could not use persisted event times for task history
 
@@ -10216,7 +10215,7 @@ Real confined safe-file and owner/member refusal controls are required before de
 
 ## 587. Repository configuration runs with the owner's Unix authority
 
-LGcode is a local program for one owner.
+LGTM Studio is a local program for one owner.
 An owner-controlled repository can configure Git content filters or merge drivers that run as that same Unix user.
 The current security boundary accepts that repository-configuration scope.
 This unit documents the limit and does not claim to sandbox owner-controlled Git configuration or introduce a different threat model.
@@ -10682,7 +10681,7 @@ The approved image was present under its transferred name and tag on the remote 
 The engine's config-digest reference returned `No such image`.
 The original remote typing failure, later passing typing and Docker inspection records remain preserved separately.
 
-The owner ruled that every host finds the editor by `lgcode-openpencil:w10b-cb71737-build1`.
+The owner ruled that every host finds the editor by `lgtm-openpencil:w10b-cb71737-build1`.
 The engine now inspects that local tag on every launch and requires Linux on AMD64.
 No digest lookup or equality decides image presence.
 A missing image is refused without building, pulling, retagging or choosing a fallback.
@@ -10785,6 +10784,10 @@ The unchanged case passed on its own in 10.0 seconds.
 The fix stays as stated above: wait on the correct event, not a longer deadline.
 It is the next unit on area/website after the master merge.
 The original logs and failure contexts remain in the W09 author result.
+
+A related timing failure appeared in the full run of the rename branch on 2026-11-12, at git.spec.ts:316.
+After Pull, the sync line still said "1 incoming" after five seconds.
+The unchanged case passed on its own in 24.5 seconds.
 
 
 ## 610. The merged shell constrained the Git workspace width
@@ -10889,6 +10892,12 @@ The unchanged case passed on its own in 24.6 seconds.
 Both failures are in the mock and component preview path under a full parallel browser run.
 The cause remains unproved.
 
+It recurred at new-project.spec.ts:605 in the full run of the rename branch on 2026-11-12, with status 0 instead of 200.
+The unchanged case passed on its own in 27.3 seconds.
+
+It recurred at the preview frame's data-loaded check in the full run of the earlier-names cleanup on 2026-11-12.
+The unchanged case passed on its own in 24.5 seconds.
+
 ## 612. The built web page prints raw engine data and has weak component design
 
 Open: found on 2026-11-10 while comparing the page in `packages/web` with the mock.
@@ -10915,7 +10924,7 @@ at `lifecycle.ts:251` and is written into stored events.
 ## 614. The design file lags the rebuilt mock's tokens and names
 
 Open: found on 2026-11-10 while building the repository Design page in `design/mock/`.
-The design file is `design/lgcode.fig`.
+The design file is `design/lgtm.fig`.
 Its `Agent row` variants show the name "Rowan", which breaks the rule that agents are named
 by role.
 It has 15 colour variables, while `design/mock/css/tokens.css` has 38 colours.
@@ -10925,7 +10934,7 @@ It has no type, space, density, shape or motion variables.
 The Design page marks every such value "Only in code" or "Retuned in code" until the file
 catches up.
 The full list of changes is in `design/mock/feedback/2026-11-10-design-categories.md`,
-under "What LGcode's file must change to meet the standard".
+under "What LGTM Studio's file must change to meet the standard".
 The Design lead agent proposes those changes, and the owner approves them.
 
 ## 615. The mock's Git tab replaces its structure with a blank page when there is no worktree
@@ -10947,3 +10956,47 @@ The page takes about a second longer to settle on the larger flows, and it uses 
 than a picture would.
 A real build should draw the frames from the design file, or from stored pictures, and load
 a live copy only for the frame the owner opens.
+
+## 617. The first marketing page pass overflowed on small phones and stretched its phone image
+
+Found: 2026-11-11, during the LGTM Studio marketing page browser checks.
+State: fixed in the marketing page before handoff.
+
+At a viewport width of 320 pixels, the workflow grid kept its children's intrinsic minimum width.
+The grid extended 20 pixels past the viewport's right edge.
+The mobile screenshot also kept its HTML height after CSS reduced its width.
+It appeared stretched in the phone frame.
+The workflow grid's children now permit shrinking.
+Images now preserve their natural aspect ratio.
+The browser check retains the 320-pixel overflow assertion.
+
+## 618. Marketing dark mode needed separate input and surface colors
+
+Found: 2026-11-11, while adding the marketing page's dark theme.
+State: fixed before handoff.
+
+The first dark-mode pass reused the light text token inside the pale email field.
+The entered address failed the browser's minimum text contrast check.
+The input and the keyboard skip link now use a dedicated dark text color.
+The input placeholder retains its readable color in both modes.
+Screenshot frame shadows also keep a dark surface color instead of following the text color.
+The browser check retains the email-field and skip-link contrast assertions.
+
+## 619. The remote test computer kept folder and slice names from before the rename
+
+Found: 2026-11-12, during the rename to LGTM Studio.
+State: fixed on 2026-11-12, after the owner chose to start fresh.
+
+The first rename pass kept the remote copies' folder, the shared systemd slice and the SSH connection socket under their earlier names.
+It did so because older branches still ran remote tests, and two slices could exceed the owner's memory limit.
+The owner then chose to reset the workspace, so no older branch runs there.
+The copies now live in `~/Work/lgtm-studio`, every remote command shares `lgtm-remote.slice`, and the socket is named `lgtm-remote-%C`.
+
+## 620. Settings the web page stored in the browser are lost by the rename
+
+Found: 2026-11-12, during the rename to LGTM Studio.
+State: accepted.
+
+The web page and the mock store the theme, panel sizes and dismissed notices under keys named after the product.
+The rename changed those keys to start with `lgtm-`.
+A browser that used the page before the rename shows the defaults once, and then remembers new choices.

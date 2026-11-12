@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect";
 import { expect, it } from "vitest";
-import { boardAlertTitles } from "@lgcode/contracts/board/alerts";
+import { boardAlertTitles } from "@lgtm/contracts/board/alerts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { awaitCleared, awaitRaised, barrier, raised, withAlerts } from "../support/alertsRig.ts";
 import { call, ownerCredential, seedAgent, success } from "../support/handlerRig.ts";

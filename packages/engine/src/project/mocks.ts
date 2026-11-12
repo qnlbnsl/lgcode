@@ -1,4 +1,4 @@
-import { MockBundle, type Event, type MockRevision, type MockSource, type MockApproval } from "@lgcode/contracts"
+import { MockBundle, type Event, type MockRevision, type MockSource, type MockApproval } from "@lgtm/contracts"
 import * as Schema from "effect/Schema"
 import { fieldStructure, eventStructure, type RedactionStructure } from "../log/redactionStructure.ts"
 import * as Effect from "effect/Effect"
@@ -54,7 +54,7 @@ const cleanBundle = (input: Input, bundle: typeof MockBundle.Type) => Effect.gen
   return cleaned
 })
 type MockObservation = {
-  readonly design: (input: Input, design: import("@lgcode/contracts").RepositoryDesign) => Effect.Effect<void, ReturnType<typeof refused>>
+  readonly design: (input: Input, design: import("@lgtm/contracts").RepositoryDesign) => Effect.Effect<void, ReturnType<typeof refused>>
   readonly source: (input: Input, source: typeof MockSource.Type) => Effect.Effect<{ fingerprint: string }, ReturnType<typeof refused>>
   readonly component: (input: Input, source: typeof MockSource.Type, component: typeof MockBundle.Type.components[number]) => Effect.Effect<void, ReturnType<typeof refused>>
 }

@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
-import { connect } from "@lgcode/client"
-import { waitForAgents } from "@lgcode/client/waitForAgents"
+import { connect } from "@lgtm/client"
+import { waitForAgents } from "@lgtm/client/waitForAgents"
 import { exportThread } from "./threadExport.ts"
 import { type CommandName } from "./registry.ts"
 import { type Parsed } from "./parse.ts"
@@ -45,7 +45,7 @@ export const runCommand = (
     Effect.catchCause((cause) => Effect.sync(() => {
       const failure = cause.reasons.find((reason) => reason._tag === "Fail")
       const defect = cause.reasons.find((reason) => reason._tag === "Die")
-      err(`lgcode: ${describeFailure(failure !== undefined ? (failure as { error: unknown }).error : (defect as { defect: unknown } | undefined)?.defect)}\n`)
+      err(`lgtm: ${describeFailure(failure !== undefined ? (failure as { error: unknown }).error : (defect as { defect: unknown } | undefined)?.defect)}\n`)
       return 1
     }))
   )

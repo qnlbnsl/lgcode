@@ -1,4 +1,4 @@
-import { comparePermission, rolesActionKinds, type AgentId, type Event, type PermissionLevel, type RolesAction, type RolesActionRecord, type RolesSettings, type StallNoticePlanned } from "@lgcode/contracts";
+import { comparePermission, rolesActionKinds, type AgentId, type Event, type PermissionLevel, type RolesAction, type RolesActionRecord, type RolesSettings, type StallNoticePlanned } from "@lgtm/contracts";
 import { emptyRoleFile, reduceRoleFile, type RoleFileState } from "./roleFile.ts";
 
 export interface Matter {

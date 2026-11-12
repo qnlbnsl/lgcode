@@ -1,13 +1,13 @@
-# Run the Foundry through LGcode
+# Run the Foundry through LGTM Studio
 
 This recipe maps Steps 3, 4, 5 and 8 of the Founder OS Software Foundry
-skill to LGcode. The source is
+skill to LGTM Studio. The source is
 `plugins/harness-sessions/skills/software-foundry/SKILL.md`, read at
 Founder OS commit `33228a7dcd122e25729c761d311b178fd30f852d` on 2026-11-04.
 The workflow is described here in new prose. No source code is copied.
 
 The recipe follows WS-8, task 8a, in the
-[roles plan](../.plans/plans/shepherd-foundry-roles/plan.md).
+[roles plan](../.plans/plans/lgtm-foundry-roles/plan.md).
 It is the input for a later rewrite of the external skill. Writing it does
 not switch a running Foundry over. Task 8b checks the composed service.
 Task 8c checks real harnesses on the owner's accounts. Those checks and the
@@ -21,11 +21,11 @@ support. This recipe does not claim that native terminal flags work in ACP.
 
 ## Prepare the owner and the orchestrator
 
-Start the engine with `lgcode serve --detach` using the project's normal setup.
+Start the engine with `lgtm serve --detach` using the project's normal setup.
 Use the owner's authenticated terminal or logged-in web client for owner
 settings. Agents use their own identity supplied by the engine. Never copy
 the owner credential into a brief, a prompt, a log or an agent environment.
-The engine supplies `LGCODE_SOCKET` and `LGCODE_TOKEN` to its agents.
+The engine supplies `LGTM_SOCKET` and `LGTM_TOKEN` to its agents.
 Do not print their values.
 
 The owner starts the run's manager with `start`, role `orchestrator`, a
@@ -45,10 +45,10 @@ For example, the owner can start the manager with this payload after
 substituting the actual repository path and selected model:
 
 ```sh
-lgcode start --input '{"name":"foundation-manager","role":"orchestrator","harness":"codex","account":{"_tag":"any"},"model":"<selected model>","effort":"high","permission":"ask","folder":"/absolute/repo","runMode":"acp","groups":["run:foundation"],"prompt":"Read the confirmed run brief and coordinate its areas. Begin with roles.orient."}'
+lgtm start --input '{"name":"foundation-manager","role":"orchestrator","harness":"codex","account":{"_tag":"any"},"model":"<selected model>","effort":"high","permission":"ask","folder":"/absolute/repo","runMode":"acp","groups":["run:foundation"],"prompt":"Read the confirmed run brief and coordinate its areas. Begin with roles.orient."}'
 ```
 
-Each agent calls `lgcode roles.orient --input '{}'` at the start of its assignment.
+Each agent calls `lgtm roles.orient --input '{}'` at the start of its assignment.
 The reply gives its identity, parent, visible team and role advice. The
 owner may load team-specific advice and bounded limits with
 `roles.role-file.set`, whose `content` is the role file's JSON text.
@@ -113,7 +113,7 @@ capacity handling.
 This payload opens an area's channel from an identity allowed to manage it:
 
 ```sh
-lgcode board.open --input '{"name":"backend-team","group":"area:backend","anchorAgentId":"<lead id>"}'
+lgtm board.open --input '{"name":"backend-team","group":"area:backend","anchorAgentId":"<lead id>"}'
 ```
 
 The channel name must start with a letter and contain only letters, digits,
@@ -123,12 +123,12 @@ not normalize a display name into that form.
 The rest of the source step maps as follows. Rows marked as team workflow
 remain in the external skill.
 
-| Source action | LGcode operation or team workflow |
+| Source action | LGTM Studio operation or team workflow |
 |---|---|
-| Create the area's branch and worktree. | Team workflow uses git and the worktree root above. LGcode receives the folder through `start`. |
+| Create the area's branch and worktree. | Team workflow uses git and the worktree root above. LGTM Studio receives the folder through `start`. |
 | Create tabs, split panes to the right, wait for a ready shell and keep at most three workers visible. | Team workflow retains the layout policy for interactive mode. ACP uses the client roster and threads without a shell-ready step. |
 | Label panes with the Foundry role and suppress fast modes. | Team workflow keeps the labels and vendor policy. `start` records the role, model and effort. A pane label is not an engine identity. |
-| Select an advisor lead, restrict the advisor to that launch and audit its use. | Team workflow retains the owner-approved trial and advisor log. Use it only with verified harness support. LGcode has no advisor-selection command. |
+| Select an advisor lead, restrict the advisor to that launch and audit its use. | Team workflow retains the owner-approved trial and advisor log. Use it only with verified harness support. LGTM Studio has no advisor-selection command. |
 | Start the lead and send its task file. | `start` carries the first prompt. Use `prompt` for later work. Inspect the roster or thread after an uncertain response before retrying the same write. |
 | Start the relayer beside the lead and give it its brief. | `start` gives a helper its worker role and first prompt. The skill keeps the short-question and verbatim-answer policy. The owner can answer through the authenticated client. |
 | Start the temporary evaluators and give them direct owner access. | `start` gives each a worker role and a shared group. The skill keeps their independence, task files, scoring, disputes and owner-only decisions about skill changes. |
@@ -171,14 +171,14 @@ the returned worker identifiers with `reply: all`. Here is a two-worker
 example:
 
 ```sh
-lgcode board.post --input '{"channelId":"<team channel id>","text":"Complete your assigned task. Write your result file, then reply to this post with its path and commit.","to":[{"_tag":"agent","agentId":"<worker one id>"},{"_tag":"agent","agentId":"<worker two id>"}],"reply":"all"}'
+lgtm board.post --input '{"channelId":"<team channel id>","text":"Complete your assigned task. Write your result file, then reply to this post with its path and commit.","to":[{"_tag":"agent","agentId":"<worker one id>"},{"_tag":"agent","agentId":"<worker two id>"}],"reply":"all"}'
 ```
 
 Save its `postId`. Each worker acknowledges the post when starting its
 response with `board.acknowledge`. When finished, it writes the result file
 and replies using `board.post` with `replyTo` set to that identifier,
 `reply: none`, and the lead as its addressee. This is an intentional change
-from the source's file-only finish: LGcode does not watch result files.
+from the source's file-only finish: LGTM Studio does not watch result files.
 The lead receives one completion when all obligations resolve. It reads
 the dispositions before treating a wave as successful. A stopped,
 undeliverable or non-answering worker is not a successful result.
@@ -189,7 +189,7 @@ Do not send a separate completion prompt, acknowledgment post or broadcast
 for every arrival. Blocking questions use a directed post that asks for a
 reply, or `ask` when the engine's holder should answer the question.
 
-An alternative is `lgcode wait --block --mode all <worker ids>`, called by
+An alternative is `lgtm wait --block --mode all <worker ids>`, called by
 the parent. The owner can use `client.wait`. A wait reports settlement and
 held requests; it does not prove that a result file is complete or that
 tests passed. Read each result and check its evidence. Keep workers and
@@ -247,7 +247,7 @@ keeps the manager's live ruling log and the steward's execution log.
 
 The remaining supervision actions map as follows:
 
-| Source action | LGcode operation or team workflow |
+| Source action | LGTM Studio operation or team workflow |
 |---|---|
 | Answer routine prompts and inspect agent progress. | Read snapshot requests and thread events, then use `answer`. Follow `client.subscribe` for changes. |
 | Deny work outside the brief and explain the denial. | Select the reject option with `answer`, then send the explanation through the board or `prompt`. |
@@ -329,7 +329,7 @@ Have the replacement call `roles.orient` for its own current assignment.
    returned identifiers, parents, roles, harnesses, models, efforts,
    folders and session references. Each lead sends the owner the relevant
    agent identifiers and intended archive paths. The owner runs
-   `lgcode thread export <agent id> --out <archive file>` for each
+   `lgtm thread export <agent id> --out <archive file>` for each
    conversation from the owner's authenticated terminal. The command
    requires the owner identity, pages the thread and writes a local file
    with mode `0600`. It refuses an agent's enveloped thread reply, even
@@ -374,7 +374,7 @@ Have the replacement call `roles.orient` for its own current assignment.
 7. At run end, stop any retained test runner, steward and evaluators under
    the owner's lifecycle policy, then the manager. Stop any old monitoring
    processes retained during migration. No legacy watcher should keep
-   delivering into a run now driven by LGcode.
+   delivering into a run now driven by LGTM Studio.
 8. Stop the roles through their switches, never by downgrading the engine.
    The owner reads `roles.settings.get`, preserves wanted limits and sends
    `roles.settings.set` with `sheepdog: false` and `standingRules: false`.
@@ -386,7 +386,7 @@ Have the replacement call `roles.orient` for its own current assignment.
 ## What this replaces
 
 These names identify old mechanisms for the later skill rewrite. They are
-not commands to run alongside LGcode delivery.
+not commands to run alongside LGTM Studio delivery.
 
 | Old mechanism | Replacement |
 |---|---|

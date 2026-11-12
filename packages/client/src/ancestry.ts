@@ -33,5 +33,5 @@ export const ancestryHeaders = (
   } catch {
     throw new ClientError({ message: "the process ancestry cannot be read from /proc" })
   }
-  return { "LGcode-Ancestors": chain.join(","), "LGcode-Process-Group": group }
+  return { "LGTM-Ancestors": chain.join(","), "LGTM-Process-Group": group }
 }

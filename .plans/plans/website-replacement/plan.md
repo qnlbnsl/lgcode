@@ -4,7 +4,7 @@
 
 The owner lifted the development freeze on 2026-11-08 for this build.
 The assignment covers the complete visible screens and all five build steps.
-The team branch is `area/website` in `qnlbnsl/lgcode`.
+The team branch is `area/website` in `qnlbnsl/lgtm-studio`.
 The starting commit is `5050be1`.
 The branch was fetched and fast-forward checks against `origin/master` and `origin/area/website` succeeded on 2026-11-08.
 The lead must never open or merge a pull request into `master`.
@@ -93,7 +93,7 @@ No command is advertised before it has a handler.
 | W12 | 3, high | Node.js 26 pseudo-terminal proof, authenticated bounded terminal service, web stream, terminal emulator, and tests. | Step 2 gates. | Native build, shell grid, vim, named sessions, resize, interrupt, reconnect, lifecycle cleanup, no terminal events or output logs, no stale input. Terminal mock checks. |
 | W13 | 3, high | Subscription placement, usage adapters and per-account provider login through terminal, contracts, API, page and tests. | W12. | Private shadow homes remain separate. Ready choices match harness and machine. Honest missing usage. Provider's own login is used. Step gates and real sign-in proof. |
 | W14 | 4, high | Installer, service startup and update/uninstall recovery, CLI and packaging documentation/tests. | Step 3 gates. | Install Node.js 26 runtime requirements and native terminal support. Standalone starts remain supported. No repository-specific team definitions. |
-| W15 | 4, high | User/repository `.lgcode` loading, validated precedence, workspace discovery, and API parity. | W14. | Global and repository overrides load the default build loop. Installer provides workspace folder and defaults. Step gates. |
+| W15 | 4, high | User/repository `.lgtm` loading, validated precedence, workspace discovery, and API parity. | W14. | Global and repository overrides load the default build loop. Installer provides workspace folder and defaults. Step gates. |
 | W16 | 5, high | Machine records, keys, pairing, role/confirmation/removal, worker CLI, secure transport and tests. | Step 4 gates. | Pairing codes expire and are one-use. Confirmed pinned peers only. Worker port stays off initially. One master event log. Machine and phone cases. |
 | W17 | 5, high | Remote Runner, tool forwarding, event acknowledgements, remote Git and terminal, local checks, capacity, recovery and tests. | W16. | Correct host execution, no duplicate work after reconnect, no dispatch to unconfirmed/offline/full workers, honest interruption, remote repository identity. |
 | W18 | 5, high | Final machines page wiring, installer-to-worker journey, four-width/two-mode regression and real second-machine proof. | W17. | Full paired worker flow and the complete mock matched. Final three gates, branch pushed, verifier evidence and closing report. |

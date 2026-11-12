@@ -1,7 +1,7 @@
 import { open } from "node:fs/promises"
 import { constants } from "node:fs"
-import { ClientError, type Client } from "@lgcode/client"
-import type { AgentId, EventSequence, RequestId } from "@lgcode/contracts"
+import { ClientError, type Client } from "@lgtm/client"
+import type { AgentId, EventSequence, RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 
 export const exportThread = (client: Client, agentId: string, path: string) => Effect.gen(function* () {

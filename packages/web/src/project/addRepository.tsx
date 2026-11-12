@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useSyncExternalStore } from "react"
-import type { Repository } from "@lgcode/contracts"
+import type { Repository } from "@lgtm/contracts"
 import { RepositoryRegistration } from "./registration.ts"
 import "./review.css"
 

@@ -1,4 +1,4 @@
-# Shephrd: finding work, answering requests, and using space
+# LGTM Studio: finding work, answering requests, and using space
 
 Reviewed on 2026-11-06 against the running browser prototype. Product source revision: `85533f5`; the design directory remains uncommitted. This follows the owner's request for another critique, a global Home page, remote project creation, and denser screens.
 
@@ -12,9 +12,9 @@ Confirmed live before this pass: the app opened inside Workspace app. Four unres
 
 The official [Cursor agents-window documentation](https://cursor.com/docs/agent/agents-window) describes work across repositories and environments with files and diffs available alongside agents. The official [Cursor 3 announcement](https://cursor.com/blog/cursor-3) describes moving between local and cloud environments and reviewing, staging, and committing changes. Its published agents-window image was inspected during this pass.
 
-Judgment from that reference: the useful standard is clear working context, a compact frame, and nearby results. Shephrd should make the selected project, conversation, branch, and host understandable without repeating all of them in oversized headers. It should spend room on the conversation or diff that the owner is reading.
+Judgment from that reference: the useful standard is clear working context, a compact frame, and nearby results. LGTM Studio should make the selected project, conversation, branch, and host understandable without repeating all of them in oversized headers. It should spend room on the conversation or diff that the owner is reading.
 
-[T3 Code](https://t3.codes/) remains a secondary reference for a direct agent workspace. The owner's difficulty discovering some of its controls is a constraint on Shephrd. This review does not claim that a specific T3 control caused that difficulty. Shephrd needs visible, named destinations and useful default views before it adds shortcut-only workflows. No external implementation code was copied for this pass.
+[T3 Code](https://t3.codes/) remains a secondary reference for a direct agent workspace. The owner's difficulty discovering some of its controls is a constraint on LGTM Studio. This review does not claim that a specific T3 control caused that difficulty. LGTM Studio needs visible, named destinations and useful default views before it adds shortcut-only workflows. No external implementation code was copied for this pass.
 
 ## The changes in this pass
 

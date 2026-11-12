@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process"
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { expect, test } from "@playwright/test"
-import type { ClientRequest, ClientSnapshot } from "@lgcode/contracts"
+import type { ClientRequest, ClientSnapshot } from "@lgtm/contracts"
 import { build } from "vite"
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
@@ -25,8 +25,8 @@ import { openNavigation } from "./support/navigation.ts"
 // WebSocket fault below drops an actual server receipt; it invents no result.
 test("conversations retain drafts, real context, delivery and owner peek across page/dock and responsive views", async ({ page }, testInfo) => {
   test.setTimeout(180_000)
-  const rig = makeRig(), previousHome = process.env.LGCODE_HOME
-  process.env.LGCODE_HOME = rig.stateFolder
+  const rig = makeRig(), previousHome = process.env.LGTM_HOME
+  process.env.LGTM_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url"), staticRoot = join(rig.root, "page")
   const git = (...args: string[]) => execFileSync("/usr/bin/git", ["-C", rig.work, ...args], { stdio: "pipe" })
   let dropPrompt = false, dropAnswer = false, dropLargeRead: number | undefined, dropped = false
@@ -389,5 +389,5 @@ test("conversations retain drafts, real context, delivery and owner peek across 
       yield* Effect.scoped(run).pipe(Effect.provide(buildServices(rig, engineLists).pipe(Layer.provide(dependencies))), Effect.provide(runner.layer))
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped)
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
-  } finally { if (previousHome === undefined) delete process.env.LGCODE_HOME; else process.env.LGCODE_HOME = previousHome; removeRig(rig) }
+  } finally { if (previousHome === undefined) delete process.env.LGTM_HOME; else process.env.LGTM_HOME = previousHome; removeRig(rig) }
 })

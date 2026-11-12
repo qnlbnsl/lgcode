@@ -1,4 +1,4 @@
-import { alertTitles } from "@lgcode/contracts";
+import { alertTitles } from "@lgtm/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import type { Snapshot } from "../../commands/internal.ts";

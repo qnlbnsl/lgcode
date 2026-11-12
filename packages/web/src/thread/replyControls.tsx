@@ -1,6 +1,6 @@
 import { useConversation } from "../data/ShellDataProvider.tsx"
-import type { ClientEnvelope } from "@lgcode/client/browser"
-import type { AgentId } from "@lgcode/contracts"
+import type { ClientEnvelope } from "@lgtm/client/browser"
+import type { AgentId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { requestId, withClient } from "./client.ts"
 

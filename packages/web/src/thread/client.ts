@@ -1,5 +1,5 @@
-import { connect, type Client } from "@lgcode/client/browser"
-import type { RequestId } from "@lgcode/contracts"
+import { connect, type Client } from "@lgtm/client/browser"
+import type { RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 
 export const requestId = () => crypto.randomUUID() as RequestId

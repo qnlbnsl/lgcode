@@ -1,7 +1,7 @@
 import { constants } from "node:fs"
 import { lstat, mkdir, open, readdir, realpath, unlink } from "node:fs/promises"
 import { dirname, join } from "node:path"
-import type { CreationFolderIdentity, ProjectCreation } from "@lgcode/contracts"
+import type { CreationFolderIdentity, ProjectCreation } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { refused } from "../commands/internal.ts"
 import type { GitService } from "./git/index.ts"
@@ -26,7 +26,7 @@ export const creationGit = async (path: string, args: string[], signal: AbortSig
   if (reply.code !== 0) throw processFailure(reply)
   return reply.stdout.trimEnd()
 }
-const markerName = ".lgcode-project-creation"
+const markerName = ".lgtm-project-creation"
 // The marker bridges mkdir and the claim append. Existing directories without
 // this intent's witness are refused, even when empty. An interruption between
 // mkdir and marker creation remains visible in the owner recovery read and
@@ -78,7 +78,7 @@ export const ensureRepository = (plan: ProjectCreation) => creationIo(async (sig
       // Bootstrap only an empty tree. A retry may find owner-staged bytes;
       // those must never be folded into the initialization commit.
       const tree = await creationGit(plan.repository.path, ["mktree"], signal)
-      const commit = await creationGit(plan.repository.path, ["-c", "user.name=LGcode", "-c", "user.email=lgcode@localhost", "commit-tree", tree, "-m", "Initialize LGcode repository"], signal)
+      const commit = await creationGit(plan.repository.path, ["-c", "user.name=LGTM Studio", "-c", "user.email=lgtm@localhost", "commit-tree", tree, "-m", "Initialize LGTM Studio repository"], signal)
       await creationGit(plan.repository.path, ["update-ref", "refs/heads/main", commit, ""], signal)
     } else if (head.code !== 0) throw processFailure(head)
   }

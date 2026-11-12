@@ -102,7 +102,7 @@ describe("pnpm live-check --dry-run", () => {
     const log = join(observed, "calls.log");
     // Fix round 1, finding F4: this used to compare the whole of /tmp before
     // and after, which fails when another run (or another test file) creates
-    // or removes a `lgcode-live-` folder meanwhile. The observer records what
+    // or removes a `lgtm-live-` folder meanwhile. The observer records what
     // this one process asks the system to do, so only its own actions count.
     const run = spawnSync(process.execPath, ["--import", observer, entry, "--dry-run"], { env: { HOME: home, PATH: "", OBSERVE_LOG: log }, encoding: "utf8", timeout: 60_000 });
     expect(run.status, run.stderr).toBe(0);
@@ -115,6 +115,6 @@ describe("pnpm live-check --dry-run", () => {
     const calls = readFileSync(log, "utf8").trim().split("\n");
     expect(calls[0], "the observer did not run, so nothing below proves anything").toBe("observer started");
     expect(calls.filter((call) => /^(spawn|spawnSync|exec|execSync|execFile|execFileSync|fork) /.test(call)), "the dry run started a process").toEqual([]);
-    expect(calls.filter((call) => /^(mkdtempSync|mkdirSync|mkdir|mkdtemp|createWriteStream) /.test(call) && call.includes("/tmp/lgcode-live-")), "the dry run made a run folder").toEqual([]);
+    expect(calls.filter((call) => /^(mkdtempSync|mkdirSync|mkdir|mkdtemp|createWriteStream) /.test(call) && call.includes("/tmp/lgtm-live-")), "the dry run made a run folder").toEqual([]);
   });
 });

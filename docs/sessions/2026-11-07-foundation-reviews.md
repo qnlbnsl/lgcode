@@ -45,7 +45,7 @@ and the attack list stays at `.scratch/security/attack-todo.md`.
 
 - Issue 519 records the unchecked Claude and Grok findings.
 - Issue 520 records finding K-368, which needs the owner's ruling.
-- Issue 516 records that Sheprd cannot run Grok without Fast through Cursor's
+- Issue 516 records that LGTM Studio cannot run Grok without Fast through Cursor's
   Agent Client Protocol.
 - Issue 521 records that finished review seats filled the file limit on `/tmp`.
 - The owner runs the hostile review, and the sandbox is not built.

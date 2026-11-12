@@ -1,4 +1,4 @@
-import type { Caller, ContextReference, Delivery, PieceNamespace } from "@lgcode/contracts";
+import type { Caller, ContextReference, Delivery, PieceNamespace } from "@lgtm/contracts";
 import type { Snapshot } from "../commands/internal.ts";
 import type { EngineLists } from "../pieces/lists.ts";
 import { guardPiece } from "../pieces/guardPiece.ts";

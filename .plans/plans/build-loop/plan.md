@@ -1,7 +1,7 @@
-# From today's LGcode to the build loop: what was found and the plan
+# From today's LGTM Studio to the build loop: what was found and the plan
 
 The owner asked for this document on 2026-11-10. It has two halves. The first half is the
-investigation of what the owner asked LGcode to be, what was built, and what is missing.
+investigation of what the owner asked LGTM Studio to be, what was built, and what is missing.
 The second half is the plan to change the engine and the website until the product does
 what the owner wants.
 
@@ -10,7 +10,7 @@ This is a plan. Nothing in the second half is built.
 ## The short version
 
 The owner wants to describe a project to one agent, settle the deliverables with it over
-a few rounds, and then be left alone until an agent needs an answer. LGcode today has the
+a few rounds, and then be left alone until an agent needs an answer. LGTM Studio today has the
 parts underneath that: an engine that runs agents, a message board, requests, phone
 alerts, and a website. It has none of the loop itself. No code moves a project from one
 phase to the next.
@@ -81,7 +81,7 @@ The idea changed five days into the build. The build did not change direction wi
 |---|---|---|
 | Import an existing V0 | Partly built | The commands `project.repository.add` and `project.create` register a repository and start a lead. No agent reads the V0 and describes it. |
 | Import the V0's design into OpenPencil | Partly built | The `skills/reverse-fig/` skill covers tokens and components. It does not cover screens. The engine starts OpenPencil but cannot save into the repository. |
-| Rounds that settle the deliverables | Missing | No setup agent and no end-result page exist. `README.md` calls loading `.lgcode` "the next piece of work". |
+| Rounds that settle the deliverables | Missing | No setup agent and no end-result page exist. `README.md` calls loading `.lgtm` "the next piece of work". |
 | The loop running from start to end | Missing | No workflow code exists. A person or a lead sets each sprint, task and stage by hand. |
 | Contacting the owner | The transport is built | Requests, the Home inbox and phone alerts work. The loop's own reasons to ask, such as a stuck statement, have no code. |
 | Writing down mistakes and lessons | Missing in the product | It exists only as an agent habit in reports and in `docs/issues.md`. |
@@ -141,37 +141,35 @@ Engine:
 - Add a workflow piece, at `packages/engine/src/workflow/`. It holds one record for each
   project: the current phase, and the moves between phases that the design lists. It has
   no behaviour yet beyond recording a move.
-- Load the `.lgcode` folder of a repository and `~/.lgcode`. `README.md` already names
+- Load the `.lgtm` folder of a repository and `~/.lgtm`. `README.md` already names
   this as the next piece of work.
 
 The new name:
 
-- The owner renamed the product to LGTM Studio on 2026-11-12. The owner confirmed the
-  spelling: two words, with a space. This plan and the rest of
-  the repository still say LGcode. The rename comes before the rest of this step, so that
-  everything built afterwards carries the new name.
-- The rename covers the visible name in the website and the mock, the documents, the
-  package names, the command, the environment variables that start with `LGCODE_`, and
-  the `.lgcode` and `~/.lgcode` folders.
-- The product's public site is `lgtmstudio.dev`. The renamed README links to it.
+- The owner named the product LGTM Studio and confirmed the spelling: two words, with a
+  space. The rename was the first piece of work in this step, so that everything built
+  afterwards carries the new name. It was done on 2026-11-12.
+- The rename covers the visible name in the website and the mock, the documents and
+  every dated record, the package names (`@lgtm/...`), the command, the environment
+  variables, the state folder, and the `.lgtm` and `~/.lgtm` folders.
+- The product's public site is `lgtmstudio.dev`. The README links to it.
 - The name is written "LGTM Studio" wherever people read it. A name inside code, such as
   a package, a command or a folder, has no space and is written in lower case.
 - The owner ruled on 2026-11-12 that the short name is `lgtm`. The command is `lgtm`. The
   configuration folders are `.lgtm` in a repository and `~/.lgtm` in the home folder.
 - The owner ruled on 2026-11-12 that the environment variables start with `LGTM_`.
 - The owner ruled that the build does not check for another program named `lgtm`. The
-  owner looks into that separately.
-- The GitHub repository is renamed by the owner, because that is an action on the owner's
-  account.
-- Another agent is carrying out the rename, as the owner said on 2026-11-12. The build
+  owner looks into that separately. The rename found no program named `lgtm` on the
+  owner's computer or on the remote test computer.
+- The GitHub repository is `qnlbnsl/lgtm-studio`, renamed on 2026-11-12 at the owner's
+  request.
+- Another agent carried out the rename, as the owner said on 2026-11-12. The build
   starts by reading what that agent changed. It finishes only what is left, and it does
   not redo the rename.
-- An existing installation keeps working. The service reads the old folder and the old
-  variables when the new ones are absent.
-- The mock's visible name was changed to "LGTM Studio" on 2026-11-11, on
-  `area/mock-rebuild`. Its machine named "Studio" became "Workstation", so the two names
-  are not confused. The mock still uses `lgcode` for the command, the package, the
-  variables and the folders, until those names are chosen.
+- The owner chose to start fresh after the rename. Nothing reads an earlier name, folder
+  or variable.
+- The mock's machine named "Studio" became "Workstation", so it is not confused with the
+  product's name.
 
 Website:
 
@@ -304,9 +302,9 @@ The owner has not ruled on the other ten choices in the result file.
 
 #### When this step is finished
 
-The owner ruled on 2026-11-11 that the first real project is LGcode itself. The owner
-types a goal for a real change to LGcode, answers the lead's
-questions, approves the end-result page, and next hears from LGcode when the merge request
+The owner ruled on 2026-11-11 that the first real project is LGTM Studio itself. The owner
+types a goal for a real change to LGTM Studio, answers the lead's
+questions, approves the end-result page, and next hears from LGTM Studio when the merge request
 is ready. The first such run is recorded in a session report, with every place a person
 had to step in.
 
@@ -331,7 +329,7 @@ This step delivers items 2, 3 and 5 of what the owner wants.
   proposal. On 2026-11-11 the owner said the proposal is a good start but is not
   approved. The categories are refined as the owner uses the product, so step 3 builds
   on them as a starting point and expects them to change.
-- **Setup's config.** Define writes the `.lgcode` config. The design leaves open who
+- **Setup's config.** Define writes the `.lgtm` config. The design leaves open who
   writes it, because agents cannot edit that folder. This plan suggests that the engine
   writes it from a tool call that the owner approves.
 
@@ -435,7 +433,7 @@ when a step touches its code, and not before.
 The owner set the end point on 2026-11-11. An agent orchestrates the build of this plan
 until the owner can stop using the terminal.
 
-The end point, in the owner's words: "when I can ditch this terminal UI, go on to" LGcode's
+The end point, in the owner's words: "when I can ditch this terminal UI, go on to" LGTM Studio's
 "hosted website, and be able to run the finalized build. That includes things like
 publishing packages, doing mobile builds, and everything else, including the entire UI
 and OpenPencil."
@@ -455,16 +453,16 @@ What the end point requires, beyond steps 1 to 6:
   without a terminal open. The owner sets up the proxy for that address.
 - **OpenPencil works inside it.** The repository Design page opens the design file and
   saves it into the repository.
-- **LGcode installs from its repository.** The owner ruled on 2026-11-12 that
+- **LGTM Studio installs from its repository.** The owner ruled on 2026-11-12 that
   distribution is simple for now. A person downloads the repository, runs the documented
   steps, and those steps build the package and install it locally. The release is
   published on GitHub. Wider distribution is decided later.
 - **A project can publish packages and make phone builds.** These run as steps the lead
   starts and the owner approves, with their logs on the Test runs page. Accounts and
   secrets stay with the owner, and the build stops to ask when a step needs one.
-- **The owner can change LGcode from inside LGcode.** The owner asked: "If I want to
+- **The owner can change LGTM Studio from inside LGTM Studio.** The owner asked: "If I want to
   update something, how can I talk to the agent that actually updates it?" The answer in
-  this plan is a project in the LGcode repository. The owner tells its project lead what
+  this plan is a project in the LGTM Studio repository. The owner tells its project lead what
   to change, and the loop does the rest.
 
 Steps 7 and 8 are not needed for the end point. The record keeping from step 7 that
@@ -500,7 +498,7 @@ proving the server on the real file before any code depends on it.
 Made on 2026-11-11:
 
 - The build loop is the next build, and an agent orchestrates it to the end point above.
-- The first real project is LGcode itself.
+- The first real project is LGTM Studio itself.
 - A project's name comes from its goal, and a lead may rename it.
 - A question shows on Home, in the project lead's thread, and in the asking agent's
   thread.
@@ -508,22 +506,22 @@ Made on 2026-11-11:
 Made on 2026-11-12:
 
 - The hosted website's address is chosen. It is kept out of this repository.
-- LGcode is installed from its repository and released on GitHub for now.
+- LGTM Studio is installed from its repository and released on GitHub for now.
 
 Made later on 2026-11-11:
 
 - **Agents change designs through OpenPencil's tool server.** The owner: "It'll be way
   more reliable with that."
-- **A project is set up by `lgcode init`.** Run inside a repository, it writes the
-  template files into `.lgcode` and puts the project in setup mode. It checks whether
-  LGcode was ever set up globally, in `~/.lgcode`. If it was, it copies those settings and
-  starts the setup conversation with the owner's preferred harness. What `lgcode init`
-  does when LGcode was never set up globally is not decided.
-- **Model evaluation moves into LGcode.** The evaluation rounds, the model ledger and the
-  related research leave Founder OS and become part of LGcode, as research. The owner
-  will strip that content out of Ananke (Enkra) and Founder OS. LGcode ships one default
+- **A project is set up by `lgtm init`.** Run inside a repository, it writes the
+  template files into `.lgtm` and puts the project in setup mode. It checks whether
+  LGTM Studio was ever set up globally, in `~/.lgtm`. If it was, it copies those settings and
+  starts the setup conversation with the owner's preferred harness. What `lgtm init`
+  does when LGTM Studio was never set up globally is not decided.
+- **Model evaluation moves into LGTM Studio.** The evaluation rounds, the model ledger and the
+  related research leave Founder OS and become part of LGTM Studio, as research. The owner
+  will strip that content out of Ananke (Enkra) and Founder OS. LGTM Studio ships one default
   model selection ledger, which each user can update. The run-by-run grades stay out of
-  what LGcode ships. How Founder OS and LGTM Studio are split is decided after this build.
+  what LGTM Studio ships. How Founder OS and LGTM Studio are split is decided after this build.
 - **The design file's categories are a starting point.** The owner, on 2026-11-11: "I'm
   not approving it, but it is a good start. We'll have to refine those categories as I use
   this thing." The proposal is in `design/mock/feedback/2026-11-10-design-categories.md`.

@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect"
 import { afterEach, expect, it, vi } from "vitest"
-import type { Client } from "@lgcode/client/browser"
+import type { Client } from "@lgtm/client/browser"
 import { createGitSession, pathLabel, safeFailure } from "../src/git/state.ts"
 const browser = vi.hoisted(() => ({ client: {} as Client }))
 vi.mock("../src/thread/client.ts", () => ({

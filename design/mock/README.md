@@ -1,6 +1,6 @@
-# The rebuilt LGcode mock
+# The rebuilt LGTM Studio mock
 
-This folder is a working mock of the whole LGcode web page. The owner asked for it on
+This folder is a working mock of the whole LGTM Studio web page. The owner asked for it on
 2026-11-10. It does not connect to the engine and it never calls an agent. Every screen
 works on data held in the browser's memory.
 
@@ -26,7 +26,7 @@ resets everything.
 This folder is also a local npm package named `lgtm`, so another project can load the
 whole website and build on it. It is the basic version of LGTM Studio. The package has no build step and no dependencies.
 
-- Install it by path, for example `npm install ../lgcode/design/mock`. npm links the
+- Install it by path, for example `npm install ../lgtm-studio/design/mock`. npm links the
   folder rather than copying it, so the links to `design/fonts/` and
   `third_party/htm-preact/` keep working.
 - Load the stylesheets that `index.html` loads, from the package's `css/` folder.
@@ -42,7 +42,7 @@ This folder's own page starts the mock the same way, through `js/main.js`.
 
 - **`connection`** receives every call the website would make to the engine. The
   website's actions report them through `js/engine.js` as `call(tag, payload)`, using
-  the request names from `@lgcode/contracts`, such as `prompt`, `answer`, `stop` and
+  the request names from `@lgtm/contracts`, such as `prompt`, `answer`, `stop` and
   `create`. The simulation's updates go through `push(kind, payload)`, such as
   `agent.message` and `agent.activity`. On mounting, the website calls `snapshot`, then
   `subscribe`. Without a connection, the calls go nowhere and the mock behaves as before.
@@ -71,7 +71,7 @@ This folder's own page starts the mock the same way, through `js/main.js`.
 | Files, the inspected worktree as a folder tree and a read-only file view | `/p/console/files`, and one file at `/p/console/files?f=README.md` |
 | Git, with generated commit and pull request text | `/p/console/git` |
 | Project settings, with the lead's model and the work assignment table | `/p/console/settings` |
-| Repository design page, the design file on a canvas | `/r/lgcode/design`, and `/r/<repository>/design/<category>/<item>` |
+| Repository design page, the design file on a canvas | `/r/lgtm/design`, and `/r/<repository>/design/<category>/<item>` |
 | Machines, Subscriptions, Phone notifications, Service settings | `/machines`, `/subscriptions`, `/notifications`, `/settings` |
 | Login and first run | `/login`, `/setup` |
 

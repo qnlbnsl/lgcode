@@ -11,23 +11,23 @@
 
 REMOTE_HOST ?= 192.168.141.18
 REMOTE_USER ?=
-REMOTE_ROOT ?= Work/lgcode
+REMOTE_ROOT ?= Work/lgtm-studio
 REMOTE_NAME ?=
 REMOTE_SLOTS ?= 2
 REMOTE_SPARE_CPUS ?= 2
 REMOTE_MEMORY ?= 80G
 
-export LGCODE_REMOTE_HOST := $(REMOTE_HOST)
-export LGCODE_REMOTE_USER := $(REMOTE_USER)
-export LGCODE_REMOTE_ROOT := $(REMOTE_ROOT)
-export LGCODE_REMOTE_NAME := $(REMOTE_NAME)
-export LGCODE_REMOTE_SLOTS := $(REMOTE_SLOTS)
-export LGCODE_REMOTE_SPARE_CPUS := $(REMOTE_SPARE_CPUS)
-export LGCODE_REMOTE_MEMORY := $(REMOTE_MEMORY)
+export LGTM_REMOTE_HOST := $(REMOTE_HOST)
+export LGTM_REMOTE_USER := $(REMOTE_USER)
+export LGTM_REMOTE_ROOT := $(REMOTE_ROOT)
+export LGTM_REMOTE_NAME := $(REMOTE_NAME)
+export LGTM_REMOTE_SLOTS := $(REMOTE_SLOTS)
+export LGTM_REMOTE_SPARE_CPUS := $(REMOTE_SPARE_CPUS)
+export LGTM_REMOTE_MEMORY := $(REMOTE_MEMORY)
 
 REMOTE := scripts/remote.sh
 # Preserve shell syntax as data until bash runs it on the remote computer.
-export LGCODE_REMOTE_COMMAND := $(value CMD)
+export LGTM_REMOTE_COMMAND := $(value CMD)
 
 .PHONY: remote-doctor remote-sync remote-install remote-check remote-test remote-browser remote-run remote-clean
 
@@ -50,8 +50,8 @@ remote-browser:
 	@$(REMOTE) browser
 
 remote-run:
-	@test -n "$$LGCODE_REMOTE_COMMAND" || { echo 'remote-run needs CMD="..."' >&2; exit 2; }
-	@$(REMOTE) run bash -c "$$LGCODE_REMOTE_COMMAND"
+	@test -n "$$LGTM_REMOTE_COMMAND" || { echo 'remote-run needs CMD="..."' >&2; exit 2; }
+	@$(REMOTE) run bash -c "$$LGTM_REMOTE_COMMAND"
 
 remote-clean:
 	@$(REMOTE) clean

@@ -9,7 +9,7 @@ import * as SqliteClient from "../../../third_party/t3code/node-sqlite/src/nodeS
 import * as Effect from "effect/Effect"
 import * as Layer from "effect/Layer"
 import * as Redacted from "effect/Redacted"
-import type { Project, Repository, Workspace } from "@lgcode/contracts"
+import type { Project, Repository, Workspace } from "@lgtm/contracts"
 import { buildServices } from "../../engine/src/service.ts"
 import { serve } from "../../engine/src/client/web/server.ts"
 import { makeRedactor } from "../../engine/src/identity/redactor.ts"
@@ -32,8 +32,8 @@ const save = (folder: string, name: string, text: string) => writeFileSync(join(
 const commit = (folder: string, title: string) => { git(folder, "add", "--all"); git(folder, "commit", "-m", title); return git(folder, "rev-parse", "HEAD") }
 interface Fixture { readonly base: string; readonly source: Workspace; readonly project: Project; readonly repository: Repository; readonly root: string }
 async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture) => void, body: (f: Fixture) => Promise<void>, options: { readonly loseCommitReply?: boolean; readonly reportedFailure?: boolean } = {}) {
-  const rig = makeRig(), previous = process.env.LGCODE_HOME
-  process.env.LGCODE_HOME = rig.stateFolder
+  const rig = makeRig(), previous = process.env.LGTM_HOME
+  process.env.LGTM_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url"), staticRoot = join(rig.root, "page"), port = await unusedPort()
   try {
     git(rig.work, "init", "-b", base); git(rig.work, "config", "user.name", "Browser Git fixture"); git(rig.work, "config", "user.email", "browser@example.invalid"); git(rig.work, "config", "commit.gpgsign", "false")
@@ -87,7 +87,7 @@ async function withGit(page: Page, base: "main" | "master", prepare: (f: Fixture
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped)
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
   } finally {
-    if (previous === undefined) delete process.env.LGCODE_HOME; else process.env.LGCODE_HOME = previous
+    if (previous === undefined) delete process.env.LGTM_HOME; else process.env.LGTM_HOME = previous
     removeRig(rig)
   }
 }

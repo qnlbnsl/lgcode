@@ -5,7 +5,7 @@ updated: 2026-11-10
 
 # Roadmap
 
-Sheprd is meant to make it possible for anyone to install Sheprd, and set up and steer teams of coding agents from a phone,
+LGTM Studio is meant to make it possible for anyone to install LGTM Studio, and set up and steer teams of coding agents from a phone,
 with every agent's conversation available as a thread.
 
 ## Now
@@ -31,7 +31,7 @@ set the build loop as the next work, after a plan.
 
 | Kind | Name | Overview |
 |---|---|---|
-| epic | shepherd-foundation | The engine, the client API, the message board and the foundry roles are merged, apart from the standing permission rules. The epic is parked. |
+| epic | lgtm-foundation | The engine, the client API, the message board and the foundry roles are merged, apart from the standing permission rules. The epic is parked. |
 
 ## Later
 

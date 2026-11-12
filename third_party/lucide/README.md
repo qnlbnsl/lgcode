@@ -4,7 +4,7 @@ The web mock draws its icons with paths copied from
 [Lucide](https://lucide.dev), copyright Lucide Contributors 2022, with portions
 copyright Cole Bemis 2013 to 2022 as part of Feather (MIT License). Lucide is
 released under the ISC License. The licence text is in [LICENSE](LICENSE) next
-to this file, and it must stay there for as long as these paths are in LGcode.
+to this file, and it must stay there for as long as these paths are in LGTM Studio.
 
 ## Which icons, and from where
 
@@ -12,7 +12,7 @@ The paths were copied on 2026-11-08 from the `lucide-static` package, version
 0.460.0, file `icons/<name>.svg` for each name below. Only the inner path,
 circle, and rectangle elements were copied. Lucide's `<svg>` wrapper was not
 copied, and `line` elements were written as equivalent `path` elements.
-LGcode's own stylesheet sets the stroke width to 1.6 instead of Lucide's 2.
+LGTM Studio's own stylesheet sets the stroke width to 1.6 instead of Lucide's 2.
 
 | Icon in Lucide | Used for |
 |---|---|
@@ -52,21 +52,21 @@ LGcode's own stylesheet sets the stroke width to 1.6 instead of Lucide's 2.
 | `maximize-2` | Opening a large thread item in full, added on 2026-11-08. Its `polyline` and `line` elements were written as equivalent `path` elements. |
 | `ellipsis` | The row menu on Machines and Subscriptions, added on 2026-11-08. |
 | `pencil` | Rename, added on 2026-11-08. |
-| `trash-2` | Remove, added on 2026-11-08. Its `line` elements were written as equivalent `path` elements. LGcode stores it under the key `trash`. |
+| `trash-2` | Remove, added on 2026-11-08. Its `line` elements were written as equivalent `path` elements. LGTM Studio stores it under the key `trash`. |
 | `archive` and `archive-restore` | Archive and Restore in Project settings, added on 2026-11-08. |
 | `rotate-ccw` | Retry on a failed phone notification, added on 2026-11-08. |
-| `send` | Send test notification, added on 2026-11-08. LGcode stores it under the key `paper-plane`, because `send` already names the arrow-up Send icon. |
+| `send` | Send test notification, added on 2026-11-08. LGTM Studio stores it under the key `paper-plane`, because `send` already names the arrow-up Send icon. |
 
 ## Where the paths live
 
 The paths are inline in `design/workbench.html` (static buttons) and in the
 `paths` table near the top of `design/workbench.js`. A comment beside the table
-names this folder. The LGcode logo mark is LGcode's own drawing, not Lucide's.
+names this folder. The LGTM Studio logo mark is LGTM Studio's own drawing, not Lucide's.
 
 ## Production shell paths
 
 `packages/web/src/shell/Icon.tsx` reuses the credited `lucide-static` 0.460.0
-paths from `design/workbench.js` and `design/workbench.html` at LGcode commit
+paths from `design/workbench.js` and `design/workbench.html` at LGTM Studio commit
 `bef4b1090a8dc783075f835e7c5e90dbc3b8aad9`.
 The source files are `icons/chevron-right.svg`, `icons/chevron-down.svg`,
 `icons/git-branch.svg`, `icons/check.svg`, `icons/x.svg`, `icons/command.svg`,
@@ -74,7 +74,7 @@ The source files are `icons/chevron-right.svg`, `icons/chevron-down.svg`,
 `icons/user.svg`, `icons/settings.svg`, `icons/panel-left.svg`, `icons/menu.svg`,
 `icons/bell.svg`, `icons/refresh-cw.svg`, and `icons/arrow-left.svg`.
 The elements are React JSX rather than HTML strings.
-The stylesheet keeps LGcode's 1.6 stroke width.
+The stylesheet keeps LGTM Studio's 1.6 stroke width.
 The production file retains the copyright and licence provenance comment.
 
 ## The rebuilt mock's icon file, added on 2026-11-10

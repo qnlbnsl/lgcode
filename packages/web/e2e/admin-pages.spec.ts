@@ -23,8 +23,8 @@ import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 
 test("the production admin pages use real RPCs and fit a 360-pixel browser", async ({ page }) => {
   const rig = makeRig()
-  const previousHome = process.env.LGCODE_HOME
-  process.env.LGCODE_HOME = rig.stateFolder
+  const previousHome = process.env.LGTM_HOME
+  process.env.LGTM_HOME = rig.stateFolder
   const password = randomBytes(32).toString("base64url")
   const staticRoot = join(rig.root, "page")
   try {
@@ -117,8 +117,8 @@ test("the production admin pages use real RPCs and fit a 360-pixel browser", asy
     }).pipe(Effect.provide(SqliteClient.layer({ filename: rig.database, readerWorker: true })), Effect.scoped)
     await Effect.runPromise(program as Effect.Effect<void, unknown>)
   } finally {
-    if (previousHome === undefined) delete process.env.LGCODE_HOME
-    else process.env.LGCODE_HOME = previousHome
+    if (previousHome === undefined) delete process.env.LGTM_HOME
+    else process.env.LGTM_HOME = previousHome
     removeRig(rig)
   }
 })

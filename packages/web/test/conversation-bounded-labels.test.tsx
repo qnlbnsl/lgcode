@@ -13,7 +13,7 @@ const button = (container: HTMLElement, name: string) => [...container.querySele
 
 for (const kind of ["tool-call", "file-change"] as const) it(`issue 604: mounted ${kind} label bounds ordinary output and preserves exact full reading, copy and stored evidence`, async () => {
   const rig = makeRig()
-  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   vi.spyOn(document, "hidden", "get").mockReturnValue(false)
   const dialogDescriptor = Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype, "showModal")
   const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard")

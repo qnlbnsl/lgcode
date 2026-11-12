@@ -2,7 +2,7 @@
 
 ## What this note is
 
-This note records how the owner wants Sheprd to run a piece of work from a
+This note records how the owner wants LGTM Studio to run a piece of work from a
 described change to a running product. The owner and an agent worked it out
 as a set of state diagrams on 2026-11-04 and 2026-11-05.
 
@@ -13,7 +13,7 @@ This is a design draft. None of it is built, and no skill has been changed.
 Measurements, model choices and round-by-round tuning were kept out of the
 session on purpose.
 
-The owner chose the spelling Sheprd on 2026-11-05, because "the pronunciation
+The owner chose the spelling LGTM Studio on 2026-11-05, because "the pronunciation
 works and its one less letter to type". The repository's code and current
 documents were renamed on 2026-11-06.
 
@@ -169,22 +169,22 @@ The owner turns tests on later by telling their main agent. Nothing checks for
 this automatically. Ananke took that path: it broke heavily first, and then its
 testing grew to about 2 hours a run.
 
-Setup produces a local `.sheprd` folder with a config file, similar to
+Setup produces a local `.lgtm` folder with a config file, similar to
 `.claude`. The steps in this note are the default workflow, and they will become
 a parsable list. Anyone who wants something else, such as skipping phase 6,
 writes their own workflow.
 
-The owner set the order on 2026-11-05. Sheprd looks in the repository's
-`.sheprd` first, then `~/.sheprd`, then its built-in copy. The default install
-places a copy in `~/.sheprd`. Agents can read `.sheprd` and cannot edit it.
+The owner set the order on 2026-11-05. LGTM Studio looks in the repository's
+`.lgtm` first, then `~/.lgtm`, then its built-in copy. The default install
+places a copy in `~/.lgtm`. Agents can read `.lgtm` and cannot edit it.
 
 ## What is not decided
 
 These points need the owner's word:
 
 - **How setup's config arrives.** Decided by the owner on 2026-11-11: the owner
-  runs `lgcode init` in the repository. It writes the template files into
-  `.lgcode`, copies the global settings from `~/.lgcode` when they exist, and
+  runs `lgtm init` in the repository. It writes the template files into
+  `.lgtm`, copies the global settings from `~/.lgtm` when they exist, and
   starts setup with the owner's preferred harness.
 - **The end of round 6.** Decided by the owner on 2026-11-11: there is no hard
   limit. Each round from round 6 on asks the owner first, and the owner either
@@ -235,7 +235,7 @@ To bisect is to find the commit that broke something by testing the middle of a
 range of commits and halving the range each time. Finding the culprit among 1,000
 commits takes about 10 tests.
 
-The agent suggests a Sheprd command, because Sheprd limits which git commands
+The agent suggests an LGTM Studio command, because LGTM Studio limits which git commands
 agents can run. The last passing full-run report gives the known-good commit, and
 the failing commit gives the other end. The test runner agent would run only the
 failing test at each step. The nightly run and the hotfix lane would both use it.
@@ -325,7 +325,7 @@ repository. Its README file defines the grades and the flags. The flags are
 
 The ledger feeds the model selection list, which says which model to try for
 each kind of task. A model moves to harder or easier work when its grades say
-so. The agent suggests that LGcode reads the list when it starts an agent, and
+so. The agent suggests that LGTM Studio reads the list when it starts an agent, and
 that the owner can override the choice for one project.
 
 A lesson that is about the work and not about a model goes into the skills, as
@@ -341,11 +341,11 @@ it.
 - **What counts as a key task.** Decided by the owner on 2026-11-11: a phase
   step. "When an evaluation round runs" above has the details.
 - **Where the ledger lives for other users.** Decided by the owner on
-  2026-11-11: model evaluation moves out of Founder OS and into LGcode, as
-  research. LGcode ships one default model selection ledger, which each user
+  2026-11-11: model evaluation moves out of Founder OS and into LGTM Studio, as
+  research. LGTM Studio ships one default model selection ledger, which each user
   can update. How Founder OS and LGTM Studio are split is decided after the
   build loop is built.
-- **How the list reaches LGcode.** Whether LGcode reads the model selection
+- **How the list reaches LGTM Studio.** Whether LGTM Studio reads the model selection
   list from a file or the owner copies choices into settings is open.
 
 ## Changes this design made to the repository's rules
@@ -354,7 +354,7 @@ The owner approved these changes to AGENTS.md on 2026-11-05, and they are in
 place:
 
 - Rule 6 allows one default workflow in this repository.
-- Rule 7 limits agents to the git commands Sheprd allows.
+- Rule 7 limits agents to the git commands LGTM Studio allows.
 - Rule 7 lets a fix sprint that users would not notice merge on its own after a
   full test run passes. Anything users would notice keeps the owner's approval.
 
@@ -367,7 +367,7 @@ necessary.
 
 ### 1 Define
 
-- V0 exists -> Config file?: Sheprd looks for the file
+- V0 exists -> Config file?: LGTM Studio looks for the file
 - Config file? -> Project set up: yes
 - Project set up -> Change described: Say what to change [OWNER]
 - Change described -> Mockups made if screens change: Make mockups
@@ -400,7 +400,7 @@ whether it is needed at this stage.
 An architecture change is not made during setup. It goes through this loop
 like any change, starting from Say what to change.
 
-The result is a local .sheprd folder with a config file, similar to .claude,
+The result is a local .lgtm folder with a config file, similar to .claude,
 holding the project's settings, including the direction, how testing runs and
 the paths to use. When the file exists, setup is skipped.
 
@@ -413,12 +413,12 @@ skipped. 6 Review always runs in this workflow.
 
 This chart is the default workflow. It will become a parsable list of steps,
 and anyone wanting something else, such as skipping phase 6, writes their own
-local workflow under ~/.sheprd.
+local workflow under ~/.lgtm.
 
 ### 2 Design and teams
 
 - Change approved -> Tests on?
-- Tests on? -> Valid checkpoint?: yes: Sheprd looks for full-run report
+- Tests on? -> Valid checkpoint?: yes: LGTM Studio looks for full-run report
 - Valid checkpoint? -> Code read: yes: read page and code
 - Valid checkpoint? -> Full run passes?: no: full run
 - Full run passes? -> Fix sprint added: no: add a fix sprint
@@ -429,7 +429,7 @@ local workflow under ~/.sheprd.
   NEEDED]
 - Teams decided -> Tests on?
 - Tests on? -> User-flow tests written: yes: write from page, mockups
-- User-flow tests written -> Teams started: List teams in Sheprd, send each
+- User-flow tests written -> Teams started: List teams in LGTM Studio, send each
   its plan
 - Teams started -> 3 Plan
 - Tests on? -> Code read: no
@@ -437,8 +437,8 @@ local workflow under ~/.sheprd.
 - Full run passes? -> Code read: yes
 - Tests on? -> Teams started: no
 
-Before any planning, Sheprd looks up the report for the commit the sprint
-starts from. Reports live in the Sheprd workspace, findable by commit. Sheprd
+Before any planning, LGTM Studio looks up the report for the commit the sprint
+starts from. Reports live in the LGTM Studio workspace, findable by commit. LGTM Studio
 keeps the report for what is on dev and every report beyond it, including
 local work and branches. Once work merges into dev and the full run happens,
 it keeps only that one report for dev, because that run includes all the
@@ -558,7 +558,7 @@ uses the same round count.
 - Configs built -> Subitems building: Start builders, send configs
 - Subitems building -> Subitems built: Build subitems
 - Subitems building -> 3 Plan: plan wrong
-- Subitems built -> Passing report?: Sheprd merge looks up commit
+- Subitems built -> Passing report?: LGTM Studio merge looks up commit
 - Passing report? -> Temp merge made: yes: temp merge; lead fixes conflicts
 - Temp merge made -> All pass?: Run all merged workers' tests
 - All pass? -> Subitems merged: yes: lead's branch moves
@@ -584,13 +584,13 @@ browser.
 Build subitems runs per subitem, and the failure decisions live inside it.
 Plan wrong is the only failure that leaves Build.
 
-The build lead merges with a Sheprd command. Before merging, Sheprd looks for
+The build lead merges with an LGTM Studio command. Before merging, LGTM Studio looks for
 a passing report for that exact commit. With one, it merges into a temporary
 branch and the build lead fixes any conflicts. Without one, it refuses and
 says to run the check. The temporary merge runs the tests of every worker
 merged so far, so earlier work is tested with the new work. The lead's branch
 moves only on a pass. On a failure the temporary branch is dropped and the
-newest worker gets the report. The full suite waits for 5 Verify. Sheprd
+newest worker gets the report. The full suite waits for 5 Verify. LGTM Studio
 limits which git commands builders and leads can run, so they merge through
 its command.
 
@@ -605,7 +605,7 @@ its command.
 - Tests approved -> Code written: Write code, edit old work, narrow runs
   [OWNER IF NEEDED]
 - Code written -> Code committed: Commit; tell build lead: done
-- Code committed -> Checks pass?: Build lead calls sheprd check; test runner
+- Code committed -> Checks pass?: Build lead calls lgtm check; test runner
   runs builder's config
 - Checks pass? -> Risky tests?: yes: script finds risky labels
 - Risky tests? -> Code broken on temp: yes: break it on a temp branch
@@ -637,19 +637,19 @@ The frozen-test script fails if the build agent changed a test, and it fails
 if it has nothing to compare.
 
 While it works, the build agent asks the test runner agent directly for narrow
-runs, using the commands Sheprd's init set up. A busy test runner agent leaves
+runs, using the commands LGTM Studio's init set up. A busy test runner agent leaves
 the request waiting. The orchestrator is not involved.
 
 When done, the build agent commits locally and tells the build lead. The build
-lead calls the Sheprd check command. Sheprd finds that builder's config, which
+lead calls the LGTM Studio check command. LGTM Studio finds that builder's config, which
 the build lead made when starting it, and runs that fixed list, including
 tests, guards and the frozen-test script, against that commit. Uncommitted
 code cannot be checked.
 
 The test runner agent runs the tests, then fills in a report form from a
-Sheprd template, naming the commit and the builder. Any test tool works,
+LGTM Studio template, naming the commit and the builder. Any test tool works,
 because the agent only needs the tool's result to fill in the form. It traces
-what broke and does not diagnose. Sheprd's engine wakes the builder with the
+what broke and does not diagnose. LGTM Studio's engine wakes the builder with the
 report.
 
 Before 5 Verify, checks run only the specific tests in the builder's config.
@@ -695,7 +695,7 @@ checks. If agent review is off too, code merges without it.
 - Failure report -> Report read: Read the report
 - Report read -> Fix team started: Set up a fix team
 - Fix team started -> Fixes built: Build subitems
-- Fixes built -> Passing report?: Sheprd merge: looks up commit
+- Fixes built -> Passing report?: LGTM Studio merge: looks up commit
 - Passing report? -> 5 Verify: yes: merge
 - Passing report? -> Fix team started: no: run the check
 

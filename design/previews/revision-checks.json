@@ -1,11 +1,10 @@
 {
-  "passed": 418,
+  "passed": 417,
   "failed": 0,
   "failures": [],
   "errors": [],
   "checks": [
-    "The product is named LGcode",
-    "The old names are gone from the page",
+    "The product is named LGTM Studio",
     "One name for starting a project",
     "The Git tab is named Git",
     "Project settings are named for their scope",

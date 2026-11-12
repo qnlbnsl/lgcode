@@ -16,7 +16,7 @@ let rig: Rig
 const credential = "synthetic-provider-readiness-credential"
 beforeEach(() => {
   rig = makeRig()
-  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   execFileSync("git", ["-C", rig.work, "init", "-b", "main"], { stdio: "ignore" })
 })
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig) })

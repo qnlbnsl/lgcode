@@ -75,7 +75,7 @@
     {
       "pass": true,
       "label": "Remote unchecked project correctly labels main checkout",
-      "evidence": "RepositorysheprdBranchmainCheckoutMain checkoutFolder~/work/sheprdMachineBuildbox"
+      "evidence": "RepositorylgtmBranchmainCheckoutMain checkoutFolder~/work/lgtmMachineBuildbox"
     },
     {
       "pass": true,

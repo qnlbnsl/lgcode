@@ -1,5 +1,5 @@
 import { gitReviewSample } from "../../contracts/test/gitReviewFixtures.ts";
-import { CommandsRpcGroup, commandAccess, ownerOnlyCommands } from "@lgcode/contracts";
+import { CommandsRpcGroup, commandAccess, ownerOnlyCommands } from "@lgtm/contracts";
 import { afterEach, expect, it } from "vitest";
 import { action, roleFile, roleFileContent, roleFileHash } from "../../contracts/test/roles/fixtures.ts";
 import {
@@ -16,7 +16,7 @@ const invocations = [...CommandsRpcGroup.requests.keys()].flatMap((command) => [
 
 // Inventory comes from the RPC group, never from a second CLI-maintained list.
 for (const { command, words, form } of invocations) {
-  it(`P01 ${command} ${form} (7.5) catches omitting this RPC's lgcode subcommand/help registration`, async () => {
+  it(`P01 ${command} ${form} (7.5) catches omitting this RPC's lgtm subcommand/help registration`, async () => {
     const child = startCli(prepareRoot(), [...words, "--help"]);
     expect(await finishCli(child)).toEqual({ code: 0, signal: null });
     expect(child.stdout()).toMatch(/usage|options|arguments/i);

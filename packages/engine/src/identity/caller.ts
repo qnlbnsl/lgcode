@@ -1,4 +1,4 @@
-import type { Caller } from "@lgcode/contracts";
+import type { Caller } from "@lgtm/contracts";
 
 // The caller as stored in `events.caller` and `receipts.caller`. It is built
 // field by field so the text does not depend on property order or on extra

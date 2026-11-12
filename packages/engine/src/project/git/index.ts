@@ -4,7 +4,7 @@ import { lstat, mkdir, mkdtemp, open, opendir, realpath, rename, rm, stat, write
 import { basename, dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import * as Effect from "effect/Effect";
-import { isRepositoryCredentialPath } from "@lgcode/contracts";
+import { isRepositoryCredentialPath } from "@lgtm/contracts";
 import { checkedMetadata, cleanText, directory, filePath, inside, slug, smallFile } from "./paths.ts";
 import { parseChanges, parseConflict, parseFiles, parseHistory, parseNumstat } from "./parse.ts";
 import { boundedUtf8, gitProcess, processFailure, type ProcessReply } from "./process.ts";
@@ -261,7 +261,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
     }
     const current = await smallFile(file, outputBytes), currentHead = await head(folder, signal);
     if (currentHead === null) return fail("unsupported_conflict");
-    const temporary = await mkdtemp(join(tmpdir(), "lgcode-git-conflict-"));
+    const temporary = await mkdtemp(join(tmpdir(), "lgtm-git-conflict-"));
     let merged: ProcessReply;
     // Existing marker-like source text cannot become a synthetic hunk.
     let markerSize = 7;
@@ -613,7 +613,7 @@ export const makeGitService = (configuration: GitConfiguration): GitService => {
         return ours + (ours !== "" && theirs !== "" && !ours.endsWith("\n") ? "\n" : "") + theirs;
       }).join("");
       const full = await filePath(path, actual.path), info = await stat(full);
-      const temporary = join(dirname(full), `.lgcode-resolve-${randomUUID()}.tmp`);
+      const temporary = join(dirname(full), `.lgtm-resolve-${randomUUID()}.tmp`);
       let created = false;
       try {
         await writeFile(temporary, content, { flag: "wx", mode: info.mode & 0o777 });

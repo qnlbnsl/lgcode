@@ -20,18 +20,18 @@ afterAll(() => {
 });
 
 const makeTree = () => {
-  const root = makeScratch("lgcode-readlink-tree-");
+  const root = makeScratch("lgtm-readlink-tree-");
   mkdirSync(join(root, "bin"));
-  copyFileSync(join(repoRoot, "bin/lgcode"), join(root, "bin/lgcode"));
-  chmodSync(join(root, "bin/lgcode"), 0o755);
+  copyFileSync(join(repoRoot, "bin/lgtm"), join(root, "bin/lgtm"));
+  chmodSync(join(root, "bin/lgtm"), 0o755);
   copyFileSync(join(repoRoot, "bin/stub-entry.ts"), join(root, "bin/stub-entry.ts"));
-  const home = makeScratch("lgcode-readlink-home-");
+  const home = makeScratch("lgtm-readlink-home-");
   const nvm = join(home, "fake-nvm");
   const nodeDirectory = join(nvm, "versions/node/v26.13.0/bin");
   mkdirSync(nodeDirectory, { recursive: true });
   expect(process.versions.node.split(".")[0], "run smoke tests with Node.js 26").toBe("26");
   symlinkSync(process.execPath, join(nodeDirectory, "node"));
-  return { root, home, nvm, launcher: join(root, "bin/lgcode") };
+  return { root, home, nvm, launcher: join(root, "bin/lgtm") };
 };
 const run = (launcher: string, home: string, nvm: string, path: string) => spawnSync("/usr/bin/env", [
   "-i", `HOME=${home}`, `NVM_DIR=${nvm}`, `PATH=${path}`, launcher, "serve", "--detach",
@@ -40,9 +40,9 @@ const run = (launcher: string, home: string, nvm: string, path: string) => spawn
 describe("linked launcher and PATH", () => {
   it("runs through a link when PATH holds only the link folder (breaks if readlink is looked up on PATH)", () => {
     const tree = makeTree();
-    const links = makeScratch("lgcode-readlink-links-");
-    symlinkSync(tree.launcher, join(links, "lgcode"));
-    const result = run(join(links, "lgcode"), tree.home, tree.nvm, links);
+    const links = makeScratch("lgtm-readlink-links-");
+    symlinkSync(tree.launcher, join(links, "lgtm"));
+    const result = run(join(links, "lgtm"), tree.home, tree.nvm, links);
     expect(result.error).toBeUndefined();
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain("not built yet");
@@ -50,23 +50,23 @@ describe("linked launcher and PATH", () => {
 
   it("never executes readlink from PATH (breaks if a substituted readlink runs before the selected Node.js)", () => {
     const tree = makeTree();
-    const links = makeScratch("lgcode-readlink-links-");
-    symlinkSync(tree.launcher, join(links, "lgcode"));
-    const hostile = makeScratch("lgcode-hostile-readlink-");
+    const links = makeScratch("lgtm-readlink-links-");
+    symlinkSync(tree.launcher, join(links, "lgtm"));
+    const hostile = makeScratch("lgtm-hostile-readlink-");
     const marker = join(hostile, "readlink-ran");
     writeFileSync(join(hostile, "readlink"), `#!/bin/sh\nprintf 'executed\\n' > '${marker}'\nexec /usr/bin/readlink "$@"\n`);
     chmodSync(join(hostile, "readlink"), 0o755);
-    const result = run(join(links, "lgcode"), tree.home, tree.nvm, hostile);
+    const result = run(join(links, "lgtm"), tree.home, tree.nvm, hostile);
     expect(result.status, result.stderr).toBe(0);
     expect(existsSync(marker), "the launcher executed the hostile PATH readlink").toBe(false);
   });
 
   it("follows a chain of links (breaks if only one link level is resolved)", () => {
     const tree = makeTree();
-    const links = makeScratch("lgcode-readlink-links-");
+    const links = makeScratch("lgtm-readlink-links-");
     symlinkSync(tree.launcher, join(links, "inner"));
-    symlinkSync(join(links, "inner"), join(links, "lgcode"));
-    const result = run(join(links, "lgcode"), tree.home, tree.nvm, links);
+    symlinkSync(join(links, "inner"), join(links, "lgtm"));
+    const result = run(join(links, "lgtm"), tree.home, tree.nvm, links);
     expect(result.status, result.stderr).toBe(0);
     expect(result.stdout).toContain("not built yet");
   });

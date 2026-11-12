@@ -7,8 +7,8 @@ import * as Stream from "effect/Stream";
 import { cleanupUnit7b } from "../../testing/test/support/unit7b.ts";
 import { chunk, clientApiPeer, closeClientApiPeers, known, succeed, type TestClient } from "./support/clientApiPeer.ts";
 
-vi.mock("@lgcode/contracts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@lgcode/contracts")>();
+vi.mock("@lgtm/contracts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@lgtm/contracts")>();
   return { ...actual, CommandsRpcGroup: actual.CommandsRpcGroup.merge(actual.ClientRpcGroup),
     WireCommandsRpcGroup: actual.WireCommandsRpcGroup.merge(actual.WireClientRpcGroup) };
 });

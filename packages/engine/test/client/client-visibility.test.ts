@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgtm/contracts";
 import { expect, it } from "vitest";
 import { clientTags } from "../../../contracts/test/client/support.ts";
 import { visibleTo } from "../../src/api/visibility.ts";

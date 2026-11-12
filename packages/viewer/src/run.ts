@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { render } from "ink";
 import * as Effect from "effect/Effect";
-import type { Environment } from "@lgcode/client";
+import type { Environment } from "@lgtm/client";
 import { connectViewer } from "./connection.ts";
 import { ViewerApp } from "./app.ts";
 
@@ -28,6 +28,6 @@ export const runViewer = (environment: Environment): Effect.Effect<number> =>
     },
     catch: () => new Error("The viewer needs an owner terminal and a running engine."),
   }).pipe(Effect.catch(() => Effect.sync(() => {
-    process.stderr.write("lgcode: the viewer needs an owner terminal and a running engine.\n");
+    process.stderr.write("lgtm: the viewer needs an owner terminal and a running engine.\n");
     return 1;
   })));

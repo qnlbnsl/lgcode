@@ -1,4 +1,4 @@
-# What ACP means, and where it fits in Shephrd
+# What ACP means, and where it fits in LGTM Studio
 
 Researched on 2026-10-30. The sources are listed at the end.
 
@@ -9,7 +9,7 @@ world, and in anything that mentions T3 Code, Zed, Claude Code, or Codex, ACP
 means the **Agent Client Protocol**. The other two, the Agent Communication
 Protocol (from IBM, for agents talking to other agents, since folded into
 Google's Agent2Agent protocol) and the Agentic Commerce Protocol (from OpenAI
-and Stripe, for agents making purchases), are not relevant to Shephrd.
+and Stripe, for agents making purchases), are not relevant to LGTM Studio.
 
 ## What the Agent Client Protocol is
 
@@ -56,7 +56,7 @@ its proprietary core, and an adapter sits in front of it.
 
 ## How T3 Code actually does it
 
-T3 Code, the multi-agent app that Shephrd's thread view takes inspiration
+T3 Code, the multi-agent app that LGTM Studio's thread view takes inspiration
 from, mostly does **not** use ACP. It talks to each harness through that
 harness's own best interface:
 
@@ -70,10 +70,10 @@ server running on the owner's machine, over an authenticated WebSocket. A
 device is added with a one-time pairing link or QR code. The server keeps each
 thread (its messages, approvals, and changed files) after the client closes.
 
-The lesson for Shephrd is that ACP is a way for a server to drive agents. It
+The lesson for LGTM Studio is that ACP is a way for a server to drive agents. It
 is not the protocol between the server and a phone.
 
-## Where ACP would fit in Shephrd
+## Where ACP would fit in LGTM Studio
 
 Herdr runs each agent as an interactive terminal program in a pane. Herdr
 Synapse coordinates agents by reading those panes and typing into them,
@@ -86,7 +86,7 @@ a terminal interface, and the server receives structured events: each
 message, each tool call, each permission request, and each changed file. That
 structure is exactly what a good thread view on a phone needs.
 
-This leaves Shephrd with a design decision, recorded as an open question in
+This leaves LGTM Studio with a design decision, recorded as an open question in
 [../features.md](../features.md):
 
 1. **Terminal panes only, as Synapse does.** This works with every Herdr agent
@@ -94,7 +94,7 @@ This leaves Shephrd with a design decision, recorded as an open question in
 2. **ACP or SDK sessions only.** This gives clean, structured threads. The
    agents would no longer be interactive panes that the owner can type into
    inside Herdr.
-3. **Both.** Herdr panes stay the place where agents live. Shephrd uses
+3. **Both.** Herdr panes stay the place where agents live. LGTM Studio uses
    ACP or an SDK where a harness supports it, to get structured events, and
    falls back to the terminal where it does not.
 
@@ -106,9 +106,9 @@ ACP, Claude runs on the Agent SDK, and T3 Code reports that the Agent SDK
 drains the 5-hour limit faster than interactive Claude Code. See
 `docs/features.md`, section 1.
 
-Whatever is chosen, Shephrd's own client API, the one the web page and the
-mobile app use, is a separate protocol designed by Shephrd. ACP sits behind
-the server, between Shephrd and the agents.
+Whatever is chosen, LGTM Studio's own client API, the one the web page and the
+mobile app use, is a separate protocol designed by LGTM Studio. ACP sits behind
+the server, between LGTM Studio and the agents.
 
 ## Sources
 

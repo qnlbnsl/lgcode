@@ -59,12 +59,12 @@ it("O01 orient returns the caller's parsed role, parent label, readable roster, 
   expect(yield* headSequence).toBe(before);
 })));
 
-it("O02 lgcode roles orient reaches the real authenticated read and returns its data envelope", async () => run(Effect.gen(function* () {
+it("O02 lgtm roles orient reaches the real authenticated read and returns its data envelope", async () => run(Effect.gen(function* () {
   const token = yield* family;
   const connection = yield* endpoint;
   chmodSync(dirname(connection.socket), 0o700);
   const root = prepareRoot();
-  const child = startCli(root, ["roles", "orient", "--input", "{}"], { ...agentEnvironment(root), LGCODE_SOCKET: connection.socket, LGCODE_TOKEN: token });
+  const child = startCli(root, ["roles", "orient", "--input", "{}"], { ...agentEnvironment(root), LGTM_SOCKET: connection.socket, LGTM_TOKEN: token });
   expect(yield* Effect.promise(() => finishCli(child)), child.stderr()).toEqual({ code: 0, signal: null });
   const reply = unwrap({ data: child.stdout().trimEnd() });
   expect(reply).toMatchObject({ name: "Name lead", kind: "lead", roleName: "builder", parentName: "Name parent" });
@@ -77,7 +77,7 @@ it("O03 the roles.orient MCP tool reaches the real engine with the calling agent
   const connection = yield* endpoint;
   chmodSync(dirname(connection.socket), 0o700);
   const root = prepareRoot();
-  const child = startCli(root, ["mcp"], { ...agentEnvironment(root), LGCODE_SOCKET: connection.socket, LGCODE_TOKEN: token });
+  const child = startCli(root, ["mcp"], { ...agentEnvironment(root), LGTM_SOCKET: connection.socket, LGTM_TOKEN: token });
   const peer = mcpPeer(child);
   yield* Effect.promise(() => peer.initialize());
   const reply = yield* Effect.promise(() => peer.request("tools/call", { name: "roles.orient", arguments: {} }));

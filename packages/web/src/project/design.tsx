@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { ProjectId, RepositoryId, RequestId, RepositoryDesignResult } from "@lgcode/contracts"
+import type { ProjectId, RepositoryId, RequestId, RepositoryDesignResult } from "@lgtm/contracts"
 import { requestId, useAdminApi } from "../admin/api.ts"
 import { DataText, visibleText } from "../thread/text.tsx"
 import "./review.css"

@@ -24,7 +24,7 @@ because they live in collections and not on pages.
 | Rule | Value |
 |---|---|
 | Folder | `design/` at the root of the repository |
-| File name | `design/<repository name>.fig`, such as `design/lgcode.fig` |
+| File name | `design/<repository name>.fig`, such as `design/lgtm.fig` |
 | Format | An OpenPencil file, which is a zip archive holding `canvas.fig`, `meta.json` and `thumbnail.png` |
 | Number of files | One design file for each repository |
 | Tokens for code | `design/tokens.css`, kept in step with the file's variables |
@@ -180,12 +180,12 @@ There is no third menu. A single frame is reached by clicking it on the canvas.
 ## The address of an item
 
 An item has its own address: `/r/<repository>/design/<category>/<item>`. Both parts are in
-lower case, with hyphens for spaces, such as `/r/lgcode/design/screens/sign-in-and-setup`.
+lower case, with hyphens for spaces, such as `/r/lgtm/design/screens/sign-in-and-setup`.
 The address `/r/<repository>/design` opens the first item of Screens.
 
-## LGcode's own items
+## LGTM Studio's own items
 
-### Screens for LGcode
+### Screens for LGTM Studio
 
 The flows follow the owner's path through the product. Each frame names the mock address
 that draws it.
@@ -199,16 +199,16 @@ that draws it.
 | Mocks | `Screens` (`/p/phone/mocks`), `Screen` (`/p/phone/mocks/screen/requests`), `Changes` (`/p/phone/mocks/changes`), `Data` (`/p/phone/mocks/data`), `Components` (`/p/phone/mocks/components`) |
 | Conversations | `Chat` (`/p/console/chat`), `Messages` (`/p/console/messages`), `Messages / Waiting for a reply` (`/p/console/messages/waiting`), `Agents` (`/p/console/agents`) |
 | Code | `Terminal` (`/p/console/terminal`), `Git / Changes` (`/p/console/git`), `Git / History`, `Git / Conflicts`, `Merge review` |
-| Repository | `Repository` (`/r/lgcode`), `Repository design` (`/r/lgcode/design`) |
+| Repository | `Repository` (`/r/lgtm`), `Repository design` (`/r/lgtm/design`) |
 | Service | `Machines` (`/machines`), `Pair machine`, `Add repository`, `Subscriptions` (`/subscriptions`), `Add subscription`, `Phone notifications` (`/notifications`), `Service settings` (`/settings`) |
 
 A frame without an address is a state or a dialog that the mock opens from the screen above
 it. Phone layouts are added as `/ Phone` states as they are drawn.
 
-### Components for LGcode
+### Components for LGTM Studio
 
-The fixed groups come first. LGcode adds two groups of its own: Agents, and Code. The words "in the file"
-mark a component that is in `design/lgcode.fig` today. The others exist only in the mock's
+The fixed groups come first. LGTM Studio adds two groups of its own: Agents, and Code. The words "in the file"
+mark a component that is in `design/lgtm.fig` today. The others exist only in the mock's
 code.
 
 | Group | Components |
@@ -223,7 +223,7 @@ code.
 | Agents | Avatar, Agent row (in the file), Agent line, Message, Composer, Request block, Tool line |
 | Code | Diff, Terminal line |
 
-### Palette for LGcode
+### Palette for LGTM Studio
 
 | Item | Content |
 |---|---|
@@ -234,7 +234,7 @@ code.
 | Motion | `motion-fast`, `motion-slow` and `ease` |
 | Icons | The Lucide icons in `design/mock/js/icons.js` |
 
-## What `design/lgcode.fig` holds today
+## What `design/lgtm.fig` holds today
 
 The file was saved by OpenPencil on 2026-11-08. It has three pages.
 
@@ -261,7 +261,7 @@ The 15 colour variables are bg, surface, raised, sidebar, text, muted, primary,
 primary-contrast, accent, success, warn, error, focus, line and selected. Their values match
 `design/tokens.css` exactly in both modes.
 
-## What LGcode's file must change to meet the standard
+## What LGTM Studio's file must change to meet the standard
 
 These are findings. They are not done, and this standard does not do them.
 

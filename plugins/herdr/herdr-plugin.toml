@@ -1,26 +1,26 @@
-id = "lgcode"
-name = "LGcode"
+id = "lgtm"
+name = "LGTM Studio"
 version = "0.0.1"
 min_herdr_version = "0.8.2"
 platforms = ["linux"]
 
 [[startup]]
-command = ["lgcode", "serve", "--detach"]
+command = ["lgtm", "serve", "--detach"]
 
 [[actions]]
 id = "serve"
-title = "Start LGcode"
+title = "Start LGTM Studio"
 contexts = ["global"]
-command = ["lgcode", "serve", "--detach"]
+command = ["lgtm", "serve", "--detach"]
 
 [[actions]]
 id = "view"
-title = "View LGcode threads"
+title = "View LGTM Studio threads"
 contexts = ["global"]
 command = ["node", "./src/openPane.ts"]
 
 [[panes]]
 id = "view"
-title = "LGcode threads"
+title = "LGTM Studio threads"
 placement = "split"
-command = ["lgcode", "view"]
+command = ["lgtm", "view"]

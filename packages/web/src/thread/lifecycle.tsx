@@ -1,5 +1,5 @@
 import { useEffect } from "react"
-import { commandOutcome, type ClientSnapshot } from "@lgcode/contracts"
+import { commandOutcome, type ClientSnapshot } from "@lgtm/contracts"
 import { requestId, withClient } from "./client.ts"
 import { useConversation, useMutationDisabled } from "../data/ShellDataProvider.tsx"
 import * as Effect from "effect/Effect"

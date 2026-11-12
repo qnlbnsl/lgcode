@@ -15,17 +15,17 @@
 #   clean             delete this working tree's copy there
 #
 # Settings, read from the environment:
-#   LGCODE_REMOTE_HOST   SSH host or alias (default 192.168.141.18)
-#   LGCODE_REMOTE_USER   user on that host (default: SSH's own choice)
-#   LGCODE_REMOTE_ROOT   folder there that holds the copies, relative to the
-#                        user's home unless absolute (default Work/lgcode)
-#   LGCODE_REMOTE_NAME   name of this copy (default: this working tree's
+#   LGTM_REMOTE_HOST   SSH host or alias (default 192.168.141.18)
+#   LGTM_REMOTE_USER   user on that host (default: SSH's own choice)
+#   LGTM_REMOTE_ROOT   folder there that holds the copies, relative to the
+#                        user's home unless absolute (default Work/lgtm-studio)
+#   LGTM_REMOTE_NAME   name of this copy (default: this working tree's
 #                        folder name, so each worktree gets its own copy)
-#   LGCODE_REMOTE_SLOTS  how many `check` and `browser` runs may use the other
+#   LGTM_REMOTE_SLOTS  how many `check` and `browser` runs may use the other
 #                        computer at once (default 2); later runs wait
-#   LGCODE_REMOTE_SPARE_CPUS  processors left free there (default 2); every
+#   LGTM_REMOTE_SPARE_CPUS  processors left free there (default 2); every
 #                        remote command runs on the others
-#   LGCODE_REMOTE_MEMORY  memory all remote commands share there, as a
+#   LGTM_REMOTE_MEMORY  memory all remote commands share there, as a
 #                        systemd size (default 80G)
 #
 # The copy holds every file Git would see in this working tree: tracked files
@@ -36,37 +36,37 @@
 
 set -euo pipefail
 
-host=${LGCODE_REMOTE_HOST:-192.168.141.18}
-user=${LGCODE_REMOTE_USER:-}
-root_dir=${LGCODE_REMOTE_ROOT:-Work/lgcode}
-slots=${LGCODE_REMOTE_SLOTS:-2}
-spare=${LGCODE_REMOTE_SPARE_CPUS:-2}
-memory=${LGCODE_REMOTE_MEMORY:-80G}
+host=${LGTM_REMOTE_HOST:-192.168.141.18}
+user=${LGTM_REMOTE_USER:-}
+root_dir=${LGTM_REMOTE_ROOT:-Work/lgtm-studio}
+slots=${LGTM_REMOTE_SLOTS:-2}
+spare=${LGTM_REMOTE_SPARE_CPUS:-2}
+memory=${LGTM_REMOTE_MEMORY:-80G}
 
 top=$(git rev-parse --show-toplevel)
-name=${LGCODE_REMOTE_NAME:-$(basename "$top")}
+name=${LGTM_REMOTE_NAME:-$(basename "$top")}
 case $name in
   "" | . | .. | */*) echo "remote: the copy name '$name' is not a plain folder name" >&2; exit 2 ;;
 esac
 case $slots in
-  "" | *[!0-9]* | 0) echo "remote: LGCODE_REMOTE_SLOTS must be a whole number above 0" >&2; exit 2 ;;
+  "" | *[!0-9]* | 0) echo "remote: LGTM_REMOTE_SLOTS must be a whole number above 0" >&2; exit 2 ;;
 esac
 case $spare in
-  "" | *[!0-9]*) echo "remote: LGCODE_REMOTE_SPARE_CPUS must be a whole number" >&2; exit 2 ;;
+  "" | *[!0-9]*) echo "remote: LGTM_REMOTE_SPARE_CPUS must be a whole number" >&2; exit 2 ;;
 esac
 case $memory in
   [0-9]*[KMGT] | [0-9]*) ;;
-  *) echo "remote: LGCODE_REMOTE_MEMORY must be a size such as 80G" >&2; exit 2 ;;
+  *) echo "remote: LGTM_REMOTE_MEMORY must be a size such as 80G" >&2; exit 2 ;;
 esac
 
 target=${user:+$user@}$host
 dir=$root_dir/$name
 ssh_opts=(-o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=30
-  -o ControlMaster=auto -o "ControlPath=$HOME/.ssh/lgcode-remote-%C" -o ControlPersist=10m)
+  -o ControlMaster=auto -o "ControlPath=$HOME/.ssh/lgtm-remote-%C" -o ControlPersist=10m)
 
 # Bash source that every remote command starts with: enter the copy, use the
 # Node.js version that .nvmrc names when the other computer has nvm, and define
-# lgcode_limited, which runs a command within the processor and memory limits.
+# lgtm_limited, which runs a command within the processor and memory limits.
 prelude() {
   printf 'set -euo pipefail\ncd %q\nspare=%q\nmemory=%q\n' "$dir" "$spare" "$memory"
   cat <<'SH'
@@ -77,7 +77,7 @@ fi
 # Every remote command runs on all processors but the last $spare, inside one
 # systemd slice that all of them share, so together they never use more than
 # $memory. Without a systemd user session, only the processor limit applies.
-lgcode_limited() {
+lgtm_limited() {
   # The processors this session may use, in order, minus the last $spare.
   local allowed cpus=() part
   allowed=$(sed -n 's/^Cpus_allowed_list:[[:space:]]*//p' /proc/self/status)
@@ -89,7 +89,7 @@ lgcode_limited() {
   local list
   list=$(IFS=,; echo "${cpus[*]:0:keep}")
   if systemctl --user show-environment >/dev/null 2>&1; then
-    local unit="$HOME/.config/systemd/user/lgcode-remote.slice"
+    local unit="$HOME/.config/systemd/user/lgtm-remote.slice"
     local want="[Slice]"$'\n'"MemoryMax=$memory"$'\n'"MemorySwapMax=0"
     if [ "$(cat "$unit" 2>/dev/null)" != "$want" ]; then
       mkdir -p -- "${unit%/*}"
@@ -100,7 +100,7 @@ lgcode_limited() {
     # Chromium moves itself into its own systemd scope over the session bus,
     # which would take the browser tests out of the memory limit, so the
     # command runs without the bus address.
-    systemd-run --user --scope --quiet --collect --slice=lgcode-remote.slice -- \
+    systemd-run --user --scope --quiet --collect --slice=lgtm-remote.slice -- \
       env -u DBUS_SESSION_BUS_ADDRESS taskset -c "$list" bash -c "set -eo pipefail"$'\n'"$1"
   else
     echo "remote: limits: $keep of ${#cpus[@]} processors ($list); no systemd user session, so no memory limit"
@@ -118,7 +118,7 @@ remote_bash() {
 
 # Runs the given Bash source in the copy.
 in_copy() {
-  { prelude; printf 'lgcode_limited %q\n' "$1"; } | remote_bash
+  { prelude; printf 'lgtm_limited %q\n' "$1"; } | remote_bash
 }
 
 # Runs the given Bash source in the copy once one of the slots is free.
@@ -133,7 +133,7 @@ while :; do
     if flock -n 9; then
       echo "remote: slot $i of $slots on $(hostname), $(nproc) processors, load $(cut -d' ' -f1 /proc/loadavg)"
 SH
-    printf '      lgcode_limited %q\n' "$1"
+    printf '      lgtm_limited %q\n' "$1"
     cat <<'SH'
       exit $?
     fi

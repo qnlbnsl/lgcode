@@ -8,7 +8,7 @@ The file in this folder is the standalone build of
 htm is copyright 2018 Google Inc., released under the Apache License 2.0.
 Preact is copyright 2015 to present Jason Miller, released under the MIT
 License. Both licence texts must stay in this folder for as long as the file
-is in LGcode: [LICENSE](LICENSE) is htm's, and
+is in LGTM Studio: [LICENSE](LICENSE) is htm's, and
 [preact.LICENSE](preact.LICENSE) is Preact's.
 
 ## Which file, and from where
@@ -22,7 +22,7 @@ is in LGcode: [LICENSE](LICENSE) is htm's, and
 - The bundle holds htm 3.1.1 and the Preact 10 release that htm's build used.
   The file is minified and carries no copyright line of its own.
 
-## Where LGcode uses it
+## Where LGTM Studio uses it
 
 The web mock loads it through `design/mock/vendor/htm-preact`, a symbolic
 link to this folder, so the preview server can serve it. Only

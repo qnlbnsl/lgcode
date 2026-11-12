@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import * as Schema from "effect/Schema"
-import { DisplayFrame, type DisplayOpen } from "@lgcode/contracts/project/display"
+import { DisplayFrame, type DisplayOpen } from "@lgtm/contracts/project/display"
 import "./display.css"
 
 type Props = {

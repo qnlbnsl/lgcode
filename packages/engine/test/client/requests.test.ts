@@ -1,5 +1,5 @@
 import { it } from "@effect/vitest";
-import { Event, type ClientRequest } from "@lgcode/contracts";
+import { Event, type ClientRequest } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
@@ -12,7 +12,7 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { requestPermission, pause, tagged } from "../support/routingRig.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const index = (extra: Record<string, unknown> = {}) => Effect.gen(function* () {
   return success(yield* call(ownerCredential, "client.requests", { after: 0, limit: 200, ...extra }));

@@ -6,7 +6,7 @@ import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { guardPiece } from "../pieces/guardPiece.ts";
 import { canReach } from "./reach.ts";
 import { randomUUID } from "node:crypto";
-import { AccountId, RunMode, type AgentId, type Delivery, type Event, type EventEnvelope } from "@lgcode/contracts";
+import { AccountId, RunMode, type AgentId, type Delivery, type Event, type EventEnvelope } from "@lgtm/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
@@ -140,7 +140,7 @@ export const turnEnded = (snapshot: Snapshot, event: Extract<RunnerEvent, { _tag
   const cancelled: Event[] = event.stopped ? Object.values(snapshot.requests)
     .filter((row) => row.agentId === agentId && row.status === "open")
     .flatMap((row): Event[] => [{ _tag: "PermissionCancelled", agentId,
-      permissionRequestId: row.permissionRequestId as import("@lgcode/contracts").PermissionRequestId, reason: "reply stopped" },
+      permissionRequestId: row.permissionRequestId as import("@lgtm/contracts").PermissionRequestId, reason: "reply stopped" },
       ...withdrawQueued(snapshot, row.deliveryId)]) : [];
   return [...cancelled, { _tag: "TurnEnded", agentId, compact,
     ...(event.stopped ? { stopped: true } : {}),

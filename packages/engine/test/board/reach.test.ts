@@ -1,4 +1,4 @@
-import type { Caller } from "@lgcode/contracts";
+import type { Caller } from "@lgtm/contracts";
 import { expect, it } from "vitest";
 
 import type { Snapshot } from "../../src/commands/internal.ts";

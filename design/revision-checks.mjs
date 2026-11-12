@@ -8,11 +8,10 @@ const check=(value,name)=>{if(value)checks.push(name);else failures.push(name)};
 const page=await browser.newPage({viewport:{width:1440,height:900}});page.setDefaultTimeout(4000);page.on('pageerror',e=>errors.push(e.message));
 const click=s=>page.locator(s).first().click(),text=s=>page.locator(s).first().textContent(),box=s=>page.locator(s).first().evaluate(e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,height:r.height,width:r.width}});
 const run=async(name,steps)=>{try{await steps()}catch(e){failures.push(name+': '+e.message.split('\n')[0])}};
-await page.goto(url);await page.waitForFunction(()=>window.lgcodeReady);
+await page.goto(url);await page.waitForFunction(()=>window.lgtmReady);
 
 await run('names',async()=>{
- check(await text('.brand')==='LGcode'&&(await page.title()).startsWith('LGcode'),'The product is named LGcode');
- check(!/shephrd|sheprd/i.test(await page.content()),'The old names are gone from the page');
+ check(await text('.brand')==='LGTM Studio'&&(await page.title()).startsWith('LGTM Studio'),'The product is named LGTM Studio');
  check(await text('[data-home-new-project]')==='New project'&&await text('#new-project')==='New project'&&await text('#project-submit')==='Create project','One name for starting a project');
  await click('.project-select[data-project="workspace"]');
  check(await text('#workspace-tab-source-control')==='Git','The Git tab is named Git');
@@ -147,7 +146,7 @@ await run('new repository',async()=>{
 await page.close();
 await run('heavy sample',async()=>{
  const heavy=await browser.newPage({viewport:{width:1440,height:900}});heavy.setDefaultTimeout(4000);heavy.on('pageerror',e=>errors.push(e.message));
- await heavy.goto(url+'?sample=heavy');await heavy.waitForFunction(()=>window.lgcodeReady);
+ await heavy.goto(url+'?sample=heavy');await heavy.waitForFunction(()=>window.lgtmReady);
  const counts=await heavy.evaluate(()=>({projects:projects.length,agents:projects.flatMap(agents).length,open:homeItems().filter(i=>i.status==='open').length}));
  check(counts.projects===10,'The heavy sample has 10 projects');check(counts.agents>=30,'The heavy sample has at least 30 agents: '+counts.agents);check(counts.open>=10,'The heavy sample has a real queue: '+counts.open);
  await heavy.evaluate(()=>{repositories.forEach(r=>expandedRepos.add(r.id));renderSidebar()});
@@ -161,7 +160,7 @@ await run('heavy sample',async()=>{
 });
 
 await run('designer findings',async()=>{
- const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgtmReady);return p};
  const fromHome=await fresh();await fromHome.evaluate(()=>openAgent('sage','workspace'));
  check(await fromHome.locator('#view-body').evaluate(e=>e.scrollHeight-e.scrollTop-e.clientHeight<=4)&&await fromHome.locator('#latest-button').isHidden(),'A thread opened from Home starts at its end');
  const q=await fresh();const at=s=>q.locator(s).first();
@@ -174,7 +173,7 @@ await run('designer findings',async()=>{
  check(await ash.locator('.dot').evaluate(e=>getComputedStyle(e).backgroundColor)!==green,'A failed agent does not share the running color');
  const reviewTeam=at('.team-select[data-team="review"]');
  check((await reviewTeam.locator('.attention-number').textContent())==='1'&&await reviewTeam.getAttribute('aria-current')===null,'A collapsed team shows its waiting request, not its member count');
- check((await at('.repo-heading:has([data-open-repo="lgcode"]) .attention-number').textContent()).match(/^\d+$/),'A repository rolls up attention');
+ check((await at('.repo-heading:has([data-open-repo="lgtm"]) .attention-number').textContent()).match(/^\d+$/),'A repository rolls up attention');
  const bell=Number(await at('#attention-count').textContent()),rolled=await q.locator('.project-select .attention-number').allTextContents();
  check(rolled.map(Number).reduce((a,b)=>a+b,0)===bell,'The sidebar counts add up to the bell');
  // THREAD-2, at a window short enough that the thread scrolls
@@ -267,7 +266,7 @@ await run('designer findings',async()=>{
 // The designer's visual foundations: type, spacing, shape, controls, colour, icons, motion, focus, tabs, and dialogs.
 await run('visual foundations',async()=>{
  const {readFileSync}=await import('node:fs');
- const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgtmReady);return p};
  const html=readFileSync(new URL('./workbench.html',import.meta.url),'utf8'),js=readFileSync(new URL('./workbench.js',import.meta.url),'utf8');
  const css=html.slice(html.indexOf('<style>')+7,html.indexOf('</style>'));
  const decls=[...css.matchAll(/([a-z-]+):([^;{}]+)/g)].map(m=>[m[1],m[2].trim()]);
@@ -297,7 +296,7 @@ await run('visual foundations',async()=>{
  // ICON-1: no text characters stand in for icons, and the shortcut matches the system.
  check(!/[×←→↗⌘✓＋]/.test(await f.evaluate(()=>[...document.querySelectorAll('button,kbd')].map(b=>b.textContent).join(''))),'Buttons use drawn icons instead of text characters');
  check((await f.locator('#quick-open-key').textContent())==='Ctrl K','The switcher shortcut reads Ctrl K off Apple systems');
- const mac=await browser.newPage({viewport:{width:1440,height:900}});await mac.addInitScript(()=>{Object.defineProperty(Navigator.prototype,'platform',{get:()=>'MacIntel'});Object.defineProperty(Navigator.prototype,'userAgentData',{get:()=>({platform:'macOS'})})});await mac.goto(url);await mac.waitForFunction(()=>window.lgcodeReady);
+ const mac=await browser.newPage({viewport:{width:1440,height:900}});await mac.addInitScript(()=>{Object.defineProperty(Navigator.prototype,'platform',{get:()=>'MacIntel'});Object.defineProperty(Navigator.prototype,'userAgentData',{get:()=>({platform:'macOS'})})});await mac.goto(url);await mac.waitForFunction(()=>window.lgtmReady);
  check(await mac.locator('#quick-open-key svg').count()===1&&(await mac.locator('#quick-open-key').textContent()).endsWith('K'),'The switcher shortcut shows the Command icon on Apple systems');await mac.close();
  check(await f.locator('[data-system-page="alerts"] svg rect').count()===1,'Alerts, which go to a phone, use a phone icon');
  // COLOR-1: amber is for attention, and the modified letter is quiet.
@@ -356,7 +355,7 @@ await run('visual foundations',async()=>{
 
 // The application shell: sidebar, top bar, tab row, and switchers, from the designer's critique of 2026-11-06.
 await run('application shell',async()=>{
- const fresh=async(path='',size={width:1440,height:900},init)=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));if(init)await p.addInitScript(init);await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const fresh=async(path='',size={width:1440,height:900},init)=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));if(init)await p.addInitScript(init);await p.goto(url+path);await p.waitForFunction(()=>window.lgtmReady);return p};
  const f=await fresh(),at=s=>f.locator(s).first(),rect=s=>at(s).evaluate(e=>{const r=e.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,height:r.height,width:r.width}});
  const clipped=s=>at(s).evaluate(e=>e.getBoundingClientRect().width<=1||e.closest('.conversation-header').getBoundingClientRect().width<=1),txt=s=>at(s).textContent();
  // WHOLE-1: Control + B folds the sidebar into a 48 pixel rail of icons, and the browser remembers it.
@@ -364,7 +363,7 @@ await run('application shell',async()=>{
  check(Math.round((await rect('#sidebar')).width)===48,'Control and B fold the sidebar into a 48 pixel rail');
  check(!await at('#repo-tree').isVisible()&&await at('[data-system-page="machines"]').isVisible()&&await at('#home-link').isVisible()&&(await at('#home-link').getAttribute('title'))==='Home','The rail keeps Home and the service pages as icons, with their names on hover');
  check(await at('#collapse-sidebar').getAttribute('aria-expanded')==='false','The collapse button says the navigation is folded');
- await f.reload();await f.waitForFunction(()=>window.lgcodeReady);
+ await f.reload();await f.waitForFunction(()=>window.lgtmReady);
  check(Math.round((await rect('#sidebar')).width)===48,'The rail is remembered in this browser');
  await at('#collapse-sidebar').click();check((await rect('#sidebar')).width>200,'The collapse button opens the sidebar again');
  await f.evaluate(()=>{openBoard('workspace');document.querySelector('[data-main-view="terminal"]').click()});await at('#terminal-command').focus();await f.keyboard.press('Control+b');
@@ -395,9 +394,9 @@ await run('application shell',async()=>{
  const choices=await f.locator('[data-theme-choice]').allTextContents();
  check(choices.join()==='Light,Dark,Match system'&&(await txt('.theme-choice')).match(/Field|Dusk/)===null,'Appearance offers Light, Dark, and Match system, without the palette names');
  await at('[data-theme-choice="dark"]').click();
- check(await f.evaluate(()=>document.documentElement.dataset.theme==='dark'&&localStorage.getItem('lgcode-theme')==='dark')&&await at('[data-theme-choice="dark"]').getAttribute('aria-pressed')==='true','Choosing Dark applies and remembers it');
+ check(await f.evaluate(()=>document.documentElement.dataset.theme==='dark'&&localStorage.getItem('lgtm-theme')==='dark')&&await at('[data-theme-choice="dark"]').getAttribute('aria-pressed')==='true','Choosing Dark applies and remembers it');
  await f.emulateMedia({colorScheme:'light'});await at('[data-theme-choice="system"]').click();
- check(await f.evaluate(()=>document.documentElement.dataset.theme==='light'&&localStorage.getItem('lgcode-theme')===null),'Match system follows the device and forgets the manual choice');
+ check(await f.evaluate(()=>document.documentElement.dataset.theme==='light'&&localStorage.getItem('lgtm-theme')===null),'Match system follows the device and forgets the manual choice');
  await f.emulateMedia({colorScheme:'dark'});await f.waitForTimeout(50);check(await f.evaluate(()=>document.documentElement.dataset.theme==='dark'),'Match system keeps following the device');
  await f.evaluate(()=>setTheme('light'));
  // SIDE-4: only the current row is filled; its ancestors are bold, and a row is one hover target.
@@ -410,14 +409,14 @@ await run('application shell',async()=>{
  await f.evaluate(()=>{expandedRepos.add('atlas-docs');expandedProjects.add('docs');renderSidebar()});
  check(await f.locator('[data-project-toggle="docs"]').count()===0&&await f.locator('#project-docs').count()===0,'A project with no teams has no disclosure and no tree line');
  // REPO-2: the selected repository uses the same fill as a selected project.
- await f.evaluate(()=>openRepository('lgcode'));
- check(await f.evaluate(()=>{const h=document.querySelector('.repo-heading:has([data-open-repo="lgcode"])'),d=document.createElement('i');d.style.color='var(--color-selected)';document.body.append(d);const c=getComputedStyle(d).color;d.remove();return getComputedStyle(h).backgroundColor===c&&h.getBoundingClientRect().height>=28}),'The selected repository fills its whole row');
+ await f.evaluate(()=>openRepository('lgtm'));
+ check(await f.evaluate(()=>{const h=document.querySelector('.repo-heading:has([data-open-repo="lgtm"])'),d=document.createElement('i');d.style.color='var(--color-selected)';document.body.append(d);const c=getComputedStyle(d).color;d.remove();return getComputedStyle(h).backgroundColor===c&&h.getBoundingClientRect().height>=28}),'The selected repository fills its whole row');
  // TOP-1: every place in the top bar opens.
  await f.evaluate(()=>openAgent('rowan','workspace'));
  check(await f.locator('#breadcrumb button').count()===3,'The repository, project, and team in the top bar are buttons');
  await at('#breadcrumb [data-crumb-team]').click();check(await f.evaluate(()=>state.view==='chat'&&state.teamId==='app-shell'&&!state.agentId),'The team in the top bar opens the team');
  await at('#breadcrumb [data-crumb-project]').click();check(await f.evaluate(()=>state.view==='board'&&state.projectId==='workspace'),'The project in the top bar opens its board');
- await at('#breadcrumb [data-crumb-repo]').click();check(await f.evaluate(()=>state.view==='repository'&&state.repoId==='lgcode'),'The repository in the top bar opens its projects');
+ await at('#breadcrumb [data-crumb-repo]').click();check(await f.evaluate(()=>state.view==='repository'&&state.repoId==='lgtm'),'The repository in the top bar opens its projects');
  // TOP-2 and PICKER-1: the picker says Inspecting, points down, and lists one line per worktree.
  await f.evaluate(()=>openBoard('workspace'));
  check((await txt('.context-label'))==='Inspecting'&&(await at('#context-toggle svg:last-child').innerHTML()).includes('m6 9 6 6 6-6'),'The picker says Inspecting and its chevron points down');
@@ -464,7 +463,7 @@ await run('application shell',async()=>{
 
 // Connection, the bell, and empty states, from the designer's critique of 2026-11-06. The connection itself is in operations-checks.
 await run('bell, terminal notice, and empty states',async()=>{
- const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgtmReady);return p};
  // TERM-3: the reconnect notice sits in the terminal's own bar, so the grid keeps its rows.
  const f=await fresh();await f.evaluate(()=>{openBoard('workspace');document.querySelector('[data-main-view="terminal"]').click()});await f.evaluate(async()=>{const s=getComputedStyle(document.querySelector('#terminal-screen'));await document.fonts.load(s.fontSize+' '+s.fontFamily)});await f.waitForTimeout(150);
  const size=await f.locator('#terminal-size').textContent();
@@ -493,7 +492,7 @@ await run('bell, terminal notice, and empty states',async()=>{
 
 // STATUS-3 and HOME-8: one request block for questions, approvals, and failed starts, in threads and on Home.
 await run('request block',async()=>{
- const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgtmReady);return p};
  for(const theme of ['light','dark'])for(const width of [390,1440]){const t=await fresh('',{width,height:900});await t.evaluate(x=>setTheme(x),theme);
   const tone=v=>t.evaluate(v=>{const d=document.createElement('i');d.style.color=v;document.body.append(d);const c=getComputedStyle(d).color;d.remove();return c},v);
   const shape=async(agent,project)=>{await t.evaluate(([a,p])=>openAgent(a,p),[agent,project]);await t.waitForTimeout(60);return t.locator('#view-body .request').first().evaluate(e=>{const r=e.getBoundingClientRect(),turn=document.querySelector('#view-body .turn:not(.user-turn)')?.getBoundingClientRect()||document.querySelector('#view-body').getBoundingClientRect(),s=getComputedStyle(e);return {left:Math.round(r.left),width:Math.round(r.width),turnLeft:Math.round(turn.left),turnWidth:Math.round(turn.width),rule:s.borderLeftStyle+' '+s.borderLeftWidth,ruleColor:s.borderLeftColor,top:s.borderTopStyle,label:e.querySelector('.request-label').textContent,labelColor:getComputedStyle(e.querySelector('.request-label')).color}})};
@@ -512,7 +511,7 @@ await run('request block',async()=>{
 
 // COMP-1, COMP-3 to COMP-6, THREAD-3 to THREAD-6, BOARD-4, and CTX-1: the composer, Add context, and what a thread shows besides messages.
 await run('composer and threads',async()=>{
- const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgtmReady);return p};
  const t=await fresh();const at=s=>t.locator(s).first();
  const shape=()=>t.evaluate(()=>{const f=document.querySelector('#message-form').getBoundingClientRect(),w=getComputedStyle(document.querySelector('#composer-wrap'));return {height:Math.round(f.height),rule:w.borderTopWidth+' '+w.borderTopStyle,tools:!!document.querySelector('#message-form .composer-tools #send-message')}});
  await t.evaluate(()=>openAgent('iris','workspace'));await t.waitForTimeout(40);const chat=await shape();
@@ -583,7 +582,7 @@ await run('composer and threads',async()=>{
 });
 
 await run('board, sprint, task, tables, and wide screens',async()=>{
- const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgtmReady);return p};
  const t=await fresh();const at=s=>t.locator(s).first();
  // BOARD-1, BOARD-2, and BOARD-3
  await t.evaluate(()=>openBoard('workspace'));await t.waitForTimeout(40);
@@ -617,7 +616,7 @@ await run('board, sprint, task, tables, and wide screens',async()=>{
  await t.evaluate(()=>openHome('projects'));await t.waitForTimeout(40);
  const all=await t.evaluate(()=>({max:Math.max(...[...document.querySelectorAll('.project-table tbody tr')].map(r=>r.getBoundingClientRect().height)),heads:[...document.querySelectorAll('.project-table th')].map(h=>h.textContent)}));
  check(all.max<=46&&all.heads.includes('Lead')&&all.heads.includes('Branch'),'ROW-1: All projects rows are one line of at most 46 pixels, with lead and branch columns: '+JSON.stringify(all));
- await t.evaluate(()=>openRepository('lgcode'));await t.waitForTimeout(40);
+ await t.evaluate(()=>openRepository('lgtm'));await t.waitForTimeout(40);
  const repo=await t.evaluate(()=>({table:!!document.querySelector('#view-body .project-table'),max:Math.max(...[...document.querySelectorAll('.project-table tbody tr')].map(r=>r.getBoundingClientRect().height)),heads:[...document.querySelectorAll('.project-table th')].map(h=>h.textContent),text:document.querySelector('#main').textContent,recovery:document.querySelector('[data-project-inbox="recovery"]').textContent}));
  check(repo.table&&repo.max<=46&&!repo.heads.includes('Repository')&&repo.heads.includes('Stage'),'REPO-1: the repository page is the All projects table with the repository filtered: '+JSON.stringify(repo.heads));
  check(!repo.text.includes('One lead per project')&&!repo.text.includes('Each has its own lead')&&!repo.text.includes('Next step')&&repo.recovery.startsWith('Needs attention'),'REPO-1: no filler, and a project with a failed agent says Needs attention');
@@ -651,7 +650,7 @@ await run('board, sprint, task, tables, and wide screens',async()=>{
 });
 
 await run('git and the terminal',async()=>{
- const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const fresh=async(path='',size={width:1440,height:900})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgtmReady);return p};
  // GIT-2: 20 pixel diff rows, a 40 pixel worktree rail below 1600 pixels, and a commit pane that resizes from the keyboard.
  const g=await fresh();const at=s=>g.locator(s).first();
  await g.evaluate(()=>openBoard('workspace'));await at('[data-main-view="source-control"]').click();
@@ -659,7 +658,7 @@ await run('git and the terminal',async()=>{
  check(row.h===20&&row.pad==='0px 0px','GIT-2: diff rows are 20 pixels with no row padding: '+JSON.stringify(row));
  check(Math.round((await at('.worktree-navigation').evaluate(e=>e.getBoundingClientRect().width)))===40&&await at('.worktree-navigation .wt-text').isHidden(),'GIT-2: below 1600 pixels the worktree list starts as a 40 pixel rail');
  await at('#worktree-fold').click();check(Math.round(await at('.worktree-navigation').evaluate(e=>e.getBoundingClientRect().width))===240&&await at('.worktree-navigation .wt-text').isVisible(),'GIT-2: the fold button opens the worktree list');
- await g.reload();await g.waitForFunction(()=>window.lgcodeReady);await g.evaluate(()=>openBoard('workspace'));await at('[data-main-view="source-control"]').click();
+ await g.reload();await g.waitForFunction(()=>window.lgtmReady);await g.evaluate(()=>openBoard('workspace'));await at('[data-main-view="source-control"]').click();
  check(await at('#worktree-fold').getAttribute('aria-expanded')==='true','GIT-2: the browser remembers the open worktree list');
  const pane=()=>at('.git-changes').evaluate(e=>Math.round(e.getBoundingClientRect().width));
  await at('#git-resize').focus();await g.keyboard.press('ArrowRight');check(await pane()===296&&await at('#git-resize').getAttribute('aria-valuenow')==='296','GIT-2: the arrow keys resize the commit pane');
@@ -719,7 +718,7 @@ await run('git and the terminal',async()=>{
 // The service pages and project pages, from the designer's critique: Machines, Project settings, and New project.
 await run('machines, project settings, and new project',async()=>{
  const f=await browser.newPage({viewport:{width:1440,height:900}});f.setDefaultTimeout(4000);f.on('pageerror',e=>errors.push(e.message));
- await f.goto(url+'?sample=heavy');await f.waitForFunction(()=>window.lgcodeReady);
+ await f.goto(url+'?sample=heavy');await f.waitForFunction(()=>window.lgtmReady);
  const sys=v=>f.evaluate(s=>document.querySelector(`[data-system-page="${s}"]`).click(),v);
  // MACH-2: overload, last seen, and a row menu.
  await sys('machines');
@@ -764,7 +763,7 @@ await run('machines, project settings, and new project',async()=>{
 
 // The phone, from the designer's critique: TOP-3, PHONE-1, PHONE-2, and PHONE-3, and the last leftovers.
 await run('phone',async()=>{
- const fresh=async(path='',size={width:390,height:844})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgcodeReady);return p};
+ const fresh=async(path='',size={width:390,height:844})=>{const p=await browser.newPage({viewport:size});p.setDefaultTimeout(4000);p.on('pageerror',e=>errors.push(e.message));await p.goto(url+path);await p.waitForFunction(()=>window.lgtmReady);return p};
  const m=await fresh();
  // TOP-3
  await m.evaluate(()=>openBoard('workspace'));await m.waitForTimeout(40);
@@ -774,7 +773,7 @@ await run('phone',async()=>{
  await m.evaluate(()=>openAgent('rowan','workspace'));await m.waitForTimeout(40);
  check(await m.evaluate(()=>[...document.querySelectorAll('#breadcrumb > *')].filter(e=>e.getBoundingClientRect().width>0).map(e=>e.textContent).join())==='Build team'&&(await m.locator('#view-title').textContent())==='Rowan','TOP-3: inside a team the top bar names the team, and Chat’s line names the agent');
  await m.evaluate(()=>document.querySelector('[data-preview="reconnect"]').click());await m.waitForTimeout(40);
- check(await m.locator('#bell-dot').evaluate(e=>e.classList.contains('wait'))&&(await m.locator('#attention-toggle').getAttribute('aria-label')).endsWith('LGcode is reconnecting')&&await m.locator('#connection-status').isHidden(),'TOP-3: a lost connection turns the bell’s dot amber, and the bell’s name says so');
+ check(await m.locator('#bell-dot').evaluate(e=>e.classList.contains('wait'))&&(await m.locator('#attention-toggle').getAttribute('aria-label')).endsWith('LGTM Studio is reconnecting')&&await m.locator('#connection-status').isHidden(),'TOP-3: a lost connection turns the bell’s dot amber, and the bell’s name says so');
  await m.locator('#attention-toggle').click();
  check(await m.locator('#attention-menu #connection-state').isVisible()&&(await m.locator('#connection-state').textContent())==='Reconnecting'&&await m.locator('#attention-menu #retry-connection').isVisible()&&(await m.locator('#retry-connection').textContent()).includes('Reconnect now'),'TOP-3: the bell opens the full connection state with Reconnect now');
  await m.locator('#retry-connection').click();await m.waitForTimeout(40);check(await m.locator('#bell-dot').evaluate(e=>!e.classList.contains('wait')&&!e.classList.contains('error')),'TOP-3: Reconnect now from the bell brings the dot back to Live');

@@ -32,8 +32,8 @@ const payloads = {
 it("5.10 startup disables the board only for the explicit setting", () => {
   registerRebuildCheck({ noLog: true });
   expect(boardEnabledAtStartup({})).toBe(true);
-  expect(boardEnabledAtStartup({ LGCODE_BOARD_DISABLED: "0" })).toBe(true);
-  expect(boardEnabledAtStartup({ LGCODE_BOARD_DISABLED: "1" })).toBe(false);
+  expect(boardEnabledAtStartup({ LGTM_BOARD_DISABLED: "0" })).toBe(true);
+  expect(boardEnabledAtStartup({ LGTM_BOARD_DISABLED: "1" })).toBe(false);
 });
 
 it("5.10 every disabled board command returns its public reason on the socket and logged-in web transport", async () => withWeb((ctx) => Effect.gen(function* () {

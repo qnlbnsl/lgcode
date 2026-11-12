@@ -1,5 +1,5 @@
 ---
-target: Shephrd chat, project board, project leads and attention routing
+target: LGTM Studio chat, project board, project leads and attention routing
 total_score: 23
 max_score: 40
 na_heuristics: 
@@ -65,7 +65,7 @@ those and replace the weak project and conversation structures.
    opens the first team, and later clicks restore arbitrary prior views.
    Make the named project open its lead conversation consistently. Give it
    a stable Board destination and teams beneath it. Use distinct sample
-   project names so Shephrd is clearly the app. Multiple leads need explicit
+   project names so LGTM Studio is clearly the app. Multiple leads need explicit
    ownership rather than several interchangeable orchestrators.
    Source: design/workbench.html:152, :169, :198. Suggested route:
    /impeccable clarify and /impeccable layout.

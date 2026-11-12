@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgtm/contracts";
 import * as Clock from "effect/Clock";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";

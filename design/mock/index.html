@@ -23,7 +23,7 @@
   // Set the colour mode before the first paint, so the page never flashes the other one.
   (function () {
     var t = 'system', d = 'compact';
-    try { t = JSON.parse(localStorage.getItem('lgcode-mock:theme')) || t; d = JSON.parse(localStorage.getItem('lgcode-mock:density')) || d; } catch (e) {}
+    try { t = JSON.parse(localStorage.getItem('lgtm-mock:theme')) || t; d = JSON.parse(localStorage.getItem('lgtm-mock:density')) || d; } catch (e) {}
     var dark = t === 'dark' || (t === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
     document.documentElement.dataset.density = d;

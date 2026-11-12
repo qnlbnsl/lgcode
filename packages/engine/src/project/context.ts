@@ -1,4 +1,4 @@
-import { ContextPath, ContextReferences, type Caller, type ContextReference, type ContextSearchResult } from "@lgcode/contracts"
+import { ContextPath, ContextReferences, type Caller, type ContextReference, type ContextSearchResult } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { agentReadReply, type ReadHandler } from "../api/reads.ts"

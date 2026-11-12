@@ -9,7 +9,7 @@ import type { designDisplay } from "../../../project/display.ts"
 export const openPencilCommit = "cb717376a6252b0387f95d1e8bf33a0b196eb9bf"
 type RegisteredDesign = Effect.Success<ReturnType<typeof designDisplay>>
 
-// Original LGcode launch configuration for the existing pinned browser build
+// Original LGTM Studio launch configuration for the existing pinned browser build
 // layout (/srv/editor), inspected in design/openpencil read-only. This module
 // copies no upstream launcher code. The image's browser app is OpenPencil's;
 // see third_party/open-pencil/README.md. No build, pull or sample fallback.
@@ -17,11 +17,11 @@ export const openPencilLaunch = (options: {
   readonly image: string; readonly folder: string; readonly socketDirectory: string
   readonly name: string; readonly uid: number; readonly gid: number
 }) => {
-  if (options.image !== openPencilImage || !/^lgcode-editor-[a-f0-9-]{36}$/.test(options.name)
+  if (options.image !== openPencilImage || !/^lgtm-editor-[a-f0-9-]{36}$/.test(options.name)
     || [options.folder, options.socketDirectory].some((path) => !isAbsolute(path) || /[,\r\n\0]/u.test(path))
     || !Number.isInteger(options.uid) || options.uid <= 0 || !Number.isInteger(options.gid) || options.gid < 0) throw new Error("editor launch configuration refused")
   const config = { admin: { disabled: true, config: { persist: false } }, apps: { http: { servers: { editor: {
-    listen: ["unix//run/lgcode/editor.sock|0600"], automatic_https: { disable: true }, routes: [
+    listen: ["unix//run/lgtm/editor.sock|0600"], automatic_https: { disable: true }, routes: [
       { match: [{ path: ["/files/*"] }], handle: [{ handler: "file_server", root: "/" }], terminal: true },
       { handle: [{ handler: "file_server", root: "/srv/editor", index_names: ["index.html"] }] }
     ]
@@ -30,7 +30,7 @@ export const openPencilLaunch = (options: {
     "--cap-drop", "ALL", "--cap-add", "NET_BIND_SERVICE", "--security-opt", "no-new-privileges", "--user", `${options.uid}:${options.gid}`,
     "--pids-limit", "64", "--memory", "256m", "--cpus", "1", "--log-driver", "none",
     "--mount", `type=bind,src=${options.folder},dst=/files,readonly`,
-    "--mount", `type=bind,src=${options.socketDirectory},dst=/run/lgcode`,
+    "--mount", `type=bind,src=${options.socketDirectory},dst=/run/lgtm`,
     "--entrypoint", "caddy", "--interactive", options.image, "run", "--config", "-"], stdin: JSON.stringify(config) }
 }
 
@@ -42,7 +42,7 @@ export const launchOpenPencil = async (design: RegisteredDesign, options: { read
     || await realpath(design.folder) !== design.folder) throw new Error("editor runtime unavailable")
   const directory = await mkdtemp(join(tmpdir(), "lg-editor-"))
   await chmod(directory, 0o700)
-  const name = `lgcode-editor-${randomUUID()}`
+  const name = `lgtm-editor-${randomUUID()}`
   const docker = ["--host", `unix://${options.dockerSocket}`]
   const environment = { PATH: "/usr/bin:/bin", HOME: directory, DOCKER_CONFIG: directory }
   let launch: ReturnType<typeof openPencilLaunch>
@@ -90,4 +90,4 @@ export const launchOpenPencil = async (design: RegisteredDesign, options: { read
 }
 // The owner-selected local name and tag, inspected on every launch. Runtime
 // never pulls or substitutes another image. See third_party/open-pencil/BUILD.md.
-export const openPencilImage = "lgcode-openpencil:w10b-cb71737-build1"
+export const openPencilImage = "lgtm-openpencil:w10b-cb71737-build1"

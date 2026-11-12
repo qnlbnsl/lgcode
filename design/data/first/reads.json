@@ -77,7 +77,7 @@
     ],
     "repositories": []
    },
-   "failed": {"failure": "LGcode could not read this computer's folders, because the service has no permission to open ~/projects."}
+   "failed": {"failure": "LGTM Studio could not read this computer's folders, because the service has no permission to open ~/projects."}
   }
  },
  "settings": {

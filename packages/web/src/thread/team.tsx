@@ -1,6 +1,6 @@
 import { useConversation, useShellData } from "../data/ShellDataProvider.tsx"
 import { useEffect, useState } from "react"
-import type { BoardPost, ChannelId, ProjectId, TeamId } from "@lgcode/contracts"
+import type { BoardPost, ChannelId, ProjectId, TeamId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { requestId, withClient } from "./client.ts"
 import { Composer } from "./composer.tsx"

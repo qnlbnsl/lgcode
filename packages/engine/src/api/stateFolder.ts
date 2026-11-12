@@ -2,10 +2,10 @@ import { lstatSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 export const stateFolder = (environment: Record<string, string | undefined>): string => {
-  if (environment.LGCODE_HOME !== undefined) return resolve(environment.LGCODE_HOME);
-  if (environment.XDG_STATE_HOME !== undefined) return resolve(environment.XDG_STATE_HOME, "lgcode");
+  if (environment.LGTM_HOME !== undefined) return resolve(environment.LGTM_HOME);
+  if (environment.XDG_STATE_HOME !== undefined) return resolve(environment.XDG_STATE_HOME, "lgtm");
   if (environment.HOME === undefined) throw new Error("home folder is unavailable");
-  return resolve(environment.HOME, ".local/state/lgcode");
+  return resolve(environment.HOME, ".local/state/lgtm");
 };
 
 // No repair of unsafe permissions: fail before creating the lock, credential

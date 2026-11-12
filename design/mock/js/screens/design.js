@@ -64,10 +64,10 @@ const FLOWS = [
   ['Mocks', [F('Screens', null, '/p/phone/mocks'), F('Screen', null, '/p/phone/mocks/screen/requests'), F('Changes', null, '/p/phone/mocks/changes'), F('Data', null, '/p/phone/mocks/data'), F('Components', null, '/p/phone/mocks/components')]],
   ['Conversations', [F('Chat', null, '/p/console/chat'), F('Chat', 'Another agent', '/p/console/chat/shell-lead'), F('Messages', null, '/p/console/messages'), F('Messages', 'Waiting for a reply', '/p/console/messages/waiting'), F('Agents', null, '/p/console/agents')]],
   ['Code', [F('Terminal', null, '/p/console/terminal'), F('Git', 'Changes', '/p/console/git'), F('Git', 'History', null), F('Git', 'Conflicts', null), F('Merge review', null, null)]],
-  ['Repository', [F('Repository', null, '/r/lgcode'), F('Repository design', null, '/r/lgcode/design/palette/colour')]],
+  ['Repository', [F('Repository', null, '/r/lgtm'), F('Repository design', null, '/r/lgtm/design/palette/colour')]],
   ['Service', [F('Machines', null, '/machines'), F('Pair machine', null, null), F('Add repository', null, null), F('Subscriptions', null, '/subscriptions'), F('Add subscription', null, null), F('Phone notifications', null, '/notifications'), F('Service settings', null, '/settings')]],
 ];
-// Components by group. "file" marks the components that are in design/lgcode.fig today,
+// Components by group. "file" marks the components that are in design/lgtm.fig today,
 // with their variants as rows by columns.
 const C = (name, demo, file) => ({ name, demo, file });
 const GROUPS = [
@@ -82,7 +82,7 @@ const GROUPS = [
   ['Agents', [C('Avatar', 'avatar'), C('Agent row', 'agentrow', { rows: [''], cols: ['Waiting', 'Running', 'Idle'], prop: ['', 'Status'] }), C('Agent line', 'agentline'), C('Message', 'message'), C('Composer', 'composer'), C('Request block', 'request'), C('Tool line', 'toolline')]],
   ['Code', [C('Diff', 'diff'), C('Terminal line', 'term')]],
 ];
-// The colours that design/lgcode.fig holds today, and the two whose values still agree.
+// The colours that design/lgtm.fig holds today, and the two whose values still agree.
 const FILE_COLORS = new Set(['bg', 'surface', 'raised', 'sidebar', 'text', 'muted', 'primary', 'primary-contrast', 'accent', 'success', 'warn', 'error', 'focus', 'line', 'selected']);
 const AGREE = new Set(['surface', 'primary-contrast']);
 const COLOUR_GROUPS = [['Surfaces', /^(sidebar|bg|surface|raised|sunken|line|line-strong|scrim)$/], ['Text', /^(text|muted|faint)$/], ['Action', /^(primary|focus|selected|accent)/], ['States', /^(success|warn|error|info)/], ['Diff', /^(add|del)-/], ['Terminal', /^term-/]];
@@ -131,8 +131,8 @@ function Demo({ kind }) {
     case 'navrow': return html`<span class="nav-item" style="width:220px"><${Icon} name="house" size=${15} /><span>Home</span><span class="count warn">6</span></span>`;
     case 'treerow': return html`<span class="dz-tree"><${Icon} name="chevron-down" size=${12} class="faint" /><${Icon} name="users" size=${13} class="faint" /><span class="grow">Build team · Shell</span><span class="warn-text">1</span></span>`;
     case 'tabs': return html`<span class="dz-tabs"><span class="on">Board</span><span>Workflow</span><span>Chat</span><span>Git</span></span>`;
-    case 'crumbs': return html`<span class="row" style="gap:6px"><span class="mono muted">lgcode</span><${Icon} name="chevron-right" size=${12} class="faint" /><b style="font-weight:var(--weight-medium)">Agent console</b></span>`;
-    case 'topbar': return html`<span class="dz-topbar"><span class="mono muted">lgcode</span><b>Agent console</b><span class="grow"></span><${Icon} name="bell" size=${15} /><i class="dot working"></i><span>Live</span></span>`;
+    case 'crumbs': return html`<span class="row" style="gap:6px"><span class="mono muted">lgtm</span><${Icon} name="chevron-right" size=${12} class="faint" /><b style="font-weight:var(--weight-medium)">Agent console</b></span>`;
+    case 'topbar': return html`<span class="dz-topbar"><span class="mono muted">lgtm</span><b>Agent console</b><span class="grow"></span><${Icon} name="bell" size=${15} /><i class="dot working"></i><span>Live</span></span>`;
     case 'menu': return html`<span class="dz-menu"><span>Rename</span><span>Archive</span><span class="sep"></span><span class="error-text">Delete</span></span>`;
     case 'dialog': return html`<span class="dz-dialog"><b>Archive Agent console?</b><span class="muted">Its agents stop. Nothing is deleted.</span><span class="row" style="justify-content:flex-end;gap:6px"><span class="btn sm">Cancel</span><span class="btn sm primary">Archive</span></span></span>`;
     case 'toast': return html`<span class="dz-toast"><${Icon} name="circle-check" size=${14} class="success-text" />Project archived<span class="link">Undo</span></span>`;
@@ -141,11 +141,11 @@ function Demo({ kind }) {
     case 'tag': return html`<span class="row" style="gap:4px"><span class="tag">SP-03</span><span class="tag">a41c0d2</span></span>`;
     case 'meter': return html`<span class="dz-meter"><i style="width:41%"></i></span>`;
     case 'progress': return html`<span class="progress" style="width:180px;height:6px;display:flex;gap:2px"><i style="flex:1"></i><i style="flex:1"></i><i class="active" style="flex:1"></i><i style="flex:1;background:transparent"></i></span>`;
-    case 'callout': return html`<span class="callout" style="width:300px"><${Icon} name="info" size=${14} /><span>Saved to .lgcode/config.</span></span>`;
+    case 'callout': return html`<span class="callout" style="width:300px"><${Icon} name="info" size=${14} /><span>Saved to .lgtm/config.</span></span>`;
     case 'empty': return html`<span class="dz-empty">No findings</span>`;
     case 'table': return html`<table class="table" style="width:300px"><thead><tr><th>Finding</th><th>Severity</th></tr></thead><tbody><tr><td class="mono muted">F-09</td><td>Major</td></tr><tr><td class="mono muted">F-10</td><td>Minor</td></tr></tbody></table>`;
     case 'listrow': return html`<span class="list-row" style="width:300px"><i class="dot waiting"></i><b style="font-weight:var(--weight-medium)">Build lead</b><span class="muted grow truncate">Waiting for your answer</span></span>`;
-    case 'dl': return html`<dl class="dl" style="width:280px"><dt>Remote</dt><dd class="mono">github.com/qnlbnsl/lgcode</dd><dt>Base branch</dt><dd class="mono">master</dd></dl>`;
+    case 'dl': return html`<dl class="dl" style="width:280px"><dt>Remote</dt><dd class="mono">github.com/qnlbnsl/lgtm-studio</dd><dt>Base branch</dt><dd class="mono">master</dd></dl>`;
     case 'kbd': return html`<span class="row" style="gap:4px"><kbd>Ctrl</kbd><kbd>K</kbd><kbd>Esc</kbd></span>`;
     case 'avatar': return html`<span class="row" style="gap:6px"><span class="avatar lead"><${Icon} name="crown" size=${13} /></span><span class="avatar"><${Icon} name="flag" size=${13} /></span><span class="avatar"><${Icon} name="hammer" size=${13} /></span><span class="avatar"><${Icon} name="eye" size=${13} /></span></span>`;
     case 'agentline': return html`<span class="row" style="gap:6px"><span class="avatar sm"><${Icon} name="flag" size=${12} /></span><b style="font-weight:var(--weight-medium)">Build lead</b><span class="muted">· Shell</span></span>`;
@@ -154,7 +154,7 @@ function Demo({ kind }) {
     case 'request': return html`<span class="dz-req"><span class="warn-text" style="font-weight:var(--weight-medium)">Question</span><b>Where should an agent's thread open?</b><span class="row" style="gap:6px"><span class="btn sm"><${Icon} name="check" size=${12} />Accept recommendation</span><span class="btn sm ghost">Open thread</span></span></span>`;
     case 'toolline': return html`<span class="dz-tool"><${Icon} name="wrench" size=${13} class="faint" />Read 14 files · searched 3 times<${Icon} name="chevron-right" size=${13} class="faint" /></span>`;
     case 'diff': return html`<span class="dz-diff"><span class="del">- .sidebar.folded { width: 56px; }</span><span class="add">+ .rail { width: 48px; }</span></span>`;
-    case 'term': return html`<span class="dz-term"><span class="g">~/projects/lgcode</span> <span>pnpm test</span></span>`;
+    case 'term': return html`<span class="dz-term"><span class="g">~/projects/lgtm-studio</span> <span>pnpm test</span></span>`;
     default: return null;
   }
 }

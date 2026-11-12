@@ -1,5 +1,5 @@
-import { EventEnvelope } from "@lgcode/contracts";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import { EventEnvelope } from "@lgtm/contracts";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";

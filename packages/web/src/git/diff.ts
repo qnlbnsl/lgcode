@@ -1,4 +1,4 @@
-import type { GitDiff } from "@lgcode/contracts"
+import type { GitDiff } from "@lgtm/contracts"
 
 export type Diff = typeof GitDiff.Type
 export interface DiffLine { readonly kind: "context" | "added" | "removed"; readonly text: string; readonly old: number | null; readonly next: number | null; readonly noNewline?: boolean }

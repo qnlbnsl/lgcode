@@ -1,4 +1,4 @@
-import { ChoiceId, type AgentChoice, type AgentChoices, type ChoiceList } from "@lgcode/contracts";
+import { ChoiceId, type AgentChoice, type AgentChoices, type ChoiceList } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type { ConfigOption } from "./config.ts";

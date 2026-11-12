@@ -12,7 +12,7 @@ const repoRoot = fileURLToPath(new URL("../../../../", import.meta.url));
 const checker = join(repoRoot, "scripts/check-credits.sh");
 const scratch: string[] = [];
 const makeScratch = (): string => {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "lgcode-credits-names-")));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "lgtm-credits-names-")));
   scratch.push(root);
   return root;
 };

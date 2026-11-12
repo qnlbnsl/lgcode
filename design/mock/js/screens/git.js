@@ -16,7 +16,7 @@ const DIFFS = {
 +import { Rail } from './Rail';
 +import { useAttention } from './useAttention';
  import { ProjectTree } from './ProjectTree';
- import type { Project } from '@lgcode/api';
+ import type { Project } from '@lgtm/api';
 
 @@ -18 +19 @@ export function Sidebar({ projects, current }: SidebarProps) {
    const [folded, setFolded] = useState(readFolded);
@@ -83,7 +83,7 @@ const DIFFS = {
 +}`,
   useAttention: `@@ -0 +1 @@
 +import { useMemo } from 'react';
-+import type { Project } from '@lgcode/api';
++import type { Project } from '@lgtm/api';
 +
 +export interface Attention {
 +  total: number;
@@ -106,7 +106,7 @@ const DIFFS = {
 +  }, [projects]);
 +}`,
   rail: `@@ -1 +1 @@
- import type { Project } from '@lgcode/api';
+ import type { Project } from '@lgtm/api';
 +import type { Attention } from './useAttention';
 
 -interface NavRailProps {
@@ -197,7 +197,7 @@ const POOL = {
   ts: ['const next = queue.shift();', 'if (!next) return;', 'await store.append(event);', 'return { ok: true, value };', 'export function resolve(id: string) {', '}', 'const key = id + ":" + revision;', 'for (const item of items) visit(item);', 'throw new NotFound(id);', 'log.debug("resolved", { id });'],
   css: ['display: flex;', 'gap: var(--space-2);', 'min-width: 0;', 'color: var(--color-muted);', 'border-radius: var(--radius-sm);', 'padding: 0 var(--inset);', '}', '.row:hover { background: var(--color-raised); }'],
   md: ['Each request names the agent that raised it.', 'The lead answers for its teams.', '', 'Run the full suite before a hand-over.', 'A fix sprint merges on its own after a passing run.', '## What changes for the owner', 'Nothing is merged into the base branch without approval.'],
-  json: ['"name": "@lgcode/web",', '"private": true,', '"type": "module",', '"test": "vitest run",', '"typecheck": "tsc --noEmit"', '},'],
+  json: ['"name": "@lgtm/web",', '"private": true,', '"type": "module",', '"test": "vitest run",', '"typecheck": "tsc --noEmit"', '},'],
   yaml: ["  '@types/node@26.1.0':", '    resolution: {integrity: sha512-9fT2k1mQp7Lw3xVbY0aZr8eH}', '    dependencies:', '      undici-types: 7.2.0', "  'vitest@4.0.3':", '    engines: {node: ">=24"}', '    dev: true'],
 };
 function synth(path, add, del, seed = 1, status = 'M') {
@@ -258,7 +258,7 @@ export function seedGit(state) {
   // Agent console: the rich one.
   const c = P('console');
   if (c) {
-    const root = repoOf(c).folders[c.machine] || '~/projects/lgcode';
+    const root = repoOf(c).folders[c.machine] || '~/projects/lgtm-studio';
     const nav = [
       commit('Merge feat/agent-console/shell: navigation foundation', 'console-lead', 1 * DAY + 2 * HOUR, [['packages/web/src/shell/NavRail.tsx', 'A', { add: 48 }], ['packages/web/src/shell/Sidebar.tsx', 'M', { add: 22, del: 30 }], ['packages/web/src/routes.ts', 'M', { add: 17, del: 5 }]], ['SP-01']),
       commit('Start the project from master', 'console-lead', 4 * DAY, [['docs/specs/agent-console.md', 'A', { add: 36 }]]),
@@ -284,7 +284,7 @@ export function seedGit(state) {
       commits: [
         commit('Count each open request once in the bell', 'shell-b2', 38 * MIN, [['packages/web/src/shell/Bell.tsx', 'M', { diff: 'bell' }], ['packages/web/src/shell/Bell.test.tsx', 'M', { add: 14, del: 2 }]], ['feat/agent-console/shell']),
         commit('Render the folded rail at 48 pixels', 'shell-b1', 1 * HOUR + 20 * MIN, [['packages/web/src/shell/NavRail.tsx', 'M', { add: 26, del: 11 }], ['packages/web/src/shell/sidebar.css', 'M', { add: 19, del: 4 }]]),
-        commit('Split SP-03 into four subitems', 'shell-lead', 2 * HOUR + 40 * MIN, [['.lgcode/sprints/SP-03.md', 'M', { add: 28, del: 3 }]]),
+        commit('Split SP-03 into four subitems', 'shell-lead', 2 * HOUR + 40 * MIN, [['.lgtm/sprints/SP-03.md', 'M', { add: 28, del: 3 }]]),
         commit('Remember the folded sidebar between visits', 'shell-b1', 3 * HOUR, [['packages/web/src/shell/Sidebar.tsx', 'M', { add: 15, del: 2 }], ['packages/web/src/shell/storage.ts', 'A', { add: 21 }]]),
         commit('Add the attention count fixture', 'shell-test', 3 * HOUR + 30 * MIN, [['packages/web/test/fixtures/attention.ts', 'A', { add: 40 }]]),
         ...nav,
@@ -357,7 +357,7 @@ export function seedGit(state) {
       ahead: merged ? 0 : p.id === 'apiref' ? 14 : 3, behind: 0, merged: merged ? Date.now() - 6 * DAY : null,
       commits: [
         commit(p.id === 'apiref' ? 'Redirect the old page addresses' : 'Merge the first sprint', lead, 3 * HOUR, [[p.id === 'apiref' ? 'redirects.json' : 'src/index.ts', p.id === 'apiref' ? 'A' : 'M', { add: 37, del: 0 }], ['README.md', 'M', { add: 6, del: 2 }]], [p.branch]),
-        commit('Write the plan and its statements', lead, 1 * DAY, [['.lgcode/plan.md', 'A', { add: 58 }]]),
+        commit('Write the plan and its statements', lead, 1 * DAY, [['.lgtm/plan.md', 'A', { add: 58 }]]),
       ],
     });
     for (const t of teams) {

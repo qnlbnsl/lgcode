@@ -2,9 +2,9 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { chmodSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import type { AgentId, EventEnvelope, RolesActionRecord } from "@lgcode/contracts";
-import { connect, type Client } from "@lgcode/client";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import type { AgentId, EventEnvelope, RolesActionRecord } from "@lgtm/contracts";
+import { connect, type Client } from "@lgtm/client";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Fiber from "effect/Fiber";
@@ -62,7 +62,7 @@ export const runFoundryRun = (options: { scenario?: "capacity" } = {}) => Effect
     chmodSync(rig.stateFolder, 0o700);
     const socket = join(rig.stateFolder, "foundry.sock");
     yield* serve({ socketPath: socket, ownerCredential: Redacted.make(secrets[0]!), debug: false });
-    const open = (token: string) => connect({ environment: { LGCODE_SOCKET: socket, LGCODE_TOKEN: token }, attempts: 1 });
+    const open = (token: string) => connect({ environment: { LGTM_SOCKET: socket, LGTM_TOKEN: token }, attempts: 1 });
     const owner = yield* open(secrets[0]!);
     const peerConnection = (token: string) => Effect.gen(function* () {
       const connection = yield* Scope.fork(scope);

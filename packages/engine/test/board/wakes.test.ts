@@ -1,12 +1,12 @@
 import { existsSync } from "node:fs";
 import { it } from "@effect/vitest";
-import type { BoardCompletion } from "@lgcode/contracts/board/schemas";
+import type { BoardCompletion } from "@lgtm/contracts/board/schemas";
 import type { Snapshot } from "../../src/commands/internal.ts";
 import { EventLog } from "../../src/log/EventLog.ts";
 import { Redactor } from "../../src/log/Redactor.ts";
 import * as SqlClient from "effect/sql/SqlClient";
-import type { Event } from "@lgcode/contracts";
-import { holdsIncoming, holdsUnsettled } from "@lgcode/contracts/board/conditions";
+import type { Event } from "@lgtm/contracts";
+import { holdsIncoming, holdsUnsettled } from "@lgtm/contracts/board/conditions";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import * as Deferred from "effect/Deferred";
@@ -28,7 +28,7 @@ import {
 } from "./wakeFixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const run = <A, E, R>(body: (credentials: Record<string, Credential>, runner: FakeRunner) => Effect.Effect<A, E, R>, states: Parameters<typeof seedBoard>[0] = {}) =>
   provideBoard(rig, (runner) => Effect.gen(function* () {

@@ -2,8 +2,8 @@ import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { Page } from "@playwright/test";
 import { expect } from "@playwright/test";
-import type { Client } from "@lgcode/client";
-import { EventEnvelope, type AgentId, type EventSequence, type Project, type RequestId } from "@lgcode/contracts";
+import type { Client } from "@lgtm/client";
+import { EventEnvelope, type AgentId, type EventSequence, type Project, type RequestId } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 
@@ -105,7 +105,7 @@ export async function webProject(page: Page, owner: Client, origin: string, step
     return rows;
   };
   await step("project: actual lead creates a linked sprint, task and owner question with supported tools", async () => {
-    const prompt = `Use only the installed lgcode MCP tools for this bounded proof, not shell commands or prose pretending to be tools. You are ${project.leadAgentId}, lead of project ${project.projectId}, assigned worktree ${project.worktreeId}. Call project.team.create with projectId, name "Proof team", worktreeId. Call project.sprint.create with projectId, label "LIVE-1", name "Provider decision", goal "Get the owner's linked decision", phase "Plan", owner your agent id, needs []. Call project.task.create with projectId, the returned teamId and sprintId, your worktreeId, owner your agent id, label "LIVE-TASK", title "Choose the existing contracts", state "active". Call ask with projectId, returned taskId and sprintId, title "Provider linked decision", text "May I use the existing contracts?", recommendation "Use the existing contracts". Do not answer it yourself, create other work, or finish the sprint. End your reply after asking. When the owner answer arrives, reply exactly OWNER_DECISION_RECEIVED and do not use tools.`;
+    const prompt = `Use only the installed lgtm MCP tools for this bounded proof, not shell commands or prose pretending to be tools. You are ${project.leadAgentId}, lead of project ${project.projectId}, assigned worktree ${project.worktreeId}. Call project.team.create with projectId, name "Proof team", worktreeId. Call project.sprint.create with projectId, label "LIVE-1", name "Provider decision", goal "Get the owner's linked decision", phase "Plan", owner your agent id, needs []. Call project.task.create with projectId, the returned teamId and sprintId, your worktreeId, owner your agent id, label "LIVE-TASK", title "Choose the existing contracts", state "active". Call ask with projectId, returned taskId and sprintId, title "Provider linked decision", text "May I use the existing contracts?", recommendation "Use the existing contracts". Do not answer it yourself, create other work, or finish the sprint. End your reply after asking. When the owner answer arrives, reply exactly OWNER_DECISION_RECEIVED and do not use tools.`;
     await page.getByRole("form", { name: "Prompt agent", exact: true }).getByRole("textbox").fill(prompt);
     await page.getByRole("button", { name: "Send prompt", exact: true }).click();
     await expect.poll(async () => (await run(owner["client.requests"]({ requestId: id(), after: 0 as EventSequence, limit: 200 }))).items

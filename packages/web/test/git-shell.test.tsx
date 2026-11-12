@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as Stream from "effect/Stream"
-import { ClientSnapshot } from "@lgcode/contracts"
+import { ClientSnapshot } from "@lgtm/contracts"
 import { afterEach, expect, it, vi } from "vitest"
 import { App } from "../src/app.tsx"
 import * as gitState from "../src/git/state.ts"
@@ -12,7 +12,7 @@ import { snapshot } from "./project-fixtures.ts"
 const browser = vi.hoisted(() => ({ client: {} as Record<string, unknown> }))
 // Substitute only the transport boundary. App, authentication transitions,
 // ShellDataProvider, watcher, Shell, GitPage and GitSession all mount normally.
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(browser.client) }
 })

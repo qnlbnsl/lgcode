@@ -1,5 +1,5 @@
 import { it } from "@effect/vitest";
-import { HarnessSettings } from "@lgcode/contracts";
+import { HarnessSettings } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import { afterEach, beforeEach, expect, vi } from "vitest";
@@ -20,7 +20,7 @@ let rig: Rig;
 beforeEach(() => {
   rig = makeRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+  vi.stubEnv("LGTM_HOME", rig.stateFolder);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

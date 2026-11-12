@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -58,7 +58,7 @@ it("FR-078 a failing piece cannot stop composed commands, adapter permissions, s
       beforeClose = state;
       stored = yield* sql`SELECT * FROM events ORDER BY sequence`;
     }), { rig, runner });
-    vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+    vi.stubEnv("LGTM_HOME", rig.stateFolder);
     const restarted = await Effect.runPromise(makeFakeRunner());
     await Effect.runPromise(provideRestart(rig, restarted.layer, Effect.gen(function* () {
       yield* registerRebuildCheck();

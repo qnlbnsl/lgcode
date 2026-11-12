@@ -1,5 +1,5 @@
 // Unit 1, criteria 1.6 and 1.7 and tasks 1a, 1d and 1f of
-// `.plans/plans/shepherd-engine/plan.md`: the committed workspace files declare
+// `.plans/plans/lgtm-engine/plan.md`: the committed workspace files declare
 // everything later units need, so no later unit edits the root manifest or the
 // lockfile (decisions rows 59 and 71).
 //
@@ -287,17 +287,17 @@ describe("herdr-plugin.toml (task 1f, criterion 1.4's input)", () => {
   })();
 
   const topLevel = sections[0]?.body ?? "";
-  const command = /^command\s*=\s*\[\s*"lgcode"\s*,\s*"serve"\s*,\s*"--detach"\s*\]\s*$/m;
+  const command = /^command\s*=\s*\[\s*"lgtm"\s*,\s*"serve"\s*,\s*"--detach"\s*\]\s*$/m;
 
-  it("identifies the plugin as lgcode 0.0.1 for Herdr 0.8.2 or newer on Linux only (breaks if a top-level field is missing or differs)", () => {
-    expect(topLevel).toMatch(/^id\s*=\s*"lgcode"\s*$/m);
-    expect(topLevel).toMatch(/^name\s*=\s*"LGcode"\s*$/m);
+  it("identifies the plugin as lgtm 0.0.1 for Herdr 0.8.2 or newer on Linux only (breaks if a top-level field is missing or differs)", () => {
+    expect(topLevel).toMatch(/^id\s*=\s*"lgtm"\s*$/m);
+    expect(topLevel).toMatch(/^name\s*=\s*"LGTM Studio"\s*$/m);
     expect(topLevel).toMatch(/^version\s*=\s*"0\.0\.1"\s*$/m);
     expect(topLevel).toMatch(/^min_herdr_version\s*=\s*"0\.8\.2"\s*$/m);
     expect(topLevel).toMatch(/^platforms\s*=\s*\[\s*"linux"\s*\]\s*$/m);
   });
 
-  it("starts the engine with `lgcode serve --detach` when Herdr starts (breaks if the [[startup]] entry is missing or runs another command)", () => {
+  it("starts the engine with `lgtm serve --detach` when Herdr starts (breaks if the [[startup]] entry is missing or runs another command)", () => {
     const startup = sections.filter((section) => section.header === "startup");
     expect(startup).toHaveLength(1);
     expect(startup[0]?.body).toMatch(command);

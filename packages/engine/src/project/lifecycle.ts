@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { dirname, join } from "node:path"
-import { ProjectCreation, ProjectId, RepositoryId, WorkspaceId, type Event } from "@lgcode/contracts"
+import { ProjectCreation, ProjectId, RepositoryId, WorkspaceId, type Event } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { freshRequest, refused, type Input, type Payload, type Planner, type Runtime } from "../commands/internal.ts"

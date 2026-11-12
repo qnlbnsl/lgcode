@@ -3,7 +3,7 @@
 The files in this folder come from [T3 Code](https://github.com/pingdotgg/t3code),
 copyright 2026 T3 Tools Inc., released under the MIT License. The licence
 text is in [LICENSE](LICENSE) next to this file, and it must stay there for as
-long as this code, or any code derived from it, is in LGcode.
+long as this code, or any code derived from it, is in LGTM Studio.
 
 ## Which files, and from where
 
@@ -19,13 +19,13 @@ its own; the only copyright line is in [LICENSE](LICENSE). If a copyright line i
 ever found in a copied file, the cell quotes it, and `scripts/check-credits.sh`
 then checks that the file still contains it.
 
-Each package also has a `package.json` and a `tsconfig.json` that LGcode
+Each package also has a `package.json` and a `tsconfig.json` that LGTM Studio
 wrote. They are not copied code and have no rows. Every package is named
-`@lgcode/t3-<folder>` and uses only dependencies from the workspace catalog.
+`@lgtm/t3-<folder>` and uses only dependencies from the workspace catalog.
 The security read of every file below is in [SECURITY-REVIEW.md](SECURITY-REVIEW.md).
 
-The 2026-11-08 rename updates the workspace package metadata, LGcode's own
-notes, and the names LGcode chose: the context keys, the temporary folder
+The 2026-11-08 rename updates the workspace package metadata, LGTM Studio's own
+notes, and the names LGTM Studio chose: the context keys, the temporary folder
 prefix, and the opening comment of the replay test. It leaves the code copied
 from T3 Code and its copyright lines unchanged.
 
@@ -52,27 +52,27 @@ from T3 Code and its copyright lines unchanged.
 | effect-acp | `effect-acp/src/schema.ts` | `packages/effect-acp/src/schema.ts` | none in original | Copied exactly. |
 | effect-acp | `effect-acp/test/fixtures/acp-mock-peer.ts` | `packages/effect-acp/test/fixtures/acp-mock-peer.ts` | none in original | Copied exactly. |
 | effect-acp | `effect-acp/test/fixtures/antigravity-initialize.json` | `packages/effect-acp/test/fixtures/antigravity-initialize.json` | none in original | Copied exactly. |
-| node-sqlite | `node-sqlite/src/nodeSqliteClient.ts` | `packages/shared/src/nodeSqliteClient.ts` | none in original | Two `worker.on("error")` handlers now turn the error into text with `cause instanceof Error ? cause.message : String(cause)`, because LGcode's Node.js type package (26) types that error as `unknown`; T3 Code uses version 24. The `Client.make` call now passes an `onCommitFailure` that runs `ROLLBACK` on the connection and counts "no transaction is active" as clean. If that `ROLLBACK` fails, the connection is poisoned and each later hand-out retries it first, following `makeSqliteAcquirers` in Effect. Nothing else changed. |
+| node-sqlite | `node-sqlite/src/nodeSqliteClient.ts` | `packages/shared/src/nodeSqliteClient.ts` | none in original | Two `worker.on("error")` handlers now turn the error into text with `cause instanceof Error ? cause.message : String(cause)`, because LGTM Studio's Node.js type package (26) types that error as `unknown`; T3 Code uses version 24. The `Client.make` call now passes an `onCommitFailure` that runs `ROLLBACK` on the connection and counts "no transaction is active" as clean. If that `ROLLBACK` fails, the connection is poisoned and each later hand-out retries it first, following `makeSqliteAcquirers` in Effect. Nothing else changed. |
 | node-sqlite | `node-sqlite/test/nodeSqliteClient.test.ts` | `packages/shared/src/nodeSqliteClient.test.ts` | none in original | The test runner import changed from `vite-plus/test` to `vitest`, and the import of the client changed from `./nodeSqliteClient.ts` to `../src/nodeSqliteClient.ts`, because the test moved to `test/`. |
 | provider-instance | `provider-instance/src/baseSchemas.ts` | `packages/contracts/src/baseSchemas.ts` | none in original | Excerpt: lines 1, 3 and 5-29 only (`TrimmedString`, `isNonBlank`, `TrimmedNonEmptyString`). The imports of `Option` and `SchemaGetter` were dropped because the excerpt does not use them. |
 | provider-instance | `provider-instance/src/ClaudeHome.ts` | `apps/server/src/provider/Drivers/ClaudeHome.ts` | none in original | Import lines only: `ClaudeSettings` now comes from `./settings.ts`, `expandHomePath` from `./pathExpansion.ts`, and `HostProcess` from `./HostProcess.ts`. |
 | provider-instance | `provider-instance/src/CodexHomeLayout.ts` | `apps/server/src/provider/Drivers/CodexHomeLayout.ts` | none in original | Import lines only: `ProviderDriverKind` now comes from `./providerInstance.ts`, `CodexSettings` from `./settings.ts`, `expandHomePath` from `./pathExpansion.ts`, and `HostProcess` from `./HostProcess.ts`. |
 | provider-instance | `provider-instance/src/CodexManagedHome.ts` | `apps/server/src/provider/CodexManagedHome.ts` | none in original | Import lines only: `ProviderInstanceId` now comes from `./providerInstance.ts`, `CodexSettings` from `./settings.ts`, and the layout from `./CodexHomeLayout.ts`. |
-| provider-instance | `provider-instance/src/HostProcess.ts` | `packages/shared/src/HostProcess.ts` | none in original | Written for LGcode from the T3 Code file. It keeps only `Platform`, `HomeDirectory` and `isWindows`. The context keys are `@lgcode/t3-host-process/Platform` and `@lgcode/t3-host-process/HomeDirectory`, shared with the copy in `provider-testing`, so that no `@t3tools` name remains. |
+| provider-instance | `provider-instance/src/HostProcess.ts` | `packages/shared/src/HostProcess.ts` | none in original | Written for LGTM Studio from the T3 Code file. It keeps only `Platform`, `HomeDirectory` and `isWindows`. The context keys are `@lgtm/t3-host-process/Platform` and `@lgtm/t3-host-process/HomeDirectory`, shared with the copy in `provider-testing`, so that no `@t3tools` name remains. |
 | provider-instance | `provider-instance/src/instanceEnvironment.ts` | `packages/provider-core/src/server/instanceEnvironment.ts` | none in original | Import lines only: `ProviderInstanceEnvironment` now comes from `./providerInstance.ts` and `HostProcess` from `./HostProcess.ts`. |
 | provider-instance | `provider-instance/src/pathExpansion.ts` | `packages/provider-core/src/server/pathExpansion.ts` | none in original | Copied exactly. |
 | provider-instance | `provider-instance/src/providerInstance.ts` | `packages/contracts/src/providerInstance.ts` | none in original | Copied exactly. |
 | provider-instance | `provider-instance/src/secretReference.ts` | `packages/contracts/src/secretReference.ts` | none in original | Copied exactly. |
-| provider-instance | `provider-instance/src/settings.ts` | `packages/contracts/src/settings.ts` | none in original | Written for LGcode. It holds small local types `CodexSettings` and `ClaudeSettings` with only the fields the copied code reads, in place of T3 Code's large settings-form schemas. |
+| provider-instance | `provider-instance/src/settings.ts` | `packages/contracts/src/settings.ts` | none in original | Written for LGTM Studio. It holds small local types `CodexSettings` and `ClaudeSettings` with only the fields the copied code reads, in place of T3 Code's large settings-form schemas. |
 | provider-instance | `provider-instance/test/CodexHomeLayout.test.ts` | `apps/server/src/provider/Drivers/CodexHomeLayout.test.ts` | none in original | Imports now point at `../src/CodexHomeLayout.ts`, `../src/settings.ts` and `./symlinks.ts`, because the test moved to `test/`. The `CodexSettings` schema decode became a small function that returns the local `CodexSettings` type with empty strings for missing fields. |
-| provider-instance | `provider-instance/test/symlinks.ts` | `packages/shared/src/testing/symlinks.ts` | none in original | The temporary folder prefix changed from `t3-symlink-probe-` to `lgcode-symlink-probe-`. Nothing else changed. |
+| provider-instance | `provider-instance/test/symlinks.ts` | `packages/shared/src/testing/symlinks.ts` | none in original | The temporary folder prefix changed from `t3-symlink-probe-` to `lgtm-symlink-probe-`. Nothing else changed. |
 | provider-testing | `provider-testing/src/baseSchemas.ts` | `packages/contracts/src/baseSchemas.ts` | none in original | Excerpt: lines 1, 3, 5-29 and 31 (`TrimmedString`, `isNonBlank`, `TrimmedNonEmptyString`, `NonNegativeInt`). |
 | provider-testing | `provider-testing/src/fakeCli.ts` | `packages/provider-testing/src/fakeCli.ts` | none in original | Import line only: `HostProcess` now comes from `./HostProcess.ts`. |
-| provider-testing | `provider-testing/src/HostProcess.ts` | `packages/shared/src/HostProcess.ts` | none in original | Written for LGcode from the T3 Code file. It keeps only `Platform`, with the same context key as the copy in `provider-instance`. |
+| provider-testing | `provider-testing/src/HostProcess.ts` | `packages/shared/src/HostProcess.ts` | none in original | Written for LGTM Studio from the T3 Code file. It keeps only `Platform`, with the same context key as the copy in `provider-instance`. |
 | provider-testing | `provider-testing/src/replaySchemas.ts` | `packages/contracts/src/orchestrationV2.ts` | none in original | Excerpt: lines 4176-4220, the replay transcript schemas, under a new import header (`effect/Schema` and `./baseSchemas.ts`). |
 | provider-testing | `provider-testing/src/replayTranscript.ts` | `packages/provider-testing/src/replayTranscript.ts` | none in original | Import line only: the schemas now come from `./replaySchemas.ts` instead of `@t3tools/contracts`. |
-| provider-testing | `provider-testing/test/fixtures/greeting.ndjson` | none, written for LGcode | none in original | Written for LGcode. A three-line replay transcript used by the test below. |
-| provider-testing | `provider-testing/test/replayTranscript.test.ts` | none, written for LGcode | none in original | Written for LGcode, because T3 Code has no unit test for these helpers. It covers decoding, fallback metadata, the four error cases, workspace placeholder replacement and reading a file URL. |
+| provider-testing | `provider-testing/test/fixtures/greeting.ndjson` | none, written for LGTM Studio | none in original | Written for LGTM Studio. A three-line replay transcript used by the test below. |
+| provider-testing | `provider-testing/test/replayTranscript.test.ts` | none, written for LGTM Studio | none in original | Written for LGTM Studio, because T3 Code has no unit test for these helpers. It covers decoding, fallback metadata, the four error cases, workspace placeholder replacement and reading a file URL. |
 | source-control | `source-control/src/mergeMessage.ts` | `packages/source-control-core/src/server/mergeMessage.ts` | none in original | Copied exactly. Moved from `mergeMessage.ts` at the top of this folder. |
 | source-control | `source-control/src/mergeMessage.test.ts` | `packages/source-control-core/src/server/mergeMessage.test.ts` | none in original | The test runner import changed from `vite-plus/test` to `vitest`. Its assertions are unchanged. Moved from `mergeMessage.test.ts` at the top of this folder. |
 
@@ -107,5 +107,5 @@ Code creates when it merges a pull request on GitHub, including auto-merge.
 It does not rewrite the original commits, so a plain merge or a rebase keeps
 their agent credits.
 
-How LGcode uses it is described in
+How LGTM Studio uses it is described in
 [docs/features.md](../../docs/features.md), section 6.

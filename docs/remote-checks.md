@@ -36,7 +36,7 @@ Each target first copies the working tree, including uncommitted changes.
 It prints the commit and the number of changed paths, so a result can be tied
 to the source it tested.
 Each working tree gets its own copy, named after its folder, under
-`~/Work/lgcode` on the other computer.
+`~/Work/lgtm-studio` on the other computer.
 The exit status is the remote command's.
 
 `remote-run` also syncs first, so it replaces edits made only in the remote
@@ -70,7 +70,7 @@ Every remote command runs on the processors its session may use, minus the
 last two.
 The owner's computer gives login sessions all 32 of its processors, so the
 tests run on 30.
-All remote commands also share one systemd slice, `lgcode-remote.slice`, which
+All remote commands also share one systemd slice, `lgtm-remote.slice`, which
 caps their combined memory at 80 gigabytes and turns off swap for them.
 Remote commands run without the session bus address.
 Otherwise Chromium moves its own processes into a systemd scope of its own,

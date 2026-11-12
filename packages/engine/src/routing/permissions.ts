@@ -1,4 +1,4 @@
-import { PermissionLevel, type Event } from "@lgcode/contracts";
+import { PermissionLevel, type Event } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 

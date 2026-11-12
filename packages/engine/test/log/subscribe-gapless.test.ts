@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { it } from "@effect/vitest";
 import {
   AccountId, AgentId, RequestId, type Actor, type Event, type EventEnvelope,
-} from "@lgcode/contracts";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+} from "@lgtm/contracts";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Deferred from "effect/Deferred";
 import type * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
@@ -28,8 +28,8 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
 let home: string;
 beforeEach(() => {
-  home = mkdtempSync("/tmp/lgcode-subscribe-");
-  vi.stubEnv("LGCODE_HOME", home);
+  home = mkdtempSync("/tmp/lgtm-subscribe-");
+  vi.stubEnv("LGTM_HOME", home);
 });
 afterEach(() => {
   vi.unstubAllEnvs();

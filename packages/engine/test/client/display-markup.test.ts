@@ -26,7 +26,7 @@ it("does not attach private scope to another origin, protocol-relative URL, data
 })
 
 it("rejects traversal, encoded separators, malformed paths and repository-selected session identities before URL normalization", () => {
-  for (const reference of ["../outside.svg", "/../outside.svg", "assets/../outside.svg", "%2e%2e/outside.svg", "/%2e%2e/outside.svg", "assets%2foutside.svg", "assets%5coutside.svg", "%252e%252e/outside.svg", "bad%00.svg", "bad%.svg", "bad%FF.svg", "bad\\name.svg", "/session/other/mark.svg", "/%73ession/other/mark.svg", "/api/private.svg", "mark.svg?__lgcode_display_session=other", "https://design.example/../outside.svg"]) {
+  for (const reference of ["../outside.svg", "/../outside.svg", "assets/../outside.svg", "%2e%2e/outside.svg", "/%2e%2e/outside.svg", "assets%2foutside.svg", "assets%5coutside.svg", "%252e%252e/outside.svg", "bad%00.svg", "bad%.svg", "bad%FF.svg", "bad\\name.svg", "/session/other/mark.svg", "/%73ession/other/mark.svg", "/api/private.svg", "mark.svg?__lgtm_display_session=other", "https://design.example/../outside.svg"]) {
     expect(() => scope(`<img src="${reference}">`)).toThrow("recorded resource address unavailable")
   }
   expect(() => scope('<img src="mark.svg" src="other.svg">')).toThrow("recorded resource address unavailable")

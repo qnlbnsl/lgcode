@@ -1,4 +1,4 @@
-import { EventEnvelope, type ProjectView } from "@lgcode/contracts"
+import { EventEnvelope, type ProjectView } from "@lgtm/contracts"
 import * as Schema from "effect/Schema"
 import { expect, it } from "vitest"
 import { apply, emptyViews } from "../../src/views/apply.ts"

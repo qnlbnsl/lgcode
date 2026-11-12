@@ -1,5 +1,5 @@
-import type { Client } from "@lgcode/client/browser"
-import type { AgentId, ChannelId, ContextReference, EventSequence, PostId, ProjectId, RequestId, TeamId, WorkspaceId } from "@lgcode/contracts"
+import type { Client } from "@lgtm/client/browser"
+import type { AgentId, ChannelId, ContextReference, EventSequence, PostId, ProjectId, RequestId, TeamId, WorkspaceId } from "@lgtm/contracts"
 
 export type ConversationIdentity =
   | { readonly _tag: "agent"; readonly agentId: AgentId }

@@ -1,6 +1,6 @@
 import type * as Effect from "effect/Effect";
 import * as Data from "effect/Data";
-import type { Caller, GitMutationIdentity } from "@lgcode/contracts";
+import type { Caller, GitMutationIdentity } from "@lgtm/contracts";
 
 export type GitFailureReason =
   | "invalid_path" | "not_repository" | "invalid_ref" | "output_limit" | "timeout" | "cancelled"

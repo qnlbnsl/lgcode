@@ -26,7 +26,7 @@ type History = Array<{ role: "user" | "agent"; text: string; repeat?: number }>;
 let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+  vi.stubEnv("LGTM_HOME", rig.stateFolder);
   vi.stubEnv("HOME", rig.home);
   vi.stubEnv("CODEX_HOME", `${rig.home}/.codex`);
 });

@@ -1,4 +1,4 @@
-import { parseRole, type Actor, type AgentId, type EventSequence, type RolesSettings } from "@lgcode/contracts";
+import { parseRole, type Actor, type AgentId, type EventSequence, type RolesSettings } from "@lgtm/contracts";
 import type { AgentRoles, RolesView } from "../../view.ts";
 import type { NoticeAction } from "../notices.ts";
 import { resolveSettings, roleSettings } from "../settings.ts";

@@ -1,5 +1,5 @@
 {
-  "name": "@lgcode/testing",
+  "name": "@lgtm/testing",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -15,10 +15,10 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
-    "@lgcode/client": "workspace:*",
-    "@lgcode/contracts": "workspace:*",
-    "@lgcode/t3-effect-acp": "workspace:*",
-    "@lgcode/t3-provider-testing": "workspace:*",
+    "@lgtm/client": "workspace:*",
+    "@lgtm/contracts": "workspace:*",
+    "@lgtm/t3-effect-acp": "workspace:*",
+    "@lgtm/t3-provider-testing": "workspace:*",
     "effect": "catalog:",
     "ws": "catalog:"
   },

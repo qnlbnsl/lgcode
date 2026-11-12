@@ -180,7 +180,7 @@ describe.skipIf(!onLinux)(`6.8 the Linux reader and a real leftover group [${rea
   beforeEach(() => {
     rig = makeRunnerRig();
     vi.stubEnv("HOME", rig.home);
-    vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+    vi.stubEnv("LGTM_HOME", rig.stateFolder);
   });
   afterEach(() => {
     if (child?.pid !== undefined) { try { process.kill(-child.pid, "SIGKILL"); } catch { /* already gone */ } }
