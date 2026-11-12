@@ -2,8 +2,8 @@
 
 Status: **draft, not approved.** The foundation is merged into `master`, so
 clients reach the built features through the web page, the command-line tool
-and the client API. Development is frozen from 2026-11-07 until the website
-mocks are ready.
+and the client API. The owner lifted the development freeze on 2026-11-08
+for the website build.
 
 Each feature has a short name, one paragraph saying what it does, and a state:
 **idea** (written down, not agreed), **agreed** (the owner wants it), or
@@ -601,11 +601,17 @@ The full design is in
 ## Open questions
 
 - Which licence should LGcode use?
-- Should LGcode be renamed LGTM code? The owner raised the name on
-  2026-11-09 and asked for it to be kept as a to-do. Nothing is renamed until
-  the owner decides.
 
 ## Decided
+
+- **LGTM Studio marketing page** (2026-11-11). The owner selected LGTM Studio
+  as the new public name and requested a separate, single-page marketing site.
+  The page lives in `marketing/` and has its own visual direction.
+  It uses captures of the desktop and mobile product mockups.
+  It accepts a walkthrough video and collects early-access email addresses.
+  The marketing server listens on port 9999 for local network review.
+  The page supports light and dark mode with a remembered theme switch.
+  This change does not rename the engine packages, commands, or state folders.
 
 - **Language: TypeScript** (2026-10-30). One language for the backend, the
   web page and the future apps, so the client API's types are written once.

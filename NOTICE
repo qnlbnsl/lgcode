@@ -20,7 +20,8 @@ where the code lives in LGcode, and where the licence text is.
   Copyright 2016 The Inter Project Authors. SIL Open Font License 1.1.
   In LGcode: third_party/inter/InterVariable-latin.woff2, the Latin subset of
   Inter 4.001, used by the web mock in design/ and the production shell
-  through packages/web/src/tokens.css.
+  through packages/web/src/tokens.css, and served unchanged by the separate
+  marketing page in marketing/.
   Licence text: third_party/inter/OFL.txt.
 
 - JetBrains Mono (https://github.com/JetBrains/JetBrainsMono)

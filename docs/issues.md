@@ -10888,3 +10888,28 @@ At new-project.spec.ts:626, the preview frame's body never received data-loaded=
 The unchanged case passed on its own in 24.6 seconds.
 Both failures are in the mock and component preview path under a full parallel browser run.
 The cause remains unproved.
+
+## 612. The first marketing page pass overflowed on small phones and stretched its phone image
+
+Found: 2026-11-11, during the LGTM Studio marketing page browser checks.
+State: fixed in the marketing page before handoff.
+
+At a viewport width of 320 pixels, the workflow grid kept its children's intrinsic minimum width.
+The grid extended 20 pixels past the viewport's right edge.
+The mobile screenshot also kept its HTML height after CSS reduced its width.
+It appeared stretched in the phone frame.
+The workflow grid's children now permit shrinking.
+Images now preserve their natural aspect ratio.
+The browser check retains the 320-pixel overflow assertion.
+
+## 613. Marketing dark mode needed separate input and surface colors
+
+Found: 2026-11-11, while adding the marketing page's dark theme.
+State: fixed before handoff.
+
+The first dark-mode pass reused the light text token inside the pale email field.
+The entered address failed the browser's minimum text contrast check.
+The input and the keyboard skip link now use a dedicated dark text color.
+The input placeholder retains its readable color in both modes.
+Screenshot frame shadows also keep a dark surface color instead of following the text color.
+The browser check retains the email-field and skip-link contrast assertions.
