@@ -93,7 +93,7 @@ const TEST_FILES = [
 const stamp = () => new Date().toTimeString().slice(0, 8);
 function testSteps(sess, { pace = 260, fail = false, total = 412 } = {}) {
   const steps = [
-    [120, ''], [40, [[`> lgtm@0.4.0 ${fail ? 'check' : 'test'} ${sess.root}`, 'tc-m']]], [40, [[`> ${fail ? 'pnpm typecheck && vitest run --project full' : 'vitest run'}`, 'tc-m']]], [pace * 2, ''],
+    [120, ''], [40, [[`> lgtm-studio@0.9.0 ${fail ? 'check' : 'test'} ${sess.root}`, 'tc-m']]], [40, [[`> ${fail ? 'pnpm typecheck && vitest run --project full' : 'vitest run'}`, 'tc-m']]], [pace * 2, ''],
     [60, [[' RUN ', 'tc-inv tc-bl'], [' ' + sess.root, 'tc-m']]], [pace, ''],
   ];
   for (const [file, n, ms] of TEST_FILES) {
@@ -217,7 +217,7 @@ function exec(sess, raw, { onExit } = {}) {
     if (!inRepo(sess)) { out(sess, [[' ERR_PNPM_NO_IMPORTER_MANIFEST_FOUND ', 'tc-inv tc-r'], [' No package.json was found in "' + sess.cwd + '".', 'tc-r']]); exit = 1; }
     else if (script === 'test') { stream(sess, 'pnpm test', testSteps(sess), 0); return; }
     else if (script === 'check') { stream(sess, 'pnpm check', testSteps(sess, { pace: 200, fail: true }), 1); return; }
-    else if (script === 'typecheck') { stream(sess, 'pnpm typecheck', [[120, ''], [40, [[`> lgtm@0.4.0 typecheck ${sess.root}`, 'tc-m']]], [40, [['> tsc --noEmit', 'tc-m']]], [1700, '']], 0); return; }
+    else if (script === 'typecheck') { stream(sess, 'pnpm typecheck', [[120, ''], [40, [[`> lgtm-studio@0.9.0 typecheck ${sess.root}`, 'tc-m']]], [40, [['> tsc --noEmit', 'tc-m']]], [1700, '']], 0); return; }
     else if (script === 'install' || script === 'i') { stream(sess, 'pnpm install', [[300, 'Lockfile is up to date, resolution step is skipped'], [500, 'Already up to date'], [200, [['Done in 1.1s', 'tc-m']]]], 0); return; }
     else { out(sess, [[' ERR_PNPM_NO_SCRIPT ', 'tc-inv tc-r'], [` Missing script: ${script || ''}`, 'tc-r']], '', 'Scripts in this package: test, typecheck, check'); exit = 1; }
   }

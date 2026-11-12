@@ -15,7 +15,7 @@
 .dz-label { position: sticky; top: 0; left: 0; z-index: 2; display: inline-flex; align-items: center; gap: 8px; margin: 8px 0 0 8px; padding: 3px 8px; border-radius: var(--radius-sm); background: var(--color-surface); border: 1px solid var(--color-line); font-size: var(--text-sm); box-shadow: var(--shadow-1); }
 .dz-label b { font-weight: var(--weight-medium); }
 .dz-sizer { position: relative; margin-top: -30px; }
-.dz-world { position: absolute; left: 32px; top: 48px; transform-origin: 0 0; }
+.dz-world { position: absolute; left: 32px; top: 64px; transform-origin: 0 0; }
 .dz-flag { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--color-muted); background: var(--color-raised); border: 1px dashed var(--color-line-strong); white-space: nowrap; }
 .dz-flag.in { color: var(--color-success); background: var(--color-success-soft); border-style: solid; border-color: transparent; }
 .dz-flag.warn { color: var(--color-warn); background: var(--color-warn-soft); border-style: solid; border-color: transparent; }
@@ -25,9 +25,10 @@
 .dz-frame { position: absolute; display: block; padding: 0; border-radius: 6px; background: var(--color-bg); box-shadow: var(--shadow-2); text-align: left; cursor: zoom-in; }
 .dz-frame iframe { width: 100%; height: 100%; border: 0; border-radius: 6px; pointer-events: none; display: block; background: var(--color-bg); }
 .dz-frame.dashed { background: transparent; box-shadow: none; border: calc(2px / var(--z, 1)) dashed var(--color-line-strong); }
-.dz-fname { position: absolute; left: 0; bottom: 100%; display: flex; align-items: baseline; gap: calc(8px / var(--z, 1)); padding-bottom: calc(6px / var(--z, 1)); font-size: calc(var(--text-sm) / var(--z, 1)); white-space: nowrap; color: var(--color-text); }
+.dz-fname { position: absolute; left: 0; right: 0; bottom: 100%; overflow: hidden; display: flex; align-items: baseline; gap: calc(8px / var(--z, 1)); padding-bottom: calc(6px / var(--z, 1)); font-size: calc(var(--text-sm) / var(--z, 1)); white-space: nowrap; color: var(--color-text); }
 .dz-fname b { font-weight: var(--weight-medium); }
-.dz-fname .mono { color: var(--color-faint); font-size: .9em; }
+.dz-fname .mono { color: var(--color-faint); font-size: .9em; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.dz-fname b { flex: none; }
 .dz-ph { position: absolute; inset: 0; display: grid; place-items: center; color: var(--color-faint); font-size: calc(var(--text-md) / var(--z, 1)); }
 .dz-frame:focus-visible { outline: calc(3px / var(--z, 1)) solid var(--color-focus); outline-offset: calc(4px / var(--z, 1)); }
 

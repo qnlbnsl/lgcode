@@ -189,7 +189,7 @@ function PairMachine({ s }) {
   const confirm = () => {
     if (!name.trim() || taken) return;
     const id = uid('machine');
-    update((st) => { st.machines.push({ id, name: name.trim(), role: 'worker', status: 'pairing', slots: { used: 0, limit: 4 }, lastSeen: Date.now(), address: '192.168.141.52', workspace: '~/code', os: 'macOS', cpu: 0, mem: 0, cores: 10, ram: 32, version: st.settings.version, harnesses: null, connectedFor: 0 }); st.expanded['machine:' + id] = true; });
+    update((st) => { st.machines.push({ id, name: name.trim(), role: 'worker', status: 'pairing', slots: { used: 0, limit: 4 }, lastSeen: Date.now(), address: '192.168.1.52', workspace: '~/code', os: 'macOS', cpu: 0, mem: 0, cores: 10, ram: 32, version: st.settings.version, harnesses: null, connectedFor: 0 }); st.expanded['machine:' + id] = true; });
     act.closeDialog(); act.toast(`${name.trim()} is paired`);
     setTimeout(() => update((st) => { const m = byId(st.machines, id); if (!m) return; m.status = 'online'; m.harnesses = { claude: '2.4.1', codex: null }; m.cpu = 7; m.mem = 28; }), 2600);
   };
@@ -202,7 +202,7 @@ function PairMachine({ s }) {
         <${Command} text=${`lgtm connect ${master.name.toLowerCase()}.lan:${s.settings.port} --code ${code}`} /></div></li>
       <li class=${step > 0 ? 'now' : ''}><span class="n">3</span><div><b>Confirm the machine here.</b>
         ${step === 0 ? html`<p class="row muted"><${Icon} name="loader-circle" size=${14} class="svc-spin" />Waiting for a machine to use the code…</p>`
-          : html`<div class="svc-found"><${Icon} name="server" size=${16} /><div class="grow"><b>mini.lan</b><span class="muted"> wants to connect</span><div class="mono muted" style="font-size:var(--text-sm)">192.168.141.52 · macOS · 10 cores · 32 GB</div></div><span class="badge success">Code matched</span></div>
+          : html`<div class="svc-found"><${Icon} name="server" size=${16} /><div class="grow"><b>mini.lan</b><span class="muted"> wants to connect</span><div class="mono muted" style="font-size:var(--text-sm)">192.168.1.52 · macOS · 10 cores · 32 GB</div></div><span class="badge success">Code matched</span></div>
             <div class="field" style="margin-top:8px"><label for="pair-name">Name</label><input id="pair-name" class="input" value=${name} onInput=${(e) => setName(e.target.value)} autofocus /></div>`}</div></li>
     </ol>
   <//>`;
@@ -513,11 +513,11 @@ function Remote({ s }) {
       <span class="muted" style="font-size:var(--text-sm)">${!dirty ? 'No unsaved changes.' : bad || badPort ? 'Fix the marked field to save.' : 'Saving closes open web connections. They reconnect on their own.'}</span></div>
   </form>`;
 }
-function Sheepdog({ s }) {
-  const set = s.settings; const off = !set.sheepdog;
+function StallWatch({ s }) {
+  const set = s.settings; const off = !set.stallWatch;
   return html`<div class="svc-rows">
-    <${Row} label="Sheepdog" hint="The part of the service that keeps every agent moving without spending its turns. It never decides what the work is.">
-      <${Switch} on=${set.sheepdog} label="Sheepdog" onChange=${(v) => setS({ sheepdog: v })} /><//>
+    <${Row} label="Stall watch" hint="The part of the service that keeps every agent moving without spending its turns. It never decides what the work is.">
+      <${Switch} on=${set.stallWatch} label="Stall watch" onChange=${(v) => setS({ stallWatch: v })} /><//>
     <div class=${cx('svc-group', off && 'svc-off')}>
       <h3>When an agent may be stuck</h3>
       <${Row} label="Assigned, not started" id="sd-a"><${Num} id="sd-a" value=${set.stallAssigned} min=${1} max=${120} unit="minutes" onChange=${(v) => setS({ stallAssigned: v })} /><//>
@@ -589,7 +589,7 @@ const SECTIONS = [
   ['appearance', 'Appearance', 'palette', Appearance, 'How this page looks on this browser.'],
   ['defaults', 'Defaults', 'sliders-horizontal', Defaults, 'What a new agent starts with.'],
   ['remote', 'Remote access', 'wifi', Remote, 'How this page is reached from other devices.'],
-  ['sheepdog', 'Sheepdog', 'timer', Sheepdog, 'Watching for agents that stop moving.'],
+  ['stall-watch', 'Stall watch', 'timer', StallWatch, 'Watching for agents that stop moving.'],
   ['workflow', 'Workflow', 'workflow', WorkflowSettings, 'The build loop and where you override it.'],
   ['git', 'Git messages', 'git-commit-horizontal', GitMessages, 'The model that writes commit and pull request messages.'],
   ['about', 'About', 'info', About, 'The version and the service.'],

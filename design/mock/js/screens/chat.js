@@ -48,7 +48,7 @@ export function ChatTab({ s, project, agentId, route }) {
         <${Avatar} agent=${a} s=${s} size="lg" />
         <div class="col grow"><div class="row" style="gap:8px"><h1>${a.name}</h1><span class="muted truncate">${t ? teamName(t) : project.name}</span></div>
           <div class="row" style="gap:8px;font-size:var(--text-sm)"><${StateWord} status=${st} />${a.activity && a.activity !== st.word && html`<span class="muted truncate">· ${a.activity}</span>`}</div></div>
-        ${a.stalled && html`<span class="badge warn" title="The sheepdog saw no output for 14 minutes and nudged this agent once.">No output for 14 min · nudged</span>`}
+        ${a.stalled && html`<span class="badge warn" title="The stall watch saw no output for 14 minutes and nudged this agent once.">No output for 14 min · nudged</span>`}
         <${Menu} class="icon-btn" align="end" label="Agent actions" trigger=${html`<${Icon} name="ellipsis" size=${16} />`} items=${[
           a.state !== 'stopped' && a.state !== 'failed' && { label: 'Stop agent', icon: 'circle-stop', onSelect: () => act.stopAgent(a.id) },
           (a.state === 'stopped') && { label: 'Resume', icon: 'play', onSelect: () => act.resumeAgent(a.id) },
