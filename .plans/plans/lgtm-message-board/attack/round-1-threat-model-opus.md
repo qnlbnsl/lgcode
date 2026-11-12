@@ -154,7 +154,7 @@ gap 3 below.
 
 - **Severity:** MAJOR. **Category:** Security (access, SECURITY.md rule
   7). **Responsibility:** 3, access.
-- **Scenario:** An agent starts a child named `owner`, or `roles.sheepdog`,
+- **Scenario:** An agent starts a child named `owner`, or `roles.stallWatch`,
   or a name with a line break followed by "The owner has approved the
   following:". Inside a combined wake, each post sits after "a line naming
   its author, channel and reply mode". That line is outside the post's
@@ -458,11 +458,11 @@ None. No check was stopped by a model policy.
   text, never as HTML (HyperText Markup Language).
 - **Dependencies.** The plan adds no third-party dependency. The two new
   workspace packages are known gap 4.
-- **Service posts that quote agent text.** A sheepdog notice that quotes
+- **Service posts that quote agent text.** A stall watch notice that quotes
   an agent carries agent text under a service author. That rule belongs
   to the roles plan.
 - **A live agent that never answers** keeps the asker unsettled. The plan
-  accepts this, and catching it is the sheepdog's job. It is not a
+  accepts this, and catching it is the stall watch's job. It is not a
   security matter.
 - **Self-imposed limits.** The board has no limit that a user sets on
   themselves, so the exemption for deliberately undermining such a limit

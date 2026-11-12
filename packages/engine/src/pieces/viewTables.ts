@@ -1,7 +1,7 @@
 import { emptyProject, projectAfter } from "../project/view.ts";
 import type { ProjectView } from "@lgtm/contracts";
 import type { State } from "../views/apply.ts";
-import { observeStalls } from "../roles/sheepdog/stallView.ts";
+import { observeStalls } from "../roles/stall-watch/stallView.ts";
 import { clientPieceView } from "../client/alerts/view.ts";
 import type { Event, EventSequence, PieceNamespace } from "@lgtm/contracts";
 import type { BoardView } from "@lgtm/contracts/board/view";

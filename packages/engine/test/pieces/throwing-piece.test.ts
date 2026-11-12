@@ -78,7 +78,7 @@ it("1.44 a throwing reducer leaves its last view intact, preserves engine writes
     expect((current as unknown as { client: unknown }).client).toEqual(prior);
     expect((yield* compareViews()).differences).toEqual([]);
     const sql = yield* SqlClient.SqlClient;
-    expect(yield* sql`SELECT COUNT(*) AS n FROM events WHERE sequence <= ${current.sequence} AND event_type != 'roles.SheepdogBaseline'`).toEqual([{ n: 2 }]);
+    expect(yield* sql`SELECT COUNT(*) AS n FROM events WHERE sequence <= ${current.sequence} AND event_type != 'roles.StallWatchBaseline'`).toEqual([{ n: 2 }]);
   }));
 });
 

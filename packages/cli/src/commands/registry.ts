@@ -133,11 +133,11 @@ const summaries: Record<CommandName, string> = {
   "roles.handoff": "Read an agent's handoff.",
   "roles.role-file.set": "Load a role file from its content.",
   "roles.role-file.get": "Read the loaded role file and its hash.",
-  "roles.settings.get": "Read the sheepdog settings.",
-  "roles.settings.set": "Change the sheepdog settings.",
+  "roles.settings.get": "Read the stall watch settings.",
+  "roles.settings.set": "Change the stall watch settings.",
   "roles.snooze": "Snooze a group's team-idle notices.",
-  "roles.actions.list": "List the sheepdog's action records.",
-  "roles.record": "Record a sheepdog action (service only)."
+  "roles.actions.list": "List the stall watch's action records.",
+  "roles.record": "Record a stall watch action (service only)."
 }
 
 export const isCommand = (name: string): name is CommandName => (commandNames as ReadonlyArray<string>).includes(name)

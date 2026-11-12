@@ -22,8 +22,8 @@ import { requiredModule, type Caller } from "../support/callerRules.ts";
 import { ready } from "../support/viewFixtures.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 
-const callers: Caller[] = [{ _tag: "owner" }, { _tag: "agent", agentId: "agent-a" }, { _tag: "service", service: "roles.sheepdog" }, { _tag: "service", service: "roles.standing-rules", rule: "rule-4" }, { _tag: "piece", namespace: "board" }];
-const keys = ["owner", "agent:agent-a", "service:roles.sheepdog", "service:roles.standing-rules", "piece:board"];
+const callers: Caller[] = [{ _tag: "owner" }, { _tag: "agent", agentId: "agent-a" }, { _tag: "service", service: "roles.stallWatch" }, { _tag: "service", service: "roles.standing-rules", rule: "rule-4" }, { _tag: "piece", namespace: "board" }];
+const keys = ["owner", "agent:agent-a", "service:roles.stallWatch", "service:roles.standing-rules", "piece:board"];
 it("1.30 caller identity survives live publication, catch-up, rebuild, paging and a reopened database; receipts ignore the rule", async () => {
   const home = mkdtempSync("/tmp/lgtm-caller-durable-");
   vi.stubEnv("LGTM_HOME", home);

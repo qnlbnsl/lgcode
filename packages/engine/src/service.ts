@@ -41,7 +41,7 @@ import type { Runtime } from "./commands/internal.ts";
 import * as Views from "./views/Views.ts";
 import { serve as serveWeb } from "./client/web/server.ts";
 import { boardEnabledAtStartup, withBoardEnabled } from "./board/switch.ts";
-import { withinCapacityLimit } from "./roles/sheepdog/switch.ts";
+import { withinCapacityLimit } from "./roles/stall-watch/switch.ts";
 import { capacityHoldCount } from "./routing/deliveries.ts";
 
 const inTemporaryFolder = (folder: string): boolean => {

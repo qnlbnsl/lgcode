@@ -14,14 +14,14 @@ const inputsOf = (text: string): ReadonlyArray<Record<string, unknown>> =>
   [...text.matchAll(/with exactly this input: (\{.*\})$/gm)].map((match) => JSON.parse(match[1]!) as Record<string, unknown>);
 
 describe("the live-check prompts", () => {
-  it("keeps the roles stall obligation unanswered through the board reminder until the sheepdog's notice", () => {
+  it("keeps the roles stall obligation unanswered through the board reminder until the stall watch's notice", () => {
     const reminder = ROLES_WORKER_PROMPT.split("\n").find((line) => line.startsWith("A later wake from the board"));
     expect(reminder).toContain(`reminding you about ${STALL_MARKER} is expected`);
-    expect(reminder).toContain("This board reminder is not the sheepdog's notice");
+    expect(reminder).toContain("This board reminder is not the stall watch's notice");
     expect(reminder).toContain('even if it says "Reply, even to say you have nothing to add."');
     expect(reminder).toContain("On this reminder turn, do not reply and do not call board.post.");
     expect(reminder).toContain("Leave the saved obligation unanswered and end that turn with the word waiting.");
-    expect(ROLES_WORKER_PROMPT).toContain("Replying to the saved obligation is correct only after a subsequent board wake containing a notice authored by the service roles.sheepdog.");
+    expect(ROLES_WORKER_PROMPT).toContain("Replying to the saved obligation is correct only after a subsequent board wake containing a notice authored by the service roles.stallWatch.");
 
     // Both start inputs sent to the real lead must carry this instruction.
     const starts = rolesLeadPrompt(liveConfig({}), ["/tmp/worker-1", "/tmp/worker-2"])

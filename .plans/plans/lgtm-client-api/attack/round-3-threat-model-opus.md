@@ -155,7 +155,7 @@ The consumers are board contract version 8 and roles plan version 10. "Consisten
 | E8 | Nothing found. Today's rule is kept, with L29's case. |
 | E9 | TM3-5. |
 | E11, E12 | Sound. `start`'s follow-on writes are under "Noted". |
-| E13, E14 | Consistent with the roles' `release`, `roles.record` and sheepdog commands, and with WS-7a's second write. |
+| E13, E14 | Consistent with the roles' `release`, `roles.record` and stall watch commands, and with WS-7a's second write. |
 | E15 to E18 | Consistent with the board's sender label and its reach check. Nothing found. |
 | E19, E20 | Nothing found. |
 | E21 | Sound. TM3-5 covers the agent's reply shape. |

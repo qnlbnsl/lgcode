@@ -10,25 +10,25 @@ registerRebuildCheck({ noLog: true });
 it("V01 the registered roles fold keeps the loaded file, settings and latest snooze together without losing actions", () => {
   const state = roles(fold([
     start(), fileEvent(), action("StallSeen"),
-    event({ _tag: "roles.SettingsChanged", settings: { sheepdog: false, limits: { stallMinutes: 20 } } }),
+    event({ _tag: "roles.SettingsChanged", settings: { stallWatch: false, limits: { stallMinutes: 20 } } }),
     event({ _tag: "roles.Snoozed", group: "build", until: 1_900_000_000_000 }),
     event({ _tag: "roles.Snoozed", group: "build", until: 1_900_000_060_000 }),
   ]));
   expect(state).toMatchObject({
-    file: { name: "Build team" }, settings: { sheepdog: false, limits: { stallMinutes: 20 } },
+    file: { name: "Build team" }, settings: { stallWatch: false, limits: { stallMinutes: 20 } },
     snoozes: { build: 1_900_000_060_000 },
     actions: [expect.objectContaining({ _tag: "roles.StallSeen", sequence: 3, occurrence: 1 })],
   });
   expect(state.roleFileHash).toMatch(/^[a-f0-9]{64}$/);
 });
 
-it("V02 the sheepdog position is the highest source or baseline, never the record, trigger or settings sequence", () => {
+it("V02 the stall watch position is the highest source or baseline, never the record, trigger or settings sequence", () => {
   const state = roles(fold([
-    event({ _tag: "roles.SheepdogBaseline", position: 30, on: true }),
+    event({ _tag: "roles.StallWatchBaseline", position: 30, on: true }),
     action("StallSeen", { sourceSequence: 40, triggerSequence: 400 }),
     action("CacheFlushed", { sourceSequence: 35 }),
-    event({ _tag: "roles.SettingsChanged", settings: { sheepdog: true } }),
-    event({ _tag: "roles.SheepdogBaseline", position: 38, on: false }),
+    event({ _tag: "roles.SettingsChanged", settings: { stallWatch: true } }),
+    event({ _tag: "roles.StallWatchBaseline", position: 38, on: false }),
   ]));
   expect(state.position).toBe(40);
 });
@@ -64,7 +64,7 @@ it.each(["CrashRetried", "GaveUp", "stop", "off"])("V05 an admitted retry remain
     event({ _tag: "StateChanged", agentId: "worker", state: { _tag: "starting" } })];
   expect(roles(fold(before)).agents.worker?.openCrash).toMatchObject({ _tag: "roles.CrashAdmitted", triggerSequence: 90, sequence: 2 });
   const closing = end === "stop" ? event({ _tag: "AgentStopped", agentId: "worker" })
-    : end === "off" ? event({ _tag: "roles.SheepdogBaseline", position: 100, on: false })
+    : end === "off" ? event({ _tag: "roles.StallWatchBaseline", position: 100, on: false })
     : action(end, { triggerSequence: 90 });
   expect(roles(fold([...before, closing])).agents.worker?.openCrash).toBeUndefined();
 });
@@ -112,7 +112,7 @@ it("V10 a turn end clears runaway but preserves a replacement and a stall until 
 });
 
 it("V11 replay and projection read only the event and sequence, with frozen inputs and no envelope time", () => {
-  const events = [start(), fileEvent(), event({ _tag: "roles.SheepdogBaseline", position: 1, on: true }),
+  const events = [start(), fileEvent(), event({ _tag: "roles.StallWatchBaseline", position: 1, on: true }),
     action("StallSeen"), action("CrashAdmitted"), action("RunawayReported"),
     event({ _tag: "TurnEnded", agentId: "worker", compact: false })];
   let projected = pieceViews.roles.empty();
@@ -137,7 +137,7 @@ it.each(["__proto__", "constructor", "toString"])("V12 the valid agent and group
 
 it.each(["read", "accepted"])("V13 a notice becomes read only through its recipient's %s, and the fact survives replay", (path) => {
   const setup = [start(), start("lead"), start("other"), channel(),
-    post("notice", { author: { _tag: "service", service: "roles.sheepdog" }, to: [{ _tag: "agent", agentId: "lead" }], reply: "none" }),
+    post("notice", { author: { _tag: "service", service: "roles.stallWatch" }, to: [{ _tag: "agent", agentId: "lead" }], reply: "none" }),
     action("ReplaceAdvised", { noticeRecipient: "lead", postId: "notice" })];
   expect(roles(fold(setup)).actions[0]?.noticeRead).toBe(false);
   const ending = path === "read" ? [read(["notice"], "lead")]
@@ -147,7 +147,7 @@ it.each(["read", "accepted"])("V13 a notice becomes read only through its recipi
 
 it("V14 another reader, another post and an unaccepted wake cannot settle an unread notice", () => {
   const state = roles(fold([start(), start("lead"), start("other"), channel(),
-    post("notice", { author: { _tag: "service", service: "roles.sheepdog" }, to: [{ _tag: "agent", agentId: "lead" }], reply: "none" }),
+    post("notice", { author: { _tag: "service", service: "roles.stallWatch" }, to: [{ _tag: "agent", agentId: "lead" }], reply: "none" }),
     action("ReplaceAdvised", { noticeRecipient: "lead", postId: "notice" }),
     read(["notice"], "other"), read(["different-post"], "lead"),
     wake("notice-wake", { targetAgentId: "lead", carried: ["notice"] }), queue("notice-wake", "delivery-notice-wake", "lead"),
@@ -158,7 +158,7 @@ it("V14 another reader, another post and an unaccepted wake cannot settle an unr
 for (const path of ["read", "accepted"] as const) for (const before of [true, false]) {
   it(`consumption by ${path} ${before ? "before" : "after"} a late notice record survives replay and isolates recipient/post`, () => {
     const base = [start(), start("lead"), start("other"), channel(),
-      post("notice", { author: { _tag: "service", service: "roles.sheepdog" }, to: [{ _tag: "agent", agentId: "lead" }], reply: "none" })];
+      post("notice", { author: { _tag: "service", service: "roles.stallWatch" }, to: [{ _tag: "agent", agentId: "lead" }], reply: "none" })];
     const consume = path === "read" ? [read(["notice"], "lead")]
       : [wake("late", { targetAgentId: "lead", carried: ["notice"] }), queue("late", "delivery-late", "lead"), accept("late", "lead")];
     const records = [action("ReplaceAdvised", { noticeRecipient: "lead", postId: "notice" }),

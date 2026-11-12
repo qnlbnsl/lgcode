@@ -10,7 +10,7 @@ export const rolesActionKinds = [
   "CompactRequested", "StallEnded",
 ] as const
 export const rolesEventTags = [
-  "roles.RoleFileSet", "roles.SettingsChanged", "roles.Snoozed", "roles.SheepdogBaseline", "roles.StallNoticePlanned",
+  "roles.RoleFileSet", "roles.SettingsChanged", "roles.Snoozed", "roles.StallWatchBaseline", "roles.StallNoticePlanned",
   ...rolesActionKinds.map((kind) => `roles.${kind}` as const),
 ] as const
 
@@ -56,7 +56,7 @@ export const RolesActionRecord = RolesAction.mapMembers(Tuple.map(Schema.fieldsA
   sequence: EventSequence, noticeRead: Schema.optionalKey(Schema.Boolean),
 }))).check(Schema.makeFilter(Schema.is(RolesAction)))
 export type RolesActionRecord = typeof RolesActionRecord.Type
-export const SheepdogBaseline = Schema.TaggedStruct("roles.SheepdogBaseline", {
+export const StallWatchBaseline = Schema.TaggedStruct("roles.StallWatchBaseline", {
   position: EventSequence, on: Schema.Boolean, boardOn: Schema.optionalKey(Schema.Boolean),
 })
 // Admit a stall notice before a board delivery can change its clock origin.
@@ -64,13 +64,13 @@ export const StallNoticePlanned = Schema.TaggedStruct("roles.StallNoticePlanned"
   ...action, stalledPostId: PostId, kind: Schema.Literals(["roles.StallSeen", "roles.ReplaceAdvised"]),
 })
 export type StallNoticePlanned = typeof StallNoticePlanned.Type
-export const SheepdogRecord = Schema.Union([RolesAction, SheepdogBaseline, StallNoticePlanned])
-export type SheepdogRecord = typeof SheepdogRecord.Type
+export const StallWatchRecord = Schema.Union([RolesAction, StallWatchBaseline, StallNoticePlanned])
+export type StallWatchRecord = typeof StallWatchRecord.Type
 export const RolesEvent = Schema.Union([
   Schema.TaggedStruct("roles.RoleFileSet", { content: Schema.String, roleFileHash: RoleFileHash }),
   Schema.TaggedStruct("roles.SettingsChanged", { settings: RolesSettings }),
   Schema.TaggedStruct("roles.Snoozed", { group: Schema.String, until: EpochMilliseconds }),
-  SheepdogBaseline,
+  StallWatchBaseline,
   StallNoticePlanned,
   ...RolesAction.members,
 ])

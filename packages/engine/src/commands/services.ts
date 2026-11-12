@@ -16,7 +16,7 @@ const permitted = (service: string, name: string, lists: EngineLists): boolean =
 // lifetimes. Keep the raw runtime, SQL and account credentials inside the
 // engine boundary; this helper exposes only these nonsecret settings.
 export const serviceCacheSettings = (caller: Extract<Caller, { _tag: "service" }>, lists: EngineLists = engineLists) => Effect.gen(function* () {
-  if (caller.service !== "roles.sheepdog" || !permitted(caller.service, "client.event", lists)) return yield* refused();
+  if (caller.service !== "roles.stallWatch" || !permitted(caller.service, "client.event", lists)) return yield* refused();
   const input = yield* (yield* CommandHandler).input(caller);
   return { home: input.runtime.home, harnesses: (yield* readHarnesses(input.runtime)).map((harness) => ({
     id: harness.id, cacheLifetime: harness.cacheLifetime,
@@ -37,7 +37,7 @@ export const subscribeService = (service: string, after: number, lists: EngineLi
 // This is an internal composite of the existing compact and board.flush
 // rights, not a new public command or an expanded service permission.
 export const serviceCacheAction = (caller: Extract<Caller, { _tag: "service" }>, target: CacheTarget, lists: EngineLists = engineLists) => Effect.gen(function* () {
-  if (caller.service !== "roles.sheepdog" || !permitted(caller.service, "compact", lists)
+  if (caller.service !== "roles.stallWatch" || !permitted(caller.service, "compact", lists)
     || !permitted(caller.service, "board.flush", lists)) return yield* refused();
   return yield* (yield* CommandHandler).cache(target);
 });

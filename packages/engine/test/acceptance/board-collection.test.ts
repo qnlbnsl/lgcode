@@ -9,7 +9,7 @@ afterEach(async () => { await stopAllServices(); });
 
 scenario("6.2 an all-mode hand-off to three workers wakes its lead once after all replies, even when one worker crashes and resumes (breaks if one reply closes the collection or the final completion is lost or duplicated)", (w) => Effect.gen(function* () {
   // This journey owns the resume and counts only the collection's lead wake.
-  yield* w.owner["roles.settings.set"]({ requestId: requestId(), settings: { sheepdog: false } } as never);
+  yield* w.owner["roles.settings.set"]({ requestId: requestId(), settings: { stallWatch: false } } as never);
   const lead = yield* w.start(w.owner, { name: "Lead", role: "lead", prompt: "Ready." });
   const leadClient = yield* w.asAgent((yield* w.token(lead)).token);
   const workers: Started[] = [];

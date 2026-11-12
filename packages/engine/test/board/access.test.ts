@@ -193,7 +193,7 @@ it("2.7/2.8 direct channels: catches dropping the service grant or giving the se
     expect(rules.directGrant(view, agent("worker"), service)).toBe(true);
     expect(rules.canPost(view, service, noReply("direct"))).toBe(true);
     expect(rules.canRead(view, service, "direct")).toBe(false);
-    expect(memberIds(rules.channelMembers(view, "direct"))).toEqual(["service:sheepdog", "worker"]);
+    expect(memberIds(rules.channelMembers(view, "direct"))).toEqual(["service:stallWatch", "worker"]);
     expect(rules.successorManager(view, "direct")).toBeUndefined();
   }
   expect(rules.directGrant(snapshot(...events, stop("worker")), service, agent("worker"))).toBe(false);

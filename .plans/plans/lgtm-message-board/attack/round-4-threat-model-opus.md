@@ -276,7 +276,7 @@ Earlier answers that the rework could have broken, re-checked:
 
 - **Severity:** MINOR. **Category:** Design; Bug (logic).
   **Responsibility:** 3, access.
-- **Scenario:** The sheepdog posts a must-reply notice to worker W in their
+- **Scenario:** The stall watch posts a must-reply notice to worker W in their
   direct channel, and W crashes. `contract.md:117-118` and row 84 say "A
   crash does not end a grant". `contract.md:152-155` and row 98 (3) say the
   agent-and-service grant "always holds while T is live", and a crashed
@@ -325,10 +325,10 @@ Scores follow the risk-score rule: severity × fallout × probability.
 
 | Id | Description | Severity | Fallout | Probability | Score and band | Evidence status | Owner |
 |---|---|---|---|---|---|---|---|
-| V4-3 | A question left out by the byte cap holds its addressee unsettled for good | 6: a core feature, a wait, wrong until fixed by hand | 3: the owner or the sheepdog closes the post | 4: needs more must-reply text for one agent than one wake holds | 72, schedule | Confirmed by reading | Board units 3a and 3b |
+| V4-3 | A question left out by the byte cap holds its addressee unsettled for good | 6: a core feature, a wait, wrong until fixed by hand | 3: the owner or the stall watch closes the post | 4: needs more must-reply text for one agent than one wake holds | 72, schedule | Confirmed by reading | Board units 3a and 3b |
 | V4-1 | Every `board.read` page is stored in its receipt; criterion 5.11 is false | 4: extra stored copies and unbounded growth; no other person sees them | 3: one installation; a purge can repair it | 10: every `board.read` | 120, schedule | Confirmed in code | Board unit 4, with the lead for the engine handler |
 | V4-2 | Reactor writes skip the handler's E17, E18 and E22 checks | 6: an engine delivery lost, or agent text sent unwrapped, through a board defect | 5: one installation, repaired with help | 2: needs a board defect on a reactor path; the send-time check still guards reach | 60, schedule | Unresolved (pre-build decision) | Client API unit 1b and board unit 3b |
-| V4-4 | The service-and-agent grant may end on a crash | 4: a notice resolved `removed` wrongly; repairs on a new post | 3 | 4: a crash with a sheepdog notice open | 48, record | Confirmed by reading | Board units 2b and 3c |
+| V4-4 | The service-and-agent grant may end on a crash | 4: a notice resolved `removed` wrongly; repairs on a new post | 3 | 4: a crash with a stall watch notice open | 48, record | Confirmed by reading | Board units 2b and 3c |
 | V4-5 | Two proposed checks dropped | 2: a test gap | 3 | 2 | 12, record | Confirmed by reading | Board unit 5 |
 
 No finding reaches the severity floor: none has severity 9 or 10.

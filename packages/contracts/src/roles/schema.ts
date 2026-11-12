@@ -35,7 +35,7 @@ export const RoleFile = Schema.Struct({
 export type RoleFile = typeof RoleFile.Type
 export const RoleFileHash = Schema.String.check(Schema.isPattern(/^[a-f0-9]{64}$/))
 export const RolesSettings = Schema.Struct({
-  sheepdog: Schema.optionalKey(Schema.Boolean),
+  stallWatch: Schema.optionalKey(Schema.Boolean),
   standingRules: Schema.optionalKey(Schema.Boolean),
   limits: Schema.optionalKey(RoleLimits),
 })

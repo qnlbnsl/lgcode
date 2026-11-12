@@ -114,7 +114,7 @@ this fold is frozen as `attack/plan-v7.md`.
 
 | Finding | Shared item | What v4 must settle |
 |---|---|---|
-| A-R4-A1 Planner replies cannot carry a post id | S1 | Settled by CAPI E3's `reply`. Every roles command is a planner or a read; the sheepdog keeps the post id from `board.post`'s reply (row 95) |
+| A-R4-A1 Planner replies cannot carry a post id | S1 | Settled by CAPI E3's `reply`. Every roles command is a planner or a read; the stall watch keeps the post id from `board.post`'s reply (row 95) |
 | A-R4-A2 Read visibility has two incompatible definitions | S2 | Settled by CAPI's read rule (L29). `orient` follows it; the hand-off checks the management rule (row 96) |
 | C-R4-C3 Visibility equates two rights rules | S2 | As A-R4-A2 (row 96) |
 | TS-R4-TM-2 Direct-child reads conflated with inherited rights | S2 | As A-R4-A2 (row 96) |
@@ -129,12 +129,12 @@ this fold is frozen as `attack/plan-v7.md`.
 | A-R4-A4 The stall task names a removed package | Task 4b cites board v6's `packages/engine/src/board/` export and `packages/contracts/src/settled.ts` | 4b; row 94 |
 | C-R4-C4 The stall task imports a removed package | As A-R4-A4 | 4b; row 94 |
 | Lo-R4-L4 The hold condition has no failure policy | Called as a total function; an error counts as no (K13) | 7b, 7.3; row 89 |
-| Lo-R4-L5 Sheepdog nudges count as busy | Sheepdog work is not busy for the waiting test; the author-blocked exception keeps the owed answer moving (ST20, ST21) | WS-4 intro, 4.2, 4.3; row 88 |
+| Lo-R4-L5 Stall watch nudges count as busy | Stall watch work is not busy for the waiting test; the author-blocked exception keeps the owed answer moving (ST20, ST21) | WS-4 intro, 4.2, 4.3; row 88 |
 | Lo-R4-L6 An unknown-reset pause makes a team look idle | As Ls-R4-L1 (TI12) | WS-4 intro, 4.1; row 83 |
 | Lo-R4-L7 The outage end and the give-up trigger are undefined | The outage ends on a clean turn, a non-capacity error, or the spent-count return; `DeliveryReturned.cause: "capacity"` triggers `GaveUp` (CP08-CP10, K15) | 7b, 7.3, 4.5, 4d; row 89 |
 | Lo-R4-L8 Capacity phrases and runner files are unnamed | As TS-R4-TM-3 | 7b; row 87 |
 | Lo-R4-L9 The compaction size has no defined basis | As C-R4-C2 | 7.5; row 86 |
-| Ls-R4-L3 A completion can look like a sheepdog wake | A wake with any completion is an ordinary turn (N19) | Notices, 3.11; row 90 |
+| Ls-R4-L3 A completion can look like a stall watch wake | A wake with any completion is an ordinary turn (N19) | Notices, 3.11; row 90 |
 | Ls-R4-L4 The stall task names the old board package | As A-R4-A4 | 4b; row 94 |
 | TO F1 "Path-like word" is undefined | WS-7a resolves every word, at most 32 (PC11, PC12) | WS-2 list, 7a, 7.2; row 91 |
 | TO F2 The services hold rights they never use | Per-service command lists; `answer`, `board.close`, `start` and `stop` refused; the lead is asked to drop `service` from `answer` in the contract | Services, 3.4; row 92 |

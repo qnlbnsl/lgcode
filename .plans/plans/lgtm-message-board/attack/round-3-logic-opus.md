@@ -248,7 +248,7 @@ current manager" (`plan.md:383-384`, `contract.md:74-79`).
     (`waits.ts:39-45`). The board's clause holds it instead.
   - L's wait never resolves W2, and L's own post stays open, so L is held
     too. Nothing wakes anyone, and nothing repairs it until the owner or
-    the sheepdog notices.
+    the stall watch notices.
   - Without the board, L's wait would have reported W2 settled and woken
     L to act.
 - **Why it is a finding:** Row 69 (8) states this clause's purpose: "the
@@ -326,7 +326,7 @@ current manager" (`plan.md:383-384`, `contract.md:74-79`).
   - Write "owed completions that have not failed twice" into the idle
     rule.
   - Let `board.flush` carry owed completions, including failed ones, so
-    the owner or the sheepdog has a repair path.
+    the owner or the stall watch has a repair path.
   - Add to criterion 4.3: after the second return, the agent goes idle
     and no third wake is queued.
 - **Risk score:** 6 × 3 × 2 = **36, record**.

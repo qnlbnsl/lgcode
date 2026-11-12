@@ -171,7 +171,7 @@ The plan's main security limit is who can reach the proxy, and nothing enforces 
 ### TM-17. MINOR: the contract and the roles plan disagree on two access entries
 
 - **Evidence:**
-  - The roles plan gives the sheepdog `release` and says the service rights "gain that one command" (`inputs/roles-plan.md:443-448`, `:713`). The contract never mentions `release` and says everything else is refused (`contract.md:344-353`).
+  - The roles plan gives the stall watch `release` and says the service rights "gain that one command" (`inputs/roles-plan.md:443-448`, `:713`). The contract never mentions `release` and says everything else is refused (`contract.md:344-353`).
   - `inputs/roles-plan.md:363` still reads "owner, and device unless CAPI's question Q2 makes it host-only", and `:695` still treats a stolen phone adding a rule as open, although row 82 decided this.
 - **Suggested fix:** Name `release` in section 2 and E13, or state that the roles plan adds it. Fold row 82 into the roles plan.
 

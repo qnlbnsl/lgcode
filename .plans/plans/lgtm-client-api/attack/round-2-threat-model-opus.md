@@ -212,7 +212,7 @@ The consumers are board contract version 8 and roles plan version 8. "Consistent
 | E10 Command-line names | Nothing found. |
 | E11 Caller schema | The follow-on writes are noted in the trace. |
 | E12 Acting device | TM2-9. |
-| E13 Service path | Consistent with the roles' `release`, `roles.record` and sheepdog's board commands. |
+| E13 Service path | Consistent with the roles' `release`, `roles.record` and stall watch's board commands. |
 | E14 A service's answer names its rule | Consistent with the roles plan. |
 | E15 Sender and envelope | Sound. Compaction is not affected, because its content is `compact`, not text (`engine/src/commands/compact.ts:9`). The board's sender label `board` is consistent (`inputs/board-contract.md:334`). `client.thread` is outside it (TM2-10). |
 | E16 Delivery source | Consistent with the board. |

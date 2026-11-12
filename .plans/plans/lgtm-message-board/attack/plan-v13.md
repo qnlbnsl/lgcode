@@ -832,7 +832,7 @@ of its own delivery (`packages/engine/src/runner/AcpRunner.ts:271-276`).
 | A level rule runs over many items after each batch | Low | It runs only over what the batch touches; the whole state only at start-up and switch-on |
 | A text that was already sent reaches an agent that just left the channel | Medium | Accepted and stated (row 50): sent text cannot be recalled; a wake still queued is stopped at send (row 67) |
 | The reach-check inputs differ from what criteria 2.11 and 4.9 assume | Medium | They are in edit E18 at `5ceb503` (L23, rows 98, 120, 121); a later difference goes to the lead |
-| A question to a live agent that never answers keeps its author unsettled | Medium | `board.close` repairs it; catching a silent agent is the sheepdog's job; `board.status` shows whom the author waits on |
+| A question to a live agent that never answers keeps its author unsettled | Medium | `board.close` repairs it; catching a silent agent is the stall watch's job; `board.status` shows whom the author waits on |
 | Engine change B6 makes a `wait` on a board author last longer than before | Medium | Intended (rows 33, 99); criterion 4.8 shows nothing changes without board state; criterion 4.6 has a pause control case; criterion 1.7 tests the conditions as pure functions |
 
 **Verify:** `packages/engine/test/board/reactor.test.ts`, `settled.test.ts`; the engine suite, with the tests that engine changes B6 to B8 name keeping their expectations. Device or environment QA: none.

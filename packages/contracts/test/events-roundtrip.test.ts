@@ -83,7 +83,7 @@ const expectedBoardTags = [
   "board.Read",
 ]
 const expectedRolesTags = [
-  "roles.RoleFileSet", "roles.SettingsChanged", "roles.Snoozed", "roles.SheepdogBaseline", "roles.StallNoticePlanned",
+  "roles.RoleFileSet", "roles.SettingsChanged", "roles.Snoozed", "roles.StallWatchBaseline", "roles.StallNoticePlanned",
   "roles.TeamIdleReported", "roles.StallSeen", "roles.ReplaceAdvised", "roles.RunawayReported",
   "roles.CapacityRetried", "roles.CrashAdmitted", "roles.CrashRetried", "roles.GaveUp",
   "roles.RoleAdviceBroken", "roles.CacheFlushed", "roles.CompactRequested", "roles.StallEnded"

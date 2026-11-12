@@ -155,7 +155,7 @@ it("3.1 encoded display budgets count escaping, multibyte names, overlong ids, u
 
 it("3.1 a service snapshot has the owner's engine wait state and reloadable flags", async () => run(Effect.gen(function* () {
   yield* seedAgent({ id: "agent-a", reloadable: false });
-  const reply = yield* snapshotFor({ _tag: "service", service: "roles.sheepdog" });
+  const reply = yield* snapshotFor({ _tag: "service", service: "roles.stallWatch" });
   expect(reply.waitState).toEqual({ deliveries: [], waits: [] });
   expect(reply.agents[0]).toMatchObject({ agentId: "agent-a", reloadable: false });
   expect(reply.accounts).toEqual(expect.any(Array));

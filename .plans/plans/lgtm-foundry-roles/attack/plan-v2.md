@@ -7,7 +7,7 @@ updated: 2026-11-03
 epic: lgtm-foundation
 ---
 
-# Build the foundry roles and the sheepdog
+# Build the foundry roles and the stall watch
 
 ## Overview
 
@@ -29,7 +29,7 @@ team's own definitions, such as how many workers a lead runs or what a
 reviewer is told, stay outside this repository, as the project rules
 require. In this version a role's rules are advice. An agent asks LGTM Studio
 "who am I" and gets its role, its parent, its children and its role's
-rules. The sheepdog reports an agent that breaks one to its parent, and
+rules. The stall watch reports an agent that breaks one to its parent, and
 LGTM Studio does not refuse the action. The lead ruled this on 2026-11-03, and
 enforcement is recorded as a later idea.
 
@@ -51,7 +51,7 @@ removes a rule, and the owner's phone is told the first time each rule is
 used. Standing rules need the first of the engine changes described below.
 Without it, the owner can write rules, but nothing is answered by them.
 
-The third addition is the sheepdog. It is a small part of the LGTM Studio
+The third addition is the stall watch. It is a small part of the LGTM Studio
 service that watches the record of events and keeps every agent moving
 without spending their turns. It replaces the Foundry's scripts. It tells a
 lead's parent when the lead's team has had nothing running for an hour. It
@@ -65,14 +65,14 @@ agent, or compacts the agent's context, because that is when both are
 cheapest. It never decides what the work is. When a worker is replaced,
 LGTM Studio builds the replacement's first message from the record of what the
 old worker did, so no model turn is spent writing a summary. The owner can
-switch the sheepdog and the standing rules off from any client.
+switch the stall watch and the standing rules off from any client.
 
 Two other plans were written at the same time, and this one builds on both
 of their contracts, which are now frozen. The client API plan adds one
 extension point to the engine. Through it the roles add their own commands
-and events, and the sheepdog acts as a narrow "service" caller whose actions
-the record names as the sheepdog's, not the owner's. The client API also
-lets an agent list its own team. The message board lets the sheepdog post
+and events, and the stall watch acts as a narrow "service" caller whose actions
+the record names as the stall watch's, not the owner's. The client API also
+lets an agent list its own team. The message board lets the stall watch post
 a notice that no agent can forge, and deliver an agent's waiting messages
 at a chosen moment.
 
@@ -97,7 +97,7 @@ first.
 
 - **The roles plug into the engine through one extension point, without
   changing what the engine does.** Pending the owner. The roles add their
-  own commands and record their own events through it. The sheepdog runs
+  own commands and record their own events through it. The stall watch runs
   inside the LGTM Studio service as a narrow caller that can nudge, compact,
   resume, post notices and release held messages, and nothing else. After a
   restart it reads the record again and knows everything it knew before.
@@ -110,7 +110,7 @@ first.
   Any character outside a short safe list, any extra word, and any request
   to leave the sandbox means no match. The cost is that the owner writes a
   rule per command, and that rules need the first engine change.
-- **The sheepdog tells the parent; the parent acts.** It wakes an agent,
+- **The stall watch tells the parent; the parent acts.** It wakes an agent,
   retries a capacity error and resumes a crash once by itself. Replacing a
   worker or giving up is reported to the nearest ancestor that can act,
   which decides. This follows the owner's words of 2026-10-25: "tell the
@@ -160,19 +160,19 @@ outside its folder. A dedicated attack review checks it. Done when a
 worker's matching request is answered by the rule, and requests for
 `pnpm test & rm -rf ~` and `pnpm test -- --config x` are not.
 
-### A sheepdog keeps every agent moving
+### A stall watch keeps every agent moving
 
-The sheepdog runs inside the LGTM Studio service, reads the record of events,
+The stall watch runs inside the LGTM Studio service, reads the record of events,
 and acts through its narrow caller. It is the base the next workstreams'
-rules sit on. The risk is a sheepdog that nudges the same agent twice after
+rules sit on. The risk is a stall watch that nudges the same agent twice after
 a restart. Every action it takes is itself recorded, so it reads its own
 past actions when it starts and does not repeat them. Done when a service
 restarted in the middle of a team's run sends no duplicate nudge, and a
-sheepdog switched off sends nothing.
+stall watch switched off sends nothing.
 
 ### Stalls, crashes and capacity errors are handled without the owner
 
-The sheepdog's rules cover a team with nothing running for an hour, a
+The stall watch's rules cover a team with nothing running for an hour, a
 worker sitting on an unanswered message, the third such stall, a turn or a
 worker that runs past two hours, a "model at capacity" error, a crash, and
 an agent that breaks its role's advice. Usage-limit pauses never count as
@@ -185,10 +185,10 @@ stays quiet in a team that is paused or rightly waiting on another agent.
 ### Waiting messages and compaction are timed to the prompt cache
 
 Two minutes before an idle Claude agent's prompt cache expires, the
-sheepdog delivers the messages waiting for it, if there are any, so they
+stall watch delivers the messages waiting for it, if there are any, so they
 are read at the cheap cached price. If there are none and its context is
 large, it asks the agent to compact. The risk is compacting an agent that
-is about to receive work. The sheepdog skips any agent with something
+is about to receive work. The stall watch skips any agent with something
 queued, open or waiting, and it schedules nothing when it cannot tell when
 the cache expires. Done when a test shows the delivery or the compact
 request two minutes before the computed expiry, and neither for a busy
@@ -211,7 +211,7 @@ for one with a very long brief.
 If the owner agrees, the engine records which tool asked for a permission
 and what it will run, and asks the roles' rule matcher before it delivers
 the request. It holds a message that met a capacity error in its queue
-instead of returning it to the lead, until the sheepdog releases it. It
+instead of returning it to the lead, until the stall watch releases it. It
 records each turn's token and cache usage. The risk is the same as any
 engine change: a regression in a part that is already reviewed. Each
 change keeps every existing engine test passing unchanged and adds its
@@ -241,7 +241,7 @@ uses no `herdr agent` command, `collect.sh` or `board-waker.sh`.
 2. **Build the roles' commands and events,** then `orient` and the
    standing-rule commands, once the extension point and the client API's
    roster have merged.
-3. **Build the sheepdog's base, then its rules.** The rules that send
+3. **Build the stall watch's base, then its rules.** The rules that send
    notices need the board's post, flush and status commands, so they follow
    the board's first units.
 4. **Build the three engine changes, if the owner allowed them,** each in
@@ -297,7 +297,7 @@ change (AGENTS.md rule 3; only the lead writes the list).
 (row 26): `packages/roles-contracts` (schemas only; depends on
 `packages/contracts`, and on the client and board contracts packages for
 their types) and `packages/roles` (handlers, view, reactors, services, the
-sheepdog). Commands and their access:
+stall watch). Commands and their access:
 
 | Command | Access (CAPI §2) | What it does |
 |---|---|---|
@@ -308,7 +308,7 @@ sheepdog). Commands and their access:
 | `roles.rules.list` | owner, device | Lists standing rules, their state and their use counts. |
 | `roles.rules.add` | owner, and device unless CAPI's question Q2 makes it host-only (CAPI §7, item 4) | Adds a standing rule. |
 | `roles.rules.disable`, `roles.rules.remove` | owner, device | Disables or removes a rule. |
-| `roles.settings.get`, `roles.settings.set` | owner, device | The sheepdog's limits, within bounds (rows 16, 25, 48), and the two on/off switches (row 46). |
+| `roles.settings.get`, `roles.settings.set` | owner, device | The stall watch's limits, within bounds (rows 16, 25, 48), and the two on/off switches (row 46). |
 | `roles.snooze` | owner, device | Silences team-idle notices for one group until a time. |
 | `roles.record` | service | The two roles services write their own action records (row 41). |
 
@@ -316,7 +316,7 @@ Events, all `owner-only` (CAPI §3), so agents never see them through
 `subscribe`: `roles.RoleFileSet`, `roles.RuleAdded` (with the adding
 device, if any), `roles.RuleDisabled`, `roles.RuleRemoved`,
 `roles.RuleFirstUsed`, `roles.SettingsChanged`, `roles.Snoozed`, and the
-sheepdog's action records `roles.TeamIdleReported`, `roles.StallSeen`,
+stall watch's action records `roles.TeamIdleReported`, `roles.StallSeen`,
 `roles.ReplaceAdvised`, `roles.RunawayReported`, `roles.CapacityRetried`,
 `roles.CrashRetried`, `roles.GaveUp`, `roles.RoleAdviceBroken`,
 `roles.CacheFlushed` and `roles.CompactRequested`. Each action record
@@ -329,7 +329,7 @@ except for a crash, where the engine's own `failure` alert already stands
 (CAPI §4); `ReplaceAdvised` raises `roles.replace`; `RunawayReported` raises
 `roles.runaway`; `RuleFirstUsed` raises `roles.rule-first-use` for every
 rule. `RoleAdviceBroken` raises no alert; the clients show it. Alert ends
-(row 40): `roles.stall` ends when its agent next starts a turn the sheepdog
+(row 40): `roles.stall` ends when its agent next starts a turn the stall watch
 did not start, or is stopped; `roles.replace` ends when its agent is
 stopped; `roles.runaway` ends when the turn ends or the agent is stopped;
 `roles.rule-first-use` ends when the rule is disabled or removed. Every
@@ -352,21 +352,21 @@ agents of the latest records (older agents' records drop out of the
 snapshot first).
 
 Services (CAPI §2, "Services"): `roles.standing-rules` and
-`roles.sheepdog`. The standing-rules service does not call the engine's
+`roles.stallWatch`. The standing-rules service does not call the engine's
 `answer`: a rule answers through WS-7a's pre-check, inside the engine's
 transaction (row 35). The standing-rules service calls only `subscribe`
-and `roles.record`. The sheepdog calls exactly `subscribe`, `prompt`,
+and `roles.record`. The stall watch calls exactly `subscribe`, `prompt`,
 `compact`, `resume`, `roles.record` and, with WS-7b, `release`. Its board
 commands are exactly `board.post`, `board.flush` and `board.status`; a
 service cannot use `board.read` (Board, "For LGTM Studio's own services"). A
 notice to an agent is a `board.post` with a `direct` target to that agent,
 which lead ruling L17 allows: the pair is the agent and the service, the
-author is `service roles.sheepdog`, and the service still cannot read it
+author is `service roles.stallWatch`, and the service still cannot read it
 (row 34). There is no engine-prompt fallback for notices. When the board is
 switched off, a notice to an agent is not sent: its action record says
 `board-off`, the clients show it, and a `GaveUp` or `ReplaceAdvised` is
 also raised to the owner as its alert, so a decision never waits on a
-switched-off board (row 34). The sheepdog's engine `prompt` is used only
+switched-off board (row 34). The stall watch's engine `prompt` is used only
 for work: the carry-on after a crash (4.6) and the capacity re-send
 without WS-7b (4.5).
 
@@ -376,7 +376,7 @@ that is idle or working, which is the engine's `holderAbove`
 (`packages/engine/src/routing/holders.ts:21`), or the owner when there is
 none. The action record names both the subject agent and the recipient. If
 the recipient crashes or is stopped while the notice is still unread
-(`board.status`), the sheepdog sends the notice once more, to the new
+(`board.status`), the stall watch sends the notice once more, to the new
 holder.
 
 Request ids (row 41). Each action's request id is
@@ -412,7 +412,7 @@ package, the role file, and `orient`. Role names are parsed from the free
 | 1a | `parseRole` and the three kinds, with generic advice for each: an orchestrator talks to leads; a lead starts, waits on and answers for its own workers; a worker reports to its lead, does not start agents and does not ask the owner | target `packages/roles-contracts/src/role.ts:parseRole`; pattern `packages/contracts/src/permission.ts:permissionLevels` |
 | 1b | `packages/roles-contracts`: `RolesRpcGroup`, `RolesEvent`, `rolesAccess`, `rolesVisibility`, `rolesAlertSources`, and the stated maxima above | CAPI §1, "Where the schemas live"; §5 (stated maxima); pattern `packages/contracts/src/commands.ts:CommandsRpcGroup`, `packages/contracts/src/events.ts:Event` |
 | 1c | Role-file schema (role name to advice text and limits, each limit within row 48's bounds), loader from content, `roles.role-file.set` and `get` handlers | target `packages/roles/src/roleFile.ts:loadRoleFile`; pattern `packages/contracts/src/harnesses.ts` |
-| 1d | The roles view (role file, rules, settings, switches, snoozes, the sheepdog's action records, the stall and retry counters, the reactors' cursors), its bounded `snapshotFor` hook, and its registration on the seam | target `packages/roles/src/view.ts:apply`; pattern `packages/engine/src/views/apply.ts:apply`, `emptyViews`; CAPI §1, "Views and reactors" |
+| 1d | The roles view (role file, rules, settings, switches, snoozes, the stall watch's action records, the stall and retry counters, the reactors' cursors), its bounded `snapshotFor` hook, and its registration on the seam | target `packages/roles/src/view.ts:apply`; pattern `packages/engine/src/views/apply.ts:apply`, `emptyViews`; CAPI §1, "Views and reactors" |
 | 1e | `roles.orient` handler over `client.roster` entries (CAPI §3) and the role file | target `packages/roles/src/orient.ts`; envelope rule `packages/engine/src/routing/envelope.ts` |
 
 **Risks:**
@@ -520,9 +520,9 @@ agent can change what the command runs.
 
 **Verify:** `pnpm --filter @lgtm/roles test`. Device or environment QA: the owner's recording run for 2g.
 
-**WS-3: A sheepdog keeps every agent moving**
+**WS-3: A stall watch keeps every agent moving**
 
-This work builds the sheepdog's base inside the roles piece (row 23): the
+This work builds the stall watch's base inside the roles piece (row 23): the
 service registration, the reactors' cursors, the settings and switches,
 snoozes, notices, request ids and timers. The rules in WS-4 and WS-5 plug
 into it.
@@ -531,27 +531,27 @@ into it.
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 3.1 | The roles view rebuilt from the log equals the live view, through the engine's rebuild check | `packages/engine/test/support/rebuildCheck.ts` run over the roles suite; `packages/roles/test/sheepdog/fold.test.ts` S01 |
-| 3.2 | After a service restart in the middle of a run, the sheepdog sends no nudge, notice, retry or compaction it had already recorded; a kill between a command and its action record, for each action kind, leads to exactly one command | `fold.test.ts` S02-S03 |
+| 3.1 | The roles view rebuilt from the log equals the live view, through the engine's rebuild check | `packages/engine/test/support/rebuildCheck.ts` run over the roles suite; `packages/roles/test/stall-watch/fold.test.ts` S01 |
+| 3.2 | After a service restart in the middle of a run, the stall watch sends no nudge, notice, retry or compaction it had already recorded; a kill between a command and its action record, for each action kind, leads to exactly one command | `fold.test.ts` S02-S03 |
 | 3.3 | Request ids follow the rule above: an hourly repeat and a stall's later episode get new ids; a retry of one action reuses its id and body; two recipients of one trigger get two ids | `fold.test.ts` S04-S06 |
-| 3.4 | The two services call only the commands listed under "Services" above; a test lists their calls and compares | `packages/roles/test/sheepdog/calls.test.ts` K01 |
-| 3.5 | A notice to an agent is a `board.post` by `service roles.sheepdog` with a `direct` target and `reply: none`, followed by `board.flush` when it must wake the agent now; its body is fixed text plus sanitized names; a notice to the owner is a roles event that raises its alert | `packages/roles/test/sheepdog/notices.test.ts` N01-N03, N07 |
+| 3.4 | The two services call only the commands listed under "Services" above; a test lists their calls and compares | `packages/roles/test/stall-watch/calls.test.ts` K01 |
+| 3.5 | A notice to an agent is a `board.post` by `service roles.stallWatch` with a `direct` target and `reply: none`, followed by `board.flush` when it must wake the agent now; its body is fixed text plus sanitized names; a notice to the owner is a roles event that raises its alert | `packages/roles/test/stall-watch/notices.test.ts` N01-N03, N07 |
 | 3.6 | With the board switched off, no notice is sent, its action record says `board-off`, and a `GaveUp` or `ReplaceAdvised` raises its owner alert | `notices.test.ts` N06 |
 | 3.7 | A notice goes to the subject's nearest idle or working ancestor, or to the owner when there is none; a notice still unread when its recipient crashes is sent once to the new holder | `notices.test.ts` N08-N09 |
 | 3.8 | `roles.snooze` silences team-idle notices for that group until the time passes; `roles.settings.set` changes a limit and the next check uses it; a value outside its bounds is refused with its path | `notices.test.ts` N04-N05, N10 |
-| 3.9 | Timers are re-armed from the view at start-up; a stall, team-idle or capacity deadline that passed while the service was down is re-checked and fires once, one step only; a cache deadline that passed is dropped | `packages/roles/test/sheepdog/timers.test.ts` T01-T03 (`TestClock.adjust`) |
-| 3.10 | With `sheepdog: off`, the sheepdog sends nothing, cancels its timers and keeps folding events; with WS-7b it first releases each held delivery once; with `standing-rules: off`, the pre-check matches nothing; switching back on re-arms the timers under 3.9's rules | `packages/roles/test/sheepdog/switch.test.ts` W01-W04 |
+| 3.9 | Timers are re-armed from the view at start-up; a stall, team-idle or capacity deadline that passed while the service was down is re-checked and fires once, one step only; a cache deadline that passed is dropped | `packages/roles/test/stall-watch/timers.test.ts` T01-T03 (`TestClock.adjust`) |
+| 3.10 | With `stallWatch: off`, the stall watch sends nothing, cancels its timers and keeps folding events; with WS-7b it first releases each held delivery once; with `standing-rules: off`, the pre-check matches nothing; switching back on re-arms the timers under 3.9's rules | `packages/roles/test/stall-watch/switch.test.ts` W01-W04 |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 3a | Register `roles.sheepdog` and `roles.standing-rules` on the seam; the reactors' cursors in the roles view; the `roles.record` command for the services | CAPI §2, "Services"; §1, "Views and reactors" |
-| 3b | Settings shape, bounds and defaults (rows 16, 25, 48), the two switches (row 46), with per-role overrides from the role file | target `packages/roles/src/sheepdog/settings.ts` |
-| 3c | Notices through `board.post` and `board.flush`, the recipient rule, the `board-off` record, owner notices as roles events | target `packages/roles/src/sheepdog/notices.ts`; Board, "For LGTM Studio's own services"; `packages/engine/src/routing/holders.ts:holderAbove` |
+| 3a | Register `roles.stallWatch` and `roles.standing-rules` on the seam; the reactors' cursors in the roles view; the `roles.record` command for the services | CAPI §2, "Services"; §1, "Views and reactors" |
+| 3b | Settings shape, bounds and defaults (rows 16, 25, 48), the two switches (row 46), with per-role overrides from the role file | target `packages/roles/src/stall-watch/settings.ts` |
+| 3c | Notices through `board.post` and `board.flush`, the recipient rule, the `board-off` record, owner notices as roles events | target `packages/roles/src/stall-watch/notices.ts`; Board, "For LGTM Studio's own services"; `packages/engine/src/routing/holders.ts:holderAbove` |
 | 3d | Timers on Effect's clock, re-armed from the view; each rule declares whether a missed deadline is re-checked or dropped | pattern `packages/engine/src/accounts/timers.ts:startAccountTimers` (and its re-check of deadlines crossed during a tick, issue 210) |
 | 3e | Action request ids (row 41) | CAPI §5, "Request ids" |
-| 3f | The on/off switches and their effect on timers, held deliveries and the pre-check | target `packages/roles/src/sheepdog/switch.ts` |
+| 3f | The on/off switches and their effect on timers, held deliveries and the pre-check | target `packages/roles/src/stall-watch/switch.ts` |
 
 **Risks:**
 
@@ -559,7 +559,7 @@ into it.
 |---|---|---|
 | Duplicate or lost actions across a restart | major | 3.2 and 3.3; the reactor is safe to run twice on the same event (CAPI §1). |
 | The service callers' rights are wider than they need | major | 3.4. |
-| A notice is read by the lead as an instruction from another agent | minor | Only an in-process service can be a post's author, and the wake's header names it as `service roles.sheepdog` from fixed words (Board, "How a wake reaches an agent"); the notice text is fixed by LGTM Studio. |
+| A notice is read by the lead as an instruction from another agent | minor | Only an in-process service can be a post's author, and the wake's header names it as `service roles.stallWatch` from fixed words (Board, "How a wake reaches an agent"); the notice text is fixed by LGTM Studio. |
 | A notice reaches a holder that cannot act | major | 3.7. |
 | The board is switched off | minor | 3.6: decisions reach the owner as alerts; the rest is recorded. |
 | A defect in the roles needs them stopped while the engine keeps running | major | 3.10; the engine is never downgraded once roles events exist (row 46). |
@@ -588,7 +588,7 @@ episode begins:
 - episode 2: A is nudged again, and A's holder is told that A stalled
   twice on P;
 - episode 3: `ReplaceAdvised` tells A's holder to replace A, offering
-  `roles.handoff`, and the sheepdog stops nudging A about P.
+  `roles.handoff`, and the stall watch stops nudging A about P.
 
 The episode count resets to zero when A makes progress (a thread item that
 records a file change, or a board post by A), when P closes, or when A's
@@ -601,12 +601,12 @@ twice at once.
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 4.1 | Team idle: a group with at least one live, unpaused member, whose live members are all idle and none is waiting on others, for 60 minutes, gets one nudge to each of its top agents (each member whose parent is outside the group) and one notice to each distinct holder of those; then hourly; turns the sheepdog started do not restart the hour; a group whose members are all stopped or paused gets nothing; a snoozed group gets nothing | `packages/roles/test/sheepdog/rules/teamIdle.test.ts` TI01-TI08 |
+| 4.1 | Team idle: a group with at least one live, unpaused member, whose live members are all idle and none is waiting on others, for 60 minutes, gets one nudge to each of its top agents (each member whose parent is outside the group) and one notice to each distinct holder of those; then hourly; turns the stall watch started do not restart the hour; a group whose members are all stopped or paused gets nothing; a snoozed group gets nothing | `packages/roles/test/stall-watch/rules/teamIdle.test.ts` TI01-TI08 |
 | 4.2 | Stall: the state machine above, through three episodes on a simulated clock: nudge, nudge and holder notice, `ReplaceAdvised`; a file change or a post resets the count; tool calls alone do not; P closing resets it; the count survives a restart | `rules/stall.test.ts` ST01-ST08 |
 | 4.3 | A lead that holds an open `all` post to its working workers, and a worker with an open wait or an open question of its own, are not stalled; when the awaited agent itself stalls, only that agent's own stall fires | `rules/stall.test.ts` ST09-ST11 |
 | 4.4 | Runaway: a turn longer than the role's turn limit (default 120 minutes, not counting time paused or holding an open permission request) tells the holder once per turn; an agent older than the role's age limit (default 120 minutes from `AgentStarted`, the Foundry's worker cap) tells the holder once, suggesting a hand-off | `rules/runaway.test.ts` RW01-RW04 |
 | 4.5 | Capacity: with WS-7b, a held delivery is released after 5 minutes, at most 12 times in one outage, then the holder is told once to move the work to another model and the delivery stays held; an outage ends, and the count resets, when a turn ends with no capacity error; without WS-7b, only a returned delivery whose source is an engine `prompt` from an agent or the owner, and whose reason matches the capacity patterns, is re-sent on the same schedule, with the original sender's engine id in a fixed header outside the data envelope, and only if the target has not started a turn and its sender has sent it nothing since; board wakes, compactions, permission, question and wait deliveries are never re-sent | `rules/capacity.test.ts` CP01-CP08 |
-| 4.6 | Crash: on the first `AgentCrashed` for an agent within an hour, the sheepdog checks that the crash is still current, calls `resume` once, and after `SessionOpened`, if the engine queued no carry-on, sends one `prompt` with fixed carry-on text; it then tells the holder that the agent was resumed, that the holder's posts to it resolved as `gone` and must be posted again if still needed, and not to replace it unless told the sheepdog gave up; a refused `resume`, an `AgentReloadFailed`, or a second crash within the hour writes `GaveUp` and tells the holder at once | `rules/crash.test.ts` CR01-CR06 |
+| 4.6 | Crash: on the first `AgentCrashed` for an agent within an hour, the stall watch checks that the crash is still current, calls `resume` once, and after `SessionOpened`, if the engine queued no carry-on, sends one `prompt` with fixed carry-on text; it then tells the holder that the agent was resumed, that the holder's posts to it resolved as `gone` and must be posted again if still needed, and not to replace it unless told the stall watch gave up; a refused `resume`, an `AgentReloadFailed`, or a second crash within the hour writes `GaveUp` and tells the holder at once | `rules/crash.test.ts` CR01-CR06 |
 | 4.7 | Usage-limit and sign-in pauses are never nudged and never counted as stalls or team idleness | `rules/stall.test.ts` ST12; `rules/teamIdle.test.ts` TI04 |
 | 4.8 | Role advice: a worker that itself starts an agent, posts to the owner, or passes a question up is reported to its holder once per kind of break; a question moved by an ancestor's `pass-up` or by the holder chain is not reported | `rules/roleAdvice.test.ts` RA01-RA04 |
 | 4.9 | A notice whose recipient is the owner raises the alert in the table above instead of a post: one test per action kind, and none for `GaveUp` after a crash or for role advice | `rules/ownerAlerts.test.ts` OA01-OA07 |
@@ -615,7 +615,7 @@ twice at once.
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 4a | Team idle rule over engine groups, per top agent and per holder | target `packages/roles/src/sheepdog/rules/teamIdle.ts`; groups from `AgentStarted.groups` and `AgentGrouped` (`packages/contracts/src/events.ts:Event`); own open posts from `board.status` |
+| 4a | Team idle rule over engine groups, per top agent and per holder | target `packages/roles/src/stall-watch/rules/teamIdle.ts`; groups from `AgentStarted.groups` and `AgentGrouped` (`packages/contracts/src/events.ts:Event`); own open posts from `board.status` |
 | 4b | Stall state machine, with its counter per post and addressee (row 37) | target `rules/stall.ts`; Board, `board.status` ("open posts waiting for its reply") and its pure-function export from `packages/board`; the "waiting on others" test above, on the pattern of `packages/engine/src/routing/waits.ts:settled` |
 | 4c | Runaway rule from `TurnStarted`, `TurnEnded`, pauses and permission requests; age rule from `AgentStarted` | target `rules/runaway.ts`; `FOUNDRY/scripts/context-keeper.sh` (`WORKER_MAX_MIN`) |
 | 4d | Capacity rule with one pattern table: `Selected model is at capacity`, `API Error: 529`, `overloaded_error`, `model is currently overloaded`; matched after the engine's redaction | target `rules/capacity.ts`; patterns from `FOUNDRY/scripts/capacity-retry.sh` `CAPACITY_RE` (scouting.md, Scout S); `DeliveryReturned {sender, reason}`; `packages/engine/src/routing/deliveries.ts` l.126-128; WS-7b's `DeliveryHeld` |
@@ -628,9 +628,9 @@ twice at once.
 |---|---|---|
 | Notices wake leads so often that they cost more than they save | major | One notice per event; hourly repeats at most; `reply: none` posts that wake only when flushed; snooze. The acceptance test counts lead wakes (8.3). |
 | A lead or worker rightly waiting on another agent is treated as stalled | major | The "waiting on others" test (4.3). |
-| Without WS-7b, a capacity outage on a board wake ends that addressee's part of the post | minor | The board owns its wakes' retries (Board, returned wakes); the sheepdog never re-sends them; known gap 6. |
+| Without WS-7b, a capacity outage on a board wake ends that addressee's part of the post | minor | The board owns its wakes' retries (Board, returned wakes); the stall watch never re-sends them; known gap 6. |
 | A crash loop on resume | major | One retry per hour per agent (row 17). |
-| The engine's own crash notice wakes the holder before the sheepdog's notice, and the holder starts a replacement anyway | minor | The sheepdog's notice says what it did; known gap 15. |
+| The engine's own crash notice wakes the holder before the stall watch's notice, and the holder starts a replacement anyway | minor | The stall watch's notice says what it did; known gap 15. |
 
 **Verify:** `pnpm --filter @lgtm/roles test`. Device or environment QA: none.
 
@@ -638,7 +638,7 @@ twice at once.
 
 A prompt cache's life starts when a model request starts, and a request
 that reads the cache renews it (row 45; Claude prompt-caching documentation,
-read through context7 on 2026-11-03). The sheepdog therefore takes, for the
+read through context7 on 2026-11-03). The stall watch therefore takes, for the
 last model request of an agent's last turn, its start time and the cache
 lifetimes it read or wrote. The start time is the request's own if the
 usage source gives it, and otherwise the turn's `TurnStarted`, which is
@@ -650,7 +650,7 @@ has no default, so nothing is scheduled until the owner sets it. The expiry
 is the start time plus the lifetime. If it has already passed, or is
 unknown, nothing is scheduled. Two minutes before the expiry, for an idle
 agent that is not waiting on others and has nothing queued: if
-`board.status` shows unread posts, the sheepdog calls `board.flush`
+`board.status` shows unread posts, the stall watch calls `board.flush`
 (row 28); otherwise, if the agent's context is at least its role's floor
 (default 150,000 tokens; a role file may switch compaction off for a role),
 it asks for a compaction.
@@ -659,20 +659,20 @@ it asks for a compaction.
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 5.1 | A last request that started at time T, wrote only one-hour cache tokens, and left 200,000 context tokens, with no unread posts, gives a compact request at T + 58 minutes | `packages/roles/test/sheepdog/rules/cache.test.ts` CM01 (`TestClock.adjust`) |
+| 5.1 | A last request that started at time T, wrote only one-hour cache tokens, and left 200,000 context tokens, with no unread posts, gives a compact request at T + 58 minutes | `packages/roles/test/stall-watch/rules/cache.test.ts` CM01 (`TestClock.adjust`) |
 | 5.2 | The same with two unread posts gives a `board.flush` at T + 58 minutes and no compaction | `cache.test.ts` CM02 |
 | 5.3 | Nothing is sent when the agent has a queued delivery, an open request, question or wait, is compacting, or its last turn was a compaction; a newer turn replaces the timer; the guard is checked again at the moment of sending | `cache.test.ts` CM03-CM07 |
 | 5.4 | No compaction below the floor, with compaction off for the role, or with an unknown expiry | `cache.test.ts` CM08-CM10 |
 | 5.5 | A four-minute turn on a five-minute cache, timed from `TurnStarted`, schedules nothing, because the deadline has passed; a request with both lifetimes uses five minutes; a read-only request uses five minutes; with no lifetime split and no `cacheLifetime` setting, nothing is scheduled | `cache.test.ts` CM11-CM14 |
 | 5.6 | With WS-7c, usage comes from `TurnEnded`; without it, from the Claude transcript, and a missing transcript schedules nothing | `cache.test.ts` CM15-CM16 |
-| 5.7 | The transcript reader refuses a session id outside the expected format, opens one expected path without following a symbolic link, reads at most a bounded tail, keeps only numbers and timestamps, and never logs or records text it read | `packages/roles/test/sheepdog/usage.test.ts` U01-U04 |
+| 5.7 | The transcript reader refuses a session id outside the expected format, opens one expected path without following a symbolic link, reads at most a bounded tail, keeps only numbers and timestamps, and never logs or records text it read | `packages/roles/test/stall-watch/usage.test.ts` U01-U04 |
 
 **Tasks:**
 
 | # | Task | Anchor (file + symbol; line optional) |
 |---|---|---|
-| 5a | Expiry rule and schedule | target `packages/roles/src/sheepdog/rules/cache.ts`; design read from T3 Code `apps/server/src/orchestration-v2/IdleCompaction.ts` (read, not copied; copying invokes AGENTS.md rule 2) |
-| 5b | Usage source: `TurnEnded` (WS-7c) or the transcript reader, hardened as in 5.7 | target `packages/roles/src/sheepdog/usage.ts`; fields from `FOUNDRY/scripts/context-keeper.sh:last_call` (`.message.usage.input_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`; scouting.md, Scout S answer b), plus `cache_creation.ephemeral_5m_input_tokens` and `ephemeral_1h_input_tokens`; reader pattern `packages/engine/src/identity/ceiling.ts` l.97-120 (`O_NOFOLLOW`) |
+| 5a | Expiry rule and schedule | target `packages/roles/src/stall-watch/rules/cache.ts`; design read from T3 Code `apps/server/src/orchestration-v2/IdleCompaction.ts` (read, not copied; copying invokes AGENTS.md rule 2) |
+| 5b | Usage source: `TurnEnded` (WS-7c) or the transcript reader, hardened as in 5.7 | target `packages/roles/src/stall-watch/usage.ts`; fields from `FOUNDRY/scripts/context-keeper.sh:last_call` (`.message.usage.input_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`; scouting.md, Scout S answer b), plus `cache_creation.ephemeral_5m_input_tokens` and `ephemeral_1h_input_tokens`; reader pattern `packages/engine/src/identity/ceiling.ts` l.97-120 (`O_NOFOLLOW`) |
 | 5c | `board.flush` and `compact` through the service caller | Board, "For LGTM Studio's own services"; `packages/engine/src/runner/compact.ts:compactPrompt` (read only) |
 
 **Risks:**
@@ -763,7 +763,7 @@ rebuild check pass unchanged.
 | Risk | Severity | Mitigation |
 |---|---|---|
 | 7a puts the matcher inside the engine's most sensitive path | major | The matcher is WS-2's pure function; the engine checks every answer itself (7.2); attack pass on 7a; the permission acceptance test stays unchanged. |
-| 7b holds a message forever when the capacity error never clears | minor | The sheepdog's 12-release limit and its notice (4.5); the holder or owner can release it; switching the sheepdog off releases it (3.10). |
+| 7b holds a message forever when the capacity error never clears | minor | The stall watch's 12-release limit and its notice (4.5); the holder or owner can release it; switching the stall watch off releases it (3.10). |
 | 7c's fields are missing in older logs | minor | Optional fields; the rebuild check. |
 
 **Verify:** `pnpm --filter @lgtm/engine test`. Device or environment QA: none.
@@ -777,8 +777,8 @@ use it is in the Founder OS repository and is changed after this plan.
 
 | # | Criterion | Observed by (test id / command / on-device step) |
 |---|---|---|
-| 8.1 | `docs/foundry.md` maps every action of the Foundry skill's Steps 3, 4, 5 and 8 to an LGTM Studio command, setting or sheepdog rule, or marks it as team workflow that stays in the skill; it states that the roles are stopped by their switches, never by downgrading the engine | Read against `FOUNDRY/SKILL.md` by the unit's reviewer; `grep -n 'herdr agent\|collect.sh\|board-waker.sh' docs/foundry.md` hits only its "What this replaces" table |
-| 8.2 | The acceptance test runs an orchestrator, two leads and two workers each, with fake agents, through the public socket only, with the sheepdog's limits set to seconds: roles and groups at start; `roles.orient` for each; a group channel per team; a standing rule answers a worker's test run; a lead's hand-off post in `all` mode wakes it once when both workers reply, and the lead is not reported as stalled while it waits; a worker stalls through three episodes and is reported; a capacity error is held and released; a worker crashes, is resumed and carries on with a new working turn, crashes again and is reported; a team idles and its lead's holder is told; the wrap-up reads `client.roster` for an attribution table and exports each thread | `packages/roles/test/acceptance/foundry-run.test.ts` FR01-FR10 |
+| 8.1 | `docs/foundry.md` maps every action of the Foundry skill's Steps 3, 4, 5 and 8 to an LGTM Studio command, setting or stall watch rule, or marks it as team workflow that stays in the skill; it states that the roles are stopped by their switches, never by downgrading the engine | Read against `FOUNDRY/SKILL.md` by the unit's reviewer; `grep -n 'herdr agent\|collect.sh\|board-waker.sh' docs/foundry.md` hits only its "What this replaces" table |
+| 8.2 | The acceptance test runs an orchestrator, two leads and two workers each, with fake agents, through the public socket only, with the stall watch's limits set to seconds: roles and groups at start; `roles.orient` for each; a group channel per team; a standing rule answers a worker's test run; a lead's hand-off post in `all` mode wakes it once when both workers reply, and the lead is not reported as stalled while it waits; a worker stalls through three episodes and is reported; a capacity error is held and released; a worker crashes, is resumed and carries on with a new working turn, crashes again and is reported; a team idles and its lead's holder is told; the wrap-up reads `client.roster` for an attribution table and exports each thread | `packages/roles/test/acceptance/foundry-run.test.ts` FR01-FR10 |
 | 8.3 | The same test counts lead wakes: none from a matched standing rule or a capacity error with WS-7 | `foundry-run.test.ts` FR11 |
 | 8.4 | Live check by hand: the same flow on a real Claude Code lead and a real Codex worker on the owner's accounts, with one standing rule and one timed compaction or flush | `pnpm live-check:roles`, run by the owner; its report saved under `.scratch/` |
 
@@ -811,7 +811,7 @@ the seam's in-process service path lets a service call a piece's command
 redaction of a returned delivery's reason; (5) a differential check: for
 every command the matcher accepts in its tests, `bash` parses it into
 exactly one simple command whose words equal the parser's words; (6) a
-fault-injection run that kills the service between each sheepdog command
+fault-injection run that kills the service between each stall watch command
 and its action record, for every action kind, and finds exactly one of
 each.
 
@@ -832,10 +832,10 @@ seven needs; (H) decisions.md; (I) lead rulings L17, L19, L20 and L22.
 |---|---|---|
 | A: orchestrator, team leads, workers | WS-1 | mapped |
 | A: standing permission rules | WS-2, WS-7a | mapped; matching needs WS-7a (row 35) |
-| A: the sheepdog | WS-3, WS-4, WS-5 | mapped |
+| A: the stall watch | WS-3, WS-4, WS-5 | mapped |
 | A: Done when 1 (Steps 3-5 and 8 through LGTM Studio alone) | WS-8 | mapped; the skill rewrite is rollout step 6 |
 | A: Done when 2 (phone pairing and answers) | — | piece 2 |
-| A: Done when 3 (a message wakes only the agent that needs it) | — | piece 3; the sheepdog's notices use `reply: none` and `board.flush` |
+| A: Done when 3 (a message wakes only the agent that needs it) | — | piece 3; the stall watch's notices use `reply: none` and `board.flush` |
 | B: rules for each role | WS-1, WS-4f | mapped (advice, row 10) |
 | B: standing permission rules | WS-2 | mapped |
 | B: retrying, replacing or giving up | WS-4b, WS-4d, WS-4e, WS-6 | mapped |
@@ -867,7 +867,7 @@ seven needs; (H) decisions.md; (I) lead rulings L17, L19, L20 and L22.
 | G: needs 1, 3, 4, 5, 6, 7 accepted; 2 refused | WS-3, WS-4, WS-5 | accepted needs used as given; work state derived (row 25) |
 | H: rows 1 to 53 | all | each row names its workstream in its own text |
 | I: L17 (service direct pair; no engine-prompt fallback) | WS-3 | mapped (row 34) |
-| I: L19 and L22 (reach check at queue and send, on every piece delivery) | — | the roles register no reach check; the sheepdog's notices pass the board's, which L17's direct pair allows (row 52) |
+| I: L19 and L22 (reach check at queue and send, on every piece delivery) | — | the roles register no reach check; the stall watch's notices pass the board's, which L17's direct pair allows (row 52) |
 | I: L20 (standing-rule matching) | WS-2, WS-7a | mapped (row 35) |
 
 </details>
@@ -904,7 +904,7 @@ before the first launch. WS-7 uses the existing `engine/backend`.
 | 2 Roles view, snapshot and `orient` (1d, 1e) | backend | roles/backend | medium | A fold on the engine's view pattern, a bounded snapshot and one read handler. | no | 1, CAPI roster |
 | 3 Rule schema, parser, matcher, harness inputs (2a to 2c, 2f) | backend | roles/backend | high | Decides permissions without a human. | yes | 2g's recordings |
 | 4 Rule commands and pre-check registration (2d, 2e) | backend | roles/backend | medium | Wires the matcher to fixed contracts. | yes | 2, 3, 11a |
-| 5 Sheepdog base and switches (3a to 3f) | backend | roles/backend | medium | Reactor, timers and request ids on the engine's patterns. | no | 2, the board's first units |
+| 5 Stall watch base and switches (3a to 3f) | backend | roles/backend | medium | Reactor, timers and request ids on the engine's patterns. | no | 2, the board's first units |
 | 6 Idle, runaway, crash and role-advice rules (4a, 4c, 4e, 4f) | backend | roles/backend | medium | Pure rules, one test file each. | no | 5 |
 | 7 Stall state machine (4b) | backend | roles/backend | medium | One state machine over the board's status. | no | 5 |
 | 8 Capacity rule (4d) | backend | roles/backend | low | A pattern table and a timer on a fixed event. | no | 5, 11b if allowed |

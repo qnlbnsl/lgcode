@@ -314,7 +314,7 @@ own wait rule (`packages/engine/src/routing/waits.ts:49-58`).
 ### m5. MINOR. An author is not told when someone else withdraws its question, and its waiter is told "settled"
 
 - **Category:** Design. Logic: failure permits or denies.
-- **Scenario:** The sheepdog, the manager or the owner runs `board.close` on
+- **Scenario:** The stall watch, the manager or the owner runs `board.close` on
   L's open question. Alternatively, the manager removes L from the channel,
   which withdraws L's posts there (row 50(2)). A `withdrawn` close wakes
   nobody (`plan.md:276`). L's hold-unsettled condition lifts, so a waiter on

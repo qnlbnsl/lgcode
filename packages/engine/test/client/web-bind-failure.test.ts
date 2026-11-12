@@ -140,7 +140,7 @@ it("5.15 disabled outage: catches retaining a web-down alert or retrying after e
     await withWeb((ctx) => Effect.gen(function* () {
       yield* waitForEvent("client.WebServerDown", 1);
       // Establish the open alert before testing its removal. The required
-      // sheepdog startup event can still be ahead of the alert reactor.
+      // stall watch startup event can still be ahead of the alert reactor.
       yield* waitForEvent("client.AlertRaised", 1);
       yield* setSettings({ ...ctx.settings, enabled: false });
       yield* release(blocker);

@@ -30,7 +30,7 @@ it("1.2/1.26 a real socket fixture command commits once, replays its batch reply
     expect(first).toEqual({ requestId: "fixture-once", id: "record-a", sequence: expect.any(Number) });
     expect(resent).toEqual(first);
     const sql = yield* SqlClient.SqlClient;
-    const stored = yield* sql<{ sequence: number; event_type: string; payload_json: string }>`SELECT sequence, event_type, payload_json FROM events WHERE event_type != 'roles.SheepdogBaseline' ORDER BY sequence`;
+    const stored = yield* sql<{ sequence: number; event_type: string; payload_json: string }>`SELECT sequence, event_type, payload_json FROM events WHERE event_type != 'roles.StallWatchBaseline' ORDER BY sequence`;
     expect(stored).toHaveLength(1);
     expect(stored[0]!.sequence).toBe(first.sequence);
     expect(stored[0]!.event_type).toBe("client.FixtureRecorded");

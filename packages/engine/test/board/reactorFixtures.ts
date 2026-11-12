@@ -53,7 +53,7 @@ export const reactorRig = (register: () => ReturnType<typeof registerRebuildChec
       readonly reactor?: Effect.Effect<void, unknown, any>;
       readonly recovery?: Layer.Layer<Restart>;
       readonly logger?: Layer.Layer<never>;
-      readonly sheepdog?: boolean;
+      readonly stallWatch?: boolean;
     } = {}) => Effect.gen(function* () {
       const runner = yield* makeFakeRunner();
       // Reopening the database changes the fake transport object. Register the
@@ -64,7 +64,7 @@ export const reactorRig = (register: () => ReturnType<typeof registerRebuildChec
       }
       const registered = registeredReactor();
       const lists = { ...engineLists, reactors: { board: options.reactor ?? registered,
-        ...(options.sheepdog ? { roles: engineLists.reactors.roles } : {}) } };
+        ...(options.stallWatch ? { roles: engineLists.reactors.roles } : {}) } };
       const base = buildServices(rig, lists).pipe(Layer.provideMerge(runner.layer),
         Layer.provideMerge(makeFakeSecrets().layer), Layer.provideMerge(redactorLayer));
       const services = options.recovery === undefined ? base : base.pipe(Layer.provideMerge(options.recovery));

@@ -13,7 +13,7 @@ import { getRoleFile } from "../roles/roleFile.ts";
 import { listActions } from "../roles/actions.ts";
 import { orient } from "../roles/orient.ts";
 import { handoff } from "../roles/handoff.ts";
-import { getSettings } from "../roles/sheepdog/settings.ts";
+import { getSettings } from "../roles/stall-watch/settings.ts";
 export { agentReadReply } from "../client/reads/index.ts";
 
 export interface ReadReply { readonly reply: Record<string, unknown>; readonly marks?: ReadonlyArray<Event>; readonly deliveries?: ReadonlyArray<import("../routing/pieceDelivery.ts").DeliveryRequest>; readonly sideRows?: import("../log/EventLog.ts").SideRows }

@@ -12,8 +12,8 @@ Under the manager's rule, only majors are folded. The minors are listed in `know
 
 ## R5-A2 and R5-L1: a restart after a crash resume loses the carry-on
 
-- **What can go wrong:** if LGTM Studio dies after the sheepdog resumes a crashed worker and before it sends the carry-on, the worker sits idle with no carry-on and its holder is never told.
-- **The fix:** the sheepdog records `roles.CrashAdmitted` before the `resume`, and after a restart it finishes that retry under the same request ids, unless a stop cancelled it, which keeps the rule of one automatic retry.
+- **What can go wrong:** if LGTM Studio dies after the stall watch resumes a crashed worker and before it sends the carry-on, the worker sits idle with no carry-on and its holder is never told.
+- **The fix:** the stall watch records `roles.CrashAdmitted` before the `resume`, and after a restart it finishes that retry under the same request ids, unless a stop cancelled it, which keeps the rule of one automatic retry.
 - **Decision row:** 134. Tests CR08 to CR14.
 
 ## The engine re-anchor

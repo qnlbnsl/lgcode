@@ -111,7 +111,7 @@ describe("ownerHeld", () => {
       one: openPost({ reply: "any" }), two: openPost({ postId: "two" }),
       indirect: openPost({ postId: "indirect", author: agent("indirect"), to: [agent("asker")] }),
       closed: openPost({ author: agent("closed"), status: "closed", outcome: "answered" }),
-      owner: openPost({ author: owner }), service: openPost({ author: { _tag: "service", service: "roles.sheepdog" } }),
+      owner: openPost({ author: owner }), service: openPost({ author: { _tag: "service", service: "roles.stallWatch" } }),
       nobody: openPost({ author: agent("nobody"), to: [agent("target")] }),
     };
     const get = exported<(view: View) => ReadonlyArray<string>>("ownerHeld");

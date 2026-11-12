@@ -32,7 +32,7 @@ scripts to start, watch, approve or wake its agents.
 | 1 | lgtm-engine | The engine: agents over ACP, the event log, commands, permissions, waits, accounts, and one authenticated API. | done |
 | 2 | lgtm-client-api | Phone alerts, remote access through the owner's proxy, the web page behind one password, and a thread viewer in a Herdr pane. | done |
 | 3 | lgtm-message-board | Channels, direct messages and wake rules, behind one delivery interface. | done |
-| 4 | lgtm-foundry-roles | The orchestrator, team leads, workers, standing permission rules and the sheepdog. | built, apart from standing rules |
+| 4 | lgtm-foundry-roles | The orchestrator, team leads, workers, standing permission rules and the stall watch. | built, apart from standing rules |
 | 5 | lgtm-worktrees | Git worktrees for agents under `<repo>/.worktrees/`, through an option on the agent `start` command, with safe clean-up. | absorbed by `website-replacement`, step 1 |
 
 `done` — the plan is built and merged into `master`.

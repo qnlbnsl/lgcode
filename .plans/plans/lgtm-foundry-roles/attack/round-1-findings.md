@@ -31,7 +31,7 @@ with no change to the plan (row 52).
 | TM-2 Disable races an automatic answer | major | Match and answer in the request's own transaction (7a); the fallback answerer is dropped | 2.10; row 35 |
 | TM-3 Hand-off mandatory text exceeds its cap | major | Overflow policy with markers and sequence numbers | WS-6, 6.2; row 47 |
 | A1 Capacity-paused agent cannot be resumed | major | 7b reshaped: held delivery and `release` | 7.3, 7.4, 4.5; row 36; question 2 |
-| A2 Capacity fallback and the board both retry | major | The board owns its wakes; the sheepdog re-sends plain prompts only | 4.5; row 49; known gap 6 |
+| A2 Capacity fallback and the board both retry | major | The board owns its wakes; the stall watch re-sends plain prompts only | 4.5; row 49; known gap 6 |
 | A3 Crash reload does not retry the work | major | Carry-on prompt after `SessionOpened`; give-up on refusal or reload failure | 4.6; row 42 |
 | A4 Hand-off cannot keep whole exchanges within its cap | major | As TM-3 | WS-6; row 47 |
 | A5 No rollback after roles events exist | major | Two owner switches; no downgrade once roles events exist | 3.10, 3f, 8.1, rollout 6; row 46 |
@@ -46,7 +46,7 @@ with no change to the plan (row 52).
 | C7 Fixtures hold no tool calls | minor | As A6 | row 51 |
 | Lo-L1 Stall flags every lead waiting on its workers | major | As C4 | row 37 |
 | Lo-L2 Stall episode, count and progress undefined | major | State machine; counter per post and addressee; tool calls are not progress | 4.2; row 37 |
-| Lo-L3 Crash resume fights the engine's notice and `gone` | major | The sheepdog keeps the first retry; its notice tells the holder about `gone` and not to replace; alternative offered to the lead | 4.6; row 42; known gap 15; question 2 |
+| Lo-L3 Crash resume fights the engine's notice and `gone` | major | The stall watch keeps the first retry; its notice tells the holder about `gone` and not to replace; alternative offered to the lead | 4.6; row 42; known gap 15; question 2 |
 | Lo-L4 7b pause cannot be resumed and wakes the parent | major | As A1; a held delivery keeps the wait open | 7.3; row 36 |
 | Lo-L5 Re-send duplicates board wakes | major | As A2 | row 49 |
 | Lo-L6 Prefix match admits code-running arguments | major | L20: exact word list | 2.3; row 35 |

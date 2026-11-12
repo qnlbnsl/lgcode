@@ -68,12 +68,12 @@ The lead's commit also holds issue and feature entries drafted by a Claude Sonne
 |---|---|---|
 | Client API | Threat model 10, ship. Architect 7, revise, with one major that version 16 fixed. | Version 17, the plain HTTP change. The manager ruled that no review was needed unless it reached beyond that section. |
 | Message board | Logic 7, revise, with one major, R7-L1, that version 15 fixed. | The R7-L1 fix. The manager's instruction was to fold major findings with one reviewer. |
-| Foundry roles | Logic 10, ship, in round 6. | The re-citation of client API version 17 and board version 15, and four lines on how the sheepdog meets the board's new rule. |
+| Foundry roles | Logic 10, ship, in round 6. | The re-citation of client API version 17 and board version 15, and four lines on how the stall watch meets the board's new rule. |
 
 ## Open items
 
 - The owner's choice on `isHarnessSettings` is issue 353.
-- A hang in the middle of a turn is caught only at the sheepdog's two-hour runaway limit. The owner accepted this as a limit.
+- A hang in the middle of a turn is caught only at the stall watch's two-hour runaway limit. The owner accepted this as a limit.
 - `lgtm-worktrees` is on hold by the owner until the build is running.
 - Standing rules depend on recordings the owner runs for each harness, and on today's evidence no harness qualifies.
 

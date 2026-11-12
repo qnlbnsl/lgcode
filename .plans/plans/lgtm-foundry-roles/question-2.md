@@ -25,10 +25,10 @@ unchanged.**
    run, and that a pause ends the parent's wait, which wakes the lead 7b
    was meant to spare. The amended 7b holds the delivery in the queue
    (`DeliveryHeld`), leaves the agent idle, and adds one command,
-   `release` (owner, the target's holder, a service), which the sheepdog
+   `release` (owner, the target's holder, a service), which the stall watch
    calls after five minutes. Usage-limit and sign-in pauses are unchanged.
 
-For your information, not a question: the crash rule keeps the sheepdog's
+For your information, not a question: the crash rule keeps the stall watch's
 one automatic resume, as the engine design says, now followed by a carry-on
 prompt. Round 1's logic reviewer offered an alternative: leave every crash
 of an agent-held agent to its holder, which the engine already wakes. If you

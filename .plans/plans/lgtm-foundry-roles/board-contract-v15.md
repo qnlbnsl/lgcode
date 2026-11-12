@@ -318,7 +318,7 @@ A post has:
   the first-start scan calls it (rows 131, 153).
 - **LGTM Studio as author** (roles request 4: **accepted**; the "needs-reply
   kind" part is already the `reply` field, so no kind label is added). A
-  post from one of LGTM Studio's own services, such as `roles.sheepdog`, records
+  post from one of LGTM Studio's own services, such as `roles.stallWatch`, records
   that service's name as its author. Services exist only inside LGTM Studio's
   process and call commands through the engine's in-process service path
   (client API contract, section 2, "Services", and edit E13). No socket or network caller
@@ -521,7 +521,7 @@ is not idle, so nothing happens to it.
   plan, 7.3). So a hold is not a turn's end. It uses no reminder and writes no
   `no-answer`, and the engine's part of the settled test stays false until the release. A
   reminder behind the hold waits there. The carry-on's `TurnEnded` then counts.
-- **A capacity error that returns the wake.** With the sheepdog off, or at its give-up, the
+- **A capacity error that returns the wake.** With the stall watch off, or at its give-up, the
   hold is over and the agent is idle, so this is a return like any other, whatever its
   `cause`. The rule goes on. The asker is told, and a late reply still counts.
 - **A pause, or an interrupt that reloads.** The accepted wake stays accepted, and a carry-on
@@ -554,7 +554,7 @@ one reminder, one `no-answer` and one notice, and returns are capped at two. A n
 wakes only an asker. The turn that follows counts for that asker's own incoming
 posts, under the same limit, so two addressees cannot keep each other going.
 Two agents that each wait on the other's answer both hold an open post of their own,
-so neither is reminded. That stays the sheepdog's to catch, as is a hang in the middle
+so neither is reminded. That stays the stall watch's to catch, as is a hang in the middle
 of a turn, which ends no turn. The roles plan's stall rule and runaway limit cover
 those two cases.
 
@@ -881,7 +881,7 @@ alone, and the owner's wait does not end on a failed read.
 
 ## For LGTM Studio's own services
 
-A roles service, such as the sheepdog, uses the board through the
+A roles service, such as the stall watch, uses the board through the
 engine's in-process service path (edit E13), under its own service name:
 
 - `board.post`, to post a notice. Its author is the service's name.
@@ -944,7 +944,7 @@ fallback). The board's plan writes the board's entry, in
   from `board.status`, which already says whom each open post waits on.
 - **Tracking prompt-cache deadlines** (part of roles request 6:
   **refused**). Cache timing is harness-specific and belongs to the roles
-  plan. The board gives the sheepdog `board.flush` to act on it.
+  plan. The board gives the stall watch `board.flush` to act on it.
 - **Kind labels** such as question, blocked, hand-off and done (part of
   roles request 4). A kind list is a workflow vocabulary. The `reply` field
   carries the only thing the wake rule needs. Kinds are recorded as a

@@ -55,7 +55,7 @@ const api = (fault = "", work = "/tmp/roles-scripted-work") => {
       time = rows[origin - 1]!.occurredAt + 600_000 - 3 - (fault === "early timer" ? 1 : 0);
       const triggerSequence = fault === "first turn origin" ? firstEnd : fault === "stale later turn" ? origin - 2 : origin;
       emit({ _tag: "roles.StallNoticePlanned", agentId: "worker", stalledPostId: "obligation", occurrence: 1, triggerSequence });
-      emit({ _tag: "board.PostWritten", postId: "nudge", channelId: "direct", author: { _tag: "service", service: "roles.sheepdog" } });
+      emit({ _tag: "board.PostWritten", postId: "nudge", channelId: "direct", author: { _tag: "service", service: "roles.stallWatch" } });
       emit({ _tag: "board.WakeBuilt", targetAgentId: "worker", carried: ["nudge"] });
       const action = { _tag: "roles.StallSeen", agentId: "worker", stalledPostId: "obligation", occurrence: 1, triggerSequence, noticeRecipient: "worker", notice: "sent", postId: "nudge" };
       emit(action);

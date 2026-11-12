@@ -208,7 +208,7 @@ it.each(["client.alerts.retry", "client.alerts.test", "client.alerts.prompt.dism
       const worker = yield* seedAgent({ id: "worker", state: "working" });
       const payload = { alertId: "unknown", generation: 0, attempt: 1 };
       expect(yield* call(agentCredential(worker.token), name, payload)).toMatchObject({ _tag: "Failure" });
-      expect(yield* (yield* CommandHandler).execute({ _tag: "service", service: "roles.sheepdog" }, name, { requestId: "service-refused", ...payload }).pipe(Effect.result)).toMatchObject({ _tag: "Failure" });
+      expect(yield* (yield* CommandHandler).execute({ _tag: "service", service: "roles.stallWatch" }, name, { requestId: "service-refused", ...payload }).pipe(Effect.result)).toMatchObject({ _tag: "Failure" });
       expect(toolNames as readonly string[]).not.toContain(name);
       expect(posts(server)).toHaveLength(0);
       expect(yield* eventsOf("client.AlertPromptDismissed")).toHaveLength(0);

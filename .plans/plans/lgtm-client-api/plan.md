@@ -71,7 +71,7 @@ view each get an attack pass.
   alternative, a board or a watcher that talks to the engine as the owner,
   would make the record say "the owner" for things the owner never did.
   The owner chose direct edits on 2026-11-03.
-- **LGTM Studio's own services get a narrow caller.** The sheepdog, which
+- **LGTM Studio's own services get a narrow caller.** The stall watch, which
   watches for stalled agents, may nudge, compact and resume, and nothing
   else. A standing rule's allow is written inside the engine's permission
   path, under the rule's own name, not by a service command. A service
@@ -925,7 +925,6 @@ the roles planner's requests 1 to 6 and the board planner's R1 items 1 to
 | Features §4: four phone alerts | WS-6 | planned |
 | Features §4: LGTM Studio runs as its own user | WS-9 | deferred by the owner (row 78) |
 | Features §4: macOS support | none | out of scope (owner, 2026-11-01, Linux only) |
-| Features §4: herding names | none | shelved by the owner |
 | Research item 9 | WS-3 | planned |
 | Research item 10 (browser terminal) | none | out of scope (row 5) |
 | Research item 11 | WS-6 | planned |

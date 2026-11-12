@@ -95,10 +95,10 @@ it("6.2 duplicate sources keep one alert open per key", async () => {
 it("6.2 a failed reload keeps a crash alert open until successful idle", async () => {
   await withAlerts(() => Effect.gen(function* () {
     yield* registerRebuildCheck();
-    // The roles sheepdog resumes a crashed agent by design, which closes the
+    // The roles stall watch resumes a crashed agent by design, which closes the
     // crash alert; on a fast computer it does so before the checks below, so it
     // is turned off for this engine rule (issue 562).
-    yield* append({ _tag: "roles.SettingsChanged", settings: { sheepdog: false } });
+    yield* append({ _tag: "roles.SettingsChanged", settings: { stallWatch: false } });
     yield* seedAgent({ id: "worker", state: "working" });
     yield* openings.failure();
     const rows = yield* awaitFirst();

@@ -12,12 +12,12 @@ workaround if the answer is no.
 
 1. **An LGTM Studio service credential, below the owner.** The engine knows two
    callers: the owner (and devices, which act as the owner) and agents. The
-   sheepdog is a separate program, because `service.ts` has no extension
+   stall watch is a separate program, because `service.ts` has no extension
    point. With only the owner's credential, every nudge, compaction and
    retry it makes is logged as the owner's, and a bug in it has the owner's
    full rights. The addition is a third caller kind, `service`, with a fixed
    list of allowed commands (subscribe, prompt as a nudge, compact, resume)
-   and its own name in the log. Workaround: the sheepdog uses the owner's
+   and its own name in the log. Workaround: the stall watch uses the owner's
    credential. That breaks the audit trail and widens a bug's reach.
    This may instead come from the client API's contract, if its device
    credentials can carry a scope (requests.md, item 3).
@@ -37,21 +37,21 @@ workaround if the answer is no.
    "529 overloaded" reply is returned to the sender as a failed delivery,
    which wakes the lead with a prompt. The addition is a third class that
    puts the message back in the queue and pauses the agent with the reason
-   "capacity", so the sheepdog can retry it after five minutes, as
-   `capacity-retry.sh` does today. Workaround: the sheepdog watches
+   "capacity", so the stall watch can retry it after five minutes, as
+   `capacity-retry.sh` does today. Workaround: the stall watch watches
    `DeliveryReturned` and re-sends; the lead is still woken once per error.
 4. **Token and prompt-cache usage on `TurnEnded`.** The engine records no
    context size. Compaction timed to the prompt cache needs the last call's
    input and cache tokens and the cache's lifetime. The addition is optional
    usage fields on `TurnEnded`, filled when the adapter reports them.
-   Workaround: the sheepdog reads Claude's transcript files from the
+   Workaround: the stall watch reads Claude's transcript files from the
    account's config folder, as `context-keeper.sh` does. That works for
    Claude only and depends on a file layout the adapter does not promise.
 5. **Role rules enforced, or only advised.** `role` is a free string that
    nothing reads. A rule such as "a worker cannot start agents" or "a worker
    does not ask the owner" can be enforced only in the command handler,
    which is an engine change. The other choice is that role rules are a
-   briefing (what `orient` tells each agent) plus a sheepdog report when an
+   briefing (what `orient` tells each agent) plus a stall watch report when an
    agent breaks one. I lean to advice in this version, because enforcement
    is a product choice about how strict the Foundry should be. If the
    owner wants enforcement, it is a small addition to the command handler,

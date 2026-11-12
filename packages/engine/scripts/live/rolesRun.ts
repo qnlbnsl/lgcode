@@ -25,12 +25,12 @@ an isolated engine under /tmp; it does not use or stop an existing engine.
 Saves a private report, roster and thread exports under .scratch/live-check-roles/.
 
 Checks orientation, group membership, an all-mode board collection with one
-completion wake, a sheepdog-timed cache flush on the Claude lead, and one
+completion wake, a stall-watch-timed cache flush on the Claude lead, and one
 worker's first stall with an idle unanswered post. The stall uses the unchanged
 production limit (normally ten minutes), followed by exactly one nudge and reply.
 The cache step needs real cache usage evidence and can take several minutes (or an hour
 with a one-hour cache). Missing evidence or a timeout fails the step. It never
-invents usage or directly flushes in place of the sheepdog.
+invents usage or directly flushes in place of the stall watch.
 
 Standing rules are skipped because the owner deferred tasks 2a-2g and 7a.
 Capacity, crash, repeated-stall and cut-hand-off fault scenarios remain in
@@ -50,7 +50,7 @@ const STEPS = [
   { id: "service", title: "the isolated engine serves its authenticated socket" },
   { id: "setup", title: "real adapters and signed-in accounts are configured" },
   { id: "wave", title: "the real lead collects both workers through one all-mode post" },
-  { id: "timed-flush", title: "the sheepdog flushes an unread post at the cache timer" },
+  { id: "timed-flush", title: "the stall watch flushes an unread post at the cache timer" },
   { id: "first-stall", title: "an idle worker's unanswered post receives exactly one first-stall nudge after production minutes" },
   { id: "wrap-up", title: "the roster and every thread are exported" },
   { id: "shutdown", title: "roles switches are off and the run's agents are stopped" },
@@ -72,7 +72,7 @@ const checked = <A, E, R>(reporter: Reporter, spec: typeof STEPS[number], body: 
   }
   const error = Cause.squash(exit.cause);
   reporter.fail(spec, error instanceof CheckFailed ? error.message : spec.id === "timed-flush"
-    ? "no completed sheepdog cache flush was observed; check adapter usage support, cache lifetime and the total time limit; provider error text is withheld"
+    ? "no completed stall watch cache flush was observed; check adapter usage support, cache lifetime and the total time limit; provider error text is withheld"
     : "the operation failed or timed out; provider error text is withheld", Date.now() - started);
   return yield* Effect.fail(new CheckFailed(`${spec.id} failed`));
 });
@@ -163,13 +163,13 @@ const runWave = (owner: Client, service: LiveService, environment: Readonly<Reco
 
 const timedFlush = (owner: Client, leadId: AgentId, channelId: string, totalTimeout: number) => Effect.gen(function* () {
   // A reply:none post remains unread without waking its recipient. Only the
-  // sheepdog may flush it. No manufactured usage, shortened clock, board.flush
+  // stall watch may flush it. No manufactured usage, shortened clock, board.flush
   // command or compact fallback can satisfy this check.
   const mark = yield* head(owner);
   const post = yield* owner["board.post"]({ requestId: requestId(), channelId, text: FLUSH_MARKER, to: [], reply: "none" } as never);
   const before = yield* owner["board.status"]({ requestId: requestId(), agentId: leadId } as never);
   requireCheck("unread" in before && before.unread > 0, "the timed step has no unread post to flush");
-  const recorded = yield* eventsUntil(owner, mark, "the sheepdog's timed cache flush (real usage is required)", ({ event }) =>
+  const recorded = yield* eventsUntil(owner, mark, "the stall watch's timed cache flush (real usage is required)", ({ event }) =>
     event._tag === "roles.CacheFlushed" && event.agentId === leadId, totalTimeout);
   const action = recorded.findLast(({ event }) => event._tag === "roles.CacheFlushed" && event.agentId === leadId)!;
   const origins = yield* since(owner, 0);
@@ -197,7 +197,7 @@ export const firstStall = (owner: Client, workerId: AgentId, totalTimeout: numbe
       && event.addressee.agentId === workerId, 300_000);
   // The board sends one reminder after the first unanswered turn. Ending
   // that reminder turn records no-answer, which leaves the post open and
-  // eligible for the sheepdog. Its clock restarts at that later turn end.
+  // eligible for the stall watch. Its clock restarts at that later turn end.
   const prepared = yield* eventsUntil(owner, mark, "the board reminder and its unanswered turn", ({ event }) =>
     event._tag === "board.AddresseeResolved" && event.postId === post.postId
       && event.addressee._tag === "agent" && event.addressee.agentId === workerId
@@ -253,7 +253,7 @@ export const firstStall = (owner: Client, workerId: AgentId, totalTimeout: numbe
   const wakes = all.filter(({ event }) => event._tag === "board.WakeBuilt" && event.targetAgentId === workerId
     && event.carried.some((id) => id === stall.postId));
   requireCheck(all.filter(({ event }) => event._tag === "board.PostWritten" && event.postId === stall.postId
-    && event.author._tag === "service" && event.author.service === "roles.sheepdog").length === 1
+    && event.author._tag === "service" && event.author.service === "roles.stallWatch").length === 1
     && wakes.length === 1, "the first-stall nudge did not reach its worker exactly once");
   const reply = all.find(({ event, caller }) => event._tag === "board.PostWritten" && event.channelId === obligation.channelId
     && event.replyToPostId === post.postId && event.author._tag === "agent" && event.author.agentId === workerId
@@ -313,7 +313,7 @@ export const rolesMain = async (argv: ReadonlyArray<string>, environment: Readon
           const defaults = yield* resolveHarnessDefaults({ binDirectory: fileURLToPath(new URL("../../node_modules/.bin", import.meta.url)), path: environment.PATH ?? "" }).pipe(Effect.provide(NodeServices.layer));
           yield* registerAccounts(owner, config, defaults.harnesses, environment);
           const current = yield* owner["roles.settings.get"]({ requestId: requestId() } as never);
-          yield* owner["roles.settings.set"]({ requestId: requestId(), settings: { ...current.settings, sheepdog: true, standingRules: false } } as never);
+          yield* owner["roles.settings.set"]({ requestId: requestId(), settings: { ...current.settings, stallWatch: true, standingRules: false } } as never);
         }));
         const wave = yield* checked(reporter, STEPS[2], runWave(owner, live, environment));
         reporter.note("Observed one Claude lead, two Codex children, three matching orientation identities, two acknowledgments, two authenticated replies to the selected wave and one completion wake.");
@@ -345,7 +345,7 @@ export const rolesMain = async (argv: ReadonlyArray<string>, environment: Readon
       })));
       yield* checked(reporter, STEPS[6], Effect.gen(function* () {
         const current = yield* owner["roles.settings.get"]({ requestId: requestId() } as never);
-        yield* owner["roles.settings.set"]({ requestId: requestId(), settings: { ...current.settings, sheepdog: false, standingRules: false } } as never);
+        yield* owner["roles.settings.set"]({ requestId: requestId(), settings: { ...current.settings, stallWatch: false, standingRules: false } } as never);
         const roster = yield* owner["client.roster"]({ requestId: requestId() } as never);
         // Children before their parent. The service is private to this run.
         for (const agent of [...roster.agents].sort((a, b) => Number(a.role === "lead") - Number(b.role === "lead"))) {

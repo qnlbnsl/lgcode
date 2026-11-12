@@ -5,7 +5,7 @@ registerRebuildCheck({ noLog: true });
 
 const render = agentText as (sender: unknown, deliveryId: string, body: string) => string;
 for (const [sender, label] of [
-  [{ _tag: "service", service: "roles.sheepdog" }, "roles.sheepdog"],
+  [{ _tag: "service", service: "roles.stallWatch" }, "roles.stallWatch"],
   [{ _tag: "piece", namespace: "board" }, "board"],
 ] as const) {
   it(`1.14 ${sender._tag}: catches raw non-owner text, missing sender attribution, slash execution or reused markers`, () => {

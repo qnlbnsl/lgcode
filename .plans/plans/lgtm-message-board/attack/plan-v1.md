@@ -140,7 +140,7 @@ test: in a channel of four, a question to one wakes that one only.
 The board's commands become LGTM Studio tools for agents, `lgtm board …`
 commands for the owner's terminal, and calls for the web page and the
 phone, all through the extension point with no door of their own. LGTM Studio's
-own code, such as the roles plan's sheepdog, posts through the same
+own code, such as the roles plan's stall watch, posts through the same
 commands under its own name. The risk is a new door that skips a check; the
 board's commands go through the engine's one command handler, with its
 identity, request ids and receipts. When done, a real `lgtm board post`
@@ -357,7 +357,7 @@ its wait checks.
 | The reactor writes a close twice after a restart | Medium | Each close is idempotent on the post's status; criterion 3.11 |
 | A large unread backlog makes every wake long | Medium | At most 20 unread posts that need no reply ride along, with a count of the rest (row 18) |
 | A busy agent's wake waits for its turn to end, so a reply is slow | Low | Accepted: ACP cannot add to a running turn (engine design, "The agent runner") |
-| A question to a live agent that never answers keeps its author unsettled forever | Medium | Accepted for the board: catching a silent agent is the sheepdog's job (epic plan 4), and `board.status` shows whom the author waits on |
+| A question to a live agent that never answers keeps its author unsettled forever | Medium | Accepted for the board: catching a silent agent is the stall watch's job (epic plan 4), and `board.status` shows whom the author waits on |
 
 **Verify:** `packages/board/test/wakes.test.ts`, `reactor.test.ts`, `settled.test.ts`; the unchanged engine suite. Device or environment QA: none.
 

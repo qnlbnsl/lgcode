@@ -3,7 +3,7 @@ import * as Schema from "effect/Schema";
 import { expect, it } from "vitest";
 
 for (const caller of [
-  { _tag: "service", service: "roles.sheepdog" },
+  { _tag: "service", service: "roles.stallWatch" },
   { _tag: "service", service: "roles.standing-rules", rule: "rule-4" },
   { _tag: "piece", namespace: "board" },
 ]) {
@@ -14,7 +14,7 @@ for (const caller of [
     expect(Schema.is(Contracts.Actor)(caller)).toBe(false);
   });
 }
-for (const sender of [{ _tag: "service", service: "roles.sheepdog" }, { _tag: "piece", namespace: "board" }]) {
+for (const sender of [{ _tag: "service", service: "roles.stallWatch" }, { _tag: "piece", namespace: "board" }]) {
   for (const event of [
     { _tag: "DeliveryQueued", delivery: { id: "delivery", target: "agent", sender, source: { _tag: "piece", namespace: "board", id: "post" }, content: { _tag: "prompt", text: "Wrapped data." } } },
     { _tag: "PromptSent", agentId: "agent", deliveryId: "delivery", sender, text: "Wrapped data." },
