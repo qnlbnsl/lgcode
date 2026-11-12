@@ -611,13 +611,10 @@ timing is a round after each phase step, in the build loop design's
 - **The public site is `lgtmstudio.dev`** (2026-11-11). It is the product's
   public website. It is not the address where the owner's own instance runs,
   which stays out of this repository.
-- **LGTM Studio marketing page** (2026-11-11). The owner selected LGTM Studio
-  as the new public name and requested a separate, single-page marketing site.
-  The page lives in `marketing/` and has its own visual direction.
-  It uses captures of the desktop and mobile product mockups.
-  It accepts a walkthrough video and collects early-access email addresses.
-  The marketing server listens on port 9999 for local network review.
-  The page supports light and dark mode with a remembered theme switch.
+- **LGTM Studio product website** (2026-11-11). The owner selected LGTM Studio
+  as the new public name and requested a separate product website.
+  On 2026-11-12 the owner moved the website out of this repository.
+  It is no longer kept here.
   This change does not rename the engine packages, commands, or state folders.
 
 - **Language: TypeScript** (2026-10-30). One language for the backend, the
