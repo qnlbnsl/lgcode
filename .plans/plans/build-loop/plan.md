@@ -439,7 +439,7 @@ publishing packages, doing mobile builds, and everything else, including the ent
 and OpenPencil."
 
 The owner's purpose: "to get to a point where I can open it and start working on all the
-other finer details of LG code that are not built". The owner also wants the product
+other finer details of LGTM Studio that are not built". The owner also wants the product
 usable enough to bring the owner's project Ananke into it. Ananke is the code name, and
 Enkra is its public name. The owner uses both for the same project.
 

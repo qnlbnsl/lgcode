@@ -189,7 +189,7 @@ function PairMachine({ s }) {
   const confirm = () => {
     if (!name.trim() || taken) return;
     const id = uid('machine');
-    update((st) => { st.machines.push({ id, name: name.trim(), role: 'worker', status: 'pairing', slots: { used: 0, limit: 4 }, lastSeen: Date.now(), address: '192.168.141.52', workspace: '~/code', os: 'macOS', cpu: 0, mem: 0, cores: 10, ram: 32, version: st.settings.version, harnesses: null, connectedFor: 0 }); st.expanded['machine:' + id] = true; });
+    update((st) => { st.machines.push({ id, name: name.trim(), role: 'worker', status: 'pairing', slots: { used: 0, limit: 4 }, lastSeen: Date.now(), address: '192.168.1.52', workspace: '~/code', os: 'macOS', cpu: 0, mem: 0, cores: 10, ram: 32, version: st.settings.version, harnesses: null, connectedFor: 0 }); st.expanded['machine:' + id] = true; });
     act.closeDialog(); act.toast(`${name.trim()} is paired`);
     setTimeout(() => update((st) => { const m = byId(st.machines, id); if (!m) return; m.status = 'online'; m.harnesses = { claude: '2.4.1', codex: null }; m.cpu = 7; m.mem = 28; }), 2600);
   };
@@ -202,7 +202,7 @@ function PairMachine({ s }) {
         <${Command} text=${`lgtm connect ${master.name.toLowerCase()}.lan:${s.settings.port} --code ${code}`} /></div></li>
       <li class=${step > 0 ? 'now' : ''}><span class="n">3</span><div><b>Confirm the machine here.</b>
         ${step === 0 ? html`<p class="row muted"><${Icon} name="loader-circle" size=${14} class="svc-spin" />Waiting for a machine to use the code…</p>`
-          : html`<div class="svc-found"><${Icon} name="server" size=${16} /><div class="grow"><b>mini.lan</b><span class="muted"> wants to connect</span><div class="mono muted" style="font-size:var(--text-sm)">192.168.141.52 · macOS · 10 cores · 32 GB</div></div><span class="badge success">Code matched</span></div>
+          : html`<div class="svc-found"><${Icon} name="server" size=${16} /><div class="grow"><b>mini.lan</b><span class="muted"> wants to connect</span><div class="mono muted" style="font-size:var(--text-sm)">192.168.1.52 · macOS · 10 cores · 32 GB</div></div><span class="badge success">Code matched</span></div>
             <div class="field" style="margin-top:8px"><label for="pair-name">Name</label><input id="pair-name" class="input" value=${name} onInput=${(e) => setName(e.target.value)} autofocus /></div>`}</div></li>
     </ol>
   <//>`;

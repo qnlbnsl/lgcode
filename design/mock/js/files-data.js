@@ -36,9 +36,10 @@ const TEXT = {
   '.nvmrc': '26\n',
   'README.md': `# LGTM Studio
 
-LGTM Studio runs teams of coding agents: an orchestrator, team leads, and workers.
-It connects them through a strict message board, and it exposes everything
-through an authenticated client API for web, desktop and mobile apps.
+LGTM Studio runs teams of coding agents: an orchestrator, team
+leads, and workers. It connects them through a strict message
+board, and it exposes everything through an authenticated client
+API for web, desktop and mobile apps.
 
 ## Start it
 

@@ -93,8 +93,8 @@ structure at `/r/atlas-docs/design`.
 - `js/files-data.js` holds the Files tab's listings, file text, and a small highlighter.
 - `js/screens/` holds one file for each screen. `js/screens/design.js` holds the Design
   page and the canvas that the Mocks tab reuses for its large preview.
-- `plans/` holds plan pages in HTML. `website-replacement.html` is converted from
-  `.plans/plans/website-replacement/plan.md`, and `plan.css` styles it.
+- `plans/` holds plan pages in HTML. `sp-07-phone-layout.html` is the sample plan for
+  SP-07, and `plan.css` styles it.
 - `js/icons.js` is generated from Lucide. `vendor/htm-preact` is a link to
   `third_party/htm-preact/`. `fonts` is a link to `design/fonts/`.
 

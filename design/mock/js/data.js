@@ -51,8 +51,8 @@ function agent(id, project, team, role, name, o = {}) {
 export function seed() {
   const machines = [
     { id: 'studio', name: 'Workstation', role: 'master', status: 'online', here: true, slots: { used: 11, limit: 16 }, lastSeen: T, address: '127.0.0.1:8787', workspace: '~/projects', os: 'Linux' },
-    { id: 'buildbox', name: 'Buildbox', role: 'worker', status: 'online', slots: { used: 3, limit: 8 }, lastSeen: at(20_000), address: '192.168.141.18', workspace: '~/Work', connectedFor: 2 * DAY + 4 * HOUR, os: 'Linux' },
-    { id: 'laptop', name: 'Laptop', role: 'worker', status: 'offline', slots: { used: 0, limit: 4 }, lastSeen: at(2 * HOUR + 12 * MIN), address: '192.168.141.40', workspace: '~/code', os: 'Linux' },
+    { id: 'buildbox', name: 'Buildbox', role: 'worker', status: 'online', slots: { used: 3, limit: 8 }, lastSeen: at(20_000), address: '192.168.1.24', workspace: '~/Work', connectedFor: 2 * DAY + 4 * HOUR, os: 'Linux' },
+    { id: 'laptop', name: 'Laptop', role: 'worker', status: 'offline', slots: { used: 0, limit: 4 }, lastSeen: at(2 * HOUR + 12 * MIN), address: '192.168.1.31', workspace: '~/code', os: 'Linux' },
   ];
   const subscriptions = [
     { id: 'sub-max', harness: 'claude', name: 'Max', machine: 'studio', enabled: true, signedIn: true, useForNew: true, usage: { pct: 41, resetsAt: T + 3 * DAY }, weekly: 41 },
@@ -120,7 +120,7 @@ export function seed() {
   ];
 
   const sprints = [
-    { id: 'sp1', epic: 'ac-nav', priority: 'High', start: -4, end: -2, project: 'console', label: 'SP-01', name: 'Navigation foundation', goal: 'Move between repositories, projects, teams and agents without losing your place.', phase: 'Hand over', column: 'Done', team: 'console-shell', dependsOn: [], evidence: { tests: '412 passed', review: 'Clean after round 2', merged: 'Merged into feat/agent-console' } },
+    { id: 'sp1', epic: 'ac-nav', priority: 'High', start: -4, end: -2, project: 'console', label: 'SP-01', name: 'Navigation foundation', goal: 'Move between repositories, projects, teams and agents without losing your place.', phase: 'Hand over', column: 'Done', team: 'console-shell', dependsOn: [], evidence: { tests: '7,796 passed', review: 'Clean after round 2', merged: 'Merged into feat/agent-console' } },
     { id: 'sp2', epic: 'ac-threads', priority: 'High', start: -1.5, end: 1, project: 'console', label: 'SP-02', name: 'Thread view', goal: 'Keep long replies readable, keep the draft, and open at the latest message.', phase: 'Build', column: 'In progress', team: 'console-threads', dependsOn: ['sp1'] },
     { id: 'sp3', epic: 'ac-nav', priority: 'Urgent', start: -1, end: 1.5, project: 'console', label: 'SP-03', name: 'Sidebar and attention', goal: 'Show what needs you from anywhere, and fold the sidebar to a rail.', phase: 'Build', column: 'In progress', team: 'console-shell', dependsOn: ['sp1'] },
     { id: 'sp4', epic: 'ac-threads', priority: 'Medium', start: -0.5, end: 1, project: 'console', label: 'SP-04', name: 'Narrow-screen pass', goal: 'Verify keyboard navigation and the phone layout at 390 pixels.', phase: 'Review', column: 'Review', team: 'console-review', dependsOn: ['sp1'] },
@@ -132,7 +132,7 @@ export function seed() {
     { id: 'ar1', epic: 'ar-ref', priority: 'High', start: -6, end: -3, project: 'apiref', label: 'SP-01', name: 'Generate the reference', goal: 'Build every endpoint page from openapi.yaml.', phase: 'Hand over', column: 'Done', team: 'apiref-review', dependsOn: [], evidence: { tests: '96 passed', review: 'Clean after round 3', merged: 'Merged into docs/api-reference' } },
     { id: 'ar2', epic: 'ar-ref', priority: 'High', start: -3, end: -0.2, project: 'apiref', label: 'SP-02', name: 'Remove hand-written pages', goal: 'Delete the old pages and redirect their addresses.', phase: 'Hand over', column: 'Review', team: 'apiref-review', dependsOn: ['ar1'], evidence: { tests: '104 passed', review: 'Clean after round 2' } },
     { id: 'sp7', epic: 'ac-board', priority: 'Low', start: 5.5, end: 7.5, project: 'console', label: 'SP-07', name: 'Phone layout pass', goal: 'Every project tab works at 390 pixels.', phase: 'Plan', column: 'Backlog', team: null, dependsOn: ['sp4'],
-      plan: { file: '.lgtm/plans/SP-07.html', src: 'plans/website-replacement.html', state: 'In review · round 2', by: 'Planner 1' } },
+      plan: { file: '.lgtm/plans/SP-07.html', src: 'plans/sp-07-phone-layout.html', state: 'Draft', by: 'Project lead' } },
     { id: 'sp8', epic: 'ac-threads', priority: 'Low', start: 6, end: 7, project: 'console', label: 'SP-08', name: 'Search inside a thread', goal: 'Find a word in a long thread.', phase: 'Plan', column: 'Backlog', team: null, dependsOn: [] },
     { id: 'rp3', epic: 'pr-rules', priority: 'Low', start: 2.5, end: 3.5, project: 'rules', label: 'SP-03', name: 'Rule usage counts', goal: 'Show how often each rule allowed a request.', phase: 'Plan', column: 'Backlog', team: null, dependsOn: ['rp2'] },
     { id: 'ie1', epic: 'ie-exports', priority: 'High', start: -2, end: 1, project: 'exports', label: 'SP-01', name: 'CSV export', goal: 'A month of invoices as one CSV file.', phase: 'Build', column: 'In progress', team: 'exports-build', dependsOn: [] },
@@ -166,13 +166,13 @@ export function seed() {
     tk('t23', 'console', 'AC-23', 'Score round 2 findings', 'sp4', 'console-review', 'review-lead', 'active', { points: 1 }),
     tk('t24', 'console', 'AC-24', 'Reconnect test waits for the socket to close', 'fx1', 'console-shell', 'shell-test', 'review', { points: 1, files: ['packages/client/test/reconnect.test.ts'] }),
     // SP-07 is still in Plan. Its tasks come from the plan, so each one names the part of the plan it carries out.
-    tk('t25', 'console', 'AC-25', 'Top bar holds menu, place and bell at 390 pixels', 'sp7', null, null, 'queue', { points: 2, section: 'what-changed-since-the-earlier-note-and-checklist', sectionName: 'What changed: Phone layout' }),
-    tk('t26', 'console', 'AC-26', 'The board becomes one ordered list on a phone', 'sp7', null, null, 'queue', { points: 5, section: 'what-changed-since-the-earlier-note-and-checklist', sectionName: 'What changed: Phone layout' }),
-    tk('t27', 'console', 'AC-27', 'Tables lead their second line with status', 'sp7', null, null, 'queue', { points: 3, section: 'what-changed-since-the-earlier-note-and-checklist', sectionName: 'What changed: Phone layout' }),
-    tk('t28', 'console', 'AC-28', 'Git keeps a phone gutter and one pane at a time', 'sp7', null, null, 'queue', { points: 3, section: 'build-units-and-dependencies', sectionName: 'Build units: W09' }),
-    tk('t29', 'console', 'AC-29', 'Phone cases for the service pages and Mocks', 'sp7', null, null, 'queue', { points: 2, section: 'build-units-and-dependencies', sectionName: 'Build units: W10' }),
-    tk('t30', 'console', 'AC-30', 'Browser checks at 390, 768, 1440 and 2560 pixels', 'sp7', null, null, 'queue', { points: 3, section: 'the-owner-approved-simpler-implementation-2026-11-09', sectionName: 'Simpler implementation: item 5' }),
-    tk('t31', 'console', 'AC-31', 'Record the phone evidence for the step gate', 'sp7', null, null, 'queue', { points: 1, section: 'stage-gates-and-evidence', sectionName: 'Stage gates and evidence' }),
+    tk('t25', 'console', 'AC-25', 'Top bar holds menu, place and bell at 390 pixels', 'sp7', null, null, 'queue', { points: 2, section: 'what-changes-at-390-pixels', sectionName: 'What changes at 390 pixels' }),
+    tk('t26', 'console', 'AC-26', 'The board becomes one ordered list on a phone', 'sp7', null, null, 'queue', { points: 5, section: 'what-changes-at-390-pixels', sectionName: 'What changes at 390 pixels' }),
+    tk('t27', 'console', 'AC-27', 'Tables lead their second line with status', 'sp7', null, null, 'queue', { points: 3, section: 'what-changes-at-390-pixels', sectionName: 'What changes at 390 pixels' }),
+    tk('t28', 'console', 'AC-28', 'Git keeps a phone gutter and one pane at a time', 'sp7', null, null, 'queue', { points: 3, section: 'pages-with-their-own-cases', sectionName: 'Pages with their own cases' }),
+    tk('t29', 'console', 'AC-29', 'Phone cases for the service pages and Mocks', 'sp7', null, null, 'queue', { points: 2, section: 'pages-with-their-own-cases', sectionName: 'Pages with their own cases' }),
+    tk('t30', 'console', 'AC-30', 'Browser checks at 390, 768, 1440 and 2560 pixels', 'sp7', null, null, 'queue', { points: 3, section: 'browser-checks', sectionName: 'Browser checks' }),
+    tk('t31', 'console', 'AC-31', 'Record the phone evidence for the step gate', 'sp7', null, null, 'queue', { points: 1, section: 'evidence', sectionName: 'Evidence' }),
     tk('r1', 'rules', 'PR-1', 'Plan: rule record and its fields', 'rp1', 'rules-plan', 'plan-p2', 'done'),
     tk('r2', 'rules', 'PR-2', 'Plan: matching a request against rules', 'rp1', 'rules-plan', 'plan-p1', 'review'),
     tk('r3', 'rules', 'PR-3', 'Rewrite statement 7 after round 3', 'rp1', 'rules-plan', 'plan-p1', 'active'),
@@ -214,7 +214,7 @@ export function seed() {
       { id: 'm2', type: 'agent', ts: at(4 * DAY - 6 * MIN), text: 'I read the repository. The web page has a thread view and a requests list, and no project model yet.\n\nI split the work into six sprints. Navigation comes first, because every other sprint links into it. Two build teams can work side by side after that: one on the shell, one on threads.' },
       { id: 'm3', type: 'tools', ts: at(4 * DAY - 6 * MIN), summary: 'Read 14 files · searched 3 times', lines: [{ verb: 'Read', arg: 'packages/web/src/app.tsx', res: '212 lines' }, { verb: 'Read', arg: 'packages/web/src/routes.ts', res: '88 lines' }, { verb: 'Search', arg: '"thread" in packages/web/src', res: '41 matches' }, { verb: 'Read', arg: 'docs/specs/2026-11-06-website-and-engine-design.md', res: '447 lines' }] },
       { id: 'm4', type: 'user', ts: at(26 * HOUR), text: 'Good. Start the shell and threads teams. Keep the review team small.' },
-      { id: 'm5', type: 'agent', ts: at(26 * HOUR - 3 * MIN), text: 'Started **Build team · Shell** and **Build team · Threads**, with one reviewer in the Review team.\n\n[[sprint:sp1|SP-01 Navigation foundation]] is merged. Its full run passed with 412 tests.' },
+      { id: 'm5', type: 'agent', ts: at(26 * HOUR - 3 * MIN), text: 'Started **Build team · Shell** and **Build team · Threads**, with one reviewer in the Review team.\n\n[[sprint:sp1|SP-01 Navigation foundation]] is merged. Its full run passed with 7,796 tests.' },
       { id: 'm6', type: 'agent', ts: at(50 * MIN), text: 'The starting commit for [[sprint:sp3|SP-03]] failed its full run: the reconnect test is flaky. I added [[sprint:fx1|FX-01]] ahead of it. Users would not notice this fix, so it merges on its own after a passing full run.' },
       { id: 'm7', type: 'tools', ts: at(50 * MIN), summary: 'Ran the full suite · 1 failed of 7,804', lines: [{ verb: 'Run', arg: 'pnpm check', res: '6 min 12 s' }, { verb: 'Read', arg: 'test-results/reconnect.test.ts.log', res: '64 lines' }] },
       { id: 'm8', type: 'agent', ts: at(17 * MIN), text: 'Three things need you before the shell team can finish:\n\n- The Build lead for Shell has a question about where threads open.\n- Builder 2 wants to run the web tests.\n- The Reviewer wants to read the review trace.', requests: ['q-open', 'q-tests', 'q-trace'] },
