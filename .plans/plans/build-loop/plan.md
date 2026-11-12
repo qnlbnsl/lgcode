@@ -433,10 +433,9 @@ when a step touches its code, and not before.
 The owner set the end point on 2026-11-11. An agent orchestrates the build of this plan
 until the owner can stop using the terminal.
 
-The end point, in the owner's words: "when I can ditch this terminal UI, go on to" LGTM Studio's
-"hosted website, and be able to run the finalized build. That includes things like
-publishing packages, doing mobile builds, and everything else, including the entire UI
-and OpenPencil."
+The end point, in short: the owner stops using the terminal, works from LGTM Studio's own
+website, and runs the finished build there. That includes publishing packages, making
+phone builds, the entire web page, and OpenPencil.
 
 The owner's purpose: "to get to a point where I can open it and start working on all the
 other finer details of LGTM Studio that are not built". The owner also wants the product
@@ -447,8 +446,9 @@ What the end point requires, beyond steps 1 to 6:
 
 - **The whole website matches the mock.** Every surface in the mock works on real
   records, not only the surfaces on the thin path.
-- **The website is hosted.** The owner chose its address on 2026-11-12. The address
-  is kept out of this repository, and it lives in the service's own configuration. The
+- **The website is reachable away from the computer.** The owner chose its address on
+  2026-11-12. The address lives in the service's own configuration, not in this
+  repository. The
   owner reaches it over HTTPS, as `docs/remote-access.md` describes,
   without a terminal open. The owner sets up the proxy for that address.
 - **OpenPencil works inside it.** The repository Design page opens the design file and
@@ -505,7 +505,7 @@ Made on 2026-11-11:
 
 Made on 2026-11-12:
 
-- The hosted website's address is chosen. It is kept out of this repository.
+- The owner's address for the website is chosen. It lives in the service's configuration.
 - LGTM Studio is installed from its repository and released on GitHub for now.
 
 Made later on 2026-11-11:
