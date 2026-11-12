@@ -28,20 +28,51 @@ and step 1 replaces it with a checked one.
 - **The current website is a separate program.** `packages/web` is about 6,400 lines of
   React. The mock is about 7,500 lines of Preact with no build step.
 
-## The one decision that shapes everything
+## What the owner ruled on 2026-11-12
 
-The mock becomes the website. The React page in `packages/web` is retired when the mock
-can do what it does.
+- **The mock becomes the website.** The React page in `packages/web` is replaced by it.
+- **The website is written in React and TypeScript.** The owner allowed another framework
+  if one fits better. This plan keeps React, because `packages/web` already uses it and
+  the mock's Preact components move to React with little change.
+- **The mock is converted before it is connected.** The owner offered to have the mock
+  converted to React first. This plan takes that offer. The converted screens live in
+  `packages/web`, with the mock's stylesheets and structure kept as they are.
+- **LGTM Studio is the first project, and it is used on itself.** As soon as the website
+  can run a project on the real engine, the rest of this plan is built as projects inside
+  LGTM Studio, on its own repository.
 
-This is the plan's recommendation, and the owner has not ruled on it. The reasons are that
-the owner approved these screens by using them, that the mock already has the connection
-seam, and that building the same screens a second time in React is how the website fell
-behind the mock before.
+## How the website talks to the engine, and whether to change it
 
-One cost comes with it. `AGENTS.md` says the product is written in TypeScript, and the
-mock's screens are plain JavaScript. This plan writes the connection and the data mapping
-in TypeScript, where the client API's types matter. The screens stay as they are for now.
-Moving the screens to TypeScript is a later choice for the owner.
+The owner wants calls from the website to the server to be very fast, and wants the
+contract typed in Protocol Buffers. The owner named the technology that Firestore uses.
+That technology is gRPC, with Protocol Buffers as its message format.
+
+What exists today, read from `packages/client/src/browser.ts` and
+`packages/client/src/core.ts`:
+
+- The website opens one WebSocket to the engine and keeps it open.
+- Every request and every update travels over that one connection, as Effect RPC messages.
+- The messages are written as JSON.
+- The contract is typed once, in TypeScript, in `packages/contracts`.
+
+So the website does not pay the cost of a new HTTP request for each call today. A call is
+one small message on a connection that is already open. That is the same idea gRPC uses.
+
+The choices:
+
+| Choice | What changes | What it costs |
+|---|---|---|
+| Keep the WebSocket, and switch the message format from JSON to a compact binary one | One line on each side. Effect RPC ships a MessagePack format. | Almost nothing. Messages get smaller. The contract stays in TypeScript. |
+| Move the contract to Protocol Buffers, and carry it over the same WebSocket | About 110 requests are rewritten as `.proto` files, and code is generated for TypeScript. | Large. The contract no longer comes from Effect, so code copied from T3 Code needs adapting. A phone app in Swift or Kotlin could then use the same contract. |
+| Move to gRPC | The same rewrite, plus a different server. A browser cannot speak gRPC directly, so it needs gRPC-Web or Connect, and a proxy or a second listener. | Largest. It replaces the working API layer. |
+
+This plan's recommendation: measure first. Step 1 times a call and a pushed update on the
+real website. If a call is slow, the cause is found before the transport is blamed. The
+binary message format is switched on in step 1, because it is nearly free. Protocol
+Buffers is decided after the measurement, and it matters most if the phone apps will not
+be written in TypeScript.
+
+The owner has not ruled on this.
 
 ## What each screen needs
 
@@ -80,7 +111,12 @@ mean the request returns everything the screen shows.
 Each step ends with something the owner can do on the real website. The work is on the
 branch `area/build-loop`, with one pull request for each step.
 
-### Step 1: one real connection, and the mock stops inventing data
+### Step 0: the mock is converted to React and TypeScript
+
+The owner arranges this with another agent. The converted website lives in `packages/web`.
+It still runs on the sample data, and it looks and behaves as the mock does.
+
+### Step 1: one real connection, and the website stops inventing data
 
 - Write a real connection for the mock. It uses the existing browser client in
   `packages/client`, and it lives in TypeScript.
@@ -112,8 +148,13 @@ This step uses only requests the engine already has.
 Every action in these screens stops changing the browser's memory. It makes its call and
 waits for the engine's update.
 
-The owner can then: do everything the current React website does, on the new website. The
-React website is retired at the end of this step.
+The owner can then: do everything the old website did, on the new one. The old pages are
+removed at the end of this step.
+
+From here on, LGTM Studio is used on itself. The owner creates a project in the LGTM
+Studio repository for each later step, and its project lead runs the work. Until step 5
+is built, the lead is steered by hand: the owner, or the orchestrating agent, tells it
+what to do next. After step 5 the workflow does that.
 
 ### Step 3: the engine gains what the daily surfaces show and it lacks
 
@@ -146,9 +187,11 @@ Each of these is a new piece in the engine, a set of requests, and the screen's 
 
 The owner can then: stop opening a terminal for everyday work on a project.
 
-### Step 5: the build loop behind the Workflow tab
+### Step 5: the autonomous workflow behind the Workflow tab
 
-This is the build loop plan in `.plans/plans/build-loop/plan.md`, from its step 2 onward.
+"Build loop" here means the product feature: the autonomous workflow that moves a project
+through its eight phases without the owner. It does not mean the way this plan itself is
+built. Its plan is `.plans/plans/build-loop/plan.md`, from its step 2 onward.
 The Workflow tab, Review rounds, End result and the workflow's settings get their engine
 here, because they show the loop and nothing else.
 
@@ -172,11 +215,10 @@ of the build loop plan's steps 1 and 2.
 
 ## Decisions the owner needs to make
 
-1. **Does the mock become the website, with the React page retired?** This plan assumes
-   yes.
-2. **Do the mock's screens stay in plain JavaScript for now?** This plan assumes yes.
-3. **Is the loop step 5, after the website works on real data?** This plan assumes yes.
-   The other order is the loop's thin path first, as the build loop plan had it.
+1. **Does the contract move to Protocol Buffers?** This plan recommends measuring first
+   and switching only the message format in step 1.
+2. **Is the autonomous workflow step 5, after the website works on real data?** This plan
+   assumes yes.
 
 ## What could go wrong
 
