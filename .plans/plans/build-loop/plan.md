@@ -148,8 +148,8 @@ The new name:
 
 - The owner renamed the product to LGTM Studio on 2026-11-12. The owner confirmed the
   spelling: two words, with a space. This plan and the rest of
-  the repository still say LGcode. The rename is the first piece of work in this step, so
-  that everything built afterwards carries the new name.
+  the repository still say LGcode. The rename comes before the rest of this step, so that
+  everything built afterwards carries the new name.
 - The rename covers the visible name in the website and the mock, the documents, the
   package names, the command, the environment variables that start with `LGCODE_`, and
   the `.lgcode` and `~/.lgcode` folders.
@@ -158,11 +158,14 @@ The new name:
   a package, a command or a folder, has no space and is written in lower case.
 - The owner ruled on 2026-11-12 that the short name is `lgtm`. The command is `lgtm`. The
   configuration folders are `.lgtm` in a repository and `~/.lgtm` in the home folder.
-- Two details are the agent's suggestions, and the owner has not ruled on them. The
-  environment variables start with `LGTM_`. The GitHub repository is renamed by the
-  owner, because that is an action on the owner's account.
-- Before the command is renamed, the build checks whether another program named `lgtm`
-  is already installed on the owner's machines, and it reports any clash.
+- The owner ruled on 2026-11-12 that the environment variables start with `LGTM_`.
+- The owner ruled that the build does not check for another program named `lgtm`. The
+  owner looks into that separately.
+- The GitHub repository is renamed by the owner, because that is an action on the owner's
+  account.
+- Another agent is carrying out the rename, as the owner said on 2026-11-12. The build
+  starts by reading what that agent changed. It finishes only what is left, and it does
+  not redo the rename.
 - An existing installation keeps working. The service reads the old folder and the old
   variables when the new ones are absent.
 - The mock's visible name was changed to "LGTM Studio" on 2026-11-11, on
