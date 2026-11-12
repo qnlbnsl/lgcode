@@ -513,11 +513,11 @@ function Remote({ s }) {
       <span class="muted" style="font-size:var(--text-sm)">${!dirty ? 'No unsaved changes.' : bad || badPort ? 'Fix the marked field to save.' : 'Saving closes open web connections. They reconnect on their own.'}</span></div>
   </form>`;
 }
-function Sheepdog({ s }) {
-  const set = s.settings; const off = !set.sheepdog;
+function StallWatch({ s }) {
+  const set = s.settings; const off = !set.stallWatch;
   return html`<div class="svc-rows">
-    <${Row} label="Sheepdog" hint="The part of the service that keeps every agent moving without spending its turns. It never decides what the work is.">
-      <${Switch} on=${set.sheepdog} label="Sheepdog" onChange=${(v) => setS({ sheepdog: v })} /><//>
+    <${Row} label="Stall watch" hint="The part of the service that keeps every agent moving without spending its turns. It never decides what the work is.">
+      <${Switch} on=${set.stallWatch} label="Stall watch" onChange=${(v) => setS({ stallWatch: v })} /><//>
     <div class=${cx('svc-group', off && 'svc-off')}>
       <h3>When an agent may be stuck</h3>
       <${Row} label="Assigned, not started" id="sd-a"><${Num} id="sd-a" value=${set.stallAssigned} min=${1} max=${120} unit="minutes" onChange=${(v) => setS({ stallAssigned: v })} /><//>
@@ -589,7 +589,7 @@ const SECTIONS = [
   ['appearance', 'Appearance', 'palette', Appearance, 'How this page looks on this browser.'],
   ['defaults', 'Defaults', 'sliders-horizontal', Defaults, 'What a new agent starts with.'],
   ['remote', 'Remote access', 'wifi', Remote, 'How this page is reached from other devices.'],
-  ['sheepdog', 'Sheepdog', 'timer', Sheepdog, 'Watching for agents that stop moving.'],
+  ['stall-watch', 'Stall watch', 'timer', StallWatch, 'Watching for agents that stop moving.'],
   ['workflow', 'Workflow', 'workflow', WorkflowSettings, 'The build loop and where you override it.'],
   ['git', 'Git messages', 'git-commit-horizontal', GitMessages, 'The model that writes commit and pull request messages.'],
   ['about', 'About', 'info', About, 'The version and the service.'],
