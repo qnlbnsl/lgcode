@@ -21,6 +21,37 @@ sizes of the panels are remembered in the browser. The "Mock controls" button at
 of the sidebar switches the connection state, the login state and the first run, and it
 resets everything.
 
+## Using it as a package
+
+This folder is also a local npm package named `lgtm`, so another project can load the
+whole website and build on it. It is the basic version of LGTM Studio. The package has no build step and no dependencies.
+
+- Install it by path, for example `npm install ../lgtm-studio/design/mock`. npm links the
+  folder rather than copying it, so the links to `design/fonts/` and
+  `third_party/htm-preact/` keep working.
+- Load the stylesheets that `index.html` loads, from the package's `css/` folder.
+- Import `mount` from `lgtm` and call it with an empty element. It seeds the sample
+  data, starts the simulation, renders the website, and returns `{ store, act }`.
+- A browser page without a build step maps the package's name to its folder with an import
+  map, such as `{"imports": {"lgtm": "/node_modules/lgtm/js/app.js",
+  "lgtm/": "/node_modules/lgtm/"}}`.
+
+This folder's own page starts the mock the same way, through `js/main.js`.
+
+`mount` takes a second, optional argument, `{ connection, slots }`:
+
+- **`connection`** receives every call the website would make to the engine. The
+  website's actions report them through `js/engine.js` as `call(tag, payload)`, using
+  the request names from `@lgtm/contracts`, such as `prompt`, `answer`, `stop` and
+  `create`. The simulation's updates go through `push(kind, payload)`, such as
+  `agent.message` and `agent.activity`. On mounting, the website calls `snapshot`, then
+  `subscribe`. Without a connection, the calls go nowhere and the mock behaves as before.
+- **`slots`** fills three named places with a component, by name. `sidebar.head` sits
+  under the sidebar's brand row. `sidebar.account` sits in the sidebar's foot, above the
+  owner's row. `topbar.connection` replaces the "Live" badge in the top bar.
+
+`unmount(el)` removes the website from the element and returns to the default connection.
+
 ## What is in it
 
 | Screen | Address after `#` |
@@ -49,7 +80,8 @@ structure at `/r/atlas-docs/design`.
 
 ## How the files are arranged
 
-- `index.html` loads the stylesheets and `js/app.js`.
+- `index.html` loads the stylesheets and `js/main.js`, which calls `mount()` from `js/app.js`.
+- `package.json` names the folder `lgtm` and lists the paths another project may import.
 - `css/tokens.css` holds every colour, size and duration. No other file may hold a literal
   colour.
 - `css/base.css` holds the shell and the shared components. Each screen has its own
@@ -61,8 +93,8 @@ structure at `/r/atlas-docs/design`.
 - `js/files-data.js` holds the Files tab's listings, file text, and a small highlighter.
 - `js/screens/` holds one file for each screen. `js/screens/design.js` holds the Design
   page and the canvas that the Mocks tab reuses for its large preview.
-- `plans/` holds plan pages in HTML. `website-replacement.html` is converted from
-  `.plans/plans/website-replacement/plan.md`, and `plan.css` styles it.
+- `plans/` holds plan pages in HTML. `sp-07-phone-layout.html` is the sample plan for
+  SP-07, and `plan.css` styles it.
 - `js/icons.js` is generated from Lucide. `vendor/htm-preact` is a link to
   `third_party/htm-preact/`. `fonts` is a link to `design/fonts/`.
 

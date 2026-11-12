@@ -44,7 +44,7 @@ export function seedBoard(state) {
   );
   state.posts.push(
     post('p60', 'ch-console-leads', 'console-lead', 'decision', 'fyi', 'Two build teams work side by side after SP-01: Shell and Threads. Review stays at one reviewer.', 26 * HOUR),
-    post('p61', 'ch-console-leads', 'shell-lead', 'done', 'fyi', 'SP-01 is merged into the project branch. The full run passed with 412 tests.', 25 * HOUR),
+    post('p61', 'ch-console-leads', 'shell-lead', 'done', 'fyi', 'SP-01 is merged into the project branch. The full run passed with 7,796 tests.', 25 * HOUR),
     post('p62', 'ch-console-leads', 'review-lead', 'question', 'needs-reply', 'Does SP-04 review the phone layout against the mocks or against the end-result page?', 24 * HOUR + 20 * MIN, { to: ['console-lead'] }),
     post('p63', 'ch-console-leads', 'console-lead', 'decision', 'fyi', 'Against the end-result page, statements 11 to 14. The mocks are a picture of it, not the contract.', 24 * HOUR + 14 * MIN, { replyTo: 'p62' }),
     post('p64', 'ch-console-shell', 'shell-lead', 'note', 'fyi', 'SP-03 is split into four subitems, 12 points in total. The plan is on the sprint page.', 3 * HOUR),
@@ -490,7 +490,7 @@ export function AgentsTab({ s, project }) {
       <div><dt>Working</dt><dd><b>${working}</b><span>of ${all.length} agents</span></dd></div>
       <div class=${needs ? 'warn' : ''}><dt>Waiting on you</dt><dd><b>${needs}</b><span>${needs === 1 ? 'agent' : 'agents'}</span></dd></div>
       <div class=${stuck ? 'warn' : ''}><dt>May be stuck</dt><dd><b>${stuck}</b><span>${stuck ? 'no output for 10 min' : 'all printing'}</span></dd></div>
-      <div><dt>Tokens today</dt><dd><b>${fmtTokens(tokens)}</b><span>${turns.toLocaleString('en-GB')} turns</span></dd></div>
+      <div><dt>Tokens so far</dt><dd><b>${fmtTokens(tokens)}</b><span>${turns.toLocaleString('en-GB')} turns</span></dd></div>
       <div class="subs"><dt>Subscriptions in use</dt><dd>${subs.map((id) => { const x = byId(s.subscriptions, id); return html`<a key=${id} class=${cx('sub-use', x.usage && x.usage.pct >= 85 && 'high')} href=${href('/subscriptions')} title="Weekly usage">${subLabel(s, id)} <b class="num">${x.usage ? x.usage.pct + '%' : 'signed out'}</b></a>`; })}</dd></div>
     </dl>
     <div class="ag-bar">

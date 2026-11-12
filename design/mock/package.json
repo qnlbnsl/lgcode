@@ -1,0 +1,16 @@
+{
+  "name": "lgtm",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The working mock of the LGTM Studio website, as a local package. It has no build step and connects to nothing.",
+  "type": "module",
+  "exports": {
+    ".": "./js/app.js",
+    "./js/*": "./js/*",
+    "./css/*": "./css/*",
+    "./fonts/*": "./fonts/*",
+    "./vendor/*": "./vendor/*",
+    "./index.html": "./index.html",
+    "./package.json": "./package.json"
+  }
+}

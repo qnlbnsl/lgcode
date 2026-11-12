@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- A sample plan page for the mock: the plan a planner wrote for SP-07 in the Agent console project. -->
+<title>SP-07 Phone layout pass</title>
+<link rel="stylesheet" href="../css/tokens.css">
+<link rel="stylesheet" href="plan.css">
+</head>
+<body>
+<article class="plan">
+<h1 id="sp-07-phone-layout-pass">SP-07 Phone layout pass</h1>
+
+<h2 id="goal">Goal</h2>
+<p>Every project tab works on a phone that is 390 pixels wide. The owner can answer a question, allow a command and read a diff without zooming or scrolling sideways.</p>
+<p>SP-04 checked keyboard navigation and found the phone problems listed below. This sprint fixes them. It starts after SP-04 merges, because both sprints change <code>packages/web/src/shell/</code>.</p>
+
+<h2 id="what-changes-at-390-pixels">What changes at 390 pixels</h2>
+<p>The sidebar folds into a menu button. The top bar keeps three things: the menu, the current place and the bell. The branch picker moves into the menu.</p>
+<p>The board shows one ordered list instead of columns. Each sprint keeps its status, its label and its name on one line. A tap opens the sprint page.</p>
+<p>Tables keep their first column and move the rest into a second line. The second line starts with the status, because the status is what the owner looks for first.</p>
+<div class="tw"><table>
+<thead><tr><th>Page</th><th>At 390 pixels today</th><th>After this sprint</th></tr></thead>
+<tbody>
+<tr><td>Board</td><td>Four columns scroll sideways.</td><td>One list, ordered by column.</td></tr>
+<tr><td>Chat</td><td>The side panel covers the thread.</td><td>The side panel opens as a sheet.</td></tr>
+<tr><td>Agents</td><td>The table is cut off after the model column.</td><td>Status and model move to a second line.</td></tr>
+<tr><td>Git</td><td>The diff and the file list share the width.</td><td>One pane at a time, with a back button.</td></tr>
+<tr><td>Terminal</td><td>Long lines wrap in the middle of a word.</td><td>Lines scroll sideways inside the terminal only.</td></tr>
+</tbody>
+</table></div>
+
+<h2 id="pages-with-their-own-cases">Pages with their own cases</h2>
+<p>Git keeps a 16 pixel gutter on each side, so a swipe from the edge still goes back. It shows the file list first and the diff after a tap.</p>
+<p>The service pages and the Mocks tab have their own layouts. Machines, Subscriptions and Service settings follow the table rule above. Mocks shows one screen at a time, with its name above it.</p>
+
+<h2 id="browser-checks">Browser checks</h2>
+<p>The browser tests open every project tab at 390, 768, 1440 and 2560 pixels, in light and dark mode. Each check fails when the page scrolls sideways or when a button is smaller than 44 pixels.</p>
+<p>The existing desktop checks stay unchanged. A failing desktop check blocks the merge.</p>
+
+<h2 id="evidence">Evidence</h2>
+<p>The Test runner records a screenshot of each tab at 390 pixels and attaches it to the sprint. The Reviewer compares them with the screens in <code>design/lgtm.fig</code>.</p>
+<p>The sprint is done when the full run passes and the review round finds no blocker.</p>
+
+<h2 id="out-of-scope">Out of scope</h2>
+<ul>
+<li>The phone app is a separate project, Phone companion.</li>
+<li>Tablet layouts between 768 and 1024 pixels wait for a later sprint.</li>
+</ul>
+</article>
+</body>
+</html>
