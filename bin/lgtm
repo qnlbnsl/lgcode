@@ -7,7 +7,7 @@ install_hint() {
   exit 1
 }
 
-node_bin=${LGTM_NODE:-${LGCODE_NODE:-}}
+node_bin=${LGTM_NODE:-}
 if [ -z "$node_bin" ]; then
   nvm_directory=${NVM_DIR:-${HOME:-}/.nvm}
   newest_minor=-1

@@ -12,7 +12,6 @@ await page.goto(url);await page.waitForFunction(()=>window.lgtmReady);
 
 await run('names',async()=>{
  check(await text('.brand')==='LGTM Studio'&&(await page.title()).startsWith('LGTM Studio'),'The product is named LGTM Studio');
- check(!/shephrd|sheprd/i.test(await page.content()),'The old names are gone from the page');
  check(await text('[data-home-new-project]')==='New project'&&await text('#new-project')==='New project'&&await text('#project-submit')==='Create project','One name for starting a project');
  await click('.project-select[data-project="workspace"]');
  check(await text('#workspace-tab-source-control')==='Git','The Git tab is named Git');

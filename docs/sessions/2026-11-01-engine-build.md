@@ -7,7 +7,7 @@
 
 ## Session summary
 
-The engine team built every unit of the engine plan, `.plans/plans/shepherd-engine/plan.md`, on the branch `area/engine`. It also built the owner's rename from Shepherd to Shephrd, and three small follow-ups the owner ruled on (issues 9, 22, 34 and 38). Every unit had a builder, a test writer on the other vendor, and one focused review on the vendor that did not build it. Units 5a, 5c, 6d, 7a and 7b also had a cyber attacker and a cyber verifier.
+The engine team built every unit of the engine plan, `.plans/plans/lgtm-engine/plan.md`, on the branch `area/engine`. It also built the owner's rename of the product, and three small follow-ups the owner ruled on (issues 9, 22, 34 and 38). Every unit had a builder, a test writer on the other vendor, and one focused review on the vendor that did not build it. Units 5a, 5c, 6d, 7a and 7b also had a cyber attacker and a cyber verifier.
 
 The last full check on the final code ran at commit 19cc4f0, the unit 8c branch head, which `area/engine` merged as b659eaa. `pnpm check` exited 0 there, with 163 test files, 2,625 tests passed and 2 skipped (test runner post #1201). Milestone pull requests (a), (b) and (c) are merged into `engine`. Pull request (d) carries units 7a, 7b, the rename, 8b and 8c, and this report.
 
@@ -26,7 +26,7 @@ One acceptance criterion is still open, and it needs the owner's machine: criter
 | Milestone pull request (d) | Opened with this report |
 | Owner-machine steps: criterion 1.4 and `pnpm record-fixtures` | Done by the manager earlier in the run |
 | Owner-machine step: the live check (criterion 8.6) | Carried: it goes to the manager with pull request (d) |
-| The rename to Shephrd (owner: "umm i want it to be called shephrd in line with herdr.") | Done, merged as 684a3fb |
+| The owner's rename of the product, to a name in line with Herdr | Done, merged as 684a3fb |
 
 **Completion rate:** 7 of 8 intents done; the live check is carried to the owner.
 
@@ -65,7 +65,7 @@ Each row is one merge into `area/engine`. The branch head is the commit merged. 
 | 85045f8 | 6d, restart recovery | worker/engine-u6db 6ad8991 | Claude Opus 5.5, 43a847d5 | Codex gpt-6.1-sol, 01a19913 | Claude Sonnet 5.5, 2eb7acc9; attack Codex Daybreak Blue; verify Codex gpt-6.1-sol |
 | 7900250 | 7a, server and service | worker/engine-u7ab 3e015e5 | Codex gpt-6.1-sol, 01a19993 | Claude Opus 5.5, c74b3b0e | Claude Sonnet 5.5, 3d64b964; attack Codex Daybreak Blue; verify Claude Opus 5.5 |
 | c10ec4d | 7b, client, CLI, MCP | worker/engine-u7bb 62ad393 | Claude Sonnet 5.5, 1383133f | Codex gpt-6.1-sol, 01a199d9 | Codex gpt-6.1-sol, 01a19a14-b32e; attack Codex Daybreak Blue; verify Codex gpt-6.1-sol |
-| 684a3fb | rename to Shephrd | worker/engine-rn ae7e2f4 | Claude Sonnet 5.5, a6f32cf1 | (in the build) | Codex gpt-6.1-sol, 01a19aa4 |
+| 684a3fb | rename to LGTM Studio | worker/engine-rn ae7e2f4 | Claude Sonnet 5.5, a6f32cf1 | (in the build) | Codex gpt-6.1-sol, 01a19aa4 |
 | 358c53e | 8b, acceptance suite | worker/engine-u8bt 1e0f7c7 | (test unit; no builder) | Claude Sonnet 5.5, 59ea1af4 | Codex gpt-6.1-sol, 01a19ae5 |
 | b659eaa | 8c, live check | worker/engine-u8cb 19cc4f0 | Claude Sonnet 5.5, 93b406dc | Codex gpt-6.1-sol, 01a19b4b | Codex gpt-6.1-sol, 01a19b60 |
 
@@ -75,7 +75,7 @@ Each row is one merge into `area/engine`. The branch head is the commit merged. 
 - **Units 4a to 4c:** the atomic event log, gapless subscriptions, and live views that can be rebuilt from the log and compared with it.
 - **Units 5a to 5d:** identity, the folder ceiling and the redactor; the command handler; routing of permission requests and questions; waits and deliveries.
 - **Units 6a to 6d:** the agent runner, accounts, crash handling and the leftover sweep, and restart recovery.
-- **Units 7a and 7b:** the API server and the service, the client library, the `shephrd` command-line tool and `shephrd mcp`.
+- **Units 7a and 7b:** the API server and the service, the client library, the `lgtm` command-line tool and `lgtm mcp`.
 - **Unit 8a:** the fake agent, the replay player and the fixture recorder.
 - **Unit 8b:** an acceptance suite that runs the service as a child process and checks the twelve capabilities, the eight failure rules and one request from start to finish, through the public socket only.
 - **Unit 8c:** `pnpm live-check`, the owner's one-time run of that request with a real Claude Code lead and a real Codex worker, plus `--dry-run`. It is merged and tested with fakes only.

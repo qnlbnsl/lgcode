@@ -94,7 +94,7 @@ and direct question/permission links.
 Comparison: T3 Code’s official screenshot connects its thread to active
 subagents, machine, branch, commit, and changes. Its composer supports explicit
 context and model selection. Borrow that relationship between work and chat,
-while keeping Shephrd’s persistent project/team structure.
+while keeping LGTM Studio’s persistent project/team structure.
 
 Source anchors: design/workbench.html:200, :302, :305, :325, :373.
 
@@ -114,7 +114,7 @@ main review surface.
 
 Comparison: VS Code groups selection, staging, commit, branch, and sync around
 source control. Cursor’s published workflow connects agents to isolated
-worktrees and subsequent review/commit work. Shephrd should expose its additional
+worktrees and subsequent review/commit work. LGTM Studio should expose its additional
 team-to-project relationship rather than hiding it in a generic branch list.
 
 Source anchors: design/workbench.html:112, :262, :263, :265, :352.

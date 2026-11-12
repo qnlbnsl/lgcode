@@ -61,7 +61,7 @@ Session ids are from `herdr agent get`. Claude Code transcripts are at `~/.claud
 
 ## Decisions and rulings
 
-- The owner chose option (b) on issue 236: the Codex Shephrd server runs approval-free, scoped to that server. Option (a) stays open as issue 237.
+- The owner chose option (b) on issue 236: the Codex LGTM Studio server runs approval-free, scoped to that server. Option (a) stays open as issue 237.
 - The owner deferred issue 240, and issue 241 was deferred to the hostile pass.
 - The manager ruled live run 6 final, whatever it showed, and ruled that minor review points on the terminal fix be recorded without another round.
 - The manager asked for one cheap seat on the reliability change, so no review seat ran on it.

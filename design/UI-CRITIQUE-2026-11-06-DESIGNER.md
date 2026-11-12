@@ -1,4 +1,4 @@
-# Design critique of the Sheprd web mock, 2026-11-06
+# Design critique of the LGTM Studio web mock, 2026-11-06
 
 This critique judges `workbench.html` from about 350 real screenshots and from measurements taken in a browser. The screenshots cover the Field color mode, which is light, and the Dusk color mode, which is dark. They were taken at window widths of 1440, 2560, and 390 pixels, with some extra captures at 900 and 1100 pixels. The default sample and the `?sample=heavy` sample were both used. All measurements are in pixels at a 1440 by 900 window unless the entry says otherwise.
 
@@ -16,7 +16,7 @@ The mock looks like one product, and that is a real achievement. The color appli
 
 It is not yet a working instrument. It is a calm administration console that happens to contain agent threads.
 
-Sheprd has one job that nothing else does, which is to tell a solo owner where to look across many agents and to give that owner enough evidence to answer. The mock is weakest exactly there. The sidebar misreports attention, a failed start wears the success color, and the most consequential approval in the product shows less evidence than the row behind it.
+LGTM Studio has one job that nothing else does, which is to tell a solo owner where to look across many agents and to give that owner enough evidence to answer. The mock is weakest exactly there. The sidebar misreports attention, a failed start wears the success color, and the most consequential approval in the product shows less evidence than the row behind it.
 
 The chrome is also too heavy. Next to Cursor, every screen spends more of its height and width on labels, repeated names, and controls than on the work. The Git diff gets 46 percent of the window width.
 
@@ -142,7 +142,7 @@ Recommendation: Above 1800 pixels, keep the lead panel open beside every project
 
 Part or screen: Whole application.
 
-What I see: Home says Question, Approval, and Failed start. The bell says Decision, Permission, and Failed start. The sidebar says "Needs you" and "Needs approval". A board card says "Needs your decision", the sprint page says "Needs your direction", a thread says "Decision needed", and a permission is headed "Sheprd permission request". `DESIGN.md` defines one term, Needs attention, but no vocabulary below it.
+What I see: Home says Question, Approval, and Failed start. The bell says Decision, Permission, and Failed start. The sidebar says "Needs you" and "Needs approval". A board card says "Needs your decision", the sprint page says "Needs your direction", a thread says "Decision needed", and a permission is headed "LGTM Studio permission request". `DESIGN.md` defines one term, Needs attention, but no vocabulary below it.
 
 Why it matters: The owner must learn that Question, Decision, and Direction are the same thing, and that Approval and Permission are the same thing. Every mismatch adds a small doubt about whether two counts refer to the same items.
 
@@ -226,7 +226,7 @@ Recommendation: Do not draw the tree line when a project has no teams, and do no
 
 Part or screen: Top bar.
 
-What I see: The items in "sheprd / Agent console / App shell" are `span` and `strong` elements with no action. The reader's habit from every other product says that these go somewhere.
+What I see: The items in "lgtm / Agent console / App shell" are `span` and `strong` elements with no action. The reader's habit from every other product says that these go somewhere.
 
 Why it matters: The owner will click them. T3 Code taught this owner that an affordance which does not behave as expected is a real defect.
 
@@ -246,7 +246,7 @@ Recommendation: Use a downward chevron.
 
 Part or screen: Top bar at 390 pixels.
 
-What I see: The bar holds the menu, a breadcrumb reduced to "sheprd ," or "s… / Projects", the bell, the Live indicator, the word Viewing, and an ellipsized branch.
+What I see: The bar holds the menu, a breadcrumb reduced to "lgtm ," or "s… / Projects", the bell, the Live indicator, the word Viewing, and an ellipsized branch.
 
 Why it matters: Nothing in the bar is legible enough to use, and the bell is the one thing a phone user came for.
 
@@ -554,7 +554,7 @@ The focus ring holds up on rows: 2 pixels of solid primary color with a 3 pixel 
 
 Part or screen: Hover and focus.
 
-What I see: On the sheprd repository disclosure, the left side of the ring is cut off by the edge of the tree's scrolling area.
+What I see: On the lgtm repository disclosure, the left side of the ring is cut off by the edge of the tree's scrolling area.
 
 Why it matters: A keyboard user sees a broken ring. The disclosure is only 23 by 30 pixels, and the add button is only 25 by 26.
 
@@ -620,7 +620,7 @@ What I see: The heading says "Back to your workspace" on a first visit too. The 
 
 Why it matters: It is a small wrong note on the first screen the owner ever sees.
 
-Recommendation: Use "Sign in to Sheprd" with the logo mark above it.
+Recommendation: Use "Sign in to LGTM Studio" with the logo mark above it.
 
 ### Screen 2. Login, session expired
 
@@ -722,7 +722,7 @@ Recommendation: Show a search field and one Filter button that opens a popover. 
 
 Part or screen: Home, Needs attention and Approvals.
 
-What I see: The approval row says "Run the web tests", which the agent wrote. The real command, `pnpm --filter @sheprd/web test`, is visible only after expanding it.
+What I see: The approval row says "Run the web tests", which the agent wrote. The real command, `pnpm --filter @lgtm/web test`, is visible only after expanding it.
 
 Why it matters: A title written by the agent is a claim, not a fact. An owner scanning approvals should see what will actually run.
 
@@ -782,7 +782,7 @@ What I see: Finch's request says "The action's input is not visible. Part of the
 
 Why it matters: The owner approves many requests a day and will build a habit of pressing the same button in the same place. This is the one approval where the habit is dangerous.
 
-Recommendation: Say what is known and what is not, such as "Finch wants to run the read tool. Sheprd cannot show its input." Make both buttons secondary. Label the approval "Allow without seeing input".
+Recommendation: Say what is known and what is not, such as "Finch wants to run the read tool. LGTM Studio cannot show its input." Make both buttons secondary. Label the approval "Allow without seeing input".
 
 ### Screen 15. Home, expanded failed start
 

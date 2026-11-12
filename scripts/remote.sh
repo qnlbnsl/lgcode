@@ -18,7 +18,7 @@
 #   LGTM_REMOTE_HOST   SSH host or alias (default 192.168.141.18)
 #   LGTM_REMOTE_USER   user on that host (default: SSH's own choice)
 #   LGTM_REMOTE_ROOT   folder there that holds the copies, relative to the
-#                        user's home unless absolute (default Work/lgcode)
+#                        user's home unless absolute (default Work/lgtm-studio)
 #   LGTM_REMOTE_NAME   name of this copy (default: this working tree's
 #                        folder name, so each worktree gets its own copy)
 #   LGTM_REMOTE_SLOTS  how many `check` and `browser` runs may use the other
@@ -38,7 +38,7 @@ set -euo pipefail
 
 host=${LGTM_REMOTE_HOST:-192.168.141.18}
 user=${LGTM_REMOTE_USER:-}
-root_dir=${LGTM_REMOTE_ROOT:-Work/lgcode}
+root_dir=${LGTM_REMOTE_ROOT:-Work/lgtm-studio}
 slots=${LGTM_REMOTE_SLOTS:-2}
 spare=${LGTM_REMOTE_SPARE_CPUS:-2}
 memory=${LGTM_REMOTE_MEMORY:-80G}
@@ -62,7 +62,7 @@ esac
 target=${user:+$user@}$host
 dir=$root_dir/$name
 ssh_opts=(-o BatchMode=yes -o ConnectTimeout=10 -o ServerAliveInterval=30
-  -o ControlMaster=auto -o "ControlPath=$HOME/.ssh/lgcode-remote-%C" -o ControlPersist=10m)
+  -o ControlMaster=auto -o "ControlPath=$HOME/.ssh/lgtm-remote-%C" -o ControlPersist=10m)
 
 # Bash source that every remote command starts with: enter the copy, use the
 # Node.js version that .nvmrc names when the other computer has nvm, and define
@@ -89,7 +89,7 @@ lgtm_limited() {
   local list
   list=$(IFS=,; echo "${cpus[*]:0:keep}")
   if systemctl --user show-environment >/dev/null 2>&1; then
-    local unit="$HOME/.config/systemd/user/lgcode-remote.slice"
+    local unit="$HOME/.config/systemd/user/lgtm-remote.slice"
     local want="[Slice]"$'\n'"MemoryMax=$memory"$'\n'"MemorySwapMax=0"
     if [ "$(cat "$unit" 2>/dev/null)" != "$want" ]; then
       mkdir -p -- "${unit%/*}"
@@ -100,7 +100,7 @@ lgtm_limited() {
     # Chromium moves itself into its own systemd scope over the session bus,
     # which would take the browser tests out of the memory limit, so the
     # command runs without the bus address.
-    systemd-run --user --scope --quiet --collect --slice=lgcode-remote.slice -- \
+    systemd-run --user --scope --quiet --collect --slice=lgtm-remote.slice -- \
       env -u DBUS_SESSION_BUS_ADDRESS taskset -c "$list" bash -c "set -eo pipefail"$'\n'"$1"
   else
     echo "remote: limits: $keep of ${#cpus[@]} processors ($list); no systemd user session, so no memory limit"

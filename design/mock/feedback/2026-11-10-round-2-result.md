@@ -1,4 +1,4 @@
-# The result of the second round of the LGcode mock
+# The result of the second round of the LGTM Studio mock
 
 This file answers `design/mock/ROUND-2-BRIEF.md`. The work is on the branch
 `area/mock-rebuild`, in five commits. Nothing is merged into `master`.
@@ -55,7 +55,7 @@ the function `searchScore(query, item)` in `js/dialogs.js`. It drops stop words,
 remaining words, and scores them against each item's name, goal, description and agent
 names. Ties order Repository, Project, Agent, then Page.
 
-Checked with a script. "lgcode" puts the repository first. "lgcode lead" puts "Project
+Checked with a script. "lgtm" puts the repository first. "lgtm lead" puts "Project
 lead · Agent console" first. "which project was working on the git worktree" puts "Agent
 console" first.
 
@@ -71,7 +71,7 @@ Checked by screenshot and by clicking in the browser.
 ### A new project starts from a goal: done
 
 The New project dialog has one "Goal" field, with the placeholder "Make a mock for the
-LGcode phone app". The project appears in the sidebar as "Naming…". The simulated lead
+LGTM Studio phone app". The project appears in the sidebar as "Naming…". The simulated lead
 then names it from the goal. The subscriptions are a small table with Harness,
 Subscription, Machine and Models. The first run at `/setup` uses the same Goal field, and
 it also asks for the model that writes commit and pull request messages.
@@ -98,7 +98,7 @@ the category menu, the item menu with counts, the file's name, the zoom controls
 "Create design file".
 
 A Design lead agent was started before the page was built. It was given the design file
-`design/lgcode.fig`, the tokens, and this mock's screens. Its answer is
+`design/lgtm.fig`, the tokens, and this mock's screens. Its answer is
 `design/mock/feedback/2026-11-10-design-categories.md`. The two menus are built from it.
 The categories used are Screens, Components and Palette. Screens holds one item per flow:
 Sign in and setup, Home, Project, Workflow, Mocks, Conversations, Code, Repository and

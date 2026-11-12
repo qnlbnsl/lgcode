@@ -7,7 +7,7 @@ Founder OS commit `33228a7dcd122e25729c761d311b178fd30f852d` on 2026-11-04.
 The workflow is described here in new prose. No source code is copied.
 
 The recipe follows WS-8, task 8a, in the
-[roles plan](../.plans/plans/shepherd-foundry-roles/plan.md).
+[roles plan](../.plans/plans/lgtm-foundry-roles/plan.md).
 It is the input for a later rewrite of the external skill. Writing it does
 not switch a running Foundry over. Task 8b checks the composed service.
 Task 8c checks real harnesses on the owner's accounts. Those checks and the

@@ -317,7 +317,7 @@ export const canUseMode = (caller: Actor, parentMode: PermissionLevel, requested
 const isHarnessSettings = (path: string): boolean => {
   const segments = path.split(sep).map((segment) => segment.toLowerCase());
   return segments.some((segment, index) =>
-    segment === ".claude" || segment === ".codex" || segment === ".gemini" || segment === ".cursor" || segment === ".lgtm" || segment === ".lgcode"
+    segment === ".claude" || segment === ".codex" || segment === ".gemini" || segment === ".cursor" || segment === ".lgtm"
     || (segment === ".mcp.json" && index === segments.length - 1));
 };
 

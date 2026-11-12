@@ -143,7 +143,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   Each delivery is recorded with when and how it landed, so a wake can never
   be silently lost. See research item 3.
 - **Wake Claude without typing** (idea). Each Claude agent keeps one
-  long-lived `Monitor` running a LGTM Studio command that prints a line only when
+  long-lived `Monitor` running an LGTM Studio command that prints a line only when
   a post needs it. Claude Code starts the turn by itself, and nothing is typed
   into the pane. Other agents keep a typed nudge that only fires when the
   agent is idle. See research item 2.
@@ -265,7 +265,7 @@ Synapse fork. It is at `docs/message-board/features.md` in the
 
 ## 5. The sheepdog
 
-A shepherd leads the flock, and the shepherd's dog keeps the sheep in line so
+A lgtm leads the flock, and the lgtm's dog keeps the sheep in line so
 none of them wander off. In LGTM Studio, the orchestrator and the owner lead. The
 sheepdog is the part of LGTM Studio's background service that keeps every agent
 moving without spending their turns. It never decides what the work is; it
@@ -626,20 +626,14 @@ timing is a round after each phase step, in the build loop design's
 
 ## Decided
 
-- **The code is renamed LGTM Studio** (2026-11-12). The owner asked for the full
-  rename to the new name. The command is `lgtm`, the packages are `@lgtm/...`, the
-  environment variables start with `LGTM_`, and the state folder is
-  `~/.local/state/lgtm`. The repository and configuration folders are `.lgtm` and
-  `~/.lgtm`. The GitHub repository is `qnlbnsl/lgtm-studio`. An existing installation
-  keeps its `LGCODE_` variables and its `~/.local/state/lgcode` folder until the owner
-  moves them. Dated records keep the old name.
-- **The product is renamed LGTM Studio** (2026-11-11). The owner raised "LGTM
-  code" on 2026-11-09 and chose "LGTM Studio" on 2026-11-11. The build loop
-  plan, in "The new name", lists what the rename covers. The owner confirmed the
-  spelling, two words with a space, on 2026-11-11. The new command and folder
-  names are still open. The
-  mock shows the new name. The code and the documents still say LGTM Studio until the
-  rename work in step 1 of the build loop plan.
+- **The product is named LGTM Studio** (2026-11-11). The owner chose the name
+  on 2026-11-11 and confirmed the spelling, two words with a space. On
+  2026-11-12 the owner asked for the full rename. The command is `lgtm`, the
+  packages are `@lgtm/...`, the environment variables start with `LGTM_`, and
+  the state folder is `~/.local/state/lgtm`. The configuration folders are
+  `.lgtm` and `~/.lgtm`. The GitHub repository is `qnlbnsl/lgtm-studio`. The
+  owner chose to start fresh, so nothing reads earlier names, and every
+  record in the repository uses the new name.
 - **The public site is `lgtmstudio.dev`** (2026-11-11). It is the product's
   public website. It is not the address where the owner's own instance runs,
   which stays out of this repository.

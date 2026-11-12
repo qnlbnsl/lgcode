@@ -146,15 +146,13 @@ Engine:
 
 The new name:
 
-- The owner renamed the product to LGTM Studio on 2026-11-12. The owner confirmed the
-  spelling: two words, with a space. The rename was the first piece of work in this step,
-  so that everything built afterwards carries the new name. It was done on 2026-11-12, on
-  the branch `area/lgtm-rename`.
-- The rename covers the visible name in the website and the mock, the documents, the
-  package names (now `@lgtm/...`), the command, the environment variables (which started
-  with `LGCODE_`), the state folder, and the `.lgtm` and `~/.lgtm` folders. Dated records,
-  such as `docs/issues.md` and the mock's dated feedback, keep the old name.
-- The product's public site is `lgtmstudio.dev`. The renamed README links to it.
+- The owner named the product LGTM Studio and confirmed the spelling: two words, with a
+  space. The rename was the first piece of work in this step, so that everything built
+  afterwards carries the new name. It was done on 2026-11-12.
+- The rename covers the visible name in the website and the mock, the documents and
+  every dated record, the package names (`@lgtm/...`), the command, the environment
+  variables, the state folder, and the `.lgtm` and `~/.lgtm` folders.
+- The product's public site is `lgtmstudio.dev`. The README links to it.
 - The name is written "LGTM Studio" wherever people read it. A name inside code, such as
   a package, a command or a folder, has no space and is written in lower case.
 - The owner ruled on 2026-11-12 that the short name is `lgtm`. The command is `lgtm`. The
@@ -163,18 +161,15 @@ The new name:
 - The owner ruled that the build does not check for another program named `lgtm`. The
   owner looks into that separately. The rename found no program named `lgtm` on the
   owner's computer or on the remote test computer.
-- The GitHub repository was renamed `qnlbnsl/lgtm-studio` on 2026-11-12, at the owner's
-  request. GitHub redirects the old name.
+- The GitHub repository is `qnlbnsl/lgtm-studio`, renamed on 2026-11-12 at the owner's
+  request.
 - Another agent carried out the rename, as the owner said on 2026-11-12. The build
   starts by reading what that agent changed. It finishes only what is left, and it does
   not redo the rename.
-- An existing installation keeps working. The service and the command copy each
-  `LGCODE_` variable to its `LGTM_` name when that name is unset. The state folder stays
-  `~/.local/state/lgcode` while that folder exists and `~/.local/state/lgtm` does not.
-  Agents are still kept from reading or inheriting the old names.
-- The mock's visible name was changed to "LGTM Studio" on 2026-11-11, on
-  `area/mock-rebuild`. Its machine named "Studio" became "Workstation", so the two names
-  are not confused.
+- The owner chose to start fresh after the rename. Nothing reads an earlier name, folder
+  or variable.
+- The mock's machine named "Studio" became "Workstation", so it is not confused with the
+  product's name.
 
 Website:
 

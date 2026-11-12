@@ -48,7 +48,7 @@ const live = (name: string, test: () => Effect.Effect<unknown, unknown, any>) =>
 
 const settingsPaths = (folder: string) => [
   ".claude/settings.json", ".claude/settings.local.json", ".claude/commands", ".claude/agents", ".mcp.json",
-  ".codex", ".gemini", ".cursor", ".lgtm", ".lgcode",
+  ".codex", ".gemini", ".cursor", ".lgtm",
 ].map((path) => join(folder, path));
 
 // One argument shape per harness, so the expansion is checked inside longer

@@ -269,7 +269,7 @@ it.effect.each([
 it.effect.each([
   ".claude/settings.json", ".claude/settings.local.json", ".claude/settings.custom.json",
   ".claude/commands/run.md", ".claude/agents/worker.md", ".mcp.json",
-  ".codex/config.toml", ".codex/other.toml", ".gemini/settings.json", ".cursor/permissions.json", ".lgtm/config.json", ".LGTM/settings.json", ".lgtm", ".lgcode/config.json", ".LGCODE/settings.json", ".lgcode",
+  ".codex/config.toml", ".codex/other.toml", ".gemini/settings.json", ".cursor/permissions.json", ".lgtm/config.json", ".LGTM/settings.json", ".lgtm",
 ] as const)(
   "5a.2 settings/%s: catches allowing persistent harness changes merely because the answerer has full mode",
   (settingsPath) => Effect.sync(() => {

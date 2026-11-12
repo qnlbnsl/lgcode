@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import { comparePermission, isServiceVariable, type AgentChoice, type AgentConfiguration, type ContextUsage, DeliveryId, ThreadContent, type PermissionLevel, type SessionReference, type TurnUsage } from "@lgtm/contracts";
+import { comparePermission, type AgentChoice, type AgentConfiguration, type ContextUsage, DeliveryId, ThreadContent, type PermissionLevel, type SessionReference, type TurnUsage } from "@lgtm/contracts";
 import { AcpClient, layerChildProcess } from "@lgtm/t3-effect-acp/client";
 import { AcpRequestError } from "@lgtm/t3-effect-acp/errors";
 import type { AgentCapabilities } from "@lgtm/t3-effect-acp/schema-v1";
@@ -359,7 +359,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     const resolvedSecrets = [input.token];
     const variables: Record<string, string> = {};
     for (const [name, value] of Object.entries(input.account.environment ?? {})) {
-      if (name.startsWith("HERDR_") || isServiceVariable(name)) continue;
+      if (name.startsWith("HERDR_") || name.startsWith("LGTM_")) continue;
       if (value.startsWith("secret:")) {
         const secret = yield* secrets.resolve(value);
         if (secret === undefined) return yield* rejected("account secret is unavailable");

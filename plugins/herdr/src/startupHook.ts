@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { request } from "node:http";
 import { join, resolve } from "node:path";
 
-import { adoptLegacyVariables, stateFolder } from "@lgtm/client";
+import { stateFolder } from "@lgtm/client";
 
 // Unit 8c: the startup-hook check (criterion 8.6). Herdr's `[[startup]]` entry
 // runs `lgtm serve --detach` when Herdr starts.
@@ -42,16 +42,14 @@ export type StartupHookResult =
   | { readonly passed: true; readonly pid: number; readonly state: string; readonly reason: string }
   | { readonly passed: false; readonly state: string; readonly reason: string; readonly pids: ReadonlyArray<number> };
 
-const STATE_VARIABLES = ["LGTM_HOME", "LGCODE_HOME", "XDG_STATE_HOME", "HOME"] as const;
+const STATE_VARIABLES = ["LGTM_HOME", "XDG_STATE_HOME", "HOME"] as const;
 
 const canonical = (path: string): string => {
   try { return realpathSync(path); } catch { return resolve(path); }
 };
 
 const stateOf = (environment: Readonly<Record<string, string | undefined>>): string | undefined => {
-  const copy = { ...environment };
-  adoptLegacyVariables(copy);
-  try { return canonical(stateFolder(copy)); } catch { return undefined; }
+  try { return canonical(stateFolder({ ...environment })); } catch { return undefined; }
 };
 
 // Reads the process listing from a /proc folder (Linux only, row 78). A

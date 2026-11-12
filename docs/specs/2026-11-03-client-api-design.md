@@ -2,7 +2,7 @@
 
 ## What this note is
 
-This note records the owner's decisions from design talk 1 for Shephrd's
+This note records the owner's decisions from design talk 1 for LGTM Studio's
 client API, the second of its four pieces. The talk was held on 2026-11-03
 with the design partner `design-api` and the lead `plans-lead`. The full
 outcome, written during the talk, is the team artifact
@@ -10,7 +10,7 @@ outcome, written during the talk, is the team artifact
 
 Each decision below gives the owner's exact words, what it changes in the
 client API plan, and what it rules out. The plan is
-`.plans/plans/shepherd-client-api/plan.md`. Its decision log is
+`.plans/plans/lgtm-client-api/plan.md`. Its decision log is
 `decisions.md` in the same folder, and the row numbers below refer to it.
 
 Abbreviations: API means application programming interface. TLS means
@@ -18,12 +18,12 @@ Transport Layer Security, the encryption a browser uses for HTTPS. ntfy is a
 small notification service with a phone app. Caddy is a web server that is
 often used as a reverse proxy.
 
-## Decision 1: the phone reaches Shephrd through the owner's own proxy
+## Decision 1: the phone reaches LGTM Studio through the owner's own proxy
 
 **The owner's exact words:** "yes. a caddy or something proxy that will proxy
 to localloopback"
 
-**Decision.** Shephrd adds one web server for the web page and the API. It
+**Decision.** LGTM Studio adds one web server for the web page and the API. It
 listens only on the loopback address. Remote access goes through the owner's
 own reverse proxy, such as Caddy, over the owner's WireGuard. The web server
 serves plain HTTP. Any encryption is at the proxy, and proxy, certificate and
@@ -39,7 +39,7 @@ page and the API. It checks the `Origin` and `Host` headers and limits
 connections. The plan documents an example proxy setup, with Caddy as the
 example.
 
-**What it rules out.** Shephrd builds no TLS of its own, no certificate
+**What it rules out.** LGTM Studio builds no TLS of its own, no certificate
 handling, no relay, and no Tailscale integration. The web server never
 listens on a non-loopback address.
 
@@ -67,22 +67,22 @@ secret.
 
 **What it rules out, for now.** Web Push is not built in this plan.
 
-## Decision 3: remote access comes before Shephrd's own Unix user
+## Decision 3: remote access comes before LGTM Studio's own Unix user
 
 **The owner's exact words:** "no. for now we get it running first. then once
 it is up and running it can improve as we use it. i need this built asap. my
 workflows are being severely affected due to the issues in herdr synapse"
 
-**Decision.** Remote access ships in this plan without Shephrd's own Unix
-user. The own-user setup comes later, once Shephrd is in daily use. This is
+**Decision.** Remote access ships in this plan without LGTM Studio's own Unix
+user. The own-user setup comes later, once LGTM Studio is in daily use. This is
 the owner's explicit approval to break the order that SECURITY.md promised,
 "It is planned for before remote access is built" (row 78).
 
 **What it changes.** The plan has no own-user unit, and remote access is not
-gated on one. SECURITY.md's paragraph "Agents can read Shephrd's own files"
+gated on one. SECURITY.md's paragraph "Agents can read LGTM Studio's own files"
 now says that the owner approved remote access first, and that the own-user
 setup is still planned. The accepted limit stays written down: any agent can
-read Shephrd's state folder, including the stored account keys.
+read LGTM Studio's state folder, including the stored account keys.
 
 **What it rules out.** An own-user unit in this plan, and a plan that stops
 at loopback.
@@ -183,20 +183,20 @@ network but not the agents on the same machine. The lead asked the planner
 to evaluate a guard that costs almost nothing and adds no authentication,
 and to decide (row 84).
 
-**The guard.** When a connection to the web server opens, Shephrd finds the
+**The guard.** When a connection to the web server opens, LGTM Studio finds the
 process at the other end of the loopback connection and applies the
 engine's existing rule for agents' processes to it.
 
 1. The kernel's socket tables, `/proc/net/tcp` and `/proc/net/tcp6`, list
    each loopback connection with its two ports, the user id that owns it and
    its socket's inode number.
-2. If that user id is not Shephrd's own user id, the connection is refused,
+2. If that user id is not LGTM Studio's own user id, the connection is refused,
    unless proxy mode is on and the user id matches the "proxy user id"
    setting, which the owner sets at the computer. A reverse proxy that runs
    as its own user, such as `caddy`, passes only this way, and its requests
    are always judged as public. The first draft let every other user id
    through; the lead's review ruling replaced that (rows 92, 133).
-3. If the user id is Shephrd's own, Shephrd finds the process that holds the
+3. If the user id is LGTM Studio's own, LGTM Studio finds the process that holds the
    socket's inode, by reading the `/proc/<pid>/fd` links of the owner's
    processes. It then walks that process's parents and applies the engine's
    check from `packages/engine/src/api/ancestry.ts`: a process in a recorded
@@ -223,7 +223,7 @@ boundary.
 owner's processes' open files when a connection opens, after the `Host` and
 `Origin` checks, not on every message.
 The web page holds one WebSocket open, so this runs rarely. There is no new
-dependency, and Shephrd already runs on Linux only.
+dependency, and LGTM Studio already runs on Linux only.
 
 **Where it fails.** A deliberate agent can get past it in these ways:
 
@@ -242,13 +242,13 @@ misuse, not a hostile agent. It adds no authentication, as the owner
 deferred authentication. The real fix is authentication, with pairing, which
 slots into the same function.
 
-## Decision 7: login is one password, and one person uses Shephrd
+## Decision 7: login is one password, and one person uses LGTM Studio
 
 **The owner's exact words:** "no. We are making this as if the login was already there. We're just not making the pairing and the login logic yet. That's all. Even if we'd go with the pairing logic, I have a pretty simple way of doing it, which is essentially just a password. That's it, because, thinking about it, we don't need multi-user capabilities. Only one person is using this. That's it. In fact, that's what we should just do: read a local environment variable, which is just a long string or a password, and then on the dashboard you just enter that password. We already have this thing behind a proxy. It's not being exposed to the web. We can have the firewall isolate the machine or the web server further, but I think just a single password would be fine. We don't need rate limits or anything. Most tools don't even do that. When we get to the mobile app part and whatnot, then we can think about something, but even then, let's just look at what Home Assistant does, right? Pretty simple, and it also has remote access."
 
 **Decision.** The owner answered question 6 no, so the engine refuses no answer
 from the web server. Login is one password. The service reads it from the local
-environment variable `SHEPHRD_WEB_PASSWORD`, and the dashboard asks for it. This
+environment variable `LGTM_WEB_PASSWORD`, and the dashboard asks for it. This
 replaces pairing codes and per-device credentials, and nothing is kept for them.
 
 **What it changes.**
@@ -274,6 +274,6 @@ The plan's rows 184 to 196 hold the details.
 
 ## What stays open
 
-- When Shephrd's own Unix user is built. The owner deferred it to "once it is up
+- When LGTM Studio's own Unix user is built. The owner deferred it to "once it is up
   and running".
 - Login for a mobile app. It starts by looking at what Home Assistant does.

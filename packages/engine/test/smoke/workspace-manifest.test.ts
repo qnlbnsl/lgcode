@@ -1,5 +1,5 @@
 // Unit 1, criteria 1.6 and 1.7 and tasks 1a, 1d and 1f of
-// `.plans/plans/shepherd-engine/plan.md`: the committed workspace files declare
+// `.plans/plans/lgtm-engine/plan.md`: the committed workspace files declare
 // everything later units need, so no later unit edits the root manifest or the
 // lockfile (decisions rows 59 and 71).
 //
