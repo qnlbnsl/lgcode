@@ -37,7 +37,7 @@ resets everything.
 | Messages, the agents' message board | `/p/console/messages` |
 | Agents, the roster by situation | `/p/console/agents` |
 | Terminal | `/p/console/terminal` |
-| Files, coming soon | `/p/console/files` |
+| Files, the inspected worktree as a folder tree and a read-only file view | `/p/console/files`, and one file at `/p/console/files?f=README.md` |
 | Git, with generated commit and pull request text | `/p/console/git` |
 | Project settings, with the lead's model and the work assignment table | `/p/console/settings` |
 | Repository design page, the design file on a canvas | `/r/lgcode/design`, and `/r/<repository>/design/<category>/<item>` |
@@ -58,6 +58,7 @@ structure at `/r/atlas-docs/design`.
 - `js/data.js` holds the sample data and the functions that read it.
 - `js/actions.js` holds every change to the data.
 - `js/ui.js` holds the shared components.
+- `js/files-data.js` holds the Files tab's listings, file text, and a small highlighter.
 - `js/screens/` holds one file for each screen. `js/screens/design.js` holds the Design
   page and the canvas that the Mocks tab reuses for its large preview.
 - `plans/` holds plan pages in HTML. `website-replacement.html` is converted from

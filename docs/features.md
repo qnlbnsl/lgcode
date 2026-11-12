@@ -697,12 +697,50 @@ engine's question records and the agents' instructions would need these fields.
 
 ## A file explorer in the Git view
 
-The owner asked for this on 2026-11-11. It is agreed and not built. A project
-gains a "Files" tab, beside its Git tab, that works like the file explorer of an editor
-such as Visual Studio Code: a folder tree of the inspected worktree, and the open file beside it.
-References in questions, approvals and plans link to a file and open it here. The
-mock shows the tab with "Coming soon". The component that shows the files is not
-chosen yet.
+The owner asked for this on 2026-11-11. It is agreed and not built in the engine. A
+project has a "Files" tab, beside its Git tab, that works like the file explorer of an
+editor such as Visual Studio Code. It shows a folder tree of the inspected worktree, and
+the open file beside it. References in questions, approvals and plans link to a file and
+open it here. The mock in `design/mock/` shows the tab at `/p/console/files`.
+
+### Where the files come from
+
+The files live on whichever machine holds the worktree, such as Studio or Buildbox. The
+web page and the phone app never reach that machine themselves. They ask the LGcode
+service through the client API, and the service asks the machine. The rules are these:
+
+- The service lists one folder at a time, so a large repository does not load at once.
+  Each entry carries its name, its size, whether it is a folder, and its Git status.
+- The service returns one file at a time, as text. A file over 1 megabyte, or a binary
+  file, is not returned as text. The client offers it as a download, which the service
+  streams from the machine.
+- Images, such as SVG and PNG files, are returned as images and shown as pictures.
+- Every path is checked on the machine against the worktree's folder, after symbolic
+  links are resolved, so a request cannot read a file outside the worktree.
+- The tab is read-only. Editing is not part of this feature.
+- When the machine is offline, the tab keeps its structure and says so. It shows the
+  files again when the machine reconnects.
+- The tab follows the "Inspecting" choice in the top bar. A branch with no worktree yet
+  shows the base branch, with a note that says so.
+
+### Which component shows the files
+
+The owner asked on 2026-11-11 for the option that works best across platforms. The
+choice is the stack that T3 Code uses, so that its code can be copied under the MIT
+License:
+
+- `@pierre/diffs` renders files and diffs. T3 Code uses it on the web and in its server,
+  and its import style works in React Native as well.
+- `@pierre/highlights` colours the code. T3 Code moved its web app from Shiki to it,
+  because Shiki took most of the render time on large files and could freeze the window.
+  T3 Code's phone app already uses the native form of `@pierre/highlights`.
+
+Highlighting runs in each client, so the service sends plain text and stays simple. The
+licences of the two Pierre packages have not been read yet, and they must be read before
+any code is copied. Monaco, the editor inside Visual Studio Code, was not chosen, because
+it does not support phones. CodeMirror 6 is the fallback if the Pierre packages do not
+fit, since it works on the web and in a phone's web view. The mock uses a small
+hand-written highlighter in place of either library, because the mock has no build step.
 
 ## Plans written as HTML pages
 
