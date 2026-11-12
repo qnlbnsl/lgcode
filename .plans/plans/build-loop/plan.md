@@ -144,6 +144,21 @@ Engine:
 - Load the `.lgcode` folder of a repository and `~/.lgcode`. `README.md` already names
   this as the next piece of work.
 
+The new name:
+
+- The owner renamed the product to LGTMStudio on 2026-11-12. This plan and the rest of
+  the repository still say LGcode. The rename is the first piece of work in this step, so
+  that everything built afterwards carries the new name.
+- The rename covers the visible name in the website and the mock, the documents, the
+  package names, the command, the environment variables that start with `LGCODE_`, and
+  the `.lgcode` and `~/.lgcode` folders.
+- Three details are the agent's suggestions, and the owner has not ruled on them. The
+  command becomes `lgtmstudio`. The folders become `.lgtmstudio` and `~/.lgtmstudio`. The
+  GitHub repository is renamed by the owner, because that is an action on the owner's
+  account.
+- An existing installation keeps working. The service reads the old folder and the old
+  variables when the new ones are absent.
+
 Website:
 
 - Fix the thread view, so it shows role, time and readable text in place of raw engine
