@@ -628,8 +628,9 @@ timing is a round after each phase step, in the build loop design's
 
 - **The product is renamed LGTM Studio** (2026-11-11). The owner raised "LGTM
   code" on 2026-11-09 and chose "LGTM Studio" on 2026-11-11. The build loop
-  plan, in "The new name", lists what the rename covers. The spelling, with or
-  without the space, and the new command and folder names are still open. The
+  plan, in "The new name", lists what the rename covers. The owner confirmed the
+  spelling, two words with a space, on 2026-11-11. The new command and folder
+  names are still open. The
   mock shows the new name. The code and the documents still say LGcode until the
   rename work in step 1 of the build loop plan.
 

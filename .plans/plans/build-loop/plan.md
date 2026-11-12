@@ -146,12 +146,15 @@ Engine:
 
 The new name:
 
-- The owner renamed the product to LGTMStudio on 2026-11-12. This plan and the rest of
+- The owner renamed the product to LGTM Studio on 2026-11-12. The owner confirmed the
+  spelling: two words, with a space. This plan and the rest of
   the repository still say LGcode. The rename is the first piece of work in this step, so
   that everything built afterwards carries the new name.
 - The rename covers the visible name in the website and the mock, the documents, the
   package names, the command, the environment variables that start with `LGCODE_`, and
   the `.lgcode` and `~/.lgcode` folders.
+- The name is written "LGTM Studio" wherever people read it. A name inside code, such as
+  a package, a command or a folder, has no space and is written in lower case.
 - Three details are the agent's suggestions, and the owner has not ruled on them. The
   command becomes `lgtmstudio`. The folders become `.lgtmstudio` and `~/.lgtmstudio`. The
   GitHub repository is renamed by the owner, because that is an action on the owner's
@@ -528,9 +531,8 @@ Made later on 2026-11-11:
 
 Still open, in the order they block work:
 
-1. **Is the new name spelled "LGTM Studio" or "LGTMStudio"?** The owner's message on
-   2026-11-11 said "LGTM Studio", and the mock now shows that. The section "The new name"
-   above says "LGTMStudio". The command and folder names follow from the answer.
+1. **What are the command and folder names?** "The new name" in step 1 suggests
+   `lgtmstudio`, `.lgtmstudio` and `~/.lgtmstudio`. The owner has not ruled on them.
 
 ### What could go wrong
 
