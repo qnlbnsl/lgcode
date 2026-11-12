@@ -33,7 +33,9 @@ th.num .th-sort { flex-direction: row-reverse; }
 .rq.closed .rq-title .truncate { color: var(--color-muted); font-weight: var(--weight-body); }
 .rq.expanded td { border-bottom-color: transparent; background: var(--color-surface); }
 .table tr.rq-detail:hover { background: transparent; }
-.rq-detail > td { white-space: normal; height: auto; padding: 0 var(--space-4) var(--space-4) calc(var(--space-4) + 26px); background: var(--color-surface); border-left: 3px solid var(--color-warn); }
+/* The expanded part lines up with the title's text, clear of the arrow: the cell's own
+   padding, plus the 20-pixel arrow and its 6-pixel gap, less the 3-pixel state edge. */
+.table .rq-detail > td { white-space: normal; height: auto; padding: var(--space-2) var(--space-6) var(--space-5) calc(var(--space-4) + 23px); background: var(--color-surface); border-left: 3px solid var(--color-warn); }
 .rq.s-error + .rq-detail > td { border-left-color: var(--color-error); }
 .rq.closed + .rq-detail > td { border-left-color: transparent; }
 .rq-detail .req { max-width: 900px; animation: open-row var(--motion-fast) var(--ease); }
@@ -170,6 +172,7 @@ th.num .th-sort { flex-direction: row-reverse; }
   .rq-table tr.rq td.rq-project { grid-column: 1; grid-row: 3; padding-left: calc(var(--space-2) + 26px); font-size: var(--text-sm); color: var(--color-muted); }
   .rq-table tr.rq-detail, .rq-table tr.rq-none, .rq-table tr.rq-group { display: block; }
   .rq-table tr.rq-detail > td, .rq-table tr.rq-none > td, .rq-table tr.rq-group > td { display: block; padding-left: var(--space-3); padding-right: var(--space-3); }
+  .rq-table tr.rq-detail > td { padding-left: calc(var(--space-2) + 26px); }
   .board-bar { flex-wrap: wrap; padding: 6px var(--space-3); }
   .board-bar .search { flex: 1 1 140px; }
   .board-bar .status-link { order: 5; }
