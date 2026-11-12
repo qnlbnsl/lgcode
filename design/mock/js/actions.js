@@ -275,7 +275,7 @@ export function startSimulation() {
 // ---- preview states (the mock's own controls) ------------------------------------
 export function setConnection(status) { update((s) => { s.conn.status = status; if (status === 'live') s.conn.lastHeard = Date.now(); }); }
 export function setSession(status) { update((s) => { s.session.status = status; }); remember('session', status === 'in' ? 'in' : 'out'); }
-export function resetMock() { try { for (const k of Object.keys(localStorage)) if (k.startsWith('lgcode-mock:')) localStorage.removeItem(k); } catch { /* storage is optional */ } location.hash = '#/home'; location.reload(); }
+export function resetMock() { try { for (const k of Object.keys(localStorage)) if (k.startsWith('lgtm-mock:')) localStorage.removeItem(k); } catch { /* storage is optional */ } location.hash = '#/home'; location.reload(); }
 export { MIN, teamName, tasksOfSprint, agentLabel, teamOf };
 
 // ---- Git messages ------------------------------------------------------------------

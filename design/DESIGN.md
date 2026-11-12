@@ -1,4 +1,4 @@
-# LGcode’s approved palette pair
+# LGTM Studio’s approved palette pair
 
 The owner selected Field for light mode and Dusk for dark mode on
 2026-11-05. The two palettes give the same app a brighter daytime surface
@@ -6,7 +6,7 @@ and a muted dark surface. Harbor is no longer an active option.
 
 ## What is approved
 
-`tokens.css` is the color contract for future LGcode app mockups.
+`tokens.css` is the color contract for future LGTM Studio app mockups.
 The workbench embeds the same token blocks so it can be opened as one file.
 Keep those blocks identical when the tokens change.
 
@@ -302,7 +302,7 @@ that is the part that differs. All files stacks every changed file with a sticky
 | Goal | What the owner wants from a new project. The lead turns it into sprints and teams. |
 | Lead subscription | The subscription the new project's lead runs on. It was named Lead runs on. |
 | Notification service | The ntfy server and topic that carry phone notifications. It was named Notification carrier. |
-| Notification service token | The secret that lets LGcode post to the notification service. It was named Carrier token. |
+| Notification service token | The secret that lets LGTM Studio post to the notification service. It was named Carrier token. |
 | Check-in interval, in seconds | How often a connected page checks in with the web server. It was named Heartbeat seconds. |
 | Archive | Hides a finished project from the sidebar and Home. All projects still lists it, and Restore brings it back. |
 
@@ -367,12 +367,12 @@ The owner chose the 15 Must fix findings, the two naming findings, and Enter to 
 A service with no projects opens a first run after login. It has three pages, and each does one
 job. The rules come from Ananke's onboarding specs and session reports, read on 2026-11-07.
 
-- **Value comes before any ask.** The first page says what LGcode does and asks for nothing. Its
+- **Value comes before any ask.** The first page says what LGTM Studio does and asks for nothing. Its
   three paired promises state only what the product does. The third says "You approve what users
   would notice", not "you approve every merge", because a fix sprint users would not notice merges
   by itself after a full test run.
 - **The second page shows what was found and asks nothing.** It lists harnesses, sign-in state,
-  and repositories in the workspace folder. It says that LGcode only looked. A harness that is
+  and repositories in the workspace folder. It says that LGTM Studio only looked. A harness that is
   installed but signed out offers its sign-in in place, through the usual sign-in dialog.
 - **The third page is the first real ask, with its answers filled in.** It starts on the most
   recent repository, a name from that repository, and a new worktree. It hides the machine when
@@ -456,7 +456,7 @@ which hold only text, so it no longer shows the tool activity it showed when it 
 ## Visual foundations, set on 2026-11-08
 
 These rules come from the designer's critique of 2026-11-06. Claude applied them on
-2026-11-08, after the rename to LGcode. They are the base that later screen work builds on.
+2026-11-08, after the rename to LGTM Studio. They are the base that later screen work builds on.
 
 ### One type scale
 
@@ -531,7 +531,7 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
 ### Login
 
 - **The page names the product.** The logo mark sits above the heading "Sign in to
-  LGcode", which suits a first visit and a return alike. The button says Sign in.
+  LGTM Studio", which suits a first visit and a return alike. The button says Sign in.
 - **A password manager can fill the field.** The field has `autocomplete="current-password"`.
 - **Messages show their severity under the field.** A rejected password uses the error
   color. An expired session uses the muted color. On the unavailable page, Try again is the
@@ -622,7 +622,7 @@ These rules come from the designer's critique of 2026-11-06. Claude applied them
   below say.
 - **Data stays readable, and actions wait.** Threads, lists, and links keep working. Every
   control that changes state is disabled, and its hover text gives the reason, such as
-  "LGcode is offline. This works again when the connection returns." Drafts can still be
+  "LGTM Studio is offline. This works again when the connection returns." Drafts can still be
   typed. Starting a project, a new terminal, and refreshing notifications also wait.
 - **The bell's count is muted while stale.** Its hover text says that the count is from the
   last update.
@@ -1002,7 +1002,7 @@ or narrower.
   is the project, or the team inside a team. Chat's line under the tabs names the agent, so
   the top bar does not repeat it.
 - **The connection is a dot on the bell.** The dot is green for Live, amber for Connecting
-  and Reconnecting, and red for Offline. The bell's name says the state, such as "LGcode is
+  and Reconnecting, and red for Offline. The bell's name says the state, such as "LGTM Studio is
   reconnecting".
 - **The bell opens the full state.** The menu starts with the indicator, the time of the
   last update, and Reconnect now, above Needs attention.
@@ -1048,7 +1048,7 @@ or narrower.
 
 These rules describe the rebuilt mock in `design/mock/`. They await the owner's approval.
 
-LGcode is an operating tool that the owner keeps open all day. The default density is
+LGTM Studio is an operating tool that the owner keeps open all day. The default density is
 Compact. A row is 30 pixels high. A control is 28 pixels high. The inset inside a region is
 10 pixels. The gap between groups is 20 pixels. Regular density is the alternate, and
 Service settings switches between them. The values live in `design/mock/css/tokens.css`

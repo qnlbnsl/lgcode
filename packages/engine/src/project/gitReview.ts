@@ -1,7 +1,7 @@
 import * as Clock from "effect/Clock"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import { GitEvidence, GitMainReview, type GitEvidenceSet, type Event } from "@lgcode/contracts"
+import { GitEvidence, GitMainReview, type GitEvidenceSet, type Event } from "@lgtm/contracts"
 import { type Input, type Payload, type PiecePlanner, refused, CommandUncertain } from "../commands/internal.ts"
 import { type ReadHandler } from "../api/reads.ts"
 import { canReadProject } from "./access.ts"

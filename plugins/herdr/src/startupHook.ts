@@ -2,17 +2,17 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { request } from "node:http";
 import { join, resolve } from "node:path";
 
-import { stateFolder } from "@lgcode/client";
+import { adoptLegacyVariables, stateFolder } from "@lgtm/client";
 
 // Unit 8c: the startup-hook check (criterion 8.6). Herdr's `[[startup]]` entry
-// runs `lgcode serve --detach` when Herdr starts.
+// runs `lgtm serve --detach` when Herdr starts.
 // This check shows that this started exactly one service for that home.
 //
 // It only reads, and it reads little:
 //
 // - The process listing: the processes whose command line runs the engine's
 //   `service.ts`, and, for each, the three variables that choose its state
-//   folder (`LGCODE_HOME`, `XDG_STATE_HOME`, `HOME`). Nothing else of a
+//   folder (`LGTM_HOME`, `XDG_STATE_HOME`, `HOME`). Nothing else of a
 //   process's environment is kept, so nothing else can be printed.
 // - Whether `engine.lock` exists, by looking at the path. The file is never
 //   opened: closing a second descriptor of a POSIX-locked file would release
@@ -42,14 +42,16 @@ export type StartupHookResult =
   | { readonly passed: true; readonly pid: number; readonly state: string; readonly reason: string }
   | { readonly passed: false; readonly state: string; readonly reason: string; readonly pids: ReadonlyArray<number> };
 
-const STATE_VARIABLES = ["LGCODE_HOME", "XDG_STATE_HOME", "HOME"] as const;
+const STATE_VARIABLES = ["LGTM_HOME", "LGCODE_HOME", "XDG_STATE_HOME", "HOME"] as const;
 
 const canonical = (path: string): string => {
   try { return realpathSync(path); } catch { return resolve(path); }
 };
 
 const stateOf = (environment: Readonly<Record<string, string | undefined>>): string | undefined => {
-  try { return canonical(stateFolder({ ...environment })); } catch { return undefined; }
+  const copy = { ...environment };
+  adoptLegacyVariables(copy);
+  try { return canonical(stateFolder(copy)); } catch { return undefined; }
 };
 
 // Reads the process listing from a /proc folder (Linux only, row 78). A
@@ -100,7 +102,7 @@ const ANSWER_PAUSE_MS = 500;
 
 export const checkStartupHook = async (deps: StartupHookDeps): Promise<StartupHookResult> => {
   const state = stateOf(deps.environment);
-  if (state === undefined) return { passed: false, state: "(unknown)", reason: "the real home cannot be found: set HOME, LGCODE_HOME or XDG_STATE_HOME", pids: [] };
+  if (state === undefined) return { passed: false, state: "(unknown)", reason: "the real home cannot be found: set HOME, LGTM_HOME or XDG_STATE_HOME", pids: [] };
   const services = deps.listServices().filter((service) => stateOf(service.environment) === state);
   const pids = services.map((service) => service.pid).sort((a, b) => a - b);
   if (services.length === 0) {

@@ -9,7 +9,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import * as Effect from "effect/Effect";
-import { connect } from "@lgcode/client";
+import { connect } from "@lgtm/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RESTART_ACTIVE_PROMPT, RESTART_PENDING_PROMPT, RESTART_PREPARE_PROMPT } from "../../scripts/live/prompts.ts";
@@ -17,8 +17,8 @@ import { startLiveService, type LiveService } from "../../scripts/live/service.t
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { ALWAYS, ONCE, REJECT, fakeEngine, LEAD, markerIn, runProbe, WORKER, type FakeEngine, type Script } from "./probe-fake-engine.ts";
 
-vi.mock("@lgcode/client", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@lgcode/client")>();
+vi.mock("@lgtm/client", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@lgtm/client")>();
   const { fakeConnect } = await import("./probe-fake-registry.ts");
   return { ...original, connect: (options: Parameters<typeof original.connect>[0]) => (fakeConnect(options) ?? original.connect(options)) as never };
 });
@@ -40,7 +40,7 @@ afterEach(async () => {
 const serving = async (service: LiveService) => {
   const until = Date.now() + 30_000;
   for (;;) {
-    const result = await Effect.runPromiseExit(Effect.scoped(connect({ environment: { LGCODE_HOME: service.state }, attempts: 1 })));
+    const result = await Effect.runPromiseExit(Effect.scoped(connect({ environment: { LGTM_HOME: service.state }, attempts: 1 })));
     if (result._tag === "Success") return;
     if (service.exited() || Date.now() > until) throw new Error("service did not serve: " + service.output());
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -93,7 +93,7 @@ const reload = (plan: Reload = {}): Script => {
           const carry = `carry-${++counter}`;
           e.emit(agentId, { _tag: "DeliveryQueued", delivery: { id: carry, target: agentId, content: { _tag: "carry-on" } } });
           e.emit(agentId, { _tag: "DeliverySent", deliveryId: carry });
-          e.tool(agentId, `ask-${agentId}`, { server: "lgcode", tool: "ask", arguments: { text: markers.get(agentId) } }, "mcp__lgcode__ask");
+          e.tool(agentId, `ask-${agentId}`, { server: "lgtm", tool: "ask", arguments: { text: markers.get(agentId) } }, "mcp__lgtm__ask");
           const caller = plan.carryOnCaller?.(agentId) ?? agentId;
           e.emit(caller, { _tag: "QuestionAsked", questionId: `q-${agentId}`, holder: { _tag: "owner" }, deliveryId: `qd-${agentId}`, text: markers.get(agentId) }, { caller: { _tag: "agent", agentId: caller } });
           e.turnEnded(agentId);
@@ -278,9 +278,9 @@ it("m-8: a stale first-reload token snapshot fails the distinct-generation guard
   // auth refusals, arguments and all carry-on events are unchanged.
   vi.spyOn(Object, "fromEntries").mockImplementation((entries) => {
     const environment = fromEntries(entries);
-    if (firstRestart && environment.LGCODE_SOCKET === join(engine.state, "engine.sock")) {
-      const agent = [...engine.tokenOf].find(([, token]) => token === environment.LGCODE_TOKEN)?.[0];
-      if (agent !== undefined) environment.LGCODE_TOKEN = originalTokens.get(agent);
+    if (firstRestart && environment.LGTM_SOCKET === join(engine.state, "engine.sock")) {
+      const agent = [...engine.tokenOf].find(([, token]) => token === environment.LGTM_TOKEN)?.[0];
+      if (agent !== undefined) environment.LGTM_TOKEN = originalTokens.get(agent);
     }
     return environment;
   });

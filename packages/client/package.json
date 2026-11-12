@@ -1,5 +1,5 @@
 {
-  "name": "@lgcode/client",
+  "name": "@lgtm/client",
   "version": "0.0.1",
   "private": true,
   "type": "module",
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@effect/platform-node": "catalog:",
-    "@lgcode/contracts": "workspace:*",
+    "@lgtm/contracts": "workspace:*",
     "effect": "catalog:",
     "ws": "catalog:"
   },

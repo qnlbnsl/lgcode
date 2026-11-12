@@ -31,7 +31,7 @@ export const processWeb = (password = freshSecret()) => Effect.gen(function* () 
   let service: CheckedWebService;
   const restart = () => Effect.gen(function* () {
     if (service !== undefined) yield* service.stop;
-    service = yield* startCheckedWebService(root, { LGCODE_WEB_PASSWORD: password });
+    service = yield* startCheckedWebService(root, { LGTM_WEB_PASSWORD: password });
     yield* waitServing(root, service);
     let listening = false;
     for (let attempt = 0; attempt < 100; attempt++) {

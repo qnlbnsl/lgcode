@@ -1,4 +1,4 @@
-import type { Caller, EventEnvelope } from "@lgcode/contracts";
+import type { Caller, EventEnvelope } from "@lgtm/contracts";
 import type { Snapshot } from "../commands/internal.ts";
 import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { guardPiece } from "../pieces/guardPiece.ts";

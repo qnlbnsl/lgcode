@@ -11,7 +11,7 @@ import { call, freshRequest, makeRig, ownerCredential, removeRig, success } from
 import { registerRebuildCheck } from "../../engine/test/support/rebuildCheck.ts"
 
 const transport = vi.hoisted(() => ({ client: undefined as unknown }))
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(transport.client) }
 })
@@ -20,7 +20,7 @@ vi.mock("@lgcode/client/browser", async () => {
 it("mounts the actual shell, answers a real linked request, reads its durable history, and keeps Done evidence-gated", async () => {
   const rig = makeRig()
   vi.stubEnv("HOME", rig.home)
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.stubEnv("LGTM_HOME", rig.stateFolder)
   vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })))
   history.replaceState({}, "", "/#/")
   const container = document.createElement("div")

@@ -16,7 +16,7 @@ vi.mock("../src/data/ShellDataProvider.tsx", async () => {
       return { session, entry, state: React.useSyncExternalStore(entry.subscribe, entry.snapshot, entry.snapshot) }
     } }
 })
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(pageEnvironment.client) }
 })

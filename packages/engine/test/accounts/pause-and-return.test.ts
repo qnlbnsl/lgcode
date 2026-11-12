@@ -24,7 +24,7 @@ const timers: Effect.Effect<void, never, Scope.Scope | EventLog.EventLog | Views
 beforeEach(() => {
   rig = makeRig();
   logLines = [];
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+  vi.stubEnv("LGTM_HOME", rig.stateFolder);
   vi.stubEnv("HOME", rig.home);
   vi.stubEnv("CODEX_HOME", `${rig.home}/.codex`);
 });

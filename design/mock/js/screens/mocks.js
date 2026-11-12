@@ -24,7 +24,7 @@ function PhoneTabs({ at }) {
 function RequestBody({ before }) {
   return html`<div class="mu-req">
     <span class="mu-kind">Approval</span><h4>Run the web tests</h4>
-    <dl><dt>Command</dt><dd>pnpm --filter @lgcode/web test</dd><dt>Folder</dt><dd>~/projects/lgcode/.worktrees/agent-console-shell</dd></dl>
+    <dl><dt>Command</dt><dd>pnpm --filter @lgtm/web test</dd><dt>Folder</dt><dd>~/projects/lgtm-studio/.worktrees/agent-console-shell</dd></dl>
     <p class="mu-agent"><span class="avatar sm"><${Icon} name="hammer" size=${12} /></span><b>Builder 2</b><span>Build team · Shell</span><span class="grow"></span><span>Waiting 6 min</span></p>
     <div class="mu-actions"><span class="btn primary lg">Allow</span>${!before && html`<span class="btn lg">Always allow</span>`}<span class="btn lg ghost">Deny</span></div>
   </div>`;
@@ -57,7 +57,7 @@ function SettingsUI() {
       <h5>Quiet hours</h5>
       <div class="mu-set"><div><b>22:00 to 07:00</b><span>Failed starts still come through.</span></div><${Icon} name="chevron-right" size=${16} /></div>
       <h5>Server</h5>
-      <div class="mu-set"><div><b>ntfy.example.net</b><span>Topic lgcode-owner · last alert 6 min ago</span></div><span class="badge success">Connected</span></div>
+      <div class="mu-set"><div><b>ntfy.example.net</b><span>Topic lgtm-owner · last alert 6 min ago</span></div><span class="badge success">Connected</span></div>
     </div>
     <${PhoneTabs} at="Settings" />
   </div></div>`;
@@ -137,8 +137,8 @@ export function seedMocks(state) {
       { field: 'request.title', on: 'Requests, Request', sample: 'Run the web tests', schema: 'matches' },
       { field: 'request.kind', on: 'Requests, Request', sample: 'approval', schema: 'matches' },
       { field: 'request.createdAt', on: 'Requests, Request', sample: '6 min ago', schema: 'matches' },
-      { field: 'request.command', on: 'Request', sample: 'pnpm --filter @lgcode/web test', schema: 'matches' },
-      { field: 'request.folder', on: 'Request', sample: '~/projects/lgcode/.worktrees/…', schema: 'matches' },
+      { field: 'request.command', on: 'Request', sample: 'pnpm --filter @lgtm/web test', schema: 'matches' },
+      { field: 'request.folder', on: 'Request', sample: '~/projects/lgtm-studio/.worktrees/…', schema: 'matches' },
       { field: 'agent.role', on: 'Requests, Request', sample: 'Builder 2', schema: 'differs', note: 'The schema has no number. The mock adds one to tell builders apart.' },
       { field: 'request.rule', on: 'Request', sample: 'always', schema: 'new', note: 'Needs the Standing permission rules project.' },
       { field: 'alerts.stalledAgent', on: 'Notification settings', sample: 'on', schema: 'new', note: 'Phone alerts are not stored yet.' },
@@ -169,7 +169,7 @@ export function seedMocks(state) {
     components: COMPONENTS.slice(0, 5).map((c) => ({ ...c, on: ['Home', 'Request'] })),
   };
   state.design = {
-    lgcode: { file: 'design/lgcode.fig', size: '4.8 megabytes', pages: 6, frames: 41, changedAt: at(52 * MIN), changedBy: D, commit: '4f9ae0a' },
+    lgtm: { file: 'design/lgtm.fig', size: '4.8 megabytes', pages: 6, frames: 41, changedAt: at(52 * MIN), changedBy: D, commit: '4f9ae0a' },
   };
 }
 

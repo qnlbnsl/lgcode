@@ -13,7 +13,7 @@ Product commit e740c19 gives editor frames allow-scripts allow-same-origin in bo
 Recorded mocks retain their opaque sandbox.
 The editor retains only the separate display hostname's origin and storage.
 Owner cookies, owner application programming interface authority, frame ancestors, referrer policy, credential-omitting import, revocation and logout controls remain unchanged.
-The image stays lgcode-openpencil:w10b-cb71737-build1, with the approved NET_BIND_SERVICE capability and every other existing confinement flag.
+The image stays lgtm-openpencil:w10b-cb71737-build1, with the approved NET_BIND_SERVICE capability and every other existing confinement flag.
 No OpenPencil patch, image build, pull or retag was applied.
 All temporary startup and boot-notice observations were removed from active source and the native case.
 

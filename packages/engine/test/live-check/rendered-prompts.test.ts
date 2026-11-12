@@ -32,7 +32,7 @@ describe("--dry-run shows the prompts as they are sent (F8)", () => {
   });
 
   it("uses the models and efforts the environment sets, in the lead prompt and in the setup list (breaks if the dry run shows the defaults while the run uses the owner's choice)", () => {
-    const config = liveConfig({ LGCODE_LIVE_WORKER_MODEL: "my-worker-model", LGCODE_LIVE_WORKER_EFFORT: "high", LGCODE_LIVE_LEAD_MODEL: "my-lead-model" });
+    const config = liveConfig({ LGTM_LIVE_WORKER_MODEL: "my-worker-model", LGTM_LIVE_WORKER_EFFORT: "high", LGTM_LIVE_LEAD_MODEL: "my-lead-model" });
     const shown = dryRunText(config);
     expect(shown).toContain('"model":"my-worker-model","effort":"high"');
     expect(shown).toContain("my-lead-model");

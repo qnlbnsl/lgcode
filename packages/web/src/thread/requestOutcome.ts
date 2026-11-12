@@ -1,4 +1,4 @@
-import { EventEnvelope, EventSequence, type RequestId } from "@lgcode/contracts"
+import { EventEnvelope, EventSequence, type RequestId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { requestId, withClient } from "./client.ts"

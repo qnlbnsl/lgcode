@@ -1,5 +1,5 @@
-import type { EventEnvelope } from "@lgcode/contracts";
-import { boardAlertSources } from "@lgcode/contracts/board/alerts";
+import type { EventEnvelope } from "@lgtm/contracts";
+import { boardAlertSources } from "@lgtm/contracts/board/alerts";
 import type { Snapshot } from "../commands/internal.ts";
 import type { PieceAlertSourceRequest } from "../client/alerts/reactor.ts";
 import { boardView } from "./wake.ts";

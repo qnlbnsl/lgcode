@@ -3,7 +3,7 @@
 The file in this folder is the Inter typeface by Rasmus Andersson and the Inter
 Project Authors. It is released under the SIL Open Font License, version 1.1
 (OFL). The licence text is in [OFL.txt](OFL.txt) next to this file, and it must
-stay there for as long as the font is in LGcode.
+stay there for as long as the font is in LGTM Studio.
 
 ## Which file, and from where
 
@@ -18,7 +18,7 @@ stay there for as long as the font is in LGcode.
 - The file is unchanged. It is 48,256 bytes. It keeps the tabular figures
   feature (`tnum`) that the web mock turns on.
 
-## Where LGcode uses it
+## Where LGTM Studio uses it
 
 The web mock in `design/` loads it through `design/fonts/inter`, a symbolic link
 to this folder, so the preview server can serve it.

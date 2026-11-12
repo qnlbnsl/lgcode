@@ -1,4 +1,4 @@
-import type { Event } from "@lgcode/contracts";
+import type { Event } from "@lgtm/contracts";
 import { appendSetup } from "../support/handlerRig.ts";
 import * as Effect from "effect/Effect";
 import { expect, it } from "vitest";

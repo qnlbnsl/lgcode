@@ -1,4 +1,4 @@
-# LGcode: problems found
+# LGTM Studio: problems found
 
 A running list of problems found while building or using Shephrd. Add a
 problem here in the same change that finds it, even if it is not fixed yet.
@@ -10786,6 +10786,10 @@ The fix stays as stated above: wait on the correct event, not a longer deadline.
 It is the next unit on area/website after the master merge.
 The original logs and failure contexts remain in the W09 author result.
 
+A related timing failure appeared in the full run of the rename branch on 2026-11-12, at git.spec.ts:316.
+After Pull, the sync line still said "1 incoming" after five seconds.
+The unchanged case passed on its own in 24.5 seconds.
+
 
 ## 610. The merged shell constrained the Git workspace width
 
@@ -10889,6 +10893,9 @@ The unchanged case passed on its own in 24.6 seconds.
 Both failures are in the mock and component preview path under a full parallel browser run.
 The cause remains unproved.
 
+It recurred at new-project.spec.ts:605 in the full run of the rename branch on 2026-11-12, with status 0 instead of 200.
+The unchanged case passed on its own in 27.3 seconds.
+
 ## 612. The built web page prints raw engine data and has weak component design
 
 Open: found on 2026-11-10 while comparing the page in `packages/web` with the mock.
@@ -10972,3 +10979,27 @@ The input and the keyboard skip link now use a dedicated dark text color.
 The input placeholder retains its readable color in both modes.
 Screenshot frame shadows also keep a dark surface color instead of following the text color.
 The browser check retains the email-field and skip-link contrast assertions.
+
+## 619. The remote test computer still uses folder and slice names from LGcode
+
+Found: 2026-11-12, during the rename to LGTM Studio.
+State: open, on purpose.
+
+The remote test scripts keep three names from before the rename.
+The copies live in `~/Work/lgcode` on the remote test computer.
+Every remote command shares the systemd slice `lgcode-remote.slice`.
+The SSH connection socket is named `lgcode-remote-%C`.
+Branches made before the rename still use these names.
+A second folder would give each branch its own two test slots.
+A second slice would give each branch its own 80 gigabyte memory limit, and together they could exceed the owner's limit.
+Rename all three once no branch from before the rename runs remote tests.
+The helper `~/.local/bin/run-remote-test` also names the local folder `~/projects/personal/lgcode`, which was not moved.
+
+## 620. Settings the web page stored in the browser are lost by the rename
+
+Found: 2026-11-12, during the rename to LGTM Studio.
+State: accepted.
+
+The web page and the mock stored the theme, panel sizes and dismissed notices under keys that started with `lgcode-`.
+The keys now start with `lgtm-`.
+A browser that used the old page shows the defaults once, and then remembers new choices.

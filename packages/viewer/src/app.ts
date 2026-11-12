@@ -168,7 +168,7 @@ export function ViewerApp({ client }: { readonly client: ViewerClient }) {
     : "Enter: send; Esc: cancel. Pasted text is added to the draft.";
 
   return h(Box, { flexDirection: "column", width: dimensions.columns },
-    h(Text, { bold: true }, "LGcode viewer — owner"),
+    h(Text, { bold: true }, "LGTM Studio viewer — owner"),
     h(Text, null, `Agents ${agents.length === 0 ? "(none)" : `${selected + 1}/${agents.length}`} — Up/Down to select`),
     ...agents.slice(Math.max(0, selected - 1), Math.max(0, selected - 1) + 3).map((entry) => h(Text, { key: entry.agentId, wrap: "truncate" },
       `${entry.agentId === session.selectedAgentId ? ">" : " "} ${oneLine(entry.name)} (${oneLine(entry.displayedState)})`)),
@@ -176,7 +176,7 @@ export function ViewerApp({ client }: { readonly client: ViewerClient }) {
     h(Box, { flexDirection: "column", height }, ...visible.map((line, index) => h(Text, { key: index }, `| ${line}`))),
     h(Text, null, reviewMode ? `Context lines ${contextStart + 1}–${Math.min(contextStart + height, contextLines.length)}/${contextLines.length}`
       : `Requests held by owner: ${requests.length}${pending === undefined ? "" : `; selected ${requestIndex % requests.length + 1}: ${pending.kind} ${oneLine(pending.id)}`}`),
-    ...(reviewMode && warning !== "" ? [h(Text, { key: "warning", bold: true }, `LGcode warning: ${warning}`)] : []),
+    ...(reviewMode && warning !== "" ? [h(Text, { key: "warning", bold: true }, `LGTM Studio warning: ${warning}`)] : []),
     h(Text, null, status),
     ...(mode === "prompt" || mode === "question" ? [h(Text, { key: "draft" },
       `Owner draft${mode === "prompt" ? ` to ${oneLine(draftTarget ?? "")}` : ""}: ${linesFor(draft, dimensions.columns - 20).slice(-2).join("\n")}`)] : []),

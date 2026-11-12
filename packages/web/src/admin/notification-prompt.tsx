@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import type { AlertSettings, RequestId } from "@lgcode/contracts"
+import type { AlertSettings, RequestId } from "@lgtm/contracts"
 import { useMutationDisabled, useShellData } from "../data/ShellDataProvider.tsx"
 import { shellHref } from "../routes.ts"
 import { readPreference, writePreference } from "../shell/preferences.ts"
@@ -12,7 +12,7 @@ export function NotificationPrompt({ onSessionExpired }: { readonly onSessionExp
   const { run, busy, message, setMessage } = useAdminApi(onSessionExpired)
   const [settings, setSettings] = useState<AlertSettings>()
   const [readAt, setReadAt] = useState<number>()
-  const [dismissed, setDismissed] = useState(() => readPreference("lgcode-phone-notifications-dismissed") === "true")
+  const [dismissed, setDismissed] = useState(() => readPreference("lgtm-phone-notifications-dismissed") === "true")
   const dismissal = useRef<RequestId | undefined>(undefined)
   const sequence = data.snapshot?.sequence
   const request = data.requests?.find((row) => row.status === "open" && row.holder._tag === "owner")
@@ -32,7 +32,7 @@ export function NotificationPrompt({ onSessionExpired }: { readonly onSessionExp
     if (reply === undefined) return
     dismissal.current = undefined
     if (reply._tag === "acknowledged") {
-      writePreference("lgcode-phone-notifications-dismissed", "true")
+      writePreference("lgtm-phone-notifications-dismissed", "true")
       setDismissed(true)
       setSettings((value) => value && { ...value, pushPromptDismissed: true })
       data.retry()

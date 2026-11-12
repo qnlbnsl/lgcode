@@ -24,13 +24,13 @@ beforeEach(() => {
 });
 afterEach(() => { rmSync(root, { recursive: true, force: true }); });
 
-const service = (pid: number, home = state): ServiceProcess => ({ pid, environment: { LGCODE_HOME: home } });
+const service = (pid: number, home = state): ServiceProcess => ({ pid, environment: { LGTM_HOME: home } });
 
 const deps = (services: ReadonlyArray<ServiceProcess>, extra: Partial<StartupHookDeps> = {}): StartupHookDeps & { readonly calls: { answers: number; sleeps: number } } => {
   const calls = { answers: 0, sleeps: 0 };
   return {
     calls,
-    environment: { LGCODE_HOME: state, HOME: join(root, "home") },
+    environment: { LGTM_HOME: state, HOME: join(root, "home") },
     listServices: () => services,
     lockExists: () => false,
     answers: async () => { calls.answers += 1; return true; },
@@ -79,9 +79,9 @@ describe("the startup-hook check", () => {
     expect(result.passed && result.pid).toBe(1);
   });
 
-  it("finds the home from XDG_STATE_HOME or HOME, as the service does (breaks if only LGCODE_HOME is read)", async () => {
+  it("finds the home from XDG_STATE_HOME or HOME, as the service does (breaks if only LGTM_HOME is read)", async () => {
     const xdg = join(root, "xdg");
-    mkdirSync(join(xdg, "lgcode"), { recursive: true });
+    mkdirSync(join(xdg, "lgtm"), { recursive: true });
     const result = await checkStartupHook(deps([{ pid: 7, environment: { XDG_STATE_HOME: xdg } }], { environment: { XDG_STATE_HOME: xdg, HOME: root } }));
     expect(result.passed).toBe(true);
   });
@@ -103,8 +103,8 @@ describe("the startup-hook check", () => {
 
   it("never prints a secret: the reasons and the state hold only paths and pids (breaks if an environment value is copied into a message)", async () => {
     const secret = "sk-live-0123456789abcdef-NEVER-PRINT";
-    const processes: Array<ServiceProcess> = [{ pid: 3, environment: { LGCODE_HOME: state, ANTHROPIC_API_KEY: secret } }, service(4)];
-    const result = await checkStartupHook(deps(processes, { environment: { LGCODE_HOME: state, ANTHROPIC_API_KEY: secret } }));
+    const processes: Array<ServiceProcess> = [{ pid: 3, environment: { LGTM_HOME: state, ANTHROPIC_API_KEY: secret } }, service(4)];
+    const result = await checkStartupHook(deps(processes, { environment: { LGTM_HOME: state, ANTHROPIC_API_KEY: secret } }));
     expect(JSON.stringify(result)).not.toContain(secret);
   });
 });
@@ -118,13 +118,13 @@ describe("the process listing", () => {
 
   it("lists the processes that run the engine's service.ts, keeps only the three state variables, and ignores the rest (breaks if another node process counts, or a secret is kept)", () => {
     const proc = join(root, "proc");
-    plant(proc, "100", ["node", "/work/packages/engine/src/service.ts"], { LGCODE_HOME: state, ANTHROPIC_API_KEY: "never-kept-0123456789", HOME: "/home/x" });
-    plant(proc, "101", ["node", "/work/packages/engine/src/other.ts"], { LGCODE_HOME: state });
-    plant(proc, "102", ["vim", "service.ts"], { LGCODE_HOME: state });
+    plant(proc, "100", ["node", "/work/packages/engine/src/service.ts"], { LGTM_HOME: state, ANTHROPIC_API_KEY: "never-kept-0123456789", HOME: "/home/x" });
+    plant(proc, "101", ["node", "/work/packages/engine/src/other.ts"], { LGTM_HOME: state });
+    plant(proc, "102", ["vim", "service.ts"], { LGTM_HOME: state });
     mkdirSync(join(proc, "self"));
     mkdirSync(join(proc, "103"));
     const listed = listServicesFromProc(proc);
-    expect(listed).toEqual([{ pid: 100, environment: { LGCODE_HOME: state, HOME: "/home/x" } }]);
+    expect(listed).toEqual([{ pid: 100, environment: { LGTM_HOME: state, HOME: "/home/x" } }]);
     expect(JSON.stringify(listed)).not.toContain("never-kept");
   });
 

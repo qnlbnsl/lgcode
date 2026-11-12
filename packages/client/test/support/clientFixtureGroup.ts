@@ -3,8 +3,8 @@
 // transport, dispatch, retry, decoding or cursor code is mocked.
 import { vi } from "vitest";
 
-vi.mock("@lgcode/contracts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@lgcode/contracts")>();
+vi.mock("@lgtm/contracts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@lgtm/contracts")>();
   const Schema = await import("effect/Schema");
   const Rpc = await import("effect/rpc/Rpc");
   const RpcGroup = await import("effect/rpc/RpcGroup");

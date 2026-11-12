@@ -1,4 +1,4 @@
-import type { Event, ProjectView, ProjectTaskRecord, TaskHistoryEntry } from "@lgcode/contracts"
+import type { Event, ProjectView, ProjectTaskRecord, TaskHistoryEntry } from "@lgtm/contracts"
 import type { Snapshot } from "../commands/internal.ts"
 
 export const own = <T>(rows: Readonly<Record<string, T>>, id: string): T | undefined => Object.hasOwn(rows, id) ? rows[id] : undefined

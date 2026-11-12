@@ -22,7 +22,7 @@ for (const proxyMode of [false, true]) {
     const addresses = Object.values(networkInterfaces()).flatMap((items) => items ?? [])
       .filter((item) => !item.internal && item.family === "IPv4").map((item) => item.address);
     for (const host of ["::1", ...addresses]) expect(yield* Effect.promise(() => accepts(host, ctx.settings.port)), "web listener accepted a non-127.0.0.1 connection").toBe(false);
-  }), { settings: proxyMode ? { proxyMode: true, publicAddress: "https://lgcode.example.test" } : {} }));
+  }), { settings: proxyMode ? { proxyMode: true, publicAddress: "https://lgtm.example.test" } : {} }));
 }
 
 it("5.1 enabled off: catches keeping the listener or accepted connections alive after the setting commits", async () => withWeb((ctx) => Effect.gen(function* () {

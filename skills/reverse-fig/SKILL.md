@@ -1,6 +1,6 @@
 ---
 name: reverse-fig
-description: Turn a project's existing interface into an OpenPencil design file (.fig) with component sets, variants and color variables, then check it against the browser pixel by pixel. Use when a project that already has screens joins LGcode and its design should become the source of truth.
+description: Turn a project's existing interface into an OpenPencil design file (.fig) with component sets, variants and color variables, then check it against the browser pixel by pixel. Use when a project that already has screens joins LGTM Studio and its design should become the source of truth.
 ---
 
 # Reverse Fig
@@ -71,15 +71,15 @@ Options:
 - `PLAYWRIGHT_MODULE` points at another Playwright copy, and `REVERSE_FIG_OPENPENCIL` at another
   `openpencil.js`.
 
-LGcode's own profile, `profiles/lgcode-mock.mjs`, runs against the web mock in `design/`, served
+LGTM Studio's own profile, `profiles/lgtm-mock.mjs`, runs against the web mock in `design/`, served
 on port 4178. Run it from the repository root, and it writes
-`design/lgcode.fig`. On 2026-11-08 its first tuning passes reached 18 of 26 variants within 3
+`design/lgtm.fig`. On 2026-11-08 its first tuning passes reached 18 of 26 variants within 3
 percent, after the faults below were fixed in the scripts.
 
 ## Where a profile lives
 
 A profile is a JavaScript module, so it can hold code as well as settings. Keep it with the
-project it describes, for example as `.lgcode/reverse-fig.mjs`. A private project's profile must
+project it describes, for example as `.lgtm/reverse-fig.mjs`. A private project's profile must
 not be committed to a public repository, because its component markup and names describe that
 product.
 
@@ -106,7 +106,7 @@ shows each component on a page of its own, such as a component gallery or a mock
 
 ## What the profile hooks are for
 
-The first project after LGcode's mock was Ananke, a React Native Web app. Its pass on 2026-11-08
+The first project after LGTM Studio's mock was Ananke, a React Native Web app. Its pass on 2026-11-08
 added three hooks, and each one is for a kind of project, not for Ananke alone:
 
 - `tokens.read` supplies tokens from Node, for colors kept in a manifest or a theme file rather

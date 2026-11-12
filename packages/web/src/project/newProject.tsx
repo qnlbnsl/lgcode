@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useSyncExternalStore } from "react"
-import type { Project } from "@lgcode/contracts"
+import type { Project } from "@lgtm/contracts"
 import { visibleText } from "../thread/text.tsx"
 import { NewProjectSession } from "./creation.ts"
 import "./newProject.css"

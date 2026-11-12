@@ -1,4 +1,4 @@
-import { RolesActionRecord } from "@lgcode/contracts";
+import { RolesActionRecord } from "@lgtm/contracts";
 import * as Schema from "effect/Schema";
 import { expect, it } from "vitest";
 import { evaluateCrash } from "../../../../src/roles/sheepdog/rules/crash.ts";

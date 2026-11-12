@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
-import { PublicWebAddress, publicAddressError, WebSettings, type AlertKind, type AlertSettings, type WebServerState } from "@lgcode/contracts"
+import { PublicWebAddress, publicAddressError, WebSettings, type AlertKind, type AlertSettings, type WebServerState } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
@@ -226,7 +226,7 @@ export function Settings({ onSessionExpired }: { readonly onSessionExpired: () =
       <div className="admin-settings-sections">
         <section className="admin-settings-section" id="admin-settings-appearance"><h3>Appearance</h3>
           <div className="admin-actions" role="group" aria-label="Color mode">{([["light", "Light"], ["dark", "Dark"], ["system", "Match system"]] as const).map(([value, label]) => <button key={value} aria-pressed={theme === value}
-            onClick={() => { const choice: ThemeChoice = value; writePreference("lgcode-theme", choice); applyTheme(choice); setTheme(choice) }}>{label}</button>)}</div>
+            onClick={() => { const choice: ThemeChoice = value; writePreference("lgtm-theme", choice); applyTheme(choice); setTheme(choice) }}>{label}</button>)}</div>
           <p className="admin-note">Saved in this browser. Match system follows the device’s light or dark setting.</p>
         </section>
         {alerts === undefined || web === undefined ? <p role="status">{busy ? "Loading settings…" : "Settings have not loaded."}</p> : <>
@@ -234,7 +234,7 @@ export function Settings({ onSessionExpired }: { readonly onSessionExpired: () =
             <div className="admin-push-list">{alerts.kinds.map(({ kind, push }) => <div key={kind}><PushSetting kind={kind} push={push} busy={locked} saving={busy} onChange={(value) => { void setPush(kind, value) }} />{savedMark(`push-${kind}`)}</div>)}</div>
           </section>
           <section className="admin-settings-section" id="admin-settings-service"><h3>Notification service</h3>
-            <p className="admin-note">LGcode sends phone notifications through an ntfy server.</p>
+            <p className="admin-note">LGTM Studio sends phone notifications through an ntfy server.</p>
             <form aria-label="Alert carrier" onSubmit={(event) => submit(event, saveCarrier)} onBlur={(event) => { if (event.target instanceof HTMLInputElement) void saveCarrier(event.currentTarget) }}
               key={`carrier-${alerts.carrier._tag === "ntfy" ? `${alerts.carrier.server}/${alerts.carrier.topic}` : "none"}`}>
               <fieldset disabled={locked}><label>Server<input name="server" type="url" defaultValue={alerts.carrier._tag === "ntfy" ? alerts.carrier.server : ""} required /></label>
@@ -262,7 +262,7 @@ export function Settings({ onSessionExpired }: { readonly onSessionExpired: () =
                 <div className="admin-form-grid"><label>Port<input name="port" type="number" min={1} max={65535} defaultValue={web.port} required /></label>
                   <label>Check-in interval, in seconds<input aria-label="Heartbeat seconds" name="heartbeatSeconds" type="number" min={1} defaultValue={web.heartbeatSeconds} required /></label></div>
                 <label className="admin-check"><input name="proxyMode" type="checkbox" defaultChecked={web.proxyMode} onChange={(event) => { void saveWeb(event.currentTarget.form!) }} />Use proxy mode</label>
-                <label>Public address (HTTPS)<input name="publicAddress" type="url" placeholder="https://lgcode.example" aria-describedby="public-address-help" defaultValue={web.publicAddress ?? ""} /></label>
+                <label>Public address (HTTPS)<input name="publicAddress" type="url" placeholder="https://lgtm.example" aria-describedby="public-address-help" defaultValue={web.publicAddress ?? ""} /></label>
                 <p className="admin-note" id="public-address-help">Use HTTPS through your proxy. For an SSH tunnel, open http://127.0.0.1 at the server’s port and leave the public address empty.</p>{savedMark("web")}
                 <label>Preview and design address (HTTPS)<input name="displayAddress" type="url" defaultValue={web.display?.publicAddress ?? ""} aria-describedby="display-address-help" /></label>
                 <label>Preview and design listener port<input name="displayPort" type="number" min={1} max={65535} defaultValue={web.display?.port ?? ""} /></label>

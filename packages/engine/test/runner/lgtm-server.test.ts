@@ -16,7 +16,7 @@ let rig: RunnerRig;
 beforeEach(() => {
   rig = makeRunnerRig();
   vi.stubEnv("HOME", rig.home);
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+  vi.stubEnv("LGTM_HOME", rig.stateFolder);
 });
 afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig); });
 registerRebuildCheck({ noLog: true });
@@ -53,8 +53,8 @@ it("Cursor retains its unguessable provider identity on reload and keeps agents 
   const name = cursorServerName(sessions);
   expect(cursorServerName(sessions)).toBe(name);
   expect(cursorServerName(join(rig.stateFolder, "cursor-sessions", "second"))).not.toBe(name);
-  expect(statSync(join(sessions, "lgcode-server-name")).mode & 0o777).toBe(0o600);
-  writeFileSync(join(sessions, "lgcode-server-name"), "external");
+  expect(statSync(join(sessions, "lgtm-server-name")).mode & 0o777).toBe(0o600);
+  writeFileSync(join(sessions, "lgtm-server-name"), "external");
   expect(() => cursorServerName(sessions)).toThrow("Invalid Cursor server identity");
 });
 
@@ -73,7 +73,7 @@ live("Cursor reload reuses only that agent's original server identity and native
   })));
 
 for (const method of ["new", "load", "resume"] as const) {
-  live(`issue 236: session/${method} configures only the LGcode server approval-free without embedding its token`, () =>
+  live(`issue 236: session/${method} configures only the LGTM Studio server approval-free without embedding its token`, () =>
     withAcpRunner(rig, {}, ({ runner }) => Effect.gen(function* () {
       const echo = echoFile(rig);
       const accountConfig = {
@@ -90,14 +90,14 @@ for (const method of ["new", "load", "resume"] as const) {
       expect(framesOf(seen, `session/${method}`)).toHaveLength(1);
       expect(framesOf(seen, `session/${method}`)[0]!.params.mcpServers ?? []).toEqual([]);
       expect(JSON.parse(seen.env.CODEX_CONFIG!)).toEqual({ ...accountConfig, mcp_servers: {
-        ...accountConfig.mcp_servers, lgcode: {
+        ...accountConfig.mcp_servers, lgtm: {
           command: process.execPath, args: [mcpScriptPath, "mcp"],
-          env_vars: ["LGCODE_SOCKET", "LGCODE_TOKEN"], default_tools_approval_mode: "approve",
+          env_vars: ["LGTM_SOCKET", "LGTM_TOKEN"], default_tools_approval_mode: "approve",
         },
       } });
       expect(seen.env.CODEX_CONFIG).not.toContain(spawn.token);
-      expect(seen.env.LGCODE_SOCKET).toBe(rig.socket);
-      expect(seen.env.LGCODE_TOKEN).toBe(spawn.token);
+      expect(seen.env.LGTM_SOCKET).toBe(rig.socket);
+      expect(seen.env.LGTM_TOKEN).toBe(spawn.token);
     })));
 }
 
@@ -108,9 +108,9 @@ live("issue 236: an account without CODEX_CONFIG still gets the scoped server", 
     yield* runner.start(spawn.input);
     const seen = yield* readEcho(echo);
     expect(seen.env.CODEX_CONFIG).toBeTypeOf("string");
-    expect(JSON.parse(seen.env.CODEX_CONFIG!)).toEqual({ mcp_servers: { lgcode: {
+    expect(JSON.parse(seen.env.CODEX_CONFIG!)).toEqual({ mcp_servers: { lgtm: {
       command: process.execPath, args: [mcpScriptPath, "mcp"],
-      env_vars: ["LGCODE_SOCKET", "LGCODE_TOKEN"], default_tools_approval_mode: "approve",
+      env_vars: ["LGTM_SOCKET", "LGTM_TOKEN"], default_tools_approval_mode: "approve",
     } } });
   })));
 
@@ -119,10 +119,10 @@ const options = [
   { optionId: "always", name: "Allow always", kind: "allow_always" },
   { optionId: "no", name: "Reject", kind: "reject_once" },
 ];
-const geminiMeta = (server = "lgcode") => ({ "gemini-cli": { mcp: { server_name: server, tool_name: "roles_orient" } } });
-const claudeMeta = (server = "lgcode", source = "dynamic") => ({ claudeCode: { mcpServer: { name: server, source }, toolName: `mcp__${server}__roles_orient` } });
+const geminiMeta = (server = "lgtm") => ({ "gemini-cli": { mcp: { server_name: server, tool_name: "roles_orient" } } });
+const claudeMeta = (server = "lgtm", source = "dynamic") => ({ claudeCode: { mcpServer: { name: server, source }, toolName: `mcp__${server}__roles_orient` } });
 const permission = (toolCallId: string, _meta?: unknown, offered = options) => ({
-  step: "permission", toolCallId, title: "mcp__lgcode__roles_orient", kind: "other", options: offered,
+  step: "permission", toolCallId, title: "mcp__lgtm__roles_orient", kind: "other", options: offered,
   ...(_meta === undefined ? {} : { _meta }),
 });
 
@@ -137,11 +137,11 @@ for (const harnessId of ["claude", "cursor"]) {
         else yield* runner.load({ ...spawn.input, session: { _tag: "acp", sessionId: "fake-session-existing" } });
         const seen = yield* readEcho(echo, (current) => framesOf(current, `session/${method}`).length > 0);
         const params = framesOf(seen, `session/${method}`)[0]!.params;
-        if (harnessId === "claude") expect(params._meta).toEqual({ claudeCode: { options: { allowedTools: ["mcp__lgcode"] } } });
+        if (harnessId === "claude") expect(params._meta).toEqual({ claudeCode: { options: { allowedTools: ["mcp__lgtm"] } } });
         else {
           const config = JSON.parse(readFileSync(join(seen.env.CURSOR_CONFIG_DIR!, "cli-config.json"), "utf8"));
           expect(config.permissions.allow).toEqual([`Mcp(${params.mcpServers[0].name}:*)`]);
-          expect(params.mcpServers[0].name).toMatch(/^lgcode-[a-f0-9-]{36}$/);
+          expect(params.mcpServers[0].name).toMatch(/^lgtm-[a-f0-9-]{36}$/);
         }
       })));
   }
@@ -184,12 +184,12 @@ for (const harnessId of ["claude", "codex", "gemini", "cursor"]) {
         const seen = yield* readEcho(echo, (current) => framesOf(current, "session/new").length > 0);
         const params = framesOf(seen, "session/new")[0]!.params;
         expect(framesOf(seen, "session/set_config_option").at(-1)?.params.value).toBe(spawn.input.harness.permissionMapping[mode]);
-        if (harnessId === "claude") expect(params._meta).toEqual({ claudeCode: { options: { allowedTools: ["mcp__lgcode"] } } });
-        if (harnessId === "codex") expect(JSON.parse(seen.env.CODEX_CONFIG!).mcp_servers.lgcode.default_tools_approval_mode).toBe("approve");
+        if (harnessId === "claude") expect(params._meta).toEqual({ claudeCode: { options: { allowedTools: ["mcp__lgtm"] } } });
+        if (harnessId === "codex") expect(JSON.parse(seen.env.CODEX_CONFIG!).mcp_servers.lgtm.default_tools_approval_mode).toBe("approve");
         const privateDirectory = seen.env.CURSOR_CONFIG_DIR;
         if (harnessId === "cursor") {
           const server = params.mcpServers[0].name;
-          expect(server).toMatch(/^lgcode-[a-f0-9-]{36}$/);
+          expect(server).toMatch(/^lgtm-[a-f0-9-]{36}$/);
           expect(privateDirectory).not.toBe(source);
           expect(JSON.parse(readFileSync(join(privateDirectory!, "cli-config.json"), "utf8"))).toEqual({ version: 1,
             permissions: { allow: ["Read(**)", `Mcp(${server}:*)`], deny: ["Shell(rm)"] } });
@@ -225,10 +225,10 @@ for (const harnessId of ["claude", "gemini"]) {
           const echo = echoFile(rig);
           const meta = harnessId === "claude" ? claudeMeta : geminiMeta;
           const own = harnessId === "claude" && version === 2
-            ? { ...permission("own", { claudeCode: { mcpServer: { name: "lgcode", source: "dynamic" } } }), name: "mcp__lgcode__roles_orient" }
+            ? { ...permission("own", { claudeCode: { mcpServer: { name: "lgtm", source: "dynamic" } } }), name: "mcp__lgtm__roles_orient" }
             : permission("own", meta());
           const spawn = yield* spawnFor(rig, harnessFor(harnessId, writeFakeAdapter(rig)),
-            accountFor(harnessId, { protocolVersion: version, turns: [[own, permission("other", meta("lgcode-other"))]] }, echo), { permission: mode });
+            accountFor(harnessId, { protocolVersion: version, turns: [[own, permission("other", meta("lgtm-other"))]] }, echo), { permission: mode });
           yield* context.runner.start(spawn.input);
           yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, sentSequence: 1, delivery: deliveryFor(spawn.agentId, "go") });
           const asked = yield* context.waitFor((event) => event._tag === "permissionRequested");
@@ -247,7 +247,7 @@ for (const source of ["user", "project", "local", "plugin", "sdk", "managed", ""
     withAcpRunner(rig, {}, (context) => Effect.gen(function* () {
       const echo = echoFile(rig);
       const spawn = yield* spawnFor(rig, harnessFor("claude", writeFakeAdapter(rig)),
-        accountFor("claude", { turns: [[permission("uncertain", claudeMeta("lgcode", source))]] }, echo));
+        accountFor("claude", { turns: [[permission("uncertain", claudeMeta("lgtm", source))]] }, echo));
       yield* context.runner.start(spawn.input);
       yield* context.runner.prompt({ agentId: spawn.agentId, incarnation: spawn.incarnation, sentSequence: 1, delivery: deliveryFor(spawn.agentId, "go") });
       const asked = yield* context.waitFor((event) => event._tag === "permissionRequested");
@@ -260,9 +260,9 @@ for (const source of ["user", "project", "local", "plugin", "sdk", "managed", ""
 for (const [name, meta, offered] of [
   ["title only", undefined, options],
   ["other server", geminiMeta("external"), options],
-  ["similar server", geminiMeta("lgcode__external"), options],
-  ["no tool identity", { "gemini-cli": { mcp: { server_name: "lgcode" } } }, options],
-  ["blank tool identity", { "gemini-cli": { mcp: { server_name: "lgcode", tool_name: " " } } }, options],
+  ["similar server", geminiMeta("lgtm__external"), options],
+  ["no tool identity", { "gemini-cli": { mcp: { server_name: "lgtm" } } }, options],
+  ["blank tool identity", { "gemini-cli": { mcp: { server_name: "lgtm", tool_name: " " } } }, options],
   ["persistent only", geminiMeta(), options.filter((option) => option.kind !== "allow_once")],
   ["ambiguous once", geminiMeta(), [...options, { optionId: "once2", kind: "allow_once", name: "Other" }]],
   ["duplicate ids", geminiMeta(), [...options, { optionId: "once", kind: "reject_once", name: "Other" }]],
@@ -282,8 +282,8 @@ for (const [name, meta, offered] of [
 }
 
 for (const value of ["invalid-private-value", "null", "[]", '"private-value"', "42", '{"mcp_servers":[]}',
-  '{"mcp_servers":null}', '{"mcp_servers":{"lgcode":{"env":{"secret":"private-value"}}}}',
-  '{"mcp_servers":{"lgcode":null}}']) {
+  '{"mcp_servers":null}', '{"mcp_servers":{"lgtm":{"env":{"secret":"private-value"}}}}',
+  '{"mcp_servers":{"lgtm":null}}']) {
   live(`issue 236: an invalid or colliding account config is refused before spawning (${value.slice(0, 25)})`, () =>
     withAcpRunner(rig, {}, ({ runner, logLines }) => Effect.gen(function* () {
       const echo = echoFile(rig);
@@ -309,8 +309,8 @@ live("issue 236: a Claude start retains the ACP server and its account configura
     const seen = yield* readEcho(echo, (current) => framesOf(current, "session/new").length > 0);
     expect(seen.env.CODEX_CONFIG).toBe(config);
     expect(framesOf(seen, "session/new")[0]!.params.mcpServers).toEqual([{
-      type: "stdio", name: "lgcode", command: process.execPath, args: [mcpScriptPath, "mcp"], env: [
-        { name: "LGCODE_SOCKET", value: rig.socket }, { name: "LGCODE_TOKEN", value: spawn.token },
+      type: "stdio", name: "lgtm", command: process.execPath, args: [mcpScriptPath, "mcp"], env: [
+        { name: "LGTM_SOCKET", value: rig.socket }, { name: "LGTM_TOKEN", value: spawn.token },
       ],
     }]);
   })));

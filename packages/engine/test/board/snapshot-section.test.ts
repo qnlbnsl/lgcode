@@ -1,5 +1,5 @@
 import { it } from "@effect/vitest";
-import type { ClientSnapshot } from "@lgcode/contracts";
+import type { ClientSnapshot } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 
@@ -11,7 +11,7 @@ import { post as postEvent } from "./fixtures.ts";
 import { waitForBoardRecovery } from "../support/boardRecovery.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 
 const run = <A>(body: Effect.Effect<A, any, any>) => provideBoard(rig, Effect.gen(function* () {

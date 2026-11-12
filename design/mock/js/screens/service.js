@@ -41,8 +41,8 @@ export function seedService(st) {
     quiet: { on: false, from: '22:00', to: '07:00', failed: true },
     defaultHarness: 'claude', defaultModel: 'Sonnet 5.5', defaultEffort: 'Medium', defaultPermission: 'Edit files without asking',
     needToKnow: false, stallAssigned: 5, stallWorker: 10, stallLead: 20, autoNudge: true, replaceAfter: 3, capacityRetries: 12,
-    workflowPath: '~/.lgcode', maxRounds: 6, testsDefault: true, reviewDefault: true,
-    version: '0.9.0', commit: '55e1bbd', dataFolder: '~/.local/state/lgcode',
+    workflowPath: '~/.lgtm', maxRounds: 6, testsDefault: true, reviewDefault: true,
+    version: '0.9.0', commit: '55e1bbd', dataFolder: '~/.local/state/lgtm',
   });
 }
 
@@ -101,7 +101,7 @@ function MachineDetail({ s, m, now }) {
   const subs = s.subscriptions.filter((x) => x.machine === m.id);
   return html`<div class="svc-detail">
     ${m.status === 'offline' && html`<div class="callout warn" style="grid-column:1/-1"><${Icon} name="wifi-off" size=${15} />
-      <span class="grow">${m.name} stopped answering at ${clock(m.lastSeen)}. Its agents are paused, and they start again when it reconnects. On ${m.name}, run <code>lgcode connect</code>.</span></div>`}
+      <span class="grow">${m.name} stopped answering at ${clock(m.lastSeen)}. Its agents are paused, and they start again when it reconnects. On ${m.name}, run <code>lgtm connect</code>.</span></div>`}
     ${m.status === 'pairing' && html`<div class="callout info" style="grid-column:1/-1"><${Icon} name="loader-circle" size=${15} class="svc-spin" /><span class="grow">${m.name} is connected. LGTM Studio is scanning it for harnesses and repositories.</span></div>`}
     <div>
       <h3>This machine</h3>
@@ -197,9 +197,9 @@ function PairMachine({ s }) {
     foot=${html`<span class="why">${step === 0 ? `The code works once and expires in ${mm}:${String(ss).padStart(2, '0')}.` : taken ? 'A machine already has that name.' : 'Confirm only a machine you started yourself.'}</span>
       <button type="button" class="btn" onClick=${act.closeDialog}>Cancel</button><button type="submit" class="btn primary" disabled=${step === 0 || !name.trim() || taken}>Confirm ${step === 1 && name.trim() ? name.trim() : 'machine'}</button>`}>
     <ol class="svc-steps">
-      <li class="done"><span class="n">1</span><div><b>Install LGTM Studio on the other machine.</b><${Command} text="npm install -g lgcode" /></div></li>
+      <li class="done"><span class="n">1</span><div><b>Install LGTM Studio on the other machine.</b><${Command} text="npm install -g lgtm" /></div></li>
       <li class=${step > 0 ? 'done' : 'now'}><span class="n">2</span><div><b>Run this command there.</b>
-        <${Command} text=${`lgcode connect ${master.name.toLowerCase()}.lan:${s.settings.port} --code ${code}`} /></div></li>
+        <${Command} text=${`lgtm connect ${master.name.toLowerCase()}.lan:${s.settings.port} --code ${code}`} /></div></li>
       <li class=${step > 0 ? 'now' : ''}><span class="n">3</span><div><b>Confirm the machine here.</b>
         ${step === 0 ? html`<p class="row muted"><${Icon} name="loader-circle" size=${14} class="svc-spin" />Waiting for a machine to use the code…</p>`
           : html`<div class="svc-found"><${Icon} name="server" size=${16} /><div class="grow"><b>mini.lan</b><span class="muted"> wants to connect</span><div class="mono muted" style="font-size:var(--text-sm)">192.168.141.52 · macOS · 10 cores · 32 GB</div></div><span class="badge success">Code matched</span></div>
@@ -372,7 +372,7 @@ function NtfyForm({ s }) {
   const fld = (k) => (e) => setF({ ...f, [k]: e.target.value });
   return html`<form class="svc-form" onSubmit=${(e) => { e.preventDefault(); save(); }}>
     <div class="field"><label for="nt-server">ntfy server</label><input id="nt-server" class="input mono" value=${f.server} onInput=${fld('server')} placeholder="https://ntfy.example.com" spellcheck="false" autocapitalize="off" />${bad && html`<span class="error">${bad}</span>`}</div>
-    <div class="field"><label for="nt-topic">Topic</label><input id="nt-topic" class="input mono" value=${f.topic} onInput=${fld('topic')} placeholder="lgcode-alerts" spellcheck="false" autocapitalize="off" />
+    <div class="field"><label for="nt-topic">Topic</label><input id="nt-topic" class="input mono" value=${f.topic} onInput=${fld('topic')} placeholder="lgtm-alerts" spellcheck="false" autocapitalize="off" />
       ${badTopic ? html`<span class="error">${badTopic}</span>` : html`<span class="hint">Subscribe to the same topic in the ntfy app on your phone. Anyone who knows the topic can read the alerts, so pick a long one.</span>`}</div>
     <div class="field"><label for="nt-token">Access token <span class="faint" style="font-weight:var(--weight-body)">· optional</span></label>
       <span class="row"><input id="nt-token" class="input mono grow" type=${show ? 'text' : 'password'} value=${f.token} onInput=${fld('token')} placeholder="tk_…" autocomplete="off" spellcheck="false" />
@@ -503,7 +503,7 @@ function Remote({ s }) {
       <${Row} label="Check-in" id="ra-check" hint="How often the page asks the service whether it is alive."><span class="row" style="gap:6px"><input id="ra-check" class="input num-field" type="number" min="5" max="120" value=${f.checkIn} onInput=${(e) => setF({ ...f, checkIn: +e.target.value })} /><span class="muted">seconds</span></span><//>
       <${Row} label="Behind your HTTPS proxy" hint="Turn on when a proxy such as Caddy serves this page over HTTPS."><${Switch} on=${f.proxyMode} label="Behind your HTTPS proxy" onChange=${(v) => setF({ ...f, proxyMode: v })} /><//>
       ${f.proxyMode && html`<${Row} label="Public address" id="ra-addr" hint="Phone alerts link to a thread through this address.">
-        <input id="ra-addr" class="input mono" value=${f.publicAddress} onInput=${(e) => setF({ ...f, publicAddress: e.target.value })} placeholder="https://lgcode.home.example" spellcheck="false" autocapitalize="off" />
+        <input id="ra-addr" class="input mono" value=${f.publicAddress} onInput=${(e) => setF({ ...f, publicAddress: e.target.value })} placeholder="https://lgtm.home.example" spellcheck="false" autocapitalize="off" />
         ${bad && f.publicAddress.trim() && html`<span class="svc-err">${bad}</span>`}<//>`}
       ${!f.proxyMode && html`<${Row} label="From another device" hint="Until a proxy is set up, forward the port over Secure Shell (SSH)." top>
         <${Command} text=${fwd} /><span class="svc-hint">Then open <span class="mono">http://127.0.0.1:${f.port}</span> on that device.</span><//>`}
@@ -549,9 +549,9 @@ function WorkflowSettings({ s }) {
         <li><${Icon} name="circle" size=${14} class="faint" /><span class="mono">${set.workflowPath}/workflow.md</span><span class="muted">Not found. The default is used.</span></li>
         <li><${Icon} name="circle-check" size=${14} class="success-text" /><span class="mono">${set.workflowPath}/roles/reviewer.md</span><span class="muted">Replaces the Reviewer's instructions.</span></li>
       </ul>${checked && checked !== 'loading' && html`<span class="svc-hint">Checked at ${clock(checked)}. Nothing changed.</span>`}<//>
-    <${Row} label="One repository" hint="A .lgcode folder in a repository wins over your overrides." top>
+    <${Row} label="One repository" hint="A .lgtm folder in a repository wins over your overrides." top>
       <ul class="svc-lines">${s.repos.map((r) => html`<li key=${r.id}><${Icon} name="folder-git-2" size=${14} class="faint" /><a class="link mono" href=${href('/r/' + r.id)}>${r.name}</a>
-        <span class="muted">${r.id === 'billing-api' ? '.lgcode/workflow.md turns agent review off' : 'No .lgcode folder'}</span></li>`)}</ul><//>
+        <span class="muted">${r.id === 'billing-api' ? '.lgtm/workflow.md turns agent review off' : 'No .lgtm folder'}</span></li>`)}</ul><//>
     <${Row} label="Write tests first" hint="New projects start with tests on. A project lead can turn them off when you say so."><${Switch} on=${set.testsDefault} label="Write tests first" onChange=${(v) => setS({ testsDefault: v })} /><//>
     <${Row} label="Agent review" hint="Reviewers score each change in rounds."><${Switch} on=${set.reviewDefault} label="Agent review" onChange=${(v) => setS({ reviewDefault: v })} /><//>
     <${Row} label="Review rounds" id="wf-r" hint="A minor finding scores 1 point, a major 3, and a blocker 9."><${Num} id="wf-r" value=${set.maxRounds} min=${1} max=${12} unit="at most" onChange=${(v) => setS({ maxRounds: v })} /><//>

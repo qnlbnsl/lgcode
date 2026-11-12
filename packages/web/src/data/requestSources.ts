@@ -1,5 +1,5 @@
-import type { ClientEnvelope } from "@lgcode/client/browser"
-import type { EventSequence } from "@lgcode/contracts"
+import type { ClientEnvelope } from "@lgtm/client/browser"
+import type { EventSequence } from "@lgtm/contracts"
 import { requestId, withClient } from "../thread/client.ts"
 
 // Only immutable request sources are retained, never a holder/status projection.

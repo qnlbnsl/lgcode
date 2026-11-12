@@ -1,6 +1,6 @@
 // Criterion 7.11 (unit 7a; row 57; SECURITY.md rule 6; issue 13): the
 // service's own log output contains no planted secret, token or credential.
-// The test plants an account secret, the service's own LGCODE_TOKEN and
+// The test plants an account secret, the service's own LGTM_TOKEN and
 // provider keys in its environment, and uses the owner credential and an
 // agent token; it runs a flow (start an agent, prompt it, answer a
 // permission), drives the copied ACP code's logging paths with frames that
@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { afterEach, expect, it } from "@effect/vitest";
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as Stream from "effect/Stream";
@@ -54,14 +54,14 @@ live("7.11 no planted secret, token or credential appears in the service's stdou
     const providerKey = `sk-ant-api03-${randomBytes(16).toString("hex")}`;
     const otherKey = `sk-proj-${randomBytes(16).toString("hex")}`;
     const service = startService(root, {
-      env: { LGCODE_TOKEN: serviceToken, ANTHROPIC_API_KEY: providerKey, OPENAI_API_KEY: otherKey },
+      env: { LGTM_TOKEN: serviceToken, ANTHROPIC_API_KEY: providerKey, OPENAI_API_KEY: otherKey },
     });
     yield* waitServing(root, service);
 
     const options = [{ optionId: "allow-once", name: "Yes", kind: "allow_once" }, { optionId: "reject", name: "No", kind: "reject_once" }];
     const frames = [
-      '{"jsonrpc":"2.0","method":"_planted/notice","params":{"leak":"${env:PLANTED_KEY}","token":"${env:LGCODE_TOKEN}"}}',
-      '{"jsonrpc":"2.0","id":9001,"method":"_planted/request","params":{"leak":"${env:PLANTED_KEY}","token":"${env:LGCODE_TOKEN}"}}',
+      '{"jsonrpc":"2.0","method":"_planted/notice","params":{"leak":"${env:PLANTED_KEY}","token":"${env:LGTM_TOKEN}"}}',
+      '{"jsonrpc":"2.0","id":9001,"method":"_planted/request","params":{"leak":"${env:PLANTED_KEY}","token":"${env:LGTM_TOKEN}"}}',
       '{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"${session}","update":{"sessionUpdate":"planted_kind","leak":"${env:PLANTED_KEY}"}}}',
       '{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"${session}","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"escaped ${env-u:PLANTED_KEY}"}}}}',
     ];
@@ -71,11 +71,11 @@ live("7.11 no planted secret, token or credential appears in the service's stdou
       const started = yield* startFakeAgent(root, owner, owner, {
         secrets: { PLANTED_KEY: accountSecret },
         script: { turns: [[
-          { step: "stderr", text: "stderr ${env:PLANTED_KEY} ${env:LGCODE_TOKEN}" },
+          { step: "stderr", text: "stderr ${env:PLANTED_KEY} ${env:LGTM_TOKEN}" },
           ...frames.map((frame) => ({ step: "raw_frame", frame })),
           { step: "text", text: "text ${env:PLANTED_KEY}" },
           { step: "permission", toolCallId: "tool-planted", title: "Write the planted file", options },
-          { step: "rpc_error", message: "failed with ${env:PLANTED_KEY} and ${env:LGCODE_TOKEN}" },
+          { step: "rpc_error", message: "failed with ${env:PLANTED_KEY} and ${env:LGTM_TOKEN}" },
         ]] },
         prompt: "Run the planted flow.",
       });
@@ -96,7 +96,7 @@ live("7.11 no planted secret, token or credential appears in the service's stdou
       // terminal-error paths above from running in this same service.
       const malformed = yield* startFakeAgent(root, owner, owner, {
         secrets: { PLANTED_KEY: accountSecret, PLANTED_TOKEN: (yield* agentToken(started)).token },
-        script: { turns: [[{ step: "raw_frame", frame: "not json ${env:PLANTED_KEY} ${env:PLANTED_TOKEN} ${env:LGCODE_TOKEN}" }]] },
+        script: { turns: [[{ step: "raw_frame", frame: "not json ${env:PLANTED_KEY} ${env:PLANTED_TOKEN} ${env:LGTM_TOKEN}" }]] },
         prompt: "Exercise the malformed frame path.",
       });
       yield* (owner.subscribe({ requestId: requestId(), after: 0 } as never) as Stream.Stream<EventEnvelope, unknown>).pipe(
@@ -116,7 +116,7 @@ live("7.11 no planted secret, token or credential appears in the service's stdou
     expect(output).toContain("adapter frame dropped: malformed");
     expect(leaks(output, {
       "account secret": accountSecret, "agent token": token, "owner credential": owner,
-      "service LGCODE_TOKEN": serviceToken, "inherited ANTHROPIC_API_KEY": providerKey, "inherited OPENAI_API_KEY": otherKey,
+      "service LGTM_TOKEN": serviceToken, "inherited ANTHROPIC_API_KEY": providerKey, "inherited OPENAI_API_KEY": otherKey,
     })).toEqual([]);
   }), 120_000);
 

@@ -14,7 +14,7 @@ import { eventually, tagged } from "../support/routingRig.ts";
 
 registerRebuildCheck({ noLog: true });
 let rig: RunnerRig;
-beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); removeRunnerRig(rig); });
 const frame = (update: unknown) => ({ step: "raw_frame", frame: JSON.stringify({ jsonrpc: "2.0", method: "session/update", params: { sessionId: "${session}", update } }) });
 const reference = frame({ sessionUpdate: "tool_call_update", toolCallId: "call", title: "Run", status: "in_progress", content: [{ type: "terminal", terminalId: "terminal" }] });
@@ -126,7 +126,7 @@ for (const source of ["terminal", "message"]) {
       // Issue 556: script order alone cannot order queued SDK notifications and
       // direct writes. The round trips above establish the actual wire order.
       yield* context.waitFor((event) => event._tag === "deliveryUpdate" && event.kind === "available_commands_update");
-      const refusals = JSON.parse(readFileSync(echo, "utf8")).inbound.filter((row: any) => row.error?.message === "Method not found: _lgcode_test_notification_barrier");
+      const refusals = JSON.parse(readFileSync(echo, "utf8")).inbound.filter((row: any) => row.error?.message === "Method not found: _lgtm_test_notification_barrier");
       expect(refusals).toHaveLength(2);
       expect(refusals.every((row: any) => row.error.code === -32601)).toBe(true);
       expect(JSON.stringify(context.events)).not.toContain(tail);

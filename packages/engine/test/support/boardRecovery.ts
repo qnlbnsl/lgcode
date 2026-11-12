@@ -1,6 +1,6 @@
-import type { ClientSnapshot } from "@lgcode/contracts";
-import type { BoardOwedCompletion } from "@lgcode/contracts/board/view";
-import type { BoardPost } from "@lgcode/contracts/board/schemas";
+import type { ClientSnapshot } from "@lgtm/contracts";
+import type { BoardOwedCompletion } from "@lgtm/contracts/board/view";
+import type { BoardPost } from "@lgtm/contracts/board/schemas";
 import * as Effect from "effect/Effect";
 
 type Agent = Pick<ClientSnapshot["agents"][number], "agentId" | "state" | "account" | "reloadable" | "capacityHeld">;

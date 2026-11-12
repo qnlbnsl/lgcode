@@ -1,4 +1,4 @@
-import type { BoardView } from "@lgcode/contracts/board/view";
+import type { BoardView } from "@lgtm/contracts/board/view";
 import type { ReachInput } from "../routing/reach.ts";
 import { canCarryCompletion, canCarryPost, own } from "./access.ts";
 import { canReadContext } from "../project/context.ts";

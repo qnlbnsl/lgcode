@@ -1,6 +1,6 @@
 import { configure } from "./configuration.ts";
-import { startFailureText } from "@lgcode/contracts/startFailure";
-import { commandOutcome } from "@lgcode/contracts";
+import { startFailureText } from "@lgtm/contracts/startFailure";
+import { commandOutcome } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import { holderAbove, passUp } from "../routing/holders.ts";
 import { answer } from "../routing/permissions.ts";

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
-import type { AgentId, GitChange, Project, WorkspaceId } from "@lgcode/contracts"
-import { sprintStatus } from "@lgcode/contracts"
+import type { AgentId, GitChange, Project, WorkspaceId } from "@lgtm/contracts"
+import { sprintStatus } from "@lgtm/contracts"
 import { useShellData } from "../data/ShellDataProvider.tsx"
 import { useProjectBoard } from "../pages/projectData.ts"
 import { shellHref } from "../routes.ts"

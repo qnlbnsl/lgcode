@@ -10,7 +10,7 @@ export interface CheckedWebService extends ServiceProcess {
 // Compare this process's live views before its database closes. Every setup
 // and restart gets its own finalizer, including when a test assertion fails.
 export const startCheckedWebService = (root: ServiceRoot, env: Record<string, string | undefined> = {}) => Effect.gen(function* () {
-  const service = startService(root, { env: { ...env, LGCODE_TEST_DEBUG: "1" } });
+  const service = startService(root, { env: { ...env, LGTM_TEST_DEBUG: "1" } });
   let stopped = false;
   const stop = Effect.suspend(() => {
     if (stopped) return Effect.void;

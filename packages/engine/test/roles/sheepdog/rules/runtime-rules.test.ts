@@ -1,9 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { it } from "@effect/vitest";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
-import type { BoardView } from "@lgcode/contracts/board/view";
-import type { RolesActionRecord } from "@lgcode/contracts";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
+import type { BoardView } from "@lgtm/contracts/board/view";
+import type { RolesActionRecord } from "@lgtm/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -33,7 +33,7 @@ import { eventually, pause, snapshot } from "../../../support/routingRig.ts";
 import { registerRebuildCheck } from "../../../support/rebuildCheck.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 const quiet: EngineLists = { ...engineLists, reactors: {} };
 const roles = snapshot.pipe(Effect.map((view) => view.roles as RolesView));

@@ -4,7 +4,7 @@
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { HarnessSettings } from "@lgcode/contracts"
+import type { HarnessSettings } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { afterEach, beforeEach, expect, it } from "vitest"
 import { RECORDER_PROMPT } from "../../engine/scripts/live/prompts.ts"
@@ -27,7 +27,7 @@ const harness = (id: string) => ({
 
 let root: string
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), "lgcode-recorder-scenarios-"))
+  root = await mkdtemp(join(tmpdir(), "lgtm-recorder-scenarios-"))
   await mkdir(join(root, "work"))
   // A transport double is sufficient here: the existing Effect fake agent
   // exits during initialize in this checkout, including in its existing tests.

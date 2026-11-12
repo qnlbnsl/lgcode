@@ -1,14 +1,14 @@
-import * as Contracts from "@lgcode/contracts";
+import * as Contracts from "@lgtm/contracts";
 import * as Schema from "effect/Schema";
 import * as Rpc from "effect/rpc/Rpc";
 import * as RpcGroup from "effect/rpc/RpcGroup";
 import { afterEach, expect, it, vi } from "vitest";
 
-afterEach(() => { vi.doUnmock("@lgcode/contracts"); vi.resetModules(); });
+afterEach(() => { vi.doUnmock("@lgtm/contracts"); vi.resetModules(); });
 const registryWithPiece = async () => {
   const group = RpcGroup.make(Rpc.make("alerts.dismiss", { payload: { requestId: Contracts.RequestId }, success: Schema.Void })).prefix("client.");
   vi.resetModules();
-  vi.doMock("@lgcode/contracts", () => ({ ...Contracts, CommandsRpcGroup: Contracts.CommandsRpcGroup.merge(group) }));
+  vi.doMock("@lgtm/contracts", () => ({ ...Contracts, CommandsRpcGroup: Contracts.CommandsRpcGroup.merge(group) }));
   return import("../src/commands/registry.ts");
 };
 
@@ -27,7 +27,7 @@ it("FR-099 matches nested installed client settings before their shorter read co
   ] as const) {
     expect(registry.matchCommand([...words, "--input", "{}"]))
       .toEqual({ command, rest: ["--input", "{}"] });
-    expect(registry.helpText(command)).toContain(`Usage: lgcode ${words.join(" ")}`);
+    expect(registry.helpText(command)).toContain(`Usage: lgtm ${words.join(" ")}`);
   }
 });
 
@@ -39,5 +39,5 @@ it("1a E10 keeps debug.compare-views and the engine's existing multiword account
 
 it("1a E10 piece help displays the invocable spaced name", async () => {
   const registry = await registryWithPiece();
-  expect(registry.helpText("client.alerts.dismiss" as never)).toContain("Usage: lgcode client alerts dismiss");
+  expect(registry.helpText("client.alerts.dismiss" as never)).toContain("Usage: lgtm client alerts dismiss");
 });

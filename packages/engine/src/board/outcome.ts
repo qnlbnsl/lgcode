@@ -1,4 +1,4 @@
-import type { CloseOutcome, Disposition, ReplyMode } from "@lgcode/contracts/board/ids";
+import type { CloseOutcome, Disposition, ReplyMode } from "@lgtm/contracts/board/ids";
 
 export interface OutcomeInput {
   readonly reply: ReplyMode;

@@ -1,8 +1,8 @@
 import { existsSync } from "node:fs";
 
-import { AgentId, type Caller, type Event, type LifecycleState, type PermissionLevel } from "@lgcode/contracts";
-import type { BoardAddressee, BoardAuthor, ReplyMode } from "@lgcode/contracts/board/ids";
-import type { BoardView } from "@lgcode/contracts/board/view";
+import { AgentId, type Caller, type Event, type LifecycleState, type PermissionLevel } from "@lgtm/contracts";
+import type { BoardAddressee, BoardAuthor, ReplyMode } from "@lgtm/contracts/board/ids";
+import type { BoardView } from "@lgtm/contracts/board/view";
 import * as Schema from "effect/Schema";
 import { expect } from "vitest";
 

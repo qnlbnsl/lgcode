@@ -18,7 +18,7 @@ import { eventually, tagged } from "../support/routingRig.ts";
 import { withViews } from "../support/withViews.ts";
 
 let rig: RunnerRig;
-beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig); });
 registerRebuildCheck({ noLog: true });
 const live = (name: string, test: () => Effect.Effect<unknown, unknown, any>) => it.live(name, () => test() as Effect.Effect<unknown, unknown, never>, 60_000);
@@ -74,7 +74,7 @@ live("W05c restart: queued owner work uses durable pending settings on reload, a
     success(yield* call(ownerCredential, "configure", { agentId, model: "model-large", effort: "high" }));
     const deliveryId = success(yield* call(ownerCredential, "prompt", { agentId, text: "durable owner work" })).deliveryId;
     const child = yield* readEcho(oldEcho);
-    return { agentId, deliveryId, incarnation: sha256Hex(child.env.LGCODE_TOKEN!), session: (yield* (yield* Views).snapshot).agents[agentId]!.session };
+    return { agentId, deliveryId, incarnation: sha256Hex(child.env.LGTM_TOKEN!), session: (yield* (yield* Views).snapshot).agents[agentId]!.session };
   }), { recovering: false });
   const nextEcho = echoFile(rig);
   const nextAccount = accountFor("first", { configOptions: options, turns: [[{ step: "report_configuration" }], [{ step: "report_configuration" }]] }, nextEcho);

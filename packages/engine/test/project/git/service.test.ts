@@ -67,7 +67,7 @@ const commit = (folder: string, title: string, date?: string) => {
 const worktree = async (name: string, from = "HEAD") => run(service.createWorktree(repo, name, from));
 
 beforeEach(async () => {
-  root = await mkdtemp(join(tmpdir(), "lgcode-git-service-"));
+  root = await mkdtemp(join(tmpdir(), "lgtm-git-service-"));
   service = makeGitService({ workspaceFolder: root });
   repo = (await run(service.createRepository("Example"))).path;
   configure(repo);
@@ -623,7 +623,7 @@ describe("bounded Git service with real temporary repositories", () => {
   });
 
   it("refuses path escape, symlink redirection, nested repositories, metadata access and option/revision injection", async () => {
-    const outside = await mkdtemp(join(tmpdir(), "lgcode-git-outside-"));
+    const outside = await mkdtemp(join(tmpdir(), "lgtm-git-outside-"));
     try {
       await writeFile(join(outside, "secret"), "do not change\n");
       await symlink(outside, join(repo, "escape"));

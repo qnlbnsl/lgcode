@@ -23,7 +23,7 @@ import { makeFakeRunner } from "../support/fakeRunner.ts"
 import { appendSetup, call, eventOf, failureOf, freshRequest, makeFakeSecrets, makeRig, ownerCredential as owner, provideRig, readLog, removeRig, success, type Rig, type Fakes } from "../support/handlerRig.ts"
 
 let rig: Rig
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder) })
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder) })
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig) })
 const tasks = (projectId: string) => Effect.gen(function* () { return success(yield* call(owner, "project.read", { projectId, collection: "tasks" })).items as Array<{ taskId: string; state: string }> })
 const taskState = (projectId: string, taskId: string) => tasks(projectId).pipe(Effect.map((rows) => rows.find((row) => row.taskId === taskId)!.state))

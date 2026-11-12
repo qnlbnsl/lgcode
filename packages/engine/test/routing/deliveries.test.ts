@@ -19,7 +19,7 @@ import {
 } from "../support/deliveryRig.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 
 it.live("U08: the handler and delivery planner persist the last request's start and cache lifetime split (catches RunnerEvent decode or the planner stripping normalized usage)", () =>

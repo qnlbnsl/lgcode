@@ -4,7 +4,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import type { EventEnvelope, HarnessSettings } from "@lgcode/contracts";
+import type { EventEnvelope, HarnessSettings } from "@lgtm/contracts";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
@@ -27,7 +27,7 @@ export const fakeAgentPath = fileURLToPath(new URL("../../../testing/src/fakeAge
 export interface ServiceRoot {
   readonly root: string;
   readonly home: string;
-  // LGCODE_HOME. Not created here: the service creates it (criterion 7.1).
+  // LGTM_HOME. Not created here: the service creates it (criterion 7.1).
   readonly state: string;
   readonly socket: string;
   readonly work: string;
@@ -65,7 +65,7 @@ const services: Array<ServiceProcess> = [];
 export const serviceEnvironment = (root: ServiceRoot): Record<string, string> => ({
   PATH: process.env.PATH ?? "/usr/bin:/bin",
   HOME: root.home,
-  LGCODE_HOME: root.state,
+  LGTM_HOME: root.state,
   XDG_STATE_HOME: join(root.root, "xdg"),
   CODEX_HOME: join(root.root, "codex"),
   TMPDIR: "/tmp",
@@ -260,8 +260,8 @@ export const startFakeAgent = (root: ServiceRoot, owner: Client, caller: Client,
 export const agentToken = (agent: StartedAgent, notPid?: number) =>
   waitFor("the fake agent's environment", () => {
     const echo = peekEcho(agent.echo);
-    if (echo === undefined || echo.pid === notPid || echo.env.LGCODE_TOKEN === undefined) return undefined;
-    return { token: echo.env.LGCODE_TOKEN, pid: echo.pid, echo };
+    if (echo === undefined || echo.pid === notPid || echo.env.LGTM_TOKEN === undefined) return undefined;
+    return { token: echo.env.LGTM_TOKEN, pid: echo.pid, echo };
   });
 
 // Waits for the agent's first turn to end, through the owner's subscription.

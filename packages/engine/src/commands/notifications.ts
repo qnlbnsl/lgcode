@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { type Event, type EventSequence, type RequestId } from "@lgcode/contracts";
+import { type Event, type EventSequence, type RequestId } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import type { AlertSender } from "../client/alerts/AlertSender.ts";
@@ -13,7 +13,7 @@ import { checkPieceBatch } from "./pieceBatch.ts";
 import { refused, type Input, type Runtime } from "./internal.ts";
 
 const testPayload = () => ({ alertId: `test-${randomUUID()}`, kind: "other" as const,
-  title: "LGcode test notification", team: [] });
+  title: "LGTM Studio test notification", team: [] });
 
 // Test notifications have no alert, log event, or receipt. The reply describes
 // the actual transport result, with no provider response body or credentials.

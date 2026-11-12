@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { Project, type RequestId } from "@lgcode/contracts"
+import { Project, type RequestId } from "@lgtm/contracts"
 import * as Schema from "effect/Schema"
-import type { Client } from "@lgcode/client/browser"
+import type { Client } from "@lgtm/client/browser"
 import { useMutationDisabled, useShellData } from "../data/ShellDataProvider.tsx"
 import { shellHref, type ShellRoute } from "../routes.ts"
 import { visibleText } from "../thread/text.tsx"
@@ -146,7 +146,7 @@ function ProjectSettings({ route }: { readonly route: Route }) {
       </section>
     </>}
     {confirmArchive && <AdminConfirm title="Archive this project?" confirm="Archive" busy={busy} disabled={offline || !data.complete} onCancel={() => setConfirmArchive(false)} onConfirm={() => { void write({ kind: "archive" }) }}>
-      <p>LGcode stops the project’s agents before archiving it. The sidebar and Home leave it out. All projects still lists it.</p>
+      <p>LGTM Studio stops the project’s agents before archiving it. The sidebar and Home leave it out. All projects still lists it.</p>
       <p>Restoring the project does not resume its agents.</p>
     </AdminConfirm>}
   </section>

@@ -1,4 +1,4 @@
-import { pieceNamespaces } from "@lgcode/contracts";
+import { pieceNamespaces } from "@lgtm/contracts";
 import { resolve, join } from "node:path";
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -49,7 +49,7 @@ it("1.22 default tables refuse delivery and add no holds, requests or kept secre
 it("1.22 all piece rule tables reject a missing namespace at compile time", async () => {
   const lists = await loadLists() as Rules;
   expect(lists.reach, "E18 supplies the type checked below").toBeDefined();
-  const root = mkdtempSync("/tmp/lgcode-table-types-");
+  const root = mkdtempSync("/tmp/lgtm-table-types-");
   const filename = join(root, "fixture.mts");
   const config = join(root, "tsconfig.json");
   writeFileSync(config, JSON.stringify({

@@ -2,7 +2,7 @@ import { createServer, type IncomingHttpHeaders, type ServerResponse } from "nod
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Logger from "effect/Logger";
@@ -90,7 +90,7 @@ export interface CarrierOptions {
 }
 export async function withCarrier(body: (rig: Rig, runner: FakeRunner) => Effect.Effect<unknown, unknown, any>, options: CarrierOptions = {}) {
   const rig = options.rig ?? makeRig();
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder);
+  vi.stubEnv("LGTM_HOME", rig.stateFolder);
   const program = Effect.gen(function* () {
     if (options.clockAt !== undefined) yield* TestClock.setTime(options.clockAt);
     const runner = yield* makeFakeRunner();

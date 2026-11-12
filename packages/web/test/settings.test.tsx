@@ -6,7 +6,7 @@ import { App } from "../src/index.ts"
 import { adminShellClient } from "./admin-shell-client.ts"
 
 const browser = vi.hoisted(() => ({ client: undefined as unknown, connect: vi.fn() }))
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: (...args: unknown[]) => { browser.connect(...args); return Effect.succeed(browser.client) } }
 })
@@ -16,7 +16,7 @@ const mounted: Array<{ root: Root; container: HTMLDivElement }> = []
 const webSettings = { enabled: true, port: 8787, heartbeatSeconds: 25, proxyMode: false }
 const alertSettings = {
   kinds: [{ kind: "approval", push: true }, { kind: "question", push: false }],
-  carrier: { _tag: "ntfy", server: "https://push.example", topic: "lgcode" }, tokenSet: true
+  carrier: { _tag: "ntfy", server: "https://push.example", topic: "lgtm" }, tokenSet: true
 }
 
 const render = async () => {
@@ -148,10 +148,10 @@ it("7.8 changes web server settings and shows the current serverState", async ()
   expect(port, "web server settings need an editable port control").toBeTruthy()
   await act(async () => {
     setControlValue(port!, "8899")
-    setControlValue(container.querySelector<HTMLInputElement>('input[name="publicAddress"]')!, "https://lgcode.example.test:9443")
+    setControlValue(container.querySelector<HTMLInputElement>('input[name="publicAddress"]')!, "https://lgtm.example.test:9443")
     container.querySelector("form[aria-label='Web server settings']")?.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }))
   })
-  await vi.waitFor(() => expect(set).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({ port: 8899, publicAddress: "https://lgcode.example.test:9443" }) })))
+  await vi.waitFor(() => expect(set).toHaveBeenCalledWith(expect.objectContaining({ settings: expect.objectContaining({ port: 8899, publicAddress: "https://lgtm.example.test:9443" }) })))
 })
 
 it("FR-001 refuses an HTTP public address before saving and explains HTTPS", async () => {
@@ -166,7 +166,7 @@ it("FR-001 refuses an HTTP public address before saving and explains HTTPS", asy
   await openSettings(container)
   await vi.waitFor(() => expect(container.querySelector('input[name="publicAddress"]')).toBeTruthy())
   await act(async () => {
-    setControlValue(container.querySelector<HTMLInputElement>('input[name="publicAddress"]')!, "http://lgcode.example.test")
+    setControlValue(container.querySelector<HTMLInputElement>('input[name="publicAddress"]')!, "http://lgtm.example.test")
     container.querySelector("form[aria-label='Web server settings']")!.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true }))
   })
   expect(container.querySelector('section[aria-label="Service settings"] [role="status"]')?.textContent).toMatch(/public address.*https/i)

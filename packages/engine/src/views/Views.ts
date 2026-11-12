@@ -1,6 +1,6 @@
-import type { EventEnvelope, EventSequence } from "@lgcode/contracts";
-import { EventSequence as EventSequenceSchema } from "@lgcode/contracts";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import type { EventEnvelope, EventSequence } from "@lgtm/contracts";
+import { EventSequence as EventSequenceSchema } from "@lgtm/contracts";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -24,7 +24,7 @@ export class Views extends Context.Service<
     readonly snapshot: Effect.Effect<ReturnType<typeof emptyViews>>;
     readonly applyCommitted: (batch: ReadonlyArray<EventEnvelope>) => Effect.Effect<void>;
   }
->()("lgcode/engine/views/Views") {}
+>()("lgtm/engine/views/Views") {}
 
 const decodeSequence = Schema.decodeUnknownSync(EventSequenceSchema);
 

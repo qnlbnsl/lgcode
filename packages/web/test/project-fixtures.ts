@@ -1,5 +1,5 @@
 import * as Schema from "effect/Schema"
-import { ClientRequest, ClientSnapshot, EventEnvelope } from "@lgcode/contracts"
+import { ClientRequest, ClientSnapshot, EventEnvelope } from "@lgtm/contracts"
 
 export const snapshot = () => Schema.decodeUnknownSync(ClientSnapshot)({ sequence: 12, agents: [{ agentId: "worker", name: "Worker", role: "worker", groups: ["team:p/t"], parent: { _tag: "owner" }, state: { _tag: "working" }, displayedState: "Working", openPermissionRequests: 0, openQuestionsAsked: 0, harness: "codex", account: "default", permission: "ask", folder: "/work", startedAt: 1 }], requests: [], questions: [], requestsWithoutDisplay: 0, questionsWithoutDisplay: 0,
   project: { sequence: 12, truncated: false, projects: [{ projectId: "p", repoId: "r", name: "Real project", goal: "A goal", leadAgentId: "worker", worktreeId: "w", machineId: "local", stage: "build" }],

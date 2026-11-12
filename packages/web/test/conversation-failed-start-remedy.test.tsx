@@ -2,7 +2,7 @@ import { completedSetup } from "../e2e/support/completedSetup.ts"
 import { act } from "react"
 import * as Effect from "effect/Effect"
 import { expect, it, vi } from "vitest"
-import type { ClientSnapshot } from "@lgcode/contracts"
+import type { ClientSnapshot } from "@lgtm/contracts"
 import { CommandHandler } from "../../engine/src/commands/CommandHandler.ts"
 import { applyPendingConfiguration } from "../../engine/src/commands/configuration.ts"
 import { RunnerRejected } from "../../engine/src/runner/Runner.ts"
@@ -19,7 +19,7 @@ const observe = (check: () => void) => vi.waitFor(async () => { await act(async 
 
 for (const axis of ["model", "effort"] as const) it(`issue 603: mounted ${axis}-refused remedy keeps configuration recovery, real resume and the unsent draft`, async () => {
   const rig = makeRig()
-  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   vi.spyOn(document, "hidden", "get").mockReturnValue(false)
   let releaseStart: (() => void) | undefined
   let start: Promise<Record<string, unknown>> | undefined

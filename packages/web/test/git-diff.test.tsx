@@ -13,7 +13,7 @@ import { parseDiff, splitRows, type Diff } from "../src/git/diff.ts"
 const folders: string[] = []
 afterEach(() => { for (const path of folders.splice(0)) rmSync(path, { recursive: true, force: true }) })
 function actualPatch(before: string, after: string) {
-  const folder = mkdtempSync(join(tmpdir(), "lgcode-web-diff-")); folders.push(folder)
+  const folder = mkdtempSync(join(tmpdir(), "lgtm-web-diff-")); folders.push(folder)
   const git = (...args: string[]) => execFileSync("git", ["-c", "core.hooksPath=/dev/null", "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", ...args], { cwd: folder, encoding: "utf8" })
   git("init", "-q"); writeFileSync(join(folder, "source.txt"), before); git("add", "--", "source.txt"); git("commit", "-qm", "Initial")
   writeFileSync(join(folder, "source.txt"), after)

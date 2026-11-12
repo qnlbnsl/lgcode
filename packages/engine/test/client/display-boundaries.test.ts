@@ -3,7 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, expect, it } from "vitest"
 import { configuredDisplay, displayConfiguration, displayHeaders, displayRequestAllowed } from "../../src/client/web/display/policy.ts"
-import { defaultWebSettings, WebSettings } from "@lgcode/contracts"
+import { defaultWebSettings, WebSettings } from "@lgtm/contracts"
 import * as Schema from "effect/Schema"
 import { openPencilImage, openPencilLaunch } from "../../src/client/web/display/openPencil.ts"
 import { makeDisplaySessions } from "../../src/client/web/display/sessions.ts"
@@ -15,7 +15,7 @@ registerRebuildCheck({ noLog: true })
 
 let temporary: string | undefined
 afterEach(async () => { if (temporary !== undefined) await rm(temporary, { recursive: true, force: true }); temporary = undefined })
-const configuration = () => displayConfiguration("https://lgcode.example", "https://design.example", 4123)
+const configuration = () => displayConfiguration("https://lgtm.example", "https://design.example", 4123)
 
 it("uses the existing optional web settings and actual listening owner port for exact display configuration", () => {
   const settings = { ...defaultWebSettings, display: { publicAddress: "https://display.example", port: 4123 } }
@@ -29,20 +29,20 @@ it("uses the existing optional web settings and actual listening owner port for 
 })
 
 it("requires an explicit different HTTPS hostname and exposes no owner cookie, API or WebSocket policy", () => {
-  for (const origin of ["https://lgcode.example:8443", "http://design.example", "https://design.example/path", "https://user@design.example", "https://design.example?x=1"]) {
-    expect(() => displayConfiguration("https://lgcode.example", origin, 4123)).toThrow()
+  for (const origin of ["https://lgtm.example:8443", "http://design.example", "https://design.example/path", "https://user@design.example", "https://design.example?x=1"]) {
+    expect(() => displayConfiguration("https://lgtm.example", origin, 4123)).toThrow()
   }
-  for (const port of [0, 65536, 1.5]) expect(() => displayConfiguration("https://lgcode.example", "https://design.example", port)).toThrow()
+  for (const port of [0, 65536, 1.5]) expect(() => displayConfiguration("https://lgtm.example", "https://design.example", port)).toThrow()
   const config = configuration(), headers = displayHeaders(config, "editor")
   expect(headers["content-security-policy"]).toContain("sandbox allow-scripts allow-same-origin;")
   const mockHeaders = displayHeaders(config, "mock")
   expect(mockHeaders["content-security-policy"]).toContain("sandbox allow-scripts;")
   expect(mockHeaders["content-security-policy"]).not.toContain("allow-same-origin")
-  expect(headers["content-security-policy"]).toContain("frame-ancestors https://lgcode.example")
+  expect(headers["content-security-policy"]).toContain("frame-ancestors https://lgtm.example")
   expect(headers).not.toHaveProperty("access-control-allow-credentials")
   expect(headers).not.toHaveProperty("set-cookie")
   expect(displayRequestAllowed(config, { host: "design.example", origin: "null" }, "GET")).toBe(true)
-  for (const extra of [{ cookie: "lgcode_session=private" }, { authorization: "Bearer private" }, { upgrade: "websocket" }, { host: "lgcode.example" }]) {
+  for (const extra of [{ cookie: "lgtm_session=private" }, { authorization: "Bearer private" }, { upgrade: "websocket" }, { host: "lgtm.example" }]) {
     expect(displayRequestAllowed(config, { host: "design.example", ...extra }, "GET")).toBe(false)
   }
   expect(displayRequestAllowed(config, { host: "design.example" }, "POST")).toBe(false)
@@ -81,7 +81,7 @@ it("delivers a redactor-registered scoped URL without requiring opaque-origin co
 })
 
 it("reads actual current CSS and image bytes from one confined folder and refuses private names, links and wrong resource kinds", async () => {
-  temporary = await mkdtemp(join(tmpdir(), "lgcode-display-"))
+  temporary = await mkdtemp(join(tmpdir(), "lgtm-display-"))
   const folder = join(temporary, "design")
   await mkdir(folder)
   const css = Buffer.from(".screen { color: #123456; background-image: url(image.png) }")
@@ -106,7 +106,7 @@ it("reads actual current CSS and image bytes from one confined folder and refuse
 
 
 it("authorizes generated registered filenames and decodes them once for the actual confined reader without admitting traversal or encoded separators", async () => {
-  temporary = await mkdtemp(join(tmpdir(), "lgcode-display-names-"))
+  temporary = await mkdtemp(join(tmpdir(), "lgtm-display-names-"))
   const folder = await realpath(temporary), config = configuration()
   const sessions = makeDisplaySessions(config, () => {})
   const frame = sessions.issue({ kind: "editor", selection: { repoId: "repository" as never } })
@@ -136,7 +136,7 @@ it("authorizes generated registered filenames and decodes them once for the actu
 })
 
 it("serves typed bounded current TTF resources through the confined reader without admitting design-file access, secrets or links", async () => {
-  temporary = await mkdtemp(join(tmpdir(), "lgcode-display-font-"))
+  temporary = await mkdtemp(join(tmpdir(), "lgtm-display-font-"))
   const folder = await realpath(temporary)
   // Synthetic resource bytes test transport identity, not browser font rendering.
   const bytes = Buffer.from([0, 1, 0, 0, 0, 0, 0, 0])
@@ -155,8 +155,8 @@ it("serves typed bounded current TTF resources through the confined reader witho
 })
 
 it("prepares the existing pinned browser/Caddy layout without a pull, network, owner environment or writable repository mount", () => {
-  const launch = openPencilLaunch({ image: openPencilImage, folder: "/actual/design", socketDirectory: "/private/socket", name: "lgcode-editor-00000000-0000-0000-0000-000000000000", uid: 1000, gid: 1000 })
-  expect(openPencilImage).toBe("lgcode-openpencil:w10b-cb71737-build1")
+  const launch = openPencilLaunch({ image: openPencilImage, folder: "/actual/design", socketDirectory: "/private/socket", name: "lgtm-editor-00000000-0000-0000-0000-000000000000", uid: 1000, gid: 1000 })
+  expect(openPencilImage).toBe("lgtm-openpencil:w10b-cb71737-build1")
   expect(launch.args).toContain(openPencilImage)
   expect(launch.args).toContain("--pull=never")
   expect(launch.args).toContain("--read-only")
@@ -168,10 +168,10 @@ it("prepares the existing pinned browser/Caddy layout without a pull, network, o
   expect(launch.args).not.toContain("/var/run/docker.sock")
   const config = JSON.parse(launch.stdin)
   expect(config.admin.disabled).toBe(true)
-  expect(config.apps.http.servers.editor.listen).toEqual(["unix//run/lgcode/editor.sock|0600"])
+  expect(config.apps.http.servers.editor.listen).toEqual(["unix//run/lgtm/editor.sock|0600"])
   expect(config).not.toHaveProperty("logging")
   expect(() => openPencilLaunch({ image: "latest", folder: "/actual/design", socketDirectory: "/private/socket", name: "bad", uid: 1000, gid: 1000 })).toThrow()
-  for (const image of ["lgcode-openpencil:missing", "lgcode-openpencil:cb71737", "sha256:" + "a".repeat(64)]) {
-    expect(() => openPencilLaunch({ image, folder: "/actual/design", socketDirectory: "/private/socket", name: "lgcode-editor-00000000-0000-0000-0000-000000000000", uid: 1000, gid: 1000 })).toThrow()
+  for (const image of ["lgtm-openpencil:missing", "lgtm-openpencil:cb71737", "sha256:" + "a".repeat(64)]) {
+    expect(() => openPencilLaunch({ image, folder: "/actual/design", socketDirectory: "/private/socket", name: "lgtm-editor-00000000-0000-0000-0000-000000000000", uid: 1000, gid: 1000 })).toThrow()
   }
 })

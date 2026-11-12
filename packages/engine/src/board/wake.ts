@@ -1,9 +1,9 @@
 import { randomBytes, randomUUID } from "node:crypto";
-import { DeliveryContextReferences, describeContext, settled, type AgentId, type ContextReference, type Event } from "@lgcode/contracts";
-import { WakeId, type BoardAddressee, type BoardAuthor } from "@lgcode/contracts/board/ids";
-import { boardLimits } from "@lgcode/contracts/board/limits";
-import type { BoardCompletion } from "@lgcode/contracts/board/schemas";
-import type { BoardPostView, BoardView, BoardWakeView } from "@lgcode/contracts/board/view";
+import { DeliveryContextReferences, describeContext, settled, type AgentId, type ContextReference, type Event } from "@lgtm/contracts";
+import { WakeId, type BoardAddressee, type BoardAuthor } from "@lgtm/contracts/board/ids";
+import { boardLimits } from "@lgtm/contracts/board/limits";
+import type { BoardCompletion } from "@lgtm/contracts/board/schemas";
+import type { BoardPostView, BoardView, BoardWakeView } from "@lgtm/contracts/board/view";
 import * as Schema from "effect/Schema";
 import type { PiecePlan, Snapshot } from "../commands/internal.ts";
 import { escapeLeadingSlash } from "../routing/envelope.ts";

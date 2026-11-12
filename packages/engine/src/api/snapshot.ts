@@ -1,5 +1,5 @@
-import type { Caller } from "@lgcode/contracts";
-import { pieceNamespaces } from "@lgcode/contracts";
+import type { Caller } from "@lgtm/contracts";
+import { pieceNamespaces } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import { engineLists, type EngineLists } from "../pieces/lists.ts";
 import { guardPiece } from "../pieces/guardPiece.ts";

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 class RemoteTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory(prefix="lgcode-remote-test-")
+        self.temp = tempfile.TemporaryDirectory(prefix="lgtm-remote-test-")
         self.addCleanup(self.temp.cleanup)
         base = Path(self.temp.name)
         self.local, self.remote, tools = (base / name for name in ("local", "remote", "bin"))
@@ -38,10 +38,10 @@ raise SystemExit(subprocess.run(['/usr/bin/rsync', *args]).returncode)
         (tools / "ssh").write_text('''#!/usr/bin/env python3
 import os, subprocess, sys
 source = sys.stdin.read()
-calls = [line for line in source.splitlines() if line.startswith('lgcode_limited ')]
+calls = [line for line in source.splitlines() if line.startswith('lgtm_limited ')]
 if not calls:
     raise SystemExit(0)
-setup = 'set -euo pipefail\\ncd "$TEST_REMOTE"\\nlgcode_limited() { bash -c "$1"; }\\n'
+setup = 'set -euo pipefail\\ncd "$TEST_REMOTE"\\nlgtm_limited() { bash -c "$1"; }\\n'
 raise SystemExit(subprocess.run(['bash', '-c', setup + calls[-1]]).returncode)
 ''')
         for tool in tools.iterdir():

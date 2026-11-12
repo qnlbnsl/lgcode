@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 
 import { it } from "@effect/vitest";
-import type { ClientStreamItem } from "@lgcode/contracts";
+import type { ClientStreamItem } from "@lgtm/contracts";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
@@ -20,7 +20,7 @@ import { connect } from "../support/socketClient.ts";
 import { agent, provideBoard, queued, seedBoard, snapshot } from "../board/wakeFixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 
 // Park automatic followers so label removal always precedes the dispatcher's

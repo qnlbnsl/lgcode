@@ -1,5 +1,5 @@
-import { connect, resolveIdentity, type ClientEnvelope, type Environment } from "@lgcode/client";
-import type { AgentId, EventSequence, PermissionRequestId, QuestionId, RequestId } from "@lgcode/contracts";
+import { connect, resolveIdentity, type ClientEnvelope, type Environment } from "@lgtm/client";
+import type { AgentId, EventSequence, PermissionRequestId, QuestionId, RequestId } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Scope from "effect/Scope";

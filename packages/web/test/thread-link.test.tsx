@@ -1,7 +1,7 @@
 import { act } from "react"
 import * as Effect from "effect/Effect"
-import { CommandsRpcGroup } from "@lgcode/contracts"
-import type { Client } from "@lgcode/client/browser"
+import { CommandsRpcGroup } from "@lgtm/contracts"
+import type { Client } from "@lgtm/client/browser"
 import { expect, it, vi } from "vitest"
 import { mountThread } from "./thread-fixtures.tsx"
 

@@ -1,4 +1,4 @@
-import type { ProjectId, RepositoryId, RequestId } from "@lgcode/contracts"
+import type { ProjectId, RepositoryId, RequestId } from "@lgtm/contracts"
 import { useMutationDisabled, useShellData } from "../data/ShellDataProvider.tsx"
 import { Empty, ReadState } from "../pages/common.tsx"
 import { Mocks } from "./mocks.tsx"

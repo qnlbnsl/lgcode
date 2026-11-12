@@ -1,4 +1,4 @@
-import { CommandsRpcGroup } from "@lgcode/contracts";
+import { CommandsRpcGroup } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import { expect, it } from "vitest";
 import { WebSocket } from "ws";

@@ -1,4 +1,4 @@
-# LGcode app mockups
+# LGTM Studio app mockups
 
 ## The rebuilt mock is in `mock/`, started on 2026-11-10
 
@@ -31,7 +31,7 @@ The page has three parts: `workbench.html` holds the markup and styles, `workben
 the app, and `data/stubs.js` holds the data functions.
 
 The owner requested the working app on 2026-11-05. A public marketing site
-is outside this pass. LGcode is a separate product inspired by Herdr
+is outside this pass. LGTM Studio is a separate product inspired by Herdr
 Synapse and T3 Code.
 
 ## What to try
@@ -138,7 +138,7 @@ now.
 - Open Service settings, the gear at the foot of the sidebar, and choose Light, Dark, or Match
   system under Appearance.
 - Open Design notes and choose Logged out, Login rejected, Session expired, or Session
-  unavailable. The page says "Sign in to LGcode" under the logo mark. A rejected password
+  unavailable. The page says "Sign in to LGTM Studio" under the logo mark. A rejected password
   shows in the error color under the field, and an expired session shows in the muted
   color. The unavailable page offers Try again as its main button.
 - Open Git in Agent console. Commit says what it needs before it can be used. Below 1600

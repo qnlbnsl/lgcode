@@ -1,4 +1,4 @@
-import type { EventEnvelope, RolesActionRecord } from "@lgcode/contracts";
+import type { EventEnvelope, RolesActionRecord } from "@lgtm/contracts";
 import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import type { Snapshot } from "../../../commands/internal.ts";

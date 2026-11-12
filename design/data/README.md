@@ -26,7 +26,7 @@ Each data folder holds up to three files:
 
 ## Why the data is one events table
 
-LGcode stores one table of events, in `events.sqlite`. Everything else is a fold over those
+LGTM Studio stores one table of events, in `events.sqlite`. Everything else is a fold over those
 events, in `packages/engine/src/views/`. The other tables hold receipts, agent tokens,
 processes, and migration records, and the page needs none of them. So `events.json` is the
 database, and `stubs.js` folds it into the shapes the page draws.

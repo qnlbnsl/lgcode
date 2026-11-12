@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
-import { settled, type AgentId } from "@lgcode/contracts";
-import { waitForAgents } from "@lgcode/client";
+import { settled, type AgentId } from "@lgtm/contracts";
+import { waitForAgents } from "@lgtm/client";
 import { connectWith } from "../../../client/src/core.ts";
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";

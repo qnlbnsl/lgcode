@@ -12,7 +12,7 @@ import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { agent, appendDelivery, boardState, change, deliveryText, encodedBytes, eventsOf, postAs, provideBoard, queued, seedBoard, snapshot, wakeFor } from "./wakeFixtures.ts";
 
 let rig: Rig;
-beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder); });
+beforeEach(() => { rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder); });
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig); });
 
 for (const trigger of ["close", "acknowledge", "merge"] as const) {

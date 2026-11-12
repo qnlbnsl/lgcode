@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import type { ClientSnapshot, ProjectId, Task } from "@lgcode/contracts"
+import type { ClientSnapshot, ProjectId, Task } from "@lgtm/contracts"
 import { useShellData } from "../data/ShellDataProvider.tsx"
 import { shellHref, type ShellRoute } from "../routes.ts"
 import { visibleText } from "../thread/text.tsx"

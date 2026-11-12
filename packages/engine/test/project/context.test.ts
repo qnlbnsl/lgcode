@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process"
 import { mkdirSync, renameSync, symlinkSync, writeFileSync, rmSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { it } from "@effect/vitest"
-import { ContextPath, ContextSearchResult, Event } from "@lgcode/contracts"
+import { ContextPath, ContextSearchResult, Event } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
 import * as Schema from "effect/Schema"
@@ -22,7 +22,7 @@ import { appendSetup, call, success, seedAccount, seedHarness, seedAgent, freshR
 let rig: Rig
 const git = (folder: string, ...args: string[]) => execFileSync("/usr/bin/git", ["-C", folder, ...args], { stdio: ["ignore", "pipe", "pipe"] })
 beforeEach(() => {
-  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   git(rig.work, "init", "-b", "main")
   writeFileSync(join(rig.work, "file.txt"), "context-secret-value must never be inlined\n")
   git(rig.work, "config", "user.name", "Context Test")

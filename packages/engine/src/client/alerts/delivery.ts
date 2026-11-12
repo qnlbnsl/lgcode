@@ -1,4 +1,4 @@
-import { type Event, type EventSequence } from "@lgcode/contracts";
+import { type Event, type EventSequence } from "@lgtm/contracts";
 import * as Cause from "effect/Cause";
 import * as Deferred from "effect/Deferred";
 import type * as Scope from "effect/Scope";

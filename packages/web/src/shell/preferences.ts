@@ -6,7 +6,7 @@ export function writePreference(key: string, value: string | null) {
   try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value) } catch { /* Preferences are optional. */ }
 }
 export function themeChoice(): ThemeChoice {
-  const saved = readPreference("lgcode-theme")
+  const saved = readPreference("lgtm-theme")
   return saved === "light" || saved === "dark" ? saved : "system"
 }
 export function applyTheme(choice: ThemeChoice) {
@@ -16,10 +16,10 @@ export function applyTheme(choice: ThemeChoice) {
 export function initializeTheme() {
   applyTheme(themeChoice())
   window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener("change", () => applyTheme(themeChoice()))
-  window.addEventListener("storage", (event) => { if (event.key === "lgcode-theme" || event.key === null) applyTheme(themeChoice()) })
+  window.addEventListener("storage", (event) => { if (event.key === "lgtm-theme" || event.key === null) applyTheme(themeChoice()) })
 }
 export const panelWidth = (value: number) => Number.isFinite(value) ? Math.round(Math.max(224, Math.min(360, value))) : 248
 export const savedPanelWidth = () => {
-  const saved = readPreference("lgcode-layout-sidebar")
+  const saved = readPreference("lgtm-layout-sidebar")
   return saved === null ? 248 : panelWidth(Number(saved))
 }

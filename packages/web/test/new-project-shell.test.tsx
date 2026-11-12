@@ -16,7 +16,7 @@ import { call, freshRequest, harnessSettings, makeFakeSecrets, makeRig, ownerCre
 
 const transport = vi.hoisted(() => ({ client: undefined as unknown }))
 const closeWindows: Array<() => void> = []
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(transport.client) }
 })
@@ -68,7 +68,7 @@ const mountedJourney = async (body: (journey: Journey) => Promise<void>, wrap?: 
   closeWindows.push(() => dom.window.close())
   const { createRoot } = await import("react-dom/client"), { App } = await import("../src/app.tsx")
   const rig = makeRig(), container = document.createElement("div")
-  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   vi.stubGlobal("fetch", vi.fn(async () => new Response(null, { status: 204 })))
   history.replaceState({}, "", "/#/?view=projects")
   // This only supplies jsdom's absent modal methods. Native focus containment,

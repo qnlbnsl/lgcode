@@ -1,4 +1,4 @@
-import type { Event } from "@lgcode/contracts";
+import type { Event } from "@lgtm/contracts";
 import { expect, it } from "vitest";
 import { pieceViews } from "../../src/pieces/viewTables.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";

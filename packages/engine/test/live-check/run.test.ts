@@ -40,8 +40,8 @@ const setup = (overrides: Partial<RunDeps> & { hookPasses?: boolean } = {}) => {
     write: (line) => { lines.push(line); },
     environment: { HOME: state },
     hook: {
-      environment: { LGCODE_HOME: state },
-      listServices: () => overrides.hookPasses === true ? [{ pid: 1, environment: { LGCODE_HOME: state } }] : [],
+      environment: { LGTM_HOME: state },
+      listServices: () => overrides.hookPasses === true ? [{ pid: 1, environment: { LGTM_HOME: state } }] : [],
       lockExists: () => false, answers: async () => true, sleep: async () => undefined,
     },
     startService: () => { calls.push("startService"); throw new Error("no service may start"); },

@@ -5,7 +5,7 @@ import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
 import * as Redacted from "effect/Redacted";
 import * as Stream from "effect/Stream";
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgtm/contracts";
 import { expect, it } from "vitest";
 import * as Server from "../../src/api/server.ts";
 import { appendSetup, eventOf, makeFakeSecrets, makeRig, provideRig, removeRig, seedAgent, headSequence, readLog } from "../support/handlerRig.ts";

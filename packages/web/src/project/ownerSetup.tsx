@@ -1,5 +1,5 @@
 import { useEffect, type ComponentProps } from "react"
-import type { Project } from "@lgcode/contracts"
+import type { Project } from "@lgtm/contracts"
 import type { NewProjectSession } from "./creation.ts"
 import { NewProjectDialog } from "./newProject.tsx"
 import { Setup } from "./setup.tsx"

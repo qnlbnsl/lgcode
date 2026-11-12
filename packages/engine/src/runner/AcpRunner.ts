@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 import { readlinkSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
-import { comparePermission, type AgentChoice, type AgentConfiguration, type ContextUsage, DeliveryId, ThreadContent, type PermissionLevel, type SessionReference, type TurnUsage } from "@lgcode/contracts";
-import { AcpClient, layerChildProcess } from "@lgcode/t3-effect-acp/client";
-import { AcpRequestError } from "@lgcode/t3-effect-acp/errors";
-import type { AgentCapabilities } from "@lgcode/t3-effect-acp/schema-v1";
-import { mergeProviderInstanceEnvironment } from "@lgcode/t3-provider-instance/instanceEnvironment";
-import { HomeDirectory } from "@lgcode/t3-provider-instance/HostProcess";
+import { comparePermission, isServiceVariable, type AgentChoice, type AgentConfiguration, type ContextUsage, DeliveryId, ThreadContent, type PermissionLevel, type SessionReference, type TurnUsage } from "@lgtm/contracts";
+import { AcpClient, layerChildProcess } from "@lgtm/t3-effect-acp/client";
+import { AcpRequestError } from "@lgtm/t3-effect-acp/errors";
+import type { AgentCapabilities } from "@lgtm/t3-effect-acp/schema-v1";
+import { mergeProviderInstanceEnvironment } from "@lgtm/t3-provider-instance/instanceEnvironment";
+import { HomeDirectory } from "@lgtm/t3-provider-instance/HostProcess";
 import * as Context from "effect/Context";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
@@ -38,7 +38,7 @@ import { linuxProcessReader } from "../recovery/orphans.ts";
 import { buildBaseEnvironment } from "./baseEnvironment.ts";
 import { harnessLogin, homeConflict, loginRefusal } from "./harnesses.ts";
 import { classifyError } from "./classify.ts";
-import { mcpScriptPath, withLGcodeMcp } from "./codexMcp.ts";
+import { mcpScriptPath, withLgtmMcp } from "./codexMcp.ts";
 import { cursorMcpConfig, cursorModelId, cursorServerName } from "./cursorMcp.ts";
 import { compactPrompt } from "./compact.ts";
 import { negotiatedChoices, reportedChoice, selector, selectValues, validChoiceId } from "./choices.ts";
@@ -359,7 +359,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     const resolvedSecrets = [input.token];
     const variables: Record<string, string> = {};
     for (const [name, value] of Object.entries(input.account.environment ?? {})) {
-      if (name.startsWith("HERDR_") || name.startsWith("LGCODE_")) continue;
+      if (name.startsWith("HERDR_") || isServiceVariable(name)) continue;
       if (value.startsWith("secret:")) {
         const secret = yield* secrets.resolve(value);
         if (secret === undefined) return yield* rejected("account secret is unavailable");
@@ -384,7 +384,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     }
     if (harness.id === "codex") {
       variables.CODEX_CONFIG = yield* Effect.try({
-        try: () => withLGcodeMcp(variables.CODEX_CONFIG),
+        try: () => withLgtmMcp(variables.CODEX_CONFIG),
         catch: () => rejected("account tool server configuration cannot be prepared"),
       });
       const homed = yield* withCodexHome({ stateFolder: configuration.stateFolder, home: configuration.environment.HOME ?? input.folder, accountId: input.account.id, variables,
@@ -395,7 +395,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
       Object.assign(variables, homed);
     }
     const base = buildBaseEnvironment({ parent: configuration.environment, accountVariables: variables,
-      lgcodeSocket: configuration.socketPath, lgcodeToken: Redacted.value(input.token) });
+      lgtmSocket: configuration.socketPath, lgtmToken: Redacted.value(input.token) });
     const environment = yield* mergeProviderInstanceEnvironment(Object.entries(variables).map(([name, value]) => ({ name, value, sensitive: name === secretVariable || (input.account.environment?.[name]?.startsWith("secret:") ?? false) })), base).pipe(
       Effect.provideService(HomeDirectory, configuration.environment.HOME ?? input.folder),
     );
@@ -408,7 +408,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
     const covered = () => credentials.healthy(credentialSource);
     const args = yield* Effect.try({ try: () => [...harness.adapterArguments, ...denyArguments(harness, input.folder, configuration.stateFolder, environment)], catch: () => rejected("deny rule cannot be resolved") });
     const scope = yield* Scope.fork(lifetime);
-    let serverName = "lgcode";
+    let serverName = "lgtm";
     let entry: Process | undefined;
     return yield* Effect.gen(function* () {
       if (harness.id === "cursor") {
@@ -653,7 +653,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         // so a session-scoped native server trust setting is unavailable.
         // Never infer identity from the title, arguments, or a tool-name prefix.
         const meta = tool._meta?.["gemini-cli"] as { mcp?: { server_name?: unknown; tool_name?: unknown } } | undefined;
-        const geminiOwn = harness.id === "gemini" && meta?.mcp?.server_name === "lgcode"
+        const geminiOwn = harness.id === "gemini" && meta?.mcp?.server_name === "lgtm"
           && typeof meta.mcp.tool_name === "string" && /^[A-Za-z0-9_-]+$/.test(meta.mcp.tool_name);
         // Claude's plan mode still invokes canUseTool for an allowed MCP tool
         // (verified with Haiku). claude-agent-acp 0.99.1 canUseTool forwards
@@ -664,8 +664,8 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
         // a matching name from one of those sources, never grants approval.
         const claude = tool._meta?.claudeCode as { mcpServer?: { name?: unknown; source?: unknown }; toolName?: unknown } | undefined;
         const claudeToolName = tool.name ?? claude?.toolName;
-        const claudeOwn = harness.id === "claude" && claude?.mcpServer?.name === "lgcode" && claude.mcpServer.source === "dynamic"
-          && typeof claudeToolName === "string" && /^mcp__lgcode__[A-Za-z0-9_-]+$/.test(claudeToolName)
+        const claudeOwn = harness.id === "claude" && claude?.mcpServer?.name === "lgtm" && claude.mcpServer.source === "dynamic"
+          && typeof claudeToolName === "string" && /^mcp__lgtm__[A-Za-z0-9_-]+$/.test(claudeToolName)
           && (claude.toolName === undefined || claude.toolName === claudeToolName);
         if ((geminiOwn || claudeOwn) && processEntry.ready && !processEntry.stopped && !processEntry.dead && processEntry.covered()) {
           const once = request.options.filter((option) => option.kind === "allow_once");
@@ -681,7 +681,7 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           return mapPermissionOption(harness.id, { ...option, name: yield* redactText(option.name, processEntry.covered), kind: yield* redactText(option.kind, processEntry.covered) });
         }));
         // Redact the whole decoded value before applying either byte cap.
-        const fields: import("@lgcode/contracts").PermissionAction = yield* Effect.gen(function* () {
+        const fields: import("@lgtm/contracts").PermissionAction = yield* Effect.gen(function* () {
           const result: Record<string, unknown> = {};
           if (tool.kind != null) result.toolKind = tool.kind;
           if (tool.rawInput !== undefined) {
@@ -716,17 +716,17 @@ export const layer = (configuration: AcpRunnerOptions) => Layer.effect(Runner, E
           toolCallId: tool.toolCallId, description, options: mapped, settingsWrite: settingsWrite((tool.locations ?? []).map((location) => location.path), folder, environment.CLAUDE_CONFIG_DIR) });
         return { outcome: yield* Deferred.await(hold.answer) };
       }));
-      const initialized = yield* client.agent.initialize({ protocolVersion: 2, clientInfo: { name: "lgcode", version: "0.0.1" }, clientCapabilities: {} }).pipe(Effect.mapError(() => rejected("adapter initialization failed")));
+      const initialized = yield* client.agent.initialize({ protocolVersion: 2, clientInfo: { name: "lgtm", version: "0.0.1" }, clientCapabilities: {} }).pipe(Effect.mapError(() => rejected("adapter initialization failed")));
       processEntry.version = initialized.protocolVersion;
       if (initialized.agentCapabilities !== undefined) processEntry.capabilities = initialized.agentCapabilities;
       const mcpServers = harness.id === "codex" ? [] : [{ type: "stdio" as const, name: serverName, command: process.execPath, args: [mcpScriptPath, "mcp"],
-        env: [{ name: "LGCODE_SOCKET", value: configuration.socketPath }, { name: "LGCODE_TOKEN", value: Redacted.value(input.token) }] }];
+        env: [{ name: "LGTM_SOCKET", value: configuration.socketPath }, { name: "LGTM_TOKEN", value: Redacted.value(input.token) }] }];
       // claude-agent-acp 0.99.1 createSession passes _meta.claudeCode.options
       // to SDK query; allowedTools is session-local on new/load/resume.
       // The SDK's mcp__<server> rule allows every tool on exactly that server.
       // Neither this nor the Codex/Cursor settings changes the agent's mode.
       const sessionOptions = harness.id === "claude"
-        ? { _meta: { claudeCode: { options: { allowedTools: ["mcp__lgcode"] } } } } : {};
+        ? { _meta: { claudeCode: { options: { allowedTools: ["mcp__lgtm"] } } } } : {};
       // Row 66 and issue 93: reload only through a method this peer
       // advertised at initialize, `session/load` first, else `session/resume`.
       const loads = processEntry.capabilities?.loadSession === true;

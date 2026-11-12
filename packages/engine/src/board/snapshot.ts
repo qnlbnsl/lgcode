@@ -1,5 +1,5 @@
-import type { Caller } from "@lgcode/contracts";
-import { holdsIncoming, holdsUnsettled, ownerHeld } from "@lgcode/contracts/board/conditions";
+import type { Caller } from "@lgtm/contracts";
+import { holdsIncoming, holdsUnsettled, ownerHeld } from "@lgtm/contracts/board/conditions";
 import type { Snapshot } from "../commands/internal.ts";
 import { channelMembers, own } from "./access.ts";
 import { boardView, encodedBytes, isUnread, postDispositions } from "./wake.ts";

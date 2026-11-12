@@ -1,6 +1,6 @@
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
-import { CommandsRpcGroup, rolesMaxima } from "@lgcode/contracts";
+import { CommandsRpcGroup, rolesMaxima } from "@lgtm/contracts";
 import { expect, it } from "vitest";
 import { agentCredential, appendSetup, call, failureOf, headSequence, seedAgent } from "../support/handlerRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";

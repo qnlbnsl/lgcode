@@ -1,6 +1,6 @@
-# The rebuilt LGcode mock
+# The rebuilt LGTM Studio mock
 
-This folder is a working mock of the whole LGcode web page. The owner asked for it on
+This folder is a working mock of the whole LGTM Studio web page. The owner asked for it on
 2026-11-10. It does not connect to the engine and it never calls an agent. Every screen
 works on data held in the browser's memory.
 
@@ -40,7 +40,7 @@ resets everything.
 | Files, the inspected worktree as a folder tree and a read-only file view | `/p/console/files`, and one file at `/p/console/files?f=README.md` |
 | Git, with generated commit and pull request text | `/p/console/git` |
 | Project settings, with the lead's model and the work assignment table | `/p/console/settings` |
-| Repository design page, the design file on a canvas | `/r/lgcode/design`, and `/r/<repository>/design/<category>/<item>` |
+| Repository design page, the design file on a canvas | `/r/lgtm/design`, and `/r/<repository>/design/<category>/<item>` |
 | Machines, Subscriptions, Phone notifications, Service settings | `/machines`, `/subscriptions`, `/notifications`, `/settings` |
 | Login and first run | `/login`, `/setup` |
 

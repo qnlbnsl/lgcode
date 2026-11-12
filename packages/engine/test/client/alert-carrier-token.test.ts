@@ -5,7 +5,7 @@ import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import * as SqlClient from "effect/sql/SqlClient";
 import { expect, it } from "vitest";
-import { carrierTokenReference } from "@lgcode/contracts";
+import { carrierTokenReference } from "@lgtm/contracts";
 import { SecretStore } from "../../src/commands/SecretStore.ts";
 import { collectSecrets } from "../../src/accounts/collectSecrets.ts";
 import { engineLists } from "../../src/pieces/lists.ts";

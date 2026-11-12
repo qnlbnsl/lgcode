@@ -22,7 +22,7 @@ import { agentCredential, appendSetup, call, eventOf, failureOf, freshRequest, h
 let rig: Rig
 const git = (path: string, ...args: string[]) => execFileSync("/usr/bin/git", ["-C", path, ...args], { stdio: "ignore" })
 beforeEach(() => {
-  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   git(rig.work, "init", "-b", "main")
   writeFileSync(join(rig.work, "screen.html"), "<h1>Observed bytes</h1>")
   writeFileSync(join(rig.work, "design.pen"), "Observed design bytes")

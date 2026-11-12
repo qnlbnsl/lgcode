@@ -183,8 +183,8 @@ places a copy in `~/.sheprd`. Agents can read `.sheprd` and cannot edit it.
 These points need the owner's word:
 
 - **How setup's config arrives.** Decided by the owner on 2026-11-11: the owner
-  runs `lgcode init` in the repository. It writes the template files into
-  `.lgcode`, copies the global settings from `~/.lgcode` when they exist, and
+  runs `lgtm init` in the repository. It writes the template files into
+  `.lgtm`, copies the global settings from `~/.lgtm` when they exist, and
   starts setup with the owner's preferred harness.
 - **The end of round 6.** Decided by the owner on 2026-11-11: there is no hard
   limit. Each round from round 6 on asks the owner first, and the owner either
@@ -325,7 +325,7 @@ repository. Its README file defines the grades and the flags. The flags are
 
 The ledger feeds the model selection list, which says which model to try for
 each kind of task. A model moves to harder or easier work when its grades say
-so. The agent suggests that LGcode reads the list when it starts an agent, and
+so. The agent suggests that LGTM Studio reads the list when it starts an agent, and
 that the owner can override the choice for one project.
 
 A lesson that is about the work and not about a model goes into the skills, as
@@ -341,11 +341,11 @@ it.
 - **What counts as a key task.** Decided by the owner on 2026-11-11: a phase
   step. "When an evaluation round runs" above has the details.
 - **Where the ledger lives for other users.** Decided by the owner on
-  2026-11-11: model evaluation moves out of Founder OS and into LGcode, as
-  research. LGcode ships one default model selection ledger, which each user
+  2026-11-11: model evaluation moves out of Founder OS and into LGTM Studio, as
+  research. LGTM Studio ships one default model selection ledger, which each user
   can update. How Founder OS and LGTM Studio are split is decided after the
   build loop is built.
-- **How the list reaches LGcode.** Whether LGcode reads the model selection
+- **How the list reaches LGTM Studio.** Whether LGTM Studio reads the model selection
   list from a file or the owner copies choices into settings is open.
 
 ## Changes this design made to the repository's rules

@@ -1,11 +1,11 @@
-import type { AgentChoice, AgentConfiguration } from "@lgcode/contracts";
+import type { AgentChoice, AgentConfiguration } from "@lgtm/contracts";
 import { configurationMatches } from "../runner/choices.ts";
-import { safeStartFailure, type StartFailure } from "@lgcode/contracts/startFailure";
+import { safeStartFailure, type StartFailure } from "@lgtm/contracts/startFailure";
 import {
   EventSequence as EventSequenceSchema, eventEffect,
   type ProjectRequestLink, type QuestionMetadata, type Account, type Actor, type Caller, type PermissionAction, type AgentId, type Delivery, type Event, type EventEnvelope, type EventSequence, type LifecycleState,
   pieceNamespaces, EngineEvent, type PieceNamespace, type PermissionOption, type SessionReference, type WaitMember,
-} from "@lgcode/contracts";
+} from "@lgtm/contracts";
 import * as Schema from "effect/Schema";
 import { guardPiece } from "../pieces/guardPiece.ts";
 import { pieceViews, type PieceView } from "../pieces/viewTables.ts";

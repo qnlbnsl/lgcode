@@ -29,7 +29,7 @@ const withBoard = async (test: (context: {
 }) => Promise<void>) => {
   const rig = makeRig()
   vi.stubEnv("HOME", rig.home)
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.stubEnv("LGTM_HOME", rig.stateFolder)
   try {
     await Effect.runPromise(provideBoard(rig, Effect.gen(function* () {
       const credentials = yield* seedBoard()

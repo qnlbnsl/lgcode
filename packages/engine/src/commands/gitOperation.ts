@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { type Event, type GitAttempt } from "@lgcode/contracts"
+import { type Event, type GitAttempt } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { CommandUncertain, freshRequest, refused, type Input, type PiecePlan, type PiecePlanner } from "./internal.ts"
 import { callerKey } from "../identity/caller.ts"

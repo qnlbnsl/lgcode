@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import * as NodeSocket from "@effect/platform-node/NodeSocket";
-import { makeNodeSocket } from "@lgcode/client/nodeSocket";
+import { makeNodeSocket } from "@lgtm/client/nodeSocket";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import { connectWith } from "../../../client/src/core.ts";

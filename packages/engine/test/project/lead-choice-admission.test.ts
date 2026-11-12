@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { Event } from "@lgcode/contracts"
+import { Event } from "@lgtm/contracts"
 import { it } from "@effect/vitest"
 import * as Effect from "effect/Effect"
 import * as Redacted from "effect/Redacted"
@@ -18,7 +18,7 @@ let rig: Rig
 beforeEach(() => {
   rig = makeRig()
   vi.stubEnv("HOME", rig.home)
-  vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.stubEnv("LGTM_HOME", rig.stateFolder)
 })
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig) })
 const axes = ["model", "effort"] as const

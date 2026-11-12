@@ -1,5 +1,5 @@
-import { toolText } from "@lgcode/contracts/thread"
-import type { Event } from "@lgcode/contracts"
+import { toolText } from "@lgtm/contracts/thread"
+import type { Event } from "@lgtm/contracts"
 import { DataText, visibleText } from "./text.tsx"
 import { BoundedText, textPreview } from "./boundedText.tsx"
 

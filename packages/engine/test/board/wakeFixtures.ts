@@ -1,6 +1,6 @@
-import type { Event, EventEnvelope } from "@lgcode/contracts";
-import type { BoardView } from "@lgcode/contracts/board/view";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
+import type { Event, EventEnvelope } from "@lgtm/contracts";
+import type { BoardView } from "@lgtm/contracts/board/view";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as PubSub from "effect/PubSub";
@@ -40,7 +40,7 @@ export const provideBoard = <A, E, R>(
   program: Effect.Effect<A, E, R> | ((runner: FakeRunner) => Effect.Effect<A, E, R>),
   secrets: ReadonlyArray<string> = [],
   options: {
-    readonly capacityHoldCondition?: (id: import("@lgcode/contracts").AgentId, snapshot: import("../../src/commands/internal.ts").Snapshot) => unknown;
+    readonly capacityHoldCondition?: (id: import("@lgtm/contracts").AgentId, snapshot: import("../../src/commands/internal.ts").Snapshot) => unknown;
   } = {},
   beforeHandlerTransaction: Effect.Effect<void> = Effect.void,
 ) => Effect.gen(function* () {

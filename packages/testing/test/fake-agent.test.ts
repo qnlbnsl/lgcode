@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url"
 
 import * as NodeServices from "@effect/platform-node/NodeServices"
 import { assert, it } from "@effect/vitest"
-import * as AcpClient from "@lgcode/t3-effect-acp/client"
+import * as AcpClient from "@lgtm/t3-effect-acp/client"
 import * as Deferred from "effect/Deferred"
 import * as Effect from "effect/Effect"
 import * as Fiber from "effect/Fiber"
@@ -52,7 +52,7 @@ const modeOption = {
 }
 
 const temporaryFolder = Effect.acquireRelease(
-  Effect.promise(() => mkdtemp(join(tmpdir(), "lgcode-fake-agent-"))),
+  Effect.promise(() => mkdtemp(join(tmpdir(), "lgtm-fake-agent-"))),
   (folder) => Effect.promise(() => rm(folder, { recursive: true, force: true }))
 )
 
@@ -514,15 +514,15 @@ live("a print environment step shows exactly the environment the child received 
   Effect.gen(function*() {
     const run = yield* converse(
       { turns: [[{ step: "print_env" }]] },
-      { env: { PLANTED_SERVICE_KEY: secretEnvValue, LGCODE_TOKEN: secretToken } }
+      { env: { PLANTED_SERVICE_KEY: secretEnvValue, LGTM_TOKEN: secretToken } }
     )
     const printed = textOf(run.updates).join("\n").split("\n")
     assert.include(printed, `PLANTED_SERVICE_KEY=${secretEnvValue}`)
-    assert.include(printed, `LGCODE_TOKEN=${secretToken}`)
+    assert.include(printed, `LGTM_TOKEN=${secretToken}`)
     assert.include(printed, `HOME=${run.home}`)
     // Only what the test passed: no name from the test process leaks in.
     const names = printed.map((line) => line.split("=")[0])
-    assert.notInclude(names, "LGCODE_HOME")
+    assert.notInclude(names, "LGTM_HOME")
     assert.notInclude(names, "VITEST")
   }))
 
@@ -530,7 +530,7 @@ live("a print environment step writes no environment value to any file in the ch
   Effect.gen(function*() {
     const run = yield* converse(
       { turns: [[{ step: "print_env" }]] },
-      { env: { PLANTED_SERVICE_KEY: secretEnvValue, LGCODE_TOKEN: secretToken } }
+      { env: { PLANTED_SERVICE_KEY: secretEnvValue, LGTM_TOKEN: secretToken } }
     )
     const entries = yield* Effect.promise(() => readdir(run.home, { recursive: true, withFileTypes: true }))
     for (const entry of entries) {
@@ -632,7 +632,7 @@ live("replay history on load sends the scripted history, in order, as user and a
   )
 )
 
-live("a LGcode command step connects to LGCODE_SOCKET with the token in an Authorization bearer header, and never prints the token (breaks if the step skips the token, sends it another way, or echoes it into the thread; rows 54 and 71)", () =>
+live("a LGTM Studio command step connects to LGTM_SOCKET with the token in an Authorization bearer header, and never prints the token (breaks if the step skips the token, sends it another way, or echoes it into the thread; rows 54 and 71)", () =>
   Effect.gen(function*() {
     const socketFolder = yield* temporaryFolder
     const socketPath = join(socketFolder, "s")
@@ -649,14 +649,14 @@ live("a LGcode command step connects to LGCODE_SOCKET with the token in an Autho
     )
 
     const run = yield* converse(
-      { turns: [[{ step: "lgcode_command", command: "ask", input: { text: "hi" } }]] },
-      { env: { LGCODE_SOCKET: socketPath, LGCODE_TOKEN: secretToken } }
+      { turns: [[{ step: "lgtm_command", command: "ask", input: { text: "hi" } }]] },
+      { env: { LGTM_SOCKET: socketPath, LGTM_TOKEN: secretToken } }
     )
     assert.deepEqual(upgrades, [{ authorization: `Bearer ${secretToken}` }])
     // The service end here answers nothing, so the step reports a failure, but it reports.
-    const outcome = textOf(run.updates).filter((line) => line.startsWith("lgcode_command:"))
+    const outcome = textOf(run.updates).filter((line) => line.startsWith("lgtm_command:"))
     assert.equal(outcome.length, 1)
-    assert.match(outcome[0]!, /^lgcode_command:(ok|failed)\b/)
+    assert.match(outcome[0]!, /^lgtm_command:(ok|failed)\b/)
     assertNoSecret([...textOf(run.updates), JSON.stringify(run.updates), ...run.logs, run.stderr()], [secretToken])
   }))
 
@@ -670,7 +670,7 @@ live("with wire options off and the logger installed, a full session logs nothin
           { step: "tool_call", toolCallId: "t", title: "Run", kind: "execute", status: "completed", output: secretToken }
         ]]
       },
-      { env: { PLANTED_SERVICE_KEY: secretEnvValue, LGCODE_TOKEN: secretToken } }
+      { env: { PLANTED_SERVICE_KEY: secretEnvValue, LGTM_TOKEN: secretToken } }
     )
     assert.deepEqual(run.logs, [])
     assertNoSecret([run.stderr()], [secretEnvValue, secretToken])

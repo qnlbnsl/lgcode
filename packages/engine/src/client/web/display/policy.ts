@@ -34,4 +34,4 @@ export const displayRequestAllowed = (configuration: DisplayConfiguration, heade
   (method === "GET" || method === "HEAD") && headers.host === configuration.displayHost && headers.upgrade === undefined
   && headers.cookie === undefined && headers.authorization === undefined
   && headers["x-forwarded-host"] === undefined && headers.forwarded === undefined
-import type { WebSettings } from "@lgcode/contracts"
+import type { WebSettings } from "@lgtm/contracts"

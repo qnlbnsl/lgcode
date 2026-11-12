@@ -1,4 +1,4 @@
-import type { AgentId, Event, EventEnvelope } from "@lgcode/contracts";
+import type { AgentId, Event, EventEnvelope } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as Redacted from "effect/Redacted";
 import { randomBytes } from "node:crypto";

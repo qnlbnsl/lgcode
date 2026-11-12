@@ -9,7 +9,7 @@ import * as Schema from "effect/Schema"
 import * as Redacted from "effect/Redacted"
 import * as SqlClient from "effect/sql/SqlClient"
 import { afterEach, beforeEach, expect, vi } from "vitest"
-import { ClientSnapshot, CommandsRpcGroup, Event, ProjectId, ProjectSnapshot, projectEventTags, sprintStatus } from "@lgcode/contracts"
+import { ClientSnapshot, CommandsRpcGroup, Event, ProjectId, ProjectSnapshot, projectEventTags, sprintStatus } from "@lgtm/contracts"
 import { EventLog } from "../../src/log/EventLog.ts"
 import { engineLists } from "../../src/pieces/lists.ts"
 import * as Server from "../../src/api/server.ts"
@@ -25,7 +25,7 @@ import { appendSetup, eventOf, harnessSettings, agentCredential, call, failureOf
 let rig: Rig
 const git = (folder: string, ...args: string[]) => execFileSync("git", ["-C", folder, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim()
 beforeEach(() => {
-  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   git(rig.work, "init", "-b", "main")
   git(rig.work, "-c", "user.name=Test", "-c", "user.email=test@example.test", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "Initialize")
 })

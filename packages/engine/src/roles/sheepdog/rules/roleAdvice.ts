@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgtm/contracts";
 import type { NoticeAction } from "../notices.ts";
 import { actionBase, isWorker, own, type AdviceKind, type RuleInput } from "./context.ts";
 

@@ -1,4 +1,4 @@
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgtm/contracts";
 import { expect, it } from "vitest";
 import { apply, emptyViews } from "../../src/views/apply.ts";
 import { holderAbove, mayActForHolder } from "../../src/routing/holders.ts";

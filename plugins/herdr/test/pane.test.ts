@@ -33,7 +33,7 @@ it("runs the Node launcher and opens the declared pane without granting an agent
   const environment = { ...serviceEnvironment(root), HERDR_BIN_PATH: binary };
   const action = startPane(environment);
   expect((await finishCli(action)).code).toBe(0);
-  expect(readFileSync(args, "utf8").trim().split("\n")).toEqual(["plugin", "pane", "open", "--plugin", "lgcode", "--entrypoint", "view"]);
+  expect(readFileSync(args, "utf8").trim().split("\n")).toEqual(["plugin", "pane", "open", "--plugin", "lgtm", "--entrypoint", "view"]);
   const agent = startPane({ ...agentEnvironment(root), HERDR_BIN_PATH: binary });
   expect((await finishCli(agent)).code).toBe(1);
 });

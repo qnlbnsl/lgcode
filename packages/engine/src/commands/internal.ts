@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   CommandsRpcGroup, Event as EventSchema, RequestId,
   type Caller, type Event, type EventEnvelope, type HarnessSettings,
-} from "@lgcode/contracts";
+} from "@lgtm/contracts";
 import type * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
@@ -63,9 +63,9 @@ export type Planner = (input: Input, payload: Record<string, unknown>) => Effect
 export type PiecePlanner = (input: Input, payload: Record<string, unknown>) => Effect.Effect<PiecePlan, CommandRefused | LogWriteFailed>;
 // Piece registrations still declare PiecePlanner at their source tables.
 // Two engine-owned project lifecycle commands also compose engine plans.
-type ProjectCommand = keyof typeof import("@lgcode/contracts").projectAccess;
+type ProjectCommand = keyof typeof import("@lgtm/contracts").projectAccess;
 export type PlannerTable = Readonly<Record<string, Planner>
-  & Record<`${Exclude<import("@lgcode/contracts").PieceNamespace, "project">}.${string}`, PiecePlanner>
+  & Record<`${Exclude<import("@lgtm/contracts").PieceNamespace, "project">}.${string}`, PiecePlanner>
   & Partial<Record<Exclude<ProjectCommand, "project.create" | "project.archive">, PiecePlanner>>>;
 
 export const freshRequest = () => Schema.decodeUnknownSync(RequestId)(randomUUID());

@@ -19,7 +19,7 @@ import { agentCredential, appendSetup, call, eventOf, failureOf, freshRequest, m
 
 let rig: Rig
 beforeEach(() => {
-  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  rig = makeRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   execFileSync("git", ["-C", rig.work, "init", "-b", "main"], { stdio: "ignore" })
 })
 afterEach(() => { vi.unstubAllEnvs(); removeRig(rig) })

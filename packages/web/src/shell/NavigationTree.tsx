@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { AgentId, ClientSnapshot } from "@lgcode/contracts"
-import { displayedState } from "@lgcode/contracts"
+import type { AgentId, ClientSnapshot } from "@lgtm/contracts"
+import { displayedState } from "@lgtm/contracts"
 import { useShellData } from "../data/ShellDataProvider.tsx"
 import { scopeKey, shellHref, type ShellRoute, type WorkspaceTab } from "../routes.ts"
 import { visibleText } from "../thread/text.tsx"
@@ -9,7 +9,7 @@ import { attentionItems, projectAgentIds, selectedScope, teamAgents } from "./mo
 import { readPreference } from "./preferences.ts"
 
 export function rememberedTab(projectId: string, teamId?: string): WorkspaceTab {
-  const value = readPreference(`lgcode-tab:${scopeKey(projectId, teamId)}`)
+  const value = readPreference(`lgtm-tab:${scopeKey(projectId, teamId)}`)
   return value === "chat" || value === "git" || value === "terminal" || value === "settings" || value === "tasks" && teamId !== undefined
     ? value : teamId === undefined ? "board" : "chat"
 }

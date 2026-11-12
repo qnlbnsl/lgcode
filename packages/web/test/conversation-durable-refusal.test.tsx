@@ -7,7 +7,7 @@ import { expect, it, vi } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import * as SqlClient from "effect/sql/SqlClient"
-import { ProjectId, type AgentChoices, type AgentId, type ChannelId, type TeamId } from "@lgcode/contracts"
+import { ProjectId, type AgentChoices, type AgentId, type ChannelId, type TeamId } from "@lgtm/contracts"
 import { CommandHandler } from "../../engine/src/commands/CommandHandler.ts"
 import { provideBoard, seedBoard } from "../../engine/test/board/wakeFixtures.ts"
 import { agentCredential, appendSetup, call, eventOf, freshRequest, makeRig, ownerCredential, readLog, removeRig, seedAccount, seedAgent, seedHarness, success } from "../../engine/test/support/handlerRig.ts"
@@ -18,7 +18,7 @@ import { Composer } from "../src/thread/composer.tsx"
 import type { ConversationEntry, ConversationIdentity } from "../src/thread/conversationState.tsx"
 
 const transport = vi.hoisted(() => ({ client: undefined as unknown }))
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(transport.client) }
 })
@@ -43,7 +43,7 @@ const allChoices: AgentChoices = {
 // file validation, choice validation, authorization, SQLite and receipts are real.
 it.each(["prompt", "board.post", "model", "effort"] as const)("605 retires only a durable %s refusal and permits a corrected new request", async (kind) => {
   const rig = makeRig()
-  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   vi.spyOn(document, "hidden", "get").mockReturnValue(false)
   const container = document.createElement("div"); document.body.append(container)
   const root = createRoot(container)
@@ -150,7 +150,7 @@ it.each(["prompt", "board.post", "model", "effort"] as const)("605 retires only 
 
 it.each(["prompt", "board.post", "configure"] as const)("605 preserves a committed %s through lost reply, real invalid credential and exact receipt recovery", async (command) => {
   const rig = makeRig()
-  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder)
+  vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder)
   vi.spyOn(document, "hidden", "get").mockReturnValue(false)
   const container = document.createElement("div"); document.body.append(container)
   const root = createRoot(container)

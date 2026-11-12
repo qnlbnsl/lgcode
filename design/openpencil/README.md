@@ -43,7 +43,7 @@ The certificate is kept in a Docker volume, so it survives restarts.
 ## Where design files live
 
 Each repository keeps its design file in its own `design/` folder, for example
-`design/lgcode.fig` here and `design/ananke.fig` in Ananke. The compose files
+`design/lgtm.fig` here and `design/ananke.fig` in Ananke. The compose files
 mount each folder read-only at `/files/<repository id>/`. Caddy serves only
 `.fig` and `.pen` files from them.
 
@@ -51,6 +51,6 @@ mount each folder read-only at `/files/<repository id>/`. Caddy serves only
 
 The editor cannot save back into the repository. OpenPencil keeps edits in the
 browser, and its Save command downloads a copy to the viewer's computer. Saving
-into the repository needs a small LGcode endpoint, or OpenPencil's own
+into the repository needs a small LGTM Studio endpoint, or OpenPencil's own
 automation bridge. The entry "The design file is the source of truth" in
 `docs/features.md` records this gap.

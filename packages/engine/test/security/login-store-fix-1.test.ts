@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { it } from "@effect/vitest";
-import type { EventEnvelope } from "@lgcode/contracts";
+import type { EventEnvelope } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 
@@ -24,7 +24,7 @@ let root: ServiceRoot;
 beforeEach(() => {
   root = makeServiceRoot("/tmp/sh-b1f1-");
   for (const [name, value] of Object.entries({
-    HOME: root.home, LGCODE_HOME: root.state, XDG_STATE_HOME: join(root.root, "xdg"),
+    HOME: root.home, LGTM_HOME: root.state, XDG_STATE_HOME: join(root.root, "xdg"),
     CODEX_HOME: join(root.home, ".codex"), CLAUDE_CONFIG_DIR: join(root.home, ".claude"),
   })) vi.stubEnv(name, value);
 });
@@ -34,7 +34,7 @@ const token = 'review-SYNTHETIC-+/"\\ space-漢࿿-login-credential-987654321';
 const withheld = "[output withheld: account credentials cannot be inspected]";
 const serviceOptions = () => ({ env: {
   CODEX_HOME: undefined, CLAUDE_CONFIG_DIR: join(root.home, ".claude"),
-  LGCODE_TEST_DEBUG: "1", LGCODE_TEST_PROTOCOL_LOG: "1",
+  LGTM_TEST_DEBUG: "1", LGTM_TEST_PROTOCOL_LOG: "1",
 } });
 
 // A wrapper around the scripted fake, never a real adapter. Each write

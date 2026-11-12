@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import * as SqliteClient from "@lgcode/t3-node-sqlite/nodeSqliteClient";
-import type { EventEnvelope } from "@lgcode/contracts";
+import * as SqliteClient from "@lgtm/t3-node-sqlite/nodeSqliteClient";
+import type { EventEnvelope } from "@lgtm/contracts";
 import * as Effect from "effect/Effect";
 import * as PubSub from "effect/PubSub";
 import * as SqlClient from "effect/sql/SqlClient";
@@ -122,7 +122,7 @@ it("1.10 the 900 KiB byte budget counts encoded multibyte text and never cuts or
 
 it("1.10 migration backfills old queued targets and creates an indexed thread_agent_id", async () => {
   registerRebuildCheck({ noLog: true });
-  const home = mkdtempSync("/tmp/lgcode-old-thread-");
+  const home = mkdtempSync("/tmp/lgtm-old-thread-");
   try {
     await Effect.runPromise(Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient;

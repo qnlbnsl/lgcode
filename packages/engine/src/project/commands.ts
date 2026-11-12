@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { realpath, stat } from "node:fs/promises"
 import { isAbsolute } from "node:path"
 import { RepositoryId, WorkspaceId, TeamId, SprintId, TaskId, ChannelId,
-  TaskNotificationId, stageLabel, projectTeamGroup, type Event, type Project, type Task } from "@lgcode/contracts"
+  TaskNotificationId, stageLabel, projectTeamGroup, type Event, type Project, type Task } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
 import { agentReadReply, type ReadHandler } from "../api/reads.ts"

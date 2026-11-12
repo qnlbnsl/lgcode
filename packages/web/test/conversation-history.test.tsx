@@ -2,7 +2,7 @@ import { act } from "react"
 import * as Effect from "effect/Effect"
 import * as Stream from "effect/Stream"
 import { expect, it, vi } from "vitest"
-import type { Sender } from "@lgcode/contracts"
+import type { Sender } from "@lgtm/contracts"
 import { agentId, item, mountThread } from "./thread-fixtures.tsx"
 
 // DeliveryQueued has neither an envelope agentId nor an event agentId.

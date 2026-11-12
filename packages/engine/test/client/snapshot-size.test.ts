@@ -4,7 +4,7 @@ import { appendSetup, seedAgent } from "../support/handlerRig.ts";
 import { run as runReadRig, snapshotFor, event, permissionFor, questionFor, bytes } from "./support/readRig.ts";
 import { registerRebuildCheck } from "../support/rebuildCheck.ts";
 import { action, fileEvent } from "../roles/fixtures.ts";
-import { rolesActionKinds } from "@lgcode/contracts";
+import { rolesActionKinds } from "@lgtm/contracts";
 import { channel, post } from "../board/fixtures.ts";
 
 const run = <A>(program: Effect.Effect<A, any, any>) => runReadRig(program, registerRebuildCheck());

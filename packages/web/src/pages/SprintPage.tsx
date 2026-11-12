@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { sprintStatus } from "@lgcode/contracts"
+import { sprintStatus } from "@lgtm/contracts"
 import { useMutationDisabled, useShellData } from "../data/ShellDataProvider.tsx"
 import { shellHref, type ShellRoute } from "../routes.ts"
 import { RequestBlock, byRequestAge } from "../requests/RequestList.tsx"

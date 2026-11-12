@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, useMemo, useSyncExternalStore, type ReactNode } from "react"
-import type { Alert, ClientRequest, ClientSnapshot, EventSequence } from "@lgcode/contracts"
+import type { Alert, ClientRequest, ClientSnapshot, EventSequence } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { requestId, withClient } from "../thread/client.ts"
 import { watchSituation, type ConnectionState } from "../watchSituation.ts"

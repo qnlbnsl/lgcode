@@ -1,5 +1,5 @@
-import type { Client } from "@lgcode/client/browser"
-import type { Discovery, Project, ProjectCreation, ProjectSettings, Repository } from "@lgcode/contracts"
+import type { Client } from "@lgtm/client/browser"
+import type { Discovery, Project, ProjectCreation, ProjectSettings, Repository } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { requestId, withClient } from "../thread/client.ts"
 

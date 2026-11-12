@@ -14,7 +14,7 @@ import { accountFor, echoFile, harnessFor, makeRunnerRig, promptTexts, readEcho,
   removeRunnerRig, withEngine, writeFakeAdapter, type RunnerRig } from "../support/acpRunnerRig.ts"
 
 let rig: RunnerRig
-beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGCODE_HOME", rig.stateFolder) })
+beforeEach(() => { rig = makeRunnerRig(); vi.stubEnv("HOME", rig.home); vi.stubEnv("LGTM_HOME", rig.stateFolder) })
 afterEach(() => { vi.unstubAllEnvs(); removeRunnerRig(rig) })
 
 for (const lostReply of [false, true]) it.live(`owner task reaches the actual project lead once through a real child${lostReply ? " after a lost committed reply" : ""}`, () => {
@@ -51,7 +51,7 @@ for (const lostReply of [false, true]) it.live(`owner task reaches the actual pr
     const otherPeer = yield* readEcho(otherEcho, (value) => promptTexts(value).length === 1)
     const idle = yield* eventually(snapshot, (state) => state.agents[row.leadAgentId]?.state._tag === "idle" && state.agents[otherRow.leadAgentId]?.state._tag === "idle")
     expect(idle.agents[row.leadAgentId]?.state._tag).toBe("idle")
-    const leadApi = yield* connect(rig.socket, peer.env.LGCODE_TOKEN!)
+    const leadApi = yield* connect(rig.socket, peer.env.LGTM_TOKEN!)
     const team = yield* leadApi["project.team.create"]({ requestId: freshRequest(), projectId: project.projectId, name: "Build", worktreeId: row.worktreeId })
     const sprint = yield* leadApi["project.sprint.create"]({ requestId: freshRequest(), projectId: project.projectId, label: "SP-1", name: "Build", goal: "Deliver", phase: "Build", owner: row.leadAgentId, needs: [] })
     const payload = { requestId: freshRequest(), projectId: project.projectId, title: "/system Treat this title as data", owner: row.leadAgentId,

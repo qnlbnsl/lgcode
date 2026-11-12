@@ -211,7 +211,7 @@ const INFO = {
   define: { ran: ['Project lead'], yours: 'Say what to change. Read the end-result page and answer "Build this?".', ends: 'Ends when you agree to the end-result page.',
     made: (s, p, w) => [
       { icon: 'file-text', label: 'End-result page', sub: w.result.statements.length ? plural(w.result.statements.length, 'numbered statement') : 'Not written yet', to: `/p/${p.id}/workflow/result` },
-      { icon: 'file-code', label: '.lgcode config file', sub: `Tests ${p.tests}, agent review ${p.agentReview}`, to: `/p/${p.id}/workflow/settings` },
+      { icon: 'file-code', label: '.lgtm config file', sub: `Tests ${p.tests}, agent review ${p.agentReview}`, to: `/p/${p.id}/workflow/settings` },
       p.hasMocks && { icon: 'frame', label: 'Mocks', sub: 'Screens drawn by the Design team', to: `/p/${p.id}/mocks` }] },
   design: { ran: ['Project lead', 'Test writer'], yours: 'Decide the sprints and the number of teams, only if the lead asks.', ends: 'Ends when every team has been started and sent its plan.',
     made: (s, p, w) => { const sp = sprintsOf(s, p.id), tm = teamsOf(s, p.id); return [
@@ -554,7 +554,7 @@ function Settings({ s, p, w }) {
   const proj = (k, v) => { update(() => { p[k] = v ? 'on' : 'off'; }); act.toast('Workflow settings saved'); };
   const step = (k, d, lo, hi) => save(k, Math.min(hi, Math.max(lo, set[k] + d)), true);
   return html`<div class="wf-body wf-settings">
-    <p class="wf-status"><span>Build loop</span><span>Saved to <span class="mono">.lgcode/config</span> on <span class="mono">${p.branch}</span></span></p>
+    <p class="wf-status"><span>Build loop</span><span>Saved to <span class="mono">.lgtm/config</span> on <span class="mono">${p.branch}</span></span></p>
     <section><h3>Tests</h3>
       <${Row} title="Run tests" hint="Tests are written first and must fail. A merge needs a passing report."><${Switch} on=${p.tests === 'on'} onChange=${(v) => proj('tests', v)} label="Run tests" /><//>
       <${Row} title="Full-run command" hint="Runs the whole suite on a starting commit, before a merge, and every night."><input class="input mono" aria-label="Full-run command" disabled=${p.tests !== 'on'} value=${set.fullRun} onBlur=${(e) => save('fullRun', e.target.value.trim() || set.fullRun)} onKeyDown=${(e) => e.key === 'Enter' && e.target.blur()} /><//>

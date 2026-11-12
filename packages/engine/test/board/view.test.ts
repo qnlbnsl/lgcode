@@ -1,4 +1,4 @@
-import type { Event, EventEnvelope } from "@lgcode/contracts";
+import type { Event, EventEnvelope } from "@lgtm/contracts";
 import { expect, it } from "vitest";
 
 import { apply, emptyViews } from "../../src/views/apply.ts";

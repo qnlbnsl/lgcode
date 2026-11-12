@@ -3,7 +3,7 @@ import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
 import * as Effect from "effect/Effect"
 import * as Schema from "effect/Schema"
-import { ContextReference, EventEnvelope, type AgentId, type ChannelId, type ProjectId, type TeamId } from "@lgcode/contracts"
+import { ContextReference, EventEnvelope, type AgentId, type ChannelId, type ProjectId, type TeamId } from "@lgtm/contracts"
 import { ShellDataProvider, useConversation, useShellData } from "../src/data/ShellDataProvider.tsx"
 import { Composer } from "../src/thread/composer.tsx"
 import { AgentTools } from "../src/thread/agentTools.tsx"
@@ -11,7 +11,7 @@ import type { ConversationEntry, ConversationIdentity, ConversationSession } fro
 import { adminShellClient } from "./admin-shell-client.ts"
 
 const api = vi.hoisted(() => ({ current: {} as Record<string, unknown> }))
-vi.mock("@lgcode/client/browser", async () => {
+vi.mock("@lgtm/client/browser", async () => {
   const Effect = await import("effect/Effect")
   return { connect: () => Effect.succeed(api.current) }
 })

@@ -1,6 +1,6 @@
 import { useConversation } from "../data/ShellDataProvider.tsx"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import type { AccountId, AgentChoices, AgentConfiguration, AgentId, ContextUsage, HarnessId } from "@lgcode/contracts"
+import type { AccountId, AgentChoices, AgentConfiguration, AgentId, ContextUsage, HarnessId } from "@lgtm/contracts"
 import * as Effect from "effect/Effect"
 import { requestId, withClient } from "./client.ts"
 import { beforeRequest, durableRefusal } from "./requestOutcome.ts"

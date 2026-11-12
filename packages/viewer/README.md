@@ -1,6 +1,6 @@
 # The terminal thread viewer
 
-Run `lgcode view` in the owner's terminal.
+Run `lgtm view` in the owner's terminal.
 The viewer uses the owner credential and the engine's Unix socket.
 The engine checks the calling process's ancestry.
 The viewer refuses inherited agent credentials.
