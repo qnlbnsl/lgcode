@@ -76,3 +76,13 @@ The source files are `icons/chevron-right.svg`, `icons/chevron-down.svg`,
 The elements are React JSX rather than HTML strings.
 The stylesheet keeps LGcode's 1.6 stroke width.
 The production file retains the copyright and licence provenance comment.
+
+## The rebuilt mock's icon file, added on 2026-11-10
+
+The rebuilt mock in `design/mock/` keeps its icons in one generated file,
+`design/mock/js/icons.js`. The file holds 146 icons from the same
+`lucide-static` package, version 0.460.0. Each entry is the inner markup of
+`icons/<name>.svg`, unchanged, under the icon's Lucide name. Lucide's `<svg>`
+wrapper was not copied. The mock's own `Icon` component in
+`design/mock/js/lib.js` draws the wrapper and sets the stroke width. The names
+in that file are the list of icons the rebuilt mock may use.

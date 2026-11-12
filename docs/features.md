@@ -28,6 +28,11 @@ Synapse fork. It is at `docs/message-board/features.md` in the
   The installer and login integration are not built by the rename and split.
 - **Project configuration in `.lgcode`** (agreed, 2026-11-05).
   Define the folder's contents and loading rules in the next piece.
+  The owner decided on 2026-11-11 that `lgcode init`, run in a repository,
+  creates the folder. It writes the template files, puts the project in setup
+  mode, copies the global settings from `~/.lgcode` when LGcode was set up
+  globally before, and starts the setup conversation with the owner's
+  preferred harness.
   Agents can read the folder, and changes require the owner through the
   existing settings protection.
 - **An overridable default workflow** (agreed, 2026-11-05).
@@ -598,14 +603,39 @@ The full design is in
   storage. Recorded mocks retain an opaque origin. The editor receives no
   owner cookie or owner origin authority.
 
+## Evaluation at project teardown
+
+The owner raised these ideas on 2026-11-11. They are not decided. The decided
+timing is a round after each phase step, in the build loop design's
+"Evaluation rounds and the model ledger".
+
+- When a project is torn down, LGTM Studio offers: "Would you like to evaluate
+  how the models did from the session reports and help improve the model
+  ledger?" The round runs only if the user says yes.
+- The round reads the project's session reports and logs. The user reads the
+  evaluation before anything else happens with it.
+- The results are kept locally, in LGTM Studio's config files.
+- LGTM Studio could send the results to a public endpoint, so that many users
+  improve the shared model ledger. This sends data off the user's machine, so it
+  needs the user's consent each time, and the payload must leave out code, file
+  paths and anything else private. SECURITY.md applies to it.
+
 ## Open questions
 
 - Which licence should LGcode use?
-- Should LGcode be renamed LGTM code? The owner raised the name on
-  2026-11-09 and asked for it to be kept as a to-do. Nothing is renamed until
-  the owner decides.
 
 ## Decided
+
+- **The product is renamed LGTM Studio** (2026-11-11). The owner raised "LGTM
+  code" on 2026-11-09 and chose "LGTM Studio" on 2026-11-11. The build loop
+  plan, in "The new name", lists what the rename covers. The owner confirmed the
+  spelling, two words with a space, on 2026-11-11. The new command and folder
+  names are still open. The
+  mock shows the new name. The code and the documents still say LGcode until the
+  rename work in step 1 of the build loop plan.
+- **The public site is `lgtmstudio.dev`** (2026-11-11). It is the product's
+  public website. It is not the address where the owner's own instance runs,
+  which stays out of this repository.
 
 - **Language: TypeScript** (2026-10-30). One language for the backend, the
   web page and the future apps, so the client API's types are written once.
@@ -674,3 +704,114 @@ and worktree through first-run setup, has its actual lead create a linked
 sprint, task and question with supported tools, answers from the board, and
 checks the durable result and exact receipt again after service restart. It remains separate from
 `pnpm check` because it consumes the signed-in account's allowance.
+
+## Evaluation rounds that update the model ledger
+
+The owner asked for this on 2026-11-10. It is not built. At the end of each key
+task and at the end of a project, the build loop runs an evaluation round. The
+round grades each task from its reviews and later corrections, and it writes the
+grades to the model ledger. The ledger feeds the list that says which model to
+try for each kind of task. The design is in "Evaluation rounds and the model
+ledger" in
+[docs/specs/2026-11-05-build-loop-design.md](specs/2026-11-05-build-loop-design.md).
+
+The owner decided on 2026-11-11 that model evaluation leaves Founder OS and becomes
+part of LGcode, as research. LGcode ships one default model selection ledger, and each
+user can update it.
+
+## Questions that carry their own brief
+
+The owner asked for this on 2026-11-11, and it is agreed for the mock. It is not
+built in the engine. When an agent asks the owner a question, it writes a short
+brief of the question, one line of description, a short recommendation, what the
+question is about, why it matters, why it recommends its answer, and the files it
+cites. A thread shows the brief first, with Accept, Deny and Details, and the
+full card opens from Details. The mock in `design/mock/` shows the layout. The
+engine's question records and the agents' instructions would need these fields.
+
+## A file explorer in the Git view
+
+The owner asked for this on 2026-11-11. It is agreed and not built in the engine. A
+project has a "Files" tab, beside its Git tab, that works like the file explorer of an
+editor such as Visual Studio Code. It shows a folder tree of the inspected worktree, and
+the open file beside it. References in questions, approvals and plans link to a file and
+open it here. The mock in `design/mock/` shows the tab at `/p/console/files`.
+
+### Where the files come from
+
+The files live on whichever machine holds the worktree, such as Studio or Buildbox. The
+web page and the phone app never reach that machine themselves. They ask the LGcode
+service through the client API, and the service asks the machine. The rules are these:
+
+- The service lists one folder at a time, so a large repository does not load at once.
+  Each entry carries its name, its size, whether it is a folder, and its Git status.
+- The service returns one file at a time, as text. A file over 1 megabyte, or a binary
+  file, is not returned as text. The client offers it as a download, which the service
+  streams from the machine.
+- Images, such as SVG and PNG files, are returned as images and shown as pictures.
+- Every path is checked on the machine against the worktree's folder, after symbolic
+  links are resolved, so a request cannot read a file outside the worktree.
+- The tab is read-only. Editing is not part of this feature.
+- When the machine is offline, the tab keeps its structure and says so. It shows the
+  files again when the machine reconnects.
+- The tab follows the "Inspecting" choice in the top bar. A branch with no worktree yet
+  shows the base branch, with a note that says so.
+
+### Which component shows the files
+
+The owner asked on 2026-11-11 for the option that works best across platforms. The
+choice is the stack that T3 Code uses, so that its code can be copied under the MIT
+License:
+
+- `@pierre/diffs` renders files and diffs. T3 Code uses it on the web and in its server,
+  and its import style works in React Native as well.
+- `@pierre/highlights` colours the code. T3 Code moved its web app from Shiki to it,
+  because Shiki took most of the render time on large files and could freeze the window.
+  T3 Code's phone app already uses the native form of `@pierre/highlights`.
+
+Highlighting runs in each client, so the service sends plain text and stays simple. The
+licences of the two Pierre packages have not been read yet, and they must be read before
+any code is copied. Monaco, the editor inside Visual Studio Code, was not chosen, because
+it does not support phones. CodeMirror 6 is the fallback if the Pierre packages do not
+fit, since it works on the web and in a phone's web view. The mock uses a small
+hand-written highlighter in place of either library, because the mock has no build step.
+
+## Plans written as HTML pages
+
+The owner decided this on 2026-11-11. It is agreed and not built. From now on,
+every plan in LGcode is an HTML page. Planner agents fill in one template, and the
+page is written to get the point across to the owner in a human-friendly way. The
+plans the agents work from keep their full detail. Each sprint has its own plan, shown on
+the sprint page beside the sprint's tasks. The tasks are the short version of the plan,
+and each task links to the part of the plan it carries out. The mock shows sprint SP-07
+with a real LGcode plan converted to HTML. The template is not written yet.
+
+## Files and images sent with a message
+
+The owner asked for this on 2026-11-11. It is agreed and not built in the engine. The
+owner can send files and images to an agent with a message. They come from a paperclip
+button in the message box, from a drop on the message box, or from a paste. Images show
+as small pictures before sending and as larger pictures in the thread. Other files show
+as a name and a size. The mock limits each file to 100 megabytes, and that limit is not
+decided. The engine would need to store the files, pass them to the agent's harness, and
+serve them back to every client through the client API.
+
+Large photos are resized before they are sent, decided by the owner on 2026-11-11. A photo
+from a phone can be 50 megabytes or more, and the models scale large images down anyway.
+The rules the mock follows are these:
+
+- A photo whose long edge is over 2,048 pixels, or whose file is over 2 megabytes, is
+  redrawn on the owner's device with a long edge of at most 2,048 pixels.
+- The redrawn photo is saved as a JPEG at 85 percent quality. A 33-megabyte test photo
+  became 1.1 megabytes.
+- Redrawing drops the photo's camera details, including the place where it was taken.
+- The chip shows "Resized from 33.4 MB to 1.1 MB", with "Send original" to send the file
+  as it was. A sent photo is captioned with both sizes.
+- Animated images and drawings in the Scalable Vector Graphics format are sent unchanged.
+- A photo that the browser cannot read is sent as a file. A HEIC photo, the iPhone's own
+  format, is marked "Converted by the service", because Chrome cannot read it. Raw camera
+  files, such as ProRAW, are sent as files.
+
+The service must apply the same rules to images that other clients send at full size. The
+common server image library, sharp, cannot read HEIC in its standard build, so the service
+needs a separate converter for it.

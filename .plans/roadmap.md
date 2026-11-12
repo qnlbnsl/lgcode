@@ -1,6 +1,6 @@
 ---
 kind: roadmap
-updated: 2026-11-07
+updated: 2026-11-10
 ---
 
 # Roadmap
@@ -10,14 +10,15 @@ with every agent's conversation available as a thread.
 
 ## Now
 
-Development is frozen from 2026-11-07 until the website mocks are ready. The
-owner lifts the freeze.
+The owner lifted the development freeze on 2026-11-08. On 2026-11-10 the owner
+set the build loop as the next work, after a plan.
 
 | Kind | Name | Overview |
 |---|---|---|
-| other | Website mocks | The mock under `design/` is under construction, and it is the golden reference for the website. |
+| other | Mock, second round | The rebuilt mock in `design/mock/` gets the owner's walkthrough feedback. The brief is `design/mock/ROUND-2-BRIEF.md`. |
+| plan | build-loop | The investigation of 2026-11-10 and the plan to reach the build loop. It is `.plans/plans/build-loop/plan.md`, and it awaits the owner's approval. |
 
-## Next, after the freeze
+## Next
 
 | Kind | Name | Overview |
 |---|---|---|

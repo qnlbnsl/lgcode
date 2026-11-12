@@ -1,5 +1,14 @@
 # LGcode app mockups
 
+## The rebuilt mock is in `mock/`, started on 2026-11-10
+
+The owner asked on 2026-11-10 for the mock to be rebuilt as a working wireframe of the whole
+product. That rebuild lives in [mock/](mock/README.md). Serve this directory with
+`python3 -m http.server 4178 --bind 127.0.0.1`, then open `http://127.0.0.1:4178/mock/`.
+The older `workbench.html` described below is kept until the owner approves the rebuild.
+
+## The older workbench
+
 Serve this directory with `python3 -m http.server 4178 --bind 127.0.0.1`, then open
 `http://127.0.0.1:4178/workbench.html`. Opening the file directly no longer works, because
 the page reads its data with `fetch`. Add `?sample=heavy` to the address to load 10 projects,
