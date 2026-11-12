@@ -1,6 +1,8 @@
 // Everything that changes the mock's state, and the small simulation that makes agents
-// answer and move. Nothing here talks to a service.
+// answer and move. Nothing here talks to a service. Each change the real product sends to the
+// engine is also reported to engine.js, under the RPC tag the real client API uses.
 import { store, update, notify, uid, remember, go, MIN } from './lib.js';
+import * as engine from './engine.js';
 import {
   agentOf, projectOf, teamOf, threadOf, openRequests, agentLabel, byId, tasksOfSprint, teamName, HARNESSES,
 } from './data.js';
@@ -77,6 +79,7 @@ export function sendMessage(agentId, text, context = [], files = []) {
   text = text.trim();
   if (!text && !files.length) return;
   const a = agentOf(S(), agentId);
+  engine.call('prompt', { agentId, text, context: context.map((c) => c.label || c.id || String(c)), files: files.map((f) => ({ name: f.name, size: f.size })) });
   update((s) => {
     threadOf(s, agentId).push({ id: uid('m'), type: 'user', ts: Date.now(), text, context, files });
     s.drafts['thread:' + agentId] = '';
@@ -88,7 +91,9 @@ export function sendMessage(agentId, text, context = [], files = []) {
       if (!s.pending[agentId]) return;
       delete s.pending[agentId];
       const got = files.length ? `I have ${files.length === 1 ? files[0].name : files.length + ' files'}. ` : '';
-      threadOf(s, agentId).push({ id: uid('m'), type: 'agent', ts: Date.now(), text: text ? got + replyFor(a, text) : got + 'What should I do with ' + (files.length === 1 ? 'it' : 'them') + '?' });
+      const reply = { id: uid('m'), type: 'agent', ts: Date.now(), text: text ? got + replyFor(a, text) : got + 'What should I do with ' + (files.length === 1 ? 'it' : 'them') + '?' };
+      engine.push('agent.message', { agentId, message: reply });
+      threadOf(s, agentId).push(reply);
       if (a.activity === 'Working on your message') { a.state = 'idle'; a.activity = ''; }
       a.turns += 1; a.context = Math.min(96, a.context + 1);
     });
@@ -97,6 +102,7 @@ export function sendMessage(agentId, text, context = [], files = []) {
 }
 // Stops the reply that is being written. The agent keeps running.
 export function stopReply(agentId) {
+  engine.call('cancel-reply', { agentId });
   update((s) => {
     clearTimeout(s.pending[agentId]); delete s.pending[agentId];
     const a = agentOf(s, agentId);
@@ -108,6 +114,7 @@ export function stopAgent(agentId) {
   const s = S(); const a = agentOf(s, agentId);
   const approvals = openRequests(s, { agent: agentId }).filter((r) => r.kind === 'approval');
   const doStop = () => update((st) => {
+    engine.call('stop', { agentId });
     const ag = agentOf(st, agentId);
     ag.prevState = ag.state; ag.prevActivity = ag.activity; ag.state = 'stopped'; ag.activity = 'Stopped by you';
     for (const r of approvals) { r.status = 'answered'; r.answer = 'Cancelled'; r.answeredAt = Date.now(); }
@@ -124,6 +131,7 @@ export function stopAgent(agentId) {
   } else doStop();
 }
 export function resumeAgent(agentId) {
+  engine.call('resume', { agentId });
   update((s) => {
     const a = agentOf(s, agentId);
     a.state = a.prevState && a.prevState !== 'stopped' ? a.prevState : 'idle';
@@ -132,7 +140,7 @@ export function resumeAgent(agentId) {
     threadOf(s, agentId).push({ id: uid('m'), type: 'note', ts: Date.now(), text: `You resumed ${a.name}.` });
   });
 }
-export function setAgentConfig(agentId, patch) { update((s) => { Object.assign(agentOf(s, agentId), patch); }); }
+export function setAgentConfig(agentId, patch) { engine.call('configure', { agentId, ...patch }); update((s) => { Object.assign(agentOf(s, agentId), patch); }); }
 
 // ---- requests ------------------------------------------------------------------
 export function answerRequest(requestId, optionId, text) {
@@ -143,6 +151,10 @@ export function answerRequest(requestId, optionId, text) {
   else if (r.kind === 'merge') answer = optionId === 'decline' ? 'Sent back' : 'Merged';
   else if (r.kind === 'failed') answer = 'Resumed';
   else answer = text ? text : (opt ? opt.label : 'Answered');
+  if (r.kind === 'approval') engine.call('answer', { kind: 'permission', id: requestId, optionId });
+  else if (r.kind === 'question') engine.call('answer', { kind: 'question', id: requestId, text: answer });
+  else if (r.kind === 'merge') engine.call(optionId === 'decline' ? 'review.report' : 'integrate', { requestId, source: r.source, target: r.target, ...(text ? { reason: text } : {}) });
+  else engine.call('resume', { agentId: r.agent });
   update((st) => {
     r.status = 'answered'; r.answer = answer; r.answeredAt = Date.now();
     const task = r.task && byId(st.tasks, r.task);
@@ -176,7 +188,9 @@ export function answerRequest(requestId, optionId, text) {
       merge: answer === 'Merged' ? `Merged into \`${r.target}\`. I am writing the finished page.` : 'Understood. I will ask what to change.',
       failed: 'Signed in and started. Reading the task now.',
     };
-    threadOf(st, ag.id).push({ id: uid('m'), type: 'agent', ts: Date.now(), text: lines[r.kind] });
+    const message = { id: uid('m'), type: 'agent', ts: Date.now(), text: lines[r.kind] };
+    engine.push('agent.message', { agentId: ag.id, message });
+    threadOf(st, ag.id).push(message);
   }), 1400);
 }
 export function declinePhoneOffer() { update((s) => { s.phoneOffer = 'declined'; }); remember('phoneOffer', 'declined'); }
@@ -201,6 +215,7 @@ export function createProject({ repo, goal, machine, subscription, newRepo }) {
   const r = byId(S().repos, repoId);
   const leadId = id + '-lead';
   const sub = byId(s.subscriptions, subscription) || s.subscriptions[0];
+  engine.call('create', { repositoryId: repoId, goal, machineId: machine, subscriptionId: sub.id, ...(newRepo ? { newRepository: newRepo } : {}) });
   update((st) => {
     st.projects.push({ id, repo: repoId, name: 'Naming…', naming: true, prefix: 'PJ', goal, stage: 'Plan', phase: 'define', branch: '', folder: '', machine, lead: leadId, shell: 'zsh', createdAt: Date.now(), hasMocks: false, tests: 'on', agentReview: 'on', fresh: true });
     st.agents.push({ id: leadId, project: id, team: null, role: 'project-lead', name: 'Project lead', harness: sub.harness, subscription: sub.id, model: HARNESSES[sub.harness].models[1] || HARNESSES[sub.harness].models[0], effort: 'High', permission: 'Edit files without asking', state: 'working', activity: 'Reading the goal', task: null, context: 2, turns: 1, tokens: 0, workState: 'working', startedAt: Date.now() });
@@ -223,6 +238,7 @@ export function createProject({ repo, goal, machine, subscription, newRepo }) {
   return id;
 }
 export function archiveProject(pid, archived = true) {
+  engine.call(archived ? 'archive' : 'restore', { projectId: pid });
   update((s) => {
     const p = projectOf(s, pid); p.archived = archived;
     if (archived) for (const a of s.agents) if (a.project === pid && a.state !== 'stopped') { a.prevState = a.state; a.state = 'stopped'; a.activity = 'Archived'; }
@@ -233,6 +249,7 @@ export function archiveProject(pid, archived = true) {
 export function startDesignTeam(pid) {
   update((s) => {
     const p = projectOf(s, pid); if (p.hasMocks) return;
+    engine.call('team.create', { projectId: pid, stage: 'Design' });
     p.hasMocks = true; p.stage = 'Design';
     const tid = pid + '-design';
     s.teams.push({ id: tid, project: pid, stage: 'Design', area: null, branch: p.branch + '/design', needToKnow: false });
@@ -267,6 +284,7 @@ export function startSimulation() {
     a.activity = list[Math.floor(Math.random() * list.length)].replace('{file}', file).replace('{n}', 3 + Math.floor(Math.random() * 9));
     a.turns += 1; a.tokens = Math.round((a.tokens + 0.02) * 100) / 100;
     if (Math.random() < 0.5) a.context = Math.min(95, a.context + 1);
+    engine.push('agent.activity', { agentId: a.id, activity: a.activity, turns: a.turns, tokens: a.tokens, context: a.context });
     s.conn.lastHeard = Date.now();
     notify();
   }, 4200);

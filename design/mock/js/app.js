@@ -8,6 +8,7 @@ import {
   KIND_LABEL, routeForRequest, routeForAgent, byId, agentLabel, machineOf,
 } from './data.js';
 import * as act from './actions.js';
+import * as engine from './engine.js';
 import { Avatar, OwnerAvatar, Menu, DialogHost, Toasts, Resizer, Thread, Composer, Tabs, Kbd, StateWord, canMessage, ReadOnlyBar } from './ui.js';
 import './dialogs.js';
 import { Home, AllProjects } from './screens/home.js';
@@ -22,6 +23,19 @@ import { MessagesTab, AgentsTab, seedBoard } from './screens/messages.js';
 import { WorkflowTab, seedWorkflow } from './screens/workflow.js';
 import { Machines, Subscriptions, Notifications, ServiceSettings, ProjectSettings, seedService } from './screens/service.js';
 import { Login, FirstRun, seedAuth } from './screens/auth.js';
+
+// ---- named places ---------------------------------------------------------------
+// A page that mounts the website can fill these places with its own components, without
+// editing the website. Each component receives the store's state as `s` and the route.
+// An empty place renders its fallback, which is the website's own content, or nothing.
+//   sidebar.head        below the brand at the top of the sidebar
+//   sidebar.account     above the owner's row at the foot of the sidebar
+//   topbar.connection   the connection badge at the right of the top bar
+let slots = {};
+function Slot({ name, s, route, fallback = null }) {
+  const Fill = slots[name];
+  return Fill ? html`<${Fill} s=${s} route=${route} />` : fallback;
+}
 
 // ---- sidebar ------------------------------------------------------------------
 function TreeRow({ kind, depth, open, onToggle, to, current, icon, label, state, tone, children, title, action }) {
@@ -114,6 +128,7 @@ function Sidebar({ s, route, onNavigate }) {
       <button type="button" class="icon-btn not-phone" aria-label=${folded ? 'Open the sidebar' : 'Fold the sidebar'} data-tip=${(folded ? 'Open' : 'Fold') + ' sidebar · ' + (isMac ? '⌘' : 'Ctrl ') + 'B'} data-tip-side=${folded ? 'right' : 'bottom'}
         onClick=${() => act.setPref('sidebarFolded', !folded)}><${Icon} name="panel-left" size=${16} /></button>
     </div>
+    <${Slot} name="sidebar.head" s=${s} route=${route} />
     <div class="side-rail">
       ${rail('/home', 'house', n ? `Home · ${n} need you` : 'Home', n > 0)}
       ${rail('/projects', 'table-2', 'All projects')}
@@ -139,6 +154,7 @@ function Sidebar({ s, route, onNavigate }) {
       ${nav('/subscriptions', 'key-round', 'Subscriptions')}
       ${nav('/notifications', 'smartphone', 'Phone notifications', failedNotes > 0 && html`<span class="count error">${failedNotes}</span>`)}
       ${nav('/settings', 'settings', 'Service settings')}
+      <${Slot} name="sidebar.account" s=${s} route=${route} />
       <div class="row" style="height:var(--row);padding:0 2px 0 8px;margin-top:4px;gap:8px">
         <${OwnerAvatar} s=${s} /><span class="truncate grow" style="font-weight:var(--weight-medium)">${s.owner.name}</span>
         <${MockControls} s=${s} />
@@ -195,7 +211,7 @@ function TopBar({ s, route, project, onMenu }) {
         ${i === crumbs.length - 1 ? html`<span class=${cx('here', c.cls)} aria-current="page">${c.label}</span>` : html`<a class=${c.cls} href=${href(c.to)}>${c.label}</a>`}`)}
     </nav>
     ${project && html`<${Inspecting} s=${s} project=${project} />`}
-    <${Bell} s=${s} /><${Live} s=${s} />
+    <${Bell} s=${s} /><${Slot} name="topbar.connection" s=${s} route=${route} fallback=${html`<${Live} s=${s} />`} />
   </header>`;
 }
 
@@ -324,12 +340,30 @@ function App() {
 }
 
 // ---- start ----------------------------------------------------------------------
-const state = seed();
-state.ui = {};
-for (const add of [seedGit, seedTerminal, seedMocks, seedBoard, seedWorkflow, seedService, seedAuth]) add?.(state);
-store.state = state;
-act.applyPrefs();
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', act.applyPrefs);
-act.startSimulation();
-render(html`<${App} />`, document.getElementById('app'));
-window.lgcode = { store, act }; // for poking at the mock from the console
+// The mock starts through mount(), so that another page can load it as a package.
+// This folder's own page calls it from main.js. A page that loads the package can pass:
+//   connection   receives every engine call and pushed update; see engine.js
+//   slots        components for the named places above, by name
+export { App };
+export function mount(el, { connection, slots: fills } = {}) {
+  engine.setConnection(connection);
+  slots = fills || {};
+  const state = seed();
+  state.ui = {};
+  for (const add of [seedGit, seedTerminal, seedMocks, seedBoard, seedWorkflow, seedService, seedAuth]) add?.(state);
+  store.state = state;
+  act.applyPrefs();
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', act.applyPrefs);
+  act.startSimulation();
+  // The real website reads everything once, then follows the engine's stream of changes.
+  engine.call('snapshot', {});
+  engine.call('subscribe', { after: 0 });
+  render(html`<${App} />`, el);
+  return { store, act };
+}
+// Takes the website out of the element and returns to the default connection.
+export function unmount(el) {
+  render(null, el);
+  engine.setConnection(null);
+  slots = {};
+}
